@@ -76,7 +76,7 @@ const HEX6 = /^#[0-9a-fA-F]{6}$/
  * rows — mirrors DEFAULT_THEME in `stores/storesApi.ts`.
  */
 const FALLBACK_BG = '#f9fafb'
-const FALLBACK_PRIMARY = '#dc2626'
+const FALLBACK_PRIMARY = '#6c3ef4'
 
 const safeHex = (hex: string, fallback: string) =>
   HEX6.test(hex) ? hex : fallback

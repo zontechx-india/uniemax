@@ -71,10 +71,10 @@ export function StoreDashboardPage() {
         <div className="mt-5 space-y-5">
           {/* Headline tiles */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {/* Same scheme rule as the section nav: gold label on the dark
-                canvas, gold edge + ink label on white. */}
-            <div className="rounded-lg border-l-[3px] border-brand bg-brand/10 p-4 dark:border-transparent">
-              <p className="text-xs font-semibold uppercase tracking-wide text-fg dark:text-brand">
+            {/* Same selected treatment as the section nav: brand left edge
+                over the Light-Purple tint, ink label, in both schemes. */}
+            <div className="rounded-lg border-l-[3px] border-brand bg-brand-soft p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-fg">
                 Today's Orders
               </p>
               <p className="mt-1 text-3xl font-bold text-fg">

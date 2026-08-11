@@ -566,7 +566,10 @@ export function normalizePrimaryLocation(locations: FooterLocation[]): void {
 
 export const DEFAULT_STORE_THEME: StoreTheme = {
   backgroundColor: "#f9fafb",
-  primaryColor: "#dc2626",
+  // The platform's Primary Purple — a store that never opens Appearance
+  // still looks like it belongs to UnieMax. Mirrored by DEFAULT_THEME in
+  // the frontend's `features/stores/storesApi.ts`.
+  primaryColor: "#6c3ef4",
   secondaryColor: null,
   surfaceColor: null,
   buttonTextColor: null,

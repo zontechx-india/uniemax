@@ -279,7 +279,7 @@ function ColorFieldInner({
         onBlur={blur}
         maxLength={7}
         spellCheck={false}
-        placeholder="#EBBB3A"
+        placeholder="#6C3EF4"
         aria-label={`${label} hex code`}
         className="w-full min-w-0 bg-transparent font-mono text-sm uppercase text-fg outline-none placeholder:text-muted"
       />

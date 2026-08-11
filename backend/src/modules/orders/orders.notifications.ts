@@ -54,7 +54,7 @@ function wrapHtml(title: string, bodyHtml: string): string {
   <div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px">
     <h2 style="margin:0 0 12px;font-size:18px;color:#111">${title}</h2>
     ${bodyHtml}
-    <p style="margin:24px 0 0;font-size:12px;color:#888">Sent by UnieMax.</p>
+    <p style="margin:24px 0 0;font-size:12px;color:#888">Sent by <span style="color:#111111;font-weight:bold">Unie</span><span style="color:#6c3ef4;font-weight:bold">Max</span>.</p>
   </div>`;
 }
 
@@ -69,7 +69,8 @@ function itemsHtml(order: OrderMailData): string {
 }
 
 function linkHtml(href: string, label: string): string {
-  return `<p style="margin:16px 0 0"><a href="${href}" style="font-size:14px;color:#1863dc">${label}</a></p>`;
+  // Brand purple — email clients get literal hex, not the app's CSS tokens.
+  return `<p style="margin:16px 0 0"><a href="${href}" style="font-size:14px;color:#6c3ef4">${label}</a></p>`;
 }
 
 async function customerAddress(

@@ -204,16 +204,16 @@ export function StoreManageLayout() {
                     key={label}
                     to={to}
                     end={end}
-                    // Where the "selected" signal comes from differs by
-                    // scheme, because the brand gold does: on the dark canvas
-                    // it is vibrant (10:1) so the LABEL carries the highlight;
-                    // on white it drops to ~1.9:1, so the solid left BAR
-                    // carries it and the label stays ink. The transparent
-                    // border on every row keeps the text from shifting 3px.
+                    // Selection is carried by the solid left BAR plus the
+                    // Light-Purple tint, with the label staying ink in both
+                    // schemes — the brand purple has its own dark step, so
+                    // this no longer needs to swap carrier per scheme (the
+                    // gold did). The transparent border on every row keeps
+                    // the text from shifting 3px.
                     className={({ isActive }) =>
                       `flex items-center gap-3 rounded-md border-l-[3px] px-3 py-2 text-sm transition-colors ${
                         isActive
-                          ? 'border-brand bg-brand/10 font-semibold text-fg dark:border-transparent dark:text-brand'
+                          ? 'border-brand bg-brand-soft font-semibold text-fg'
                           : 'border-transparent font-medium text-muted hover:bg-surface-alt hover:text-fg'
                       }`
                     }

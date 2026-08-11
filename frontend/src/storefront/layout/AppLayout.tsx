@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { Link, Outlet } from 'react-router-dom'
 import { ThemeToggle } from '../../shared/theme'
-import { AppLogoMark } from '../../shared/ui/AppLogo'
+import { AppLogoLockup } from '../../shared/ui/AppLogo'
 import { AccountMenu } from './AccountMenu'
 import { NotificationBell } from './NotificationBell'
 
@@ -18,11 +18,8 @@ export function AppLayout() {
   return (
     <div className="min-h-screen bg-bg">
       <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-line bg-surface px-4 sm:px-6 lg:px-8">
-        <Link to="/" className="flex shrink-0 items-center gap-2.5">
-          <AppLogoMark className="h-8 w-8" />
-          <span className="whitespace-nowrap font-heading text-xl font-semibold text-fg">
-            UnieMax
-          </span>
+        <Link to="/" className="flex shrink-0 items-center">
+          <AppLogoLockup className="h-8" />
         </Link>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">

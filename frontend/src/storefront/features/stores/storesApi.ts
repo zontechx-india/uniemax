@@ -492,7 +492,10 @@ export function formatPrice(price: string | number): string {
 
 export const DEFAULT_THEME: StoreTheme = {
   backgroundColor: '#f9fafb',
-  primaryColor: '#dc2626',
+  // The platform's Primary Purple — a store that never opens Appearance
+  // still looks like it belongs to UnieMax. Mirrors DEFAULT_STORE_THEME in
+  // the backend's `stores.schema.ts`.
+  primaryColor: '#6c3ef4',
   secondaryColor: null,
   surfaceColor: null,
   buttonTextColor: null,

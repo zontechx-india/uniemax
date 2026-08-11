@@ -2,9 +2,9 @@
 
 /* `dark:` follows OUR mode switch (<html data-theme>), not the OS setting —
  * Tailwind's default `prefers-color-scheme` rule would ignore the toggle.
- * Use it only where a treatment must genuinely differ per scheme (e.g. the
- * brand gold reads vibrant on a dark canvas but washes out on white);
- * semantic tokens still handle everything that merely flips color. */
+ * Use it only where a treatment must genuinely differ per scheme; semantic
+ * tokens (including `--brand`, which now carries its own dark step) handle
+ * everything that merely flips color. Nothing needs it today. */
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 /* ------------------------------------------------------------------ *
@@ -76,6 +76,11 @@
   --color-brand: var(--brand);
   --color-brand-hover: var(--brand-hover);
   --color-brand-contrast: var(--brand-contrast);
+  /* Fixed lightened step — for marks on a permanently dark surface, where the
+   * scheme-following brand would be too dim in light mode. */
+  --color-brand-light: var(--brand-light);
+  /* Light Purple tint — selected rows, brand chips, soft brand wells. */
+  --color-brand-soft: var(--brand-soft);
   /* Text on CTA buttons — contrasts the CTA background (store-overridable). */
   --color-cta-contrast: var(--cta-contrast);
   --color-accent: var(--accent);
@@ -94,13 +99,22 @@
 /* ------------------------------------------------------------------ *
  * Brand palette (approved override of the anydesk skill's red)
  *
- *   Primary #f5b400 · Hover #e0a000 · Dark #121212 · Background #f8f8f8
- *   Surface #ffffff · Border #e8e8e8 · Text #1a1a1a · Secondary text #707070
+ *   Primary Purple #6c3ef4 · Dark Purple #5428d9 · Black #111111
+ *   White #ffffff · Light Purple #f3f0ff
+ *
+ * Neutral ramp around it: Background #f8f8f8 · Surface #ffffff ·
+ * Border #e8e8e8 · Text #1a1a1a · Secondary text #707070.
  *
  * Light is the default scheme (the palette is light-first), so `:root`
  * carries it — that is also what paints before JS runs, so there is no
- * flash. `mode.ts` writes `data-theme` on <html>; only the seven neutrals
- * flip, everything below the neutrals block is shared by both schemes.
+ * flash. `mode.ts` writes `data-theme` on <html>.
+ *
+ * The seven neutrals flip between schemes, and so does the **brand step**:
+ * unlike the gold it replaced, the purple is a DARK color, so the same hex
+ * cannot be both a legible text color on a dark canvas and a fill that
+ * carries white text. Light uses #6c3ef4 (5.8:1 on white, white label);
+ * dark uses its lightened step #9574f7 (5.0:1 on #121212, black label).
+ * Everything else below the brand block is shared by both schemes.
  * ------------------------------------------------------------------ */
 :root {
   --bg: #f8f8f8;
@@ -113,27 +127,47 @@
   --fg: #1a1a1a;
   --fg-muted: #707070;
 
-  /* invariants (identical across themes) */
-  --brand: #f5b400;
-  --brand-hover: #e0a000;
-  /* Text ON the brand color. The primary is a light gold, so this is the
-   * dark ink — white on #f5b400 is illegible (1.5:1). */
-  --brand-contrast: #121212;
-  --cta-contrast: #121212;
-  /* Lighter gold — the brand gradient's warm end. */
-  --gold-light: #ffd24d;
-  /* Signature gold brand gradient (app chrome only). */
-  --brand-gradient: linear-gradient(135deg, #f5b400 0%, #ffd24d 100%);
+  /* --- brand (the light step; the dark scheme overrides the first five) --- */
+  --brand: #6c3ef4;
+  --brand-hover: #5428d9;
+  /* Text ON the brand color. The primary is a dark purple, so this is white
+   * (5.8:1) — the dark ink the gold needed would be illegible here. */
+  --brand-contrast: #ffffff;
+  /* Light Purple — brand tint for selected rows, chips and soft wells. */
+  --brand-soft: #f3f0ff;
+  /* Signature brand gradient. Both stops are dark enough to carry white
+   * text, so it works as a CTA fill AND (via text-brand-gradient) as
+   * display text on the light canvas. */
+  --brand-gradient: linear-gradient(135deg, #6c3ef4 0%, #5428d9 100%);
+
+  /* Lightened brand step — lighten(#6c3ef4, 0.28), the same derivation
+   * storeVars() uses for the metal top edge. Carries the dark scheme and
+   * the on-dark gradient. */
+  --brand-light: #9574f7;
+  /* Display text on a permanently dark surface (the auth heroes sit on a
+   * dark photo whatever the scheme, where the CTA gradient above is too
+   * dim). Light Purple → the lightened brand step: 4.8:1 at its darkest. */
+  --brand-gradient-on-dark: linear-gradient(135deg, #f3f0ff 0%, #9574f7 100%);
+
+  /* --- invariants (identical across themes) ------------------------- */
+  --cta-contrast: #ffffff;
   --accent: #1863dc;
-  /* Metal-CTA fallbacks cut from the app brand gold — store pages override
+  /* Metal-CTA fallbacks cut from the app brand purple — store pages override
    * these via storeVars() with the OWNER's colors; the fallbacks keep
    * metal CTAs rendering on store-themed-but-neutral pages (e.g. a /cart
-   * with no known store). Mirrors the storeVars() derivation for #f5b400. */
-  --brand-metal: linear-gradient(180deg, #f8c947 0%, #f5b400 48%, #c49000 100%);
-  --brand-metal-hover: linear-gradient(180deg, #f9d161 0%, #f6ba14 48%, #d89e00 100%);
-  /* storeVars() picks the brighter edge for a LIGHT primary. */
-  --brand-metal-edge: rgba(255, 255, 255, 0.6);
-  --brand-glow: 0 6px 18px -8px rgba(245, 180, 0, 0.65);
+   * with no known store). Mirrors the storeVars() derivation for #6c3ef4,
+   * so they do NOT flip per scheme — `--cta-contrast` (white) pairs with
+   * this chrome in both. */
+  --brand-metal: linear-gradient(180deg, #9574f7 0%, #6c3ef4 48%, #5632c3 100%);
+  --brand-metal-hover: linear-gradient(180deg, #a487f8 0%, #784df5 48%, #5f37d7 100%);
+  /* storeVars() picks the dimmer edge for a DARK primary. */
+  --brand-metal-edge: rgba(255, 255, 255, 0.34);
+  --brand-glow: 0 6px 18px -8px rgba(108, 62, 244, 0.65);
+
+  /* Brand lockup (mark + name). The artwork sets "Unie" in near-black, so the
+   * dark scheme swaps in the twin whose name is white. A variable rather than
+   * two <img> tags: the browser only fetches the file it actually paints. */
+  --logo-lockup: url('/app_logo_with_name.png');
   --success: #008000;
   --warning: #856404;
   /* Independent of the brand now — danger stays red whatever the brand is. */
@@ -143,19 +177,22 @@
 
   /* Chart series (admin dashboard).
    *
-   * The brand gold (#f5b400) is a FILL color, not a mark color: on a white
-   * chart surface it sits at 1.79:1 contrast and outside the readable
-   * lightness band, so a 2px line drawn in it disappears. These are the
-   * nearest steps of the same two hues that pass the categorical checks —
-   * lightness band, chroma floor, colorblind separation (ΔE 34 normal /
-   * 30 protan) and 3:1 against the surface — verified with the dataviz
-   * skill's validator for BOTH schemes. Dark mode gets its own steps
-   * (below), never an automatic flip of these.
+   * Unlike the gold it replaced, the brand purple IS a usable mark color:
+   * #6c3ef4 is 5.8:1 on the white chart surface and inside the readable
+   * lightness band, so money draws in the brand itself.
+   *
+   * Counts moved OFF the accent blue when the brand became purple: purple
+   * and blue are neighbouring hues at near-identical lightness (L* 39 vs
+   * 41), which is exactly the pair red-green colorblind viewers cannot
+   * separate — the two trend lines would have read as one. Burnt orange is
+   * the complementary side of the wheel and stays separable under every
+   * CVD simulation, at 5.2:1 on white. Dark mode gets its own steps
+   * (below), selected against #1e1e1e rather than flipped.
    *
    * Assignment is by ENTITY, fixed: chart-1 = money/revenue,
    * chart-2 = counts/orders. A filter never repaints a series. */
-  --chart-1: #b07a00;
-  --chart-2: #1863dc;
+  --chart-1: #6c3ef4;
+  --chart-2: #c2410c;
   --chart-grid: #ececec;
 
   color-scheme: light;
@@ -173,25 +210,62 @@
   --fg: #f8f8f8;
   --fg-muted: #9a9a9a;
 
+  /* Brand steps up to its lightened value here: #6c3ef4 as link/price text
+   * on this canvas is only 3:1, which fails AA. #9574f7 reads at 5.0:1, and
+   * because it is now a LIGHT fill its label flips to the palette's Black —
+   * the same swap the gold made in reverse. `--brand-gradient` follows so
+   * gradient CTAs and gradient display text stay legible together. */
+  --brand: #9574f7;
+  --brand-hover: #aa90f9;
+  --brand-contrast: #111111;
+  --brand-soft: rgba(149, 116, 247, 0.16);
+  --brand-gradient: linear-gradient(135deg, #aa90f9 0%, #9574f7 100%);
+
+  --logo-lockup: url('/app_logo_with_name_dark.png');
+
   /* Dark chart steps — SELECTED against the #1e1e1e card surface and
    * validated there, not derived from the light values. */
-  --chart-1: #b88500;
-  --chart-2: #4b84e0;
+  --chart-1: #9574f7;
+  --chart-2: #f08c4b;
   --chart-grid: #2f2f2f;
 
   color-scheme: dark;
 }
 
 /* Brand gradient helpers — the one place a gradient is allowed (skill's
- * primary-gradient slot, cut from the brand gold). Solid brand tokens stay the
- * default everywhere else; use these only on hero surfaces, brand marks and
- * primary CTAs. */
+ * primary-gradient slot, cut from the brand purple). Solid brand tokens stay
+ * the default everywhere else; use these only on hero surfaces, brand marks
+ * and primary CTAs. */
 @layer utilities {
   .bg-brand-gradient {
     background-image: var(--brand-gradient);
   }
   .text-brand-gradient {
     background-image: var(--brand-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  /* Brand lockup (mark + "UnieMax"). Painted as a background so the
+   * light/dark artwork swap is a variable — callers set the HEIGHT and the
+   * aspect ratio supplies the width. 888/224 is the trimmed art's ratio. */
+  .logo-lockup {
+    aspect-ratio: 888 / 224;
+    background-image: var(--logo-lockup);
+    background-size: contain;
+    background-position: left center;
+    background-repeat: no-repeat;
+  }
+  /* Pinned to the white-name twin — for marks on a permanently dark surface. */
+  .logo-lockup-on-dark {
+    background-image: url('/app_logo_with_name_dark.png');
+  }
+
+  /* Same treatment for text that always sits on a dark photo (auth heroes),
+   * where the scheme-following gradient above would be too dim in light. */
+  .text-brand-gradient-on-dark {
+    background-image: var(--brand-gradient-on-dark);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -233,8 +307,8 @@
     letter-spacing: 0.02em;
   }
 
-  /* Brand-gradient display text (prototype's `gold-text`), cut from the
-   * owner's primary color. Brand marks only — store name, logo text. */
+  /* Brand-gradient display text (the prototype's `gold-text` slot), cut from
+   * the owner's primary color. Brand marks only — store name, logo text. */
   .metal-text {
     background-image: var(--brand-metal);
     -webkit-background-clip: text;

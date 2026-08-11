@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { usePageTitle } from '../../shared/usePageTitle'
-import { AppLogoMark } from '../../shared/ui/AppLogo'
+import { AppLogoLockup } from '../../shared/ui/AppLogo'
 
 /**
  * Public placeholder for the marketplace footer pages (About, Privacy,
@@ -25,10 +25,9 @@ export function InfoComingSoonPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-6 text-center">
       <Link
         to="/"
-        className="mb-8 flex items-center gap-2 text-lg font-semibold text-fg"
+        className="mb-8 flex items-center"
       >
-        <AppLogoMark className="h-9 w-9" />
-        <span className="font-heading">UnieMax</span>
+        <AppLogoLockup className="h-9" />
       </Link>
 
       <h1 className="font-heading text-3xl font-bold text-fg">{title}</h1>

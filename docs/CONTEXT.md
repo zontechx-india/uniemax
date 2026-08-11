@@ -154,7 +154,8 @@ A single account can own multiple stores and switch between them.
   only for delivery. The page warns a delivering store that switches all
   address fields off.
 - **Customization (Appearance)** — background + primary color (picker or
-  typed/pasted hex code, e.g. `#EBBB3A`), plus three optional colors that
+  typed/pasted hex code, e.g. `#6C3EF4`; a new store starts on the platform's
+  own purple), plus three optional colors that
   default to **Auto**: secondary (links, prices & highlights — Auto follows
   primary), surface (cards & panels — Auto derives from the background) and
   **button text** (labels on Add to Cart / Place Order — Auto picks white or

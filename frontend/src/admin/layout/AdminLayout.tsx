@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { AppLogoMark } from '../../shared/ui/AppLogo'
+import { AppLogoLockup } from '../../shared/ui/AppLogo'
 import { ThemeToggle } from '../../shared/theme/ThemeToggle'
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
 import { useAdminSession } from '../app/adminSession'
@@ -59,7 +59,7 @@ export function AdminLayout() {
                     className={({ isActive }) =>
                       `block rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                         isActive
-                          ? 'bg-brand/15 text-fg'
+                          ? 'bg-brand-soft text-fg'
                           : 'text-muted hover:bg-surface-alt hover:text-fg'
                       }`
                     }
@@ -97,9 +97,8 @@ export function AdminLayout() {
       {/* Fixed rail — lg and up. */}
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r border-line bg-surface lg:flex">
         <div className="flex h-16 items-center gap-2 border-b border-line px-5">
-          <AppLogoMark className="h-8 w-8" />
-          <span className="font-heading text-base font-semibold text-fg">UnieMax</span>
-          <span className="rounded-pill bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-fg">
+          <AppLogoLockup className="h-7" />
+          <span className="rounded-pill bg-brand-soft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-fg">
             Admin
           </span>
         </div>
@@ -119,7 +118,7 @@ export function AdminLayout() {
           <aside className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-surface shadow-lifted">
             <div className="flex h-16 items-center justify-between border-b border-line px-4">
               <div className="flex items-center gap-2">
-                <AppLogoMark className="h-8 w-8" />
+                <AppLogoLockup className="h-7" />
                 <span className="font-heading text-base font-semibold text-fg">Admin</span>
               </div>
               <button
@@ -147,8 +146,8 @@ export function AdminLayout() {
           >
             <MenuIcon />
           </button>
-          <span className="truncate font-heading text-base font-semibold text-fg lg:hidden">
-            UnieMax Admin
+          <span className="flex items-center gap-2 truncate font-heading text-base font-semibold text-fg lg:hidden">
+            <AppLogoLockup className="h-7" /> Admin
           </span>
           <div className="ml-auto flex items-center gap-1">
             <a

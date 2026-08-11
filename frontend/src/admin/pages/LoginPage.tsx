@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { adminAuth } from '../../shared/auth/authApi'
 import type { Admin } from '../../shared/auth/authApi'
-import { AppLogoMark } from '../../shared/ui/AppLogo'
+import { AppLogoLockup } from '../../shared/ui/AppLogo'
 import {
   AuthLayout,
   Hero,
@@ -53,7 +53,7 @@ export function LoginPage({ onSignedIn }: { onSignedIn: (admin: Admin) => void }
       }
     >
       <Brand
-        badge={<AppLogoMark className="h-14 w-14" />}
+        badge={<AppLogoLockup className="h-11" />}
         badgeClass=""
         title="Admin Console"
         subtitle="Sign in to manage your store"
@@ -108,7 +108,7 @@ function AdminHero() {
       image="/auth_hero_1.jpg"
       logo={
         <>
-          <AppLogoMark className="h-8 w-8" /> UnieMax Admin
+          <AppLogoLockup tone="on-dark" className="h-8" /> Admin
         </>
       }
     >
@@ -116,7 +116,7 @@ function AdminHero() {
         <h2 className="text-4xl font-bold leading-tight font-heading">
           Run your store
           <br />
-          <span className="text-brand-gradient">from one place.</span>
+          <span className="text-brand-gradient-on-dark">from one place.</span>
         </h2>
         <p className="mt-3 max-w-sm text-white/80">
           Products, orders, inventory, and shipping — all in one console.

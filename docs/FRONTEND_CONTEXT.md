@@ -898,14 +898,15 @@ Rules they follow (constraints, not taste):
 - **Color is assigned by entity, never rank** — `--chart-1` is always money,
   `--chart-2` always counts, whatever a filter does.
 - **Colors come from tokens.** `index.css` defines `--chart-1/2/-grid` per
-  scheme. The brand gold `#f5b400` is a *fill* color, not a mark color — on a
-  white chart surface it's 1.79:1 contrast and outside the readable lightness
-  band, so a 2px line in it disappears. The chart steps (`#b07a00`/`#1863dc`
-  light, `#b88500`/`#4b84e0` dark) are the nearest steps of the same two hues
-  that pass the lightness band, chroma floor, colorblind separation (ΔE ≈ 34
-  normal / 29 protan) and 3:1-against-surface checks — **validated for both
-  schemes**, with dark selected against its own `#1e1e1e` surface rather than
-  flipped.
+  scheme. Money draws in the brand purple itself (`#6c3ef4`, 5.8:1 on the
+  white chart surface — unlike the gold it replaced, which at 1.79:1 was a
+  *fill* color, not a mark color). Counts moved **off the accent blue** in the
+  same change: purple and blue are neighbouring hues at near-identical
+  lightness, exactly the pair red-green colorblind viewers cannot separate, so
+  the two trend lines would have read as one. The steps are now
+  `#6c3ef4`/`#c2410c` light and `#9574f7`/`#f08c4b` dark — complementary sides
+  of the wheel, each ≥ 4.8:1 against its own surface, with dark selected
+  against `#1e1e1e` rather than flipped.
 - **Hover is part of the chart**: crosshair + tooltip on the trend (hit
   targets are full-height columns, far bigger than the marks), per-slice
   hover on the donut. Values are direct-labeled selectively — never a number
@@ -1013,10 +1014,12 @@ frontend/
     │   │   ├── form.tsx          # Auth primitives: AuthLayout (split screen), Hero,
     │   │   │                     #   AuthCard, TextField, Select (themed, custom
     │   │   │                     #   chevron), SegmentedTabs, buttons, icons
-    │   │   ├── AppLogo.tsx       # UnieMax brand marks: AppLogoMark (UM monogram) +
-    │   │   │                     #   AppLogoFull (splash screens) — both render the
-    │   │   │                     #   single master public/app_logo.png, which is also
-    │   │   │                     #   the tab icon in both HTML entries
+    │   │   ├── AppLogo.tsx       # UnieMax brand art: AppLogoFull (splash screens —
+    │   │   │                     #   public/app_logo.png, the bag mark, also the
+    │   │   │                     #   tab icon in both HTML entries) + AppLogoLockup
+    │   │   │                     #   (mark + name; size by HEIGHT only, the aspect
+    │   │   │                     #   ratio sets the width; tone="on-dark" for the
+    │   │   │                     #   auth heroes)
     │   │   ├── ConfirmDialog.tsx # Reusable confirmation modal (used by logout).
     │   │   │                     #   Portals into document.body — callers mount it
     │   │   │                     #   beside their trigger, and a `backdrop-blur`
@@ -1183,17 +1186,61 @@ hardcoding colors, fonts, spacing, radii, or shadows:
 | `shadows.ts`    | `shadows` (`floating`, `glowRed`)                             |
 | `index.ts`      | barrel — re-exports all + a `theme` aggregate object          |
 
-Accent convention: the brand color is the gold **`#f5b400`**
-(`colors.brand.primary`, drives CTAs and links) with hover **`#e0a000`**;
-blue **`#1863dc`** (`colors.accent` / `colors.focusRing`) is reserved for
-focus rings and active states. **Color is the one deliberate deviation from
-the skill** (an approved brand palette replacing its red) — structure,
-spacing, radius, shadows and the type scale still come from skillui
-unchanged, and no colors outside the palette below are invented.
+The approved brand palette is five colors:
 
-Because the gold is a **light** color, text placed on it is the dark ink
-`#121212` (`--brand-contrast` / `--cta-contrast`), never white. `--danger`
-is now independent of the brand and stays red `#ef443b`.
+| Name | Hex | Role |
+| ---- | --- | ---- |
+| Primary Purple | `#6c3ef4` | `--brand` — CTAs, links, prices, chart-1 |
+| Dark Purple | `#5428d9` | `--brand-hover` + the brand gradient's far stop |
+| Black | `#111111` | the lockup's "Unie"; the label on the dark scheme's brand |
+| White | `#ffffff` | `--brand-contrast` — text ON the brand in light |
+| Light Purple | `#f3f0ff` | `--brand-soft` — selected rows, chips, soft wells |
+
+Accent convention: the brand purple drives CTAs and links
+(`colors.brand.primary`); blue **`#1863dc`** (`colors.accent` /
+`colors.focusRing`) is still reserved for focus rings and active states.
+**Color is the one deliberate deviation from the skill** (an approved brand
+palette replacing its red) — structure, spacing, radius, shadows and the type
+scale still come from skillui unchanged, and no colors outside the palette
+are invented; one derived step, `#9574f7` = `lighten(#6c3ef4, .28)` (the same
+derivation `storeVars()` uses for the metal edge), carries the dark scheme.
+
+Because the purple is a **dark** color, text placed on it is white
+(`--brand-contrast` / `--cta-contrast`), never the ink the gold needed.
+`--danger` is independent of the brand and stays red `#ef443b`.
+
+**The brand is the one non-neutral that flips per scheme.** `#6c3ef4` reads
+at 5.8:1 on white but only 3:1 on the dark canvas, which fails AA for links
+and prices — so the dark scheme steps `--brand` up to `#9574f7` (5.0:1) and,
+because that is now a *light* fill, flips `--brand-contrast` to the palette's
+Black. `--brand-gradient` follows suit. Two things deliberately do **not**
+flip: `--brand-metal*` (the metal-CTA fallbacks, cut from `#6c3ef4`) and
+`--cta-contrast` (white), which pair with each other in both schemes.
+
+### Brand art (`public/` + `AppLogoLockup`)
+
+Two supplied RGBA assets, both trimmed of their transparent margin and
+downscaled for the web (the originals were 1–1.3 MB):
+
+| File | What | Used by |
+| ---- | ---- | ------- |
+| `app_logo.png` | the bag mark — white U on the brand purple, 453×512 | `AppLogoFull` (splash screens), the tab icon in both HTML entries, `favicon.ts`, `push-sw.js` |
+| `app_logo_with_name.png` | the lockup — mark + "UnieMax", 888×224 | `AppLogoLockup` (light scheme) |
+| `app_logo_with_name_dark.png` | the same lockup with "Unie" lifted to white | `AppLogoLockup` (dark scheme + `tone="on-dark"`) |
+
+The lockup sets **Unie** in near-black and **Max** in the purple, so it needs
+the dark twin — the black half would vanish on the dark canvas. The swap is a
+**CSS variable** (`--logo-lockup`, flipped by `:root[data-theme='dark']`)
+painted through the `.logo-lockup` utility rather than two `<img>` tags, so
+the browser only fetches the file it actually paints. The utility carries the
+artwork's `aspect-ratio`, which is why callers set a **height only**
+(`h-7`…`h-11`) and never a width. `tone="on-dark"` pins the white-name twin
+for the auth heroes, which sit on a dark photo in both schemes.
+
+The lockup is the brand signature everywhere the name appears as a mark: the
+marketplace header and footer, the authed top bar, both login pages, the
+admin rail/drawer/mobile header, and the coming-soon page. Prose mentions
+("Sell on UnieMax", "Powered by UnieMax") stay plain text.
 
 > ⚠️ `src/index.css` is the **runtime source of truth** for every color.
 > `shared/theme/colors.ts` mirrors the same values as typed constants for
@@ -1220,8 +1267,9 @@ whole palette as CSS variables and maps them into Tailwind v4 via
 | `bg-bg` | page canvas | `text-fg` | primary text |
 | `bg-surface` | cards / panels / bars | `text-muted` | secondary text |
 | `bg-surface-alt` | wells / hover tracks | `border-line` | borders / dividers |
-| `bg-input` | input fields | `bg-brand` / `text-brand` | CTAs / links (gold) |
-| `text-brand-contrast` | text on brand (dark ink) | `bg-accent` / `text-accent` | focus / active (blue) |
+| `bg-input` | input fields | `bg-brand` / `text-brand` | CTAs / links (purple) |
+| `text-brand-contrast` | text on brand (white) | `bg-accent` / `text-accent` | focus / active (blue) |
+| `bg-brand-soft` | brand tint (Light Purple) | `logo-lockup` | the brand lockup (see *Brand art*) |
 | `text-danger` / `success` / `warning` | status | `shadow-floating` | elevation |
 | `rounded-md` (4px) · `rounded-lg` (6px) · `rounded-pill` (50px) | radius | `font-heading` / `font-body` | Oswald / Inter |
 
@@ -1242,16 +1290,15 @@ it carries no extra specificity and wins purely on source order (Tailwind emits
 variants after their base utilities, which is what makes `text-fg
 dark:text-brand` resolve correctly).
 
-The one place it is used today is the **selected-state rule on
-`/stores/{slug}`**: the brand gold reads vibrant on the dark canvas (10:1) but
-drops to ~1.9:1 on white, so the highlight swaps carrier by scheme — in dark
-the **label** is gold; in light a solid gold **left bar** marks the row and the
-label stays ink (`border-brand … text-fg dark:border-transparent
-dark:text-brand`, on the section nav and the Today's Orders tile). Every nav
-row carries a transparent left border so the text never shifts on selection.
+**Nothing uses it today.** Its one user was the selected-state rule on
+`/stores/{slug}`, which swapped carrier per scheme because the light gold was
+illegible on white; now that the brand carries its own dark step, the section
+nav and the Today's Orders tile use one rule in both schemes — a solid brand
+**left bar** over the `bg-brand-soft` tint with an ink label. Every nav row
+still carries a transparent left border so the text never shifts on selection.
 
-**The seven neutrals are the only values that flip**; brand, accent and
-status live once on `:root` and are shared by both schemes.
+**The seven neutrals and the brand step flip**; accent and status live once
+on `:root` and are shared by both schemes.
 
 | Var (utility) | Light (default) | Dark |
 | ------------- | --------------- | ---- |
@@ -1262,18 +1309,27 @@ status live once on `:root` and are shared by both schemes.
 | `--line` (`border-line`) | `#e8e8e8` | `#2a2a2a` |
 | `--fg` (`text-fg`) | `#1a1a1a` | `#f8f8f8` |
 | `--fg-muted` (`text-muted`) | `#707070` | `#9a9a9a` |
+| `--brand` (`bg-brand`/`text-brand`) | `#6c3ef4` | `#9574f7` |
+| `--brand-hover` | `#5428d9` | `#aa90f9` |
+| `--brand-contrast` (`text-brand-contrast`) | `#ffffff` | `#111111` |
+| `--brand-soft` (`bg-brand-soft`) | `#f3f0ff` | `rgba(149,116,247,.16)` |
+| `--logo-lockup` | `app_logo_with_name.png` | `…_dark.png` |
 
-Only `#121212` was specified for the dark scheme; the other six are derived
-from it, and the secondary text is lifted to `#9a9a9a` because `#707070`
-fails AA against `#121212`.
+Only `#121212` was specified for the dark scheme; the other six neutrals are
+derived from it, and the secondary text is lifted to `#9a9a9a` because
+`#707070` fails AA against `#121212`.
 
-- **Brand gradient.** The signature gold brand treatment
-  (`--brand-gradient`: `#f5b400`→`#ffd24d`) is exposed as two utilities —
-  `bg-brand-gradient` (hero surfaces, brand logo/avatar marks, **primary
-  CTAs**) and `text-brand-gradient` (gradient display text, e.g. the auth
-  hero accent). Solid `bg-brand`/`text-brand` stays the default for chips,
-  dots, links and status; the red→orange gradient is **app chrome only** —
-  destructive confirms keep solid color, and per-store pages
+- **Brand gradient.** The signature brand treatment (`--brand-gradient`:
+  `#6c3ef4`→`#5428d9` in light, its light steps in dark) is exposed as two
+  utilities — `bg-brand-gradient` (hero surfaces, brand logo/avatar marks,
+  **primary CTAs**) and `text-brand-gradient` (gradient display text). Both
+  stops carry `--brand-contrast` at ≥ 4.5:1 in either scheme, which is what
+  lets one token serve as both a fill and a text color. A third,
+  **`text-brand-gradient-on-dark`** (`--brand-gradient-on-dark`: Light Purple
+  → `#9574f7`, fixed), covers display text that sits on a dark photo in both
+  schemes — the two auth heroes. Solid `bg-brand`/`text-brand` stays the
+  default for chips, dots, links and status; the gradient is **app chrome
+  only** — destructive confirms keep solid color, and per-store pages
   (`/store/{slug}`) use their own owner-derived metal-accent gradients instead
   (see *Metal accents* below), never this brand one.
   Gradient CTAs use `hover:opacity-90` and `disabled:bg-none` (so the muted

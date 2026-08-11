@@ -10,9 +10,9 @@
  *
  * Structure, spacing, radius, shadows and typography still come from the skill
  * unchanged (`skillui/DESIGN.md`, `skillui/SKILL.md`). **Color is the one
- * deliberate deviation**: the brand is the gold `#f5b400` (not the skill's red),
- * on a light-first neutral ramp. Blue `#1863dc` — the skill's own accent — is
- * still reserved for focus rings and active states.
+ * deliberate deviation**: the brand is the purple `#6c3ef4` (not the skill's
+ * red), on a light-first neutral ramp. Blue `#1863dc` — the skill's own accent
+ * — is still reserved for focus rings and active states.
  */
 
 /** Raw palette — the approved brand hexes plus the skill's status colors. */
@@ -24,7 +24,7 @@ export const palette = {
   ink: '#1a1a1a', // primary text (light)
   muted: '#707070', // secondary text (light)
 
-  dark: '#121212', // page background (dark) + text ON the brand gold
+  dark: '#121212', // page background (dark)
   darkSurface: '#1e1e1e', // extended — cards/panels (dark)
   darkWell: '#0c0c0c', // extended — recessed wells (dark)
   darkInput: '#1a1a1a', // extended — input fields (dark)
@@ -35,9 +35,11 @@ export const palette = {
   blue: '#1863dc', // accent — focus rings, active states
   info: '#0000ee', // informational highlights
 
-  gold: '#f5b400', // brand primary
-  goldHover: '#e0a000', // link/CTA hover
-  goldLight: '#ffd24d', // brand gradient end (lighter gold)
+  purple: '#6c3ef4', // brand primary (Primary Purple)
+  purpleDark: '#5428d9', // link/CTA hover + brand gradient end (Dark Purple)
+  purpleLight: '#9574f7', // derived lighten(purple, .28) — the dark scheme's brand step
+  purpleSoft: '#f3f0ff', // Light Purple — brand tint (selected rows, chips)
+  black: '#111111', // brand Black — the label ON the dark scheme's brand step
 
   red: '#ef443b', // danger (no longer the brand color)
   green: '#008000', // success
@@ -64,10 +66,12 @@ export const colors = {
 
   /** Brand accent — CTAs, primary buttons, links. */
   brand: {
-    primary: palette.gold,
-    primaryHover: palette.goldHover,
-    /** Text ON the brand color — the gold is light, so ink, never white. */
-    contrast: palette.dark,
+    primary: palette.purple,
+    primaryHover: palette.purpleDark,
+    /** Text ON the brand color — the purple is dark, so white, never ink. */
+    contrast: palette.white,
+    /** Light Purple tint — selected rows, brand chips, soft wells. */
+    soft: palette.purpleSoft,
   },
 
   /** Blue accent — focus rings, active nav, secondary emphasis. */
@@ -85,7 +89,7 @@ export const colors = {
     /** Modal / dialog backdrop. */
     backdrop: 'rgba(0, 0, 0, 0.6)',
     /** Brand glow (metal CTA elevation). */
-    glowBrand: 'rgba(245, 180, 0, 0.65)',
+    glowBrand: 'rgba(108, 62, 244, 0.65)',
   },
 } as const
 
@@ -97,7 +101,10 @@ export const colors = {
  * from the palette's single dark value #121212; its secondary text is lifted to
  * #9a9a9a because the light scheme's #707070 fails AA on that canvas.
  *
- * Brand gold and accent blue are identical across both themes.
+ * Accent blue and the status colors are identical across both themes. The
+ * **brand is not**: see `brandByScheme` below — the purple is a dark color, so
+ * it steps up to #9574f7 on the dark canvas (3:1 → 5:1) and its label flips
+ * from white to the palette's Black.
  */
 export const schemes = {
   light: {
@@ -120,16 +127,36 @@ export const schemes = {
   },
 } as const
 
-/** Colors shared by both themes (brand, accent, status, overlays). */
+/**
+ * The brand step per scheme — the ONE non-neutral that flips.
+ *
+ * Light: the Primary Purple, 5.8:1 on white, carrying a white label.
+ * Dark: its lightened step, 5.0:1 on #121212, carrying a Black label —
+ * the same fill/text swap the light gold made in reverse.
+ */
+export const brandByScheme = {
+  light: {
+    brand: palette.purple,
+    brandHover: palette.purpleDark,
+    brandContrast: palette.white,
+    brandSoft: palette.purpleSoft,
+    brandGradient: `linear-gradient(135deg, ${palette.purple} 0%, ${palette.purpleDark} 100%)`,
+  },
+  dark: {
+    brand: palette.purpleLight,
+    brandHover: '#aa90f9',
+    brandContrast: palette.black,
+    brandSoft: 'rgba(149, 116, 247, 0.16)',
+    brandGradient: `linear-gradient(135deg, #aa90f9 0%, ${palette.purpleLight} 100%)`,
+  },
+} as const
+
+/** Colors shared by both themes (accent, status, overlays, metal CTA chrome). */
 export const invariants = {
-  brand: palette.gold,
-  brandHover: palette.goldHover,
-  /** Text ON the brand — dark ink, because the gold is a light color. */
-  brandContrast: palette.dark,
-  /** The signature gold brand gradient. Used for hero surfaces, brand marks
-   *  and primary CTAs (app chrome only — per-store pages keep the owner's
-   *  own colors). */
-  brandGradient: `linear-gradient(135deg, ${palette.gold} 0%, ${palette.goldLight} 100%)`,
+  /** Text on the metal CTA chrome, which does NOT flip — always white. */
+  ctaContrast: palette.white,
+  /** Display text on a permanently dark surface (the auth heroes). */
+  brandGradientOnDark: `linear-gradient(135deg, ${palette.purpleSoft} 0%, ${palette.purpleLight} 100%)`,
   accent: palette.blue,
   success: palette.green,
   warning: palette.amber,

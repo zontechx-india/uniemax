@@ -84,20 +84,24 @@ export function Brand({
   subtitle,
 }: {
   badge: ReactNode
+  /** The badge sizes itself; this only adds treatment (e.g. a tile). */
   badgeClass: string
-  title: string
+  /** Omitted where the badge is the full lockup, which already sets the name. */
+  title?: ReactNode
   subtitle: string
 }) {
   return (
     <div className="mb-8 flex flex-col items-center text-center">
       <div
-        className={`mb-4 flex h-14 w-14 items-center justify-center rounded-md text-2xl text-brand-contrast ${badgeClass}`}
+        className={`mb-4 flex items-center justify-center text-2xl text-brand-contrast ${badgeClass}`}
       >
         {badge}
       </div>
-      <h1 className="font-heading text-2xl font-bold tracking-tight text-fg">
-        {title}
-      </h1>
+      {title && (
+        <h1 className="font-heading text-2xl font-bold tracking-tight text-fg">
+          {title}
+        </h1>
+      )}
       <p className="mt-2 text-sm text-muted">{subtitle}</p>
     </div>
   )

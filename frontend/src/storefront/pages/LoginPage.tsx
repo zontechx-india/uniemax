@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { customerAuth } from '../../shared/auth/authApi'
 import type { Customer } from '../../shared/auth/authApi'
-import { AppLogoMark } from '../../shared/ui/AppLogo'
+import { AppLogoLockup } from '../../shared/ui/AppLogo'
 import {
   AuthLayout,
   Hero,
@@ -66,10 +66,10 @@ export function LoginPage({ onSignedIn }: { onSignedIn: (customer: Customer) => 
       hero={<StorefrontHero />}
       footer={<p className="text-xs text-muted">© UnieMax · Terms · Privacy</p>}
     >
+      {/* The lockup already sets the name, so there is no title line here. */}
       <Brand
-        badge={<AppLogoMark className="h-14 w-14" />}
+        badge={<AppLogoLockup className="h-11" />}
         badgeClass=""
-        title="UnieMax"
         subtitle="Sign in to continue shopping"
       />
 
@@ -740,7 +740,7 @@ function StorefrontHero() {
       image="/auth_hero_1.jpg"
       logo={
         <>
-          <AppLogoMark className="h-8 w-8" /> UnieMax
+          <AppLogoLockup tone="on-dark" className="h-8" />
         </>
       }
     >
@@ -748,7 +748,7 @@ function StorefrontHero() {
         <h2 className="text-4xl font-bold leading-tight font-heading">
           Gear up.
           <br />
-          <span className="text-brand-gradient">Play your best.</span>
+          <span className="text-brand-gradient-on-dark">Play your best.</span>
         </h2>
         <p className="mt-3 max-w-sm text-white/80">
           Premium cricket bats delivered to your door. Cash on delivery

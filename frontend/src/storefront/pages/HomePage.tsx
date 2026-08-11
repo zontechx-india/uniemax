@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { usePageTitle } from '../../shared/usePageTitle'
 import { ThemeToggle } from '../../shared/theme/ThemeToggle'
-import { AppLogoMark } from '../../shared/ui/AppLogo'
+import { AppLogoLockup } from '../../shared/ui/AppLogo'
 import { SessionProvider } from '../app/SessionProvider'
 import { useMarketSession } from '../app/marketSession'
 import { AccountMenu } from '../layout/AccountMenu'
@@ -158,11 +158,8 @@ function MarketHeader() {
           (brand · search · sell · utilities) so nothing reads as crowded. */}
       <div className="mx-auto flex h-16 w-full max-w-[1920px] items-center gap-5 px-4 sm:gap-8 sm:px-6 md:h-20 lg:gap-12 lg:px-10">
         {/* Brand never wraps or shrinks — it's the anchor of the bar. */}
-        <Link to="/" className="flex shrink-0 items-center gap-3">
-          <AppLogoMark className="h-10 w-10 md:h-12 md:w-12" />
-          <span className="whitespace-nowrap font-heading text-xl font-semibold text-fg sm:text-2xl">
-            UnieMax
-          </span>
+        <Link to="/" className="flex shrink-0 items-center">
+          <AppLogoLockup className="h-9 md:h-11" />
         </Link>
 
         {/* Global search lives in the toolbar (md+); below md it gets its
@@ -889,7 +886,7 @@ function NewStoresSection() {
  * destination.
  *
  * Hover is the premium cue: 4px lift, deeper halo (`shadow-lifted`), the
- * banner zooms, and the CTA fills with the brand gold.
+ * banner zooms, and the CTA fills with the brand color.
  */
 function StoreCard({ store }: { store: MarketStore }) {
   const banner = store.previewImages[0] ?? null
@@ -933,8 +930,8 @@ function StoreCard({ store }: { store: MarketStore }) {
         />
 
         {/* Left-aligned and full-bleed to the card's padding — a centred column
-            left both margins empty. Stays `text-fg` on hover: the brand gold is
-            a light color and would drop to ~1.9:1 against the white surface. */}
+            left both margins empty. Stays `text-fg` on hover: the lift, halo
+            and banner zoom already carry the hover state. */}
         <p className="mt-2.5 line-clamp-1 font-heading text-lg font-medium leading-tight text-fg">
           {store.name}
         </p>
@@ -1239,8 +1236,10 @@ function BecomeSellerSection({ ownsStores }: { ownsStores: boolean }) {
               </li>
             ))}
           </ul>
-          {/* Dark button with a gold label: the panel is now the brand
-              gradient, so a white button would barely separate from it. */}
+          {/* Inverted button — it paints in the panel's own label color with
+              the brand as its text, so it separates from the brand gradient
+              in either scheme (white/purple in light, near-black/purple in
+              dark) without a third color. */}
           <CreateStoreLink className="mt-8 inline-block rounded-md bg-brand-contrast px-8 py-3 text-sm font-bold text-brand transition hover:opacity-90">
             {ownsStores ? 'Create Another Store' : 'Create Store'}
           </CreateStoreLink>
@@ -1318,11 +1317,8 @@ function MarketFooter() {
       <div className="mx-auto w-full max-w-[1920px] px-4 py-10 sm:px-6 lg:px-10">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <div className="max-w-xs">
-            <Link to="/" className="flex items-center gap-2">
-              <AppLogoMark className="h-8 w-8" />
-              <span className="font-heading text-lg font-semibold text-fg">
-                UnieMax
-              </span>
+            <Link to="/" className="flex items-center">
+              <AppLogoLockup className="h-8" />
             </Link>
             <p className="mt-3 text-sm text-muted">
               One marketplace of independent stores — discover, shop, or open
