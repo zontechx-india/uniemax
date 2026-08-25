@@ -458,3 +458,23 @@ export function ChartIcon({ className }: { className?: string }) {
     </Svg>
   )
 }
+
+/** Life-buoy — the Help & Support section. */
+export function LifebuoyIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="3.5" />
+      <path d="m6 6 3.5 3.5M18 6l-3.5 3.5M6 18l3.5-3.5M18 18l-3.5-3.5" />
+    </Svg>
+  )
+}
+
+/** Speech bubble — a ticket thread / reply. */
+export function ChatIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M20 12a7 7 0 0 1-7 7H8l-4 3v-4.3A7 7 0 0 1 4 12a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7Z" />
+    </Svg>
+  )
+}

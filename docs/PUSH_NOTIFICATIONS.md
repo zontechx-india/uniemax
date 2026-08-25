@@ -103,6 +103,10 @@ a browser standard — the VAPID pair *is* the credential.
 | Product hidden / restored by an admin | store owner | `STORE` | their store's products section |
 | Payout account verified / failed | store owner | `ACCOUNT` | their store's bank-accounts section |
 | Account unblocked | customer | `ACCOUNT` | — |
+| UnieMax ticket raised · reporter replies | every active admin | `SUPPORT` | the ticket in the console |
+| UnieMax ticket answered · status changed | whoever raised it | `SUPPORT` | the ticket where they raised it — the account menu's Help & Support, or their store's UnieMax Support |
+| Customer writes to a shop · replies again | that store's owner | `SUPPORT` | the request in the store's Customer Support inbox |
+| Shop answers · changes the request's status | the customer who raised it | `SUPPORT` | the request in that storefront's Help & Support |
 | Admin broadcast | chosen audience | `ANNOUNCEMENT` | optional link |
 
 Order events fire from `modules/orders/orders.notifications.ts` — **the same

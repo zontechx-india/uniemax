@@ -4,15 +4,19 @@ import { AppLogoLockup } from '../../shared/ui/AppLogo'
 
 /**
  * Public placeholder for the marketplace footer pages (About, Privacy,
- * Terms, Support, Contact). It needs no session and no dashboard shell —
- * a shared link must land here for anonymous visitors without bouncing
- * through /login.
+ * Terms, Contact). It needs no session and no dashboard shell — a shared
+ * link must land here for anonymous visitors without bouncing through
+ * /login.
+ *
+ * `/support` is deliberately NOT here any more: it is a real page in the
+ * account subtree, because a support ticket has to know who is writing it.
+ * A signed-out visitor following the footer's Support link lands on sign-in
+ * and continues to it, which beats a "coming soon" that helps nobody.
  */
 const TITLES: Record<string, string> = {
   '/about': 'About',
   '/privacy': 'Privacy Policy',
   '/terms': 'Terms & Conditions',
-  '/support': 'Support',
   '/contact': 'Contact',
 }
 

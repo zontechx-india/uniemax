@@ -220,7 +220,9 @@ Signed-in account pages mount inside `RequireCustomer` → `AppLayout`
   navigation lives: Flipkart-style dropdown on the top-bar avatar, opens on
   hover (click/tap on touch), closes on Escape / outside tap / item click.
   Items come from `ACCOUNT_MENU_ITEMS` in `app/navigation.ts` (My Profile,
-  Orders, Saved Addresses) plus the dynamic store row and a Logout row using
+  Orders, Saved Addresses, Help & Support — Help last, because it is where
+  someone goes when one of the rows above has gone wrong) plus the dynamic
+  store row and a Logout row using
   the shared confirm flow (`layout/useSignOutConfirm.ts`); Logout always
   goes through `shared/ui/ConfirmDialog.tsx` ("Logout?" / Logout, matching
   the menu row's wording) — only on confirm is the session revoked
@@ -263,8 +265,40 @@ Signed-in account pages mount inside `RequireCustomer` → `AppLayout`
   default checkout suggestion — deleting it promotes the oldest remaining),
   add/edit via the shared `AddressForm` (label, name, phone, optional
   email, address, pincode, state, country), Set primary, guarded delete.
-  Checkout offers this list as one-tap suggestions. Unknown paths redirect
-  to `/` (the marketplace homepage).
+  Checkout offers this list as one-tap suggestions.
+  `/support` is the real **Help & Support** page (`SupportPage.tsx` +
+  `SupportTicketPage.tsx` over `features/support/`) — the shopper's channel
+  to the **UnieMax team**: the contact card (email/phone/hours), a ticket
+  form and the account's own tickets, each opening a thread at
+  `/support/{ticketId}`. It is the same feature as a seller's store Support
+  section pointed at the other half of the audience, and differs in exactly
+  two things: the list is fetched `scope=ACCOUNT` (so a customer who also
+  sells never sees their store threads here — those live under each store,
+  where the store's context is), and the categories offered are a shopper's
+  problems (orders, refunds, **Report a store or seller**) rather than a
+  seller's (payouts, store setup). A ticket raised here goes to UnieMax, not
+  to the shop that was ordered from — a customer↔seller channel is a
+  separate, later feature. Because a ticket must know who is writing,
+  `/support` moved **out** of the public footer placeholders: a signed-out
+  visitor following the marketplace footer's Support link now lands on
+  sign-in and continues to the real page. Unknown paths redirect to `/` (the
+  marketplace homepage).
+
+### Support feature (`storefront/features/support/`)
+
+**One implementation, three entry points.** The account menu's Help &
+Support, a store's UnieMax Support section and a storefront's Help & Support
+are the same screens pointed at different recipients, so the parts live here
+and the six pages are thin compositions:
+
+| Piece | What it owns |
+| ----- | ------------ |
+| `supportApi.ts` | Three typed clients — `supportApi` (→ UnieMax), `storeSupportApi` (shopper → a shop) and `storeInboxApi` (the seller's side) — plus `CATEGORY_LABELS` (**one wording per enum value**, audience-neutral: two wordings is how a queue starts disagreeing with itself) and the three **option lists** `SELLER_CATEGORIES` / `CUSTOMER_CATEGORIES` / `STORE_CATEGORIES`, which is where the audiences actually differ |
+| `SupportContactCard.tsx` | Email / phone / hours. Renders from a **local fallback copy first** and never blocks on `GET /public/support-contact` — a support page showing no way to contact support is the one failure it must not have, so a failed fetch is silently ignored |
+| `NewTicketForm.tsx` | Subject · topic · details · reply-to email/phone. Topic options **and the submit target** (`submitTo`) are props, since the flows post to different endpoints; **priority is never offered** — given the choice everyone picks Urgent and the field stops sorting anything |
+| `TicketList.tsx` | The reporter's tickets. Rows link **relatively** (`to={ticket.id}`), which is what lets one list sit under both `/support` and `/stores/{slug}/support` without knowing either path. `null` = loading, `[]` = the empty state — never confused |
+| `TicketThread.tsx` | Fetch + conversation + reply + Close, for all three flows. Each message is labelled from its server-derived **`authorRole`** — "You", the shop's name, or "UnieMax Support" — never an individual (the reporter is talking to an organisation, and naming a staff member invites chasing that person instead of the queue). `authorType` can't do this job: on a store thread both sides are `CUSTOMER`. Bodies render `whitespace-pre-wrap` so a pasted error log stays readable; the reply box warns when replying will **reopen** a resolved ticket; a closed ticket is read-only. Only the back link is a prop |
+| `ticketMeta.tsx` | Status chip + thread timestamp format |
 
 ### Stores feature (customer-owned stores — `storefront/features/stores/`)
 
@@ -304,6 +338,7 @@ navigation and hide the item being hunted for):
 | **Catalog** | Categories · Products |
 | **Storefront** | Store Details · Appearance · Homepage · Footer |
 | **Settings** | Payments · Bank Accounts · Shipping · Checkout |
+| **Help** | Customer Support · UnieMax Support |
 
 Ordering rationale, so it isn't re-shuffled by accident: Catalog leads because
 Products is the most-opened section after Orders (it used to sit last);
@@ -311,8 +346,13 @@ Categories precedes Products because the app gates Products until a category
 exists; **Storefront** is what a customer sees (safe to experiment with) while
 **Settings** is money + fulfilment (three of which confirm before saving);
 Store Details is branding rather than configuration, so it sits under
-Storefront; and Payments precedes Bank Accounts because payout accounts only
-matter once online payment is on.
+Storefront; Payments precedes Bank Accounts because payout accounts only
+matter once online payment is on; and **Help** sits last, holding the two
+support channels that must not be confused — **Customer Support** is the
+shop's own inbox (buyers writing to the seller, so it leads: daily work) and
+**UnieMax Support** is the seller writing to the platform. Naming them by
+*who is on the other end* is the only labelling that stays unambiguous once
+both exist.
 
 **Dashboard** (`StoreDashboardPage`, the manage landing at
 `/stores/{slug}`; Store Details moved to `/stores/{slug}/details`) — over
@@ -380,6 +420,7 @@ scales from a few products to thousands:
 /store/:storeSlug/category/:categorySlug   StoreCategoryPage
 /store/:storeSlug/product/:productSlug     StoreProductPage
 /store/:storeSlug/shop[?q=]                StoreShopPage
+/store/:storeSlug/support[/:ticketId]      StoreHelpPage · StoreHelpTicketPage
 /cart, /cart/:storeSlug                    cart pages (OUTSIDE the store
                                            layout — one cart spans stores)
 /checkout/:storeSlug                       per-store order review (orders
@@ -395,6 +436,16 @@ and renders `StoreHeader` + `<Outlet/>` + `StoreFooter`. `<main>` is
 themselves in the exported **`StorePageShell`** (the 1920px-capped padded
 column), which lets the homepage render full-bleed section bands instead.
 
+- **Help & Support entry points** — a shopper reaches the shop from the
+  **top bar** (a `Help` nav item beside Categories, and a row in the mobile
+  drawer) and from the **footer** (first row of Customer Support). Two
+  placements because the two reading patterns are different: someone hunting
+  for "how do I contact them" scans the toolbar, someone who has read to the
+  bottom of a product page is already in the footer. The footer's Customer
+  Support block is now **unconditional** — it used to render only when the
+  owner had filled in a phone or email, but the in-app link exists for every
+  store, and hiding the one guaranteed contact route to keep a heading tidy
+  is the wrong trade.
 - **`StoreFooter`** (`features/publicStore/StoreFooter.tsx`) — renders the
   owner's Footer settings from the shell (`store.footer`): brand block (logo +
   metal-text name, about, "Since {year}", social icon chips — FB/IG/YT live,
@@ -749,6 +800,27 @@ for crawlers wait for SSR/prerender).
   `PATCH /stores/:id/checkout`; a disabled field is hidden from customers
   and skipped in validation. Warns when a delivering store switches all
   address fields off),
+  `StoreSupportPage` (**UnieMax Support** — the two ways to reach the
+  platform team, in the order they are useful: direct contact, then a tracked
+  ticket. The page itself is thin: everything visual comes from
+  `features/support/` (see the Support feature above), and what it decides is
+  the **scope** — the list is filtered to THIS store and new tickets carry
+  it, because "my tickets across everything I own" is a different question
+  that would make the section ambiguous), `StoreSupportTicketPage` (one
+  thread at `support/{ticketId}` — a back link around the shared
+  `TicketThread`),
+  `StoreCustomerSupportPage` (**Customer Support** — the shop's own **inbox**:
+  what its buyers raised from the storefront. Opens on **Needs reply** (open
+  + in progress) sorted oldest-activity-first, for the same reason the admin
+  queue does — an inbox exists to show what is still owed, the opposite of
+  the newest-first ordering everywhere else in store management — with an
+  "awaiting reply" count that stays truthful whatever tab is selected),
+  `StoreCustomerSupportTicketPage` (one request at
+  `customer-support/{ticketId}`: the thread, the customer's contact snapshot
+  as `tel:`/`mailto:` links, a reply box and a status select. Deliberately
+  simpler than the console's equivalent — **no priority**, which is the
+  platform's triage vocabulary — and replying picks the request up on its own
+  so the Needs-reply tab can't quietly lie),
   `StoreAppearancePage` (background + primary color — picker swatch plus a
   typed/pasted hex field (`#rrggbb`, `#rgb` shorthand auto-expanded) —
   plus optional **secondary** (links/prices/highlights), **surface**
@@ -924,6 +996,7 @@ Rules they follow (constraints, not taste):
 | `/products` | Seller catalog across stores, with the hide/restore moderation switch (always asks for a reason — the seller is notified immediately). |
 | `/stores`, `/stores/:id` | Stores + owners. Detail carries suspension and **manual payout-account verification** (account numbers masked to the last 4). |
 | `/customers`, `/customers/:id` | Buyers and sellers (same account type), with blocking. The dialog states both effects: no future sign-in **and** every session revoked. |
+| `/support`, `/support/:ticketId` | The support queue — **sellers and shoppers in one list** (never a shopper's thread with a shop: those are the seller's to answer), filterable by `scope` (two pages would just mean one of them going unread), each row carrying a Seller/Shopper chip. Defaults to the **Needs reply** tab (open + in progress) sorted **oldest activity first** — a queue's job is to show what is still owed, which is the opposite of every other table here. The detail page carries the thread, the reply box (replying moves OPEN → IN_PROGRESS on its own) and triage: status saves on change and notifies the reporter, priority is internal and silent. |
 | `/notifications` | This admin's feed, the per-device push toggle, and the platform broadcast (confirm-with-preview — a broadcast can't be recalled). |
 | `/activity` | The append-only admin audit trail, filterable by action and record type. |
 | `/admins` | SUPER_ADMIN only: create, promote/demote, deactivate, reset password. |
@@ -932,7 +1005,10 @@ Rules they follow (constraints, not taste):
 `features/useAdminQuery.ts` holds the two data hooks — `useAdminQuery` (one
 resource) and `useAdminList` (**filters live in the URL**, so back/forward
 work, a filtered view is shareable, and a filter change resets to page 1).
-Both discard out-of-order responses via a request counter.
+Both discard out-of-order responses via a request counter. `useAdminList`
+takes an optional second type parameter for endpoints whose `meta` carries
+more than the pagination counters (support adds `openCount`); it defaults to
+`ListMeta`, so plain list pages are unaffected.
 
 ---
 
@@ -1062,6 +1138,15 @@ frontend/
     │   │   ├── addresses/        # Customer address book
     │   │   │   ├── addressesApi.ts # Typed client for /api/v1/addresses
     │   │   │   └── AddressForm.tsx # Shared add/edit form (Saved Addresses + checkout)
+    │   │   ├── support/          # Support tickets — ONE set of parts, three
+    │   │   │   │                 #   entry points (account menu · a store's
+    │   │   │   │                 #   UnieMax Support · a storefront's Help)
+    │   │   │   ├── supportApi.ts # Typed clients + labels + per-audience topic lists
+    │   │   │   ├── SupportContactCard.tsx # Email/phone/hours (fallback-first)
+    │   │   │   ├── NewTicketForm.tsx # Raise a ticket (topics passed in)
+    │   │   │   ├── TicketList.tsx    # The reporter's tickets (relative row links)
+    │   │   │   ├── TicketThread.tsx  # Conversation + reply + close
+    │   │   │   └── ticketMeta.tsx    # Status chip + thread timestamp format
     │   │   ├── discovery/        # Marketplace homepage data layer
     │   │   │   ├── discoveryApi.ts # /public/stores · /public/products · /public/search · /public/categories · /public/stats
     │   │   │   └── recentActivity.ts # localStorage recent searches + recently viewed stores
@@ -1092,9 +1177,11 @@ frontend/
     │       ├── LoginPage.tsx     # Email+password · Google (dev) · phone OTP
     │       ├── LoginRoute.tsx    # /login route: ?next= handling + already-authed redirect
     │       ├── HomePage.tsx      # Marketplace homepage: hero+collage, New Stores, Fresh Finds, seller CTA
-    │       ├── InfoComingSoonPage.tsx # Public placeholder for /about /privacy /terms /support /contact
+    │       ├── InfoComingSoonPage.tsx # Public placeholder for /about /privacy /terms /contact
     │       ├── ProfilePage.tsx   # /profile — account details + mobile-number linking (SMS OTP)
     │       ├── AddressesPage.tsx # /addresses — saved delivery addresses (one primary)
+    │       ├── SupportPage.tsx   # /support — shopper → UnieMax (contact + tickets)
+    │       ├── SupportTicketPage.tsx # /support/:ticketId — one ticket thread
     │       ├── OrdersPage.tsx    # /orders — the customer's order history
     │       ├── store/            # Public storefront pages (no sign-in)
     │       │   ├── StoreHomePage.tsx     # Hero, featured categories, merchandising rows
@@ -1137,6 +1224,10 @@ frontend/
     │           │                        #   (confirm-before-save)
     │           ├── StoreCheckoutPage.tsx # Which checkout fields to collect
     │           │                        #   (7 toggles, hidden = not validated)
+    │           ├── StoreSupportPage.tsx # UnieMax Support: contact + this store's tickets
+    │           ├── StoreSupportTicketPage.tsx # One UnieMax thread + reply/close
+    │           ├── StoreCustomerSupportPage.tsx # The shop's inbox (buyers' requests)
+    │           ├── StoreCustomerSupportTicketPage.tsx # One request + reply + status
     │           ├── StoreCategoriesPage.tsx # Add/list/rename/collapse/toggle/delete categories
     │           ├── StoreProductsPage.tsx # Add/list/toggle/delete products (category-gated)
     │           └── ActiveSwitch.tsx     # Enable/disable pill switch (rows)

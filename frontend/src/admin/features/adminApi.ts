@@ -184,6 +184,69 @@ export interface ProductDetail extends ProductRow {
   media: { id: string; type: 'IMAGE' | 'VIDEO'; url: string | null; altText: string | null }[]
 }
 
+export type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'
+export type TicketPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'
+export type TicketCategory =
+  | 'ORDERS'
+  | 'PAYMENTS'
+  | 'PAYOUTS'
+  | 'PRODUCTS'
+  | 'STORE_SETUP'
+  | 'STORE_REPORT'
+  | 'ACCOUNT'
+  | 'TECHNICAL'
+  | 'OTHER'
+
+/**
+ * Which side of the platform a ticket came from. Derived server-side from
+ * whether the ticket names a store, so it can never disagree with the row:
+ * `STORE` = a seller writing from their shop's Help & Support, `ACCOUNT` = a
+ * shopper writing from the account menu.
+ */
+export type TicketScope = 'STORE' | 'ACCOUNT'
+
+export interface TicketMessage {
+  id: string
+  authorType: 'ADMIN' | 'CUSTOMER'
+  authorId: string
+  authorName: string | null
+  body: string
+  createdAt: string
+}
+
+export interface TicketRow {
+  id: string
+  ticketNumber: string
+  subject: string
+  category: TicketCategory
+  status: TicketStatus
+  priority: TicketPriority
+  storeId: string | null
+  storeName: string | null
+  storeSlug: string | null
+  contactEmail: string | null
+  contactPhone: string | null
+  lastMessageAt: string
+  resolvedAt: string | null
+  closedAt: string | null
+  createdAt: string
+  messageCount: number
+  customer: { id: string; name: string | null; email: string | null; phone: string | null }
+}
+
+export interface TicketDetail extends TicketRow {
+  messages: TicketMessage[]
+}
+
+/**
+ * The support list's meta carries `openCount` — every OPEN/IN_PROGRESS ticket
+ * platform-wide, regardless of the current filter — so the queue tab can show
+ * the backlog without a second request.
+ */
+export interface TicketListMeta extends ListMeta {
+  openCount: number
+}
+
 export interface AuditRow {
   id: string
   adminId: string
@@ -321,6 +384,23 @@ export const adminApi = {
   },
   setProductVisibility(id: string, body: { isActive: boolean; reason?: string | null }) {
     return call<ProductDetail>(http.patch(`${BASE}/catalog/products/${id}/visibility`, body))
+  },
+
+  // Support tickets
+  listTickets(query: Params) {
+    return callList<TicketRow>(http.get(`${BASE}/support/tickets`, params(query))) as Promise<{
+      items: TicketRow[]
+      meta: TicketListMeta
+    }>
+  },
+  getTicket(id: string) {
+    return call<TicketDetail>(http.get(`${BASE}/support/tickets/${id}`))
+  },
+  replyTicket(id: string, message: string) {
+    return call<TicketDetail>(http.post(`${BASE}/support/tickets/${id}/messages`, { message }))
+  },
+  updateTicket(id: string, body: { status?: TicketStatus; priority?: TicketPriority }) {
+    return call<TicketDetail>(http.patch(`${BASE}/support/tickets/${id}`, body))
   },
 
   // Audit trail

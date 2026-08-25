@@ -1423,6 +1423,9 @@ export const cartUrl = (from?: string | null) =>
   from ? `/cart?from=${encodeURIComponent(from)}` : '/cart'
 
 export const storeHomeUrl = (storeSlug: string) => `/store/${storeSlug}`
+/** Help & Support WITH THIS SHOP — answered by the seller, not by UnieMax. */
+export const storeSupportUrl = (storeSlug: string) =>
+  `/store/${storeSlug}/support`
 export const storeCategoryUrl = (storeSlug: string, categorySlug: string) =>
   `/store/${storeSlug}/category/${categorySlug}`
 export const storeProductUrl = (storeSlug: string, productSlug: string) =>

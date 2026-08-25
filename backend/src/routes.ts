@@ -25,6 +25,11 @@ import {
   customerNotificationRoutes,
   publicPushRoutes,
 } from "./modules/notifications/notifications.routes.js";
+import {
+  adminSupportRoutes,
+  customerSupportRoutes,
+  publicSupportRoutes,
+} from "./modules/support/support.routes.js";
 
 /**
  * Central route registrar.
@@ -51,6 +56,10 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       await api.register(customerOrderRoutes, { prefix: "/orders" });
       // Notification feed + push subscriptions (guarded — requireCustomer).
       await api.register(customerNotificationRoutes, { prefix: "/notifications" });
+      // Support tickets raised from a store's Support section (requireCustomer).
+      await api.register(customerSupportRoutes, { prefix: "/support" });
+      // How to reach support without opening a ticket — public by definition.
+      await api.register(publicSupportRoutes, { prefix: "/public" });
       // VAPID public key — public by definition (browsers subscribe with it).
       await api.register(publicPushRoutes, { prefix: "/public" });
       // Public storefront pages by slug (published stores only, no auth).
@@ -90,6 +99,9 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
             await guarded.register(adminNotificationRoutes, {
               prefix: "/notifications",
             });
+            // Support ticket queue — the platform team's side of the threads
+            // sellers raise from their stores.
+            await guarded.register(adminSupportRoutes, { prefix: "/support" });
             // The platform console (dashboard, stores, customers, orders,
             // payments, catalog oversight, audit trail, admin accounts).
             await guarded.register(adminConsoleRoutes);

@@ -30,7 +30,12 @@ The first implementation will be for a **Cricket Bat Store**, but the architectu
 - Track orders
 - View previous orders
 - Create and manage own online stores (a single account can own multiple
-  stores; one is "active" at a time — see Store Creation & Management)
+  stores; one is "active" at a time — see Store Creation & Management),
+  including answering the support requests their own customers raise
+- Contact UnieMax from the account menu, or **a shop from its storefront**
+  (Help & Support in its top bar and footer): call, email, or raise a tracked
+  request and follow the answer in-app — including reporting a store or
+  seller to UnieMax (see Help & Support)
 
 ## Admin (UnieMax platform staff)
 - View the platform dashboard (revenue, orders, stores, customers, trends)
@@ -39,6 +44,7 @@ The first implementation will be for a **Cricket Bat Store**, but the architectu
 - Suspend / restore a store; verify a seller's payout account
 - Block / unblock a customer account
 - Send platform announcements
+- Answer support tickets from sellers and shoppers, and triage the queue
 - Review the admin activity log
 - Manage admin users (super admins)
 - Manage shipping charges and banners *(planned)*
@@ -62,9 +68,10 @@ A single account can own multiple stores and switch between them.
   The page's Back control returns to wherever the visitor came from
   (homepage, account menu, or the store list).
 - **Store management** — a two-panel page (left: section list —
-  Dashboard, Store Details, Appearance, Homepage, Footer, Bank Accounts, Payments, Shipping,
-  Checkout, Categories, Products; right: the selected section), addressed
-  by the store's slug (`/stores/{storeSlug}`).
+  Dashboard, Orders, Categories, Products, Store Details, Appearance,
+  Homepage, Footer, Payments, Bank Accounts, Shipping, Checkout, plus
+  Customer Support and UnieMax Support; right: the selected section),
+  addressed by the store's slug (`/stores/{storeSlug}`).
 - **Seller dashboard** — the management page's landing view: **Today's
   Orders**, Total Orders and Revenue up top, then the order pipeline —
   **Pending / Processing / Shipped / Completed / Cancelled / Refunded** —
@@ -715,6 +722,15 @@ revoked from anywhere else.
 - **Customers** — buyers and sellers together (they are the same account
   type), with **blocking**: no future sign-in by any method, and every signed-in
   device logged out at once.
+- **Support** — one queue for everything written to the platform: sellers
+  about their stores and shoppers about their orders and accounts, each row
+  marked Seller or Shopper and filterable by either (two separate queues
+  would just mean one of them going unread). It opens on **what still needs a
+  reply**, oldest first, because a queue's job is to show what is owed rather
+  than what is newest. A ticket page carries the whole conversation, the
+  reply box (replying marks the ticket as being worked on, so the queue can't
+  quietly lie) and triage — a status change is told to the reporter, priority
+  stays internal.
 - **Notifications** — the admin's own feed, push opt-in per device, and a
   **platform broadcast** to admins, sellers or all customers (confirmed with
   a preview, since it can't be recalled).
@@ -723,6 +739,61 @@ revoked from anywhere else.
 - **Admin users** (super admins only) — create admins, change roles,
   deactivate, reset passwords. The platform refuses to let anyone change
   their own role, deactivate themselves, or remove the last super admin.
+
+---
+
+# Help & Support
+
+**Help & Support** covers the three conversations the product has. Which one
+you are in is decided by where you open it, and each is answered by the side
+that can actually act:
+
+| Where | Who writes | Who answers |
+| ----- | ---------- | ----------- |
+| Account menu → Help & Support | a shopper | **UnieMax** — orders, payments and refunds, a listing, the account, or **reporting a store or seller** |
+| A storefront's Help & Support (top bar + footer of `/store/{shop}`) | a shopper | **the shop** — their order with it, a return, a product |
+| Store management → UnieMax Support | a seller | **UnieMax** — that shop's payouts, catalog, settings |
+
+A seller answers the second from **Store management → Customer Support**, the
+shop's own inbox. The two sections are named for who is on the other end
+because "Help & Support" would describe both equally.
+
+They are one feature throughout, kept apart by who a thread is *with*: a
+seller who also shops sees their store threads under the store, their
+personal ones in the account menu, and their customers' in the inbox — never
+mixed. UnieMax is **not a party** to a shopper's conversation with a shop and
+never sees it; a shopper who needs the platform to step in uses "Report a
+store or seller" instead.
+
+Two routes out of a problem, in the order they are useful:
+
+1. **Contact them directly** — email and phone (plus working hours), always
+   on the page as tap-to-call / tap-to-email links. UnieMax's own details on
+   the platform pages; the shop's own on its storefront. No sign-in needed —
+   a phone number needs no account.
+2. **Raise a ticket** — a tracked thread with a quotable reference number,
+   answered inside the app. This one does need an account, since a
+   conversation has to belong to somebody; a signed-out visitor on a
+   storefront is offered sign-in rather than a form that would fail on
+   submit. The reporter picks what the issue is about (the topics offered
+   match who they are writing to), writes it up, and can leave a different
+   reply-to email or phone than the account's.
+
+How a ticket behaves, and why:
+
+- The reporter sees the whole conversation and gets a notification whenever
+  the platform replies or changes the ticket's state.
+- Replying to a ticket the team marked **resolved reopens it** — "resolved" is
+  the platform's opinion, and the person who raised it gets to disagree
+  without starting over.
+- **Closing is final** for both sides. If the problem comes back it is a new
+  ticket, so one thread never turns into three unrelated issues.
+- The reporter never chooses a priority: offered the choice, everything
+  becomes urgent and the queue stops meaning anything. The platform team
+  sets it — and sellers don't set it either, since a shop's inbox is small
+  enough to read without one.
+- A shop owner cannot message their own store: that thread would land in
+  their own inbox.
 
 ---
 

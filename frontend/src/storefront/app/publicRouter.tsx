@@ -20,6 +20,10 @@ import { OrderSuccessPage } from '../pages/cart/OrderSuccessPage'
  *   /store/:storeSlug/category/:categorySlug category page
  *   /store/:storeSlug/product/:productSlug   product detail (variant picker)
  *   /store/:storeSlug/shop[?q=]              browse all / search results
+ *   /store/:storeSlug/support[/:ticketId]    Help & Support WITH THIS SHOP —
+ *                                            the shop's contact details (open
+ *                                            to everyone) plus tracked
+ *                                            requests (need an account)
  *   /cart, /cart/:storeSlug                  cart (deliberately OUTSIDE the
  *                                            store layout — one cart spans
  *                                            every store the visitor shops)
@@ -44,6 +48,16 @@ const StoreProductPage = lazy(() =>
 const StoreShopPage = lazy(() =>
   import('../pages/store/StoreShopPage').then((m) => ({
     default: m.StoreShopPage,
+  })),
+)
+const StoreHelpPage = lazy(() =>
+  import('../pages/store/StoreHelpPage').then((m) => ({
+    default: m.StoreHelpPage,
+  })),
+)
+const StoreHelpTicketPage = lazy(() =>
+  import('../pages/store/StoreHelpTicketPage').then((m) => ({
+    default: m.StoreHelpTicketPage,
   })),
 )
 
@@ -123,6 +137,12 @@ export const publicRouter = createBrowserRouter([
           },
           // Browse-all; `?q=` search results; `?section=` merchandising row.
           { path: 'shop', element: lazyRoute(<StoreShopPage />) },
+          // Contacting THIS shop (not UnieMax — that is /support).
+          { path: 'support', element: lazyRoute(<StoreHelpPage />) },
+          {
+            path: 'support/:ticketId',
+            element: lazyRoute(<StoreHelpTicketPage />),
+          },
         ],
       },
       { path: '/cart', element: <CartPage /> },

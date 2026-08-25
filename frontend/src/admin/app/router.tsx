@@ -24,6 +24,8 @@ const OrdersPage = lazy(() => import('../pages/OrdersPage'))
 const OrderDetailPage = lazy(() => import('../pages/OrderDetailPage'))
 const PaymentsPage = lazy(() => import('../pages/PaymentsPage'))
 const ProductsPage = lazy(() => import('../pages/ProductsPage'))
+const SupportPage = lazy(() => import('../pages/SupportPage'))
+const SupportTicketPage = lazy(() => import('../pages/SupportTicketPage'))
 const NotificationsPage = lazy(() => import('../pages/NotificationsPage'))
 const ActivityPage = lazy(() => import('../pages/ActivityPage'))
 const AdminsPage = lazy(() => import('../pages/AdminsPage'))
@@ -48,6 +50,8 @@ export function AdminRouter() {
                 <Route path="orders/:orderId" element={<OrderDetailPage />} />
                 <Route path="payments" element={<PaymentsPage />} />
                 <Route path="products" element={<ProductsPage />} />
+                <Route path="support" element={<SupportPage />} />
+                <Route path="support/:ticketId" element={<SupportTicketPage />} />
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="activity" element={<ActivityPage />} />
                 <Route path="admins" element={<AdminsPage />} />

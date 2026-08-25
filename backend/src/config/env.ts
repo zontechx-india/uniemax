@@ -53,6 +53,13 @@ const envSchema = z.object({
   // it, configure the webhook URL in the Cashfree merchant dashboard instead.
   PUBLIC_API_URL: z.string().optional(),
 
+  // Platform support contact — printed on the seller's Support page and
+  // served to clients at GET /api/v1/public/support-contact. Defaults are the
+  // live UnieMax details, so no environment has to set them to work.
+  SUPPORT_EMAIL: z.string().default("support@uniemax.com"),
+  SUPPORT_PHONE: z.string().default("+91 7708774542"),
+  SUPPORT_HOURS: z.string().default("Mon–Sat, 10 AM – 7 PM IST"),
+
   // NOTE: all auth config (JWT, cookies, OTP/verification codes, OAuth) lives
   // inside the self-contained auth package (src/package/auth/core/config/env.ts),
   // not here.

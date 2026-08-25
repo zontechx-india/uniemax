@@ -102,6 +102,7 @@ enum NotificationKind {
   STORE
   ACCOUNT
   ANNOUNCEMENT
+  SUPPORT
 }
 
 // ---------------------------------------------------------------------------
@@ -110,20 +111,20 @@ enum NotificationKind {
 // ---------------------------------------------------------------------------
 
 model StoreSetting {
-  id           String   @id @default(cuid())
-  businessName String
-  businessType String   @default("General")
-  logoUrl      String?
-  about        String?
-  contactEmail String?
-  contactPhone String?
-  address      String?
-  socialLinks  Json? // { instagram, facebook, whatsapp, ... }
-  currency     String   @default("INR")
+  id                String   @id @default(cuid())
+  businessName      String
+  businessType      String   @default("General")
+  logoUrl           String?
+  about             String?
+  contactEmail      String?
+  contactPhone      String?
+  address           String?
+  socialLinks       Json? // { instagram, facebook, whatsapp, ... }
+  currency          String   @default("INR")
   // Order-independent shipping default; per-rule config lives in ShippingRule.
-  lowStockThreshold Int  @default(5)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  lowStockThreshold Int      @default(5)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@map("store_settings")
 }
@@ -227,12 +228,13 @@ model Customer {
   blockedAt     DateTime?
   blockedReason String?
 
-  oauthAccounts OAuthAccount[]
-  orders        Order[]
-  stores        Store[]
-  addresses     CustomerAddress[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  oauthAccounts  OAuthAccount[]
+  orders         Order[]
+  stores         Store[]
+  addresses      CustomerAddress[]
+  supportTickets SupportTicket[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   @@map("customers")
 }
@@ -274,9 +276,9 @@ model CustomerAddress {
 /// `isPublished` gates the public storefront page — unpublished stores are
 /// never served to customers.
 model Store {
-  id          String  @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
-  slug        String  @unique
+  slug        String    @unique
   /// Storage OBJECT KEY of the uploaded logo (e.g. "store-logo/…/x.webp") —
   /// never a full URL. The public URL is derived from configuration at read
   /// time, so buckets/CDNs/providers can change without touching rows.
@@ -306,7 +308,7 @@ model Store {
   /// all default TRUE via `resolveCheckoutFields`. A disabled field is
   /// hidden from the customer and excluded from checkout validation.
   checkout    Json?
-  isPublished Boolean @default(false)
+  isPublished Boolean   @default(false)
   /// Set the FIRST time the store is published (never reset), so marketplace
   /// "New Stores" ranks by real publish time — re-publishing an old store
   /// doesn't bump it back to the top.
@@ -323,10 +325,11 @@ model Store {
   ownerId String
   owner   Customer @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
-  categories   StoreCategory[]
-  products     StoreProduct[]
-  bankAccounts StoreBankAccount[]
-  orders       Order[]
+  categories     StoreCategory[]
+  products       StoreProduct[]
+  bankAccounts   StoreBankAccount[]
+  orders         Order[]
+  supportTickets SupportTicket[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -355,20 +358,20 @@ model StoreCategory {
   parent   StoreCategory?  @relation("StoreCategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
   children StoreCategory[] @relation("StoreCategoryTree")
 
-  name     String
+  name       String
   /// URL identity within the store — the storefront addresses a category as
   /// /store/{storeSlug}/category/{slug}. Generated from the name on create
   /// and deliberately STABLE across renames, so shared links keep working
   /// (same convention as Store.slug).
-  slug     String
+  slug       String
   // Disabled categories (and everything inside them, subcategories
   // included) are hidden from the public storefront but stay manageable —
   // the store-catalog analogue of the store-level publish switch.
-  isActive Boolean        @default(true)
+  isActive   Boolean        @default(true)
   /// Surfaces this root category in the storefront homepage's
   /// "Featured Categories" row. Owner-controlled merchandising.
-  isFeatured Boolean      @default(false)
-  products StoreProduct[]
+  isFeatured Boolean        @default(false)
+  products   StoreProduct[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -457,14 +460,14 @@ model StoreProductVariant {
 
   name          String
   // Required: every variant carries its own price (no inheriting a base).
-  price         Decimal  @db.Decimal(10, 2)
-  stockQuantity Int      @default(0)
+  price         Decimal @db.Decimal(10, 2)
+  stockQuantity Int     @default(0)
   // Disabled variants are hidden from the public storefront.
-  isActive      Boolean  @default(true)
+  isActive      Boolean @default(true)
   // The implicit single variant of a product that has no options. It is
   // hidden from the storefront's variant picker and is replaced the moment
   // the owner adds a real, named variant.
-  isDefault     Boolean  @default(false)
+  isDefault     Boolean @default(false)
 
   orderItems OrderItem[]
 
@@ -543,9 +546,9 @@ model StoreBankAccount {
 /// or storage provider can change without touching a single row.
 /// The image with the lowest `displayOrder` is the product's COVER image.
 model StoreProductMedia {
-  id        String         @id @default(cuid())
+  id        String       @id @default(cuid())
   productId String
-  product   StoreProduct   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   StoreProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   type         StoreMediaType
   key          String
@@ -582,8 +585,8 @@ model OAuthAccount {
 /// and deletions. Contact/delivery fields are nullable because the SELLER
 /// chooses which checkout fields to collect (Store.checkout).
 model Order {
-  id          String   @id @default(cuid())
-  orderNumber String   @unique
+  id          String      @id @default(cuid())
+  orderNumber String      @unique
   status      OrderStatus @default(PENDING)
 
   // The store the order belongs to — SetNull + snapshots below so the
@@ -594,8 +597,8 @@ model Order {
   storeSlug String
 
   // Optional link to a Customer (guest checkout keeps it null).
-  customerId  String?
-  customer    Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   fulfilment OrderFulfilment @default(DELIVERY)
 
@@ -610,18 +613,18 @@ model Order {
 
   // Money (all snapshots at time of order)
   subtotal       Decimal @db.Decimal(10, 2)
-  shippingCharge Decimal @db.Decimal(10, 2) @default(0)
+  shippingCharge Decimal @default(0) @db.Decimal(10, 2)
   total          Decimal @db.Decimal(10, 2)
 
-  paymentMethod PaymentMethod @default(COD)
-  paymentStatus PaymentStatus @default(PENDING)
+  paymentMethod    PaymentMethod @default(COD)
+  paymentStatus    PaymentStatus @default(PENDING)
   /// Gateway payment reference — "DEV-SIMULATED" for development-mode
   /// online payments; the Cashfree cf_payment_id once a real payment lands.
-  paymentRef    String?
+  paymentRef       String?
   /// The order_id registered with Cashfree for the LATEST payment attempt —
   /// orderNumber for the first attempt, "orderNumber~R<n>" for retries after
   /// an expired session. Null for COD / simulated orders.
-  cfOrderId        String? @unique
+  cfOrderId        String?       @unique
   /// Cashfree payment_session_id of the latest attempt (drives the web SDK
   /// checkout). Useless once paymentStatus is PAID.
   paymentSessionId String?
@@ -639,10 +642,10 @@ model Order {
   cancelReason String?
 
   estimatedDeliveryAt DateTime?
-  placedAt            DateTime  @default(now())
+  placedAt            DateTime    @default(now())
   items               OrderItem[]
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 
   @@index([storeId])
   @@index([customerId])
@@ -655,14 +658,14 @@ model Order {
 /// historical orders survive catalog edits and deletions. `imageKey` is the
 /// cover image's storage key at order time (URL derived at read).
 model OrderItem {
-  id        String  @id @default(cuid())
-  orderId   String
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  productId   String?
-  product     StoreProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
-  variantId   String?
-  variant     StoreProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  productId String?
+  product   StoreProduct?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variantId String?
+  variant   StoreProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
   productName String
   /// Chosen option label ("Red / 128 GB") — null for simple products.
@@ -683,18 +686,18 @@ model OrderItem {
 // ---------------------------------------------------------------------------
 
 model ShippingRule {
-  id            String       @id @default(cuid())
-  type          ShippingType
+  id             String       @id @default(cuid())
+  type           ShippingType
   // Region name for DISTRICT/STATE rules; null for FIXED/FREE.
-  region        String?
-  amount        Decimal      @db.Decimal(10, 2) @default(0)
+  region         String?
+  amount         Decimal      @default(0) @db.Decimal(10, 2)
   // For FREE rules: order subtotal at/above which shipping is waived.
-  minOrderAmount Decimal?    @db.Decimal(10, 2)
-  isActive      Boolean      @default(true)
+  minOrderAmount Decimal?     @db.Decimal(10, 2)
+  isActive       Boolean      @default(true)
   // Lower number = evaluated first (more specific rules win).
-  priority      Int          @default(0)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  priority       Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@index([type])
   @@index([isActive])
@@ -769,18 +772,18 @@ model Admin {
 /// stays reusable across projects. Rotated on each refresh; `replacedById`
 /// links the chain so a reused (already-rotated) token flags a breach.
 model AuthSession {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   principalId   String
   principalType String // "admin" | "customer"
   role          String? // snapshot (e.g. admin role) for fast re-issue
-  refreshHash   String   @unique // sha256 of the opaque refresh token
+  refreshHash   String    @unique // sha256 of the opaque refresh token
   userAgent     String?
   ip            String?
   expiresAt     DateTime
   revokedAt     DateTime?
   replacedById  String? // id of the session that rotated this one
-  createdAt     DateTime @default(now())
-  lastUsedAt    DateTime @default(now())
+  createdAt     DateTime  @default(now())
+  lastUsedAt    DateTime  @default(now())
 
   @@index([principalId, principalType])
   @@map("auth_sessions")
@@ -813,9 +816,9 @@ model PushSubscription {
   /// Set when the push service permanently rejected the endpoint (404/410 —
   /// the browser dropped the subscription). Kept rather than deleted so a
   /// device that stops receiving can be explained; excluded from every send.
-  disabledAt DateTime?
+  disabledAt   DateTime?
   /// Consecutive transient send failures — reset on success.
-  failureCount Int @default(0)
+  failureCount Int       @default(0)
 
   createdAt  DateTime @default(now())
   lastUsedAt DateTime @default(now())
@@ -861,8 +864,8 @@ model Notification {
 /// stays trustworthy for incident review. `meta` carries the action's own
 /// details (previous value, reason, affected counts).
 model AdminAuditLog {
-  id      String  @id @default(cuid())
-  adminId String
+  id         String @id @default(cuid())
+  adminId    String
   /// Snapshot of the actor's email — an admin can be deleted, the trail can't.
   adminEmail String
 
@@ -880,4 +883,134 @@ model AdminAuditLog {
   @@index([entityType, entityId])
   @@index([createdAt])
   @@map("admin_audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Support tickets
+// Sellers (and any customer) raising an issue with the UnieMax platform team.
+// ---------------------------------------------------------------------------
+
+/// Who answers a support ticket. This is the axis `storeId` cannot express:
+/// a seller writing to UnieMax *about* their store and a shopper writing *to*
+/// that store both name the same store, and only this column separates them.
+enum SupportRecipient {
+  /// The UnieMax platform team answers (shoppers and sellers alike).
+  PLATFORM
+  /// The store's owner answers — a shopper contacting the shop they bought
+  /// from. UnieMax is not a party to these threads.
+  STORE
+}
+
+/// Lifecycle of a support ticket. Forward-only in practice, except that a
+/// customer reply on a RESOLVED ticket reopens it — "resolved" is the
+/// platform's opinion, and the person who raised it gets to disagree.
+/// CLOSED is terminal: nobody can post to a closed ticket.
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+/// What the ticket is about — chosen by the person raising it, so the queue
+/// can be triaged before anything is read. Adding a subject is one value.
+enum SupportTicketCategory {
+  ORDERS
+  PAYMENTS
+  PAYOUTS
+  PRODUCTS
+  STORE_SETUP
+  /// Shopper reporting a store/seller to the platform. Never offered to a
+  /// seller writing about their own store.
+  STORE_REPORT
+  ACCOUNT
+  TECHNICAL
+  OTHER
+}
+
+/// Triage level, set by the platform team only. Deliberately NOT customer
+/// input: given the choice everyone picks URGENT and the field stops sorting
+/// anything.
+enum SupportTicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+/// A support request raised from the app. Owned by the Customer who raised it
+/// (cascade delete); `storeId` is set when it was raised from a store's
+/// management pages, which is how the admin sees which business is affected —
+/// SetNull with a `storeName` snapshot, so a deleted store never takes the
+/// conversation with it.
+///
+/// `contactEmail` / `contactPhone` are snapshots of how to reach the reporter
+/// at the time they wrote in — an account's email can change, and a ticket
+/// must stay answerable by the details the reporter actually gave.
+model SupportTicket {
+  id           String @id @default(cuid())
+  /// Human-quotable reference ("TKT-M4X7-9QRS"), unique, shown in both apps.
+  ticketNumber String @unique
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  storeId   String?
+  store     Store?  @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  /// Snapshot — the ticket keeps naming the store after the store is gone.
+  storeName String?
+
+  /// Who answers. PLATFORM tickets belong to the admin console's queue;
+  /// STORE tickets belong to the store owner and never appear there.
+  recipient SupportRecipient @default(PLATFORM)
+
+  subject  String
+  category SupportTicketCategory @default(OTHER)
+  status   SupportTicketStatus   @default(OPEN)
+  /// Triage level. Only ever set by the platform team, so it stays NORMAL on
+  /// STORE tickets — a seller's queue is small enough to read.
+  priority SupportTicketPriority @default(NORMAL)
+
+  contactEmail String?
+  contactPhone String?
+
+  /// Bumped by every message on either side, so the queue can sort by "who is
+  /// waiting longest" without joining the message table.
+  lastMessageAt DateTime  @default(now())
+  resolvedAt    DateTime?
+  closedAt      DateTime?
+
+  messages  SupportTicketMessage[]
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+
+  // The reporter's own list, newest activity first.
+  @@index([customerId, lastMessageAt])
+  // The admin queue: PLATFORM only, filtered by status, sorted by activity.
+  @@index([recipient, status, lastMessageAt])
+  // A seller's inbox: one store's incoming threads, newest activity first.
+  @@index([storeId, recipient, lastMessageAt])
+  @@map("support_tickets")
+}
+
+/// One message in a ticket thread. `authorType` reuses `PrincipalType`
+/// (ADMIN / CUSTOMER) — the same principal vocabulary as sessions and
+/// notifications — with `authorName` snapshotted so the thread still reads
+/// correctly after an admin account is removed.
+model SupportTicketMessage {
+  id       String        @id @default(cuid())
+  ticketId String
+  ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  authorType PrincipalType
+  /// Customer id or admin id. Opaque, like every other principal reference.
+  authorId   String
+  /// Snapshot of the author's display name at write time.
+  authorName String?
+
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+  @@map("support_ticket_messages")
 }

@@ -28,7 +28,9 @@ export const router = createBrowserRouter([
   { path: '/login', element: <LoginRoute /> },
   // Footer links — real routes with a lightweight public placeholder, so a
   // shared link lands on "coming soon" rather than a 404/redirect.
-  ...['about', 'privacy', 'terms', 'support', 'contact'].map((page) => ({
+  // `support` is NOT among them: it is a real page in the account subtree
+  // below, since a ticket needs to know who is writing.
+  ...['about', 'privacy', 'terms', 'contact'].map((page) => ({
     path: `/${page}`,
     lazy: async () => ({
       Component: (await import('../pages/InfoComingSoonPage')).InfoComingSoonPage,
@@ -58,6 +60,21 @@ export const router = createBrowserRouter([
             path: 'addresses',
             lazy: async () => ({
               Component: (await import('../pages/AddressesPage')).AddressesPage,
+            }),
+          },
+          // Help & Support for the ACCOUNT (a shopper writing to UnieMax).
+          // Tickets about a store the customer owns live under that store —
+          // see the `stores/:storeSlug/support` routes below.
+          {
+            path: 'support',
+            lazy: async () => ({
+              Component: (await import('../pages/SupportPage')).SupportPage,
+            }),
+          },
+          {
+            path: 'support/:ticketId',
+            lazy: async () => ({
+              Component: (await import('../pages/SupportTicketPage')).SupportTicketPage,
             }),
           },
           // Store creation & management (a customer can own multiple stores)
@@ -157,6 +174,38 @@ export const router = createBrowserRouter([
                 path: 'products',
                 lazy: async () => ({
                   Component: (await import('../pages/stores/StoreProductsPage')).StoreProductsPage,
+                }),
+              },
+              // The shop's own inbox — buyers who wrote in from the
+              // storefront's Help & Support. Answered by the seller; UnieMax
+              // never sees these.
+              {
+                path: 'customer-support',
+                lazy: async () => ({
+                  Component: (await import('../pages/stores/StoreCustomerSupportPage'))
+                    .StoreCustomerSupportPage,
+                }),
+              },
+              {
+                path: 'customer-support/:ticketId',
+                lazy: async () => ({
+                  Component: (await import('../pages/stores/StoreCustomerSupportTicketPage'))
+                    .StoreCustomerSupportTicketPage,
+                }),
+              },
+              // Contact the UnieMax team: the contact details plus this
+              // store's tickets, and one ticket's thread.
+              {
+                path: 'support',
+                lazy: async () => ({
+                  Component: (await import('../pages/stores/StoreSupportPage')).StoreSupportPage,
+                }),
+              },
+              {
+                path: 'support/:ticketId',
+                lazy: async () => ({
+                  Component: (await import('../pages/stores/StoreSupportTicketPage'))
+                    .StoreSupportTicketPage,
                 }),
               },
             ],

@@ -1232,6 +1232,176 @@ Deletes the product. Order history is preserved (order items keep a product snap
 
 ---
 
+## Support Tickets — `/api/v1/support` 🔒 customer · `/api/v1/admin/support` 🔒 admin
+
+A tracked conversation raised from inside the app. **Three flows, one
+resource**, separated by two columns:
+
+| Raised from | `recipient` | `storeId` | Answered by |
+| ----------- | ----------- | --------- | ----------- |
+| The account menu's Help & Support | `PLATFORM` | `null` | UnieMax |
+| A store's UnieMax Support section | `PLATFORM` | the store | UnieMax |
+| A storefront's Help & Support (`/store/{slug}/support`) | `STORE` | the store | **the shop's owner** |
+
+`storeId` alone cannot express the third: a seller writing *about* a store
+and a shopper writing *to* it name the same store. Hence `recipient`. The
+`scope` filter on the PLATFORM surfaces (`STORE`/`ACCOUNT`) is **derived**
+from `storeId` rather than stored, so it can never disagree with the row.
+
+**STORE threads never enter the admin console** — a conversation between a
+buyer and a seller is theirs, and `/api/v1/admin/support` 404s on one. A
+shopper who needs the platform instead uses the `STORE_REPORT` category on an
+account ticket.
+
+Every surface reads and writes the **same thread**, so the rules live in one
+service:
+
+- A ticket belonging to someone else is a **404**, never a 403.
+- **CLOSED is terminal** — neither side can post to a closed ticket (`409`).
+- A customer reply on a **RESOLVED** ticket **reopens** it (→ `OPEN`).
+- An admin reply on an **OPEN** ticket moves it to **IN_PROGRESS**.
+- `priority` is admin-only input; the reporter never sets or sees it.
+- Each account may hold **10** OPEN/IN_PROGRESS tickets at a time (`409`).
+
+Every message and status change notifies the other side (feed + Web Push),
+and every admin write appends an audit-trail row.
+
+### `GET /api/v1/public/support-contact` (no auth)
+
+How to reach support without opening a ticket — printed on the seller's
+Support page.
+→ `{ "data": { "email": "support@uniemax.com", "phone": "+91 7708774542", "hours": "…" } }`
+
+### The ticket shape
+
+```jsonc
+{ "id", "ticketNumber": "TKT-MT66KRBQ-FDYR",
+  "recipient": "PLATFORM" | "STORE",     // who answers
+  "subject", "category", "status", "priority",
+  "storeId", "storeName", "storeSlug",   // null for account-level tickets
+  "contactEmail", "contactPhone",        // snapshot of how to reach the reporter
+  "lastMessageAt", "resolvedAt", "closedAt", "createdAt",
+  "messageCount",
+  "customer": { "id", "name", "email", "phone" },   // who raised it
+  "messages": [                          // detail + every write response
+    { "id", "authorType": "CUSTOMER" | "ADMIN", "authorId", "authorName",
+      "authorRole": "REPORTER" | "STORE" | "PLATFORM",
+      "body", "createdAt" }
+  ] }
+```
+
+**Render messages from `authorRole`, not `authorType`.** On a STORE thread the
+seller replies from a Customer account, so both sides are `CUSTOMER`;
+`authorRole` is derived server-side (author vs. the ticket's reporter) so two
+clients cannot disagree about who said what.
+
+`category` ∈ `ORDERS | PAYMENTS | PAYOUTS | PRODUCTS | STORE_SETUP |
+STORE_REPORT | ACCOUNT | TECHNICAL | OTHER` · `status` ∈ `OPEN | IN_PROGRESS |
+RESOLVED | CLOSED` · `priority` ∈ `LOW | NORMAL | HIGH | URGENT`.
+
+The API accepts **any** category from any entry point; which ones are
+*offered* is a client decision — `PAYOUTS`/`STORE_SETUP` are seller-only,
+`STORE_REPORT` is shopper-to-UnieMax only (reporting a seller *to* that same
+seller is not a channel), and a message to a shop offers the four it can act
+on.
+
+### `GET /api/v1/support/tickets` 🔒 customer
+
+Query: `page`, `pageSize`, `status`, `storeId` (**id or slug**, ownership
+enforced), `scope` (`STORE`/`ACCOUNT`; ignored when `storeId` is given).
+**PLATFORM tickets only** — threads with a shop are listed under that shop
+(below). Own tickets, most recent activity first. `scope=ACCOUNT` is what
+keeps a seller's store threads out of their personal Help & Support list.
+
+### `POST /api/v1/support/tickets` 🔒 customer → `201`
+
+Rate limited to **5 / 10 min**.
+```jsonc
+{
+  "subject": "Payout not received for last week",  // 4–150
+  "category": "PAYOUTS",                            // defaults to OTHER
+  "message": "…",                                   // 10–4000
+  "storeId": "my-store",                            // optional, id or slug
+  "contactEmail": "seller@example.com",             // optional — falls back to
+  "contactPhone": "+91 98765 43210"                 //   the account's own
+}
+```
+
+### `GET /api/v1/support/tickets/:ticketId` 🔒 customer
+The ticket with its full thread.
+
+### `POST /api/v1/support/tickets/:ticketId/messages` 🔒 customer → `201`
+Body `{ "message" }` (10–4000). Rate limited to **20 / 10 min**. Reopens a
+RESOLVED ticket; `409` on a CLOSED one.
+
+### `POST /api/v1/support/tickets/:ticketId/close` 🔒 customer
+The reporter closing their own ticket. `409` if already closed.
+
+The three endpoints above serve **both** recipients: a reporter's own thread
+behaves identically whoever answers it, so only *starting* one is scoped.
+
+### `GET /api/v1/support/stores/:storeRef/tickets` 🔒 customer
+
+The shopper's own threads **with one shop**. `:storeRef` is its slug or id,
+resolved by the same public-visibility rule as the storefront — you can only
+message a shop you could have bought from, and an unpublished or suspended
+one is a `404`. Query: `page`, `pageSize`, `status`.
+
+### `POST /api/v1/support/stores/:storeRef/tickets` 🔒 customer → `201`
+
+Raise one. Body is the create shape **without `storeId`** — the shop is the
+path, not a field, since a body that could name a different one would be a way
+to post into a store you never opened. Rate limited to **5 / 10 min**.
+`400` when the caller owns the store (messaging yourself), `409` past **5**
+open threads with that one shop.
+
+### `GET /api/v1/stores/:id/support/tickets` 🔒 customer (store owner)
+
+The **shop's inbox** — what its customers raised. Ownership is enforced per
+call; another owner's store is a `404`. Query: `page`, `pageSize`, `q`
+(ticket number / subject / customer), `status`, `open` (`"true"`). Sorted
+oldest-activity-first under `open`, newest first otherwise; `meta` carries
+`openCount` for the store.
+
+### `GET /api/v1/stores/:id/support/tickets/:ticketId` 🔒 customer (store owner)
+One thread. A **platform** ticket about this store is a `404` here — that one
+is with UnieMax, not with the shop.
+
+### `POST /api/v1/stores/:id/support/tickets/:ticketId/messages` 🔒 customer (store owner) → `201`
+Body `{ "message" }`. Notifies the customer; moves OPEN → IN_PROGRESS.
+
+### `PATCH /api/v1/stores/:id/support/tickets/:ticketId` 🔒 customer (store owner)
+Body `{ "status" }` — **status only**. `priority` is the platform's triage
+vocabulary and is not offered to sellers. A change stamps
+`resolvedAt`/`closedAt` and notifies the customer.
+
+### `GET /api/v1/admin/support/tickets` 🔒 admin
+
+Query: `page`, `pageSize`, `q` (ticket number / subject / store / reporter
+name or email), `status`, `open` (`"true"` — OPEN + IN_PROGRESS), `category`,
+`priority`, `storeId`, `scope` (`STORE` = from sellers, `ACCOUNT` = from
+shoppers; ignored when `storeId` is given). **PLATFORM tickets only** — a
+shopper's thread with a shop is invisible here, including by direct id.
+Sorted **oldest activity first** under `open`, newest first otherwise. `meta`
+carries `openCount` — the platform-wide backlog, independent of the current
+filter.
+
+### `GET /api/v1/admin/support/tickets/:ticketId` 🔒 admin
+The ticket with its full thread.
+
+### `POST /api/v1/admin/support/tickets/:ticketId/messages` 🔒 admin → `201`
+Body `{ "message" }`. Notifies the reporter; moves OPEN → IN_PROGRESS.
+Audit: `support.reply`.
+
+### `PATCH /api/v1/admin/support/tickets/:ticketId` 🔒 admin
+
+Body `{ "status"?, "priority"? }` — at least one. A status change stamps
+`resolvedAt`/`closedAt` (and clears them when it moves away) and notifies the
+reporter; a priority change is silent. Audit: `support.status` /
+`support.priority`.
+
+---
+
 ## Notifications — `/api/v1/notifications` 🔒 customer · `/api/v1/admin/notifications` 🔒 admin
 
 The **same handlers** serve both surfaces; the guard that ran decides whose
@@ -1250,7 +1420,7 @@ identifies the sender and authorises nothing.
 Query: `page`, `pageSize`, `unreadOnly` (`"true"`/`"false"`).
 → `{ "data": [ { id, kind, title, body, url, data, readAt, createdAt } ], "meta": { … }, "unread": 3 }`
 
-`kind` ∈ `ORDER_PLACED | ORDER_STATUS | PAYMENT | STORE | ACCOUNT | ANNOUNCEMENT`.
+`kind` ∈ `ORDER_PLACED | ORDER_STATUS | PAYMENT | STORE | ACCOUNT | ANNOUNCEMENT | SUPPORT`.
 `url` is an in-app path the client navigates to on click.
 
 ### `GET …/notifications/unread-count`

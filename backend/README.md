@@ -77,6 +77,7 @@ Verify: `curl http://localhost:4000/health`
 | `CASHFREE_ENV` | `sandbox` (default — `sandbox.cashfree.com/pg`) \| `production` (`api.cashfree.com/pg`); also picks the web SDK mode |
 | `CASHFREE_API_VERSION` | `x-api-version` header (default `2023-08-01`, PG API v4) |
 | `PUBLIC_API_URL` | Optional public origin of this API — builds the per-order webhook `notify_url`; otherwise configure the webhook URL in the Cashfree dashboard (see [docs/CASHFREE_PAYMENTS.md](../docs/CASHFREE_PAYMENTS.md)) |
+| `SUPPORT_EMAIL` / `SUPPORT_PHONE` / `SUPPORT_HOURS` | Platform support contact served at `GET /api/v1/public/support-contact` and printed on the seller's Help & Support page. All default to the live UnieMax details, so no environment has to set them |
 | `DATABASE_URL` | Pooled connection (runtime) — Supabase PgBouncer `:6543`  |
 | `DIRECT_URL`   | Direct connection (migrations) — Supabase `:5432`         |
 | `JWT_SECRET`   | **Required.** Signs access tokens (admin + customer)      |

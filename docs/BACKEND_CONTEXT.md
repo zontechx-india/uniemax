@@ -109,6 +109,10 @@ backend/
 │   │   │                      #   admin.controller.ts (thin, audits writes) ·
 │   │   │                      #   adminDashboard/Stores/Customers/Orders/
 │   │   │                      #   Products/Accounts.service.ts · adminAudit.ts
+│   │   ├── support/           # support tickets — THREE flows, one table:
+│   │   │                      #   support.shared.ts (selects/shapes/urls) ·
+│   │   │                      #   support.service.ts (→ UnieMax + /admin) ·
+│   │   │                      #   supportStore.service.ts (shopper ↔ seller)
 │   │   ├── payments/          # Cashfree gateway: cashfree.client.ts (PG v4
 │   │   │                      #   REST wrapper) + session create/retry +
 │   │   │                      #   HMAC-verified webhook + reconcile fallback
@@ -299,6 +303,90 @@ Endpoint naming note: the console's catalog lives under
 `/api/v1/admin/catalog/products` because `/admin/products` is already the
 original single-tenant catalog (`modules/product`) — these are the *sellers'*
 products, a different thing.
+
+### Support tickets — `modules/support`
+
+One module, three route trees: a public contact endpoint, the reporter's
+surface behind `requireCustomer` (`/api/v1/support`), and the platform
+queue inside the `/admin` guard (`/api/v1/admin/support`). **One service**
+backs both sides, because they are the same thread read from opposite ends —
+splitting them would mean two definitions of "who may post here", which is
+exactly the rule that must not diverge.
+
+**Three flows, one table**, separated by two columns:
+
+| Flow | `recipient` | `storeId` | Answered by |
+| ---- | ----------- | --------- | ----------- |
+| Shopper → UnieMax (account menu) | PLATFORM | null | the console |
+| Seller → UnieMax (their shop) | PLATFORM | the store | the console |
+| Shopper → the shop they buy from | STORE | the store | **the store owner** |
+
+`storeId` alone cannot express the third — a seller writing *about* a store
+and a shopper writing *to* it name the same store — which is the whole reason
+`recipient` exists. The `scope` filter the PLATFORM surfaces expose
+(`STORE`/`ACCOUNT`) is still **derived** from `storeId`, so that flag can
+never disagree with the row it describes, and a customer who also sells never
+sees their shop threads in their personal list or the reverse.
+
+**The console answers PLATFORM tickets only.** `adminListTickets` filters on
+it and `adminGetTicket` 404s on a store thread: a conversation between a
+buyer and a seller is theirs, and a queue padded with threads nobody there is
+expected to answer is a queue that stops being read. A shopper who needs the
+platform to step in has the `STORE_REPORT` category on an account ticket.
+
+Code layout follows the split: `support.shared.ts` holds what every flow
+needs (selects, the wire shape, ticket numbers, per-flow reporter URLs),
+`support.service.ts` owns the PLATFORM flows plus the console, and
+`supportStore.service.ts` owns the store flows. The reporter's own reads and
+writes stay in `support.service.ts` **for both recipients** — a thread behaves
+identically for the person who raised it whoever answers, and only the
+notification target differs — so they branch on `recipient` instead of
+existing in two copies.
+
+The category enum spans every audience (`PAYOUTS`/`STORE_SETUP` are seller
+concerns, `STORE_REPORT` a shopper's); the **API accepts any of them** and the
+clients decide which to offer, because the alternative is a validation rule
+that has to know which page the request came from.
+
+Decisions worth keeping:
+
+- **Ownership failures are 404s**, not 403s: a 403 confirms the ticket exists.
+- **CLOSED is terminal** for both sides; carrying on means a new ticket, so a
+  thread always has exactly one subject. A reporter's reply on a **RESOLVED**
+  ticket, by contrast, **reopens** it — "resolved" is the platform's opinion,
+  and the person who raised it gets to disagree without filing a duplicate.
+- **An admin reply moves OPEN → IN_PROGRESS.** Answering *is* picking it up;
+  making that a second manual step guarantees a queue that lies.
+- **`priority` is admin-only input.** Offered the choice, every reporter picks
+  URGENT and the field stops sorting anything.
+- **Contact details come from env** (`SUPPORT_EMAIL` / `SUPPORT_PHONE` /
+  `SUPPORT_HOURS`, served at `GET /public/support-contact`) rather than being
+  hardcoded in the client, so the number changes with one deploy. The client
+  still ships a fallback copy — a support page showing no way to reach support
+  is the one failure mode it must not have.
+- Creating a ticket fans a notification out to **every** admin, so the route is
+  rate-limited (5 / 10 min) well below the global ceiling. The admin's
+  notification names the store, or says "(shopper)", so the queue it belongs
+  to is clear before anything is opened.
+- The reporter's notifications deep-link to **their** view of the ticket,
+  which differs per flow (`reporterUrl` in `support.shared.ts`):
+  `/support/{id}` for an account thread, `/stores/{slug}/support/{id}` for a
+  seller's platform thread, `/store/{slug}/support/{id}` for a shopper's
+  thread with a shop.
+- **A message's `authorRole` is derived server-side** (`REPORTER`/`STORE`/
+  `PLATFORM`) and is what clients render from. `authorType` cannot answer it
+  on a store thread: the seller replies from a Customer account, so both
+  sides read `CUSTOMER` and telling them apart means comparing the author to
+  the ticket's reporter. Doing that once, server-side, stops two clients
+  implementing it slightly differently.
+- **A shop is messaged through its public identity.** `createStoreTicket`
+  resolves the store with `PUBLIC_STORE_VISIBILITY` — the same rule the
+  storefront uses — so you can only write to a shop you could have bought
+  from, and an owner writing to their own store is refused outright (it would
+  land in their own inbox). A seller answers only from their own store's
+  subtree, so a ticket id from another shop is a 404.
+- **Sellers set status, never priority.** Priority is the platform's triage
+  vocabulary; a shop's inbox is small enough to read without one.
 
 ### Authentication — the `package/auth` sub-system
 
@@ -595,6 +683,26 @@ White-label design — one codebase, any business:
   `ACCOUNT`/`ANNOUNCEMENT`), `title`, `body`, optional in-app `url` and `data`
   JSON, `readAt`. Indexed for the two queries that exist: the feed and the
   unread count.
+- **SupportTicket / SupportTicketMessage** — the seller↔platform
+  conversation (`modules/support`). The ticket is owned by the `Customer`
+  who raised it (cascade) and optionally points at the `Store` it is about
+  (`SetNull` + a `storeName` snapshot, so a deleted store never takes the
+  thread with it). Carries a quotable `ticketNumber` (unique,
+  "TKT-MT66KRBQ-FDYR"), `subject`, `category`
+  (`SupportTicketCategory`), `status` (`SupportTicketStatus` —
+  OPEN/IN_PROGRESS/RESOLVED/CLOSED), `priority` (`SupportTicketPriority`,
+  admin-set), `contactEmail`/`contactPhone` **snapshots** (an account's email
+  can change; a ticket must stay answerable by the details actually given),
+  and `lastMessageAt` — bumped by every message on either side, so the queue
+  sorts by "who is waiting longest" without joining the message table.
+  `recipient` (`SupportRecipient` — PLATFORM/STORE) says **who answers**, the
+  one thing `storeId` cannot express: a seller writing *about* a store and a
+  shopper writing *to* it both name the same store. Together the two columns
+  separate all three flows with nothing to keep in sync.
+  `SupportTicketMessage` is one post in the thread: `authorType` reuses
+  `PrincipalType` (the same vocabulary as sessions and notifications) with an
+  `authorName` snapshot, so a thread still reads correctly after an admin
+  account is removed.
 - **AdminAuditLog** — append-only record of every state-changing admin
   action. Nothing in the app updates or deletes a row, which is what keeps it
   trustworthy for an incident review. Holds `adminId` **plus a snapshot of
@@ -611,7 +719,8 @@ White-label design — one codebase, any business:
 Enums: `ProductStatus`, `OrderStatus`, `PaymentMethod`, `PaymentStatus`, `ShippingType`,
 `OtpChannel`, `OtpPurpose`, `AuthProvider`, `AdminRole`, `StoreMediaType`,
 `BankVerificationStatus`, `BankVerificationMethod`, `PrincipalType`,
-`NotificationKind`.
+`NotificationKind` (includes `SUPPORT`), `SupportRecipient`,
+`SupportTicketStatus`, `SupportTicketCategory`, `SupportTicketPriority`.
 
 ---
 
@@ -663,7 +772,9 @@ either `.env` or a per-mode file, never both. `config/env.ts` prints
 `APP_ENV=production` via `backend/ecosystem.config.cjs`.
 
 Key env vars. App-level (`config/env.ts`): `DATABASE_URL`, `DIRECT_URL`, `CORS_ORIGIN`,
-`TRUST_PROXY`, plus `HOST`/`PORT`/`LOG_LEVEL`, and the Cashfree gateway set
+`TRUST_PROXY`, plus `HOST`/`PORT`/`LOG_LEVEL`, the platform support contact
+`SUPPORT_EMAIL` / `SUPPORT_PHONE` / `SUPPORT_HOURS` (all defaulted to the live
+UnieMax details, so no environment has to set them), and the Cashfree gateway set
 `CASHFREE_APP_ID` / `CASHFREE_SECRET_KEY` / `CASHFREE_ENV`
 (`sandbox`/`production`) / `CASHFREE_API_VERSION` (`2023-08-01`) /
 `PUBLIC_API_URL` (webhook `notify_url` origin) — see
@@ -763,6 +874,20 @@ subscriptions, `notify()`/`notifyAdmins()` dispatch, admin broadcast).
 Order placement and every status change now fire email **and** push from the
 same function; store suspension, product moderation and payout verification
 notify the seller. Full reference: `docs/PUSH_NOTIFICATIONS.md`.
+
+Also done: **support tickets** — `modules/support` covers all three
+conversations the product has, over one table:
+
+1. **Shopper → UnieMax** from the account menu's Help & Support.
+2. **Seller → UnieMax** from their store's UnieMax Support section.
+3. **Shopper → the shop they buy from**, raised at
+   `/store/{slug}/support` and answered by the owner in that store's
+   Customer Support section.
+
+`recipient` + `storeId` separate them; the console answers (1) and (2) from
+one queue filterable by audience and never sees (3). Every message and status
+change notifies the other side over the existing feed + Web Push, and every
+admin write lands in the audit trail.
 
 **Not yet (hooks in place):**
 1. **Cashfree refunds** — cancelling a paid order marks REFUNDED (status

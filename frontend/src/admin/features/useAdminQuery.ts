@@ -60,9 +60,13 @@ export function useAdminQuery<T>(
  * The URL is the state: back/forward work, a filtered view is shareable, and
  * a refresh lands where the admin was. `setFilter` resets to page 1 — a
  * filter change makes the old page number meaningless.
+ *
+ * `M` widens the meta envelope for the endpoints that return more than the
+ * pagination counters (support tickets add `openCount`). It defaults to
+ * `ListMeta`, so every plain list call site is untouched.
  */
-export function useAdminList<T>(
-  fetcher: (query: Record<string, string | number>) => Promise<{ items: T[]; meta: ListMeta }>,
+export function useAdminList<T, M extends ListMeta = ListMeta>(
+  fetcher: (query: Record<string, string | number>) => Promise<{ items: T[]; meta: M }>,
   options: { pageSize?: number; keys: string[] },
 ) {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -106,7 +110,9 @@ export function useAdminList<T>(
 
   return {
     rows: query.data?.items ?? [],
-    meta: query.data?.meta ?? { total: 0, page, pageSize, totalPages: 0 },
+    // Before the first response lands there are no counters — the extra keys
+    // of a widened `M` are simply absent, which reads as falsy in the UI.
+    meta: query.data?.meta ?? ({ total: 0, page, pageSize, totalPages: 0 } as M),
     loading: query.loading,
     error: query.error,
     refresh: query.refresh,

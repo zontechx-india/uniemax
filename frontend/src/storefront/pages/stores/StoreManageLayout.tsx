@@ -14,9 +14,11 @@ import {
   CardIcon,
   CartIcon,
   ChartIcon,
+  ChatIcon,
   ClipboardIcon,
   FooterIcon,
   HomeIcon,
+  LifebuoyIcon,
   PaletteIcon,
   StoreIcon,
   TagIcon,
@@ -58,9 +60,15 @@ interface SectionItem {
  * - Payments precedes Bank Accounts: payout accounts only matter once online
  *   payment is switched on, and that page already links across when it needs one.
  *
- * Deliberately NOT collapsible — twelve items over four groups fit on screen,
- * and an accordion would add a click before every navigation while hiding the
- * item being hunted for.
+ * - **Help** sits last, holding the two support channels that must not be
+ *   confused: **Customer Support** is the shop's own inbox (buyers writing to
+ *   the seller — daily work, so it leads) and **UnieMax Support** is the
+ *   seller writing to the platform. Naming them by *who is on the other end*
+ *   is the only labelling that stays unambiguous once both exist.
+ *
+ * Deliberately NOT collapsible — fourteen items over five groups fit on
+ * screen, and an accordion would add a click before every navigation while
+ * hiding the item being hunted for.
  */
 const SECTION_GROUPS: { caption: string; items: SectionItem[] }[] = [
   {
@@ -93,6 +101,13 @@ const SECTION_GROUPS: { caption: string; items: SectionItem[] }[] = [
       { label: 'Bank Accounts', to: 'bank-accounts', icon: BankIcon },
       { label: 'Shipping', to: 'shipping', icon: TruckIcon },
       { label: 'Checkout', to: 'checkout', icon: ClipboardIcon },
+    ],
+  },
+  {
+    caption: 'Help',
+    items: [
+      { label: 'Customer Support', to: 'customer-support', icon: ChatIcon },
+      { label: 'UnieMax Support', to: 'support', icon: LifebuoyIcon },
     ],
   },
 ]

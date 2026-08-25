@@ -4,6 +4,7 @@ import { SOCIAL_META } from '../../../shared/ui/socialIcons'
 import {
   FOOTER_POLICY_KEYS,
   FOOTER_SOCIAL_KEYS,
+  storeSupportUrl,
   type FooterLocation,
   type FooterPolicyKey,
   type PublicStore,
@@ -12,6 +13,7 @@ import {
 import {
   ClockIcon,
   ExternalLinkIcon,
+  LifebuoyIcon,
   MailIcon,
   MapPinIcon,
   PhoneCallIcon,
@@ -25,6 +27,12 @@ import type { Skin } from './storeTheme'
  * block is conditional: a store that configured nothing gets the original
  * minimal footer (brand mark + powered-by), never a wall of empty headings.
  * Fully responsive: one column on phones, two on tablets, four on desktop.
+ *
+ * The Customer Support block is the one exception to "conditional": it always
+ * renders, because **Help & Support is always available** whether or not the
+ * owner filled in a phone number — the shopper can message the shop through
+ * the app either way, and a footer that hides the only guaranteed contact
+ * route to keep a heading tidy is the wrong trade.
  */
 
 const POLICY_LABELS: Record<FooterPolicyKey, string> = {
@@ -43,21 +51,12 @@ export function StoreFooter({ store, skin }: { store: PublicStore; skin: Skin })
   const footer = store.footer
   const socials = FOOTER_SOCIAL_KEYS.filter((key) => footer.social[key])
   const policies = FOOTER_POLICY_KEYS.filter((key) => footer.policies[key])
-  const hasSupport =
-    footer.support.email ||
-    footer.support.phone ||
-    footer.support.whatsapp ||
-    footer.support.hours
-  const hasBrandExtras =
-    footer.info.about ||
-    footer.info.establishedYear ||
-    footer.info.gstNumber ||
-    footer.info.registrationNumber ||
-    socials.length > 0
   const hasLinks = footer.links.length > 0 || policies.length > 0
 
-  const hasContent =
-    hasBrandExtras || hasLinks || hasSupport || footer.locations.length > 0
+  // The block grid always renders now: Customer Support is unconditional
+  // (it carries the in-app Help & Support link, which every store has), so
+  // the old "configured nothing → minimal footer" branch can no longer be
+  // reached and the flags that decided it are gone.
 
   const copyright =
     footer.copyrightText ??
@@ -66,95 +65,101 @@ export function StoreFooter({ store, skin }: { store: PublicStore; skin: Skin })
   return (
     <footer className={`mt-10 border-t ${skin.border}`}>
       <div className="mx-auto max-w-[1920px] px-4 sm:px-6 lg:px-10">
-        {hasContent && (
-          <div className="grid gap-10 py-10 sm:grid-cols-2 lg:grid-cols-4">
-            <BrandBlock store={store} socials={socials} />
-            {hasLinks && (
-              <FooterBlock title="Quick Links">
-                <ul className="space-y-2">
-                  {footer.links.map((link) => (
-                    <li key={`${link.label}-${link.url}`}>
-                      <FooterAnchor href={link.url}>{link.label}</FooterAnchor>
-                    </li>
+        <div className="grid gap-10 py-10 sm:grid-cols-2 lg:grid-cols-4">
+          <BrandBlock store={store} socials={socials} />
+          {hasLinks && (
+            <FooterBlock title="Quick Links">
+              <ul className="space-y-2">
+                {footer.links.map((link) => (
+                  <li key={`${link.label}-${link.url}`}>
+                    <FooterAnchor href={link.url}>{link.label}</FooterAnchor>
+                  </li>
+                ))}
+                {policies.map((key) => (
+                  <li key={key}>
+                    <FooterAnchor href={footer.policies[key]!}>
+                      {POLICY_LABELS[key]}
+                    </FooterAnchor>
+                  </li>
+                ))}
+              </ul>
+            </FooterBlock>
+          )}
+          {footer.locations.length > 0 && (
+            <FooterBlock
+              title={footer.locations.length > 1 ? 'Our Locations' : 'Visit Us'}
+            >
+              <ul className="space-y-5">
+                {[...footer.locations]
+                  .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary))
+                  .map((location) => (
+                    <LocationBlock
+                      key={location.id ?? location.address}
+                      location={location}
+                    />
                   ))}
-                  {policies.map((key) => (
-                    <li key={key}>
-                      <FooterAnchor href={footer.policies[key]!}>
-                        {POLICY_LABELS[key]}
-                      </FooterAnchor>
-                    </li>
-                  ))}
-                </ul>
-              </FooterBlock>
-            )}
-            {footer.locations.length > 0 && (
-              <FooterBlock
-                title={footer.locations.length > 1 ? 'Our Locations' : 'Visit Us'}
-              >
-                <ul className="space-y-5">
-                  {[...footer.locations]
-                    .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary))
-                    .map((location) => (
-                      <LocationBlock
-                        key={location.id ?? location.address}
-                        location={location}
-                      />
-                    ))}
-                </ul>
-              </FooterBlock>
-            )}
-            {hasSupport && (
-              <FooterBlock title="Customer Support">
-                <ul className="space-y-2.5 text-sm">
-                  {footer.support.phone && (
-                    <ContactRow icon={<PhoneCallIcon className="h-4 w-4" />}>
-                      <a
-                        href={telLink(footer.support.phone)}
-                        className="transition hover:text-brand"
-                      >
-                        {footer.support.phone}
-                      </a>
-                    </ContactRow>
-                  )}
-                  {footer.support.whatsapp && (
-                    <ContactRow
-                      icon={
-                        <SOCIAL_META.whatsapp.Icon className="h-4 w-4" />
-                      }
-                    >
-                      <a
-                        href={waLink(footer.support.whatsapp)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="transition hover:text-brand"
-                      >
-                        WhatsApp: {footer.support.whatsapp}
-                      </a>
-                    </ContactRow>
-                  )}
-                  {footer.support.email && (
-                    <ContactRow icon={<MailIcon className="h-4 w-4" />}>
-                      <a
-                        href={`mailto:${footer.support.email}`}
-                        className="break-all transition hover:text-brand"
-                      >
-                        {footer.support.email}
-                      </a>
-                    </ContactRow>
-                  )}
-                  {footer.support.hours && (
-                    <ContactRow icon={<ClockIcon className="h-4 w-4" />}>
-                      {footer.support.hours}
-                    </ContactRow>
-                  )}
-                </ul>
-              </FooterBlock>
-            )}
-          </div>
-        )}
+              </ul>
+            </FooterBlock>
+          )}
+          <FooterBlock title="Customer Support">
+            <ul className="space-y-2.5 text-sm">
+              {/* First, and always present: the tracked conversation. A
+                  phone number can go unanswered; this one has a record. */}
+              <ContactRow icon={<LifebuoyIcon className="h-4 w-4" />}>
+                <Link
+                  to={storeSupportUrl(store.slug)}
+                  className="font-semibold transition hover:text-brand"
+                >
+                  Help &amp; Support
+                </Link>
+              </ContactRow>
+              {footer.support.phone && (
+                <ContactRow icon={<PhoneCallIcon className="h-4 w-4" />}>
+                  <a
+                    href={telLink(footer.support.phone)}
+                    className="transition hover:text-brand"
+                  >
+                    {footer.support.phone}
+                  </a>
+                </ContactRow>
+              )}
+              {footer.support.whatsapp && (
+                <ContactRow
+                  icon={
+                    <SOCIAL_META.whatsapp.Icon className="h-4 w-4" />
+                  }
+                >
+                  <a
+                    href={waLink(footer.support.whatsapp)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="transition hover:text-brand"
+                  >
+                    WhatsApp: {footer.support.whatsapp}
+                  </a>
+                </ContactRow>
+              )}
+              {footer.support.email && (
+                <ContactRow icon={<MailIcon className="h-4 w-4" />}>
+                  <a
+                    href={`mailto:${footer.support.email}`}
+                    className="break-all transition hover:text-brand"
+                  >
+                    {footer.support.email}
+                  </a>
+                </ContactRow>
+              )}
+              {footer.support.hours && (
+                <ContactRow icon={<ClockIcon className="h-4 w-4" />}>
+                  {footer.support.hours}
+                </ContactRow>
+              )}
+            </ul>
+          </FooterBlock>
+        </div>
 
         <div
-          className={`flex flex-col items-center justify-between gap-2 border-t ${skin.border} py-6 text-center text-xs sm:flex-row sm:text-left ${skin.muted} ${hasContent ? '' : 'border-t-0'}`}
+          className={`flex flex-col items-center justify-between gap-2 border-t ${skin.border} py-6 text-center text-xs sm:flex-row sm:text-left ${skin.muted}`}
         >
           <div>
             <p>{copyright}</p>

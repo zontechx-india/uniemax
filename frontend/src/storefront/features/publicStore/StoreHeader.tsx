@@ -6,6 +6,7 @@ import {
   storeCategoryUrl,
   storeHomeUrl,
   storeShopUrl,
+  storeSupportUrl,
   type PublicStore,
 } from '../stores/storesApi'
 import { useCart } from '../cart/cart'
@@ -21,7 +22,7 @@ import {
 import type { Skin } from './storeTheme'
 
 /**
- * Storefront chrome: logo · Home · Categories ▾ · search · cart.
+ * Storefront chrome: logo · Home · Shop · Categories ▾ · Help · search · cart.
  *
  * The Categories menu lists **categories and subcategories only, never
  * products** — a dropdown that enumerated products would be unusable the
@@ -32,8 +33,13 @@ import type { Skin } from './storeTheme'
  * below `lg` the hamburger opens a drawer where categories expand as an
  * accordion.
  *
- * Nav items whose features don't exist yet (Offers, Track Order, About,
- * Contact) are deliberately absent rather than rendered as dead links.
+ * **Help** goes to this shop's own Help & Support — the seller answers it,
+ * not UnieMax. It sits in the nav rather than behind an icon because a
+ * shopper looking for "how do I reach them" scans for the word; the footer
+ * carries the same link for anyone who reads to the bottom instead.
+ *
+ * Nav items whose features don't exist yet (Offers, Track Order, About) are
+ * deliberately absent rather than rendered as dead links.
  */
 export function StoreHeader({
   store,
@@ -97,6 +103,9 @@ export function StoreHeader({
             Shop
           </NavLink>
           <CategoriesMenu store={store} skin={skin} />
+          <NavLink to={storeSupportUrl(store.slug)} skin={skin}>
+            Help
+          </NavLink>
         </nav>
 
         {/* Search */}
@@ -295,6 +304,13 @@ function MobileDrawer({
             className={`block rounded-md px-3 py-2.5 text-sm font-bold ${skin.text}`}
           >
             Shop
+          </Link>
+          <Link
+            to={storeSupportUrl(store.slug)}
+            onClick={onClose}
+            className={`block rounded-md px-3 py-2.5 text-sm font-bold ${skin.text}`}
+          >
+            Help &amp; Support
           </Link>
 
           <p

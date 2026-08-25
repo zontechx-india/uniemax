@@ -5,6 +5,7 @@ import * as catalogController from "./storeCatalog.controller.js";
 import * as bankController from "./storeBank.controller.js";
 import * as publicController from "./publicStore.controller.js";
 import * as ordersController from "../orders/orders.controller.js";
+import { storeOwnerSupportRoutes } from "../support/support.routes.js";
 
 /**
  * Customer-owned stores. Mounted at /api/v1/stores — every route requires a
@@ -24,6 +25,9 @@ export const storeRoutes: FastifyPluginAsync = async (app) => {
   app.get("/:id/orders/:orderId", ordersController.getStoreOrder);
   app.patch("/:id/orders/:orderId/status", ordersController.updateStoreOrderStatus);
   app.post("/:id/orders/:orderId/cancel", ordersController.cancelStoreOrder);
+  // Customer support — the shop's own inbox: threads shoppers opened with
+  // this store. (Its Help & Support *with UnieMax* is /api/v1/support.)
+  await app.register(storeOwnerSupportRoutes, { prefix: "/:id/support" });
   app.get("/:id", controller.getStore);
   app.patch("/:id", controller.updateStore);
   app.patch("/:id/theme", controller.updateStoreTheme);

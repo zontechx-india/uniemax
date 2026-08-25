@@ -30,7 +30,8 @@ export type NotificationKind =
   | "PAYMENT"
   | "STORE"
   | "ACCOUNT"
-  | "ANNOUNCEMENT";
+  | "ANNOUNCEMENT"
+  | "SUPPORT";
 
 export interface NotifyInput {
   principalType: PrincipalType;
