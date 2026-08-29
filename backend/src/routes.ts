@@ -12,6 +12,10 @@ import {
   adminProductRoutes,
 } from "./modules/product/product.routes.js";
 import { storeRoutes, publicStoreRoutes } from "./modules/stores/stores.routes.js";
+import {
+  sellerThemeTemplateRoutes,
+  adminThemeTemplateRoutes,
+} from "./modules/themeTemplates/themeTemplates.routes.js";
 import { publicDiscoveryRoutes } from "./modules/discovery/discovery.routes.js";
 import { addressRoutes } from "./modules/addresses/addresses.routes.js";
 import {
@@ -50,6 +54,9 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       await api.register(publicProductRoutes, { prefix: "/products" });
       // Customer-owned stores (guarded inside the plugin — requireCustomer).
       await api.register(storeRoutes, { prefix: "/stores" });
+      // Curated storefront palettes a seller applies from Appearance —
+      // active templates only (guarded inside the plugin — requireCustomer).
+      await api.register(sellerThemeTemplateRoutes, { prefix: "/theme-templates" });
       // Customer address book (guarded inside the plugin — requireCustomer).
       await api.register(addressRoutes, { prefix: "/addresses" });
       // Customer order history (guarded inside the plugin — requireCustomer).
@@ -102,6 +109,10 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
             // Support ticket queue — the platform team's side of the threads
             // sellers raise from their stores.
             await guarded.register(adminSupportRoutes, { prefix: "/support" });
+            // Store appearance templates — the palettes sellers pick from.
+            await guarded.register(adminThemeTemplateRoutes, {
+              prefix: "/theme-templates",
+            });
             // The platform console (dashboard, stores, customers, orders,
             // payments, catalog oversight, audit trail, admin accounts).
             await guarded.register(adminConsoleRoutes);

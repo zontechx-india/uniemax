@@ -90,6 +90,18 @@ export const router = createBrowserRouter([
               Component: (await import('../pages/stores/CreateStorePage')).CreateStorePage,
             }),
           },
+          // Full-width theme preview. A SIBLING of the manage layout, not a
+          // child: inside that layout the preview shares its row with the
+          // 260px section nav, which on a 1024px laptop leaves it narrower
+          // than a 768px tablet gets. React Router ranks by specificity, so
+          // this four-segment path wins over the layout's 'appearance' child.
+          {
+            path: 'stores/:storeSlug/appearance/preview',
+            lazy: async () => ({
+              Component: (await import('../pages/stores/StoreThemePreviewPage'))
+                .StoreThemePreviewPage,
+            }),
+          },
           {
             path: 'stores/:storeSlug',
             lazy: async () => ({

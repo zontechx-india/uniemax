@@ -90,6 +90,41 @@ export interface StoreRow {
   revenue: string
 }
 
+/**
+ * A store appearance template — a curated palette a seller can apply to their
+ * storefront in one click. Colors ONLY: the same five keys as a store's own
+ * theme, and nothing else about a store.
+ */
+export interface ThemeTemplateColors {
+  backgroundColor: string
+  primaryColor: string
+  /** Links, prices & highlights. `null` = Auto (follows primary). */
+  secondaryColor: string | null
+  /** Cards & panels. `null` = Auto (derived from the background). */
+  surfaceColor: string | null
+  /** Text on CTA buttons. `null` = Auto (from the primary's luminance). */
+  buttonTextColor: string | null
+}
+
+export interface ThemeTemplate {
+  id: string
+  name: string
+  description: string | null
+  theme: ThemeTemplateColors
+  isActive: boolean
+  displayOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ThemeTemplateInput {
+  name: string
+  description: string | null
+  theme: ThemeTemplateColors
+  isActive: boolean
+  displayOrder: number
+}
+
 export interface BankAccount {
   id: string
   accountHolderName: string
@@ -420,6 +455,24 @@ export const adminApi = {
   },
   resetAdminPassword(id: string, password: string) {
     return call<{ revokedSessions: number }>(http.post(`${BASE}/admins/${id}/password`, { password }))
+  },
+
+  // Store appearance templates — the palettes sellers pick from. Applying
+  // one COPIES its colors onto a store, so edits here never reach a live
+  // storefront; disabling one only removes it from the seller's picker.
+  listThemeTemplates() {
+    return call<ThemeTemplate[]>(http.get(`${BASE}/theme-templates`))
+  },
+  createThemeTemplate(body: ThemeTemplateInput) {
+    return call<ThemeTemplate>(http.post(`${BASE}/theme-templates`, body))
+  },
+  updateThemeTemplate(id: string, body: Partial<ThemeTemplateInput>) {
+    return call<ThemeTemplate>(http.patch(`${BASE}/theme-templates/${id}`, body))
+  },
+  deleteThemeTemplate(id: string) {
+    return call<{ id: string; deleted: boolean }>(
+      http.delete(`${BASE}/theme-templates/${id}`),
+    )
   },
 
   // Broadcast (the feed itself lives in notificationsApi)

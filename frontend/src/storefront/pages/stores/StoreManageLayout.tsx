@@ -187,7 +187,7 @@ export function StoreManageLayout() {
 
       <div className="items-start gap-3 space-y-3 lg:grid lg:grid-cols-[260px_1fr] lg:space-y-0">
         {/* Left: section picker */}
-        <aside className="rounded-lg bg-surface shadow-floating">
+        <aside className="min-w-0 rounded-lg bg-surface shadow-floating">
           <div className="flex items-center gap-3 border-b border-line p-4">
             {store.logoUrl ? (
               <img
@@ -254,8 +254,14 @@ export function StoreManageLayout() {
           <StorePublishCard store={store} onStoreChange={setStore} />
         </aside>
 
-        {/* Right: the selected section */}
-        <section className="min-h-[400px] rounded-lg bg-surface p-4 shadow-floating sm:p-5">
+        {/* Right: the selected section.
+
+            `min-w-0` is load-bearing: a grid item defaults to
+            `min-width: auto`, so anything wide inside (a horizontal card
+            strip, a table, a long unbroken string) grows the `1fr` track past
+            its share and pushes the whole panel off the right edge instead of
+            scrolling or truncating within it. */}
+        <section className="min-w-0 min-h-[400px] rounded-lg bg-surface p-4 shadow-floating sm:p-5">
           <Outlet
             context={
               {

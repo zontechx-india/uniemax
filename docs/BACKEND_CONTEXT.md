@@ -47,7 +47,7 @@ library, VAPID; console fallback without keys — see
 ```
 backend/
 ├── prisma/
-│   ├── schema.prisma          # Data model (18 models, source of truth)
+│   ├── schema.prisma          # Data model (26 models, source of truth)
 │   └── check.sql              # Connectivity probe for `npm run db:check`
 ├── prisma.config.ts           # Prisma 7 config — migration datasource (DIRECT_URL)
 ├── src/
@@ -91,6 +91,8 @@ backend/
 │   │   ├── stores/            # customer stores: stores.* · storeCatalog.* ·
 │   │   │                      #   storeBank.* (payout accounts) ·
 │   │   │                      #   publicStore.* (storefront) · catalogSlug.ts
+│   │   ├── themeTemplates/    # curated storefront palettes: seller read
+│   │   │                      #   (active only) + admin CRUD; colors only
 │   │   ├── addresses/         # customer address book (schema · service ·
 │   │   │                      #   controller · routes, requireCustomer)
 │   │   ├── orders/            # storefront order placement (requireCustomer)
@@ -121,6 +123,9 @@ backend/
 │   │   └── (shipping, inventory, settings, dashboard — planned)
 │   ├── scripts/
 │   │   ├── createAdmin.ts     # Bootstrap an admin (npm run create-admin)
+│   │   ├── seedThemeTemplates.ts # Starter appearance templates, colors
+│   │   │                      #   lifted from real stores (npm run
+│   │   │                      #   seed-theme-templates)
 │   │   ├── generatePushKeys.ts# VAPID key pair (npm run push-keys)
 │   │   └── backfillCatalog.ts # Slugs + price aggregates (npm run backfill-catalog)
 │   ├── utils/                 # response, slug, httpError, zodHelpers, logger, password
@@ -304,6 +309,24 @@ Endpoint naming note: the console's catalog lives under
 original single-tenant catalog (`modules/product`) — these are the *sellers'*
 products, a different thing.
 
+### Store appearance templates — `modules/themeTemplates`
+
+One table (`StoreThemeTemplate`), two surfaces. Sellers read
+`GET /api/v1/theme-templates` (behind `requireCustomer`, **active rows only**)
+and pick a palette in their store's Appearance section; the console owns full
+CRUD at `/api/v1/admin/theme-templates`, auditing every write.
+
+The design rule that makes the whole feature safe: **a template is colors, and
+applying one is a copy.** There is no foreign key from `Store` to
+`StoreThemeTemplate` — the store's own `theme` JSON holds its five colors plus
+a `templateId` breadcrumb. So a template that is edited, disabled or deleted
+changes no storefront, and a seller customising their colors (saved under
+`theme.themeName`) never writes back to the template.
+
+`storeThemeColorsSchema` in `modules/stores/stores.schema.ts` is the single
+definition of those five colors — both the store column and the template column
+parse with it, so the two shapes cannot drift apart.
+
 ### Support tickets — `modules/support`
 
 One module, three route trees: a public contact endpoint, the reporter's
@@ -482,8 +505,11 @@ White-label design — one codebase, any business:
   can own several). Minimal by design: `name`, unique `slug` (auto-generated,
   stable across renames — the store's public URL identity), optional `logoKey`
   (the uploaded logo's storage **object key** — responses expose a derived
-  `logoUrl`, never the key), a `theme` JSON column for the Appearance settings so
-  customization evolves without migrations, a `homepage` JSON column holding
+  `logoUrl`, never the key), a `theme` JSON column for the Appearance settings
+  (five colors — background, primary and the nullable secondary/surface/button
+  text — plus `templateId` and `themeName` recording which appearance template
+  the colors were **copied** from and what the seller named their customised
+  palette) so customization evolves without migrations, a `homepage` JSON column holding
   the storefront sections as an **ordered** `{ key, enabled }[]` (`hero`,
   `categories`, `featured`, `newArrivals`, `bestSellers`; default order, all
   enabled — the owner drags to reorder and toggles each). `resolveHomepage`
@@ -664,6 +690,15 @@ White-label design — one codebase, any business:
 - **Otp** — hashed verification code with `channel` (SMS/EMAIL), `destination`, `purpose`
   (LOGIN / LINK / EMAIL_VERIFY / PASSWORD_RESET / ORDER_PLACEMENT), optional `customerId`
   (account-bound codes), expiry + attempts.
+- **StoreThemeTemplate** — a curated storefront palette a seller applies in one
+  click (`name`, `description`, `isActive`, `displayOrder` + a `theme` JSON
+  column holding the same five colors as `Store.theme`). Deliberately holds
+  **colors and nothing else**, and there is **no relation to Store**: applying a
+  template copies its colors onto the store, so editing, disabling or deleting
+  one never changes a storefront, and a seller's customisation never writes
+  back. Sellers see `isActive` rows only; `/admin/theme-templates` owns the
+  full list. Seeded from real, well-configured stores (colors only) by
+  `npm run seed-theme-templates`.
 - **Banner** — home carousel.
 - **Admin** — email + hashed password, roles (multi-admin ready).
 - **AuthSession** — refresh-token session for `package/auth/core`. Domain-agnostic on purpose:
@@ -758,6 +793,7 @@ Enums: `ProductStatus`, `OrderStatus`, `PaymentMethod`, `PaymentStatus`, `Shippi
 | `npm run create-admin -- <email> <pw> [name]` | Bootstrap/reset an admin account |
 | `npm run push-keys` | Generate a VAPID key pair for Web Push (run once per environment) |
 | `npm run backfill-catalog` | Fill missing category/product slugs, recompute price aggregates, stamp `publishedAt` on pre-column published stores (idempotent) |
+| `npm run seed-theme-templates` | Create the five starter store appearance templates — palettes (colors only) lifted from real configured stores, topped up from curated fallbacks. Idempotent; `-- --force` tops an existing table back up to five |
 | `npx prisma generate` | Regenerate client after schema edits            |
 
 **Environment files are layered, never edited to switch.** `config/loadEnv.ts`

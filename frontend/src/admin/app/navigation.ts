@@ -49,6 +49,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: 'Platform',
     items: [
       { to: '/support', label: 'Support' },
+      { to: '/theme-templates', label: 'Store themes' },
       { to: '/notifications', label: 'Notifications' },
       { to: '/activity', label: 'Activity log' },
       { to: '/admins', label: 'Admin users', superAdminOnly: true },
@@ -64,6 +65,7 @@ const TITLES: [string, string][] = [
   ['/stores', 'Stores'],
   ['/customers', 'Customers'],
   ['/support', 'Support'],
+  ['/theme-templates', 'Store themes'],
   ['/notifications', 'Notifications'],
   ['/activity', 'Activity log'],
   ['/admins', 'Admin users'],

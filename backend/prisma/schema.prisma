@@ -562,6 +562,41 @@ model StoreProductMedia {
   @@map("store_product_media")
 }
 
+/// A ready-made storefront palette a seller can apply in one click
+/// (Appearance -> Templates), curated by the platform team.
+///
+/// Deliberately holds **colors only** - the same five keys as the
+/// `Store.theme` JSON column (background, primary, secondary, surface,
+/// button text), and nothing else about a store. Applying a template COPIES
+/// those colors onto the store, so a template can never reach back into a
+/// storefront: editing or disabling one leaves every store that used it
+/// untouched, and a seller customising their colors edits their own store
+/// row, never this table.
+///
+/// Sellers only ever see rows with `isActive`; the admin console
+/// (`/admin/theme-templates`) owns the full list.
+model StoreThemeTemplate {
+  id          String  @id @default(cuid())
+  name        String
+  /// One line of positioning shown under the name in the picker
+  /// ("Warm, high-contrast - good for food and fashion").
+  description String?
+  /// { backgroundColor, primaryColor, secondaryColor, surfaceColor,
+  /// buttonTextColor } - validated by `storeThemeColorsSchema`. JSON, like
+  /// `Store.theme`, so the two shapes evolve together without a migration.
+  theme       Json
+  /// Only active templates are offered to sellers.
+  isActive    Boolean @default(true)
+  /// Ascending; ties break on `createdAt`.
+  displayOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, displayOrder])
+  @@map("store_theme_templates")
+}
+
 /// A social-login identity linked to a customer (one row per provider account).
 /// `(provider, providerAccountId)` is the stable key OAuth providers guarantee
 /// (Google/Apple `sub` claim) — email on the provider side can change.

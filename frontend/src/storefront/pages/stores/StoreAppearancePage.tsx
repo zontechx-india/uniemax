@@ -1,30 +1,95 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
 import { ErrorNote, SuccessNote } from '../../../shared/ui/form'
 import { storesApi } from '../../features/stores/storesApi'
 import type { StoreTheme } from '../../features/stores/storesApi'
+import { themeTemplatesApi } from '../../features/stores/themeTemplatesApi'
+import type { StoreThemeTemplate } from '../../features/stores/themeTemplatesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
-import { storeVars } from '../../features/publicStore/storeTheme'
+import { ThemePreview } from './ThemePreview'
+import { findActiveTemplate, ThemeTemplateStrip } from './ThemeTemplateStrip'
+import type { ThemeNavState } from './ThemeTemplateStrip'
+import { EyeIcon, PaletteIcon } from '../../layout/icons'
 
 /**
- * Appearance section — storefront customization: background + primary
- * colors, optional secondary (links/prices/highlights) and surface
- * (cards/panels) colors — both default to **Auto**, matching the derived
- * behaviour stores had before the fields existed — with a live
- * mini-storefront preview mirroring how the public store page will render.
+ * Appearance — pick a look, then (optionally) make it yours.
+ *
+ * The section leads with the platform's **templates** rather than five color
+ * pickers, because a seller opening this page for the first time has an
+ * opinion about "which of these looks right for my shop" and none at all
+ * about what hex value a surface should be. One click applies a whole
+ * palette; **Customize** then opens the same per-color editor for anyone who
+ * wants it, saved under a name of their own.
+ *
+ * Nothing here writes to a template: applying one COPIES its five colors onto
+ * the store (`theme.templateId` records where they came from), so a seller's
+ * edits stay in their store and a later change to the template leaves every
+ * storefront exactly as it is.
+ *
+ * The inline preview is deliberately compact — it fits the panel and gives
+ * immediate feedback while picking colors. **Open full preview** hands the
+ * current draft to `/stores/{slug}/appearance/preview`, which renders the same
+ * sample shop across the whole window with no section nav stealing 260px.
+ *
+ * The preview below is one sample shop, identical for every seller — see
+ * `ThemePreview`. It is deliberately not this store's own page: the palette is
+ * then the only thing that differs between two templates, which is what makes
+ * them comparable, and nothing has to be fetched to show one.
  */
 export function StoreAppearancePage() {
   const { store, onStoreChange } = useManagedStore()
+  const { storeSlug } = useParams()
+  const location = useLocation()
+  // The full-screen preview hands its draft back here (and asks for the color
+  // editor when the seller pressed Customize there). Read once, on mount:
+  // arriving from that page is a fresh mount of this one.
+  const handoff = location.state as ThemeNavState | null
 
-  const [theme, setTheme] = useState<StoreTheme>(store.theme)
+  const [theme, setTheme] = useState<StoreTheme>(handoff?.theme ?? store.theme)
+  const [templates, setTemplates] = useState<StoreThemeTemplate[] | null>(null)
+  const [customizing, setCustomizing] = useState(Boolean(handoff?.customize))
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [busy, setBusy] = useState(false)
 
+  useEffect(() => {
+    let cancelled = false
+    themeTemplatesApi
+      .list()
+      // An empty list is a legitimate state (the platform disabled them all):
+      // the page then falls back to being the plain color editor it was.
+      .then((rows) => !cancelled && setTemplates(rows))
+      .catch(() => !cancelled && setTemplates([]))
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const dirty = JSON.stringify(theme) !== JSON.stringify(store.theme)
+
   const set = <K extends keyof StoreTheme>(key: K, value: StoreTheme[K]) => {
     setTheme((t) => ({ ...t, [key]: value }))
+    setSaved(false)
+  }
+
+  const activeTemplate = findActiveTemplate(templates, theme)
+
+  const selectTheme = (next: StoreTheme) => {
+    setTheme(next)
+    setCustomizing(false)
+    setSaved(false)
+  }
+
+  const startCustomizing = () => {
+    setTheme((t) => ({
+      ...t,
+      // A custom theme always carries a name; seed it from the template the
+      // seller started out from so the field is never an empty demand.
+      themeName: t.themeName ?? `My ${activeTemplate?.name ?? store.name}`,
+    }))
+    setCustomizing(true)
     setSaved(false)
   }
 
@@ -35,6 +100,7 @@ export function StoreAppearancePage() {
     try {
       const updated = await storesApi.updateTheme(store.id, theme)
       onStoreChange(updated)
+      setTheme(updated.theme)
       setSaved(true)
     } catch (err) {
       setError(toApiError(err).message)
@@ -49,59 +115,150 @@ export function StoreAppearancePage() {
         Appearance
       </h2>
       <p className="mt-1 text-sm text-muted">
-        Customize how your store looks to customers.
+        Pick a ready-made look for your store, then customize it if you want to.
       </p>
 
-      <form onSubmit={submit} className="mt-4 max-w-xl space-y-5" noValidate>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <ColorField
-            label="Background color"
-            hint="The page canvas."
-            value={theme.backgroundColor}
-            onChange={(v) => set('backgroundColor', v)}
-          />
-          <ColorField
-            label="Primary color"
-            hint="Buttons and the call-to-action shine."
-            value={theme.primaryColor}
-            onChange={(v) => set('primaryColor', v)}
-          />
-          <AutoColorField
-            label="Secondary color"
-            hint="Links, prices and highlights."
-            autoLabel="same as primary"
-            value={theme.secondaryColor}
-            customizeSeed={theme.primaryColor}
-            onChange={(v) => set('secondaryColor', v)}
-          />
-          <AutoColorField
-            label="Surface color"
-            hint="Cards and panels. Keep it close to your background's tone so text stays readable."
-            autoLabel="derived from background"
-            value={theme.surfaceColor}
-            customizeSeed={theme.backgroundColor}
-            onChange={(v) => set('surfaceColor', v)}
-          />
-          <AutoColorField
-            label="Button text color"
-            hint="Text on your buttons (Add to Cart, Place Order). Check the button in the preview below stays readable."
-            autoLabel="white or black, based on your primary color"
-            value={theme.buttonTextColor}
-            customizeSeed={autoButtonText(theme.primaryColor)}
-            onChange={(v) => set('buttonTextColor', v)}
-          />
-        </div>
+      <form onSubmit={submit} className="mt-5 space-y-6" noValidate>
+        {/* ---- Templates ------------------------------------------------ */}
+        <section>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="text-sm font-semibold text-fg">Templates</h3>
+            <span className="text-xs text-muted">
+              {activeTemplate
+                ? `Using ${activeTemplate.name}`
+                : theme.themeName
+                  ? `Using your theme "${theme.themeName}"`
+                  : 'Using your own colors'}
+            </span>
+          </div>
 
-        {/* Live mini-storefront preview */}
-        <div>
-          <span className="mb-2 block text-sm font-medium text-muted">
-            Preview
-          </span>
-          <ThemePreview theme={theme} storeName={store.name} />
+          <div className="mt-3">
+            <ThemeTemplateStrip
+              templates={templates}
+              savedTheme={store.theme}
+              theme={theme}
+              onSelect={selectTheme}
+              onCustomize={startCustomizing}
+              emptyHint="No templates are available right now — set your colors below."
+            />
+          </div>
+        </section>
+
+        {/* ---- Customize ------------------------------------------------ */}
+        {customizing ? (
+          <section className="rounded-lg border border-line p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-fg">
+                  Customize your theme
+                </h3>
+                <p className="mt-0.5 text-xs text-muted">
+                  Your changes are saved to this store only — the template stays
+                  as it is.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCustomizing(false)}
+                className="text-xs font-semibold text-brand hover:underline"
+              >
+                Done
+              </button>
+            </div>
+
+            <label className="mt-4 block max-w-sm">
+              <span className="mb-2 block text-sm font-medium text-muted">
+                Theme name
+              </span>
+              <input
+                type="text"
+                value={theme.themeName ?? ''}
+                onChange={(e) => set('themeName', e.target.value || null)}
+                maxLength={60}
+                placeholder="My store theme"
+                className="h-11 w-full rounded-md border border-line bg-transparent px-3 text-sm text-fg outline-none transition-colors placeholder:text-muted focus:border-accent"
+              />
+              <span className="mt-1.5 block text-xs text-muted">
+                Only you see this — it names the palette in this section.
+              </span>
+            </label>
+
+            <div className="mt-5 grid gap-5 sm:grid-cols-2">
+              <ColorField
+                label="Background color"
+                hint="The page canvas."
+                value={theme.backgroundColor}
+                onChange={(v) => set('backgroundColor', v)}
+              />
+              <ColorField
+                label="Primary color"
+                hint="Buttons and the call-to-action shine."
+                value={theme.primaryColor}
+                onChange={(v) => set('primaryColor', v)}
+              />
+              <AutoColorField
+                label="Secondary color"
+                hint="Links, prices and highlights."
+                autoLabel="same as primary"
+                value={theme.secondaryColor}
+                customizeSeed={theme.primaryColor}
+                onChange={(v) => set('secondaryColor', v)}
+              />
+              <AutoColorField
+                label="Surface color"
+                hint="Cards and panels. Keep it close to your background's tone so text stays readable."
+                autoLabel="derived from background"
+                value={theme.surfaceColor}
+                customizeSeed={theme.backgroundColor}
+                onChange={(v) => set('surfaceColor', v)}
+              />
+              <AutoColorField
+                label="Button text color"
+                hint="Text on your buttons (Add to Cart, Place Order). Check the button in the preview stays readable."
+                autoLabel="white or black, based on your primary color"
+                value={theme.buttonTextColor}
+                customizeSeed={autoButtonText(theme.primaryColor)}
+                onChange={(v) => set('buttonTextColor', v)}
+              />
+            </div>
+          </section>
+        ) : (
+          <button
+            type="button"
+            onClick={startCustomizing}
+            className="inline-flex items-center gap-2 rounded-md border border-line px-4 py-2.5 text-sm font-semibold text-fg transition-colors hover:border-brand"
+          >
+            <PaletteIcon className="h-4 w-4" />
+            Customize colors
+          </button>
+        )}
+
+        {/* ---- Preview -------------------------------------------------- */}
+        <section>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm font-medium text-muted">Preview</span>
+            {/* Carries the DRAFT, so opening the big preview mid-edit shows
+                what you were editing rather than the last saved palette. */}
+            <Link
+              to={`/stores/${storeSlug}/appearance/preview`}
+              state={{ theme } satisfies ThemeNavState}
+              className="inline-flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-fg transition-colors hover:border-brand"
+            >
+              <EyeIcon className="h-3.5 w-3.5" />
+              Open full preview
+            </Link>
+          </div>
+          <ThemePreview
+            theme={theme}
+            storeName={store.name}
+            logoUrl={store.logoUrl}
+          />
           <span className="mt-1.5 block text-xs text-muted">
-            A miniature of your public store page with these settings.
+            A sample shop in your colors — the same layout for every store, so
+            templates differ here by color alone. Open the full preview to see
+            it across the whole window.
           </span>
-        </div>
+        </section>
 
         {error && <ErrorNote>{error}</ErrorNote>}
         {saved && !dirty && <SuccessNote>Appearance saved.</SuccessNote>}
@@ -114,77 +271,6 @@ export function StoreAppearancePage() {
           {busy ? 'Saving…' : 'Save Appearance'}
         </button>
       </form>
-    </div>
-  )
-}
-
-/**
- * Miniature of the public store page: sticky chrome (logo · search · cart),
- * the horizontal category bar, and the product card grid. It drives itself
- * from the very same `storeVars()` + `.metal-*` semantics the real
- * storefront uses (flat surfaces, chrome CTAs), so the luminance-adaptive
- * palette shown here is exactly what customers get.
- */
-function ThemePreview({
-  theme,
-  storeName,
-}: {
-  theme: StoreTheme
-  storeName: string
-}) {
-  return (
-    <div
-      className="overflow-hidden rounded-md border border-line"
-      style={storeVars(theme)}
-    >
-      {/* Mini top bar: logo · search · cart — flat like the real header. */}
-      <div className="flex items-center gap-2 border-b border-line bg-bg px-3.5 py-2.5">
-        <span className="metal-cta h-6 w-6 shrink-0 rounded-md" />
-        <span className="truncate text-[11px] font-bold text-fg">
-          {storeName}
-        </span>
-        <span className="ml-auto h-5 w-24 shrink-0 rounded-full border border-line bg-surface-alt" />
-        <span className="relative shrink-0">
-          <span className="block h-6 w-6 rounded-full border border-line bg-surface" />
-          <span className="metal-cta absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full" />
-        </span>
-      </div>
-
-      {/* Mini category bar */}
-      <div className="flex items-center gap-1.5 border-b border-line bg-bg px-3.5 py-2">
-        <span className="metal-cta h-3.5 w-7 rounded-full" />
-        <span className="h-3.5 w-10 rounded-full border border-line bg-surface" />
-        <span className="h-3.5 w-8 rounded-full border border-line bg-surface" />
-        <span className="h-3.5 w-11 rounded-full border border-line bg-surface" />
-      </div>
-
-      {/* Mini product grid — flat cards; the shine lives on the CTAs only. */}
-      <div className="bg-bg px-3.5 py-4">
-        <div className="grid grid-cols-3 gap-2">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="overflow-hidden rounded-lg border border-line bg-surface p-2"
-            >
-              <div className="h-10 rounded-md bg-surface-alt" />
-              <div className="mt-1.5 h-1.5 w-3/4 rounded-full bg-surface-alt" />
-              <div className="mt-2 flex items-center justify-between">
-                <span className="h-1.5 w-6 rounded-full bg-brand" />
-                <span className="metal-cta h-4 w-8 rounded-md" />
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Real, labeled CTA — the place to check the button text color
-            actually reads against the button. Same classes as the live
-            storefront's Add to Cart / Place Order. */}
-        <div className="mt-3 flex justify-center">
-          <span className="metal-cta inline-flex h-8 items-center rounded-md px-4 text-xs font-bold text-cta-contrast">
-            Add to Cart
-          </span>
-        </div>
-      </div>
     </div>
   )
 }

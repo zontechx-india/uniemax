@@ -22,7 +22,7 @@ const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Must be a hex color like
  * exactly the behaviour stores had before these fields existed, so old rows
  * render unchanged.
  */
-export const storeThemeSchema = z.object({
+export const storeThemeColorsSchema = z.object({
   backgroundColor: hexColor,
   primaryColor: hexColor,
   secondaryColor: hexColor.nullable(),
@@ -32,6 +32,22 @@ export const storeThemeSchema = z.object({
    * picked from the primary color's luminance so the label stays readable.
    */
   buttonTextColor: hexColor.nullable(),
+});
+
+/**
+ * The full `Store.theme` column: the five colors plus the provenance of the
+ * palette the seller is on.
+ *
+ * `templateId` records which `StoreThemeTemplate` the colors were COPIED from
+ * — provenance only, never a live link: the row holds its own colors, so
+ * editing or disabling the template never changes a storefront (and the
+ * seller editing colors never touches the template). `themeName` is set once
+ * the seller customises a template and names the result; while it is null the
+ * store is simply "on" the named template.
+ */
+export const storeThemeSchema = storeThemeColorsSchema.extend({
+  templateId: z.string().trim().max(40).nullable(),
+  themeName: z.string().trim().min(1).max(60).nullable(),
 });
 
 export const storeThemeUpdateSchema = storeThemeSchema.partial();
@@ -573,11 +589,14 @@ export const DEFAULT_STORE_THEME: StoreTheme = {
   secondaryColor: null,
   surfaceColor: null,
   buttonTextColor: null,
+  templateId: null,
+  themeName: null,
 };
 
 export type StoreCreateInput = z.infer<typeof storeCreateSchema>;
 export type StorePublishInput = z.infer<typeof storePublishSchema>;
 export type StoreUpdateInput = z.infer<typeof storeUpdateSchema>;
 export type StoreTheme = z.infer<typeof storeThemeSchema>;
+export type StoreThemeColors = z.infer<typeof storeThemeColorsSchema>;
 export type StoreThemeUpdateInput = z.infer<typeof storeThemeUpdateSchema>;
 export type StoreHomepageInput = z.infer<typeof storeHomepageSchema>;

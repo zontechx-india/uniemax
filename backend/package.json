@@ -15,6 +15,7 @@
     "create-admin": "tsx src/scripts/createAdmin.ts",
     "push-keys": "tsx src/scripts/generatePushKeys.ts",
     "backfill-catalog": "tsx src/scripts/backfillCatalog.ts",
+    "seed-theme-templates": "tsx src/scripts/seedThemeTemplates.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

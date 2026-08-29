@@ -160,15 +160,49 @@ A single account can own multiple stores and switch between them.
   phone/email) are asked even for store-pickup orders; the address fields
   only for delivery. The page warns a delivering store that switches all
   address fields off.
-- **Customization (Appearance)** — background + primary color (picker or
-  typed/pasted hex code, e.g. `#6C3EF4`; a new store starts on the platform's
-  own purple), plus three optional colors that
-  default to **Auto**: secondary (links, prices & highlights — Auto follows
-  primary), surface (cards & panels — Auto derives from the background) and
-  **button text** (labels on Add to Cart / Place Order — Auto picks white or
-  black from the button color's luminance, so text never disappears on a
-  dark button). All edited with a live mini-storefront preview that includes
-  a real labeled button, so the owner sees the text contrast before saving.
+- **Customization (Appearance)** — the section leads with **templates**, not
+  color pickers: a horizontal strip of the platform's ready-made palettes,
+  each drawn in its own colors, applied to the whole storefront in one click.
+  A new seller who has no opinion about hex codes gets a professional look
+  immediately; anyone who does can press **Customize** on the selected
+  template and edit the same five colors as before — background + primary
+  (picker or typed/pasted hex, e.g. `#6C3EF4`), plus three that default to
+  **Auto**: secondary (links, prices & highlights — Auto follows primary),
+  surface (cards & panels — Auto derives from the background) and **button
+  text** (labels on Add to Cart / Place Order — Auto picks white or black from
+  the button color's luminance, so text never disappears on a dark button).
+  A customised palette is **the seller's own, named theme**, saved on their
+  store; the template it started from is never modified, and the store keeps
+  its colors even if that template is later changed or withdrawn. The seller's
+  existing palette stays in the strip as its own card, so trying templates on
+  never loses what they already had.
+
+  Below it sits a **preview of a sample shop** — top bar, banner, category
+  tiles, product cards, a promo strip and a footer — painted in the chosen
+  colors and repainting the moment a template or a single color changes. It is
+  **one layout, identical for every seller**, and deliberately not a rendering
+  of their own store page: the palette is then the only thing that differs
+  between two templates, which is what makes them comparable at a glance.
+  The sample content is chosen so every color role appears at least once —
+  the button at two sizes, prices and a sale badge in the secondary color,
+  cards on the surface color, muted text on both the canvas and a card — so
+  what the seller is really checking (does the button label stay readable, do
+  card edges survive against the background) is on screen before they save.
+  It reflows against **its own width rather than the window's** — the panel it
+  sits in loses 260px to the section nav above `lg`, so a laptop can leave it
+  narrower than a tablet does — stepping two-up → three-up → six-up products
+  and dropping the search box and nav links as the room for them runs out,
+  with no horizontal scroll or shrunken text at any size.
+
+  **Open full preview** takes the same sample shop to its own page
+  (`/stores/{slug}/appearance/preview`), outside the management workbench, so
+  it gets the entire window — roughly 300–400px more than the panel can give
+  it on a laptop. The template strip travels with it and stays pinned while
+  the preview scrolls, so a seller can click through every template at close
+  to real size and save from there. Colours stay on the Appearance form;
+  **Customize** hands the draft back to it. Unsaved work survives the trip in
+  both directions, so opening the full preview mid-edit shows what was being
+  edited rather than the last saved palette.
 - **Store catalog** — hierarchy: **Store → Category → Subcategory
   (optional) → Product → Variants**. The Categories section lets the owner
   add, list, **rename**, and delete the store's own categories, each
@@ -731,6 +765,15 @@ revoked from anywhere else.
   reply box (replying marks the ticket as being worked on, so the queue can't
   quietly lie) and triage — a status change is told to the reporter, priority
   stays internal.
+- **Store themes** — the appearance templates sellers pick from: view them
+  all, create and edit (name, one-line description, the five colors, order),
+  and **enable or disable** — only enabled templates reach a seller's picker.
+  Each row and the editor show the palette as a miniature storefront, so the
+  CTA's text contrast is judged where it actually matters. Safe by design:
+  a store keeps its **own copy** of the colors it applied, so editing,
+  disabling or deleting a template never changes a live storefront. The
+  starter five were built from real, well-configured stores — their colors
+  only, no other store data.
 - **Notifications** — the admin's own feed, push opt-in per device, and a
   **platform broadcast** to admins, sellers or all customers (confirmed with
   a preview, since it can't be recalled).

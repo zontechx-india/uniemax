@@ -380,6 +380,38 @@ Partial update of the theme object (unknown keys rejected; colors must be
 from the primary color's luminance). Returns the full store with the merged
 theme.
 
+```jsonc
+{
+  "backgroundColor": "#0f1115",
+  "primaryColor":    "#ff6b00",
+  "secondaryColor":  null,       // null = Auto (follows primary)
+  "surfaceColor":    null,       // null = Auto (derived from background)
+  "buttonTextColor": null,       // null = Auto (from primary's luminance)
+  "templateId":      "clx…",     // which appearance template these colors
+                                 // came from — PROVENANCE, not a live link
+  "themeName":       "My Shop"   // the seller's name for a customised palette
+}
+```
+
+`templateId` / `themeName` (both nullable, `themeName` ≤ 60 chars) record how
+the seller arrived at these colors. Applying a template **copies** its five
+colors here, so a template that is later edited, disabled or deleted changes
+no storefront, and a seller's customisation never writes back to the template.
+While `themeName` is null the store is simply sitting on the named template.
+
+### `GET /api/v1/theme-templates` 🔒 customer
+The appearance templates a seller can apply — **enabled ones only**, ordered
+by `displayOrder` then oldest first. Colors only; nothing else about a store.
+```jsonc
+{ "data": [ {
+  "id": "clx…", "name": "Obsidian Amber",
+  "description": "Dark canvas with an amber call to action — food, groceries and everyday retail.",
+  "theme": { "backgroundColor", "primaryColor", "secondaryColor",
+             "surfaceColor", "buttonTextColor" },
+  "isActive": true, "displayOrder": 0, "createdAt", "updatedAt"
+} ] }
+```
+
 ### `PATCH /api/v1/stores/:id/homepage`
 ```jsonc
 { "sections": [                       // FULL ordered list, not a subset
@@ -1589,6 +1621,34 @@ Actions: `store.suspend` · `store.restore` · `customer.block` ·
 `customer.unblock` · `product.hide` · `product.show` ·
 `bankAccount.verified|failed|pending` · `admin.create` · `admin.update` ·
 `admin.passwordReset`.
+
+### Store appearance templates — `/api/v1/admin/theme-templates` 🔒 admin
+
+The curated palettes sellers pick from in their store's Appearance section.
+**Colors only** — a template never carries a store's name, logo, catalog or
+settings. Applying one copies its colors onto the store, so nothing here can
+alter a live storefront: editing a template leaves every shop that used it
+untouched, disabling one only removes it from the seller's picker, and
+deleting one is equally non-destructive.
+
+| Method | Path | Notes |
+| ------ | ---- | ----- |
+| `GET`   | `/theme-templates` | Every template (disabled included). Optional `?isActive=true` / `?isActive=false` |
+| `POST`  | `/theme-templates` | `{ name, description?, theme, isActive?, displayOrder? }` → `201` |
+| `GET`   | `/theme-templates/:id` | One template |
+| `PATCH` | `/theme-templates/:id` | Any subset of the create body; `theme` replaces all five colors |
+| `DELETE`| `/theme-templates/:id` | `{ id, deleted: true }` |
+
+`theme` is the same five-key object as a store's: `backgroundColor` and
+`primaryColor` are required `#rrggbb`; `secondaryColor`, `surfaceColor` and
+`buttonTextColor` are `#rrggbb` **or `null`** (Auto). `name` ≤ 60 chars,
+`description` ≤ 160, `displayOrder` 0–9999.
+
+Audit actions: `themeTemplate.create` · `themeTemplate.update` ·
+`themeTemplate.enable` · `themeTemplate.disable` · `themeTemplate.delete`.
+
+The initial five were seeded from real, well-configured stores (colors only)
+by `npm run seed-theme-templates`.
 
 ### Admin accounts — `/api/v1/admin/admins` 🔒 SUPER_ADMIN
 

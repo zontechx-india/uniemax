@@ -10,7 +10,7 @@ import type { ListMeta } from '../../../shared/auth/http'
  * then no logo is sent).
  */
 
-export interface StoreTheme {
+export interface StoreThemeColors {
   backgroundColor: string
   primaryColor: string
   /** Links, prices & flat highlights. `null` = Auto (follows primary). */
@@ -22,6 +22,48 @@ export interface StoreTheme {
    * picked from the button color's luminance so the label stays readable.
    */
   buttonTextColor: string | null
+}
+
+/** The five color keys, in the order the Appearance editor shows them. */
+export const THEME_COLOR_KEYS = [
+  'backgroundColor',
+  'primaryColor',
+  'secondaryColor',
+  'surfaceColor',
+  'buttonTextColor',
+] as const satisfies readonly (keyof StoreThemeColors)[]
+
+/**
+ * The store's appearance: the five colors plus where the palette came from.
+ *
+ * `templateId` is **provenance, not a live link** — applying a template copies
+ * its colors into this row, so the store keeps rendering exactly as it does
+ * today even if the template is later edited, disabled or deleted (and a
+ * seller's edits never travel back to the template). `themeName` is the name
+ * the seller gave their customised palette; while it is null the store is
+ * simply on the template named by `templateId`.
+ */
+export interface StoreTheme extends StoreThemeColors {
+  templateId: string | null
+  themeName: string | null
+}
+
+/** Just the colors — what gets compared against, and copied from, a template. */
+export function themeColors(theme: StoreThemeColors): StoreThemeColors {
+  return {
+    backgroundColor: theme.backgroundColor,
+    primaryColor: theme.primaryColor,
+    secondaryColor: theme.secondaryColor,
+    surfaceColor: theme.surfaceColor,
+    buttonTextColor: theme.buttonTextColor,
+  }
+}
+
+/** Do two palettes paint the same storefront? Drives "customised" detection. */
+export function sameColors(a: StoreThemeColors, b: StoreThemeColors): boolean {
+  return THEME_COLOR_KEYS.every(
+    (key) => (a[key] ?? '').toLowerCase() === (b[key] ?? '').toLowerCase(),
+  )
 }
 
 /**
@@ -499,6 +541,8 @@ export const DEFAULT_THEME: StoreTheme = {
   secondaryColor: null,
   surfaceColor: null,
   buttonTextColor: null,
+  templateId: null,
+  themeName: null,
 }
 
 const STORES = '/api/v1/stores'
