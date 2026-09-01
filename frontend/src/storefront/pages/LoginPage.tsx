@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { trackCompleteRegistration } from '../../shared/analytics/metaPixel'
 import { customerAuth } from '../../shared/auth/authApi'
 import type { Customer } from '../../shared/auth/authApi'
 import { AppLogoLockup } from '../../shared/ui/AppLogo'
@@ -277,6 +278,9 @@ function Register({
     setBusy(true)
     try {
       const { customer } = await customerAuth.registerVerify({ ...form, code })
+      // Registration is verify-first: the account exists only once this call
+      // succeeds, so this is the exact moment Meta's CompleteRegistration means.
+      trackCompleteRegistration('email')
       onSignedIn(customer)
     } catch (err) {
       setError((err as Error).message)
@@ -537,10 +541,13 @@ function PhoneOtp({
     setError('')
     setBusy(true)
     try {
-      const { customer } = await customerAuth.verifyOtp({
+      const { customer, isNewUser } = await customerAuth.verifyOtp({
         phone: phone.replace(/\s/g, ''),
         code,
       })
+      // OTP is login-only today, but the backend still reports whether it had
+      // to create the account — only that case is a registration.
+      if (isNewUser) trackCompleteRegistration('phone_otp')
       onSignedIn(customer)
     } catch (err) {
       setError((err as Error).message)
@@ -653,7 +660,8 @@ function GoogleSignIn({ onSignedIn }: { onSignedIn: (customer: Customer) => void
         email: email.trim().toLowerCase(),
         ...(name.trim() ? { name: name.trim() } : {}),
       })
-      const { customer } = await customerAuth.google(idToken)
+      const { customer, isNewUser } = await customerAuth.google(idToken)
+      if (isNewUser) trackCompleteRegistration('google')
       onSignedIn(customer)
     } catch (err) {
       setError((err as Error).message)

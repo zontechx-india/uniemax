@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { RouterProvider } from 'react-router-dom'
+import { trackRouterPageViews } from '../shared/analytics/metaPixel'
 import { customerAuth } from '../shared/auth/authApi'
 import { useSession } from '../shared/auth/useSession'
 import { MarketSessionProvider } from './app/marketSession'
@@ -25,6 +26,15 @@ import { cart } from './features/cart/cart'
  *    with a `?next=` return path.
  */
 const PUBLIC_PATH = /^\/(store|cart|checkout|order)(\/|$)/
+
+/**
+ * Meta Pixel: the base snippet in `index.html` reports only the url the
+ * browser loaded, so each router reports its own `PageView` from then on.
+ * Both are subscribed here because the surface is chosen per page load —
+ * whichever one this load does not mount never navigates, so it never reports.
+ */
+trackRouterPageViews(router)
+trackRouterPageViews(publicRouter)
 
 export function StorefrontApp() {
   if (PUBLIC_PATH.test(window.location.pathname)) {

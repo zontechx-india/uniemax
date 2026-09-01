@@ -1040,6 +1040,39 @@ Full architecture: [`PUSH_NOTIFICATIONS.md`](./PUSH_NOTIFICATIONS.md).
 
 ---
 
+## Analytics — Meta Pixel (storefront only)
+
+Meta's base snippet (pixel `931826082697608`) sits verbatim in the head of
+`index.html`, so it loads before the app bundle and fires the first
+`PageView`. The **admin console (`admin.html`) has no pixel** — nothing about
+operator activity belongs in an ad platform.
+
+`shared/analytics/metaPixel.ts` is only what the snippet cannot do itself.
+Every call in it no-ops when `fbq` is missing (ad blocker), so tracking can
+never break a page.
+
+- The pixel id is **hardcoded in the HTML**, not an env var — which also means
+  dev and staging builds report to the same pixel. Filter them out in Events
+  Manager, or gate the snippet if that noise starts to matter.
+- `trackRouterPageViews(router)` is subscribed to **both** routers in
+  `StorefrontApp.tsx` — a client-side navigation is invisible to the stock
+  snippet, so without it Meta would only ever see the first URL of a visit.
+  Whichever router the page load did not mount never navigates, so it never
+  double-counts.
+- `trackCompleteRegistration(method)` fires on **account creation only**:
+  after `registerVerify` (verify-first — no account exists until then), and
+  after OTP/Google sign-in when the backend reports `isNewUser`. A returning
+  sign-in must never fire it; that would train Meta's delivery model on the
+  wrong people.
+- The snippet's `<noscript>` tracking image is kept as Meta issues it, though
+  it can never fire: the app needs JS to render at all.
+
+Adding a funnel event (`ViewContent`, `AddToCart`, `InitiateCheckout`,
+`Purchase`) means calling `trackEvent()` at the point the thing actually
+happened — after the server confirms, not on the click.
+
+---
+
 ## Tech Stack
 
 | Concern       | Choice                                        |
@@ -1103,6 +1136,9 @@ frontend/
     │   │   │                     #   block for `fixed`, which pinned the overlay to
     │   │   │                     #   the header instead of centring it on screen
     │   │   └── socialIcons.tsx   # Social brand glyphs + SOCIAL_META (label + icon per platform)
+    │   ├── analytics/
+    │   │   └── metaPixel.ts     # Meta Pixel: SPA PageView + CompleteRegistration
+    │   │                        #   (layers on the index.html base snippet)
     │   ├── maps/
     │   │   └── googleMaps.ts     # Maps JS API script loader (VITE_GOOGLE_MAPS_API_KEY,
     │   │                         #   minimal typings) + googleMapsLink() builder
