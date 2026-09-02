@@ -1067,9 +1067,34 @@ never break a page.
 - The snippet's `<noscript>` tracking image is kept as Meta issues it, though
   it can never fire: the app needs JS to render at all.
 
-Adding a funnel event (`ViewContent`, `AddToCart`, `InitiateCheckout`,
-`Purchase`) means calling `trackEvent()` at the point the thing actually
-happened — after the server confirms, not on the click.
+### Shopping funnel
+
+`ViewContent` → `AddToCart` → `InitiateCheckout` → `Purchase`, all in rupees
+(`currency: 'INR'`).
+
+| Event | Fired from | Notes |
+| ----- | ---------- | ----- |
+| `ViewContent` | `pages/store/StoreProductPage.tsx` (`ProductDetail`) | Once per product. The component is keyed by product id, so it remounts per product; switching **variant** is the same view and does not re-fire. |
+| `AddToCart` | `features/cart/cart.ts` → `cart.add()` | In the store module, not the button, so no caller can add to the cart uncounted. Buy Now goes through `add()` too, and counts. |
+| `InitiateCheckout` | `pages/cart/CheckoutPage.tsx` | Once per visit, ref-guarded — cart revalidation re-renders with fresh prices, and `group` is a new object each render. Carries only the store's own group: orders are placed per store. |
+| `Purchase` | `pages/cart/OrderSuccessPage.tsx` | See below. |
+
+`content_ids` is the **product slug** everywhere. `Product.slug` is `@unique`
+platform-wide and is the only product identifier present on both cart lines
+and placed-order lines, so it is what keeps ids consistent across the funnel —
+and what a future catalog feed (dynamic product ads) will have to match.
+
+`Purchase` is the one with teeth:
+
+- `value` is `order.total`, not the sum of the lines — that is what the
+  customer actually paid, shipping included.
+- It waits for the payment to settle: COD, or `paymentStatus === 'PAID'`.
+  A `PENDING` or `FAILED` gateway order reports nothing, so a drop-off at
+  Cashfree is never counted as revenue.
+- `trackPurchase()` de-duplicates by order id (in-memory + `localStorage`),
+  which is **required**, not defensive: the confirmation page polls while an
+  online payment settles, and its URL is deliberately shareable and
+  bookmarkable. Unguarded, one sale would report several times.
 
 ---
 
@@ -1137,7 +1162,8 @@ frontend/
     │   │   │                     #   the header instead of centring it on screen
     │   │   └── socialIcons.tsx   # Social brand glyphs + SOCIAL_META (label + icon per platform)
     │   ├── analytics/
-    │   │   └── metaPixel.ts     # Meta Pixel: SPA PageView + CompleteRegistration
+    │   │   └── metaPixel.ts     # Meta Pixel: SPA PageView, CompleteRegistration,
+    │   │                        #   and the ViewContent→Purchase funnel
     │   │                        #   (layers on the index.html base snippet)
     │   ├── maps/
     │   │   └── googleMaps.ts     # Maps JS API script loader (VITE_GOOGLE_MAPS_API_KEY,

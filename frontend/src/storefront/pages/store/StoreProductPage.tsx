@@ -15,6 +15,7 @@ import {
   usePublicStore,
 } from '../../features/publicStore/PublicStoreLayout'
 import { usePageTitle } from '../../../shared/usePageTitle'
+import { trackViewContent } from '../../../shared/analytics/metaPixel'
 import { ProductGrid } from '../../features/publicStore/ProductCard'
 import { ShareButton } from '../../features/publicStore/ShareButton'
 import {
@@ -150,6 +151,17 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
     price,
     stock,
   }
+
+  // Meta ViewContent — one per product view. `ProductDetail` is keyed by
+  // product id, so it mounts fresh for each product; switching variant is the
+  // same view and deliberately does not re-fire.
+  useEffect(() => {
+    trackViewContent(
+      { id: product.slug, price: Number(price), quantity: 1 },
+      product.name,
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per product, not per variant
+  }, [product.slug])
 
   const trail: Crumb[] = [
     ...(product.category.parent

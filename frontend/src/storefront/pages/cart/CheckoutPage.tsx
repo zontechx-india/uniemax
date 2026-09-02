@@ -1,7 +1,8 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useGoBack } from '../../../shared/useGoBack'
 import { usePageTitle } from '../../../shared/usePageTitle'
+import { trackInitiateCheckout } from '../../../shared/analytics/metaPixel'
 import { customerAuth } from '../../../shared/auth/authApi'
 import { toApiError } from '../../../shared/auth/http'
 import { useSession } from '../../../shared/auth/useSession'
@@ -57,6 +58,22 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
   usePageTitle('Place Order', group?.storeName ?? shell?.name)
   const navigate = useNavigate()
   const goBack = useGoBack(cartUrl(storeSlug))
+
+  // Meta InitiateCheckout — once per visit to this store's checkout. The ref
+  // guard matters because cart revalidation re-renders the page with refreshed
+  // prices, and `group` is a fresh object on every render.
+  const checkoutReported = useRef(false)
+  useEffect(() => {
+    if (checkoutReported.current || !group || group.items.length === 0) return
+    checkoutReported.current = true
+    trackInitiateCheckout(
+      group.items.map((item) => ({
+        id: item.productSlug,
+        price: Number(item.price),
+        quantity: item.qty,
+      })),
+    )
+  }, [group])
 
   const [checkout, setCheckout] = useState<CheckoutState>({
     delivery: null,

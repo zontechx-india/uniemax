@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { usePageTitle } from '../../../shared/usePageTitle'
+import { trackPurchase } from '../../../shared/analytics/metaPixel'
 import { toApiError } from '../../../shared/auth/http'
 import { storeVars } from '../../features/publicStore/storeTheme'
 import { useStoreShell } from '../../features/publicStore/useStoreShells'
@@ -100,6 +101,37 @@ export function OrderSuccessPage({
         : order.paymentStatus === 'PENDING'
           ? 'pending'
           : 'paid'
+
+  /**
+   * Meta Purchase — the sale itself.
+   *
+   * Held back while an online payment is still pending or has failed, so a
+   * drop-off at the gateway is never reported as revenue. `trackPurchase`
+   * de-duplicates by order id, which matters twice over here: this page polls
+   * while a payment settles, and its URL is deliberately shareable and
+   * bookmarkable.
+   */
+  useEffect(() => {
+    if (!order) return
+    if (paymentState !== 'paid' && paymentState !== 'cod') return
+    trackPurchase(
+      order.id,
+      Number(order.total),
+      // A line whose product has since been deleted carries no slug, so it has
+      // no content id to report — the order total still accounts for it.
+      order.items.flatMap((item) =>
+        item.productSlug
+          ? [
+              {
+                id: item.productSlug,
+                price: Number(item.unitPrice),
+                quantity: item.quantity,
+              },
+            ]
+          : [],
+      ),
+    )
+  }, [order, paymentState])
 
   return (
     <div

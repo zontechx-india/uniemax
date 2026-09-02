@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { trackAddToCart } from '../../../shared/analytics/metaPixel'
 
 /**
  * Shopping cart — client-side, localStorage-backed. Public store pages are
@@ -133,6 +134,16 @@ export const cart = {
    * caller adds one.
    */
   add(item: Omit<CartItem, 'qty'>, qty = 1) {
+    // Meta AddToCart lives here rather than on the button, so no present or
+    // future caller can put something in the cart without being counted.
+    trackAddToCart(
+      {
+        id: item.productSlug,
+        price: Number(item.price),
+        quantity: Math.max(1, Math.min(qty, item.stockQuantity)),
+      },
+      item.name,
+    )
     const key = keyOf(item.storeSlug, item.productId, item.variantId)
     const existing = items.find((i) => itemKey(i) === key)
     if (existing) {
