@@ -25,8 +25,8 @@ import {
   TrashIcon,
 } from '../../layout/icons'
 import { ActiveSwitch } from './ActiveSwitch'
-import { NewProductPhotos } from './NewProductPhotos'
-import type { PendingPhoto } from './NewProductPhotos'
+import { MediaBoard } from './media/MediaBoard'
+import { usePendingMedia } from './media/usePendingMedia'
 import { ProductMediaManager } from './ProductMediaManager'
 
 /**
@@ -1235,11 +1235,17 @@ function AddProductForm({
 }: {
   storeId: string
   categories: StoreCategory[]
-  /** `warning` = the product saved, but some photos didn't upload. */
+  /** `warning` = the product saved, but some media didn't upload. */
   onCreated: (product: StoreProduct, warning?: string) => void
   onCancel: () => void
 }) {
   const [name, setName] = useState('')
+  /**
+   * Name is the one field with its own inline error: it is required and it is
+   * the first thing entered, so pointing at the field beats a form-level note
+   * the user has to map back to a control.
+   */
+  const [nameError, setNameError] = useState<string | null>(null)
   const [categoryId, setCategoryId] = useState(categories[0]?.id ?? '')
   const [price, setPrice] = useState('')
   const [stock, setStock] = useState('')
@@ -1254,14 +1260,17 @@ function AddProductForm({
     { name: string; price: string; stock: string }[]
   >([{ name: '', price: '', stock: '' }])
   /**
-   * Photos picked and cropped locally. They can only be uploaded once the
-   * product has an id, so they wait here and go up right after create.
+   * Photos and the optional video, held in memory: they can only be uploaded
+   * once the product has an id, so they wait here and go up right after
+   * create. At least one photo is required — a storefront card with a
+   * placeholder where the product should be sells nothing.
    */
-  const [photos, setPhotos] = useState<PendingPhoto[]>([])
+  const { driver: mediaDriver, photos, video } = usePendingMedia()
+  const [photoError, setPhotoError] = useState<string | null>(null)
   /**
-   * Photo upload progress — drives the submit button label. `null` until the
+   * Media upload progress — drives the submit button label. `null` until the
    * product is created, so the button says "Adding…" for the create call and
-   * only then starts counting photos.
+   * only then starts counting photos (and the video last).
    */
   const [uploaded, setUploaded] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -1295,8 +1304,17 @@ function AddProductForm({
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    if (!name.trim()) return setError('Please enter a product name.')
+    if (!name.trim()) {
+      setNameError('Product name is required.')
+      return setError('Please enter a product name.')
+    }
+    setNameError(null)
     if (!categoryId) return setError('Please choose a category.')
+    if (photos.length === 0) {
+      setPhotoError('Add at least one photo of the product.')
+      return setError('Please add at least one product photo.')
+    }
+    setPhotoError(null)
 
     // Only the fields for the selected shape are validated or submitted —
     // whatever sits on the hidden side is ignored, never sent.
@@ -1367,14 +1385,15 @@ function AddProductForm({
 
     /**
      * The product now exists — everything past this point is best-effort.
-     * Photos upload one at a time (each response is a fresh snapshot of the
-     * parent product, so they must not race), and a failure never strands
-     * the flow: the row still appears and the seller is told which photos to
-     * re-add from its Photos & video panel.
+     * Media uploads one file at a time (each response is a fresh snapshot of
+     * the parent product, so they must not race), and a failure never strands
+     * the flow: the row still appears and the seller is told what to re-add
+     * from its Photos & video panel.
      */
     let product = created
-    let failed = 0
-    if (photos.length > 0) setUploaded(0)
+    let failedPhotos = 0
+    let failedVideo = false
+    if (photos.length > 0 || video) setUploaded(0)
     for (const photo of photos) {
       try {
         product = await storeCatalogApi.addProductMedia(
@@ -1384,15 +1403,34 @@ function AddProductForm({
           photo.filename,
         )
       } catch {
-        failed += 1
+        failedPhotos += 1
+      }
+      setUploaded((n) => (n ?? 0) + 1)
+    }
+    if (video) {
+      try {
+        product = await storeCatalogApi.addProductMedia(
+          storeId,
+          created.id,
+          video.file,
+          video.file.name,
+        )
+      } catch {
+        failedVideo = true
       }
       setUploaded((n) => (n ?? 0) + 1)
     }
 
+    const missing: string[] = []
+    if (failedPhotos > 0) {
+      missing.push(`${failedPhotos} photo${failedPhotos === 1 ? '' : 's'}`)
+    }
+    if (failedVideo) missing.push('the video')
+
     onCreated(
       product,
-      failed > 0
-        ? `“${product.name}” was added, but ${failed} photo${failed === 1 ? '' : 's'} could not be uploaded. Open the product and use Photos & video to add ${failed === 1 ? 'it' : 'them'} again.`
+      missing.length > 0
+        ? `“${product.name}” was added, but ${missing.join(' and ')} could not be uploaded. Open the product and use Photos & video to add ${missing.length === 1 && failedPhotos === 1 ? 'it' : 'them'} again.`
         : undefined,
     )
   }
@@ -1404,15 +1442,40 @@ function AddProductForm({
       noValidate
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <TextField
-          label="Product name"
-          placeholder="e.g. English Willow Bat"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          maxLength={120}
-          autoFocus
-          className="!bg-input"
-        />
+        <div>
+          <TextField
+            label={
+              <>
+                Product name{' '}
+                <span className="text-danger" aria-hidden="true">
+                  *
+                </span>
+                <span className="sr-only">(required)</span>
+              </>
+            }
+            placeholder="e.g. English Willow Bat"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value)
+              if (nameError && e.target.value.trim()) setNameError(null)
+            }}
+            onBlur={(e) =>
+              setNameError(
+                e.target.value.trim() ? null : 'Product name is required.',
+              )
+            }
+            required
+            aria-invalid={nameError ? true : undefined}
+            maxLength={120}
+            autoFocus
+            className={`!bg-input ${nameError ? '!border-danger' : ''}`}
+          />
+          {nameError && (
+            <p className="mt-1.5 text-xs font-medium text-danger">
+              {nameError}
+            </p>
+          )}
+        </div>
         <label className="block">
           <span className="mb-2 block text-sm font-medium text-muted">
             Category
@@ -1464,10 +1527,14 @@ function AddProductForm({
         />
       </label>
 
-      <NewProductPhotos
-        photos={photos}
-        onChange={setPhotos}
+      <MediaBoard
+        driver={mediaDriver}
         disabled={busy}
+        error={photos.length === 0 ? photoError : null}
+        preview={{
+          name: name.trim(),
+          price: price.trim() ? `₹${price.trim()}` : null,
+        }}
       />
 
       {/* Product shape switch — the one control that decides where price and
@@ -1560,7 +1627,9 @@ function AddProductForm({
             ? 'Add Product'
             : uploaded === null
               ? 'Adding…'
-              : `Uploading photo ${Math.min(uploaded + 1, photos.length)} of ${photos.length}…`}
+              : uploaded < photos.length
+                ? `Uploading photo ${uploaded + 1} of ${photos.length}…`
+                : 'Uploading video…'}
         </button>
         <button
           type="button"

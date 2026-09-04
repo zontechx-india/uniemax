@@ -313,7 +313,8 @@ management page — or create; first-run empty state; each card shows the
 store's **Published/Draft** status chip and its public `/store/{slug}` path,
 so the list doubles as an at-a-glance health check), `/stores/new` (create:
 name + an **optional logo** — picked, validated against the server's media
-config and cropped 1:1 **locally** (the shared `ImageCropDialog` pipeline),
+config and cropped 1:1 **locally** (the shared `ImageEditDialog` pipeline —
+square-locked for logos, which are shown in a square everywhere),
 then uploaded to `PUT /stores/:id/logo` right after the store is created —
 an upload failure never strands the flow, Store Details offers the same
 upload again. Its **Back control is history-aware**: `navigate(-1)` when
@@ -739,8 +740,8 @@ for crawlers wait for SSR/prerender).
 - `useStores.ts` — data hooks: `useStores` (list), `useStore` (by id;
   404/foreign → `null` → redirect to `/stores`).
 - Sections: `StoreDetailsPage` (name update + **logo upload**: pick →
-  validate against the server's media config → crop 1:1 → upload as WebP
-  with a progress bar; Replace / Remove with confirmation — saves
+  validate the format → crop 1:1 (`ImageEditDialog`, square-locked) → upload
+  as WebP with a progress bar; Replace / Remove with confirmation — saves
   immediately, independent of the name form),
   `StoreHomepagePage` (**arrange** the storefront homepage — drag-and-drop
   (native HTML5 DnD, no dependency) plus ▲/▼ buttons for keyboard/touch to
@@ -849,8 +850,9 @@ for crawlers wait for SSR/prerender).
   (**gated**: with zero categories it shows an "Add a category first"
   state linking to the Categories section — the category-first sequence;
   otherwise an Add Product form — name, category select grouped by root
-  with "Root › Sub" options, optional description, an optional **photo
-  picker** (`NewProductPhotos.tsx`) and a **"This product
+  with "Root › Sub" options, optional description, the **Media Board**
+  (`media/MediaBoard.tsx` — required photos plus the optional video, the same
+  screen the product row uses) and a **"This product
   has variants" checkbox** that picks the product shape. Unchecked (the
   default) shows required Price + Stock; checked hides them and shows a
   **variants editor** instead (rows of name / price / stock, each required,
@@ -859,16 +861,26 @@ for crawlers wait for SSR/prerender).
   never a second competing price — and the checkbox only *hides* fields, so
   toggling back and forth preserves whatever was typed. The submitted
   payload carries `hasVariants` plus exactly one side's fields.
-  **Photos at add time** (`NewProductPhotos.tsx`): media uploads need a
+  **Product name and at least one photo are required** — both marked with a
+  `*`, each with its own inline error (the name also on blur, with a danger
+  border). The server enforces the name (`storeProductCreateSchema`); a photo
+  cannot be required at create time — media addresses a product by id, so it
+  can only follow it — so the server's matching rule is that a product with no
+  image cannot be **enabled**.
+  **Media at add time** is the shared **Media Board** (see below) running on
+  `usePendingMedia`: media uploads need a
   product id (`POST …/products/:productId/media`), so up to 8 images are
-  validated, cropped 1:1 and held as blobs **locally**, then uploaded one at
-  a time straight after `createProduct` — the deferred-upload shape
+  checked for FORMAT, optimized (downscaled to 1600px + WebP, **aspect ratio
+  untouched**) and held as blobs **locally**, alongside at most **one optional
+  video** held as the picked file (validated against the video rule, never
+  cropped or re-encoded). All of it is uploaded one file at a time straight
+  after `createProduct`, photos first and the video last — the
+  deferred-upload shape
   `CreateStorePage` uses for a new store's logo. The button counts them
-  ("Uploading photo 2 of 3…"). The picker offers pick/drop, remove and Make
-  cover only; full reordering, alt text and the video stay in the row's
-  Photos & video panel, which owns real media rows. A failed upload never
+  ("Uploading photo 2 of 3…", then "Uploading video…").
+  A failed upload never
   strands the flow — the product row still appears and the page shows which
-  photos to re-add. The product
+  photos or video to re-add. The product
   list shows "Root › Sub" paths, total stock and a price **range** when
   options differ ("₹89,900 – ₹1,09,999"). Each row has a **pencil** opening
   an inline **details editor** — name, category (same grouped "Root › Sub"
@@ -886,16 +898,50 @@ for crawlers wait for SSR/prerender).
   only *requests* the change — a `ConfirmDialog` names the affected row and
   nothing is written until it is accepted, so the boxes always reflect saved
   state. Root categories get a matching **star** toggle.
-  The expanded panel opens with **Photos & video**
-  (`ProductMediaManager.tsx`): up to **8 images** — multi-select or
-  drag-and-drop onto the + tile, each validated (size/type from
-  `/public/media-config`, shown as hints), **cropped 1:1**
-  (`ImageCropDialog`, queue-walks multiple picks) and uploaded as WebP with
-  a per-file progress bar; failures stay in the grid with **Retry** (reuses
-  the cropped blob) / Discard. Tiles drag to reorder (optimistic, ‹ ›
-  buttons as fallback) — the **first image is the cover** (badged) — and
-  each has Replace / Delete / **Alt** (alt-text dialog). Below sits the
-  **single video slot** (upload/replace/delete, no crop).
+  The expanded panel opens with **Photos & video** — the same **Media Board**
+  the Add Product form uses (`ProductMediaManager.tsx` is now a ~30-line
+  wrapper that supplies the `useLiveMedia` driver).
+
+  **The Media Board** (`pages/stores/media/`) is one component for both
+  places, because a seller should meet one screen, not two. It owns
+  everything visible — picking, the crop question, the editor, the grid, the
+  per-photo sheet, the confirms — while a **driver** owns only where the
+  finished blob goes: `usePendingMedia` (blobs in memory until a product id
+  exists) or `useLiveMedia` (every action an API call, uploads chained so
+  product snapshots never race, optimistic reorder). Both satisfy
+  `MediaDriver` in `media/types.ts`.
+  Built for sellers who read slowly and work on a phone:
+  - **A status line, not a guess** — "Add 1 photo to put this product on your
+    shop" (red) → "Ready — 4 photos and a video" (green), the same rule the
+    server enforces on `isActive: true`.
+  - **Camera first on touch devices** (`capture="environment"`), gallery
+    second; on a pointer device only the gallery button shows.
+  - **The crop question** (`ReviewQueue.tsx`): every picked photo stops on a
+    card showing it whole, with **Use this photo** as the primary button and
+    **Cut or turn it first** as the detour, plus "Use all N as they are" for a
+    batch. Cropping is never applied without being asked for.
+  - **One sheet per photo** (`PhotoSheet.tsx`), opened by tapping the tile:
+    Make this the cover · Cut or turn · Use a different photo · Describe this
+    photo · Move earlier / later · Remove (last, red, behind a confirm). It
+    replaces a hover-only strip of ‹ › ⇄ Alt — symbols a phone cannot reveal.
+  - **"Cut or turn" is hidden for photos already on the server**: S3 serves no
+    CORS headers, so a stored image cannot be read back into a canvas. The
+    sheet says so and offers "Use a different photo" — cropping happens on the
+    way in.
+  - **Uploads live in the grid** — a tile with a progress bar, or a red tile
+    with a full-width **Try again**.
+  - **Alt text is "Describe this photo"** (`DescribeDialog.tsx`), with who
+    reads it and an example; live mode only, since it needs a media row.
+  - **A storefront preview card** under the video shows what the cover photo
+    actually produces — the fastest way to explain "cover".
+  - **Every seller-facing string is in `media/strings.ts`**, so a Hindi /
+    Tamil / Malayalam pass is a translation job, not a rewrite.
+  - Tiles preview with `object-contain` and carry a ratio (or "Edited") chip;
+    drag still reorders on desktop. Oversized photos are **not rejected**:
+    only the format is checked up front (plus a 40 MB decode ceiling), and the
+    optimized result is retried at lower quality/size until it fits.
+  Below the grid sits the **single video slot** (add / replace / delete, no
+  crop) — picking a second video replaces the first rather than earning a 409.
   Every category, product, and variant
   row has an **enable/disable pill switch** (`ActiveSwitch.tsx` → the
   `PATCH` toggle endpoints); disabled rows dim and show a "Disabled"
@@ -1110,7 +1156,7 @@ and what a future catalog feed (dynamic product ads) will have to match.
 
 > `react-router-dom` v7 powers the storefront's authed shell
 > (`storefront/app/router.tsx`, lazy page chunks). The admin app has no
-> router yet. `react-easy-crop` powers the crop-before-upload dialog in
+> router yet. `react-easy-crop` powers the optional crop/rotate editor in
 > `shared/media/`.
 
 ---
@@ -1172,9 +1218,12 @@ frontend/
     │   ├── media/                # Upload building blocks (logo + product media)
     │   │   ├── mediaConfig.ts    # Server upload rules (/public/media-config) +
     │   │   │                     #   validateFile/acceptAttr/ruleHint helpers
-    │   │   ├── cropImage.ts      # Canvas crop → WebP (≤1600px, q0.85) — only the
-    │   │   │                     #   cropped, compressed image is ever uploaded
-    │   │   └── ImageCropDialog.tsx # react-easy-crop modal (fixed aspect, zoom)
+    │   │   ├── cropImage.ts      # Canvas rotate/crop/downscale → WebP (≤1600px,
+    │   │   │                     #   q0.85); `prepareImage` is the no-crop path and
+    │   │   │                     #   retries smaller if still over the size limit
+    │   │   └── ImageEditDialog.tsx # react-easy-crop modal — OPTIONAL crop: aspect
+    │   │                         #   chips (Original/Square/Portrait/Landscape),
+    │   │                         #   rotate, zoom, Reset, "Use original"
     │   └── auth/
     │       ├── http.ts           # Axios client (cookies + CSRF + ApiError)
     │       ├── authApi.ts        # Typed customer/admin auth endpoints
@@ -1269,9 +1318,19 @@ frontend/
     │           ├── orderMeta.tsx        # Shared status chips / payment labels / date formats
     │           ├── StorePublishCard.tsx # Publish/Unpublish toggle + Share Store
     │           ├── StoreDetailsPage.tsx # Name + logo upload (crop → progress → replace/remove)
-    │           ├── ProductMediaManager.tsx # Per-product photos (8, DnD reorder, cover) + video
-    │           ├── NewProductPhotos.tsx # Add-Product photo picker: crops locally,
-    │           │                     #   uploads after the product id exists
+    │           ├── ProductMediaManager.tsx # Thin wrapper: MediaBoard + useLiveMedia
+    │           ├── media/               # The Media Board — one Photos & video
+    │           │   │                    #   screen for the add form AND the row
+    │           │   ├── MediaBoard.tsx   # Status line, grid, tiles, video slot,
+    │           │   │                    #   storefront preview, all dialogs
+    │           │   ├── ReviewQueue.tsx  # "Use this photo" / "Cut or turn it first"
+    │           │   ├── PhotoSheet.tsx   # Per-photo actions, in words
+    │           │   ├── DescribeDialog.tsx # Alt text, renamed for sellers
+    │           │   ├── usePendingMedia.ts # Driver: blobs held until a product id
+    │           │   ├── useLiveMedia.ts  # Driver: uploads + API mutations
+    │           │   ├── types.ts         # MediaDriver contract
+    │           │   ├── strings.ts       # Every seller-facing word, one file
+    │           │   └── icons.tsx        # Camera / video / rotate glyphs
     │           ├── StoreAppearancePage.tsx # Colors + live preview
     │           ├── StoreHomepagePage.tsx # Show/hide storefront homepage sections
     │           ├── StoreFooterPage.tsx  # Footer manager: locations, social, info,

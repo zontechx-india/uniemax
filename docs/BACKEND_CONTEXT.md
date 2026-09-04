@@ -231,8 +231,10 @@ provider entirely (R2/MinIO/Azure/GCS = one new driver) can change without
 touching a row. Two drivers exist: **s3** (AWS SDK v3; explicit keys or the
 default credential chain) and **local** (dev default — writes under
 `backend/uploads/`, served at `/uploads/*` by `@fastify/static`, proxied by
-Vite in dev). Uploads arrive as multipart (`readUpload`), validated against
-env-configured size/type rules (`mediaRules`) that are also served to clients
+Vite in dev). Uploads arrive as multipart (`readUpload`, which also returns
+the plain text fields sent alongside the file so an endpoint can take a file
+and its metadata in one request — `POST /stores` takes name + logo that way),
+validated against env-configured size/type rules (`mediaRules`) that are also served to clients
 via `GET /api/v1/public/media-config`, so UI hints can't drift from what the
 server enforces. Keys are never reused (a replace mints a new key), which
 makes objects immutable and infinitely cacheable. The package parses its own
@@ -503,9 +505,11 @@ White-label design — one codebase, any business:
   account not mandatory.
 - **Store** — customer-owned store (`ownerId` → Customer, cascade delete; a customer
   can own several). Minimal by design: `name`, unique `slug` (auto-generated,
-  stable across renames — the store's public URL identity), optional `logoKey`
+  stable across renames — the store's public URL identity), `logoKey`
   (the uploaded logo's storage **object key** — responses expose a derived
-  `logoUrl`, never the key), a `theme` JSON column for the Appearance settings
+  `logoUrl`, never the key; supplied at creation and replaceable but never
+  removable, so the column is nullable only for stores that predate the
+  requirement), a `theme` JSON column for the Appearance settings
   (five colors — background, primary and the nullable secondary/surface/button
   text — plus `templateId` and `themeName` recording which appearance template
   the colors were **copied** from and what the seller named their customised
@@ -609,7 +613,11 @@ White-label design — one codebase, any business:
   (default true) — the enable/disable switch for the public storefront: a
   product is publicly visible only when it and its category chain are
   active (a disabled root hides its subcategories' products); disabling
-  never touches the children's own flags.
+  never touches the children's own flags. **Enabling a product requires at
+  least one photo** (`400` otherwise): the photo cannot be demanded at create
+  time — media is attached by product id, so it can only follow the product —
+  so the invariant is enforced at the moment the product would become
+  visible. Disabling is never blocked.
   Handled by the `storeCatalog.*` files in `modules/stores` (routes nested
   under `/stores/:id/…`, same ownership rules), with slug/aggregate helpers in
   `catalogSlug.ts` and the anonymous storefront surface in `publicStore.*`.

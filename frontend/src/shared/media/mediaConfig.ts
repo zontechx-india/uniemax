@@ -71,6 +71,34 @@ export function validateFile(file: File, rule: MediaRule): string | null {
   return null
 }
 
+/**
+ * Sanity ceiling for a picked IMAGE file, before it is decoded and optimized.
+ * Not the upload limit — decoding a 60 MP photo is what would hurt, and by the
+ * time the browser has re-encoded it to WebP it is a small fraction of this.
+ */
+export const SOURCE_MAX_MB = 40
+
+/**
+ * Validation for an image the browser is about to OPTIMIZE (downscale +
+ * WebP-encode) before uploading — every product photo and store logo.
+ *
+ * The format must be supported, but the file's own size is deliberately not
+ * measured against `rule.maxMB`: a 12 MB phone photo lands well under the
+ * server limit once re-encoded, and rejecting it up front would send the
+ * seller off to find an image editor for no reason. The size that matters is
+ * checked on the RESULT (`prepareImage`), which is the blob actually uploaded.
+ */
+export function validateImageSource(file: File, rule: MediaRule): string | null {
+  const type = file.type.toLowerCase()
+  if (!rule.contentTypes.includes(type)) {
+    return `"${file.name}" is not a supported format. Use ${formatTypes(rule.contentTypes)}.`
+  }
+  if (file.size > SOURCE_MAX_MB * 1024 * 1024) {
+    return `"${file.name}" is too large to open — keep photos under ${SOURCE_MAX_MB} MB.`
+  }
+  return null
+}
+
 const TYPE_LABELS: Record<string, string> = {
   'image/jpeg': 'JPG',
   'image/png': 'PNG',

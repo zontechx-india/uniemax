@@ -1,8 +1,10 @@
 import { z } from "zod";
 
 /**
- * Customer-owned stores. Creation is intentionally minimal: name only. The
- * logo is uploaded (multipart) via PUT /stores/:id/logo — never sent as JSON.
+ * Customer-owned stores. Creation takes a name **and a logo** — both are
+ * required, so POST /stores is a multipart request (text field `name` plus
+ * the file) rather than JSON. PUT /stores/:id/logo swaps the logo later;
+ * there is no removal — a store always has one.
  */
 
 export const storeCreateSchema = z.object({

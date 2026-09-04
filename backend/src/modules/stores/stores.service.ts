@@ -97,18 +97,41 @@ export async function listMyStores(ownerId: string) {
   return rows.map(shapeStore);
 }
 
-export async function createStore(ownerId: string, input: StoreCreateInput) {
+/**
+ * Create a store. The logo is REQUIRED, and the object key is namespaced by
+ * the store id, so the row is written first and the logo attached to it in a
+ * second write. If storing the object fails the fresh (still empty) row is
+ * rolled back, so a store never exists without its logo.
+ */
+export async function createStore(
+  ownerId: string,
+  input: StoreCreateInput,
+  logo: UploadedFile,
+) {
   const slug = await uniqueSlug(slugify(input.name));
-  const row = await prisma.store.create({
+  const created = await prisma.store.create({
     data: {
       ownerId,
       name: input.name,
       slug,
       theme: DEFAULT_STORE_THEME,
     },
-    select: storeSelect,
+    select: { id: true },
   });
-  return shapeStore(row);
+
+  try {
+    const key = newObjectKey(`store-logo/${created.id}`, logo.contentType);
+    await storage.put("logo", key, logo.buffer, logo.contentType);
+    const row = await prisma.store.update({
+      where: { id: created.id },
+      data: { logoKey: key },
+      select: storeSelect,
+    });
+    return shapeStore(row);
+  } catch (err) {
+    await prisma.store.delete({ where: { id: created.id } }).catch(() => {});
+    throw err;
+  }
 }
 
 /** `storeRef` is the store's id or slug — both resolve, ownership enforced. */
@@ -145,10 +168,11 @@ export async function updateStore(
 // ---------------------------------------------------------------------------
 
 /**
- * Upload (or replace) the store's logo. The cropped/processed file arrives as
- * multipart; a fresh object key is minted every time (immutable objects →
- * cacheable forever) and the previous object is deleted best-effort after the
- * row points at the new one.
+ * Replace the store's logo. The cropped/processed file arrives as multipart;
+ * a fresh object key is minted every time (immutable objects → cacheable
+ * forever) and the previous object is deleted best-effort after the row
+ * points at the new one. There is no removal counterpart — the logo is
+ * mandatory from creation onward.
  */
 export async function updateStoreLogo(
   ownerId: string,
@@ -172,25 +196,6 @@ export async function updateStoreLogo(
 
   // Best-effort cleanup — an orphaned object must never fail the request.
   if (previous.logoKey && previous.logoKey !== key) {
-    await storage.remove("logo", previous.logoKey).catch(() => {});
-  }
-  return shapeStore(row);
-}
-
-export async function removeStoreLogo(ownerId: string, storeRef: string) {
-  const store = await getMyStore(ownerId, storeRef); // ownership check
-  const previous = await prisma.store.findUniqueOrThrow({
-    where: { id: store.id },
-    select: { logoKey: true },
-  });
-
-  const row = await prisma.store.update({
-    where: { id: store.id },
-    data: { logoKey: null },
-    select: storeSelect,
-  });
-
-  if (previous.logoKey) {
     await storage.remove("logo", previous.logoKey).catch(() => {});
   }
   return shapeStore(row);

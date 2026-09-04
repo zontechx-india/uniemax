@@ -37,9 +37,9 @@ export const storeRoutes: FastifyPluginAsync = async (app) => {
   app.patch("/:id/shipping", controller.updateStoreShipping);
   app.patch("/:id/checkout", controller.updateStoreCheckout);
   app.patch("/:id/publish", controller.setStorePublished);
-  // Logo — multipart upload to the dedicated logo bucket.
+  // Logo — multipart upload to the dedicated logo bucket. Replace only: a
+  // store's logo is mandatory (set at creation), so there is no delete.
   app.put("/:id/logo", controller.updateStoreLogo);
-  app.delete("/:id/logo", controller.removeStoreLogo);
 
   // Payout bank accounts — several per store, exactly one primary (the
   // payout target). Verification (third-party + admin) is provisioned in

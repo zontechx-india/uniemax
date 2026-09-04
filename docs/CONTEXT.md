@@ -60,7 +60,8 @@ A single account can own multiple stores and switch between them.
   (select a store → its management page, or create another). The selection
   page shows a "Create Your First Store" empty state for first-timers.
 - **Create Store** — intentionally minimal to reduce friction: a store
-  name plus an **optional logo** (pick an image → crop it square → it is
+  name plus an **optional logo** (pick an image → crop it square, the one
+  place a square is required → it is
   staged locally and uploaded the moment the store is created). The logo
   can also be added, replaced or removed at any time from Store Details
   (same pick → crop → upload pipeline, with progress, to a dedicated
@@ -218,13 +219,23 @@ A single account can own multiple stores and switch between them.
   a product can move to any category of the same store); **the
   variant is what actually sells**, so price and stock always live on a
   variant, and each variant's name, price and stock are likewise editable
-  in place. Every product carries **media**: up to **8 photos** — added by
-  multi-select or drag-and-drop, each **cropped square before upload** so
-  the storefront stays consistent, reorderable by drag (the **first photo
-  is the cover** customers see on listing cards), each replaceable,
-  deletable and carrying optional alt text — plus **one optional video**
-  (replace/delete). Upload hints (max size, allowed formats) come from
-  server configuration and files are validated before uploading. A product with no options is entered with a single price and
+  in place. Every product carries **media**: **at least one photo** and up to
+  **8** — added by
+  multi-select or drag-and-drop, uploaded **as they were shot** (the browser
+  only downscales and compresses them; nothing is cut off), reorderable (the
+  **first photo is the cover** customers see on listing cards), each
+  replaceable, deletable and carrying optional alt text — plus **one optional
+  video** (replace/delete). Photos and the video can both be attached while
+  the product is being added, or later from the product's Photos & video
+  panel; a product with no photo cannot be enabled for the storefront.
+  **Cropping is a choice, not a step**: a seller can crop, rotate or zoom any
+  photo before it uploads (square, portrait, landscape or its own ratio), and
+  a photo they leave alone reaches the storefront untouched, shown whole
+  inside the square product frame.
+  Upload hints (allowed formats) come from
+  server configuration and files are checked before uploading; big photos are
+  resized automatically to fit the server's limits —
+  **5 MB per photo, 50 MB for the video** as currently configured. A product with no options is entered with a single price and
   stock (kept on one implicit variant behind the scenes); adding options —
   labels like "Red / 128 GB" — replaces that single price, and each option
   then carries its own price and stock. Listings show the cheapest option

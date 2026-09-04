@@ -276,13 +276,15 @@ order, all enabled). `slug` is auto-generated from the name
 storefront footer configuration (see `PATCH …/footer` below), always returned
 resolved to its complete shape.
 
-### `POST /api/v1/stores` → `201`
-```json
-{ "name": "Anwin's Sports Hub" }
-```
-`name` required (1–60 chars). The store is created with the default theme, an
-auto-generated unique `slug`, and `isPublished: false`. The logo is uploaded
-separately (`PUT /stores/:id/logo`) — never sent as JSON.
+### `POST /api/v1/stores` (multipart) → `201`
+Two parts, **both required**: a text field `name` (1–60 chars) and a `file`
+part carrying the logo (image; validated against the `logo` rule of
+`GET /public/media-config`). Missing file → `400`, oversized → `413`,
+unsupported type → `400`.
+
+The store is created with the default theme, an auto-generated unique `slug`,
+and `isPublished: false`. A store never exists without a logo: if storing the
+object fails, the new row is rolled back.
 
 ### `GET /api/v1/stores/:id`
 One of the customer's stores. `404` if not found / not owned.
@@ -364,14 +366,15 @@ Update `name`. Renaming does **not** change the slug, so shared links keep
 working.
 
 ### `PUT /api/v1/stores/:id/logo` (multipart)
-Upload or replace the store logo — one multipart `file` part (image;
-validated against the `logo` rule of `GET /public/media-config`). Stored in
-the dedicated **logo bucket**; the DB keeps only the object key and responses
-carry a derived `logoUrl`. Returns the full store. Oversized → `413`,
-unsupported type → `400`.
+Replace the store logo — one multipart `file` part (image; validated against
+the `logo` rule of `GET /public/media-config`). Stored in the dedicated
+**logo bucket**; the DB keeps only the object key and responses carry a
+derived `logoUrl`. Returns the full store. Oversized → `413`, unsupported
+type → `400`.
 
-### `DELETE /api/v1/stores/:id/logo`
-Remove the logo (`logoUrl` becomes `null`). Returns the full store.
+There is no `DELETE` counterpart: the logo is mandatory from creation onward,
+so it can only be swapped. (`logoUrl` can still be `null` on stores created
+before the logo became required.)
 
 ### `PATCH /api/v1/stores/:id/theme`
 Partial update of the theme object (unknown keys rejected; colors must be
@@ -733,6 +736,12 @@ and stock of an option-less product are edited — patch its `defaultVariant.id`
 Deleting the **last remaining** variant does not leave the product unsellable:
 that variant is demoted back to the implicit `Default` (keeping its price and
 stock), so the product simply becomes an option-less product again.
+
+A product cannot be **enabled** without a photo: `PATCH …/products/:productId`
+with `isActive: true` is a `400` while the product has no `IMAGE` media
+("Add at least one photo before enabling this product"). Disabling is always
+allowed, and creating is unaffected — media can only be attached after the
+product exists.
 
 **Media** — up to **8 images + 1 video** per product; the image with the
 lowest `displayOrder` is the **cover**. Files go to the product-media bucket;

@@ -405,6 +405,21 @@ export async function updateProduct(
     }
   }
 
+  // A product needs a photo before customers can see it. The photo cannot be
+  // required when the product is CREATED — media uploads address a product by
+  // id, so they can only follow it — which makes the moment it becomes
+  // visible the place to enforce it. Disabling never needs a photo.
+  if (patch.isActive === true) {
+    const imageCount = await prisma.storeProductMedia.count({
+      where: { productId, type: "IMAGE" },
+    });
+    if (imageCount === 0) {
+      throw HttpError.badRequest(
+        "Add at least one photo before enabling this product",
+      );
+    }
+  }
+
   const data: Prisma.StoreProductUncheckedUpdateInput = {};
   if (patch.name !== undefined) data.name = patch.name;
   if (patch.description !== undefined) {

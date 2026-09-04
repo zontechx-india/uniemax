@@ -60,6 +60,13 @@ export interface UploadedFile {
   filename: string;
   /** The rule the file was validated against ("image" | "video" | "logo"). */
   kind: MediaKind;
+  /**
+   * The plain TEXT fields sent alongside the file, by field name. Lets one
+   * endpoint take a file together with its metadata (e.g. POST /stores —
+   * name + logo in a single request). Collected after the file stream is
+   * drained, so fields on either side of the file part are seen.
+   */
+  fields: Record<string, string>;
 }
 
 /**
@@ -104,7 +111,25 @@ export async function readUpload(
     throw tooLarge();
   }
 
-  return { buffer, contentType, filename: file.filename, kind: resolvedKind };
+  return {
+    buffer,
+    contentType,
+    filename: file.filename,
+    kind: resolvedKind,
+    fields: textFields(file.fields),
+  };
+}
+
+/** Picks the plain text fields out of a multipart part's `fields` bag. */
+function textFields(fields: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!fields || typeof fields !== "object") return out;
+  for (const [name, entry] of Object.entries(fields as Record<string, unknown>)) {
+    const part = Array.isArray(entry) ? entry[0] : entry;
+    const value = (part as { value?: unknown } | null)?.value;
+    if (typeof value === "string") out[name] = value;
+  }
+  return out;
 }
 
 /**

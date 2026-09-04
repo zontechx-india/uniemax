@@ -25,9 +25,15 @@ export async function listStores(request: FastifyRequest) {
   return ok(await service.listMyStores(request.customer!.id));
 }
 
+/**
+ * Create a store — MULTIPART: the text field `name` plus the logo file,
+ * both required. A store is never created without a logo, so the two arrive
+ * in one request instead of a create-then-upload pair that could half-fail.
+ */
 export async function createStore(request: FastifyRequest, reply: FastifyReply) {
-  const input = storeCreateSchema.parse(request.body);
-  const store = await service.createStore(request.customer!.id, input);
+  const file = await readUpload(request, "logo");
+  const input = storeCreateSchema.parse({ name: file.fields.name });
+  const store = await service.createStore(request.customer!.id, input, file);
   return reply.status(201).send(ok(store));
 }
 
@@ -88,14 +94,13 @@ export async function setStorePublished(request: FastifyRequest) {
   );
 }
 
-/** Upload/replace the store logo (multipart file, validated as "logo"). */
+/**
+ * Replace the store logo (multipart file, validated as "logo"). There is no
+ * delete counterpart — every store must have a logo, so it can only be
+ * swapped for another one.
+ */
 export async function updateStoreLogo(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   const file = await readUpload(request, "logo");
   return ok(await service.updateStoreLogo(request.customer!.id, id, file));
-}
-
-export async function removeStoreLogo(request: FastifyRequest) {
-  const { id } = idParamSchema.parse(request.params);
-  return ok(await service.removeStoreLogo(request.customer!.id, id));
 }

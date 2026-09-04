@@ -1,14 +1,13 @@
 import { useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { toApiError } from '../../../shared/auth/http'
-import { ImageCropDialog } from '../../../shared/media/ImageCropDialog'
+import { ImageEditDialog } from '../../../shared/media/ImageEditDialog'
 import {
   acceptAttr,
   ruleHint,
   useMediaConfig,
-  validateFile,
+  validateImageSource,
 } from '../../../shared/media/mediaConfig'
-import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { ErrorNote, SuccessNote, TextField } from '../../../shared/ui/form'
 import { storesApi } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
@@ -17,8 +16,9 @@ import { ImageIcon } from '../../layout/icons'
 /**
  * Store Details section — name plus the store logo. The logo flow is
  * pick → validate (size/type per the server's media config) → crop (1:1)
- * → upload (WebP, with progress) to the dedicated logo bucket; Replace and
- * Remove act on the current logo. Business information, contact details,
+ * → upload (WebP, with progress) to the dedicated logo bucket. The logo is
+ * mandatory (set when the store is created), so it can only be replaced,
+ * never removed. Business information, contact details,
  * address, and policies get their own sections in future updates.
  */
 export function StoreDetailsPage() {
@@ -95,8 +95,6 @@ function LogoField() {
 
   const [cropFile, setCropFile] = useState<File | null>(null)
   const [progress, setProgress] = useState<number | null>(null)
-  const [confirmRemove, setConfirmRemove] = useState(false)
-  const [removing, setRemoving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const uploading = progress !== null
@@ -104,7 +102,7 @@ function LogoField() {
   const pick = (file: File | undefined) => {
     if (!file || !config) return
     setError(null)
-    const problem = validateFile(file, config.logo)
+    const problem = validateImageSource(file, config.logo)
     if (problem) return setError(problem)
     setCropFile(file)
   }
@@ -120,20 +118,6 @@ function LogoField() {
       setError(toApiError(err).message)
     } finally {
       setProgress(null)
-    }
-  }
-
-  const remove = async () => {
-    setRemoving(true)
-    setError(null)
-    try {
-      onStoreChange(await storesApi.removeLogo(store.id))
-      setConfirmRemove(false)
-    } catch (err) {
-      setError(toApiError(err).message)
-      setConfirmRemove(false)
-    } finally {
-      setRemoving(false)
     }
   }
 
@@ -156,26 +140,14 @@ function LogoField() {
         )}
 
         <div className="min-w-0">
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              disabled={uploading || !config}
-              className="h-9 rounded-md border border-line bg-surface px-3.5 text-sm font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
-            >
-              {store.logoUrl ? 'Replace' : 'Upload Logo'}
-            </button>
-            {store.logoUrl && (
-              <button
-                type="button"
-                onClick={() => setConfirmRemove(true)}
-                disabled={uploading}
-                className="h-9 rounded-md px-3 text-sm font-semibold text-danger transition hover:bg-danger/10 disabled:cursor-not-allowed disabled:text-muted"
-              >
-                Remove
-              </button>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading || !config}
+            className="h-9 rounded-md border border-line bg-surface px-3.5 text-sm font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
+          >
+            {store.logoUrl ? 'Replace' : 'Upload Logo'}
+          </button>
           <p className="mt-1.5 text-xs text-muted">
             {config ? `Square logo · ${ruleHint(config.logo)}` : 'Loading…'}
           </p>
@@ -208,25 +180,18 @@ function LogoField() {
       )}
 
       {cropFile && (
-        <ImageCropDialog
+        <ImageEditDialog
           file={cropFile}
-          aspect={1}
+          // A logo is shown in a square everywhere, so its frame stays fixed.
+          aspects={[{ label: 'Square', value: 1 }]}
+          allowOriginal={false}
           title="Crop your logo"
+          confirmLabel="Use this logo"
           busy={uploading}
           onCancel={() => setCropFile(null)}
-          onCropped={upload}
+          onDone={upload}
         />
       )}
-
-      <ConfirmDialog
-        open={confirmRemove}
-        title="Remove logo?"
-        description="Your store will show its name without a logo until you upload a new one."
-        confirmLabel="Remove"
-        busy={removing}
-        onConfirm={remove}
-        onCancel={() => setConfirmRemove(false)}
-      />
     </div>
   )
 }

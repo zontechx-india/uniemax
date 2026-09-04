@@ -765,7 +765,7 @@ function MediaGallery({ product }: { product: PublicProductDetail }) {
                       alt=""
                       loading="lazy"
                       decoding="async"
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-contain"
                     />
                   )
                 )}
@@ -821,7 +821,7 @@ function MediaGallery({ product }: { product: PublicProductDetail }) {
                   }
                 : undefined
             }
-            className="h-full w-full object-cover transition-transform duration-200 ease-out"
+            className="h-full w-full object-contain transition-transform duration-200 ease-out"
           />
         )}
 

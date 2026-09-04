@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { FormEvent } from 'react'
 import { toApiError } from '../../../shared/auth/http'
-import { ImageCropDialog } from '../../../shared/media/ImageCropDialog'
+import { ImageEditDialog } from '../../../shared/media/ImageEditDialog'
 import {
   acceptAttr,
   ruleHint,
   useMediaConfig,
-  validateFile,
+  validateImageSource,
 } from '../../../shared/media/mediaConfig'
 import { ErrorNote, TextField } from '../../../shared/ui/form'
 import { useGoBack } from '../../../shared/useGoBack'
@@ -15,11 +15,12 @@ import { storesApi } from '../../features/stores/storesApi'
 import { ArrowLeftIcon, ImageIcon } from '../../layout/icons'
 
 /**
- * Create Store — deliberately minimal to reduce friction: a name plus an
- * optional logo. The upload endpoint is per-store (PUT /stores/:id/logo),
- * so the logo is **staged locally** (validate → crop 1:1, same pipeline as
- * Store Details) and uploaded right after the store is created. Everything
- * remains editable afterwards from Store Details.
+ * Create Store — deliberately minimal to reduce friction, but a name AND a
+ * logo are both required: a storefront without a mark looks unfinished, and
+ * the API enforces the same rule. The logo is **staged locally** (validate →
+ * crop 1:1, same pipeline as Store Details) and posted together with the name
+ * in the single multipart create request, so a store is never left
+ * half-created. Everything remains editable afterwards from Store Details.
  */
 export function CreateStorePage() {
   const navigate = useNavigate()
@@ -27,9 +28,8 @@ export function CreateStorePage() {
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [uploadingLogo, setUploadingLogo] = useState(false)
 
-  // Staged logo — cropped locally, uploaded once the store exists.
+  // Staged logo — cropped locally, sent with the create request.
   const config = useMediaConfig()
   const inputRef = useRef<HTMLInputElement>(null)
   const [cropFile, setCropFile] = useState<File | null>(null)
@@ -55,7 +55,7 @@ export function CreateStorePage() {
   const pick = (file: File | undefined) => {
     if (!file || !config) return
     setError(null)
-    const problem = validateFile(file, config.logo)
+    const problem = validateImageSource(file, config.logo)
     if (problem) return setError(problem)
     setCropFile(file)
   }
@@ -66,35 +66,23 @@ export function CreateStorePage() {
     setCropFile(null)
   }
 
-  const clearLogo = () => {
-    setLogo(null)
-    setLogoPreview(null)
-  }
-
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return setError('Please enter a store name.')
+    if (!logo) return setError('Please add a store logo.')
 
     setError(null)
     setBusy(true)
     try {
-      const store = await storesApi.create({ name: name.trim() })
-      if (logo) {
-        // The store exists now — a failed logo upload must not strand the
-        // flow: continue to the manage page, where Store Details offers the
-        // same upload again.
-        setUploadingLogo(true)
-        try {
-          await storesApi.uploadLogo(store.id, logo.blob, logo.filename)
-        } catch {
-          /* retry available in Store Details */
-        }
-      }
+      const store = await storesApi.create(
+        { name: name.trim() },
+        logo.blob,
+        logo.filename,
+      )
       navigate(`/stores/${store.slug}`)
     } catch (err) {
       setError(toApiError(err).message)
       setBusy(false)
-      setUploadingLogo(false)
     }
   }
 
@@ -114,13 +102,13 @@ export function CreateStorePage() {
           Create Your Store
         </h1>
         <p className="mt-1 text-sm text-muted">
-          Just a name to get started — you can customize everything else
+          A name and a logo to get started — you can customize everything else
           afterwards.
         </p>
 
         <form onSubmit={submit} className="mt-6 space-y-5" noValidate>
           <TextField
-            label="Store name"
+            label="Store name *"
             placeholder="e.g. Anwin's Sports Hub"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -128,10 +116,10 @@ export function CreateStorePage() {
             autoFocus
           />
 
-          {/* Optional logo — staged locally, uploaded after creation. */}
+          {/* Required — staged locally, sent with the create request. */}
           <div>
             <span className="mb-2 block text-sm font-medium text-muted">
-              Store logo <span className="font-normal text-muted">(optional)</span>
+              Store logo *
             </span>
             <div className="flex items-center gap-4">
               {logoPreview ? (
@@ -155,16 +143,6 @@ export function CreateStorePage() {
                   >
                     {logo ? 'Replace' : 'Choose Logo'}
                   </button>
-                  {logo && (
-                    <button
-                      type="button"
-                      onClick={clearLogo}
-                      disabled={busy}
-                      className="h-9 rounded-md px-3 text-sm font-semibold text-danger transition hover:bg-danger/10 disabled:cursor-not-allowed disabled:text-muted"
-                    >
-                      Remove
-                    </button>
-                  )}
                 </div>
                 <p className="mt-1.5 text-xs text-muted">
                   {config
@@ -182,11 +160,7 @@ export function CreateStorePage() {
             disabled={busy}
             className="h-12 w-full rounded-md bg-brand-gradient px-4 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
           >
-            {busy
-              ? uploadingLogo
-                ? 'Uploading logo…'
-                : 'Creating…'
-              : 'Create Store'}
+            {busy ? 'Creating…' : 'Create Store'}
           </button>
         </form>
       </div>
@@ -203,12 +177,15 @@ export function CreateStorePage() {
       />
 
       {cropFile && (
-        <ImageCropDialog
+        <ImageEditDialog
           file={cropFile}
-          aspect={1}
+          // A logo is shown in a square everywhere, so its frame stays fixed.
+          aspects={[{ label: 'Square', value: 1 }]}
+          allowOriginal={false}
           title="Crop your logo"
+          confirmLabel="Use this logo"
           onCancel={() => setCropFile(null)}
-          onCropped={stageLogo}
+          onDone={stageLogo}
         />
       )}
     </div>

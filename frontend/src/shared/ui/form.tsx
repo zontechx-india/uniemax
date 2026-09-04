@@ -108,7 +108,8 @@ export function Brand({
 }
 
 interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
-  label: string
+  /** A node, not a string, so a field can mark itself required ("Name *"). */
+  label: ReactNode
   /** Optional leading icon shown inside the field. */
   icon?: ReactNode
   /** Optional trailing control (e.g. a show/hide password toggle). */

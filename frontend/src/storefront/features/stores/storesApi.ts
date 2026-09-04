@@ -607,8 +607,29 @@ export const storesApi = {
     return (await call<RawStore[]>(http.get(STORES))).map(normalize)
   },
 
-  async create(input: { name: string }): Promise<Store> {
-    return normalize(await call<RawStore>(http.post(STORES, input)))
+  /**
+   * Create a store. The logo is mandatory, so this is a MULTIPART request
+   * carrying the name and the cropped logo together — the server never
+   * writes a store without one.
+   */
+  async create(
+    input: { name: string },
+    logo: Blob,
+    logoFilename: string,
+    onProgress?: (fraction: number) => void,
+  ): Promise<Store> {
+    const form = new FormData()
+    form.append('name', input.name)
+    form.append('file', logo, logoFilename)
+    return normalize(
+      await call<RawStore>(
+        http.post(STORES, form, {
+          onUploadProgress: (e) => {
+            if (onProgress && e.total) onProgress(e.loaded / e.total)
+          },
+        }),
+      ),
+    )
   },
 
   async get(storeId: string): Promise<Store> {
@@ -619,7 +640,10 @@ export const storesApi = {
     return normalize(await call<RawStore>(http.patch(`${STORES}/${storeId}`, patch)))
   },
 
-  /** Upload/replace the store logo (multipart to the dedicated logo bucket). */
+  /**
+   * Replace the store logo (multipart to the dedicated logo bucket). There
+   * is no remove counterpart — a store must always have a logo.
+   */
   async uploadLogo(
     storeId: string,
     file: Blob,
@@ -637,10 +661,6 @@ export const storesApi = {
         }),
       ),
     )
-  },
-
-  async removeLogo(storeId: string): Promise<Store> {
-    return normalize(await call<RawStore>(http.delete(`${STORES}/${storeId}/logo`)))
   },
 
   async updateTheme(
