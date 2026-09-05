@@ -12,6 +12,14 @@ import * as paymentsController from "../payments/payments.controller.js";
  * re-validated server-side.
  */
 export const publicOrderRoutes: FastifyPluginAsync = async (app) => {
+  // Price summary for the checkout — the server quotes subtotal, shipping,
+  // tax, discount and total so the client never computes money itself.
+  // Static segment registered before the :orderId matcher below.
+  app.post(
+    "/:slug/orders/quote",
+    { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
+    controller.quoteOrder,
+  );
   app.post(
     "/:slug/orders",
     {

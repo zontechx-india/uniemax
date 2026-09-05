@@ -322,24 +322,63 @@ export interface DeliveryRule {
 
 export const DEFAULT_DELIVERY_RULE: DeliveryRule = { type: 'ALL', pincodes: [] }
 
+/**
+ * Shipping CHARGE — how much the seller charges per order (WHERE they
+ * deliver is the delivery rule above). MVP pricing, mirrors the server's
+ * `shippingRates.ts`:
+ *   FREE                    → ₹0
+ *   FLAT amount             → one charge per ORDER
+ *   FLAT + freeAbove        → waived once the order subtotal reaches it
+ * The store rate is the default for every product; a product's own
+ * `shippingOverride` (FREE or FLAT, no threshold) replaces it. An order pays
+ * the HIGHEST applicable per-order rate across its lines, never the sum.
+ * The client never computes a charge — the checkout asks
+ * `publicOrderApi.quote` and displays the answer.
+ */
+export type ShippingRateType = 'FREE' | 'FLAT'
+
+export interface ShippingRate {
+  type: ShippingRateType
+  /** Per-order charge for FLAT; 0 for FREE. */
+  amount: number
+  /** FLAT only: subtotal at/above which shipping is free. Null = never. */
+  freeAbove: number | null
+}
+
+export const DEFAULT_SHIPPING_RATE: ShippingRate = {
+  type: 'FREE',
+  amount: 0,
+  freeAbove: null,
+}
+
+/** A product's own rate. `null` on the product = follows the store rate. */
+export interface ProductShippingOverride {
+  type: ShippingRateType
+  amount: number
+}
+
 export interface StoreShipping {
   mode: ShippingMode
   /** The store-wide default rule; products without an override follow it. */
   deliveryRule: DeliveryRule
+  /** The store-wide default charge; products without an override follow it. */
+  rate: ShippingRate
 }
 
 export const DEFAULT_SHIPPING: StoreShipping = {
   mode: 'DELIVERY',
   deliveryRule: DEFAULT_DELIVERY_RULE,
+  rate: DEFAULT_SHIPPING_RATE,
 }
 
 /**
- * What the PUBLIC shell says about shipping — the mode only. The pincode
- * lists never leave the server; the storefront asks about one pincode at a
- * time through `publicStoreApi.checkDelivery`.
+ * What the PUBLIC shell says about shipping — the mode and the default
+ * rate. The pincode lists never leave the server; the storefront asks about
+ * one pincode at a time through `publicStoreApi.checkDelivery`.
  */
 export interface PublicStoreShipping {
   mode: ShippingMode
+  rate: ShippingRate
 }
 
 /**
@@ -521,6 +560,14 @@ export interface PublicProductDetail {
    * checks the customer's pincode through `publicStoreApi.checkDelivery`.
    */
   delivery: { restricted: boolean }
+  /**
+   * The rate this product advertises — its own override (`source: PRODUCT`)
+   * or the store rate. Informational; the order's charge is quoted over the
+   * whole cart.
+   */
+  shipping: ShippingRate & { source: 'STORE' | 'PRODUCT' }
+  /** Effective: the store accepts COD AND this product allows it. */
+  codAvailable: boolean
   /** Sellable combinations in matrix order. Empty for a simple product. */
   variants: PublicStoreVariant[]
   /** Gallery, ordered: images by display order (first = cover), video last. */
@@ -669,7 +716,10 @@ function normalizePublic(raw: RawPublicStore): PublicStore {
     theme: { ...DEFAULT_THEME, ...(raw.theme ?? {}) },
     footer: raw.footer ?? EMPTY_FOOTER,
     payments: raw.payments ?? DEFAULT_PAYMENTS,
-    shipping: raw.shipping ?? { mode: DEFAULT_SHIPPING.mode },
+    shipping: raw.shipping ?? {
+      mode: DEFAULT_SHIPPING.mode,
+      rate: DEFAULT_SHIPPING_RATE,
+    },
     checkout: raw.checkout ?? DEFAULT_CHECKOUT_FIELDS,
   }
 }
@@ -828,6 +878,15 @@ export const storesApi = {
     return normalize(
       await call<RawStore>(
         http.patch(`${STORES}/${storeId}/shipping`, { deliveryRule }),
+      ),
+    )
+  },
+
+  /** Set the store's DEFAULT shipping rate (same merging PATCH). */
+  async updateShippingRate(storeId: string, rate: ShippingRate): Promise<Store> {
+    return normalize(
+      await call<RawStore>(
+        http.patch(`${STORES}/${storeId}/shipping`, { rate }),
       ),
     )
   },
@@ -1084,6 +1143,13 @@ export interface StoreProduct extends StoreProductMerchandising {
    * store default (`store.shipping.deliveryRule`).
    */
   deliveryRule: DeliveryRule | null
+  /**
+   * This product's own shipping charge, or `null` when it follows the store
+   * rate (`store.shipping.rate`).
+   */
+  shippingOverride: ProductShippingOverride | null
+  /** Cash on delivery allowed for orders containing this product. */
+  codAvailable: boolean
   /** Real combinations only, in matrix order — the Default variant is never listed. */
   variants: StoreProductVariant[]
   /** Ordered media: images by displayOrder (first = cover), video last. */
@@ -1119,6 +1185,10 @@ export interface StoreProductCreateInput {
   specifications?: ProductSpec[]
   /** Delivery-area override; omit to follow the store default. */
   deliveryRule?: DeliveryRule
+  /** Shipping-charge override; omit to follow the store rate. */
+  shippingOverride?: ProductShippingOverride
+  /** Defaults to true. */
+  codAvailable?: boolean
   hasVariants: boolean
   price?: number
   stockQuantity?: number
@@ -1226,6 +1296,9 @@ export const storeCatalogApi = {
       specifications?: ProductSpec[] | null
       /** Delivery-area override; `null` drops it (follow the store default). */
       deliveryRule?: DeliveryRule | null
+      /** Shipping-charge override; `null` drops it (follow the store rate). */
+      shippingOverride?: ProductShippingOverride | null
+      codAvailable?: boolean
     },
   ): Promise<StoreProduct> {
     return call<StoreProduct>(
@@ -1450,9 +1523,21 @@ export interface OrderItemInput {
  * re-prices everything from the live catalog and re-checks stock, so stale
  * cart snapshots can never buy at an old price.
  */
+/** Billing details when they differ from the delivery address. */
+export interface BillingAddressInput {
+  name: string
+  phone?: string | null
+  address: string
+  pincode: string
+  state?: string | null
+  country?: string | null
+}
+
 export interface OrderCreateInput {
   fulfilment: 'DELIVERY' | 'PICKUP'
   paymentMethod: 'ONLINE' | 'COD'
+  /** Null / absent = billed to the delivery (or contact) details. */
+  billingAddress?: BillingAddressInput | null
   customer: {
     name?: string | null
     phone?: string | null
@@ -1463,6 +1548,57 @@ export interface OrderCreateInput {
     country?: string | null
   }
   items: OrderItemInput[]
+}
+
+/**
+ * The server's price summary for a cart — every rupee the checkout shows
+ * comes from here, never from client arithmetic.
+ *   total = subtotal − discount + shippingCharge + tax
+ */
+export interface OrderQuote {
+  fulfilment: 'DELIVERY' | 'PICKUP'
+  /** Decimal strings on the wire. */
+  subtotal: string
+  shippingCharge: string
+  /** "Free delivery" / "Standard delivery" / "Store pickup". */
+  shippingMethod: string
+  shippingBasis: ShippingBasis
+  tax: string
+  discount: string
+  total: string
+  paymentMethods: {
+    online: boolean
+    cod: boolean
+    /** Product names that rule COD out for this cart (empty when the store disables it). */
+    codUnavailableFor: string[]
+  }
+  /** Lines the server could price; vanished ones are simply absent. */
+  lines: {
+    productId: string
+    variantId: string | null
+    quantity: number
+    unitPrice: string
+    lineTotal: string
+  }[]
+}
+
+/** Why a shipping charge is what it is (snapshotted on the order too). */
+export type ShippingBasis =
+  | { kind: 'PICKUP' }
+  | { kind: 'STORE_FREE' }
+  | { kind: 'STORE_FLAT'; amount: number; freeAbove: number | null }
+  | { kind: 'FREE_ABOVE'; amount: number; freeAbove: number }
+  | { kind: 'PRODUCT_FREE' }
+  | { kind: 'PRODUCT_RATE'; amount: number; productName: string }
+
+/** Billing snapshot on a placed order (null = same as delivery). */
+export interface OrderBillingAddress {
+  name: string
+  phone: string | null
+  addressLine: string
+  pincode: string
+  state: string | null
+  country: string | null
 }
 
 export interface PlacedOrderItem {
@@ -1500,8 +1636,15 @@ export interface PlacedOrder {
   pincode: string | null
   state: string | null
   country: string | null
+  billingAddress: OrderBillingAddress | null
   subtotal: string
   shippingCharge: string
+  /** Null on orders placed before shipping rates existed. */
+  shippingMethod: string | null
+  shippingBasis: ShippingBasis | null
+  tax: string
+  discount: string
+  /** Grand total. */
   total: string
   paymentMethod: 'ONLINE' | 'COD'
   paymentStatus: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED'
@@ -1537,6 +1680,19 @@ export type PaySessionResult =
   | { paymentStatus: 'PENDING'; payment: PaymentSession }
 
 export const publicOrderApi = {
+  /**
+   * Price this cart the way placement will — subtotal, shipping, tax,
+   * discount, total and the payment methods it may use. Read-only.
+   */
+  async quote(
+    storeSlug: string,
+    input: { fulfilment: 'DELIVERY' | 'PICKUP'; items: OrderItemInput[] },
+  ): Promise<OrderQuote> {
+    return call<OrderQuote>(
+      http.post(`${PUBLIC_STORES}/${storeSlug}/orders/quote`, input),
+    )
+  },
+
   /**
    * Place the order (201). Server-side gates: published store only, method/
    * fulfilment must be seller-enabled, required checkout fields validated

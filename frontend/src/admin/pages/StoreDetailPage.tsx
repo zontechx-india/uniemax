@@ -19,7 +19,13 @@ import {
   TextArea,
 } from '../ui/primitives'
 import { BankStatusChip, OrderStatusChip, PaymentChip, StoreStatusChip } from '../ui/statusMeta'
-import { formatCount, formatDate, formatDateTime, formatMoney } from '../ui/format'
+import {
+  formatCount,
+  formatDate,
+  formatDateTime,
+  formatMoney,
+  formatMoneyExact,
+} from '../ui/format'
 import { StoreAvatar } from './StoresPage'
 import { BackIcon, ExternalIcon } from '../layout/icons'
 
@@ -223,6 +229,15 @@ export default function StoreDetailPage() {
                 : store.settings.shipping.mode === 'PICKUP'
                   ? 'Store pickup only'
                   : 'Delivery only'}
+            </Detail>
+            <Detail label="Shipping charge">
+              {store.settings.shipping.rate.type === 'FREE'
+                ? 'Free'
+                : `Flat ${formatMoneyExact(store.settings.shipping.rate.amount)} per order${
+                    store.settings.shipping.rate.freeAbove !== null
+                      ? ` · free above ${formatMoneyExact(store.settings.shipping.rate.freeAbove)}`
+                      : ''
+                  }`}
             </Detail>
             <Detail label="Checkout collects">
               {Object.entries(store.settings.checkout)

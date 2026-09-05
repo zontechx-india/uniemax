@@ -6,6 +6,7 @@ import { mediaUrl } from "../../package/storage/index.js";
 import { notify } from "../notifications/notifications.service.js";
 import { resolveOptionTypes, resolveSpecifications } from "../stores/storeCatalog.schema.js";
 import { resolveProductDeliveryRule } from "../stores/deliveryRules.js";
+import { resolveProductShippingOverride } from "../stores/shippingRates.js";
 import type { ProductListQuery, ProductVisibilityInput } from "./admin.schema.js";
 
 /**
@@ -107,6 +108,8 @@ export async function getProduct(productId: string) {
       optionTypes: true,
       specifications: true,
       deliveryRule: true,
+      shippingOverride: true,
+      codAvailable: true,
       updatedAt: true,
       store: {
         select: { id: true, name: true, slug: true, isPublished: true, ownerId: true },
@@ -131,7 +134,8 @@ export async function getProduct(productId: string) {
   });
   if (!product) throw HttpError.notFound("Product not found");
 
-  const { media, _count, optionTypes, specifications, deliveryRule, ...rest } = product;
+  const { media, _count, optionTypes, specifications, deliveryRule, shippingOverride, ...rest } =
+    product;
   return {
     ...rest,
     variantCount: _count.variants,
@@ -139,6 +143,8 @@ export async function getProduct(productId: string) {
     specifications: resolveSpecifications(specifications),
     // Null = no override; the product follows the store's default rule.
     deliveryRule: resolveProductDeliveryRule(deliveryRule),
+    // Null = no override; the product follows the store's default rate.
+    shippingOverride: resolveProductShippingOverride(shippingOverride),
     media: media.map(({ key, type, ...item }) => ({
       ...item,
       type,

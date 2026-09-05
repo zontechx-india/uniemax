@@ -19,9 +19,18 @@ import {
   resolveProductDeliveryRule,
   restrictsDelivery,
 } from "../stores/deliveryRules.js";
+import {
+  quoteShipping,
+  resolveProductShippingOverride,
+} from "../stores/shippingRates.js";
+import {
+  getVisibleStore,
+  visibleProductWhere,
+} from "../stores/publicStore.service.js";
 import type {
   OrderCreateInput,
   OrderCustomerInput,
+  OrderQuoteInput,
   OrderStatusUpdateInput,
   SellerOrderListQuery,
 } from "./orders.schema.js";
@@ -46,7 +55,15 @@ import {
  * Money and availability NEVER come from the client: every line is re-priced
  * from the live catalog inside the transaction, stock is decremented with a
  * guarded update (a concurrent order can't oversell), and the totals are
- * computed server-side.
+ * computed server-side:
+ *
+ *   total (grand total) = subtotal − discount + shippingCharge + tax
+ *
+ * Shipping is quoted by `shippingRates.ts#quoteShipping` (store rate, free-
+ * above threshold, per-product overrides); tax and discount are reserved
+ * columns that stay 0 until tax configuration and coupons exist. The same
+ * pricing runs in `quoteOrder` for the checkout summary, so the customer
+ * sees exactly what placement will charge — the client never computes money.
  *
  * Payment: COD orders start `paymentStatus: PENDING`. ONLINE orders go
  * through Cashfree when the gateway keys are configured — the order is
@@ -91,8 +108,13 @@ const orderSelect = {
   pincode: true,
   state: true,
   country: true,
+  billingAddress: true,
   subtotal: true,
   shippingCharge: true,
+  shippingMethod: true,
+  shippingBasis: true,
+  tax: true,
+  discount: true,
   total: true,
   paymentMethod: true,
   paymentStatus: true,
@@ -160,6 +182,226 @@ function validateCustomerFields(
   }
 }
 
+// ---------------------------------------------------------------------------
+// Pricing — shared by the checkout quote and order placement
+// ---------------------------------------------------------------------------
+
+/** Everything about a product that pricing, COD and shipping need. */
+const pricingProductSelect = {
+  id: true,
+  name: true,
+  slug: true,
+  deliveryRule: true,
+  shippingOverride: true,
+  codAvailable: true,
+  variants: {
+    where: { isActive: true },
+    select: {
+      id: true,
+      name: true,
+      price: true,
+      stockQuantity: true,
+      isDefault: true,
+    },
+  },
+  media: {
+    where: { type: "IMAGE" as const },
+    orderBy: [{ displayOrder: "asc" as const }, { createdAt: "asc" as const }],
+    take: 1,
+    select: { key: true },
+  },
+} satisfies Prisma.StoreProductSelect;
+
+type PricingProduct = Prisma.StoreProductGetPayload<{
+  select: typeof pricingProductSelect;
+}>;
+
+type OrderItemRef = OrderCreateInput["items"][number];
+
+interface PricedLine {
+  productId: string;
+  variantId: string | null;
+  productName: string;
+  variantName: string | null;
+  productSlug: string;
+  imageKey: string | null;
+  unitPrice: Prisma.Decimal;
+  quantity: number;
+  lineTotal: Prisma.Decimal;
+  stockVariantId: string;
+  codAvailable: boolean;
+  shippingOverride: ReturnType<typeof resolveProductShippingOverride>;
+}
+
+/** Duplicate product+variant references are a client bug, not a merge request. */
+function assertNoDuplicateLines(items: OrderItemRef[]): void {
+  const seen = new Set<string>();
+  for (const item of items) {
+    const key = `${item.productId} ${item.variantId ?? ""}`;
+    if (seen.has(key)) throw HttpError.badRequest("Duplicate order line");
+    seen.add(key);
+  }
+}
+
+/** The publicly sellable products among the referenced ids, keyed by id. */
+async function loadPricingProducts(
+  storeId: string,
+  items: OrderItemRef[],
+): Promise<Map<string, PricingProduct>> {
+  const products = await prisma.storeProduct.findMany({
+    where: {
+      ...visibleProductWhere(storeId),
+      id: { in: [...new Set(items.map((i) => i.productId))] },
+    },
+    select: pricingProductSelect,
+  });
+  return new Map(products.map((p) => [p.id, p]));
+}
+
+/**
+ * Price one requested line from the live catalog. `strict` (placement)
+ * refuses vanished products/variants and short stock with 409; the quote
+ * path passes `strict: false` and gets null for lines it should skip — the
+ * cart's own revalidation already tells the customer about those, and a
+ * price summary must not blow up while it does.
+ */
+function priceLine(
+  item: OrderItemRef,
+  product: PricingProduct | undefined,
+  strict: boolean,
+): PricedLine | null {
+  if (!product) {
+    if (!strict) return null;
+    throw HttpError.conflict(
+      "An item in your order is no longer available — refresh your cart",
+    );
+  }
+  const variant = item.variantId
+    ? product.variants.find((v) => v.id === item.variantId && !v.isDefault)
+    : product.variants.find((v) => v.isDefault);
+  if (!variant) {
+    if (!strict) return null;
+    throw HttpError.conflict(
+      `"${product.name}" changed — refresh your cart and try again`,
+    );
+  }
+  if (strict && variant.stockQuantity < item.quantity) {
+    throw HttpError.conflict(
+      variant.stockQuantity === 0
+        ? `"${product.name}" is out of stock`
+        : `Only ${variant.stockQuantity} left of "${product.name}"`,
+    );
+  }
+  const unitPrice = new Prisma.Decimal(variant.price);
+  return {
+    productId: product.id,
+    variantId: item.variantId,
+    productName: product.name,
+    variantName: item.variantId ? variant.name : null,
+    productSlug: product.slug,
+    imageKey: product.media[0]?.key ?? null,
+    unitPrice,
+    quantity: item.quantity,
+    lineTotal: unitPrice.mul(item.quantity),
+    stockVariantId: variant.id,
+    codAvailable: product.codAvailable,
+    shippingOverride: resolveProductShippingOverride(product.shippingOverride),
+  };
+}
+
+/**
+ * The money side of an order, from priced lines + the store's settings.
+ * One function for the quote and the placement — never two formulas.
+ */
+function priceOrder(
+  lines: PricedLine[],
+  fulfilment: "DELIVERY" | "PICKUP",
+  shipping: ReturnType<typeof resolveShipping>,
+) {
+  const subtotal = lines.reduce(
+    (sum, line) => sum.add(line.lineTotal),
+    new Prisma.Decimal(0),
+  );
+  const quote = quoteShipping({
+    fulfilment,
+    storeRate: shipping.rate,
+    subtotal,
+    lines: lines.map((line) => ({
+      productName: line.productName,
+      override: line.shippingOverride,
+    })),
+  });
+  // Reserved: prices are GST-inclusive and there are no coupons yet, so both
+  // are 0 — but they are part of the formula so the total never changes
+  // shape when they become real.
+  const tax = new Prisma.Decimal(0);
+  const discount = new Prisma.Decimal(0);
+  const total = subtotal.sub(discount).add(quote.charge).add(tax);
+  return {
+    subtotal,
+    shippingCharge: quote.charge,
+    shippingMethod: quote.method,
+    shippingBasis: quote.basis,
+    tax,
+    discount,
+    total,
+  };
+}
+
+/**
+ * Which payment methods this particular order can use. COD needs the store
+ * switch AND every product's own `codAvailable`; the names of the products
+ * that block it let the checkout say why.
+ */
+function paymentMethodsFor(
+  payments: ReturnType<typeof resolvePayments>,
+  lines: PricedLine[],
+) {
+  const codUnavailableFor = [
+    ...new Set(lines.filter((l) => !l.codAvailable).map((l) => l.productName)),
+  ];
+  return {
+    online: payments.acceptOnlinePayment,
+    cod: payments.acceptCod && codUnavailableFor.length === 0,
+    /** Product names that rule COD out (empty when the store itself disables it). */
+    codUnavailableFor: payments.acceptCod ? codUnavailableFor : [],
+  };
+}
+
+/**
+ * Checkout price summary — what placing this cart with this fulfilment would
+ * cost, and which payment methods it may use. Reads only. Visible stores
+ * (incl. the owner's draft preview) so the owner can see their shipping
+ * rules at work before publishing; lines that are no longer sellable are
+ * dropped rather than failing the whole summary.
+ */
+export async function quoteOrder(
+  storeSlug: string,
+  input: OrderQuoteInput,
+  viewerId?: string,
+) {
+  const store = await getVisibleStore(storeSlug, viewerId);
+  assertNoDuplicateLines(input.items);
+  const productById = await loadPricingProducts(store.id, input.items);
+  const lines = input.items
+    .map((item) => priceLine(item, productById.get(item.productId), false))
+    .filter((line): line is PricedLine => line !== null);
+
+  const money = priceOrder(lines, input.fulfilment, resolveShipping(store.shipping));
+  return {
+    fulfilment: input.fulfilment,
+    ...money,
+    paymentMethods: paymentMethodsFor(resolvePayments(store.payments), lines),
+    lines: lines.map((line) => ({
+      productId: line.productId,
+      variantId: line.variantId,
+      quantity: line.quantity,
+      unitPrice: line.unitPrice,
+      lineTotal: line.lineTotal,
+    })),
+  };
+}
+
 export async function createOrder(
   storeSlug: string,
   input: OrderCreateInput,
@@ -190,6 +432,7 @@ export async function createOrder(
   if (input.paymentMethod === "COD" && !payments.acceptCod) {
     throw HttpError.badRequest("This store does not accept cash on delivery");
   }
+  // Per-product COD is checked once the lines are priced (below).
   if (input.paymentMethod === "ONLINE" && isProduction && !cashfreeConfigured) {
     // Without gateway keys, production must never pretend a payment happened.
     throw new HttpError(
@@ -213,85 +456,25 @@ export async function createOrder(
 
   // --- re-price every line from the live catalog ---------------------------
   // One line per product+variant; duplicate references are rejected rather
-  // than silently merged (the cart never produces them).
-  const seen = new Set<string>();
-  for (const item of input.items) {
-    const key = `${item.productId} ${item.variantId ?? ""}`;
-    if (seen.has(key)) throw HttpError.badRequest("Duplicate order line");
-    seen.add(key);
+  // than silently merged (the cart never produces them). Strict mode: a
+  // vanished product/variant or short stock is a 409 the customer must see.
+  assertNoDuplicateLines(input.items);
+  const productById = await loadPricingProducts(store.id, input.items);
+  const lines = input.items.map(
+    (item) => priceLine(item, productById.get(item.productId), true)!,
+  );
+
+  // --- COD is per product too: one product that refuses it rules it out ----
+  if (input.paymentMethod === "COD") {
+    const blockers = paymentMethodsFor(payments, lines).codUnavailableFor;
+    if (blockers.length > 0) {
+      throw HttpError.badRequest(
+        `Cash on delivery is not available for: ${blockers
+          .map((name) => `"${name}"`)
+          .join(", ")} — choose another payment method`,
+      );
+    }
   }
-
-  const products = await prisma.storeProduct.findMany({
-    where: {
-      storeId: store.id,
-      id: { in: [...new Set(input.items.map((i) => i.productId))] },
-      isActive: true,
-      category: {
-        isActive: true,
-        OR: [{ parentId: null }, { parent: { isActive: true } }],
-      },
-    },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      deliveryRule: true,
-      variants: {
-        where: { isActive: true },
-        select: {
-          id: true,
-          name: true,
-          price: true,
-          stockQuantity: true,
-          isDefault: true,
-        },
-      },
-      media: {
-        where: { type: "IMAGE" },
-        orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
-        take: 1,
-        select: { key: true },
-      },
-    },
-  });
-  const productById = new Map(products.map((p) => [p.id, p]));
-
-  const lines = input.items.map((item) => {
-    const product = productById.get(item.productId);
-    if (!product) {
-      throw HttpError.conflict(
-        "An item in your order is no longer available — refresh your cart",
-      );
-    }
-    const variant = item.variantId
-      ? product.variants.find((v) => v.id === item.variantId && !v.isDefault)
-      : product.variants.find((v) => v.isDefault);
-    if (!variant) {
-      throw HttpError.conflict(
-        `"${product.name}" changed — refresh your cart and try again`,
-      );
-    }
-    if (variant.stockQuantity < item.quantity) {
-      throw HttpError.conflict(
-        variant.stockQuantity === 0
-          ? `"${product.name}" is out of stock`
-          : `Only ${variant.stockQuantity} left of "${product.name}"`,
-      );
-    }
-    const unitPrice = new Prisma.Decimal(variant.price);
-    return {
-      productId: product.id,
-      variantId: item.variantId,
-      productName: product.name,
-      variantName: item.variantId ? variant.name : null,
-      productSlug: product.slug,
-      imageKey: product.media[0]?.key ?? null,
-      unitPrice,
-      quantity: item.quantity,
-      lineTotal: unitPrice.mul(item.quantity),
-      stockVariantId: variant.id,
-    };
-  });
 
   // --- delivery areas: every line must reach the customer's pincode --------
   // The product's own rule wins over the store default (deliveryRules.ts).
@@ -330,13 +513,21 @@ export async function createOrder(
     }
   }
 
-  const subtotal = lines.reduce(
-    (sum, line) => sum.add(line.lineTotal),
-    new Prisma.Decimal(0),
-  );
-  // Shipping charges arrive with the shipping-rules feature; free until then.
-  const shippingCharge = new Prisma.Decimal(0);
-  const total = subtotal.add(shippingCharge);
+  // --- money: the same formula the checkout quote showed -------------------
+  const money = priceOrder(lines, input.fulfilment, shipping);
+  // A billing address only makes sense alongside a delivery address; pickup
+  // and same-as-delivery orders leave it null (= the contact details).
+  const billingAddress =
+    withAddress && input.billingAddress
+      ? {
+          name: input.billingAddress.name,
+          phone: input.billingAddress.phone,
+          addressLine: input.billingAddress.address,
+          pincode: input.billingAddress.pincode,
+          state: input.billingAddress.state,
+          country: input.billingAddress.country,
+        }
+      : null;
 
   // Real gateway when keys are configured (any env — sandbox keys in dev
   // exercise the real flow); the old dev simulation only without them.
@@ -380,9 +571,14 @@ export async function createOrder(
         pincode: withAddress ? input.customer.pincode : null,
         state: withAddress ? input.customer.state : null,
         country: withAddress ? input.customer.country : null,
-        subtotal,
-        shippingCharge,
-        total,
+        billingAddress: billingAddress ?? Prisma.DbNull,
+        subtotal: money.subtotal,
+        shippingCharge: money.shippingCharge,
+        shippingMethod: money.shippingMethod,
+        shippingBasis: money.shippingBasis as unknown as Prisma.InputJsonValue,
+        tax: money.tax,
+        discount: money.discount,
+        total: money.total,
         paymentMethod: input.paymentMethod,
         paymentStatus: simulated ? "PAID" : "PENDING",
         paymentRef: simulated ? "DEV-SIMULATED" : null,

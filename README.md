@@ -66,7 +66,10 @@ never ships to a shopper.
   (hero, categories, featured, new arrivals, best sellers).
 - Footer builder: up to 10 locations with map pins, social links, business info,
   support contacts, policy links, custom links, copyright.
-- Configure payments (COD / online), fulfilment (delivery / pickup / both),
+- Configure payments (COD / online, with per-product COD opt-out), fulfilment
+  (delivery / pickup / both), shipping charges (free, or a flat rate per order
+  with a free-above threshold — a store default with per-product overrides;
+  always computed server-side and quoted to the checkout),
   pincode-based delivery areas (a store default — all / only selected / all
   except selected pincodes — with per-product overrides; shown on the product
   page against the customer's default address and enforced at checkout) and
@@ -346,7 +349,9 @@ fallback runbook: [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md).
   the refund itself is done manually in the Cashfree dashboard. There is also no
   automatic expiry sweep for abandoned unpaid online orders — they hold stock
   until the seller cancels.
-- **Shipping-charge calculation** — orders currently ship free.
+- **Shipping beyond the MVP rates** — weight bands and courier-API pricing
+  (flat / free / free-above per store with per-product overrides are live);
+  tax configuration and coupons (`Order.tax` / `Order.discount` are held at 0).
 - **Inventory alerts** and **banners**.
 - **Google / Apple sign-in** — scaffolded, verifier unregistered (endpoints 400).
 - **Socket.IO real-time layer.**

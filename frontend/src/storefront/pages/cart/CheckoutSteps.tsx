@@ -12,7 +12,9 @@ import type {
 } from '../../features/addresses/addressesApi'
 import { AddressForm } from '../../features/addresses/AddressForm'
 import type {
+  BillingAddressInput,
   CheckoutFieldKey,
+  OrderQuote,
   PublicStore,
   StoreCheckoutFields,
 } from '../../features/stores/storesApi'
@@ -39,8 +41,13 @@ import {
  *
  * Signed-in customers see their saved addresses as selectable rows (primary
  * first) with an inline "Add new address" that saves to the address book;
- * guests get a plain form. Everything is kept in component state — order
- * creation consumes it once it exists.
+ * guests get a plain form. Delivery orders can also give a separate
+ * **billing address** (same as delivery by default). Everything is kept in
+ * component state — order creation consumes it once it exists.
+ *
+ * The payment step offers what the STORE accepts, narrowed by the server's
+ * quote for THIS cart: a product that refuses cash on delivery greys COD out
+ * and names itself, so the customer learns why before Place Order.
  */
 
 // --- field configuration ----------------------------------------------------
@@ -100,21 +107,70 @@ function summarize(values: CheckoutForm, withAddress: boolean): string {
 export interface DeliveryDetails {
   fulfilment: 'DELIVERY' | 'PICKUP'
   values: CheckoutForm
+  /** A billing address that differs from delivery; null = same. */
+  billing: BillingAddressInput | null
 }
 
 /** What the summary panel needs to enable + submit Place Order. */
 export interface CheckoutState {
   delivery: DeliveryDetails | null
   payment: 'ONLINE' | 'COD' | null
+  /** The CURRENT fulfilment choice, even before step 1 is confirmed — the
+   *  price quote depends on it (pickup ships free). */
+  fulfilment: 'DELIVERY' | 'PICKUP'
+}
+
+// --- billing address -------------------------------------------------------
+
+interface BillingForm {
+  name: string
+  phone: string
+  address: string
+  pincode: string
+  state: string
+  country: string
+}
+
+const EMPTY_BILLING: BillingForm = {
+  name: '',
+  phone: '',
+  address: '',
+  pincode: '',
+  state: '',
+  country: 'India',
+}
+
+function validateBilling(values: BillingForm): string | null {
+  if (!values.name.trim()) return 'Enter the billing name.'
+  if (!values.address.trim()) return 'Enter the billing address.'
+  if (!/^[A-Za-z0-9 -]{3,10}$/.test(values.pincode.trim())) {
+    return 'The billing pincode looks invalid.'
+  }
+  return null
+}
+
+function toBillingInput(values: BillingForm): BillingAddressInput {
+  const text = (v: string) => (v.trim() ? v.trim() : null)
+  return {
+    name: values.name.trim(),
+    phone: text(values.phone),
+    address: values.address.trim(),
+    pincode: values.pincode.trim(),
+    state: text(values.state),
+    country: text(values.country),
+  }
 }
 
 // --- the two steps ----------------------------------------------------------
 
 export function CheckoutSteps({
   shell,
+  quote,
   onStateChange,
 }: {
   shell: PublicStore
+  /** The server's price summary for this cart — null while loading/failed. */
+  quote: OrderQuote | null
   /** Fired whenever a step completes/changes — feeds the Place Order button. */
   onStateChange: (state: CheckoutState) => void
 }) {
@@ -126,12 +182,27 @@ export function CheckoutSteps({
   )
   const [delivery, setDelivery] = useState<DeliveryDetails | null>(null)
   const [payment, setPayment] = useState<'ONLINE' | 'COD' | null>(null)
+  const [billingSame, setBillingSame] = useState(true)
+  const [billingValues, setBillingValues] = useState<BillingForm>(EMPTY_BILLING)
+  const [billingProblem, setBillingProblem] = useState<string | null>(null)
 
   useEffect(() => {
-    onStateChange({ delivery, payment })
-  }, [delivery, payment, onStateChange])
+    onStateChange({ delivery, payment, fulfilment })
+  }, [delivery, payment, fulfilment, onStateChange])
 
   const withAddress = fulfilment === 'DELIVERY'
+
+  /** Step 1 completes only once the billing section (if used) is valid too. */
+  const completeDelivery = (values: CheckoutForm) => {
+    let billing: BillingAddressInput | null = null
+    if (withAddress && !billingSame) {
+      const failure = validateBilling(billingValues)
+      if (failure) return setBillingProblem(failure)
+      billing = toBillingInput(billingValues)
+    }
+    setBillingProblem(null)
+    setDelivery({ fulfilment, values, billing })
+  }
 
   return (
     <>
@@ -155,6 +226,12 @@ export function CheckoutSteps({
                 {summarize(delivery.values, delivery.fulfilment === 'DELIVERY') ||
                   'Details recorded.'}
               </p>
+              {delivery.billing && (
+                <p className="mt-1 text-xs text-muted">
+                  Billed to {delivery.billing.name} · {delivery.billing.address}{' '}
+                  · {delivery.billing.pincode}
+                </p>
+              )}
             </div>
             <button
               type="button"
@@ -174,10 +251,25 @@ export function CheckoutSteps({
               <FulfilmentPicker value={fulfilment} onChange={setFulfilment} />
             )}
             {fulfilment === 'PICKUP' && <PickupLocation shell={shell} />}
+            {withAddress && (
+              <BillingAddressSection
+                same={billingSame}
+                onSameChange={(same) => {
+                  setBillingSame(same)
+                  setBillingProblem(null)
+                }}
+                values={billingValues}
+                onChange={(next) => {
+                  setBillingValues(next)
+                  setBillingProblem(null)
+                }}
+                problem={billingProblem}
+              />
+            )}
             <DeliveryStep
               fields={fields}
               withAddress={withAddress}
-              onDone={(values) => setDelivery({ fulfilment, values })}
+              onDone={completeDelivery}
             />
           </div>
         )}
@@ -201,7 +293,12 @@ export function CheckoutSteps({
             first.
           </p>
         ) : (
-          <PaymentStep shell={shell} value={payment} onChange={setPayment} />
+          <PaymentStep
+            shell={shell}
+            quote={quote}
+            value={payment}
+            onChange={setPayment}
+          />
         )}
       </section>
     </>
@@ -290,6 +387,102 @@ function PickupLocation({ shell }: { shell: PublicStore }) {
         ? `Pickup point: ${location.label ? `${location.label} — ` : ''}${location.address}`
         : 'The seller will share the pickup address with your order confirmation.'}
     </InfoNote>
+  )
+}
+
+/**
+ * "Billing address is the same as delivery" (default) or a compact form for
+ * a different one. Sits above the delivery form so it is filled in before
+ * the step's confirm button; the parent validates it on confirm.
+ */
+function BillingAddressSection({
+  same,
+  onSameChange,
+  values,
+  onChange,
+  problem,
+}: {
+  same: boolean
+  onSameChange: (same: boolean) => void
+  values: BillingForm
+  onChange: (next: BillingForm) => void
+  problem: string | null
+}) {
+  const set = (key: keyof BillingForm, value: string) =>
+    onChange({ ...values, [key]: value })
+  return (
+    <div className="rounded-md border border-line p-3">
+      <label className="flex cursor-pointer items-start gap-3">
+        <input
+          type="checkbox"
+          checked={same}
+          onChange={(e) => onSameChange(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[var(--brand)]"
+        />
+        <span className="text-sm">
+          <span className="font-medium text-fg">
+            Billing address is the same as the delivery address
+          </span>
+          <span className="mt-0.5 block text-xs text-muted">
+            Untick to bill a different name or address.
+          </span>
+        </span>
+      </label>
+      {!same && (
+        <div className="mt-3 space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <TextField
+              label="Billing name"
+              value={values.name}
+              onChange={(e) => set('name', e.target.value)}
+              maxLength={100}
+            />
+            <TextField
+              label="Billing phone (optional)"
+              value={values.phone}
+              onChange={(e) => set('phone', e.target.value)}
+              inputMode="tel"
+              maxLength={20}
+            />
+          </div>
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium text-muted">
+              Billing address
+            </span>
+            <textarea
+              value={values.address}
+              onChange={(e) => set('address', e.target.value)}
+              placeholder="House / street / area / city"
+              rows={2}
+              maxLength={300}
+              className="w-full rounded-md border border-line bg-input px-4 py-3 text-sm text-fg outline-none transition-colors placeholder:text-muted hover:border-fg/30 focus:border-accent"
+            />
+          </label>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <TextField
+              label="Pincode"
+              value={values.pincode}
+              onChange={(e) => set('pincode', e.target.value)}
+              inputMode="numeric"
+              maxLength={10}
+            />
+            <TextField
+              label="State"
+              value={values.state}
+              onChange={(e) => set('state', e.target.value)}
+              maxLength={100}
+            />
+            <TextField
+              label="Country"
+              value={values.country}
+              onChange={(e) => set('country', e.target.value)}
+              maxLength={100}
+            />
+          </div>
+          {problem && <ErrorNote>{problem}</ErrorNote>}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -628,19 +821,35 @@ function ManualDetailsForm({
 
 function PaymentStep({
   shell,
+  quote,
   value,
   onChange,
 }: {
   shell: PublicStore
+  quote: OrderQuote | null
   value: 'ONLINE' | 'COD' | null
-  onChange: (next: 'ONLINE' | 'COD') => void
+  onChange: (next: 'ONLINE' | 'COD' | null) => void
 }) {
+  // The store's switches say what it offers; the quote narrows COD for THIS
+  // cart (a product may refuse it). Without a quote yet, trust the switches
+  // — the server refuses a disallowed COD order anyway.
+  const codBlockedBy = quote?.paymentMethods.codUnavailableFor ?? []
+  const codDisabled = quote ? !quote.paymentMethods.cod : false
+
+  // A cart change can take COD away after it was picked — drop the choice so
+  // Place Order cannot submit a method the server will reject.
+  useEffect(() => {
+    if (value === 'COD' && codDisabled) onChange(null)
+  }, [value, codDisabled, onChange])
+
   const methods = [
     shell.payments.acceptOnlinePayment
       ? {
           key: 'ONLINE' as const,
           title: 'Online Payment',
           description: 'Pay securely through UnieMax — UPI, cards and more.',
+          disabled: false,
+          note: null as string | null,
         }
       : null,
     shell.payments.acceptCod
@@ -648,6 +857,13 @@ function PaymentStep({
           key: 'COD' as const,
           title: 'Cash on Delivery',
           description: 'Pay in cash when your order arrives.',
+          disabled: codDisabled,
+          note:
+            codBlockedBy.length > 0
+              ? `Not available for ${codBlockedBy
+                  .map((name) => `"${name}"`)
+                  .join(', ')} — these items are prepaid only.`
+              : null,
         }
       : null,
   ].filter((m): m is NonNullable<typeof m> => m !== null)
@@ -674,11 +890,14 @@ function PaymentStep({
                 type="button"
                 role="radio"
                 aria-checked={isSelected}
+                disabled={method.disabled}
                 onClick={() => onChange(method.key)}
-                className={`flex w-full items-center gap-3 rounded-md border p-3.5 text-left transition ${
+                className={`flex w-full items-center gap-3 rounded-md border p-3.5 text-left transition disabled:cursor-not-allowed ${
                   isSelected
                     ? 'border-brand bg-brand/5'
-                    : 'border-line hover:bg-surface-alt'
+                    : method.disabled
+                      ? 'border-line opacity-60'
+                      : 'border-line hover:bg-surface-alt'
                 }`}
               >
                 <span
@@ -697,6 +916,11 @@ function PaymentStep({
                   <span className="mt-0.5 block text-sm text-muted">
                     {method.description}
                   </span>
+                  {method.note && (
+                    <span className="mt-1 block text-xs font-semibold text-warning">
+                      {method.note}
+                    </span>
+                  )}
                 </span>
               </button>
             </li>

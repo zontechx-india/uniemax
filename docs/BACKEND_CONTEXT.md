@@ -587,14 +587,22 @@ White-label design — one codebase, any business:
   RECEIVE orders (`resolveShipping` default DELIVERY) — **and the store's
   default delivery-area rule** `deliveryRule: { type: ALL | INCLUDE |
   EXCLUDE, pincodes }` — WHERE it delivers, by 6-digit pincode (default
-  ALL; the shipping-charge rules join this column later), updated as a
-  partial merge via `PATCH /stores/:id/shipping`. The rule shape, its
-  Zod schema, the product-override precedence (`effectiveDeliveryRule`:
-  a product's own `StoreProduct.deliveryRule` replaces the store default)
-  and the pincode match (`isDeliverable`) all live in
-  `modules/stores/deliveryRules.ts`, which order placement and the public
-  delivery check both call — one evaluation, never two. The public shell
-  exposes only `shipping.mode`: pincode lists never leave the server;
+  ALL) — **and the store's default shipping rate** `rate: { type: FREE |
+  FLAT, amount, freeAbove }` — HOW MUCH it charges per order (default FREE;
+  FLAT = one amount per order, waived at/above the optional `freeAbove`
+  subtotal), all updated as a partial merge via `PATCH /stores/:id/shipping`.
+  The delivery-rule shape, its Zod schema, the product-override precedence
+  (`effectiveDeliveryRule`: a product's own `StoreProduct.deliveryRule`
+  replaces the store default) and the pincode match (`isDeliverable`) all
+  live in `modules/stores/deliveryRules.ts`; the rate/override schemas and
+  the **one shipping calculation** `quoteShipping` (an order pays the
+  HIGHEST applicable per-order rate across its lines — the store rate after
+  its threshold for default lines, or a line's own override — never the
+  sum; pickup = 0) live in `modules/stores/shippingRates.ts`. Order
+  placement, the checkout quote endpoint and the public delivery check all
+  call these — one evaluation, never two, and **never on the client**. The
+  public shell exposes `shipping.mode` and `shipping.rate`: pincode lists
+  never leave the server;
   a `checkout` JSON column holds the **checkout field toggles**
   `{ name, phone, email, address, pincode, state, country }` — which
   customer details the checkout collects (`resolveCheckoutFields`, all
@@ -733,6 +741,14 @@ White-label design — one codebase, any business:
   never resolves garbage to ALL — that would silently widen delivery). The
   public product detail only says whether delivery is `restricted`;
   `GET /public/stores/:slug/delivery-check` answers for one pincode.
+  A nullable `shippingOverride` JSON column (`{ type: FREE | FLAT, amount }`)
+  is the same idea for the **shipping charge** — null = follow
+  `Store.shipping.rate`, set = this product's own per-order rate
+  (`resolveProductShippingOverride`, garbage → null, never FREE). A
+  `codAvailable` boolean (default true) says whether **cash on delivery**
+  may be chosen for an order containing the product; the effective answer
+  (store switch AND product flag) is what the public detail returns and what
+  placement enforces.
   Handled by the `storeCatalog.*` files in `modules/stores` (routes nested
   under `/stores/:id/…`, same ownership rules), with slug/aggregate helpers in
   `catalogSlug.ts` and the anonymous storefront surface in `publicStore.*`.
@@ -781,8 +797,14 @@ White-label design — one codebase, any business:
   the confirmation lookup is public). Order snapshots the store
   (`storeId` SetNull + `storeName`/`storeSlug`), fulfilment
   (`OrderFulfilment`: DELIVERY/PICKUP), the contact + delivery fields (all
-  **nullable** — sellers choose what their checkout collects), money
-  (subtotal/shipping/total), `paymentMethod` (ONLINE/COD/…),
+  **nullable** — sellers choose what their checkout collects), an optional
+  `billingAddress` JSON snapshot (null = same as delivery), money
+  (`subtotal`, `shippingCharge` + its customer-facing `shippingMethod`
+  label + a `shippingBasis` JSON explaining the charge, `tax` and
+  `discount` — reserved columns held at 0 until tax config and coupons
+  exist — and `total`, the grand total = subtotal − discount + shipping +
+  tax; **all computed server-side**, the same `priceOrder` the checkout
+  quote runs), `paymentMethod` (ONLINE/COD/…),
   `paymentStatus`, `paymentRef` (Cashfree `cf_payment_id` once paid, or
   `"DEV-SIMULATED"` when the gateway keys are absent in dev), plus the
   gateway attempt fields `cfOrderId` (unique — the order id registered
@@ -794,7 +816,8 @@ White-label design — one codebase, any business:
   survives catalog edits and deletions. The variant label is the derived
   `"M / Red"` name — there is no per-dimension snapshot yet (a `variantOptions
   Json?` would be the addition if per-option analytics are ever wanted). Order creation re-prices every
-  line from the live catalog, enforces the seller's payment/shipping/
+  line from the live catalog, enforces the seller's payment (store switch
+  AND every product's `codAvailable` for COD)/shipping/
   delivery-area (pincode)/
   checkout configs, and decrements variant stock with a **guarded
   `updateMany` inside the transaction** (concurrent orders can't oversell),
@@ -813,6 +836,9 @@ White-label design — one codebase, any business:
   `updateMany` re-checking the read status, so concurrent updates conflict
   (409) instead of double-applying.
 - **ShippingRule** — `FIXED` / `DISTRICT` / `STATE` / `FREE` with `priority`.
+  **Legacy, unused**: shipping pricing lives in `Store.shipping.rate` +
+  `StoreProduct.shippingOverride` (see `shippingRates.ts`); this table has no
+  code path and is a candidate for removal.
 - **Otp** — hashed verification code with `channel` (SMS/EMAIL), `destination`, `purpose`
   (LOGIN / LINK / EMAIL_VERIFY / PASSWORD_RESET / ORDER_PLACEMENT), optional `customerId`
   (account-bound codes), expiry + attempts.
@@ -1001,8 +1027,12 @@ Also done: **orders** — `modules/orders` places per-store orders from the
 storefront checkout (**signed-in customers only** — placement runs behind
 `requireCustomer`; guests browse and fill a cart but must sign in to
 order), re-pricing from the live catalog,
-enforcing the seller's payment/shipping/checkout-field configs, and
-decrementing stock transactionally. COD is live end-to-end; ONLINE payment
+enforcing the seller's payment/shipping/checkout-field configs, quoting
+shipping (`shippingRates.ts` — store flat rate / free / free-above, product
+overrides, per-product COD) and
+decrementing stock transactionally. `POST …/orders/quote` serves the
+checkout's price summary from the very same pricing functions, so the
+client never computes money. COD is live end-to-end; ONLINE payment
 runs through **Cashfree** (`modules/payments` — session on placement,
 HMAC-verified webhook, reconcile fallback, pay/retry endpoint; see
 `docs/CASHFREE_PAYMENTS.md`) when the gateway keys are configured, and
@@ -1056,9 +1086,11 @@ admin write lands in the audit trail.
    only); the actual refund API call is manual (Cashfree dashboard) until
    wired. Also: automatic expiry/cancel sweep for abandoned unpaid ONLINE
    orders (they hold stock until the seller cancels).
-2. Shipping-charge calculation (orders currently ship free — delivery
-   AREAS by pincode are done, see `deliveryRules.ts`), Inventory alerts,
-   Banners.
+2. Shipping beyond the MVP rates (weight bands, courier APIs, state-level
+   delivery restriction — pincode areas and flat/free/free-above rates with
+   product overrides are DONE, see `deliveryRules.ts` / `shippingRates.ts`),
+   tax configuration and coupons (the `Order.tax` / `Order.discount`
+   columns exist and are held at 0), Inventory alerts, Banners.
 3. OAuth verification: Google (verifier currently unregistered — endpoints return 400)
    and Apple Sign-In. Email (Resend) + SMS (Message Central) delivery are DONE;
    adapters slot into `package/auth/providers/` — see

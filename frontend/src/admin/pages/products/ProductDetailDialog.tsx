@@ -191,6 +191,29 @@ function ProductBody({ product }: { product: ProductDetail }) {
             <SectionLabel>Delivery area</SectionLabel>
             <DeliveryArea rule={product.deliveryRule} />
           </div>
+
+          <div>
+            <SectionLabel>Shipping &amp; payment</SectionLabel>
+            <p className="text-sm text-fg">
+              {product.shippingOverride
+                ? product.shippingOverride.type === 'FREE'
+                  ? 'Ships free'
+                  : `Ships for ${formatMoneyExact(product.shippingOverride.amount)} per order`
+                : "Follows the store's shipping rate"}
+              {product.shippingOverride ? (
+                <span className="text-muted"> (product override)</span>
+              ) : null}
+            </p>
+            <p className="mt-1 text-sm text-fg">
+              {product.codAvailable ? (
+                'Cash on delivery allowed.'
+              ) : (
+                <>
+                  Cash on delivery <Chip tone="warning">not allowed</Chip>
+                </>
+              )}
+            </p>
+          </div>
         </div>
       </div>
 

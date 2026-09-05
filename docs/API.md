@@ -633,7 +633,10 @@ primary payout account) — see **Store readiness**. Turning it off never is.
 ```jsonc
 { "mode": "DELIVERY",                       // DELIVERY · PICKUP · BOTH
   "deliveryRule": { "type": "INCLUDE",      // ALL · INCLUDE · EXCLUDE
-                    "pincodes": ["629154", "629001"] } }
+                    "pincodes": ["629154", "629001"] },
+  "rate": { "type": "FLAT",                 // FREE · FLAT
+            "amount": 80,                   // per ORDER (FLAT only, > 0)
+            "freeAbove": 1000 } }           // optional: subtotal at/above which shipping is free
 // any subset (≥ 1 key) — absent keys are kept
 ```
 The store's shipping settings, stored as the `Store.shipping` JSON column
@@ -652,8 +655,21 @@ and returned resolved on every store response:
   Every product follows this rule unless it carries its own `deliveryRule`
   override (see the product endpoints), which then **replaces** it for that
   product. Enforced at order placement and queried by the public
-  delivery check. The public shell exposes only `shipping.mode` — the
-  pincode lists never leave the server.
+  delivery check. The public shell exposes `shipping.mode` and
+  `shipping.rate` — the pincode lists never leave the server.
+- **`rate`** — the store's **default shipping charge** (default `FREE`):
+  `FREE` = ₹0; `FLAT` = one `amount` per **order** (not per item), waived
+  once the order subtotal reaches `freeAbove` when that is set. `FLAT`
+  needs `amount > 0` (`422` otherwise); `FREE` stores `amount: 0,
+  freeAbove: null`. Every product follows this rate unless it carries its
+  own `shippingOverride` (see the product endpoints). **The charge is only
+  ever computed server-side** (`shippingRates.ts#quoteShipping`): an order
+  pays the **highest** applicable per-order rate among its lines — the store
+  rate (after its free-above threshold) for lines that follow the default,
+  or a line's own override — never the sum; FREE lines add nothing, and a
+  product override is not waived by the store's threshold. Pickup orders
+  ship free. Quoted to the checkout by `POST …/orders/quote` and snapshotted
+  on the order (`shippingCharge`, `shippingMethod`, `shippingBasis`).
 
 Returns the full store.
 
@@ -856,13 +872,22 @@ combination of their values, each with price + stock; top-level
     { "optionValues": { "Size": "M", "Colour": "Blue" }, "price": 549, "stockQuantity": 4 }
   ],
   "specifications": [ { "label": "Fabric", "value": "100% cotton" } ],  // optional, ordered, ≤ 30
-  "deliveryRule": { "type": "EXCLUDE", "pincodes": ["629154"] }         // optional — see below
+  "deliveryRule": { "type": "EXCLUDE", "pincodes": ["629154"] },        // optional — see below
+  "shippingOverride": { "type": "FLAT", "amount": 200 },                // optional — see below
+  "codAvailable": false                                                 // optional, default true
 }
 ```
 Both shapes accept an optional **`deliveryRule`** — this product's own
 delivery areas (same shape and validation as the store's
 `PATCH …/shipping` `deliveryRule`). Omitted / `null` = the product follows
 the store default; when set it **replaces** the default for this product.
+Likewise an optional **`shippingOverride`** — this product's own shipping
+charge, `{ type: FREE }` or `{ type: FLAT, amount > 0 }` (no threshold);
+omitted / `null` = follow the store's `shipping.rate`. An order's charge is
+the highest applicable rate among its lines (see `PATCH …/shipping`).
+**`codAvailable`** (default `true`) says whether cash on delivery may be
+chosen for an order containing this product — one `false` product removes
+COD from that order's checkout even when the store accepts it.
 
 `422` with a field-level `issues[]` when: `hasVariants` is false and `price`
 or `stockQuantity` is missing (or options were sent anyway); or `hasVariants`
@@ -888,6 +913,8 @@ subset (at least one field required, `422` otherwise).
 { "hideFromSearch": true }   // excluded from search; still browsable by category
 { "specifications": [ { "label": "Material", "value": "Memory foam" } ] }  // ordered rows; null or [] clears
 { "deliveryRule": { "type": "INCLUDE", "pincodes": ["629154"] } }         // own delivery areas; null = follow the store default
+{ "shippingOverride": { "type": "FREE" } }                                // own shipping charge; null = follow the store rate
+{ "codAvailable": false }                                                 // cash on delivery allowed for this product
 ```
 `categoryId` must reference a category (root or subcategory) of the same
 store — anything else is a `400`, exactly as on create. `isActive` controls
@@ -1080,7 +1107,8 @@ products**. Small and cacheable; fetched once per store visit.
   "footer": { … },                // owner-managed footer content, resolved to the
                                   // full shape (see PATCH /stores/:id/footer)
   "payments": { "acceptOnlinePayment", "acceptCod" },
-  "shipping": { "mode": "DELIVERY | PICKUP | BOTH" },   // mode only — never the pincode lists
+  "shipping": { "mode": "DELIVERY | PICKUP | BOTH",     // never the pincode lists
+                "rate": { "type": "FREE | FLAT", "amount", "freeAbove" } },  // the store's default charge
   "checkout": { "name", "phone", "email", "address", "pincode", "state", "country" },
   "categories": [                 // enabled ROOT categories with something shoppable
     { "id", "name", "slug", "isFeatured",
@@ -1164,6 +1192,9 @@ product page is where a customer picks one.
   "optionTypes": [ { "name": "Size", "values": ["S", "M", "XL"] } ],     // picker dimensions, in order
   "specifications": [ { "label": "Fabric", "value": "100% cotton" } ],   // ordered; [] → description fallback
   "delivery": { "restricted": false },                          // true = limited to some pincodes (see delivery-check)
+  "shipping": { "type": "FLAT", "amount": 80, "freeAbove": 1000,
+                "source": "STORE | PRODUCT" },                  // the rate this product advertises (own override or store rate)
+  "codAvailable": true,                                         // effective: store accepts COD AND the product allows it
   "variants": [ { "id", "name", "price", "stockQuantity",
                   "optionValues": { "Size": "M" } } ],            // enabled combinations only, matrix order
   "media": [ { "id", "type": "IMAGE|VIDEO", "url", "altText" } ], // gallery, cover first
@@ -1175,6 +1206,9 @@ product fields. A value may appear in `optionTypes` with no enabled variant
 carrying it — the picker greys such values rather than hiding them.
 `delivery.restricted` reflects the product's **effective** delivery rule
 (its own override, else the store default) without revealing the pincodes.
+`shipping` is likewise the effective rate — informational for the product
+page; the order's actual charge is quoted over the whole cart by
+`POST …/orders/quote`.
 
 ### `GET /api/v1/public/stores/:slug/delivery-check?pincode=629154&productIds=a,b`
 Can these products be delivered to one pincode? Each product is judged by
@@ -1192,6 +1226,35 @@ or a pincode they typed) and by the checkout (against the chosen address).
 
 ---
 
+### `POST /api/v1/public/stores/:slug/orders/quote` (no auth)
+
+The checkout's **price summary** — what placing this cart would cost, priced
+exactly as placement prices it. Nothing is written. **The client never
+computes money**: subtotal, shipping, tax, discount and total all come from
+here, and the same functions run again at placement.
+```jsonc
+{ "fulfilment": "DELIVERY",        // DELIVERY | PICKUP (pickup ships free)
+  "items": [ { "productId": "cmr…", "variantId": null, "quantity": 2 } ] }
+```
+Response:
+```jsonc
+{ "fulfilment": "DELIVERY",
+  "subtotal": "1198.00", "shippingCharge": "80.00",     // decimal strings
+  "shippingMethod": "Standard delivery",               // "Free delivery" · "Standard delivery" · "Store pickup"
+  "shippingBasis": { "kind": "STORE_FLAT", "amount": 80, "freeAbove": 1000 },
+                                     // PICKUP | STORE_FREE | STORE_FLAT | FREE_ABOVE
+                                     // | PRODUCT_FREE | PRODUCT_RATE { amount, productName }
+  "tax": "0.00", "discount": "0.00", // reserved — always 0 today (prices are GST-inclusive; no coupons)
+  "total": "1278.00",                // = subtotal − discount + shippingCharge + tax
+  "paymentMethods": { "online": false, "cod": false,
+                      "codUnavailableFor": ["Fragile Vase"] },  // products whose codAvailable=false
+  "lines": [ { "productId", "variantId", "quantity", "unitPrice", "lineTotal" } ] }
+```
+Visible stores (an owner's draft preview included, via an optional session);
+lines that are no longer sellable are **dropped** from the quote rather than
+failing it — the cart's own revalidation reports those. Rate-limited
+60/min per IP.
+
 ### Orders — `POST /api/v1/public/stores/:slug/orders` 🔒 customer → `201`
 
 Place an order with one store. **Requires a signed-in customer** (`401`
@@ -1204,7 +1267,11 @@ never sell.
 {
   "fulfilment": "DELIVERY",          // DELIVERY | PICKUP — must be allowed by
                                      // the store's shipping mode
-  "paymentMethod": "COD",            // ONLINE | COD — must be seller-enabled
+  "paymentMethod": "COD",            // ONLINE | COD — must be seller-enabled AND
+                                     // allowed by every product (codAvailable)
+  "billingAddress": {                // optional — omit/null = same as delivery
+    "name": "Ravi", "phone": null, "address": "12/4 MG Road, Kochi",
+    "pincode": "682016", "state": "Kerala", "country": "India" },
   "customer": {                      // validated per the STORE's checkout-field
     "name": "Ravi", "phone": "+91 98765 43210", "email": null,
     "address": "12/4 MG Road, Kochi", // config: enabled fields are required
@@ -1220,8 +1287,18 @@ Server-side: every line is re-priced from the catalog (client prices are
 never trusted), visibility rules apply, and stock is decremented with a
 guarded update inside the transaction — concurrent orders can't oversell
 (`409` "just sold out" if they race). Product aggregates recompute in the
-same transaction. Totals: `subtotal` + `shippingCharge` (0 until the
-shipping-rules feature) = `total`.
+same transaction. **Totals** are the same functions the quote endpoint runs:
+`total` (grand total) = `subtotal` − `discount` + `shippingCharge` + `tax`,
+with shipping from `shippingRates.ts#quoteShipping` (store rate / free-above
+/ product overrides; pickup = 0) and `tax`/`discount` reserved at 0. The
+charge, its customer-facing `shippingMethod` label and its `shippingBasis`
+are snapshotted on the order.
+
+**COD per product:** `400 "Cash on delivery is not available for: "Fragile
+Vase" — choose another payment method"` when any line's product has
+`codAvailable: false` (the quote's `paymentMethods.cod` said so already).
+`billingAddress` is stored only on DELIVERY orders (null = same as the
+delivery details).
 
 **Delivery areas** (`DELIVERY` orders): every line's effective pincode rule
 (the product's own `deliveryRule`, else the store's `shipping.deliveryRule`)
@@ -1248,7 +1325,11 @@ Response: the full order —
   "status": "PENDING", "storeName", "storeSlug",
   "fulfilment", "customerName", "customerPhone", "customerEmail",
   "addressLine", "pincode", "state", "country",   // null when not collected
-  "subtotal", "shippingCharge", "total",          // decimal strings
+  "billingAddress": { "name", "phone", "addressLine",
+                      "pincode", "state", "country" } | null,   // null = same as delivery
+  "subtotal", "shippingCharge", "tax", "discount", "total",     // decimal strings
+  "shippingMethod",                 // "Free delivery" · "Standard delivery" · "Store pickup" (null on legacy orders)
+  "shippingBasis",                  // why the charge is what it is (see the quote endpoint)
   "paymentMethod", "paymentStatus", "paymentRef",
   "placedAt",
   "confirmedAt", "packedAt", "shippedAt",         // lifecycle stamps — null

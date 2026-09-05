@@ -10,6 +10,7 @@ import { ErrorNote } from '../../../shared/ui/form'
 import { cart, groupByStore, lineTotal, useCart } from '../../features/cart/cart'
 import type { CartItem } from '../../features/cart/cart'
 import { useCartRevalidation } from '../../features/cart/useCartRevalidation'
+import { useCheckoutQuote } from '../../features/cart/useCheckoutQuote'
 import { useDeliveryCheck } from '../../features/cart/useDeliveryCheck'
 import { storeVars } from '../../features/publicStore/storeTheme'
 import { useStoreShell } from '../../features/publicStore/useStoreShells'
@@ -20,6 +21,7 @@ import {
   publicOrderApi,
   storeHomeUrl,
 } from '../../features/stores/storesApi'
+import type { OrderQuote } from '../../features/stores/storesApi'
 import {
   ArrowLeftIcon,
   BoxIcon,
@@ -35,9 +37,14 @@ import { StoreLogo } from './StoreLogo'
 /**
  * Per-store order page (/checkout/{storeSlug}) — target of a store group's
  * "Place Order" button. Orders are placed PER STORE, so this page carries
- * only that store's cart items as a read-only review, plus placeholder
- * sections for Delivery Details and Payment (both arrive with the orders
- * module — the page is the frame they will land in).
+ * only that store's cart items as a read-only review, the Delivery Details
+ * and Payment steps, and an order summary.
+ *
+ * **Every rupee in the summary comes from the server.** `useCheckoutQuote`
+ * asks `POST …/orders/quote` for subtotal, shipping, tax, discount and
+ * total (and which payment methods this cart may use) whenever the lines or
+ * the fulfilment change; the page never adds numbers up itself, so what the
+ * customer sees is exactly what placement charges.
  *
  * Like the per-store cart page, it renders in the STORE'S OWN THEME
  * (`storeVars` on the page root once the shell loads), so a customer coming
@@ -79,6 +86,7 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
   const [checkout, setCheckout] = useState<CheckoutState>({
     delivery: null,
     payment: null,
+    fulfilment: 'DELIVERY',
   })
   const [placing, setPlacing] = useState(false)
   const [placeError, setPlaceError] = useState<string | null>(null)
@@ -89,6 +97,24 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
 
   const sellable = group?.items.filter((i) => i.stockQuantity > 0) ?? []
   const excluded = (group?.items.length ?? 0) - sellable.length
+
+  // Server-side price summary — only once the customer can actually order
+  // (a guest sees the sign-in gate, not a summary).
+  const {
+    quote,
+    loading: quoting,
+    error: quoteError,
+  } = useCheckoutQuote(
+    storeSlug,
+    checkout.fulfilment,
+    session.status === 'authed'
+      ? sellable.map((item) => ({
+          productId: item.productId,
+          variantId: item.variantId,
+          quantity: item.qty,
+        }))
+      : [],
+  )
 
   // Delivery-area check against the CHOSEN address: every line must reach
   // its pincode (each product's own rule, else the store default). Pickup
@@ -120,6 +146,7 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
       const order = await publicOrderApi.place(storeSlug, {
         fulfilment: checkout.delivery.fulfilment,
         paymentMethod: checkout.payment,
+        billingAddress: checkout.delivery.billing,
         customer: {
           name: checkout.delivery.values.name ?? null,
           phone: checkout.delivery.values.phone ?? null,
@@ -280,7 +307,11 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
                 {/* Delivery details → payment method. The steps need the
                     shell (checkout fields + payments + shipping config). */}
                 {shell ? (
-                  <CheckoutSteps shell={shell} onStateChange={onStepsChange} />
+                  <CheckoutSteps
+                    shell={shell}
+                    quote={quote}
+                    onStateChange={onStepsChange}
+                  />
                 ) : (
                   <section className="rounded-xl border border-dashed border-line bg-surface px-5 py-6 text-sm text-muted">
                     Loading checkout…
@@ -293,29 +324,13 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
                 <h2 className="font-body text-base font-semibold tracking-normal">
                   Order Summary
                 </h2>
-                <dl className="mt-4 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <dt className="text-muted">
-                      Subtotal ({group.itemCount} item
-                      {group.itemCount === 1 ? '' : 's'})
-                    </dt>
-                    <dd className="font-semibold">
-                      {formatPrice(group.subtotal)}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-muted">Shipping</dt>
-                    <dd className="text-muted">Calculated at checkout</dd>
-                  </div>
-                </dl>
-                <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
-                  <span className="text-sm font-semibold text-muted">
-                    Total
-                  </span>
-                  <span className="text-lg font-bold">
-                    {formatPrice(group.subtotal)}
-                  </span>
-                </div>
+                <OrderTotals
+                  quote={quote}
+                  loading={quoting}
+                  error={quoteError}
+                  itemCount={group.itemCount}
+                  fallbackSubtotal={group.subtotal}
+                />
                 {placeError && (
                   <div className="mt-3">
                     <ErrorNote>{placeError}</ErrorNote>
@@ -356,6 +371,108 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
       </main>
     </div>
   )
+}
+
+/**
+ * The order summary's money rows, straight from the server quote. While the
+ * first quote loads the subtotal shows the cart's own figure (a display
+ * convenience — it is re-stated by the server the moment the quote lands)
+ * and the shipping/total rows wait; a failed quote says so rather than
+ * guessing, and Place Order still works because the server is the authority.
+ */
+function OrderTotals({
+  quote,
+  loading,
+  error,
+  itemCount,
+  fallbackSubtotal,
+}: {
+  quote: OrderQuote | null
+  loading: boolean
+  error: string | null
+  itemCount: number
+  fallbackSubtotal: number
+}) {
+  const shippingHint = quote ? describeShippingBasis(quote) : null
+  const tax = quote ? Number(quote.tax) : 0
+  const discount = quote ? Number(quote.discount) : 0
+  return (
+    <>
+      <dl className={`mt-4 space-y-2 text-sm ${loading && quote ? 'opacity-60' : ''}`}>
+        <div className="flex justify-between">
+          <dt className="text-muted">
+            Subtotal ({itemCount} item{itemCount === 1 ? '' : 's'})
+          </dt>
+          <dd className="font-semibold">
+            {formatPrice(quote ? quote.subtotal : fallbackSubtotal)}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-muted">
+            Shipping
+            {shippingHint && (
+              <span className="block text-xs">{shippingHint}</span>
+            )}
+          </dt>
+          <dd className={quote ? 'font-semibold' : 'text-muted'}>
+            {quote
+              ? Number(quote.shippingCharge) === 0
+                ? 'Free'
+                : formatPrice(quote.shippingCharge)
+              : loading
+                ? 'Calculating…'
+                : '—'}
+          </dd>
+        </div>
+        {tax > 0 && (
+          <div className="flex justify-between">
+            <dt className="text-muted">Tax</dt>
+            <dd className="font-semibold">{formatPrice(quote!.tax)}</dd>
+          </div>
+        )}
+        {discount > 0 && (
+          <div className="flex justify-between">
+            <dt className="text-muted">Discount</dt>
+            <dd className="font-semibold text-success">
+              − {formatPrice(quote!.discount)}
+            </dd>
+          </div>
+        )}
+      </dl>
+      <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
+        <span className="text-sm font-semibold text-muted">Total</span>
+        <span className="text-lg font-bold">
+          {quote ? formatPrice(quote.total) : loading ? '…' : '—'}
+        </span>
+      </div>
+      {error && !quote && (
+        <p className="mt-2 text-xs font-semibold text-warning">
+          Couldn&rsquo;t fetch the price summary ({error}). The final amount is
+          confirmed when you place the order.
+        </p>
+      )}
+    </>
+  )
+}
+
+/** One line under "Shipping" explaining the quoted charge. */
+function describeShippingBasis(quote: OrderQuote): string | null {
+  const basis = quote.shippingBasis
+  switch (basis.kind) {
+    case 'PICKUP':
+      return 'Store pickup'
+    case 'FREE_ABOVE':
+      return `Free on orders above ${formatPrice(basis.freeAbove)}`
+    case 'STORE_FLAT':
+      return basis.freeAbove !== null
+        ? `Free on orders above ${formatPrice(basis.freeAbove)}`
+        : 'Flat rate per order'
+    case 'PRODUCT_RATE':
+      return `Rate for "${basis.productName}"`
+    case 'STORE_FREE':
+    case 'PRODUCT_FREE':
+      return null
+  }
 }
 
 /** Login URL that lands the customer back on this checkout after sign-in. */

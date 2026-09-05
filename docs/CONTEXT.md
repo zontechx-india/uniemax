@@ -231,8 +231,17 @@ A single account can own multiple stores and switch between them.
   the default for that product. Customers see on a product's page whether
   it reaches their pincode, and the checkout refuses an address outside
   the area (see Storefront below).
-  Shipping-charge configuration (fixed / district / state) joins this
-  section with the orders module.
+  **Shipping charges** (same section, hidden for pickup-only stores): the
+  store's default charge — **Free shipping**, or a **Flat rate per order**
+  with an optional **free shipping above** a subtotal (e.g. ₹80, free above
+  ₹1,000). This applies to every product; a product can **override** it
+  from the Products section ("Use store rate" / "Free for this product" /
+  "Custom rate"). An order pays the **highest** rate among its items, never
+  the sum; pickup orders are free. The charge is always computed by the
+  server — the checkout shows the server's quote and the order records the
+  charge, the method ("Free delivery" / "Standard delivery" / "Store
+  pickup") and the reason. Weight-based and courier-API pricing are
+  deliberately out of scope for the MVP.
 - **Checkout settings** — which customer details the store's checkout
   collects: Name, Phone, Email, Address, Pincode, State, Country — each a
   seller toggle, **all enabled by default**. A disabled field is hidden
@@ -298,7 +307,10 @@ A single account can own multiple stores and switch between them.
   "Thickness: 8 inch" — facts shown as a table, not choices), and optional
   **delivery areas** of its own (a pincode rule that overrides the store's
   default from Shipping settings; the row summarises it — "Delivery: Only
-  12 pincodes") — all editable
+  12 pincodes"), an optional **shipping charge** of its own (free, or a
+  custom flat rate — "Shipping: ₹200 per order"), and a **Cash on Delivery
+  available** switch (default on; an order containing a switched-off product
+  offers online payment only — "No COD" on the row) — all editable
   after creation (renames keep the product's public link; a product can move
   to any category of the same store); **the variant is what actually sells**,
   so price and stock always live on a variant. Every product carries **media**: **at least one photo** and up to
@@ -501,7 +513,17 @@ A single account can own multiple stores and switch between them.
      up. Confirming collapses the step to
      an editable summary.
   2. **Choose Payment Method** — Online Payment / Cash on Delivery,
-     limited to what the seller enabled in Payment settings.
+     limited to what the seller enabled in Payment settings **and** what
+     this cart allows: if any item has Cash on Delivery switched off, the
+     COD card is greyed out and names the item(s).
+  Delivery orders can also give a **billing address** that differs from the
+  delivery address (same by default).
+
+  The **order summary is priced by the server**: subtotal, shipping (with
+  the reason — "Free on orders above ₹1,000", "Rate for 'Heavy Item'"),
+  tax and discount (0 today), and the total are fetched as a quote whenever
+  the cart or the delivery/pickup choice changes, and re-computed at
+  placement — the page never adds up money itself.
 
   Once a delivery address is chosen, every item is **checked against its
   pincode**: items the seller doesn't deliver there are flagged on the

@@ -7,15 +7,21 @@ import {
   deliveryRuleProblem,
   sameDeliveryRule,
 } from '../../features/stores/deliveryRules'
+import {
+  sameShippingRate,
+  shippingRateProblem,
+} from '../../features/stores/shippingRates'
 import { storesApi } from '../../features/stores/storesApi'
 import type {
   DeliveryRule,
   ShippingMode,
+  ShippingRate,
   Store,
 } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import { CheckIcon, MapPinIcon, TruckIcon } from '../../layout/icons'
 import { DeliveryRuleEditor } from './DeliveryRuleEditor'
+import { ShippingRateEditor } from './ShippingRateEditor'
 
 /**
  * Shipping section of Store Management — how customers RECEIVE orders:
@@ -25,11 +31,15 @@ import { DeliveryRuleEditor } from './DeliveryRuleEditor'
  * a ConfirmDialog spells out the effect and nothing is saved until it is
  * accepted, so the selection always reflects saved state.
  *
- * Below the mode sits **Delivery areas** — the store's DEFAULT pincode rule
- * (all / only selected / all except selected) that every product follows
- * unless it carries its own override (set per product in Products). Drafted
- * locally and saved with its own button, since a pincode list is edited in
- * many small steps.
+ * Below the mode sit two store-wide defaults every product follows unless it
+ * carries its own override (set per product in Products), each drafted
+ * locally and saved with its own button:
+ *
+ *   **Shipping charges** — Free, or a flat rate per order with an optional
+ *   free-above threshold. The charge itself is only ever computed by the
+ *   server (`shippingRates.ts`) — this page just edits the inputs.
+ *   **Delivery areas** — the DEFAULT pincode rule (all / only selected /
+ *   all except selected); a pincode list is edited in many small steps.
  */
 
 const MODES: {
@@ -189,7 +199,10 @@ export function StoreShippingPage() {
       </div>
 
       {current !== 'PICKUP' && (
-        <DeliveryAreas store={store} onStoreChange={onStoreChange} />
+        <>
+          <ShippingCharges store={store} onStoreChange={onStoreChange} />
+          <DeliveryAreas store={store} onStoreChange={onStoreChange} />
+        </>
       )}
 
       <ConfirmDialog
@@ -203,6 +216,117 @@ export function StoreShippingPage() {
         onCancel={() => setPending(null)}
       />
     </div>
+  )
+}
+
+/**
+ * The store-wide default shipping charge. Local draft → Save; the draft
+ * re-syncs whenever the saved store changes underneath. The editor is keyed
+ * so a discard/save also resets the text it keeps for half-typed amounts.
+ */
+function ShippingCharges({
+  store,
+  onStoreChange,
+}: {
+  store: Store
+  onStoreChange: (store: Store) => void
+}) {
+  const saved = store.shipping.rate
+  const [draft, setDraft] = useState<ShippingRate>(saved)
+  const [editorKey, setEditorKey] = useState(0)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [savedNote, setSavedNote] = useState(false)
+
+  useEffect(() => {
+    setDraft(saved)
+    setEditorKey((k) => k + 1)
+  }, [saved])
+
+  const dirty = !sameShippingRate(draft, saved)
+  const problem = shippingRateProblem(draft)
+
+  const save = async () => {
+    if (problem) return setError(problem)
+    setBusy(true)
+    setError(null)
+    setSavedNote(false)
+    try {
+      onStoreChange(await storesApi.updateShippingRate(store.id, draft))
+      setSavedNote(true)
+    } catch (err) {
+      setError(toApiError(err).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="mt-8 max-w-2xl border-t border-line pt-6">
+      <h3 className="font-body text-base font-semibold tracking-normal text-fg">
+        Shipping charges
+      </h3>
+      <p className="mt-1 text-sm text-muted">
+        What customers pay for delivery. This is the default for every
+        product; a product can ship free or at its own rate from{' '}
+        <Link
+          to="../products"
+          className="font-semibold text-brand hover:underline"
+        >
+          Products
+        </Link>
+        . An order pays the highest rate among its items — never the sum.
+        Pickup orders are always free.
+      </p>
+
+      <div className="mt-4">
+        <ShippingRateEditor
+          key={editorKey}
+          value={draft}
+          onChange={(next) => {
+            setDraft(next)
+            setError(null)
+            setSavedNote(false)
+          }}
+          disabled={busy}
+        />
+      </div>
+
+      {error && (
+        <div className="mt-3">
+          <ErrorNote>{error}</ErrorNote>
+        </div>
+      )}
+      {savedNote && !dirty && (
+        <div className="mt-3">
+          <SuccessNote>Shipping charges saved.</SuccessNote>
+        </div>
+      )}
+
+      <div className="mt-4 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => void save()}
+          disabled={busy || !dirty}
+          className="inline-flex h-10 items-center rounded-md bg-brand-gradient px-4 text-sm font-semibold text-brand-contrast transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
+        >
+          {busy ? 'Saving…' : 'Save Shipping Charges'}
+        </button>
+        {dirty && !busy && (
+          <button
+            type="button"
+            onClick={() => {
+              setDraft(saved)
+              setEditorKey((k) => k + 1)
+              setError(null)
+            }}
+            className="text-sm font-semibold text-muted hover:text-fg"
+          >
+            Discard changes
+          </button>
+        )}
+      </div>
+    </section>
   )
 }
 

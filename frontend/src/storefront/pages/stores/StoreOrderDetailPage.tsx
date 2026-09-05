@@ -276,8 +276,27 @@ export function StoreOrderDetailPage() {
                       {Number(order.shippingCharge) === 0
                         ? 'Free'
                         : formatPrice(order.shippingCharge)}
+                      {order.shippingMethod && (
+                        <span className="ml-1.5 text-xs">
+                          · {order.shippingMethod}
+                        </span>
+                      )}
                     </dd>
                   </div>
+                  {Number(order.tax) > 0 && (
+                    <div className="flex justify-between">
+                      <dt className="text-muted">Tax</dt>
+                      <dd className="text-muted">{formatPrice(order.tax)}</dd>
+                    </div>
+                  )}
+                  {Number(order.discount) > 0 && (
+                    <div className="flex justify-between">
+                      <dt className="text-muted">Discount</dt>
+                      <dd className="text-success">
+                        − {formatPrice(order.discount)}
+                      </dd>
+                    </div>
+                  )}
                   <div className="flex justify-between border-t border-line pt-1.5">
                     <dt className="font-semibold text-fg">Total</dt>
                     <dd className="font-bold text-fg">
@@ -340,6 +359,31 @@ export function StoreOrderDetailPage() {
                     </p>
                   )}
                 </div>
+
+                {order.billingAddress && (
+                  <>
+                    <h3 className="mt-4 flex items-center gap-2 font-body text-sm font-semibold tracking-normal text-fg">
+                      <UserIcon className="h-4 w-4 text-muted" />
+                      Billing address
+                    </h3>
+                    <div className="mt-2 text-sm text-fg">
+                      <p>{order.billingAddress.name}</p>
+                      <p>
+                        {[
+                          order.billingAddress.addressLine,
+                          order.billingAddress.state,
+                          order.billingAddress.pincode,
+                          order.billingAddress.country,
+                        ]
+                          .filter(Boolean)
+                          .join(', ')}
+                      </p>
+                      {order.billingAddress.phone && (
+                        <p className="text-muted">{order.billingAddress.phone}</p>
+                      )}
+                    </div>
+                  </>
+                )}
               </section>
             </div>
 

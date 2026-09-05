@@ -18,9 +18,15 @@ import {
   describeDeliveryRule,
   sameDeliveryRule,
 } from '../../features/stores/deliveryRules'
+import {
+  describeShippingOverride,
+  sameShippingOverride,
+  shippingOverrideProblem,
+} from '../../features/stores/shippingRates'
 import { formatPrice, storeCatalogApi } from '../../features/stores/storesApi'
 import type {
   DeliveryRule,
+  ProductShippingOverride,
   ProductSpec,
   StoreCategory,
   StoreProduct,
@@ -38,6 +44,7 @@ import {
 } from '../../layout/icons'
 import { ActiveSwitch } from './ActiveSwitch'
 import { ProductDeliveryField } from './DeliveryRuleEditor'
+import { ProductShippingField } from './ShippingRateEditor'
 import { MediaBoard } from './media/MediaBoard'
 import { usePendingMedia } from './media/usePendingMedia'
 import { ProductMediaManager } from './ProductMediaManager'
@@ -472,6 +479,13 @@ function ProductRow({
             {product.deliveryRule && (
               <> · Delivery: {describeDeliveryRule(product.deliveryRule)}</>
             )}
+            {product.shippingOverride && (
+              <>
+                {' '}
+                · Shipping: {describeShippingOverride(product.shippingOverride)}
+              </>
+            )}
+            {!product.codAvailable && <> · No COD</>}
             {!product.isActive && (
               <span className="ml-1.5 rounded-sm bg-surface-alt px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
                 Disabled
@@ -618,6 +632,9 @@ function EditProductForm({
   const [deliveryRule, setDeliveryRule] = useState<DeliveryRule | null>(
     product.deliveryRule,
   )
+  const [shippingOverride, setShippingOverride] =
+    useState<ProductShippingOverride | null>(product.shippingOverride)
+  const [codAvailable, setCodAvailable] = useState(product.codAvailable)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -625,12 +642,19 @@ function EditProductForm({
     JSON.stringify(cleanSpecifications(specs)) !==
     JSON.stringify(product.specifications)
   const deliveryChanged = !sameDeliveryRule(deliveryRule, product.deliveryRule)
+  const shippingChanged = !sameShippingOverride(
+    shippingOverride,
+    product.shippingOverride,
+  )
+  const codChanged = codAvailable !== product.codAvailable
   const dirty =
     name.trim() !== product.name ||
     categoryId !== product.category.id ||
     description.trim() !== (product.description ?? '') ||
     specsChanged ||
-    deliveryChanged
+    deliveryChanged ||
+    shippingChanged ||
+    codChanged
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -638,6 +662,9 @@ function EditProductForm({
     if (!dirty) return onCancel()
     const deliveryProblem = deliveryRule && deliveryRuleProblem(deliveryRule)
     if (deliveryProblem) return setError(deliveryProblem)
+    const shippingProblem =
+      shippingOverride && shippingOverrideProblem(shippingOverride)
+    if (shippingProblem) return setError(shippingProblem)
 
     // Send only what changed — the endpoint is a partial PATCH.
     const patch: {
@@ -646,6 +673,8 @@ function EditProductForm({
       description?: string | null
       specifications?: ProductSpec[]
       deliveryRule?: DeliveryRule | null
+      shippingOverride?: ProductShippingOverride | null
+      codAvailable?: boolean
     } = {}
     if (name.trim() !== product.name) patch.name = name.trim()
     if (categoryId !== product.category.id) patch.categoryId = categoryId
@@ -655,6 +684,8 @@ function EditProductForm({
     if (specsChanged) patch.specifications = cleanSpecifications(specs)
     // null = drop the override (follow the store default again).
     if (deliveryChanged) patch.deliveryRule = deliveryRule
+    if (shippingChanged) patch.shippingOverride = shippingOverride
+    if (codChanged) patch.codAvailable = codAvailable
 
     setError(null)
     setBusy(true)
@@ -721,6 +752,34 @@ function EditProductForm({
         }}
         disabled={busy}
       />
+
+      <ProductShippingField
+        storeRate={store.shipping.rate}
+        value={shippingOverride}
+        onChange={(next) => {
+          setShippingOverride(next)
+          setError(null)
+        }}
+        disabled={busy}
+      />
+
+      <label className="flex cursor-pointer items-start gap-3">
+        <input
+          type="checkbox"
+          checked={codAvailable}
+          onChange={(e) => setCodAvailable(e.target.checked)}
+          disabled={busy}
+          className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[var(--brand)]"
+        />
+        <span className="text-sm">
+          <span className="font-medium text-fg">Cash on Delivery available</span>
+          <span className="mt-0.5 block text-xs text-muted">
+            {store.payments.acceptCod
+              ? 'Untick for items you only sell prepaid — an order containing this product then offers online payment only.'
+              : 'Your store has Cash on Delivery switched off in Payments; this applies once you turn it on.'}
+          </span>
+        </span>
+      </label>
 
       {error && <ErrorNote>{error}</ErrorNote>}
 
@@ -881,6 +940,10 @@ function AddProductForm({
   const [specs, setSpecs] = useState<ProductSpec[]>([])
   /** null = follow the store's default delivery areas. */
   const [deliveryRule, setDeliveryRule] = useState<DeliveryRule | null>(null)
+  /** null = follow the store's default shipping rate. */
+  const [shippingOverride, setShippingOverride] =
+    useState<ProductShippingOverride | null>(null)
+  const [codAvailable, setCodAvailable] = useState(true)
   /**
    * Photos and the optional video, held in memory: they can only be uploaded
    * once the product has an id, so they wait here and go up right after
@@ -979,6 +1042,12 @@ function AddProductForm({
       if (deliveryProblem) return setError(deliveryProblem)
       payload.deliveryRule = deliveryRule
     }
+    if (shippingOverride) {
+      const shippingProblem = shippingOverrideProblem(shippingOverride)
+      if (shippingProblem) return setError(shippingProblem)
+      payload.shippingOverride = shippingOverride
+    }
+    if (!codAvailable) payload.codAvailable = false
 
     setError(null)
     setBusy(true)
@@ -1148,6 +1217,34 @@ function AddProductForm({
         }}
         disabled={busy}
       />
+
+      <ProductShippingField
+        storeRate={store.shipping.rate}
+        value={shippingOverride}
+        onChange={(next) => {
+          setShippingOverride(next)
+          setError(null)
+        }}
+        disabled={busy}
+      />
+
+      <label className="flex cursor-pointer items-start gap-3">
+        <input
+          type="checkbox"
+          checked={codAvailable}
+          onChange={(e) => setCodAvailable(e.target.checked)}
+          disabled={busy}
+          className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[var(--brand)]"
+        />
+        <span className="text-sm">
+          <span className="font-medium text-fg">Cash on Delivery available</span>
+          <span className="mt-0.5 block text-xs text-muted">
+            {store.payments.acceptCod
+              ? 'Untick for items you only sell prepaid — an order containing this product then offers online payment only.'
+              : 'Your store has Cash on Delivery switched off in Payments; this applies once you turn it on.'}
+          </span>
+        </span>
+      </label>
 
       <MediaBoard
         driver={mediaDriver}

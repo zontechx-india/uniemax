@@ -22,6 +22,10 @@ import {
   resolveProductDeliveryRule,
   restrictsDelivery,
 } from "./deliveryRules.js";
+import {
+  effectiveProductShipping,
+  resolveProductShippingOverride,
+} from "./shippingRates.js";
 import type {
   PublicDeliveryCheckQuery,
   PublicProductQuery,
@@ -87,7 +91,7 @@ export const PUBLIC_STORE_VISIBILITY = {
  * Resolves a publicly visible store by slug, or 404. "Visible" means
  * published — or unpublished but owned by the viewer (the draft preview).
  */
-async function getVisibleStore(slug: string, viewerId?: string) {
+export async function getVisibleStore(slug: string, viewerId?: string) {
   const store = await prisma.store.findFirst({
     where: {
       slug,
@@ -121,7 +125,7 @@ export const PUBLIC_PRODUCT_VISIBILITY = {
 } satisfies Prisma.StoreProductWhereInput;
 
 /** `PUBLIC_PRODUCT_VISIBILITY` scoped to one store. */
-function visibleProductWhere(storeId: string): Prisma.StoreProductWhereInput {
+export function visibleProductWhere(storeId: string): Prisma.StoreProductWhereInput {
   return { storeId, ...PUBLIC_PRODUCT_VISIBILITY };
 }
 
@@ -318,16 +322,17 @@ export async function getPublicStoreShell(slug: string, viewerId?: string) {
   // payments JSON are resolved to their complete shapes so the storefront
   // renders them directly.
   const { logoKey, footer, payments, shipping, checkout, ...shell } = store;
-  // Only the MODE is public. The store's default delivery-area rule (which
-  // can be thousands of pincodes) never ships with the shell — customers ask
-  // about one pincode at a time through the delivery check instead.
-  const { mode } = resolveShipping(shipping);
+  // The MODE and the store's default RATE are public (the product page and
+  // cart advertise them). The default delivery-area rule (which can be
+  // thousands of pincodes) never ships with the shell — customers ask about
+  // one pincode at a time through the delivery check instead.
+  const { mode, rate } = resolveShipping(shipping);
   return {
     ...shell,
     logoUrl: mediaUrl("logo", logoKey),
     footer: resolveFooter(footer),
     payments: resolvePayments(payments),
-    shipping: { mode },
+    shipping: { mode, rate },
     checkout: resolveCheckoutFields(checkout),
     categories: tree,
   };
@@ -569,6 +574,8 @@ export async function getPublicProduct(
       optionTypes: true,
       specifications: true,
       deliveryRule: true,
+      shippingOverride: true,
+      codAvailable: true,
       category: {
         select: {
           name: true,
@@ -622,6 +629,7 @@ export async function getPublicProduct(
     })),
   );
 
+  const storeShipping = resolveShipping(store.shipping);
   return {
     id: product.id,
     name: product.name,
@@ -653,10 +661,21 @@ export async function getPublicProduct(
       restricted: restrictsDelivery(
         effectiveDeliveryRule(
           resolveProductDeliveryRule(product.deliveryRule),
-          resolveShipping(store.shipping).deliveryRule,
+          storeShipping.deliveryRule,
         ),
       ),
     },
+    /**
+     * The shipping rate this product advertises — its own override, else the
+     * store rate (`source` says which). Informational: the order's actual
+     * charge is quoted over the whole cart by the checkout quote endpoint.
+     */
+    shipping: effectiveProductShipping(
+      resolveProductShippingOverride(product.shippingOverride),
+      storeShipping.rate,
+    ),
+    /** Effective COD availability: the store accepts COD AND this product allows it. */
+    codAvailable: resolvePayments(store.payments).acceptCod && product.codAvailable,
     /**
      * Sellable combinations in matrix order, each with its option values.
      * Empty for a simple product — the implicit Default is never exposed.

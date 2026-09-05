@@ -267,12 +267,43 @@ export function OrderSuccessPage({
                   </li>
                 ))}
               </ul>
-              <div className="flex items-center justify-between border-t border-line px-5 py-3.5">
-                <span className="text-sm font-semibold text-muted">Total</span>
-                <span className="text-lg font-bold">
-                  {formatPrice(order.total)}
-                </span>
-              </div>
+              <dl className="space-y-1.5 border-t border-line px-5 py-3.5 text-sm">
+                <div className="flex justify-between">
+                  <dt className="text-muted">Subtotal</dt>
+                  <dd className="font-semibold">{formatPrice(order.subtotal)}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-muted">
+                    Shipping
+                    {order.shippingMethod && (
+                      <span className="ml-1.5 text-xs">· {order.shippingMethod}</span>
+                    )}
+                  </dt>
+                  <dd className="font-semibold">
+                    {Number(order.shippingCharge) === 0
+                      ? 'Free'
+                      : formatPrice(order.shippingCharge)}
+                  </dd>
+                </div>
+                {Number(order.tax) > 0 && (
+                  <div className="flex justify-between">
+                    <dt className="text-muted">Tax</dt>
+                    <dd className="font-semibold">{formatPrice(order.tax)}</dd>
+                  </div>
+                )}
+                {Number(order.discount) > 0 && (
+                  <div className="flex justify-between">
+                    <dt className="text-muted">Discount</dt>
+                    <dd className="font-semibold text-success">
+                      − {formatPrice(order.discount)}
+                    </dd>
+                  </div>
+                )}
+                <div className="flex items-center justify-between border-t border-line pt-2">
+                  <dt className="text-sm font-semibold text-muted">Total</dt>
+                  <dd className="text-lg font-bold">{formatPrice(order.total)}</dd>
+                </div>
+              </dl>
             </section>
 
             {/* Where it's going */}

@@ -54,6 +54,19 @@ export interface OrderDetail extends OrderRow {
   country: string | null
   subtotal: string
   shippingCharge: string
+  /** "Free delivery" / "Standard delivery" / "Store pickup"; null on legacy orders. */
+  shippingMethod: string | null
+  tax: string
+  discount: string
+  /** Billing snapshot when it differed from delivery; null = same. */
+  billingAddress: {
+    name: string
+    phone: string | null
+    addressLine: string
+    pincode: string
+    state: string | null
+    country: string | null
+  } | null
   cfOrderId: string | null
   confirmedAt: string | null
   packedAt: string | null
@@ -143,7 +156,10 @@ export interface BankAccount {
 export interface StoreDetail extends StoreRow {
   settings: {
     payments: { acceptOnlinePayment: boolean; acceptCod: boolean }
-    shipping: { mode: 'DELIVERY' | 'PICKUP' | 'BOTH' }
+    shipping: {
+      mode: 'DELIVERY' | 'PICKUP' | 'BOTH'
+      rate: { type: 'FREE' | 'FLAT'; amount: number; freeAbove: number | null }
+    }
     checkout: Record<string, boolean>
   }
   bankAccounts: BankAccount[]
@@ -231,6 +247,10 @@ export interface ProductDetail extends ProductRow {
   optionTypes: ProductOptionType[]
   specifications: ProductSpecification[]
   deliveryRule: ProductDeliveryRule | null
+  /** Per-product shipping charge. `null` = follows the store rate. */
+  shippingOverride: { type: 'FREE' | 'FLAT'; amount: number } | null
+  /** Whether cash on delivery may be chosen for orders containing this product. */
+  codAvailable: boolean
   variants: {
     id: string
     name: string

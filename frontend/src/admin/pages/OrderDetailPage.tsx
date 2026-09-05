@@ -131,7 +131,18 @@ export default function OrderDetailPage() {
             </ul>
             <dl className="mt-3">
               <Detail label="Subtotal">{formatMoneyExact(order.subtotal)}</Detail>
-              <Detail label="Shipping">{formatMoneyExact(order.shippingCharge)}</Detail>
+              <Detail label="Shipping">
+                {formatMoneyExact(order.shippingCharge)}
+                {order.shippingMethod ? (
+                  <span className="text-muted"> · {order.shippingMethod}</span>
+                ) : null}
+              </Detail>
+              {Number(order.tax) > 0 ? (
+                <Detail label="Tax">{formatMoneyExact(order.tax)}</Detail>
+              ) : null}
+              {Number(order.discount) > 0 ? (
+                <Detail label="Discount">− {formatMoneyExact(order.discount)}</Detail>
+              ) : null}
               <Detail label="Total">
                 <span className="text-base">{formatMoneyExact(order.total)}</span>
               </Detail>
@@ -161,6 +172,19 @@ export default function OrderDetailPage() {
                   <Detail label="State">
                     {[order.state, order.country].filter(Boolean).join(', ') || '—'}
                   </Detail>
+                  {order.billingAddress ? (
+                    <Detail label="Billing address">
+                      {[
+                        order.billingAddress.name,
+                        order.billingAddress.addressLine,
+                        order.billingAddress.pincode,
+                        order.billingAddress.state,
+                        order.billingAddress.country,
+                      ]
+                        .filter(Boolean)
+                        .join(', ')}
+                    </Detail>
+                  ) : null}
                 </>
               ) : (
                 <Detail label="Fulfilment">Customer collects from the store</Detail>

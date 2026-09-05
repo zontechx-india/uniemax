@@ -18,9 +18,61 @@ const optionalText = (max: number) =>
     .nullish()
     .transform((v) => (v ? v : null));
 
+/**
+ * A billing address the customer gives when it differs from the delivery
+ * address. Optional everywhere: absent / null = "same as delivery" (or, for
+ * pickup, the contact details). Snapshotted on the order as JSON.
+ */
+export const billingAddressSchema = z.object({
+  name: z.string().trim().min(1, "Billing name is required").max(100),
+  phone: optionalText(20),
+  address: z.string().trim().min(1, "Billing address is required").max(300),
+  pincode: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9 -]{3,10}$/, "The billing pincode looks invalid"),
+  state: optionalText(100),
+  country: optionalText(100),
+});
+
+export type BillingAddressInput = z.infer<typeof billingAddressSchema>;
+
+const orderItemsSchema = z
+  .array(
+    z.object({
+      productId: z.string().min(1),
+      /** Chosen option id — null for simple products. */
+      variantId: z
+        .string()
+        .min(1)
+        .nullish()
+        .transform((v) => v ?? null),
+      quantity: z.number().int().min(1).max(999),
+    }),
+  )
+  .min(1, "The order has no items")
+  .max(100);
+
+/**
+ * `POST /public/stores/:slug/orders/quote` — the checkout's price summary.
+ * Same item references as placement, plus the fulfilment (shipping depends
+ * on it). Nothing is written; the server prices the cart and quotes
+ * shipping/tax/discount/total so the client never computes money itself.
+ */
+export const orderQuoteSchema = z.object({
+  fulfilment: z.enum(["DELIVERY", "PICKUP"]),
+  items: orderItemsSchema,
+});
+
+export type OrderQuoteInput = z.infer<typeof orderQuoteSchema>;
+
 export const orderCreateSchema = z.object({
   fulfilment: z.enum(["DELIVERY", "PICKUP"]),
   paymentMethod: z.enum(["ONLINE", "COD"]),
+  /** Null / absent = billed to the delivery (or contact) details. */
+  billingAddress: billingAddressSchema
+    .nullish()
+    .transform((v) => v ?? null),
   customer: z
     .object({
       name: optionalText(100),
@@ -40,21 +92,7 @@ export const orderCreateSchema = z.object({
       state: null,
       country: null,
     })),
-  items: z
-    .array(
-      z.object({
-        productId: z.string().min(1),
-        /** Chosen option id — null for simple products. */
-        variantId: z
-          .string()
-          .min(1)
-          .nullish()
-          .transform((v) => v ?? null),
-        quantity: z.number().int().min(1).max(999),
-      }),
-    )
-    .min(1, "The order has no items")
-    .max(100),
+  items: orderItemsSchema,
 });
 
 export const orderParamSchema = z.object({

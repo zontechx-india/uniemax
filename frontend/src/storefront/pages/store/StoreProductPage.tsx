@@ -294,7 +294,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
               it to the cart. */}
           <DeliveryCheck store={store} product={product} skin={skin} />
 
-          <DeliveryInfo store={store} skin={skin} />
+          <DeliveryInfo store={store} product={product} skin={skin} />
           <TrustBadges store={store} skin={skin} />
         </div>
       </div>
@@ -384,11 +384,23 @@ function PageSection({
 /**
  * What the customer needs to know before buying, taken from the seller's
  * Shipping / Payments / Footer-policy settings — never a fabricated courier
- * estimate. (Shipping is free platform-wide today: the order service charges
- * a flat 0 until the shipping-rules feature lands — update this line with it.)
+ * estimate. The shipping row advertises the product's EFFECTIVE rate (its
+ * own override, else the store rate — served by the API as
+ * `product.shipping`); the order's actual charge is quoted over the whole
+ * cart at checkout. COD is likewise the effective answer (store switch AND
+ * this product's own flag).
  */
-function DeliveryInfo({ store, skin }: { store: PublicStore; skin: Skin }) {
+function DeliveryInfo({
+  store,
+  product,
+  skin,
+}: {
+  store: PublicStore
+  product: PublicProductDetail
+  skin: Skin
+}) {
   const mode = store.shipping.mode
+  const shipping = product.shipping
   const delivers = mode === 'DELIVERY' || mode === 'BOTH'
   const pickup = mode === 'PICKUP' || mode === 'BOTH'
   const pickupAt = pickup ? primaryLocation(store) : null
@@ -399,10 +411,14 @@ function DeliveryInfo({ store, skin }: { store: PublicStore; skin: Skin }) {
       {delivers && (
         <InfoRow
           icon={<TruckIcon className="h-5 w-5" />}
-          title="Free delivery"
+          title={
+            shipping.type === 'FREE'
+              ? 'Free delivery'
+              : `Delivery ${formatPrice(shipping.amount)}`
+          }
           skin={skin}
         >
-          Delivered to your address — no shipping charges at checkout.
+          {shippingCopy(shipping)}
         </InfoRow>
       )}
 
@@ -418,7 +434,7 @@ function DeliveryInfo({ store, skin }: { store: PublicStore; skin: Skin }) {
         </InfoRow>
       )}
 
-      {store.payments.acceptCod && (
+      {product.codAvailable ? (
         <InfoRow
           icon={<CardIcon className="h-5 w-5" />}
           title="Cash on delivery"
@@ -426,7 +442,16 @@ function DeliveryInfo({ store, skin }: { store: PublicStore; skin: Skin }) {
         >
           Pay when your order arrives.
         </InfoRow>
-      )}
+      ) : store.payments.acceptCod ? (
+        <InfoRow
+          icon={<CardIcon className="h-5 w-5" />}
+          title="Prepaid only"
+          skin={skin}
+        >
+          Cash on delivery isn&rsquo;t offered for this product — pay online at
+          checkout.
+        </InfoRow>
+      ) : null}
 
       {policies.returns && (
         <InfoRow
@@ -453,6 +478,21 @@ function DeliveryInfo({ store, skin }: { store: PublicStore; skin: Skin }) {
       )}
     </ul>
   )
+}
+
+/** The shipping row's explanation, from the product's effective rate. */
+function shippingCopy(shipping: PublicProductDetail['shipping']): string {
+  if (shipping.type === 'FREE') {
+    return shipping.source === 'PRODUCT'
+      ? 'This product ships free — no delivery charge at checkout.'
+      : 'Delivered to your address — no shipping charges at checkout.'
+  }
+  let copy = `Flat ${formatPrice(shipping.amount)} shipping per order`
+  if (shipping.freeAbove !== null) {
+    copy += `, free on orders above ${formatPrice(shipping.freeAbove)}`
+  }
+  if (shipping.source === 'PRODUCT') copy += ' (this product’s own rate)'
+  return `${copy}. Confirmed at checkout.`
 }
 
 function InfoRow({

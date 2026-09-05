@@ -540,10 +540,12 @@ column), which lets the homepage render full-bleed section bands instead.
     against the address actually chosen. Hidden for pickup-only stores.
   - **Delivery, returns & trust are read from the seller's own settings** —
     fulfilment mode (delivery / pickup, pickup naming the primary footer
-    location), COD and online-payment switches, and the returns/shipping
-    policy links — never a fabricated courier ETA. "Free delivery" is true
-    platform-wide today (`orders.service.ts` charges a flat 0); **update that
-    line when shipping rules land**.
+    location), the product's **effective shipping rate** (`product.shipping`
+    — "Free delivery", or "Delivery ₹80 · flat per order, free above
+    ₹1,000", flagged when it is the product's own rate), its **effective
+    COD** (`product.codAvailable` — "Cash on delivery", or "Prepaid only"
+    when the store accepts COD but this product refuses it), and the
+    returns/shipping policy links — never a fabricated courier ETA.
   - **Highlights / Description / Specifications come out of the single
     description field** (`productDescription.ts` — see below). The first 4
     highlights sit in the purchase card; the standalone **Product Highlights**
@@ -674,6 +676,16 @@ multiple tabs all keep the right theme, where ambient tracking broke. All pages 
 the storefront treatment (full-width shell, flat surface+border cards,
 Oswald headings, sticky top bar) with an order-summary panel stuck beside
 the list on desktop.
+**Order summary — priced by the server.** `features/cart/useCheckoutQuote.ts`
+calls `POST …/orders/quote` whenever the lines or the current fulfilment
+choice change and the page renders exactly what comes back (`OrderTotals`
+in `CheckoutPage.tsx`: subtotal, shipping with a one-line reason from
+`shippingBasis`, tax/discount rows only when non-zero, total). The client
+never adds up money; a failed quote says so and Place Order still works
+because the server is the authority. `CheckoutState.fulfilment` carries the
+CURRENT delivery/pickup choice (before step 1 is confirmed) so a pickup
+switch re-quotes shipping to ₹0 immediately.
+
 **`/checkout/{storeSlug}`** (`pages/cart/CheckoutPage.tsx`) is the
 per-store **checkout** — **sign-in required**: the page probes the cookie
 session on mount (browsing and the cart stay anonymous; only ordering
@@ -716,8 +728,13 @@ fallback only renders if the addresses probe fails — the page itself
 already required sign-in). The form renders **only the fields
 the store collects** (`shell.checkout`, seller-toggled) and validates
 exactly those. Confirming collapses the step to a summary with a Change
-button. **Step 2 — Choose Payment Method**: radio cards for Online Payment
-/ Cash on Delivery per the store's `payments` switches (dimmed until step
+button. Delivery orders also get a **billing address** section above the
+form ("same as delivery" by default; untick for a compact name/address form
+validated on the step's confirm). **Step 2 — Choose Payment Method**: radio
+cards for Online Payment / Cash on Delivery per the store's `payments`
+switches, narrowed by the server quote's `paymentMethods` — a cart with a
+`codAvailable: false` product greys COD out, names the item, and clears a
+COD choice that has become invalid (dimmed until step
 1 is done; a store with nothing enabled gets a can't-order note). With both
 steps complete the summary's **Place Order** button goes live
 (`publicOrderApi.place` → `POST /public/stores/:slug/orders`): the payload
@@ -903,7 +920,14 @@ a pickup-address item.
   pincodes, validates 6 digits and reports rejects) and saved with its own
   button → the same PATCH with `{ deliveryRule }`; helpers
   (`parsePincodes`, `describeDeliveryRule`, `sameDeliveryRule`,
-  `deliveryRuleProblem`) in `features/stores/deliveryRules.ts`),
+  `deliveryRuleProblem`) in `features/stores/deliveryRules.ts`). Above
+  it, **Shipping charges**: the store's default rate drafted in
+  `ShippingRateEditor` (`pages/stores/ShippingRateEditor.tsx` — Free /
+  Flat rate per order with an optional free-above threshold, rupee inputs
+  kept as text while typing) and saved with its own button → the same PATCH
+  with `{ rate }`; helpers (`describeShippingRate`, `sameShippingRate`,
+  `shippingRateProblem`, `parseAmount`) in
+  `features/stores/shippingRates.ts`. The page never computes a charge),
   `StoreCheckoutPage` (**Checkout** — which customer details the checkout
   collects: seven toggles (Name / Phone / Email / Address / Pincode /
   State / Country, all on by default) grouped into contact + delivery
@@ -969,8 +993,13 @@ a pickup-address item.
   default", naming the current default, or "Custom for this product",
   which opens the rule editor; `null` = follow the default, sent as
   `deliveryRule` on create and as a PATCH from the edit form, where the row
-  then reads "Delivery: Only 12 pincodes") and a **"This product has options"
-  checkbox** that picks the product shape. Unchecked (the default) shows
+  then reads "Delivery: Only 12 pincodes"), the **Shipping charge** field
+  (`ProductShippingField` in `ShippingRateEditor.tsx` — "Use store rate",
+  naming it, "Free for this product", or "Custom rate" with a rupee input;
+  `null` = follow the store rate, sent as `shippingOverride`; the row reads
+  "Shipping: ₹200 per order"), a **Cash on Delivery available** checkbox
+  (`codAvailable`, default on; the row reads "No COD" when off) and a
+  **"This product has options" checkbox** that picks the product shape. Unchecked (the default) shows
   required Price + Stock; checked hides them and shows the
   **`OptionTypesEditor`** (up to 3 named options, values as chips via the
   shared `shared/ui/ChipInput.tsx` — Enter/comma adds, click a chip renames,
@@ -1402,6 +1431,7 @@ frontend/
     │   │   ├── cart/
     │   │   │   ├── cart.ts       # Client-side cart: localStorage store + hooks + sync()
     │   │   │   ├── useCartRevalidation.ts # Cart-open price/stock refresh
+    │   │   │   ├── useCheckoutQuote.ts # Checkout: server-priced summary (subtotal/shipping/tax/total)
     │   │   │   └── useDeliveryCheck.ts # Checkout: which lines reach the chosen pincode
     │   │   ├── publicStore/      # The multi-page storefront under /store/{slug}
     │   │   │   ├── useStoreShells.ts # Session-cached shell lookup (logo+theme) for cart/checkout
@@ -1425,6 +1455,7 @@ frontend/
     │   │   └── stores/           # Customer-owned stores (see Stores feature above)
     │   │       ├── storesApi.ts  # Typed HTTP client for /api/v1/stores
     │   │       ├── deliveryRules.ts # Pincode parsing/validation + rule summaries (seller editors)
+    │   │       ├── shippingRates.ts # Shipping-rate summaries/validation (seller editors; no charge math)
     │   │       ├── productOptions.ts # Client mirror of the server option logic + seller draft model
     │   │       ├── useStores.ts  # useStores (list) + useStore (by id) hooks
     │   │       └── useManagedStore.ts # Outlet-context hook for manage sections
@@ -1489,7 +1520,8 @@ frontend/
     │           │                        #   verification status chips)
     │           ├── StorePaymentsPage.tsx # Accept Online Payment / COD switches
     │           │                        #   (confirm-before-save)
-    │           ├── StoreShippingPage.tsx # Fulfilment mode: Delivery / Pickup / Both
+    │           ├── StoreShippingPage.tsx # Fulfilment mode + shipping charges + delivery areas
+    │           ├── ShippingRateEditor.tsx # Store rate editor + per-product shipping override field
     │           │                        #   (confirm-before-save) + default delivery areas
     │           ├── DeliveryRuleEditor.tsx # Pincode rule editor (all / only / except + chip
     │           │                        #   list) + ProductDeliveryField (default vs custom)
@@ -1887,8 +1919,9 @@ Other scripts: `npm run build` (typecheck + build both), `npm run preview`
    phone/email linking — endpoints already live) and the remaining account
    placeholder (`/profile`). Wishlist/settings return as routes only when
    the features are actually built.
-4. Shipping-charge rules (fixed/district/state — orders currently ship
-   free) and customer-side order tracking/cancellation.
+4. Customer-side order tracking/cancellation. (Shipping charges — flat /
+   free / free-above with product overrides — are live; weight bands and
+   courier APIs are deliberately not planned for the MVP.)
 5. Per-kind notification preferences (a subscribed device currently gets
    every notification for its principal; the `kind` column is already there).
 

@@ -1,10 +1,12 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { list, ok } from "../../utils/response.js";
 import { idParamSchema, slugParamSchema } from "../../utils/zodHelpers.js";
+import { optionalCustomerId } from "../../package/auth/index.js";
 import {
   orderCancelSchema,
   orderCreateSchema,
   orderParamSchema,
+  orderQuoteSchema,
   orderStatusUpdateSchema,
   sellerOrderListQuerySchema,
   sellerOrderParamSchema,
@@ -21,6 +23,16 @@ export async function createOrder(request: FastifyRequest, reply: FastifyReply) 
   const input = orderCreateSchema.parse(request.body);
   const order = await service.createOrder(slug, input, request.customer!.id);
   return reply.status(201).send(ok(order));
+}
+
+/**
+ * Checkout price summary (no auth — the cart is anonymous; an owner's draft
+ * preview is honoured when a session is present). Nothing is written.
+ */
+export async function quoteOrder(request: FastifyRequest) {
+  const { slug } = slugParamSchema.parse(request.params);
+  const input = orderQuoteSchema.parse(request.body);
+  return ok(await service.quoteOrder(slug, input, optionalCustomerId(request)));
 }
 
 export async function getOrder(request: FastifyRequest) {
