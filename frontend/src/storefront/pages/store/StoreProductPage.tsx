@@ -6,9 +6,9 @@ import {
   storeCategoryUrl,
   storeProductUrl,
   type FooterLocation,
+  type OptionValues,
   type PublicProductDetail,
   type PublicStore,
-  type PublicStoreVariant,
 } from '../../features/stores/storesApi'
 import {
   StorePageShell,
@@ -32,6 +32,12 @@ import {
   parseDescription,
   type ProductSpec,
 } from '../../features/publicStore/productDescription'
+import { OptionPicker } from '../../features/publicStore/OptionPicker'
+import { DeliveryCheck } from '../../features/publicStore/DeliveryCheck'
+import {
+  findVariant,
+  firstSellableSelection,
+} from '../../features/stores/productOptions'
 import {
   BoxIcon,
   CardIcon,
@@ -57,10 +63,14 @@ import type { Skin } from '../../features/publicStore/storeTheme'
  * Page structure: breadcrumb · gallery + purchase card · highlights ·
  * description · specifications · you-may-also-like, plus a sticky purchase bar
  * once the buy card scrolls away. Everything below the fold is built from what
- * the seller actually entered — highlights and specs are read out of the
- * description (see `productDescription.ts`), and the delivery/trust block from
- * the store's own shipping, payment and policy settings. Nothing on this page
- * is invented: there is no review system yet, so no rating is shown.
+ * the seller actually entered — specs come from the product's own
+ * `specifications` rows, falling back to "Label: value" lines read out of the
+ * description (see `productDescription.ts`); highlights from the description's
+ * bullets; the **delivery check** (`DeliveryCheck`) from the product's
+ * effective pincode rule against the customer's default address; and the
+ * delivery/trust block from the store's own shipping, payment and policy
+ * settings. Nothing on this page is invented: there is no review system yet,
+ * so no rating is shown.
  */
 /** Highlights shown inside the purchase card before the section takes over. */
 const CARD_HIGHLIGHTS = 4
@@ -123,16 +133,27 @@ export function StoreProductPage() {
 
 function ProductDetail({ product }: { product: PublicProductDetail }) {
   const { store, skin } = usePublicStore()
-  // A simple product has no options; its price/stock come from the product.
-  const [variant, setVariant] = useState<PublicStoreVariant | null>(() =>
-    firstSellable(product.variants),
+  // One value per option type; the variant is whatever combination that
+  // resolves to. Starts on the first in-stock combination. A simple product
+  // has no option types, so the selection is empty and no variant matches —
+  // its price/stock come from the product itself.
+  const [selection, setSelection] = useState<OptionValues>(() =>
+    firstSellableSelection(product.variants),
   )
+  const variant = findVariant(product.variants, product.optionTypes, selection)
+  const hasOptions = product.optionTypes.length > 0
   // The sticky bar appears only once the real purchase card is out of view.
   const buyCardRef = useRef<HTMLDivElement>(null)
   const buyCardVisible = useIsVisible(buyCardRef)
 
   const price = variant ? variant.price : (product.price ?? '0')
-  const stock = variant ? variant.stockQuantity : product.stockQuantity
+  // Options but no matching variant means the chosen combination is not sold:
+  // stock 0 disables purchase, and the picker says why.
+  const stock = variant
+    ? variant.stockQuantity
+    : hasOptions
+      ? 0
+      : product.stockQuantity
   const cover = product.media.find((m) => m.type === 'IMAGE')?.url ?? null
   const content = useMemo(
     () => parseDescription(product.description),
@@ -249,44 +270,29 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
             </ul>
           )}
 
-          {/* Variant picker — the reason this page exists. */}
-          {product.variants.length > 0 && (
-            <div className="mt-6">
-              <p
-                className={`text-xs font-bold uppercase tracking-wide ${skin.muted}`}
-              >
-                Choose an option
-              </p>
-              <div className="mt-2.5 flex flex-wrap gap-2">
-                {product.variants.map((option) => {
-                  const selected = option.id === variant?.id
-                  const out = option.stockQuantity <= 0
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => setVariant(option)}
-                      aria-pressed={selected}
-                      className={`rounded-md border px-3.5 py-2 text-left text-sm font-semibold transition-colors ${
-                        selected
-                          ? `border-brand ${skin.cta}`
-                          : `${skin.border} ${skin.chip} ${skin.text}`
-                      } ${out && !selected ? 'opacity-40' : ''}`}
-                    >
-                      {option.name}
-                      <span className="block text-[11px] font-normal opacity-80">
-                        {out ? 'Out of stock' : formatPrice(option.price)}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
+          {/* Option pickers — the reason this page exists. One per dimension. */}
+          <OptionPicker
+            optionTypes={product.optionTypes}
+            variants={product.variants}
+            selection={selection}
+            onChange={setSelection}
+            skin={skin}
+          />
+          {hasOptions && !variant && (
+            <p className={`mt-3 text-sm font-medium ${skin.muted}`}>
+              This combination isn’t available — try another option.
+            </p>
           )}
 
           <div className="mt-6">
             <PurchaseActions target={target} skin={skin} />
           </div>
+
+          {/* Does it reach the customer's pincode? Checked against their
+              default address (or a pincode they typed) the moment the page
+              opens, so a product outside their area says so before they add
+              it to the cart. */}
+          <DeliveryCheck store={store} product={product} skin={skin} />
 
           <DeliveryInfo store={store} skin={skin} />
           <TrustBadges store={store} skin={skin} />
@@ -351,14 +357,6 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
       )}
     </StorePageShell>
   )
-}
-
-/** Prefer the first in-stock option; fall back to the first (or none). */
-function firstSellable(
-  variants: PublicStoreVariant[],
-): PublicStoreVariant | null {
-  if (variants.length === 0) return null
-  return variants.find((v) => v.stockQuantity > 0) ?? variants[0]!
 }
 
 /** Below-the-fold section: heading + content, evenly spaced. */
@@ -555,9 +553,10 @@ function primaryLocation(store: PublicStore): FooterLocation | null {
 // ---------------------------------------------------------------------------
 
 /**
- * Seller-written specs (parsed out of the description) plus the catalog facts
- * the page already knows. A store that writes no "Label: value" lines still
- * gets a useful table instead of an empty section.
+ * The product's specification rows — the seller's real `specifications` when
+ * they have any, otherwise the "Label: value" lines parsed out of the
+ * description — plus the catalog facts the page already knows. A store that
+ * fills in neither still gets a useful table instead of an empty section.
  */
 function SpecTable({
   specs,
@@ -570,13 +569,19 @@ function SpecTable({
   store: PublicStore
   skin: Skin
 }) {
-  const rows: ProductSpec[] = [...specs]
+  // Real specification rows win; the description heuristic is the fallback
+  // for products whose seller has not filled any in.
+  const rows: ProductSpec[] =
+    product.specifications.length > 0
+      ? [...product.specifications]
+      : [...specs]
   const path = product.category.parent
     ? `${product.category.parent.name} › ${product.category.name}`
     : product.category.name
   rows.push({ label: 'Category', value: path })
-  if (product.variants.length > 0) {
-    rows.push({ label: 'Options', value: String(product.variants.length) })
+  // One row per option type ("Size: S, M, L") — what the product comes in.
+  for (const type of product.optionTypes) {
+    rows.push({ label: type.name, value: type.values.join(', ') })
   }
   rows.push({
     label: 'Availability',

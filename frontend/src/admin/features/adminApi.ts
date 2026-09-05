@@ -206,8 +206,31 @@ export interface ProductRow {
   variantCount: number
 }
 
+/** Seller-defined purchasable dimension: `{ name: "Size", values: ["S", "M"] }`. */
+export interface ProductOptionType {
+  name: string
+  values: string[]
+}
+
+/** Descriptive spec-table row: `{ label: "Material", value: "Memory foam" }`. */
+export interface ProductSpecification {
+  label: string
+  value: string
+}
+
+/** Per-product delivery-area override. `null` on the product = follows the store default. */
+export interface ProductDeliveryRule {
+  type: 'ALL' | 'INCLUDE' | 'EXCLUDE'
+  pincodes: string[]
+}
+
 export interface ProductDetail extends ProductRow {
   description: string | null
+  hideFromSearch: boolean
+  updatedAt: string
+  optionTypes: ProductOptionType[]
+  specifications: ProductSpecification[]
+  deliveryRule: ProductDeliveryRule | null
   variants: {
     id: string
     name: string
@@ -215,6 +238,8 @@ export interface ProductDetail extends ProductRow {
     stockQuantity: number
     isActive: boolean
     isDefault: boolean
+    /** `{ [optionTypeName]: value }`; null on the implicit default variant. */
+    optionValues: Record<string, string> | null
   }[]
   media: { id: string; type: 'IMAGE' | 'VIDEO'; url: string | null; altText: string | null }[]
 }

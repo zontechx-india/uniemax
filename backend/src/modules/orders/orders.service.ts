@@ -13,6 +13,12 @@ import {
   resolveShipping,
 } from "../stores/stores.schema.js";
 import type { CheckoutFieldKey } from "../stores/stores.schema.js";
+import {
+  effectiveDeliveryRule,
+  isDeliverable,
+  resolveProductDeliveryRule,
+  restrictsDelivery,
+} from "../stores/deliveryRules.js";
 import type {
   OrderCreateInput,
   OrderCustomerInput,
@@ -229,6 +235,7 @@ export async function createOrder(
       id: true,
       name: true,
       slug: true,
+      deliveryRule: true,
       variants: {
         where: { isActive: true },
         select: {
@@ -285,6 +292,43 @@ export async function createOrder(
       stockVariantId: variant.id,
     };
   });
+
+  // --- delivery areas: every line must reach the customer's pincode --------
+  // The product's own rule wins over the store default (deliveryRules.ts).
+  // A restricted product with no pincode to check against is refused rather
+  // than waved through — the seller limited where it goes, and an order
+  // that cannot be checked would be one the seller then has to cancel.
+  if (withAddress) {
+    const pincode = input.customer.pincode;
+    const storeRule = shipping.deliveryRule;
+    const undeliverable: string[] = [];
+    let unchecked = false;
+    for (const productId of new Set(lines.map((l) => l.productId))) {
+      const product = productById.get(productId)!;
+      const rule = effectiveDeliveryRule(
+        resolveProductDeliveryRule(product.deliveryRule),
+        storeRule,
+      );
+      if (!restrictsDelivery(rule)) continue;
+      if (!pincode) {
+        unchecked = true;
+      } else if (!isDeliverable(rule, pincode)) {
+        undeliverable.push(product.name);
+      }
+    }
+    if (unchecked) {
+      throw HttpError.badRequest(
+        "Enter your pincode — some items in this order are delivered to selected areas only",
+      );
+    }
+    if (undeliverable.length > 0) {
+      throw HttpError.badRequest(
+        `Not deliverable to pincode ${pincode}: ${undeliverable
+          .map((name) => `"${name}"`)
+          .join(", ")}`,
+      );
+    }
+  }
 
   const subtotal = lines.reduce(
     (sum, line) => sum.add(line.lineTotal),

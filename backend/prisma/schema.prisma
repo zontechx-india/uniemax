@@ -295,13 +295,28 @@ model Store {
   /// JSON like `theme`/`homepage` so footer sections can evolve without a
   /// migration; validated + normalised by `stores.schema.ts#resolveFooter`.
   footer      Json?
+  /// The store's BUSINESS IDENTITY — legal/trading name, the accountable
+  /// seller, business contact, the structured business and pickup addresses,
+  /// and tax IDs (PAN, GSTIN + a "not registered" declaration).
+  /// Operational truth that orders, payouts and compliance read; distinct
+  /// from `footer`, which is the branch list the owner chooses to *display*.
+  /// JSON like the rest of the store config, so a new field is a line in
+  /// `storeProfile.schema.ts` rather than a migration; `resolveProfile`
+  /// back-fills it field-by-field on read, so one bad value costs that field
+  /// alone. Which fields are REQUIRED is decided per capability by the
+  /// requirement registry in `storeReadiness.ts`, not by this column.
+  profile     Json?
   /// Payment acceptance switches: { acceptOnlinePayment, acceptCod }.
   /// Defaults (via `resolvePayments`): COD on, online off. JSON so future
   /// methods (UPI-only, partial payment…) slot in without a migration.
   payments    Json?
-  /// Shipping/fulfilment settings: { mode: DELIVERY | PICKUP | BOTH }
-  /// (default DELIVERY via `resolveShipping`). JSON so the shipping-charge
-  /// rules (fixed/district/state) can join the column without a migration.
+  /// Shipping/fulfilment settings, resolved by `resolveShipping`:
+  ///   { mode: DELIVERY | PICKUP | BOTH,            (default DELIVERY)
+  ///     deliveryRule: { type, pincodes },           (WHERE — deliveryRules.ts)
+  ///     rate: { type: FREE | FLAT, amount, freeAbove } }  (HOW MUCH — shippingRates.ts)
+  /// `rate` is the store's default shipping charge per order; a product may
+  /// override it (StoreProduct.shippingOverride). The order service is the
+  /// only place a charge is computed — clients only display quotes.
   shipping    Json?
   /// Which customer fields this store's checkout collects:
   /// { name, phone, email, address, pincode, state, country } — booleans,
@@ -419,6 +434,33 @@ model StoreProduct {
   isNewArrival   Boolean @default(false)
   hideFromSearch Boolean @default(false)
 
+  /// Ordered seller-defined option types: [{ name: "Size", values: ["S","M"] }].
+  /// Free text only — "500 ml" is a value, never a quantity. Null/[] = simple
+  /// product. Every variant is one combination of these values; the FULL
+  /// cartesian product is always present and the seller disables what they
+  /// don't sell. Read through resolveOptionTypes(); written as
+  /// InputJsonValue / DbNull.
+  optionTypes    Json?
+  /// Ordered descriptive rows [{ label, value }] for the storefront spec table
+  /// ("Material: Memory foam"). Not purchasable dimensions — those are
+  /// optionTypes. Read through resolveSpecifications().
+  specifications Json?
+  /// Per-product delivery-area OVERRIDE: { type: ALL | INCLUDE | EXCLUDE,
+  /// pincodes: [...] }. Null = no override — the product follows the store's
+  /// default rule (Store.shipping.deliveryRule). When set it REPLACES the
+  /// default for this product. Read through resolveProductDeliveryRule();
+  /// precedence + matching live in deliveryRules.ts.
+  deliveryRule   Json?
+  /// Per-product shipping-charge OVERRIDE: { type: FREE | FLAT, amount }.
+  /// Null = the product follows the store's default rate
+  /// (Store.shipping.rate). An order's charge is the HIGHEST applicable
+  /// per-order rate across its lines — see shippingRates.ts#quoteShipping.
+  shippingOverride Json?
+  /// Whether this product may be bought with cash on delivery. Only
+  /// meaningful while the store accepts COD (Store.payments.acceptCod);
+  /// one false product in an order removes COD from that order's checkout.
+  codAvailable   Boolean @default(true)
+
   /// DENORMALISED aggregates over the product's **sellable** variants (active
   /// only), maintained by `recomputeProductAggregates()` on every variant
   /// mutation. Price lives on the variant, so without these columns the
@@ -468,6 +510,11 @@ model StoreProductVariant {
   // hidden from the storefront's variant picker and is replaced the moment
   // the owner adds a real, named variant.
   isDefault     Boolean @default(false)
+  /// { [optionTypeName]: value } — exactly one entry per product option type.
+  /// `name` is DERIVED from this (values joined " / " in type order), which is
+  /// what keeps @@unique([productId, name]), OrderItem.variantName and the
+  /// cart working unchanged. Null on the implicit Default variant.
+  optionValues  Json?
 
   orderItems OrderItem[]
 
@@ -646,9 +693,29 @@ model Order {
   state         String?
   country       String?
 
-  // Money (all snapshots at time of order)
+  /// Billing address snapshot { name, phone, addressLine, pincode, state,
+  /// country } when the customer gave one that differs from the delivery
+  /// address; null = same as the delivery/contact details above.
+  billingAddress Json?
+
+  // Money (all snapshots at time of order). Computed SERVER-SIDE only:
+  //   total (grand total) = subtotal - discount + shippingCharge + tax
   subtotal       Decimal @db.Decimal(10, 2)
+  /// Shipping charge as quoted by `quoteShipping` at placement.
   shippingCharge Decimal @default(0) @db.Decimal(10, 2)
+  /// Customer-facing label of how the order ships — "Free delivery",
+  /// "Standard delivery", "Store pickup". Null on legacy orders.
+  shippingMethod String?
+  /// Why the charge is what it is — { kind: PICKUP | STORE_FREE | STORE_FLAT
+  /// | FREE_ABOVE | PRODUCT_FREE | PRODUCT_RATE, ... } (shippingRates.ts).
+  /// Lets sellers/admins audit a charge without re-running the rules.
+  shippingBasis  Json?
+  /// Reserved: prices are GST-inclusive today, so this is always 0 until a
+  /// tax configuration exists. Kept on the row so the total formula is fixed.
+  tax            Decimal @default(0) @db.Decimal(10, 2)
+  /// Reserved for coupons/promotions — always 0 until they exist.
+  discount       Decimal @default(0) @db.Decimal(10, 2)
+  /// Grand total the customer pays.
   total          Decimal @db.Decimal(10, 2)
 
   paymentMethod    PaymentMethod @default(COD)

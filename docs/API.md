@@ -261,7 +261,10 @@ interchangeably.
 
 ### `GET /api/v1/stores`
 The customer's stores, oldest first. Each: `{ id, name, slug, logoUrl, theme,
-homepage, footer, isPublished, createdAt, updatedAt }`. `theme` is the Appearance JSON
+homepage, footer, profile, readiness, isPublished, createdAt, updatedAt }`.
+`profile` is the business identity (see `PATCH …/profile`) and `readiness` the
+setup evaluation (see **Store readiness** below), both always returned
+resolved on every store response. `theme` is the Appearance JSON
 (`backgroundColor`, `primaryColor`, plus nullable `secondaryColor` —
 links/prices/highlights —, `surfaceColor` — cards/panels — and
 `buttonTextColor` — text on CTA buttons; `null` means Auto: secondary
@@ -285,6 +288,69 @@ unsupported type → `400`.
 The store is created with the default theme, an auto-generated unique `slug`,
 and `isPublished: false`. A store never exists without a logo: if storing the
 object fails, the new row is rolled back.
+
+The `profile` is **seeded from the owner's account** — `sellerName` plus the
+account's **verified** `phone` and `email`, so the onboarding wizard's next
+step opens pre-filled and nothing already verified is asked for twice. An
+unverified channel is seeded as `null` rather than copied, because the
+contact fields only accept verified identifiers (see `PATCH …/profile`);
+seeding an unverified value would pre-fill something its own save rejects.
+
+### Store readiness
+
+Every store response carries a `readiness` object: the server's evaluation of
+what the store still needs, computed from **one requirement registry**
+(`modules/stores/storeReadiness.ts`) that also enforces the gates below. The
+client renders its setup checklist from exactly what the server would reject
+on, so the two can never disagree.
+
+```jsonc
+{
+  "steps": [                          // registry order; wizard steps first
+    { "key": "business",              // store · business · address · tax ·
+                                      //   catalog · payout
+      "title": "Business & contact",
+      "blurb": "Who is selling, and how we reach you about orders.",
+      "wizard": true,                 // a numbered Create Store step
+      "href": "business",             // relative to /stores/:slug
+      "stepNumber": 2,                // 1-based; null for checklist-only steps
+      "requirements": [
+        { "key": "business.phone", "label": "Contact phone number",
+          "step": "business", "gates": ["PUBLISH"], "met": false }
+      ],
+      "complete": false, "metCount": 3, "totalCount": 4 }
+  ],
+  "gates": {
+    "PUBLISH":        { "gate": "PUBLISH", "allowed": false,
+                        "blockers": ["Contact phone number", "Business address"],
+                        "blockerKeys": ["business.phone", "address.business"] },
+    "ONLINE_PAYMENT": { "gate": "ONLINE_PAYMENT", "allowed": false,
+                        "blockers": ["PAN"], "blockerKeys": ["tax.pan"] },
+    "PICKUP":         { "gate": "PICKUP", "allowed": true,
+                        "blockers": [], "blockerKeys": [] }
+  },
+  "complete": false, "metCount": 8, "totalCount": 12
+}
+```
+
+**The three gates and what they require**
+
+| Gate | Blocks | Requirements |
+| --- | --- | --- |
+| `PUBLISH` | `PATCH …/publish` with `isPublished: true` | store name + logo · business name · seller name · contact phone · contact email · business address · ≥ 1 category · ≥ 1 product |
+| `ONLINE_PAYMENT` | `PATCH …/payments` turning `acceptOnlinePayment` **on** | PAN · a primary payout bank account |
+| `PICKUP` | `PATCH …/shipping` with mode `PICKUP` / `BOTH` | the business address |
+
+A blocked request returns `400` naming every missing requirement at once, e.g.
+`"Before you can publish your store, please add: Business address, At least one product."`
+
+Requirements that do not apply are omitted rather than reported unmet — a
+delivery-only store has no pickup-address requirement at all. Turning a
+capability **off** is never gated, and neither is unpublishing.
+
+**Grandfathering.** The `PUBLISH` gate is enforced only on a store's **first**
+publish (`publishedAt === null`). Stores that were already live before these
+requirements existed can still unpublish and re-publish freely.
 
 ### `GET /api/v1/stores/:id`
 One of the customer's stores. `404` if not found / not owned.
@@ -483,6 +549,69 @@ pattern as `theme` / `homepage`). Every store response returns `footer`
 **resolved** to the complete shape above — missing sections defaulted, at
 most one primary location — so clients never normalise it themselves.
 
+### `PATCH /api/v1/stores/:id/profile`
+
+The store's **business identity** — the legal entity, the accountable seller,
+the business contact, the structured addresses and the tax IDs. Stored as the
+`Store.profile` JSON column. The body carries any subset of the keys below; a
+present key replaces that key wholesale, absent keys are untouched. At least
+one key is required (`422` otherwise). Returns the full store.
+
+```jsonc
+{
+  "businessName": "Anwin Sports Pvt Ltd",   // ≤ 120
+  "sellerName": "Anwin Paulji",             // ≤ 80
+  "phone": "+91 98765 43210",               // must equal the owner's VERIFIED
+  "email": "anwin@example.com",             //   account phone / email — see below
+  "address": {                              // canonical postal address
+    "line1": "12 Mount Road",               // required
+    "line2": "Near Spencer Plaza",          // nullable
+    "city": "Chennai",                      // required
+    "state": "Tamil Nadu",                  // required; validated against the
+                                            //   state list when country=India
+    "pincode": "600002",                    // required; ^[1-9]\d{5}$
+    "country": "India",                     // defaults to India
+    "lat": 13.06, "lng": 80.26              // both or neither, nullable
+  },
+  "tax": {
+    "pan": "ABCDE1234F",                    // ^[A-Z]{5}[0-9]{4}[A-Z]$
+    "gstin": "33ABCDE1234F1Z5",             // 15 chars; must contain the PAN
+    "gstExempt": false,                     // declared not GST-registered
+    "registrationNumber": "U52100TN2020PTC" // CIN/LLPIN/Udyam — free text
+  }
+}
+```
+
+Every field is nullable, so a partially-completed profile is a legal state and
+onboarding is resumable — what a field is *required for* is decided per gate
+by **Store readiness** above, not by this endpoint. Validation still applies to
+whatever is present: a malformed PAN, GSTIN or pincode is rejected with `422`.
+
+`address` is the one address the platform holds. Sellers hand parcels to a
+courier office themselves, so there is no separate ship-from or collection
+point to record; if store pickup is offered later, where customers collect
+will be a Shipping setting, not a profile field.
+
+**`phone` and `email` are not free text.** Each must equal one of the owner's
+own **verified** account identifiers; anything else is rejected with `400`,
+and so is any value at all on a channel the account has not verified. They are
+the addresses order notifications and platform notices go to and that shoppers
+see on the storefront, so a seller must have proven they control them.
+
+The value is stored in the account's canonical spelling, not the caller's
+(`ME@X.COM` is accepted as a match and saved as `me@x.com`); phones are
+matched on digits alone, so `+91 98765 43210` and `+919876543210` are the same
+number.
+
+To use a different address or number, the owner **verifies it on their
+account** — `POST /auth/me/link/request` → `/auth/me/link/verify` — which
+sends a code to it and refuses an identifier already linked elsewhere. That
+keeps one OTP implementation on the platform, and means cross-account
+uniqueness and proof-of-control hold here without this endpoint re-checking
+either. A customer's verified identifier can only go from unset to verified
+(`PATCH /auth/me` cannot touch `email`/`phone`), so the stored copy cannot go
+stale.
+
 ### `PATCH /api/v1/stores/:id/payments`
 ```jsonc
 { "acceptOnlinePayment": true, "acceptCod": true }
@@ -497,15 +626,36 @@ module), `acceptCod` = cash on delivery. Every store response returns
 it too, so the checkout can show what the store accepts. Returns the full
 store.
 
+Turning `acceptOnlinePayment` **on** is gated by `ONLINE_PAYMENT` (PAN + a
+primary payout account) — see **Store readiness**. Turning it off never is.
+
 ### `PATCH /api/v1/stores/:id/shipping`
 ```jsonc
-{ "mode": "DELIVERY" }   // DELIVERY · PICKUP · BOTH
+{ "mode": "DELIVERY",                       // DELIVERY · PICKUP · BOTH
+  "deliveryRule": { "type": "INCLUDE",      // ALL · INCLUDE · EXCLUDE
+                    "pincodes": ["629154", "629001"] } }
+// any subset (≥ 1 key) — absent keys are kept
 ```
-The store's fulfilment mode (**how customers receive orders**): the seller
-delivers, customers pick up from a business location, or both. Stored as
-the `Store.shipping` JSON column (default `DELIVERY`; the shipping-charge
-rules join this column later). Returned resolved on every store response
-and in the public shell. Returns the full store.
+The store's shipping settings, stored as the `Store.shipping` JSON column
+and returned resolved on every store response:
+
+- **`mode`** — the fulfilment mode (**how customers receive orders**): the
+  seller delivers, customers pick up from a business location, or both
+  (default `DELIVERY`). `PICKUP` and `BOTH` are gated by `PICKUP` — the
+  store needs a business address before it can offer collection.
+- **`deliveryRule`** — the store's **default delivery areas** by pincode
+  (default `ALL`): `ALL` delivers everywhere (`pincodes` is ignored and
+  stored empty); `INCLUDE` delivers **only** to the listed pincodes;
+  `EXCLUDE` delivers everywhere **except** them. Pincodes are 6-digit Indian
+  PIN codes (`422` otherwise), normalised (spaces/hyphens stripped) and
+  de-duplicated; ≤ 2000 per rule; `INCLUDE`/`EXCLUDE` need at least one.
+  Every product follows this rule unless it carries its own `deliveryRule`
+  override (see the product endpoints), which then **replaces** it for that
+  product. Enforced at order placement and queried by the public
+  delivery check. The public shell exposes only `shipping.mode` — the
+  pincode lists never leave the server.
+
+Returns the full store.
 
 ### `PATCH /api/v1/stores/:id/checkout`
 ```jsonc
@@ -526,6 +676,10 @@ public shell. Returns the full store.
 { "isPublished": true }
 ```
 Publish / unpublish the store's public page. Returns the full store.
+
+A store's **first** publish is gated by `PUBLISH` — see **Store readiness**;
+`400` lists everything still missing. Unpublishing is never gated, and stores
+that have published before are grandfathered past the check.
 
 ### Payout bank accounts — `/api/v1/stores/:id/bank-accounts`
 
@@ -581,7 +735,7 @@ the next primary explicitly, and payouts stay on hold until they do.
 
 The catalog **inside one customer store** (separate from the admin's global
 catalog), following the hierarchy **Store → Category → Subcategory
-(optional) → Product → Variants**. The setup sequence is enforced: a
+(optional) → Product → Option types → Variants**. The setup sequence is enforced: a
 product requires a category (root **or** subcategory) of the same store,
 so at least one category must exist before the first product can be added.
 Category nesting is one level deep — a subcategory cannot have children.
@@ -625,6 +779,18 @@ category still has products **or subcategories**. → `{ "data": { "id" } }`
 > options carries a single implicit variant named `Default`. Product-level
 > `price` / `priceMax` / `stockQuantity` in responses are **derived** from the
 > variants and are read-only.
+>
+> **Variants are combinations of option values.** A product declares ordered
+> `optionTypes` — `[{ "name": "Size", "values": ["S","M"] }, { "name":
+> "Colour", "values": ["Red","Blue"] }]` — and its variants are **exactly the
+> cartesian product** of those values (every combination present; the seller
+> disables the ones they don't sell). Each variant carries `optionValues`
+> (`{ "Size": "M", "Colour": "Red" }`) and its `name` is **derived** from them
+> (values joined `" / "` in type order → `"M / Red"`) — clients never send it.
+> Limits: ≤ 3 option types, ≤ 30 values per type, ≤ 100 combinations; names
+> and values ≤ 40 chars, free text (`"500 ml"` is a value — there is no unit
+> system). A product that predates option types is presented with one
+> synthesised type, `"Option"`, whose values are its old variant names.
 
 **`GET /api/v1/stores/:id/products`** — the store's products, newest first.
 Each:
@@ -641,16 +807,20 @@ Each:
   "isFeatured": false, "isBestSeller": false, "isNewArrival": false,
   "hideFromSearch": false,
   "category": { "id": "cmr…", "name": "Smartphones", "slug": "smartphones", "parentId": "cmr…" },
-  "variants": [ { "id", "name", "price", "stockQuantity", "isActive", "createdAt" } ],
+  "optionTypes": [ { "name": "Storage", "values": ["128 GB", "256 GB"] } ],   // [] for a simple product
+  "specifications": [ { "label": "Chip", "value": "A19" } ],                  // ordered; [] = none
+  "deliveryRule": { "type": "INCLUDE", "pincodes": ["629154"] } | null,        // own override; null = store default
+  "variants": [ { "id", "name", "price", "stockQuantity", "isActive",
+                  "optionValues": { "Storage": "128 GB" }, "createdAt" } ],
   "media":    [ { "id", "type": "IMAGE|VIDEO", "url", "altText", "displayOrder" } ],
   "createdAt": "…"
 }
 ```
-`variants` lists **real options only** — the implicit `Default` is never
-included; edit it through `defaultVariant.id` instead. Decimals serialize as
-strings. `media` is ordered (images by `displayOrder` — the first image is
-the **cover** — video last); `url` is derived from storage config, the DB
-holds only object keys.
+`variants` lists **real combinations only, in matrix order** — the implicit
+`Default` is never included; edit it through `defaultVariant.id` instead.
+Decimals serialize as strings. `media` is ordered (images by `displayOrder` —
+the first image is the **cover** — video last); `url` is derived from storage
+config, the DB holds only object keys.
 
 **`POST /api/v1/stores/:id/products`** → `201`
 
@@ -668,22 +838,39 @@ product shapes, so a payload is never ambiguous.
   "stockQuantity": 20             // required (int >= 0)
 }
 ```
-**Variant product** — at least one variant, each with name + price + stock;
-top-level `price`/`stockQuantity` are not accepted:
+**Variant product** — `optionTypes` (≥ 1) plus `variants` = **every**
+combination of their values, each with price + stock; top-level
+`price`/`stockQuantity` are not accepted:
 ```jsonc
 {
-  "name": "iPhone 17", "categoryId": "cmr…",
+  "name": "Tee", "categoryId": "cmr…",
   "hasVariants": true,
-  "variants": [                    // max 50, names unique (case-insensitive)
-    { "name": "128 GB", "price": 79999, "stockQuantity": 10 },
-    { "name": "256 GB", "price": 89999, "stockQuantity": 5 }
-  ]
+  "optionTypes": [
+    { "name": "Size",   "values": ["S", "M"] },
+    { "name": "Colour", "values": ["Red", "Blue"] }
+  ],
+  "variants": [                    // exactly 2 × 2 = 4 rows, one per combination
+    { "optionValues": { "Size": "S", "Colour": "Red"  }, "price": 499, "stockQuantity": 10 },
+    { "optionValues": { "Size": "S", "Colour": "Blue" }, "price": 499, "stockQuantity": 0, "isActive": false },
+    { "optionValues": { "Size": "M", "Colour": "Red"  }, "price": 549, "stockQuantity": 4 },
+    { "optionValues": { "Size": "M", "Colour": "Blue" }, "price": 549, "stockQuantity": 4 }
+  ],
+  "specifications": [ { "label": "Fabric", "value": "100% cotton" } ],  // optional, ordered, ≤ 30
+  "deliveryRule": { "type": "EXCLUDE", "pincodes": ["629154"] }         // optional — see below
 }
 ```
+Both shapes accept an optional **`deliveryRule`** — this product's own
+delivery areas (same shape and validation as the store's
+`PATCH …/shipping` `deliveryRule`). Omitted / `null` = the product follows
+the store default; when set it **replaces** the default for this product.
+
 `422` with a field-level `issues[]` when: `hasVariants` is false and `price`
-or `stockQuantity` is missing (or `variants` were sent anyway); or
-`hasVariants` is true and `variants` is empty / a row is missing its name,
-price or stock / names collide.
+or `stockQuantity` is missing (or options were sent anyway); or `hasVariants`
+is true and `optionTypes` is empty, option names or values collide
+(case-insensitive), the combinations exceed 100, or `variants` is not exactly
+the cartesian product — a combination missing or duplicated, a row with the
+wrong keys, a value not in its type, or two rows whose derived labels collide
+(possible when a value itself contains `" / "`).
 
 > The wire field is `stockQuantity` (not `stock`) everywhere — request bodies,
 > responses and the DB column all use the same name.
@@ -699,6 +886,8 @@ subset (at least one field required, `422` otherwise).
 { "isBestSeller": true }     // Best Sellers row
 { "isNewArrival": true }     // New Arrivals row
 { "hideFromSearch": true }   // excluded from search; still browsable by category
+{ "specifications": [ { "label": "Material", "value": "Memory foam" } ] }  // ordered rows; null or [] clears
+{ "deliveryRule": { "type": "INCLUDE", "pincodes": ["629154"] } }         // own delivery areas; null = follow the store default
 ```
 `categoryId` must reference a category (root or subcategory) of the same
 store — anything else is a `400`, exactly as on create. `isActive` controls
@@ -708,34 +897,48 @@ booleans are **merchandising** flags letting a merchant curate the homepage
 without code changes. Each section flag maps to **exactly one** row and
 affects nothing else. Price and stock are not here — they live on the
 variants (PATCH the variant, or `defaultVariant.id` for an option-less
-product). Returns the updated product.
+product) — and neither are option types, which change together with the
+variant set through `PUT …/options`. Returns the updated product.
 
 **`DELETE /api/v1/stores/:id/products/:productId`** → `{ "data": { "id" } }`
 Variants are deleted with the product.
 
-**Variants** — every variant mutation returns the **full parent product**
-(with its `variants` array), so clients can replace one product row in
-place:
+**Options & variants** — every mutation returns the **full parent product**
+(with `optionTypes` and `variants`), so clients can replace one product row
+in place. Variants change only **as a set**:
 
-**`POST /api/v1/stores/:id/products/:productId/variants`** → `201`
+**`PUT /api/v1/stores/:id/products/:productId/options`** — the **full target
+state**: every option type and every combination. The server reconciles the
+stored variants to it in **one transaction** — rows sent with an `id` are
+updated in place (new values, label, price, stock, on/off — so a renamed or
+re-priced combination keeps its variant id and every cart line and order
+pointing at it), rows without an `id` are created, and stored variants not
+referenced are **deleted** (orders keep their snapshot; a cart line pointing
+at one revalidates to "no longer available").
 ```jsonc
-{ "name": "Red / 128 GB", "price": 5299, "stockQuantity": 4 }  // price REQUIRED
+{
+  "optionTypes": [ { "name": "Size", "values": ["S", "M", "XL"] } ],
+  "variants": [
+    { "id": "cmr…", "optionValues": { "Size": "S" },  "price": 499, "stockQuantity": 3, "isActive": true },
+    { "id": "cmr…", "optionValues": { "Size": "M" },  "price": 499, "stockQuantity": 0, "isActive": false },
+    {               "optionValues": { "Size": "XL" }, "price": 549, "stockQuantity": 2 }   // new combination
+  ]
+}
 ```
-`name` unique per product case-insensitively (`409` on duplicate). Adding the
-**first** option to a product that only had its implicit `Default` variant
-removes that `Default` — the product now sells through its options.
+Same `422` matrix rules as create; `400 "Variant "…" does not belong to this
+product"` for a foreign or stale `id`. `{ "optionTypes": [], "variants": [] }`
+turns the product **back into a simple one**: every variant is replaced by a
+single `Default` carrying the cheapest price and the summed stock, and the
+option data is cleared. There is deliberately no per-variant `POST` or
+`DELETE` — a variant *is* a combination, so it cannot exist or vanish on its
+own.
 
 **`PATCH /api/v1/stores/:id/products/:productId/variants/:variantId`**
 ```jsonc
-{ "name": "…", "price": 5499, "stockQuantity": 2, "isActive": false }  // all optional
+{ "price": 5499, "stockQuantity": 2, "isActive": false }  // all optional; no `name` — it is derived
 ```
 A variant's price can be changed but never cleared. This is also how the price
 and stock of an option-less product are edited — patch its `defaultVariant.id`.
-
-**`DELETE /api/v1/stores/:id/products/:productId/variants/:variantId`**
-Deleting the **last remaining** variant does not leave the product unsellable:
-that variant is demoted back to the implicit `Default` (keeping its price and
-stock), so the product simply becomes an option-less product again.
 
 A product cannot be **enabled** without a photo: `PATCH …/products/:productId`
 with `isActive: true` is a `400` while the product has no `IMAGE` media
@@ -877,7 +1080,7 @@ products**. Small and cacheable; fetched once per store visit.
   "footer": { … },                // owner-managed footer content, resolved to the
                                   // full shape (see PATCH /stores/:id/footer)
   "payments": { "acceptOnlinePayment", "acceptCod" },
-  "shipping": { "mode": "DELIVERY | PICKUP | BOTH" },
+  "shipping": { "mode": "DELIVERY | PICKUP | BOTH" },   // mode only — never the pincode lists
   "checkout": { "name", "phone", "email", "address", "pincode", "state", "country" },
   "categories": [                 // enabled ROOT categories with something shoppable
     { "id", "name", "slug", "isFeatured",
@@ -958,12 +1161,34 @@ product page is where a customer picks one.
 ```jsonc
 { "id", "name", "slug", "description", "price", "priceMax", "stockQuantity",
   "category": { "name", "slug", "parent": { "name", "slug" } | null },
-  "variants": [ { "id", "name", "price", "stockQuantity" } ],  // enabled OPTIONS only
+  "optionTypes": [ { "name": "Size", "values": ["S", "M", "XL"] } ],     // picker dimensions, in order
+  "specifications": [ { "label": "Fabric", "value": "100% cotton" } ],   // ordered; [] → description fallback
+  "delivery": { "restricted": false },                          // true = limited to some pincodes (see delivery-check)
+  "variants": [ { "id", "name", "price", "stockQuantity",
+                  "optionValues": { "Size": "M" } } ],            // enabled combinations only, matrix order
   "media": [ { "id", "type": "IMAGE|VIDEO", "url", "altText" } ], // gallery, cover first
   "related": [ … ] }                                           // same category, max 8
 ```
-A product with no options arrives with `variants: []` (the implicit `Default`
-is never exposed) and its price/stock come from the product fields.
+A product with no options arrives with `optionTypes: []` and `variants: []`
+(the implicit `Default` is never exposed) and its price/stock come from the
+product fields. A value may appear in `optionTypes` with no enabled variant
+carrying it — the picker greys such values rather than hiding them.
+`delivery.restricted` reflects the product's **effective** delivery rule
+(its own override, else the store default) without revealing the pincodes.
+
+### `GET /api/v1/public/stores/:slug/delivery-check?pincode=629154&productIds=a,b`
+Can these products be delivered to one pincode? Each product is judged by
+its effective rule — its own `deliveryRule` if set, otherwise the store's
+`shipping.deliveryRule` — the **same** evaluation order placement enforces,
+so the answer here is never contradicted at checkout. `productIds` is a
+comma-separated list (1–100 ids); products that are not publicly visible
+are simply absent from `results`.
+```jsonc
+{ "pincode": "629154",
+  "results": [ { "productId": "cmr…", "deliverable": false } ] }
+```
+Used by the product page (against the signed-in customer's primary address,
+or a pincode they typed) and by the checkout (against the chosen address).
 
 ---
 
@@ -997,6 +1222,15 @@ guarded update inside the transaction — concurrent orders can't oversell
 (`409` "just sold out" if they race). Product aggregates recompute in the
 same transaction. Totals: `subtotal` + `shippingCharge` (0 until the
 shipping-rules feature) = `total`.
+
+**Delivery areas** (`DELIVERY` orders): every line's effective pincode rule
+(the product's own `deliveryRule`, else the store's `shipping.deliveryRule`)
+is checked against `customer.pincode` before anything is written —
+`400 "Not deliverable to pincode 629154: "Bat", "Gloves""` names the
+offending products. A restricted product with **no pincode** in the payload
+(the store does not collect one) is refused too
+(`400 "Enter your pincode — …"`) rather than shipped unchecked. Pickup
+orders skip the check.
 
 **Payment:** `COD` orders start `paymentStatus: "PENDING"`. `ONLINE` goes
 through **Cashfree** when the gateway keys are configured (see
@@ -1609,7 +1843,11 @@ Namespaced under `/catalog` because `/admin/products` belongs to the original
 single-tenant catalog (`modules/product`); these are the **sellers'** products.
 Query: `q` (product / store name), `storeId`, `status` (`ACTIVE` · `DISABLED` ·
 `LOW_STOCK` ≤ 5 · `OUT_OF_STOCK`), `page`, `pageSize`. Detail adds
-`description`, `variants[]` and the full `media[]`.
+`description`, `hideFromSearch`, `updatedAt`, `optionTypes[]` (`{ name,
+values[] }`), `specifications[]` (`{ label, value }`), `deliveryRule`
+(`{ type: ALL | INCLUDE | EXCLUDE, pincodes[] }`, or `null` = follows the
+store default), `variants[]` (each with `optionValues`) and the full
+`media[]` — everything the seller configured, read-only.
 
 ### `PATCH /api/v1/admin/catalog/products/:id/visibility`
 

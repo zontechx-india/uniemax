@@ -1,12 +1,21 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
-import { ErrorNote, InfoNote } from '../../../shared/ui/form'
+import { ErrorNote, InfoNote, SuccessNote } from '../../../shared/ui/form'
+import {
+  deliveryRuleProblem,
+  sameDeliveryRule,
+} from '../../features/stores/deliveryRules'
 import { storesApi } from '../../features/stores/storesApi'
-import type { ShippingMode } from '../../features/stores/storesApi'
+import type {
+  DeliveryRule,
+  ShippingMode,
+  Store,
+} from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import { CheckIcon, MapPinIcon, TruckIcon } from '../../layout/icons'
+import { DeliveryRuleEditor } from './DeliveryRuleEditor'
 
 /**
  * Shipping section of Store Management — how customers RECEIVE orders:
@@ -15,6 +24,12 @@ import { CheckIcon, MapPinIcon, TruckIcon } from '../../layout/icons'
  * the live checkout, picking a different option only *requests* the change —
  * a ConfirmDialog spells out the effect and nothing is saved until it is
  * accepted, so the selection always reflects saved state.
+ *
+ * Below the mode sits **Delivery areas** — the store's DEFAULT pincode rule
+ * (all / only selected / all except selected) that every product follows
+ * unless it carries its own override (set per product in Products). Drafted
+ * locally and saved with its own button, since a pincode list is edited in
+ * many small steps.
  */
 
 const MODES: {
@@ -36,7 +51,7 @@ const MODES: {
     description:
       'Customers collect their orders from your business location — no delivery.',
     confirm:
-      'Customers will collect orders from your store. Delivery will no longer be offered at checkout, so make sure your pickup address is set in Footer → Contact Information.',
+      'Customers will collect orders from your business address in Business Details. Delivery will no longer be offered at checkout.',
   },
   {
     mode: 'BOTH',
@@ -73,7 +88,16 @@ export function StoreShippingPage() {
 
   const pendingMode = MODES.find((m) => m.mode === pending)
   const pickupEnabled = current === 'PICKUP' || current === 'BOTH'
-  const hasLocation = store.footer.locations.length > 0
+
+  /**
+   * Offering collection needs somewhere to collect from — the business
+   * address, the one address the platform holds. The condition comes from
+   * `store.readiness`, the same evaluation the endpoint enforces. This used
+   * to check the FOOTER's location list, which was never the business
+   * address; it just happened to be the only address the app held.
+   */
+  const pickupGate = store.readiness.gates.PICKUP
+  const pickupBlocked = !pickupGate.allowed
 
   return (
     <div>
@@ -90,20 +114,29 @@ export function StoreShippingPage() {
           {MODES.map(({ mode, title, description }) => {
             const selected = mode === current
             const Icon = mode === 'PICKUP' ? MapPinIcon : TruckIcon
+            // A pickup-capable mode the store cannot honour yet.
+            const locked = mode !== 'DELIVERY' && pickupBlocked
             return (
               <li key={mode}>
                 <button
                   type="button"
                   role="radio"
                   aria-checked={selected}
-                  disabled={busy || pending !== null}
+                  disabled={busy || pending !== null || locked}
+                  title={
+                    locked
+                      ? `Still needed: ${pickupGate.blockers.join(', ')}`
+                      : undefined
+                  }
                   onClick={() => {
                     if (!selected) setPending(mode)
                   }}
                   className={`flex w-full items-center gap-4 rounded-lg border p-4 text-left transition disabled:cursor-not-allowed ${
                     selected
                       ? 'border-brand bg-brand/5'
-                      : 'border-line hover:bg-surface-alt'
+                      : locked
+                        ? 'border-line opacity-60'
+                        : 'border-line hover:bg-surface-alt'
                   }`}
                 >
                   <span
@@ -136,22 +169,28 @@ export function StoreShippingPage() {
           })}
         </ul>
 
-        {pickupEnabled && !hasLocation && (
+        {pickupBlocked && (
           <InfoNote>
-            Store pickup is enabled, but you haven't added a business location
-            yet — add your pickup address in{' '}
+            {pickupEnabled
+              ? 'Store pickup is on, but customers have no address to collect from — add'
+              : 'To offer store pickup, first add'}{' '}
+            {pickupGate.blockers.join(', ').toLowerCase()} in{' '}
             <Link
-              to="../footer"
+              to="../business"
               className="font-semibold text-brand hover:underline"
             >
-              Footer → Contact Information
-            </Link>{' '}
-            so customers know where to collect their orders.
+              Business Details
+            </Link>
+            .
           </InfoNote>
         )}
 
         {error && <ErrorNote>{error}</ErrorNote>}
       </div>
+
+      {current !== 'PICKUP' && (
+        <DeliveryAreas store={store} onStoreChange={onStoreChange} />
+      )}
 
       <ConfirmDialog
         open={pending !== null}
@@ -164,5 +203,112 @@ export function StoreShippingPage() {
         onCancel={() => setPending(null)}
       />
     </div>
+  )
+}
+
+/**
+ * The store-wide default delivery-area rule. Local draft → Save; the draft
+ * re-syncs whenever the saved store changes underneath (another tab, or a
+ * mode switch above that returned a fresh store).
+ */
+function DeliveryAreas({
+  store,
+  onStoreChange,
+}: {
+  store: Store
+  onStoreChange: (store: Store) => void
+}) {
+  const saved = store.shipping.deliveryRule
+  const [draft, setDraft] = useState<DeliveryRule>(saved)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [savedNote, setSavedNote] = useState(false)
+
+  useEffect(() => {
+    setDraft(saved)
+  }, [saved])
+
+  const dirty = !sameDeliveryRule(draft, saved)
+  const problem = deliveryRuleProblem(draft)
+
+  const save = async () => {
+    if (problem) return setError(problem)
+    setBusy(true)
+    setError(null)
+    setSavedNote(false)
+    try {
+      onStoreChange(await storesApi.updateDeliveryRule(store.id, draft))
+      setSavedNote(true)
+    } catch (err) {
+      setError(toApiError(err).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="mt-8 max-w-2xl border-t border-line pt-6">
+      <h3 className="font-body text-base font-semibold tracking-normal text-fg">
+        Delivery areas
+      </h3>
+      <p className="mt-1 text-sm text-muted">
+        Where you deliver, by pincode. This is the default for every product;
+        a product can set its own delivery areas from{' '}
+        <Link
+          to="../products"
+          className="font-semibold text-brand hover:underline"
+        >
+          Products
+        </Link>
+        . Customers see whether a product reaches their pincode on its page,
+        and an address outside the area is refused at checkout.
+      </p>
+
+      <div className="mt-4">
+        <DeliveryRuleEditor
+          value={draft}
+          onChange={(next) => {
+            setDraft(next)
+            setError(null)
+            setSavedNote(false)
+          }}
+          disabled={busy}
+        />
+      </div>
+
+      {error && (
+        <div className="mt-3">
+          <ErrorNote>{error}</ErrorNote>
+        </div>
+      )}
+      {savedNote && !dirty && (
+        <div className="mt-3">
+          <SuccessNote>Delivery areas saved.</SuccessNote>
+        </div>
+      )}
+
+      <div className="mt-4 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => void save()}
+          disabled={busy || !dirty}
+          className="inline-flex h-10 items-center rounded-md bg-brand-gradient px-4 text-sm font-semibold text-brand-contrast transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
+        >
+          {busy ? 'Saving…' : 'Save Delivery Areas'}
+        </button>
+        {dirty && !busy && (
+          <button
+            type="button"
+            onClick={() => {
+              setDraft(saved)
+              setError(null)
+            }}
+            className="text-sm font-semibold text-muted hover:text-fg"
+          >
+            Discard changes
+          </button>
+        )}
+      </div>
+    </section>
   )
 }

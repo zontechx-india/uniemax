@@ -63,3 +63,22 @@ export const publicProductParamSchema = z.object({
 
 export type PublicProductQuery = z.infer<typeof publicProductQuerySchema>;
 export type PublicStoreListQuery = z.infer<typeof publicStoreListQuerySchema>;
+
+/**
+ * `GET /public/stores/:slug/delivery-check?pincode=…&productIds=a,b` — one
+ * pincode against up to 100 products (the cart cap). `productIds` is a
+ * comma-separated list so the check stays a cacheable GET.
+ */
+export const publicDeliveryCheckQuerySchema = z.object({
+  pincode: z.string().trim().min(3).max(10),
+  productIds: z
+    .string()
+    .transform((raw) =>
+      [...new Set(raw.split(",").map((id) => id.trim()).filter(Boolean))],
+    )
+    .pipe(z.array(z.string().min(1)).min(1).max(100)),
+});
+
+export type PublicDeliveryCheckQuery = z.infer<
+  typeof publicDeliveryCheckQuerySchema
+>;

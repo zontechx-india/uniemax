@@ -9,9 +9,10 @@ import {
   storeHomepageSchema,
   storeFooterUpdateSchema,
   storePaymentsUpdateSchema,
-  storeShippingSchema,
+  storeShippingUpdateSchema,
   storeCheckoutUpdateSchema,
   storePublishSchema,
+  storeProfileUpdateSchema,
 } from "./stores.schema.js";
 import * as service from "./stores.service.js";
 
@@ -82,7 +83,7 @@ export async function updateStoreCheckout(request: FastifyRequest) {
 
 export async function updateStoreShipping(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
-  const input = storeShippingSchema.parse(request.body);
+  const input = storeShippingUpdateSchema.parse(request.body);
   return ok(await service.updateStoreShipping(request.customer!.id, id, input));
 }
 
@@ -103,4 +104,14 @@ export async function updateStoreLogo(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   const file = await readUpload(request, "logo");
   return ok(await service.updateStoreLogo(request.customer!.id, id, file));
+}
+
+/**
+ * Update the store's business profile — identity, contact, addresses and tax
+ * IDs. Partial by section: a present key replaces that section wholesale.
+ */
+export async function updateStoreProfile(request: FastifyRequest) {
+  const { id } = idParamSchema.parse(request.params);
+  const patch = storeProfileUpdateSchema.parse(request.body);
+  return ok(await service.updateStoreProfile(request.customer!.id, id, patch));
 }

@@ -18,10 +18,15 @@
  * fall back to prose (so a single colon line is never dressed up as a table).
  */
 
-export interface ProductSpec {
-  label: string
-  value: string
-}
+import type { ProductSpec } from '../stores/storesApi'
+
+/**
+ * The spec-row shape now lives with the API types (a product can carry real
+ * `specifications`); re-exported here so the heuristic's callers are unchanged.
+ * When a product has real specs they take precedence and this parser's rows
+ * are ignored — see `SpecTable` in `StoreProductPage`.
+ */
+export type { ProductSpec }
 
 export interface ParsedDescription {
   /** Bullet lines, in the order written. */

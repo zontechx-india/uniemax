@@ -4,30 +4,50 @@ import { Link } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { ErrorNote, Select, TextField } from '../../../shared/ui/form'
+import {
+  draftToInput,
+  newKey,
+  reconcileDraft,
+} from '../../features/stores/productOptions'
+import type {
+  OptionTypeDraft,
+  VariantDraft,
+} from '../../features/stores/productOptions'
+import {
+  deliveryRuleProblem,
+  describeDeliveryRule,
+  sameDeliveryRule,
+} from '../../features/stores/deliveryRules'
 import { formatPrice, storeCatalogApi } from '../../features/stores/storesApi'
 import type {
+  DeliveryRule,
+  ProductSpec,
   StoreCategory,
   StoreProduct,
   StoreProductCreateInput,
   StoreProductMerchandising,
-  StoreProductVariant,
-  StoreVariantInput,
 } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import {
   BoxIcon,
-  CheckIcon,
   ChevronDownIcon,
-  CloseIcon,
   PencilIcon,
   PlusIcon,
   TagIcon,
   TrashIcon,
 } from '../../layout/icons'
 import { ActiveSwitch } from './ActiveSwitch'
+import { ProductDeliveryField } from './DeliveryRuleEditor'
 import { MediaBoard } from './media/MediaBoard'
 import { usePendingMedia } from './media/usePendingMedia'
 import { ProductMediaManager } from './ProductMediaManager'
+import { OptionTypesEditor } from './products/OptionTypesEditor'
+import { OptionsPanel } from './products/OptionsPanel'
+import {
+  SpecificationsEditor,
+  cleanSpecifications,
+} from './products/SpecificationsEditor'
+import { VariantMatrix } from './products/VariantMatrix'
 
 /**
  * Products section of the store manage page — the product + variants end
@@ -35,9 +55,10 @@ import { ProductMediaManager } from './ProductMediaManager'
  * Variants. Until the store has at least one category, this section is a
  * gate pointing to Categories (a product must belong to a category — root
  * or subcategory; the backend enforces the same rule). Each product row can
- * be edited in place (name / category / description via the pencil) and
- * expands into a variant manager (add / edit / enable-disable / delete
- * variants).
+ * be edited in place (name / category / description / specifications via the
+ * pencil) and expands into media, storefront placement and the options panel
+ * — option types plus the generated combination matrix, with price / stock /
+ * on-off per row.
  */
 export function StoreProductsPage() {
   const { store } = useManagedStore()
@@ -448,6 +469,9 @@ function ProductRow({
             {categoryPath(product.category, categories)} ·{' '}
             {priceLabel(product)} ·{' '}
             {stock > 0 ? `${stock} in stock` : 'Out of stock'}
+            {product.deliveryRule && (
+              <> · Delivery: {describeDeliveryRule(product.deliveryRule)}</>
+            )}
             {!product.isActive && (
               <span className="ml-1.5 rounded-sm bg-surface-alt px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
                 Disabled
@@ -468,8 +492,8 @@ function ProductRow({
           }`}
         >
           {hasVariants
-            ? `${product.variants.length} variant${product.variants.length === 1 ? '' : 's'}`
-            : 'Variants'}
+            ? `${product.optionTypes.length} option${product.optionTypes.length === 1 ? '' : 's'} · ${product.variants.length} variant${product.variants.length === 1 ? '' : 's'}`
+            : 'Options'}
           <ChevronDownIcon
             className={`h-3.5 w-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`}
           />
@@ -521,7 +545,7 @@ function ProductRow({
             onProductChange={onProductChange}
           />
           <MerchandisingPanel product={product} onRequest={onMerchandising} />
-          <VariantManager
+          <OptionsPanel
             storeId={storeId}
             product={product}
             onProductChange={onProductChange}
@@ -566,11 +590,12 @@ function CategoryOptions({ categories }: { categories: StoreCategory[] }) {
 }
 
 /**
- * Edit a product's details — name, category and description. Price and stock
- * are deliberately NOT here: they live on the variants (the unit of sale) and
- * are edited in the expanded variant panel. Only changed fields are sent; an
- * emptied description is sent as `null` (cleared). The product's public URL
- * (slug) never changes on rename, so shared links keep working.
+ * Edit a product's details — name, category, description and specification
+ * rows. Price and stock are deliberately NOT here: they live on the variants
+ * (the unit of sale) and are edited in the expanded options panel. Only
+ * changed fields are sent; an emptied description is sent as `null`
+ * (cleared). The product's public URL (slug) never changes on rename, so
+ * shared links keep working.
  */
 function EditProductForm({
   storeId,
@@ -585,33 +610,51 @@ function EditProductForm({
   onSaved: (product: StoreProduct) => void
   onCancel: () => void
 }) {
+  const { store } = useManagedStore()
   const [name, setName] = useState(product.name)
   const [categoryId, setCategoryId] = useState(product.category.id)
   const [description, setDescription] = useState(product.description ?? '')
+  const [specs, setSpecs] = useState<ProductSpec[]>(product.specifications)
+  const [deliveryRule, setDeliveryRule] = useState<DeliveryRule | null>(
+    product.deliveryRule,
+  )
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
+  const specsChanged =
+    JSON.stringify(cleanSpecifications(specs)) !==
+    JSON.stringify(product.specifications)
+  const deliveryChanged = !sameDeliveryRule(deliveryRule, product.deliveryRule)
   const dirty =
     name.trim() !== product.name ||
     categoryId !== product.category.id ||
-    description.trim() !== (product.description ?? '')
+    description.trim() !== (product.description ?? '') ||
+    specsChanged ||
+    deliveryChanged
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return setError('Please enter a product name.')
     if (!dirty) return onCancel()
+    const deliveryProblem = deliveryRule && deliveryRuleProblem(deliveryRule)
+    if (deliveryProblem) return setError(deliveryProblem)
 
     // Send only what changed — the endpoint is a partial PATCH.
     const patch: {
       name?: string
       categoryId?: string
       description?: string | null
+      specifications?: ProductSpec[]
+      deliveryRule?: DeliveryRule | null
     } = {}
     if (name.trim() !== product.name) patch.name = name.trim()
     if (categoryId !== product.category.id) patch.categoryId = categoryId
     if (description.trim() !== (product.description ?? '')) {
       patch.description = description.trim() ? description.trim() : null
     }
+    if (specsChanged) patch.specifications = cleanSpecifications(specs)
+    // null = drop the override (follow the store default again).
+    if (deliveryChanged) patch.deliveryRule = deliveryRule
 
     setError(null)
     setBusy(true)
@@ -666,6 +709,18 @@ function EditProductForm({
           className="w-full rounded-md border border-line bg-input px-3.5 py-2.5 text-sm text-fg outline-none transition-all placeholder:text-muted focus:border-accent"
         />
       </label>
+
+      <SpecificationsEditor value={specs} onChange={setSpecs} disabled={busy} />
+
+      <ProductDeliveryField
+        storeRule={store.shipping.deliveryRule}
+        value={deliveryRule}
+        onChange={(next) => {
+          setDeliveryRule(next)
+          setError(null)
+        }}
+        disabled={busy}
+      />
 
       {error && <ErrorNote>{error}</ErrorNote>}
 
@@ -791,442 +846,6 @@ function MerchandisingPanel({
   )
 }
 
-/**
- * Price + stock editor for a product that has no options. Those values live on
- * the product's implicit `Default` variant, so this simply patches that
- * variant — there is no product-level price to edit.
- */
-function DefaultVariantEditor({
-  storeId,
-  productId,
-  variant,
-  onProductChange,
-  onError,
-}: {
-  storeId: string
-  productId: string
-  variant: NonNullable<StoreProduct['defaultVariant']>
-  onProductChange: (product: StoreProduct) => void
-  onError: (message: string | null) => void
-}) {
-  const [price, setPrice] = useState(variant.price)
-  const [stock, setStock] = useState(String(variant.stockQuantity))
-  const [busy, setBusy] = useState(false)
-
-  // Re-sync when the server sends back a new value (e.g. after saving).
-  const [lastId, setLastId] = useState(variant.id)
-  if (variant.id !== lastId) {
-    setLastId(variant.id)
-    setPrice(variant.price)
-    setStock(String(variant.stockQuantity))
-  }
-
-  const dirty =
-    price !== variant.price || stock !== String(variant.stockQuantity)
-
-  const save = async (e: FormEvent) => {
-    e.preventDefault()
-    const priceValue = Number(price)
-    if (!price.trim() || Number.isNaN(priceValue) || priceValue < 0) {
-      return onError('Please enter a valid price.')
-    }
-    const stockValue = stock.trim() === '' ? 0 : Number(stock)
-    if (!Number.isInteger(stockValue) || stockValue < 0) {
-      return onError('Stock must be a whole number.')
-    }
-
-    onError(null)
-    setBusy(true)
-    try {
-      onProductChange(
-        await storeCatalogApi.updateVariant(storeId, productId, variant.id, {
-          price: priceValue,
-          stockQuantity: stockValue,
-        }),
-      )
-    } catch (err) {
-      onError(toApiError(err).message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <form
-      onSubmit={save}
-      className="flex flex-col gap-2 sm:flex-row sm:items-end"
-      noValidate
-    >
-      <label className="block sm:w-40 sm:shrink-0">
-        <span className="mb-1 block text-xs font-medium text-muted">
-          Price (₹)
-        </span>
-        <input
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          inputMode="decimal"
-          className="h-10 w-full rounded-md border border-line bg-input px-3 text-sm text-fg outline-none transition placeholder:text-muted focus:border-accent"
-        />
-      </label>
-      <label className="block sm:w-28 sm:shrink-0">
-        <span className="mb-1 block text-xs font-medium text-muted">Stock</span>
-        <input
-          value={stock}
-          onChange={(e) => setStock(e.target.value)}
-          inputMode="numeric"
-          className="h-10 w-full rounded-md border border-line bg-input px-3 text-sm text-fg outline-none transition placeholder:text-muted focus:border-accent"
-        />
-      </label>
-      <button
-        type="submit"
-        disabled={busy || !dirty}
-        className="inline-flex h-10 shrink-0 items-center justify-center rounded-md bg-brand-gradient px-4 text-sm font-semibold text-brand-contrast transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
-      >
-        {busy ? 'Saving…' : 'Save'}
-      </button>
-    </form>
-  )
-}
-
-/** Expanded panel under a product row: list, toggle, delete + add variants. */
-function VariantManager({
-  storeId,
-  product,
-  onProductChange,
-  onError,
-}: {
-  storeId: string
-  product: StoreProduct
-  onProductChange: (product: StoreProduct) => void
-  onError: (message: string | null) => void
-}) {
-  const [name, setName] = useState('')
-  const [price, setPrice] = useState('')
-  const [stock, setStock] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [busyVariantId, setBusyVariantId] = useState<string | null>(null)
-
-  const addVariant = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!name.trim()) return onError('Please enter a variant name.')
-    const priceValue = Number(price)
-    if (!price.trim() || Number.isNaN(priceValue) || priceValue < 0) {
-      return onError('Please enter a price for this variant.')
-    }
-    const stockValue = stock.trim() === '' ? 0 : Number(stock)
-    if (!Number.isInteger(stockValue) || stockValue < 0) {
-      return onError('Variant stock must be a whole number.')
-    }
-
-    onError(null)
-    setBusy(true)
-    try {
-      onProductChange(
-        await storeCatalogApi.createVariant(storeId, product.id, {
-          name: name.trim(),
-          price: priceValue,
-          stockQuantity: stockValue,
-        }),
-      )
-      setName('')
-      setPrice('')
-      setStock('')
-    } catch (err) {
-      onError(toApiError(err).message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const toggleVariant = async (variantId: string, next: boolean) => {
-    onError(null)
-    setBusyVariantId(variantId)
-    try {
-      onProductChange(
-        await storeCatalogApi.updateVariant(storeId, product.id, variantId, {
-          isActive: next,
-        }),
-      )
-    } catch (err) {
-      onError(toApiError(err).message)
-    } finally {
-      setBusyVariantId(null)
-    }
-  }
-
-  const deleteVariant = async (variantId: string) => {
-    onError(null)
-    setBusyVariantId(variantId)
-    try {
-      onProductChange(
-        await storeCatalogApi.deleteVariant(storeId, product.id, variantId),
-      )
-    } catch (err) {
-      onError(toApiError(err).message)
-    } finally {
-      setBusyVariantId(null)
-    }
-  }
-
-  return (
-    <div className="border-t border-line bg-surface-alt px-4 py-4 pl-16">
-      {!product.hasVariants ? (
-        <>
-          {product.defaultVariant && (
-            <DefaultVariantEditor
-              storeId={storeId}
-              productId={product.id}
-              variant={product.defaultVariant}
-              onProductChange={onProductChange}
-              onError={onError}
-            />
-          )}
-          <p className="mt-3 text-xs text-muted">
-            This product has no options — it sells at the single price above.
-            Add options like{' '}
-            <span className="font-medium text-fg">Red / 128 GB</span> or{' '}
-            <span className="font-medium text-fg">Size XL</span> below; the
-            first one replaces that single price, and each option then carries
-            its own.
-          </p>
-        </>
-      ) : (
-        <ul className="space-y-2">
-          {product.variants.map((variant) => (
-            <VariantRow
-              key={variant.id}
-              storeId={storeId}
-              productId={product.id}
-              variant={variant}
-              busy={busyVariantId === variant.id}
-              onToggle={(next) => toggleVariant(variant.id, next)}
-              onDelete={() => deleteVariant(variant.id)}
-              onProductChange={onProductChange}
-              onError={onError}
-            />
-          ))}
-        </ul>
-      )}
-
-      {/* Inline add-variant form */}
-      <form
-        onSubmit={addVariant}
-        className="mt-3 flex flex-col gap-2 sm:flex-row"
-        noValidate
-      >
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Variant (e.g. Red / 128 GB)"
-          maxLength={60}
-          className="h-10 w-full rounded-md border border-line bg-input px-3 text-sm text-fg outline-none transition placeholder:text-muted focus:border-accent"
-        />
-        <input
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          placeholder="Price"
-          inputMode="decimal"
-          className="h-10 w-full rounded-md border border-line bg-input px-3 text-sm text-fg outline-none transition placeholder:text-muted focus:border-accent sm:w-36 sm:shrink-0"
-        />
-        <input
-          value={stock}
-          onChange={(e) => setStock(e.target.value)}
-          placeholder="Stock"
-          inputMode="numeric"
-          className="h-10 w-full rounded-md border border-line bg-input px-3 text-sm text-fg outline-none transition placeholder:text-muted focus:border-accent sm:w-24 sm:shrink-0"
-        />
-        <button
-          type="submit"
-          disabled={busy}
-          className="inline-flex h-10 shrink-0 items-center justify-center gap-1 rounded-md bg-brand-gradient px-3.5 text-sm font-semibold text-brand-contrast transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
-        >
-          <PlusIcon className="h-3.5 w-3.5" />
-          {busy ? 'Adding…' : 'Add'}
-        </button>
-      </form>
-    </div>
-  )
-}
-
-/**
- * One variant of a product — view row with a pencil that swaps it for an
- * inline editor (name, price, stock; save/cancel). Only changed fields are
- * PATCHed; the server returns the full parent product so the whole row list
- * refreshes in place.
- */
-function VariantRow({
-  storeId,
-  productId,
-  variant,
-  busy,
-  onToggle,
-  onDelete,
-  onProductChange,
-  onError,
-}: {
-  storeId: string
-  productId: string
-  variant: StoreProductVariant
-  /** True while a toggle/delete on this row is in flight. */
-  busy: boolean
-  onToggle: (next: boolean) => void
-  onDelete: () => void
-  onProductChange: (product: StoreProduct) => void
-  onError: (message: string | null) => void
-}) {
-  const [editing, setEditing] = useState(false)
-  const [name, setName] = useState(variant.name)
-  const [price, setPrice] = useState(variant.price)
-  const [stock, setStock] = useState(String(variant.stockQuantity))
-  const [saving, setSaving] = useState(false)
-
-  const startEdit = () => {
-    // Seed from the current server truth each time the editor opens.
-    setName(variant.name)
-    setPrice(variant.price)
-    setStock(String(variant.stockQuantity))
-    onError(null)
-    setEditing(true)
-  }
-
-  const save = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!name.trim()) return onError('Please enter a variant name.')
-    const priceValue = Number(price)
-    if (!String(price).trim() || Number.isNaN(priceValue) || priceValue < 0) {
-      return onError('Please enter a valid price.')
-    }
-    const stockValue = stock.trim() === '' ? 0 : Number(stock)
-    if (!Number.isInteger(stockValue) || stockValue < 0) {
-      return onError('Stock must be a whole number.')
-    }
-
-    const patch: { name?: string; price?: number; stockQuantity?: number } = {}
-    if (name.trim() !== variant.name) patch.name = name.trim()
-    if (priceValue !== Number(variant.price)) patch.price = priceValue
-    if (stockValue !== variant.stockQuantity) patch.stockQuantity = stockValue
-    if (Object.keys(patch).length === 0) return setEditing(false)
-
-    onError(null)
-    setSaving(true)
-    try {
-      onProductChange(
-        await storeCatalogApi.updateVariant(
-          storeId,
-          productId,
-          variant.id,
-          patch,
-        ),
-      )
-      setEditing(false)
-    } catch (err) {
-      onError(toApiError(err).message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (editing) {
-    return (
-      <li className="rounded-md border border-accent/50 bg-surface px-3 py-2">
-        <form
-          onSubmit={save}
-          className="flex flex-col gap-2 sm:flex-row sm:items-center"
-          noValidate
-        >
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={60}
-            autoFocus
-            aria-label={`${variant.name} name`}
-            className="h-9 w-full rounded-md border border-line bg-input px-3 text-sm text-fg outline-none transition placeholder:text-muted focus:border-accent"
-          />
-          <input
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            inputMode="decimal"
-            placeholder="Price (₹)"
-            aria-label={`${variant.name} price`}
-            className="h-9 w-full rounded-md border border-line bg-input px-3 text-sm text-fg outline-none transition placeholder:text-muted focus:border-accent sm:w-32 sm:shrink-0"
-          />
-          <input
-            value={stock}
-            onChange={(e) => setStock(e.target.value)}
-            inputMode="numeric"
-            placeholder="Stock"
-            aria-label={`${variant.name} stock quantity`}
-            className="h-9 w-full rounded-md border border-line bg-input px-3 text-sm text-fg outline-none transition placeholder:text-muted focus:border-accent sm:w-24 sm:shrink-0"
-          />
-          <div className="flex shrink-0 gap-1.5">
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex h-9 w-9 items-center justify-center rounded-md bg-brand-gradient text-brand-contrast transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
-              aria-label={`Save ${variant.name}`}
-            >
-              <CheckIcon className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditing(false)}
-              disabled={saving}
-              className="flex h-9 w-9 items-center justify-center rounded-md border border-line text-muted transition hover:bg-surface-alt hover:text-fg disabled:opacity-40"
-              aria-label={`Cancel editing ${variant.name}`}
-            >
-              <CloseIcon className="h-4 w-4" />
-            </button>
-          </div>
-        </form>
-      </li>
-    )
-  }
-
-  return (
-    <li className="flex items-center gap-3 rounded-md border border-line bg-surface px-3 py-2">
-      <div className="min-w-0 flex-1">
-        <p
-          className={`truncate text-sm font-medium ${
-            variant.isActive ? 'text-fg' : 'text-muted'
-          }`}
-        >
-          {variant.name}
-        </p>
-        <p className="text-xs text-muted">
-          {formatPrice(variant.price)} ·{' '}
-          {variant.stockQuantity > 0
-            ? `${variant.stockQuantity} in stock`
-            : 'Out of stock'}
-        </p>
-      </div>
-      <button
-        type="button"
-        onClick={startEdit}
-        disabled={busy}
-        className="rounded-md p-1.5 text-muted transition hover:bg-surface-alt hover:text-fg disabled:opacity-40"
-        aria-label={`Edit ${variant.name}`}
-      >
-        <PencilIcon className="h-4 w-4" />
-      </button>
-      <ActiveSwitch
-        checked={variant.isActive}
-        disabled={busy}
-        label={`${variant.isActive ? 'Disable' : 'Enable'} ${variant.name}`}
-        onChange={onToggle}
-      />
-      <button
-        type="button"
-        onClick={onDelete}
-        disabled={busy}
-        className="rounded-md p-1.5 text-muted transition hover:bg-danger/10 hover:text-danger disabled:opacity-40"
-        aria-label={`Delete ${variant.name}`}
-      >
-        <TrashIcon className="h-4 w-4" />
-      </button>
-    </li>
-  )
-}
-
 function AddProductForm({
   storeId,
   categories,
@@ -1239,6 +858,7 @@ function AddProductForm({
   onCreated: (product: StoreProduct, warning?: string) => void
   onCancel: () => void
 }) {
+  const { store } = useManagedStore()
   const [name, setName] = useState('')
   /**
    * Name is the one field with its own inline error: it is required and it is
@@ -1256,9 +876,11 @@ function AddProductForm({
    * hidden side are kept, so switching back and forth never loses input.
    */
   const [hasVariants, setHasVariants] = useState(false)
-  const [variantRows, setVariantRows] = useState<
-    { name: string; price: string; stock: string }[]
-  >([{ name: '', price: '', stock: '' }])
+  const [optionTypes, setOptionTypes] = useState<OptionTypeDraft[]>([])
+  const [rows, setRows] = useState<VariantDraft[]>([])
+  const [specs, setSpecs] = useState<ProductSpec[]>([])
+  /** null = follow the store's default delivery areas. */
+  const [deliveryRule, setDeliveryRule] = useState<DeliveryRule | null>(null)
   /**
    * Photos and the optional video, held in memory: they can only be uploaded
    * once the product has an id, so they wait here and go up right after
@@ -1276,30 +898,24 @@ function AddProductForm({
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const setRow = (
-    index: number,
-    patch: Partial<{ name: string; price: string; stock: string }>,
-  ) =>
-    setVariantRows((rows) =>
-      rows.map((row, i) => (i === index ? { ...row, ...patch } : row)),
-    )
+  /**
+   * Option changes regenerate the matrix, carrying over anything typed for a
+   * combination that survives. Nothing here is saved yet, so a dropped row
+   * needs no confirmation — the seller simply sees it go.
+   */
+  const changeOptionTypes = (types: OptionTypeDraft[]) => {
+    setOptionTypes(types)
+    setRows(reconcileDraft(rows, types).rows)
+    setError(null)
+  }
 
-  const addRow = () =>
-    setVariantRows((rows) => [...rows, { name: '', price: '', stock: '' }])
-
-  const removeRow = (index: number) =>
-    setVariantRows((rows) =>
-      // Always leave one row standing so the section is never empty.
-      rows.length === 1
-        ? [{ name: '', price: '', stock: '' }]
-        : rows.filter((_, i) => i !== index),
-    )
-
-  /** Turning the checkbox on with no rows yet gives the user one to fill. */
+  /** Turning the checkbox on with no options yet gives the user one to fill. */
   const toggleHasVariants = (next: boolean) => {
     setHasVariants(next)
     setError(null)
-    if (next && variantRows.length === 0) addRow()
+    if (next && optionTypes.length === 0) {
+      changeOptionTypes([{ key: newKey(), name: '', values: [] }])
+    }
   }
 
   const submit = async (e: FormEvent) => {
@@ -1321,34 +937,21 @@ function AddProductForm({
     let payload: StoreProductCreateInput
 
     if (hasVariants) {
-      const variants: StoreVariantInput[] = []
-      for (const [index, row] of variantRows.entries()) {
-        const label = row.name.trim() || `Variant ${index + 1}`
-        if (!row.name.trim()) return setError(`${label} needs a name.`)
+      if (optionTypes.length === 0) {
+        return setError(
+          'Add at least one option (e.g. Size), or untick “has options”.',
+        )
+      }
+      const result = draftToInput(optionTypes, rows)
+      if ('error' in result) return setError(result.error)
 
-        const vPrice = Number(row.price)
-        if (!row.price.trim() || Number.isNaN(vPrice) || vPrice < 0) {
-          return setError(`${label} needs a valid price.`)
-        }
-        const vStock = Number(row.stock)
-        if (!row.stock.trim() || !Number.isInteger(vStock) || vStock < 0) {
-          return setError(`${label} needs a stock quantity.`)
-        }
-        variants.push({
-          name: row.name.trim(),
-          price: vPrice,
-          stockQuantity: vStock,
-        })
+      payload = {
+        name: name.trim(),
+        categoryId,
+        hasVariants: true,
+        optionTypes: result.input.optionTypes,
+        variants: result.input.variants,
       }
-      if (variants.length === 0) {
-        return setError('Add at least one variant.')
-      }
-      const lowerNames = variants.map((v) => v.name.toLowerCase())
-      if (new Set(lowerNames).size !== lowerNames.length) {
-        return setError('Variant names must be unique.')
-      }
-
-      payload = { name: name.trim(), categoryId, hasVariants: true, variants }
     } else {
       const priceValue = Number(price)
       if (!price.trim() || Number.isNaN(priceValue) || priceValue < 0) {
@@ -1369,6 +972,13 @@ function AddProductForm({
     }
 
     if (description.trim()) payload.description = description.trim()
+    const specifications = cleanSpecifications(specs)
+    if (specifications.length > 0) payload.specifications = specifications
+    if (deliveryRule) {
+      const deliveryProblem = deliveryRuleProblem(deliveryRule)
+      if (deliveryProblem) return setError(deliveryProblem)
+      payload.deliveryRule = deliveryRule
+    }
 
     setError(null)
     setBusy(true)
@@ -1527,6 +1137,18 @@ function AddProductForm({
         />
       </label>
 
+      <SpecificationsEditor value={specs} onChange={setSpecs} disabled={busy} />
+
+      <ProductDeliveryField
+        storeRule={store.shipping.deliveryRule}
+        value={deliveryRule}
+        onChange={(next) => {
+          setDeliveryRule(next)
+          setError(null)
+        }}
+        disabled={busy}
+      />
+
       <MediaBoard
         driver={mediaDriver}
         disabled={busy}
@@ -1548,70 +1170,38 @@ function AddProductForm({
         />
         <span className="text-sm">
           <span className="font-medium text-fg">
-            This product has variants
+            This product has options
           </span>
           <span className="mt-0.5 block text-xs text-muted">
-            Tick this when the product comes in options like color, size or
-            storage — each option then sets its own price and stock.
+            Tick this when it comes in sizes, colours, volumes or other choices.
+            Every combination becomes a variant with its own price and stock.
           </span>
         </span>
       </label>
 
       {hasVariants && (
-        <div>
-          <span className="mb-2 block text-sm font-medium text-muted">
-            Variants
-          </span>
-          <div className="space-y-2">
-            {variantRows.map((row, index) => (
-              <div key={index} className="flex flex-col gap-2 sm:flex-row">
-                <input
-                  value={row.name}
-                  onChange={(e) => setRow(index, { name: e.target.value })}
-                  placeholder="Variant name (e.g. 128 GB)"
-                  maxLength={60}
-                  aria-label={`Variant ${index + 1} name`}
-                  className="h-10 w-full rounded-md border border-line bg-input px-3 text-sm text-fg outline-none transition placeholder:text-muted focus:border-accent"
-                />
-                <input
-                  value={row.price}
-                  onChange={(e) => setRow(index, { price: e.target.value })}
-                  placeholder="Price (₹)"
-                  inputMode="decimal"
-                  aria-label={`Variant ${index + 1} price`}
-                  className="h-10 w-full rounded-md border border-line bg-input px-3 text-sm text-fg outline-none transition placeholder:text-muted focus:border-accent sm:w-36 sm:shrink-0"
-                />
-                <input
-                  value={row.stock}
-                  onChange={(e) => setRow(index, { stock: e.target.value })}
-                  placeholder="Stock"
-                  inputMode="numeric"
-                  aria-label={`Variant ${index + 1} stock quantity`}
-                  className="h-10 w-full rounded-md border border-line bg-input px-3 text-sm text-fg outline-none transition placeholder:text-muted focus:border-accent sm:w-24 sm:shrink-0"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeRow(index)}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-muted transition hover:bg-danger/10 hover:text-danger"
-                  aria-label={`Remove variant ${index + 1}`}
-                >
-                  <TrashIcon className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
+        <div className="space-y-4">
+          <div>
+            <span className="mb-2 block text-sm font-medium text-muted">
+              Options
+            </span>
+            <OptionTypesEditor
+              value={optionTypes}
+              onChange={changeOptionTypes}
+              disabled={busy}
+            />
           </div>
-          <button
-            type="button"
-            onClick={addRow}
-            className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-dashed border-line px-3 py-2 text-xs font-semibold text-muted transition hover:text-fg"
-          >
-            <PlusIcon className="h-3.5 w-3.5" />
-            Add variant
-          </button>
-          <p className="mt-2 text-xs text-muted">
-            Every variant needs a name, price and stock. Listings show the
-            cheapest one as a “from” price.
-          </p>
+          <div>
+            <span className="mb-2 block text-sm font-medium text-muted">
+              Combinations
+            </span>
+            <VariantMatrix
+              types={optionTypes}
+              rows={rows}
+              onChange={setRows}
+              disabled={busy}
+            />
+          </div>
         </div>
       )}
 

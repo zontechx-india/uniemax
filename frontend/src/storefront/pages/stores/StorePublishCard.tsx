@@ -32,6 +32,15 @@ export function StorePublishCard({
 
   const shareUrl = publicStoreUrl(store.slug)
 
+  /**
+   * What stops this store going live, straight from the server's evaluation —
+   * the same object the publish endpoint checks, so the button is disabled
+   * for exactly the reasons a request would have been rejected. Unpublishing
+   * is never blocked: a seller must always be able to take their shop down.
+   */
+  const publishGate = store.readiness.gates.PUBLISH
+  const blocked = !store.isPublished && !publishGate.allowed
+
   const togglePublished = async () => {
     setError(null)
     setBusy(true)
@@ -68,22 +77,45 @@ export function StorePublishCard({
         <button
           type="button"
           onClick={togglePublished}
-          disabled={busy}
+          disabled={busy || blocked}
+          title={
+            blocked
+              ? `Still needed: ${publishGate.blockers.join(', ')}`
+              : undefined
+          }
           className={`h-8 rounded-md px-3 text-xs font-semibold transition disabled:cursor-not-allowed ${
             store.isPublished
               ? 'bg-surface-alt text-fg hover:bg-line'
-              : 'bg-success text-white shadow-floating hover:bg-success/90'
+              : blocked
+                ? 'bg-line text-muted'
+                : 'bg-success text-white shadow-floating hover:bg-success/90'
           }`}
         >
           {busy ? 'Saving…' : store.isPublished ? 'Unpublish' : 'Publish'}
         </button>
       </div>
 
-      <p className="mt-2 text-xs text-muted">
-        {store.isPublished
-          ? 'Your store is live — customers can browse it at the link below.'
-          : 'Open the link below to preview your store, and publish it when it looks right.'}
-      </p>
+      {/* Naming the blockers beats a disabled button with no explanation —
+          the seller can act without hunting for what is missing. */}
+      {blocked ? (
+        <div className="mt-2 rounded-md border border-line bg-surface-alt px-2.5 py-2">
+          <p className="text-xs font-medium text-fg">Before publishing, add:</p>
+          <ul className="mt-1 space-y-0.5">
+            {publishGate.blockers.map((blocker) => (
+              <li key={blocker} className="flex gap-1.5 text-xs text-muted">
+                <span aria-hidden>·</span>
+                <span>{blocker}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="mt-2 text-xs text-muted">
+          {store.isPublished
+            ? 'Your store is live — customers can browse it at the link below.'
+            : 'Open the link below to preview your store, and publish it when it looks right.'}
+        </p>
+      )}
 
       <div className="mt-3 space-y-2">
         <a

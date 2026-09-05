@@ -33,6 +33,7 @@ export const storeRoutes: FastifyPluginAsync = async (app) => {
   app.patch("/:id/theme", controller.updateStoreTheme);
   app.patch("/:id/homepage", controller.updateStoreHomepage);
   app.patch("/:id/footer", controller.updateStoreFooter);
+  app.patch("/:id/profile", controller.updateStoreProfile);
   app.patch("/:id/payments", controller.updateStorePayments);
   app.patch("/:id/shipping", controller.updateStoreShipping);
   app.patch("/:id/checkout", controller.updateStoreCheckout);
@@ -50,8 +51,11 @@ export const storeRoutes: FastifyPluginAsync = async (app) => {
   app.delete("/:id/bank-accounts/:accountId", bankController.deleteBankAccount);
 
   // Store catalog — Store → Category → Subcategory (optional) → Product →
-  // Variants. Categories must exist before products can be added (product
-  // creation requires a category — root or subcategory — of the same store).
+  // Option types → Variants. Categories must exist before products can be
+  // added (product creation requires a category — root or subcategory — of
+  // the same store). Variants are the cartesian product of the option types
+  // and change only as a set, through the options PUT; per-variant PATCH is
+  // for price / stock / on-off alone.
   app.get("/:id/categories", catalogController.listCategories);
   app.post("/:id/categories", catalogController.createCategory);
   app.patch("/:id/categories/:categoryId", catalogController.updateCategory);
@@ -60,14 +64,13 @@ export const storeRoutes: FastifyPluginAsync = async (app) => {
   app.post("/:id/products", catalogController.createProduct);
   app.patch("/:id/products/:productId", catalogController.updateProduct);
   app.delete("/:id/products/:productId", catalogController.deleteProduct);
-  app.post("/:id/products/:productId/variants", catalogController.createVariant);
+  app.put(
+    "/:id/products/:productId/options",
+    catalogController.replaceProductOptions,
+  );
   app.patch(
     "/:id/products/:productId/variants/:variantId",
     catalogController.updateVariant,
-  );
-  app.delete(
-    "/:id/products/:productId/variants/:variantId",
-    catalogController.deleteVariant,
   );
 
   // Product media — up to 8 images + 1 video; first image = cover. Uploads
@@ -110,4 +113,7 @@ export const publicStoreRoutes: FastifyPluginAsync = async (app) => {
   app.get("/:slug/products", publicController.listProducts);
   app.get("/:slug/products/:productSlug", publicController.getProduct);
   app.get("/:slug/categories/:categorySlug", publicController.getCategory);
+  // Delivery-area check — the product page (customer's default address) and
+  // the checkout (chosen address) ask whether products reach one pincode.
+  app.get("/:slug/delivery-check", publicController.checkDelivery);
 };

@@ -10,7 +10,20 @@ import {
   resolveShipping,
 } from "./stores.schema.js";
 import type { HomepageSectionKey } from "./stores.schema.js";
+import {
+  resolveOptionTypes,
+  resolveOptionValues,
+  resolveSpecifications,
+} from "./storeCatalog.schema.js";
+import { deriveProductOptions, sortByOptionOrder } from "./productOptions.js";
+import {
+  effectiveDeliveryRule,
+  isDeliverable,
+  resolveProductDeliveryRule,
+  restrictsDelivery,
+} from "./deliveryRules.js";
 import type {
+  PublicDeliveryCheckQuery,
   PublicProductQuery,
   PublicStoreListQuery,
 } from "./publicStore.schema.js";
@@ -305,12 +318,16 @@ export async function getPublicStoreShell(slug: string, viewerId?: string) {
   // payments JSON are resolved to their complete shapes so the storefront
   // renders them directly.
   const { logoKey, footer, payments, shipping, checkout, ...shell } = store;
+  // Only the MODE is public. The store's default delivery-area rule (which
+  // can be thousands of pincodes) never ships with the shell — customers ask
+  // about one pincode at a time through the delivery check instead.
+  const { mode } = resolveShipping(shipping);
   return {
     ...shell,
     logoUrl: mediaUrl("logo", logoKey),
     footer: resolveFooter(footer),
     payments: resolvePayments(payments),
-    shipping: resolveShipping(shipping),
+    shipping: { mode },
     checkout: resolveCheckoutFields(checkout),
     categories: tree,
   };
@@ -549,6 +566,9 @@ export async function getPublicProduct(
       priceMax: true,
       stockTotal: true,
       categoryId: true,
+      optionTypes: true,
+      specifications: true,
+      deliveryRule: true,
       category: {
         select: {
           name: true,
@@ -559,7 +579,13 @@ export async function getPublicProduct(
       variants: {
         where: { isActive: true, isDefault: false },
         orderBy: { createdAt: "asc" },
-        select: { id: true, name: true, price: true, stockQuantity: true },
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          stockQuantity: true,
+          optionValues: true,
+        },
       },
       media: {
         orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
@@ -581,6 +607,21 @@ export async function getPublicProduct(
     take: RELATED_LIMIT,
   });
 
+  // The structured view — synthesising the single implicit option type for a
+  // product that predates option types, so the picker has one shape to render.
+  // Only ACTIVE variants are selected, so for such a legacy product the
+  // synthesised values are the sellable ones; once the backfill has persisted
+  // its option types, the stored list is used and the picker greys out values
+  // with no active variant, exactly as for a new product.
+  const { optionTypes, variants } = deriveProductOptions(
+    resolveOptionTypes(product.optionTypes),
+    product.variants.map((variant) => ({
+      ...variant,
+      isDefault: false,
+      optionValues: resolveOptionValues(variant.optionValues),
+    })),
+  );
+
   return {
     id: product.id,
     name: product.name,
@@ -599,8 +640,34 @@ export async function getPublicProduct(
           }
         : null,
     },
-    /** Empty for a simple product — the implicit Default is never exposed. */
-    variants: product.variants,
+    /** The dimensions the picker renders, in order. Empty for a simple product. */
+    optionTypes,
+    /** Ordered descriptive rows; empty means "fall back to the description". */
+    specifications: resolveSpecifications(product.specifications),
+    /**
+     * Whether this product's delivery is limited to some pincodes (its own
+     * rule, else the store default). The pincodes themselves are never sent
+     * — the page asks `checkPublicDelivery` about the customer's pincode.
+     */
+    delivery: {
+      restricted: restrictsDelivery(
+        effectiveDeliveryRule(
+          resolveProductDeliveryRule(product.deliveryRule),
+          resolveShipping(store.shipping).deliveryRule,
+        ),
+      ),
+    },
+    /**
+     * Sellable combinations in matrix order, each with its option values.
+     * Empty for a simple product — the implicit Default is never exposed.
+     */
+    variants: sortByOptionOrder(optionTypes, variants).map((variant) => ({
+      id: variant.id,
+      name: variant.name,
+      price: variant.price,
+      stockQuantity: variant.stockQuantity,
+      optionValues: variant.optionValues,
+    })),
     /** Gallery, ordered: images by display order (first = cover), video last. */
     media: product.media.map((item) => ({
       id: item.id,
@@ -609,5 +676,47 @@ export async function getPublicProduct(
       altText: item.altText,
     })),
     related: related.map(shapeListProduct),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Delivery check — "can these products reach this pincode?"
+// ---------------------------------------------------------------------------
+
+/**
+ * Evaluate the delivery-area rule of each requested product against ONE
+ * pincode — the product page asks about the product it shows (using the
+ * customer's default address), the checkout asks about the whole cart
+ * against the chosen address. Same `effectiveDeliveryRule` the order
+ * placement enforces, so the answer here is never contradicted at checkout.
+ *
+ * Products that are not publicly visible are simply absent from `results`
+ * (the cart's own revalidation already reports vanished lines).
+ */
+export async function checkPublicDelivery(
+  slug: string,
+  query: PublicDeliveryCheckQuery,
+  viewerId?: string,
+) {
+  const store = await getVisibleStore(slug, viewerId);
+  const storeRule = resolveShipping(store.shipping).deliveryRule;
+
+  const products = await prisma.storeProduct.findMany({
+    where: { ...visibleProductWhere(store.id), id: { in: query.productIds } },
+    select: { id: true, deliveryRule: true },
+  });
+
+  return {
+    pincode: query.pincode,
+    results: products.map((product) => ({
+      productId: product.id,
+      deliverable: isDeliverable(
+        effectiveDeliveryRule(
+          resolveProductDeliveryRule(product.deliveryRule),
+          storeRule,
+        ),
+        query.pincode,
+      ),
+    })),
   };
 }

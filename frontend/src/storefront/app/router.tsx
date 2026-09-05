@@ -135,6 +135,14 @@ export const router = createBrowserRouter([
                 }),
               },
               {
+                // Business identity, addresses and tax IDs — the permanent
+                // home of what the Create Store wizard collects.
+                path: 'business',
+                lazy: async () => ({
+                  Component: (await import('../pages/stores/StoreBusinessPage')).StoreBusinessPage,
+                }),
+              },
+              {
                 path: 'appearance',
                 lazy: async () => ({
                   Component: (await import('../pages/stores/StoreAppearancePage')).StoreAppearancePage,

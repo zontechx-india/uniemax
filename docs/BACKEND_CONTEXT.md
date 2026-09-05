@@ -91,6 +91,13 @@ backend/
 │   │   ├── stores/            # customer stores: stores.* · storeCatalog.* ·
 │   │   │                      #   storeBank.* (payout accounts) ·
 │   │   │                      #   publicStore.* (storefront) · catalogSlug.ts
+│   │   │                      #   storeAddress.schema.ts (canonical address) ·
+│   │   │                      #   storeProfile.schema.ts (business identity) ·
+│   │   │                      #   storeReadiness.ts (requirement registry) ·
+│   │   │                      #   productOptions.ts (option-matrix logic, pure) ·
+│   │   │                      #   deliveryRules.ts (pincode delivery rules:
+│   │   │                      #   schema, store-default vs product-override
+│   │   │                      #   precedence, match — used by orders + public)
 │   │   ├── themeTemplates/    # curated storefront palettes: seller read
 │   │   │                      #   (active only) + admin CRUD; colors only
 │   │   ├── addresses/         # customer address book (schema · service ·
@@ -127,7 +134,8 @@ backend/
 │   │   │                      #   lifted from real stores (npm run
 │   │   │                      #   seed-theme-templates)
 │   │   ├── generatePushKeys.ts# VAPID key pair (npm run push-keys)
-│   │   └── backfillCatalog.ts # Slugs + price aggregates (npm run backfill-catalog)
+│   │   ├── backfillCatalog.ts # Slugs + price aggregates (npm run backfill-catalog)
+│   │   └── backfillProductOptions.ts # Legacy variants → one "Option" type (npm run backfill-product-options)
 │   ├── utils/                 # response, slug, httpError, zodHelpers, logger, password
 │   └── generated/prisma/      # Prisma client (generated, git-ignored)
 └── .env                       # runtime, DB, JWT, cookie, OTP config (see Environment below)
@@ -328,6 +336,42 @@ changes no storefront, and a seller customising their colors (saved under
 `storeThemeColorsSchema` in `modules/stores/stores.schema.ts` is the single
 definition of those five colors — both the store column and the template column
 parse with it, so the two shapes cannot drift apart.
+
+### Store readiness — `modules/stores/storeReadiness.ts`
+
+**One registry, every consumer.** "Is this store complete enough to go live?"
+used to be answered independently in three places that drifted — the publish
+endpoint (which checked nothing), the payments page (a hint that enforced
+nothing) and the seller's guesswork. It is now declared once:
+
+```ts
+{ key: "tax.pan", label: "PAN", step: "tax",
+  gates: ["ONLINE_PAYMENT"], isMet: (ctx) => filled(ctx.profile.tax.pan) }
+```
+
+Everything derives from `REQUIREMENTS`: the server enforces gates
+(`assertGate` in `stores.service.ts`), the seller's setup checklist renders
+from the same evaluation, and the Create Store wizard's steps ARE the
+registry's `wizard: true` steps. Adding a requirement — a verified GSTIN
+before payout, three products before a marketplace feature — is one entry;
+no endpoint, no UI and no migration change.
+
+- **Gates** are capabilities a requirement can block: `PUBLISH`,
+  `ONLINE_PAYMENT`, `PICKUP`. `gates: []` makes a requirement advisory
+  (it shows in the checklist but blocks nothing).
+- **Steps** group requirements into a screen's worth of fields.
+  `wizard: true` steps are the numbered pages of Create Store; the rest are
+  checklist-only (you cannot add a product from a signup wizard).
+- `appliesWhen` makes a requirement conditional — for a field that only
+  matters once the seller switches a capability on. Inapplicable requirements
+  are dropped from the evaluation, never reported unmet.
+- `evaluateReadiness(ctx)` is pure. The context's three counts (categories,
+  products, primary bank account) are loaded by `loadReadinessCounts`, which
+  batches: listing a seller's whole portfolio costs three queries, not three
+  per store.
+- Turning a capability **off** is never gated, and the `PUBLISH` gate applies
+  only to a store's **first** publish (`publishedAt === null`), so stores that
+  went live before the requirements existed are grandfathered.
 
 ### Support tickets — `modules/support`
 
@@ -540,15 +584,55 @@ White-label design — one codebase, any business:
   (`resolvePayments` defaults: COD on, online off), updated via
   `PATCH /stores/:id/payments`; a `shipping` JSON column holds the
   fulfilment mode `{ mode: DELIVERY | PICKUP | BOTH }` — how customers
-  RECEIVE orders (`resolveShipping` default DELIVERY; the shipping-charge
-  rules join this column later), updated via `PATCH /stores/:id/shipping`;
+  RECEIVE orders (`resolveShipping` default DELIVERY) — **and the store's
+  default delivery-area rule** `deliveryRule: { type: ALL | INCLUDE |
+  EXCLUDE, pincodes }` — WHERE it delivers, by 6-digit pincode (default
+  ALL; the shipping-charge rules join this column later), updated as a
+  partial merge via `PATCH /stores/:id/shipping`. The rule shape, its
+  Zod schema, the product-override precedence (`effectiveDeliveryRule`:
+  a product's own `StoreProduct.deliveryRule` replaces the store default)
+  and the pincode match (`isDeliverable`) all live in
+  `modules/stores/deliveryRules.ts`, which order placement and the public
+  delivery check both call — one evaluation, never two. The public shell
+  exposes only `shipping.mode`: pincode lists never leave the server;
   a `checkout` JSON column holds the **checkout field toggles**
   `{ name, phone, email, address, pincode, state, country }` — which
   customer details the checkout collects (`resolveCheckoutFields`, all
   default true; disabled = hidden from the customer and excluded from
   validation), updated via `PATCH /stores/:id/checkout`. All three are
   included resolved in the owner responses and the public shell so the
-  checkout knows what a store offers/asks. And `isPublished` (default false) —
+  checkout knows what a store offers/asks. A `profile` JSON column holds the
+  **business identity** — `businessName`, `sellerName`, contact `phone` /
+  `email`, a structured `address`, and `tax`
+  (`pan`, `gstin`, `gstExempt`, `registrationNumber`) — updated via
+  `PATCH /stores/:id/profile` and normalised by `resolveProfile`
+  **field-by-field**, so one unparseable value costs that field rather than
+  the seller's whole profile. It is deliberately distinct from `footer`:
+  `profile` is operational truth (orders, payouts, compliance read it, and
+  customers mostly never see it), `footer` is the branch list the owner
+  chooses to *display*. Collapsing them would mean hiding a footer location
+  also loses their business address. It is the one address the platform holds
+  — sellers hand parcels to a courier office themselves, so there is no
+  separate ship-from point, and store pickup is not offered yet (where
+  customers collect would be a Shipping setting when it is, not a profile
+  field). Every field is nullable so a half-finished profile is
+  a legal, resumable state; what is *required* is decided per capability by
+  the requirement registry (see **Store readiness**), never by the column.
+  Addresses use the canonical `storeAddressSchema` (line1/line2, city, state,
+  6-digit pincode, country, optional lat/lng) so `state` and `pincode` are
+  real queryable fields for the shipping-charge rules to come, not substrings
+  of a paragraph. `phone` and `email` are the exception to "any valid value
+  goes": `assertVerifiedContact` requires each to equal one of the owner's own
+  **verified** account identifiers and stores the account's canonical spelling
+  (phones compared on digits alone), so the contact a shopper sees and the
+  address an order alert goes to is always one the seller proved they control.
+  Changing one is a verification, not an edit — it goes through the auth
+  package's `me/link` OTP flow, which already refuses an identifier linked to
+  another account, so uniqueness and proof-of-control hold here without a
+  second OTP implementation. The denormalised copy cannot go stale because a
+  customer's verified identifier only ever goes from unset to verified
+  (`customerUpdateSchema` carries `name`/`altPhone`/`avatarUrl` only).
+  And `isPublished` (default false) —
   the switch that makes the public storefront page live — plus `publishedAt`,
   stamped on the **first** publish only (never reset), so the marketplace
   "New Stores" index ranks by real publish time and re-publishing an old
@@ -585,19 +669,43 @@ White-label design — one codebase, any business:
   `StoreCategory.isFeatured` drives the Shop-by-Category row (when no category is
   starred, that row falls back to all categories).
   `StoreProduct` requires a category — root or subcategory — of the
-  same store, and holds only `name` + optional `description`: it has **no
-  price or stock column**. **The variant is the unit of sale** —
-  `StoreProductVariant` (cascade delete with its product) is a labeled
-  variation ("Red / 128 GB") carrying a **required** `price Decimal(10,2)`,
-  its own `stockQuantity`, and `name` unique per product. Every product owns
-  at least one variant: a product without options carries a single implicit
-  one flagged `isDefault`, so there is exactly one place a price can live.
-  Adding the first real option removes that default; deleting the last option
-  demotes it back to the default (keeping price/stock) rather than leaving
-  the product unsellable. Product-level `price` (cheapest), `priceMax`,
-  `stockQuantity` (total) and `hasVariants` are **derived** in the service and
-  are read-only; the public storefront never sees the default variant, so a
-  simple product still arrives with `variants: []`.
+  same store, and holds `name`, optional `description`, and two JSON columns:
+  **`optionTypes`** (ordered `[{ name, values[] }]` — the dimensions it is
+  sold along, e.g. Size × Colour) and **`specifications`** (ordered `[{ label,
+  value }]` descriptive rows for the spec table). It has **no price or stock
+  column**. **The variant is the unit of sale** — `StoreProductVariant`
+  (cascade delete with its product) is **one combination of option values**,
+  carrying `optionValues` (`{ Size: "M", Colour: "Red" }`), a **required**
+  `price Decimal(10,2)`, its own `stockQuantity`, and a `name` that is
+  **derived** from the values (joined `" / "` in type order → `"M / Red"`) and
+  unique per product — which is what keeps `OrderItem.variantName`, the cart
+  and every label render unchanged. **The variant set is always the full
+  cartesian product** of the option types (the seller disables combinations
+  they don't sell), and it changes only as a set through
+  `replaceProductOptions` (`PUT …/options`), which reconciles rows by `id` in
+  one transaction (update in place → cart/order links survive; create the
+  rest; delete the remainder) with a two-pass rename so label swaps cannot
+  trip the unique constraint. Limits (`OPTION_LIMITS`): ≤ 3 types, ≤ 30
+  values/type, ≤ 100 combinations, 40-char names/values, ≤ 30 spec rows.
+  Values are strings only — deliberately **no unit system**. The pure logic
+  (`variantLabel`, `cartesian`, `validateOptionMatrix`, `deriveProductOptions`)
+  lives in `productOptions.ts`, Prisma- and Zod-free, mirrored line-for-line
+  on the frontend; the JSON columns are read through `resolveOptionTypes` /
+  `resolveOptionValues` / `resolveSpecifications` (`resolveFooter` pattern,
+  via the shared `parseRows`). Every product owns at least one variant: a
+  product without options carries a single implicit one flagged `isDefault`,
+  so there is exactly one place a price can live; `PUT …/options` with
+  `optionTypes: []` demotes back to it (cheapest price, summed stock) and
+  clears both JSON columns. **Legacy products** (free-text variants from
+  before option types) are presented with one synthesised type `"Option"`
+  whose values are their old names — persisted by
+  `scripts/backfillProductOptions.ts` (`npm run backfill-product-options`,
+  `--dry-run` supported) and, as a safety net, synthesised at read time by
+  `deriveProductOptions`, so there is exactly one product shape everywhere.
+  Product-level `price` (cheapest), `priceMax`, `stockQuantity` (total) and
+  `hasVariants` are **derived** in the service and are read-only; the public
+  storefront never sees the default variant, so a simple product still arrives
+  with `variants: []`.
   **Denormalised aggregates:** `StoreProduct` also stores `priceMin` /
   `priceMax` / `stockTotal`, maintained by `recomputeProductAggregates()`
   (`modules/stores/catalogSlug.ts`) on every variant mutation and on product
@@ -618,6 +726,13 @@ White-label design — one codebase, any business:
   time — media is attached by product id, so it can only follow the product —
   so the invariant is enforced at the moment the product would become
   visible. Disabling is never blocked.
+  A nullable `deliveryRule` JSON column carries the product's **delivery-area
+  override** (`{ type: ALL | INCLUDE | EXCLUDE, pincodes }`, same shape as
+  the store default in `Store.shipping.deliveryRule`); null = follow the
+  store default, set = replace it for this product (`resolveProductDeliveryRule`
+  never resolves garbage to ALL — that would silently widen delivery). The
+  public product detail only says whether delivery is `restricted`;
+  `GET /public/stores/:slug/delivery-check` answers for one pincode.
   Handled by the `storeCatalog.*` files in `modules/stores` (routes nested
   under `/stores/:id/…`, same ownership rules), with slug/aggregate helpers in
   `catalogSlug.ts` and the anonymous storefront surface in `publicStore.*`.
@@ -676,8 +791,11 @@ White-label design — one codebase, any business:
   `docs/CASHFREE_PAYMENTS.md`). Items reference
   `StoreProduct`/`StoreProductVariant` (SetNull)
   and snapshot name/variant label/slug/cover `imageKey`/price, so history
-  survives catalog edits and deletions. Order creation re-prices every
+  survives catalog edits and deletions. The variant label is the derived
+  `"M / Red"` name — there is no per-dimension snapshot yet (a `variantOptions
+  Json?` would be the addition if per-option analytics are ever wanted). Order creation re-prices every
   line from the live catalog, enforces the seller's payment/shipping/
+  delivery-area (pincode)/
   checkout configs, and decrements variant stock with a **guarded
   `updateMany` inside the transaction** (concurrent orders can't oversell),
   recomputing product aggregates in the same transaction.
@@ -938,8 +1056,9 @@ admin write lands in the audit trail.
    only); the actual refund API call is manual (Cashfree dashboard) until
    wired. Also: automatic expiry/cancel sweep for abandoned unpaid ONLINE
    orders (they hold stock until the seller cancels).
-2. Shipping-charge calculation (orders currently ship free), Inventory
-   alerts, Banners.
+2. Shipping-charge calculation (orders currently ship free — delivery
+   AREAS by pincode are done, see `deliveryRules.ts`), Inventory alerts,
+   Banners.
 3. OAuth verification: Google (verifier currently unregistered — endpoints return 400)
    and Apple Sign-In. Email (Resend) + SMS (Message Central) delivery are DONE;
    adapters slot into `package/auth/providers/` — see

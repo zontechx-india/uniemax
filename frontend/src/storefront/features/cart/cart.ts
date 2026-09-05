@@ -216,6 +216,8 @@ export const cart = {
       stockQuantity: number
       /** Fresh cover-image URL; omitted = keep the snapshot. */
       imageUrl?: string | null
+      /** Fresh variant label (a seller renamed a value); omitted = keep. */
+      variantName?: string | null
     }[],
   ): number {
     const byKey = new Map(
@@ -232,13 +234,22 @@ export const cart = {
           : item.qty
       const imageUrl =
         update.imageUrl === undefined ? item.imageUrl : update.imageUrl
+      const variantName =
+        update.variantName === undefined ? item.variantName : update.variantName
       const priceOrStockChanged =
         update.price !== item.price ||
         update.stockQuantity !== item.stockQuantity ||
         qty !== item.qty
-      if (!priceOrStockChanged && imageUrl === item.imageUrl) return item
-      // A refreshed thumbnail is persisted but not *reported* — the changed
-      // count feeds the "prices or stock changed" note, which would mislead.
+      if (
+        !priceOrStockChanged &&
+        imageUrl === item.imageUrl &&
+        variantName === item.variantName
+      ) {
+        return item
+      }
+      // A refreshed thumbnail or label is persisted but not *reported* — the
+      // changed count feeds the "prices or stock changed" note, which would
+      // mislead.
       if (priceOrStockChanged) changed += 1
       dirty = true
       return {
@@ -247,6 +258,7 @@ export const cart = {
         stockQuantity: update.stockQuantity,
         qty,
         imageUrl,
+        variantName,
       }
     })
     if (dirty) commit(next)

@@ -59,20 +59,86 @@ A single account can own multiple stores and switch between them.
   no stores (straight to the creation page) and "My Store" otherwise
   (select a store → its management page, or create another). The selection
   page shows a "Create Your First Store" empty state for first-timers.
-- **Create Store** — intentionally minimal to reduce friction: a store
-  name plus an **optional logo** (pick an image → crop it square, the one
-  place a square is required → it is
-  staged locally and uploaded the moment the store is created). The logo
-  can also be added, replaced or removed at any time from Store Details
-  (same pick → crop → upload pipeline, with progress, to a dedicated
-  storage bucket). Remaining information is collected in future updates.
-  The page's Back control returns to wherever the visitor came from
-  (homepage, account menu, or the store list).
+- **Create Store** — a **four-step guided wizard**, numbered so the seller
+  always knows how much is left:
+  1. **Your store** — name + logo (pick an image → crop it square, the one
+     place a square is required → staged locally and uploaded with the
+     create request).
+  2. **Business & contact** — business name and seller name, plus the contact
+     phone and email shown read-only as the seller's verified account
+     identifiers. A seller who has no mobile number yet (the ordinary case —
+     registration is by email) verifies one by OTP without leaving the step.
+  3. **Address** — the business address (street, PIN code, city, state). The
+     one address the platform holds: sellers drop parcels at a courier office
+     themselves, so nothing is collected from a warehouse and no second
+     address is asked for.
+  4. **Tax details** — PAN and GSTIN, **skippable**, with a "not registered
+     for GST" declaration.
+
+  Two rules keep it fast. **The store is created at the end of step 1**, so
+  onboarding is resumable: a seller who leaves on step 3 still owns a store,
+  keeps what they typed, and is met by the setup checklist on their dashboard.
+  And **nothing is asked twice** — the seller name, phone and email are
+  pre-filled from the account, and the business name defaults to the store
+  name. A "Finish later" control is available from step 2 onward.
+
+  Because the store exists from step 1, an abandoned run would otherwise
+  leave a store behind — and a seller returning to **Create store** is far
+  more likely to be coming back to it than wanting a duplicate of it. So if
+  they own any unfinished draft (unpublished, with a required step still
+  open), they are first offered to **continue** it, landing on the step it
+  needs next; starting a new store stays one click away. A store missing only
+  the optional tax step is not a draft — skipping it was a choice.
+
+  The contact phone and email are deliberately **not editable anywhere**, in
+  the wizard or later in Business Details. They are the channels order alerts
+  and platform notices go to and that shoppers see on the storefront, so they
+  must be identifiers the seller has proven they control: a free-text field
+  invites a number nobody answers, which is worse than no number at all. They
+  are therefore always the seller's own verified account email and phone, and
+  changing one means verifying the new one through the account linking flow
+  (which already refuses an identifier belonging to another account). The
+  server enforces this independently of the UI.
+
+  The logo can be replaced at any time from Store Details (same pick → crop →
+  upload pipeline, with progress, to a dedicated storage bucket).
+- **Setup checklist** — on the store dashboard until every requirement is
+  met: a progress bar, the remaining steps grouped as in the wizard, and each
+  step expandable to the individual fields still missing (with a "to publish"
+  marker on the ones that block going live). It renders from the same
+  server-side evaluation the endpoints enforce, so it can never tell a seller
+  they are done while the server disagrees. It removes itself at 100%.
+- **What is required, and when** — a seller can build their whole catalog
+  without filling anything in; requirements attach to *capabilities*, not to
+  screens:
+  - **Publishing** needs the store name and logo, business name, seller name,
+    contact phone and email, a business address, and at least one category
+    and one product. An empty or anonymous storefront never reaches the
+    marketplace.
+  - **Online payments** need a **PAN** and a primary payout bank account —
+    the point at which UnieMax starts collecting and paying out money (and
+    without a PAN, TDS is withheld at 5% instead of 1%). A cash-on-delivery
+    store never needs either.
+  - **Store pickup** needs the business address, so customers know where to
+    collect.
+  - **GSTIN is never mandatory** — small sellers supplying within their own
+    state may trade on a marketplace unregistered, so the form asks them to
+    say which they are rather than demanding a number.
+
+  Blocked actions say exactly what is missing, all of it at once, and the
+  control that is disabled explains itself where it sits. Turning a
+  capability off is never blocked, and stores that were live before these
+  rules existed keep publishing freely.
 - **Store management** — a two-panel page (left: section list —
-  Dashboard, Orders, Categories, Products, Store Details, Appearance,
-  Homepage, Footer, Payments, Bank Accounts, Shipping, Checkout, plus
-  Customer Support and UnieMax Support; right: the selected section),
+  Dashboard, Orders, Categories, Products, Store Details, Business Details,
+  Appearance, Homepage, Footer, Payments, Bank Accounts, Shipping, Checkout,
+  plus Customer Support and UnieMax Support; right: the selected section),
   addressed by the store's slug (`/stores/{storeSlug}`).
+- **Business Details** — the permanent home of everything the wizard
+  collects: three independently-saved cards for **Business & contact**,
+  **Address** and **Tax & compliance** (PAN, GSTIN,
+  registration number). Correcting a phone number never means re-validating
+  an address.
 - **Seller dashboard** — the management page's landing view: **Today's
   Orders**, Total Orders and Revenue up top, then the order pipeline —
   **Pending / Processing / Shipped / Completed / Cancelled / Refunded** —
@@ -144,14 +210,27 @@ A single account can own multiple stores and switch between them.
   a change applies to the live checkout immediately, every toggle asks for
   **confirmation** (a dialog spelling out the effect) before saving. The
   checkout shows customers which methods a store accepts. Turning
-  everything off warns the seller that customers can't order, and enabling
-  online payment without a primary payout account points to Bank Accounts.
+  everything off warns the seller that customers can't order. **Online
+  payment cannot be switched on** until the store has a PAN and a primary
+  payout account; the switch is disabled and names both, linking to Business
+  Details and Bank Accounts. Switching it off is never blocked.
 - **Shipping settings** — how customers **receive** orders: the seller
   chooses **Delivery**, **Store Pickup**, or **Both** (default Delivery).
   Selecting a different option asks for **confirmation** before saving,
-  since it changes the live checkout. Enabling pickup without a business
-  location on file points the seller to Footer → Contact Information, and
-  the checkout previews the store's fulfilment mode to customers.
+  since it changes the live checkout. **Pickup and Both are unavailable
+  until the store has an address to collect from** (its business address
+  counts), with the missing piece named and linked to Business Details. The
+  checkout previews the store's fulfilment mode to customers.
+  **Delivery areas** (same section, hidden for pickup-only stores): the
+  store's default pincode rule — **All pincodes**, **Only selected
+  pincodes**, or **All except selected pincodes** — with the list entered
+  as chips (paste a comma-separated list to add many at once; 6-digit
+  Indian pincodes, up to 2000). This applies to every product; a product
+  can **override** it with its own rule from the Products section ("Use
+  store default" / "Custom for this product"), and the override replaces
+  the default for that product. Customers see on a product's page whether
+  it reaches their pincode, and the checkout refuses an address outside
+  the area (see Storefront below).
   Shipping-charge configuration (fixed / district / state) joins this
   section with the orders module.
 - **Checkout settings** — which customer details the store's checkout
@@ -214,12 +293,15 @@ A single account can own multiple stores and switch between them.
   **after** at least one category exists: every product must belong to a
   category — root or subcategory — of the same store (enforced by the API,
   and the Products section shows an "Add a category first" gate until
-  then). A product has a name, category and an optional description — all
-  three editable after creation (renames keep the product's public link;
-  a product can move to any category of the same store); **the
-  variant is what actually sells**, so price and stock always live on a
-  variant, and each variant's name, price and stock are likewise editable
-  in place. Every product carries **media**: **at least one photo** and up to
+  then). A product has a name, category, an optional description and an
+  optional ordered list of **specifications** ("Material: Memory foam",
+  "Thickness: 8 inch" — facts shown as a table, not choices), and optional
+  **delivery areas** of its own (a pincode rule that overrides the store's
+  default from Shipping settings; the row summarises it — "Delivery: Only
+  12 pincodes") — all editable
+  after creation (renames keep the product's public link; a product can move
+  to any category of the same store); **the variant is what actually sells**,
+  so price and stock always live on a variant. Every product carries **media**: **at least one photo** and up to
   **8** — added by
   multi-select or drag-and-drop, uploaded **as they were shot** (the browser
   only downscales and compresses them; nothing is cut off), reorderable (the
@@ -236,11 +318,21 @@ A single account can own multiple stores and switch between them.
   server configuration and files are checked before uploading; big photos are
   resized automatically to fit the server's limits —
   **5 MB per photo, 50 MB for the video** as currently configured. A product with no options is entered with a single price and
-  stock (kept on one implicit variant behind the scenes); adding options —
-  labels like "Red / 128 GB" — replaces that single price, and each option
-  then carries its own price and stock. Listings show the cheapest option
-  as a "from" price. Removing the last option turns the product back into a
-  simple one. Categories that still contain products or
+  stock (kept on one implicit variant behind the scenes). A product that comes
+  in choices declares up to three **options** — any names, any values: Size
+  (S, M, L), Colour (Red, Blue), Volume (500 ml, 1 L) — and **every
+  combination** of their values becomes a variant with its own price and stock
+  (the seller switches off combinations they don't sell; "Set all" helpers
+  fill a whole matrix in one go). Values are plain text on purpose — "500 ml"
+  and "42 inch" are just values, so any product type fits without the platform
+  learning about units. Adding a value adds its combinations (blank price
+  until filled); removing one drops them, after confirming which — past orders
+  keep their details, and a customer with one in their cart sees it as no
+  longer available. Listings show the cheapest combination as a "from" price.
+  Removing every option turns the product back into a simple one (cheapest
+  price and total stock carry over). Products created before options existed
+  show one option named "Option" holding their old variant labels — rename it
+  to what it really was. Categories that still contain products or
   subcategories cannot be deleted. Every category, product, and variant
   can be **enabled/disabled** individually (the catalog-level
   publish/unpublish): disabled items stay manageable but are hidden from
@@ -303,17 +395,29 @@ A single account can own multiple stores and switch between them.
   **Product page** (`/store/{slug}/product/{product}`) — a full detail page,
   and the *only* place variants are rendered. A **gallery** (zoom on hover,
   swipe on touch, thumbnail rail, inline video) beside a **purchase card**:
-  name, price, stock, the **variant picker** (Colour / Storage / Size / RAM as
-  labelled options, each showing its own price), a **quantity selector**, **Add
-  to Cart** and **Buy Now** (straight to this store's checkout), and share.
+  name, price, stock, **one picker per option** (Size, then Colour… — a value
+  greys out when no in-stock combination has it given the other choices, but
+  stays clickable so the customer can always walk to one that exists; with a
+  single option each value also shows its price), a **quantity selector**,
+  **Add to Cart** and **Buy Now** (straight to this store's checkout), a
+  **delivery check** and share. The delivery check tells the customer
+  whether THIS product reaches their pincode: a product with no pincode
+  restriction says "Delivers to all pincodes"; a restricted one is checked
+  automatically against the signed-in customer's **default (primary)
+  address** — or a pincode they typed earlier, remembered across pages —
+  and shows "Delivers to 629154" or **"Not deliverable to pincode
+  629154"** with a Change link; a customer with no known pincode gets a
+  pincode box to check with. Add to Cart stays available (they may have
+  another address) — the checkout enforces it against the chosen one.
   Below the card: **Product Highlights**, **Description**, **Specifications**
   and **You May Also Like**. A **sticky purchase bar** follows the customer
   once the card scrolls away.
 
   What the page shows is what the seller actually entered — there are no
-  invented selling points: highlights and specifications are read out of the
-  product's own description (bullet lines become highlights, short
-  "Label: value" lines become specification rows), and the delivery / returns /
+  invented selling points: specifications are the seller's own specification
+  rows when they have any (plus one row per option — "Size: S, M, L"),
+  otherwise short "Label: value" lines read out of the description; highlights
+  are the description's bullet lines; and the delivery / returns /
   trust block is built from the store's shipping mode, pickup location, payment
   switches and policy links. **No rating or reviews are shown** — the review
   system doesn't exist yet, and the platform never fabricates stars.
@@ -399,9 +503,15 @@ A single account can own multiple stores and switch between them.
   2. **Choose Payment Method** — Online Payment / Cash on Delivery,
      limited to what the seller enabled in Payment settings.
 
+  Once a delivery address is chosen, every item is **checked against its
+  pincode**: items the seller doesn't deliver there are flagged on the
+  line ("Not deliverable to pincode 629154"), a note explains the fix
+  (choose another address or remove them), and Place Order stays disabled
+  until the order is clean. Pickup orders skip this.
+
   With both steps complete, **Place Order is live**: the server re-prices
   every line from the live catalog, validates the seller's payment/
-  shipping/checkout configs, decrements stock transactionally (no
+  shipping/delivery-area/checkout configs, decrements stock transactionally (no
   overselling), and creates the order with a customer-friendly order
   number. The store's cart lines clear and the customer lands on a
   store-themed **Order Success** page (order number, paid/pay-on-delivery

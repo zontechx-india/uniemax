@@ -11,7 +11,7 @@ import {
   storeProductCreateSchema,
   storeCategoryParamSchema,
   storeProductParamSchema,
-  storeVariantCreateSchema,
+  storeProductOptionsSchema,
   storeVariantUpdateSchema,
   storeVariantParamSchema,
   storeProductUpdateSchema,
@@ -81,24 +81,28 @@ export async function deleteProduct(request: FastifyRequest) {
   return ok(await service.deleteProduct(request.customer!.id, id, productId));
 }
 
-// Variants — every mutation responds with the full parent product (variants
-// included), so clients can swap one product row in place.
+// Options & variants — every mutation responds with the full parent product
+// (option types and variants included), so clients can swap one product row
+// in place.
 
-export async function createVariant(
-  request: FastifyRequest,
-  reply: FastifyReply,
-) {
+/**
+ * Replace the product's option types and its whole variant set atomically.
+ * The body is the full target state; the response is the reconciled product.
+ */
+export async function replaceProductOptions(request: FastifyRequest) {
   const { id, productId } = storeProductParamSchema.parse(request.params);
-  const input = storeVariantCreateSchema.parse(request.body);
-  const product = await service.createVariant(
-    request.customer!.id,
-    id,
-    productId,
-    input,
+  const input = storeProductOptionsSchema.parse(request.body);
+  return ok(
+    await service.replaceProductOptions(
+      request.customer!.id,
+      id,
+      productId,
+      input,
+    ),
   );
-  return reply.status(201).send(ok(product));
 }
 
+/** Price / stock / on-off for one combination. */
 export async function updateVariant(request: FastifyRequest) {
   const { id, productId, variantId } = storeVariantParamSchema.parse(
     request.params,
@@ -112,15 +116,6 @@ export async function updateVariant(request: FastifyRequest) {
       variantId,
       patch,
     ),
-  );
-}
-
-export async function deleteVariant(request: FastifyRequest) {
-  const { id, productId, variantId } = storeVariantParamSchema.parse(
-    request.params,
-  );
-  return ok(
-    await service.deleteVariant(request.customer!.id, id, productId, variantId),
   );
 }
 

@@ -13,16 +13,28 @@ import {
   uniqueCategorySlug,
   uniqueProductSlug,
 } from "./catalogSlug.js";
+import {
+  resolveOptionTypes,
+  resolveOptionValues,
+  resolveSpecifications,
+} from "./storeCatalog.schema.js";
+import { resolveProductDeliveryRule } from "./deliveryRules.js";
+import { resolveProductShippingOverride } from "./shippingRates.js";
 import type {
   StoreCategoryCreateInput,
   StoreCategoryUpdateInput,
   StoreMediaOrderInput,
   StoreMediaUpdateInput,
   StoreProductCreateInput,
+  StoreProductOptionsInput,
   StoreProductUpdateInput,
-  StoreVariantCreateInput,
   StoreVariantUpdateInput,
 } from "./storeCatalog.schema.js";
+import {
+  deriveProductOptions,
+  sortByOptionOrder,
+  variantLabel,
+} from "./productOptions.js";
 
 /**
  * Catalog of a customer-owned store, following the hierarchy
@@ -57,6 +69,11 @@ const productSelect = {
   isBestSeller: true,
   isNewArrival: true,
   hideFromSearch: true,
+  optionTypes: true,
+  specifications: true,
+  deliveryRule: true,
+  shippingOverride: true,
+  codAvailable: true,
   category: { select: { id: true, name: true, slug: true, parentId: true } },
   variants: {
     orderBy: { createdAt: "asc" },
@@ -67,6 +84,7 @@ const productSelect = {
       stockQuantity: true,
       isActive: true,
       isDefault: true,
+      optionValues: true,
       createdAt: true,
     },
   },
@@ -89,6 +107,19 @@ type ProductRow = Prisma.StoreProductGetPayload<{ select: typeof productSelect }
  * The variant is the unit of sale, so a product has no price column of its
  * own — everything money- or stock-related is derived from its variants:
  *
+ *   - `optionTypes` — the ordered dimensions ("Size", "Colour") whose
+ *                     cartesian product the variants are. Products that
+ *                     predate option types get their single implicit one
+ *                     synthesised here (`deriveProductOptions`), so every
+ *                     consumer sees one shape.
+ *   - `specifications` — ordered descriptive rows for the spec table.
+ *   - `deliveryRule` — the product's own delivery-area rule, or null when
+ *                     it follows the store default (never resolved to the
+ *                     default here — the owner UI needs to tell the two apart).
+ *   - `shippingOverride` — likewise for the shipping charge: the product's
+ *                     own rate, or null when it follows `Store.shipping.rate`.
+ *   - `codAvailable` — whether cash on delivery may be chosen for orders
+ *                     containing this product (store COD switch permitting).
  *   - `hasVariants` — false when the product only carries its implicit
  *                     `Default` variant (no picker on the storefront).
  *   - `price`       — the cheapest variant price ("from" price in listings).
@@ -96,11 +127,32 @@ type ProductRow = Prisma.StoreProductGetPayload<{ select: typeof productSelect }
  *   - `stockQuantity` — total across variants.
  *   - `defaultVariant` — the implicit variant (null once real options exist);
  *                     this is what the owner UI edits for a simple product.
- *   - `variants`    — the real options only; the default one is never listed.
+ *   - `variants`    — the real options only, each with its `optionValues`,
+ *                     in matrix order; the default one is never listed.
  */
 function shapeProduct(row: ProductRow) {
-  const { variants, media, ...rest } = row;
-  const options = variants.filter((variant) => !variant.isDefault);
+  const {
+    variants: storedVariants,
+    media,
+    optionTypes: storedTypes,
+    specifications,
+    deliveryRule,
+    shippingOverride,
+    ...rest
+  } = row;
+
+  const { optionTypes, variants } = deriveProductOptions(
+    resolveOptionTypes(storedTypes),
+    storedVariants.map((variant) => ({
+      ...variant,
+      optionValues: resolveOptionValues(variant.optionValues),
+    })),
+  );
+
+  const options = sortByOptionOrder(
+    optionTypes,
+    variants.filter((variant) => !variant.isDefault),
+  );
   const fallback = variants.find((variant) => variant.isDefault) ?? null;
   const pricing = options.length > 0 ? options : variants;
 
@@ -117,7 +169,11 @@ function shapeProduct(row: ProductRow) {
       altText: item.altText,
       displayOrder: item.displayOrder,
     })),
-    hasVariants: options.length > 0,
+    optionTypes,
+    specifications: resolveSpecifications(specifications),
+    deliveryRule: resolveProductDeliveryRule(deliveryRule),
+    shippingOverride: resolveProductShippingOverride(shippingOverride),
+    hasVariants: optionTypes.length > 0,
     price: pricing.length > 0 ? pricing[prices.indexOf(Math.min(...prices))]!.price : null,
     priceMax: pricing.length > 0 ? pricing[prices.indexOf(Math.max(...prices))]!.price : null,
     stockQuantity: variants.reduce((sum, variant) => sum + variant.stockQuantity, 0),
@@ -331,14 +387,18 @@ export async function createProduct(
     throw HttpError.badRequest("Category not found in this store");
   }
 
-  // A product always ships with at least one variant. Real options when the
-  // owner supplied them, otherwise the implicit `Default` carrying the single
-  // price/stock they typed — so there is exactly one place a price lives.
+  // A product always ships with at least one variant. With option types, the
+  // variants are the full cartesian product the schema has already validated,
+  // each NAMED by its values ("M / Red"); otherwise the implicit `Default`
+  // carries the single price/stock — so there is exactly one place a price
+  // lives.
   const variants = input.hasVariants
     ? input.variants!.map((variant) => ({
-        name: variant.name,
+        name: variantLabel(input.optionTypes!, variant.optionValues),
+        optionValues: variant.optionValues as unknown as Prisma.InputJsonValue,
         price: variant.price,
         stockQuantity: variant.stockQuantity,
+        isActive: variant.isActive,
         isDefault: false,
       }))
     : [
@@ -358,6 +418,29 @@ export async function createProduct(
       name: input.name,
       slug: await uniqueProductSlug(store.id, input.name),
       description: input.description ?? null,
+      // Casts: typed object literals without an index signature don't satisfy
+      // Prisma's InputJsonValue (same as the store JSON columns). Spread
+      // conditionally — under exactOptionalPropertyTypes an explicit
+      // `undefined` is not an accepted value for these fields.
+      ...(input.hasVariants
+        ? { optionTypes: input.optionTypes as unknown as Prisma.InputJsonValue }
+        : {}),
+      ...(input.specifications && input.specifications.length > 0
+        ? {
+            specifications:
+              input.specifications as unknown as Prisma.InputJsonValue,
+          }
+        : {}),
+      ...(input.deliveryRule
+        ? { deliveryRule: input.deliveryRule as unknown as Prisma.InputJsonValue }
+        : {}),
+      ...(input.shippingOverride
+        ? {
+            shippingOverride:
+              input.shippingOverride as unknown as Prisma.InputJsonValue,
+          }
+        : {}),
+      codAvailable: input.codAvailable,
       variants: { create: variants },
     },
     select: { id: true },
@@ -375,9 +458,12 @@ export async function createProduct(
 
 /**
  * Partial update of a product — editable details (name, description,
- * category) plus the storefront visibility switch and the merchandising
- * flags driving the homepage sections. The slug never changes on rename —
- * it is the product's public URL identity, so shared links keep working.
+ * category, specification rows, delivery-area and shipping-charge
+ * overrides, COD availability) plus the storefront visibility switch and
+ * the merchandising flags driving the homepage sections. The slug never
+ * changes on rename — it is the product's public URL identity, so shared
+ * links keep working. Option types and variants are NOT here: they change
+ * together through `replaceProductOptions`.
  */
 export async function updateProduct(
   ownerId: string,
@@ -433,6 +519,29 @@ export async function updateProduct(
   if (patch.isNewArrival !== undefined) data.isNewArrival = patch.isNewArrival;
   if (patch.hideFromSearch !== undefined)
     data.hideFromSearch = patch.hideFromSearch;
+  if (patch.specifications !== undefined) {
+    // `null` and `[]` both mean "no specs": clear the column rather than store
+    // an empty list, so the storefront falls back to the description.
+    data.specifications =
+      patch.specifications === null || patch.specifications.length === 0
+        ? Prisma.DbNull
+        : (patch.specifications as unknown as Prisma.InputJsonValue);
+  }
+  if (patch.deliveryRule !== undefined) {
+    // `null` = drop the override; the product follows the store default again.
+    data.deliveryRule =
+      patch.deliveryRule === null
+        ? Prisma.DbNull
+        : (patch.deliveryRule as unknown as Prisma.InputJsonValue);
+  }
+  if (patch.shippingOverride !== undefined) {
+    // Same contract as deliveryRule: `null` = follow the store rate again.
+    data.shippingOverride =
+      patch.shippingOverride === null
+        ? Prisma.DbNull
+        : (patch.shippingOverride as unknown as Prisma.InputJsonValue);
+  }
+  if (patch.codAvailable !== undefined) data.codAvailable = patch.codAvailable;
 
   const row = await prisma.storeProduct.update({
     where: { id: productId },
@@ -485,51 +594,144 @@ async function getMyProductId(
   return product.id;
 }
 
-export async function createVariant(
+/**
+ * Replace a product's option types and its ENTIRE variant set in one
+ * transaction. The body is the full target state — the schema has already
+ * checked it is a valid, complete matrix — and the stored variants are
+ * reconciled to it:
+ *
+ *   - rows sent with an `id` are updated in place (values, label, price,
+ *     stock, on/off), so a renamed or re-priced combination keeps its variant
+ *     id and every cart line and order pointing at it stays valid;
+ *   - rows without an `id` are created;
+ *   - stored variants not referenced are deleted — combinations the seller
+ *     removed. Orders keep their snapshot (`OrderItem.variantName`, price) and
+ *     `variantId` is SetNull, so history survives; a cart line pointing at one
+ *     revalidates to "no longer available", which is the truth.
+ *
+ * `optionTypes: []` turns the product back into a simple one: every variant is
+ * replaced by a single `Default` carrying the cheapest price and the summed
+ * stock, and both JSON columns are cleared. This is the ONE place the
+ * back-to-simple transition lives — it used to be a side effect of deleting
+ * the last variant, which left the option data behind.
+ *
+ * Labels are unique per product (`@@unique([productId, name])`) and Postgres
+ * checks that per statement, so two existing rows swapping labels ("S / Red"
+ * ↔ "Red / S" after a type reorder) would collide mid-transaction. Updates
+ * therefore go in two passes: park every row on a placeholder, then write the
+ * real names.
+ */
+export async function replaceProductOptions(
   ownerId: string,
   storeRef: string,
   productId: string,
-  input: StoreVariantCreateInput,
+  input: StoreProductOptionsInput,
 ) {
   const id = await getMyProductId(ownerId, storeRef, productId);
 
   const existing = await prisma.storeProductVariant.findMany({
     where: { productId: id },
-    select: { id: true, name: true, isDefault: true },
+    select: { id: true, price: true, stockQuantity: true, isDefault: true },
   });
-
-  // Adding the first real option turns the product into a variant product:
-  // the implicit `Default` is superseded and removed (its price/stock were
-  // only ever a stand-in for "this product has no options").
-  const onlyDefault =
-    existing.length > 0 && existing.every((variant) => variant.isDefault);
-
-  const duplicate = existing.some(
-    (variant) =>
-      !variant.isDefault &&
-      variant.name.toLowerCase() === input.name.toLowerCase(),
+  const existingReal = new Set(
+    existing.filter((variant) => !variant.isDefault).map((variant) => variant.id),
   );
-  if (duplicate) {
-    throw HttpError.conflict("A variant with this name already exists");
+
+  const referenced = input.variants.flatMap((variant) =>
+    variant.id !== undefined ? [variant.id] : [],
+  );
+  for (const variantId of referenced) {
+    if (!existingReal.has(variantId)) {
+      throw HttpError.badRequest(
+        `Variant "${variantId}" does not belong to this product`,
+      );
+    }
   }
 
   await prisma.$transaction(async (tx) => {
-    if (onlyDefault) {
+    if (input.optionTypes.length === 0) {
+      // Back to a simple product. Keep the money honest: the cheapest price
+      // and all the stock carry over; 0 only when there was nothing to inherit.
+      const prices = existing.map((variant) => Number(variant.price));
+      await tx.storeProductVariant.deleteMany({ where: { productId: id } });
+      await tx.storeProductVariant.create({
+        data: {
+          productId: id,
+          name: DEFAULT_VARIANT_NAME,
+          price: prices.length > 0 ? Math.min(...prices) : 0,
+          stockQuantity: existing.reduce(
+            (sum, variant) => sum + variant.stockQuantity,
+            0,
+          ),
+          isActive: true,
+          isDefault: true,
+        },
+      });
+      await tx.storeProduct.update({
+        where: { id },
+        data: { optionTypes: Prisma.DbNull },
+      });
+    } else {
+      // The implicit Default goes the moment real options exist, and so does
+      // every combination the seller dropped.
+      const keep = new Set(referenced);
       await tx.storeProductVariant.deleteMany({
-        where: { productId: id, isDefault: true },
+        where:
+          keep.size > 0
+            ? {
+                productId: id,
+                OR: [{ isDefault: true }, { id: { notIn: [...keep] } }],
+              }
+            : { productId: id },
+      });
+
+      const updates = input.variants.filter((variant) => variant.id !== undefined);
+      // Pass 1 — park on placeholders so label swaps cannot collide.
+      for (const variant of updates) {
+        await tx.storeProductVariant.update({
+          where: { id: variant.id! },
+          data: { name: `~${variant.id}` },
+        });
+      }
+      // Pass 2 — the real state.
+      for (const variant of updates) {
+        await tx.storeProductVariant.update({
+          where: { id: variant.id! },
+          data: {
+            name: variantLabel(input.optionTypes, variant.optionValues),
+            optionValues: variant.optionValues as unknown as Prisma.InputJsonValue,
+            price: variant.price,
+            stockQuantity: variant.stockQuantity,
+            isActive: variant.isActive,
+          },
+        });
+      }
+
+      const creations = input.variants.filter((variant) => variant.id === undefined);
+      if (creations.length > 0) {
+        await tx.storeProductVariant.createMany({
+          data: creations.map((variant) => ({
+            productId: id,
+            name: variantLabel(input.optionTypes, variant.optionValues),
+            optionValues: variant.optionValues as unknown as Prisma.InputJsonValue,
+            price: variant.price,
+            stockQuantity: variant.stockQuantity,
+            isActive: variant.isActive,
+            isDefault: false,
+          })),
+        });
+      }
+
+      await tx.storeProduct.update({
+        where: { id },
+        data: {
+          optionTypes: input.optionTypes as unknown as Prisma.InputJsonValue,
+        },
       });
     }
-    await tx.storeProductVariant.create({
-      data: {
-        productId: id,
-        name: input.name,
-        price: input.price,
-        stockQuantity: input.stockQuantity,
-        isDefault: false,
-      },
-    });
+
     // Inside the transaction so the aggregates can never disagree with the
-    // default-variant swap that just happened.
+    // variant set that was just written.
     await recomputeProductAggregates(id, tx);
   });
 
@@ -555,22 +757,9 @@ export async function updateVariant(
   });
   if (!variant) throw HttpError.notFound("Variant not found");
 
-  if (patch.name !== undefined) {
-    const duplicate = await prisma.storeProductVariant.findFirst({
-      where: {
-        productId: id,
-        id: { not: variantId },
-        name: { equals: patch.name, mode: "insensitive" },
-      },
-      select: { id: true },
-    });
-    if (duplicate) {
-      throw HttpError.conflict("A variant with this name already exists");
-    }
-  }
-
+  // `name` is derived from the option values and is not patchable here;
+  // changing what a variant IS goes through `replaceProductOptions`.
   const data: Prisma.StoreProductVariantUncheckedUpdateInput = {};
-  if (patch.name !== undefined) data.name = patch.name;
   if (patch.price !== undefined) data.price = patch.price;
   if (patch.stockQuantity !== undefined) data.stockQuantity = patch.stockQuantity;
   if (patch.isActive !== undefined) data.isActive = patch.isActive;
@@ -578,43 +767,6 @@ export async function updateVariant(
   await prisma.storeProductVariant.update({ where: { id: variantId }, data });
   // Price / stock / isActive all move the aggregates.
   await recomputeProductAggregates(id);
-  const row = await prisma.storeProduct.findUniqueOrThrow({
-    where: { id },
-    select: productSelect,
-  });
-  return shapeProduct(row);
-}
-
-export async function deleteVariant(
-  ownerId: string,
-  storeRef: string,
-  productId: string,
-  variantId: string,
-) {
-  const id = await getMyProductId(ownerId, storeRef, productId);
-
-  const variants = await prisma.storeProductVariant.findMany({
-    where: { productId: id },
-    select: { id: true, isDefault: true },
-  });
-  const variant = variants.find((row) => row.id === variantId);
-  if (!variant) throw HttpError.notFound("Variant not found");
-
-  // A product must always keep exactly one sellable variant. Removing the
-  // last option therefore turns it back into a simple product: the variant is
-  // demoted to the implicit `Default` (keeping its price and stock) instead of
-  // leaving the product with nothing to sell.
-  if (variants.length === 1) {
-    await prisma.storeProductVariant.update({
-      where: { id: variantId },
-      data: { name: DEFAULT_VARIANT_NAME, isDefault: true, isActive: true },
-    });
-  } else {
-    await prisma.storeProductVariant.delete({ where: { id: variantId } });
-  }
-
-  await recomputeProductAggregates(id);
-
   const row = await prisma.storeProduct.findUniqueOrThrow({
     where: { id },
     select: productSelect,

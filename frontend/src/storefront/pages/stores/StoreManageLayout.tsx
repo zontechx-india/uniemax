@@ -23,6 +23,7 @@ import {
   StoreIcon,
   TagIcon,
   TruckIcon,
+  ShieldCheckIcon,
 } from '../../layout/icons'
 
 /**
@@ -89,6 +90,10 @@ const SECTION_GROUPS: { caption: string; items: SectionItem[] }[] = [
     caption: 'Storefront',
     items: [
       { label: 'Store Details', to: 'details', icon: StoreIcon },
+      // Business identity sits beside Store Details rather than under
+      // Payments: it is who the seller IS, which orders and invoices need
+      // long before any payout does.
+      { label: 'Business Details', to: 'business', icon: ShieldCheckIcon },
       { label: 'Appearance', to: 'appearance', icon: PaletteIcon },
       { label: 'Homepage', to: 'homepage', icon: HomeIcon },
       { label: 'Footer', to: 'footer', icon: FooterIcon },

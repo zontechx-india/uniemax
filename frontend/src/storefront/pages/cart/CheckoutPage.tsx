@@ -10,6 +10,7 @@ import { ErrorNote } from '../../../shared/ui/form'
 import { cart, groupByStore, lineTotal, useCart } from '../../features/cart/cart'
 import type { CartItem } from '../../features/cart/cart'
 import { useCartRevalidation } from '../../features/cart/useCartRevalidation'
+import { useDeliveryCheck } from '../../features/cart/useDeliveryCheck'
 import { storeVars } from '../../features/publicStore/storeTheme'
 import { useStoreShell } from '../../features/publicStore/useStoreShells'
 import {
@@ -88,10 +89,31 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
 
   const sellable = group?.items.filter((i) => i.stockQuantity > 0) ?? []
   const excluded = (group?.items.length ?? 0) - sellable.length
-  const ready = checkout.delivery !== null && checkout.payment !== null
+
+  // Delivery-area check against the CHOSEN address: every line must reach
+  // its pincode (each product's own rule, else the store default). Pickup
+  // orders and an unfinished delivery step have nothing to check.
+  const deliveryPincode =
+    checkout.delivery?.fulfilment === 'DELIVERY'
+      ? checkout.delivery.values.pincode?.trim() || null
+      : null
+  const deliveryCheck = useDeliveryCheck(
+    storeSlug,
+    deliveryPincode,
+    sellable.map((item) => item.productId),
+  )
+  const blockedLines = sellable.filter((item) =>
+    deliveryCheck.undeliverable.has(item.productId),
+  )
+
+  const ready =
+    checkout.delivery !== null &&
+    checkout.payment !== null &&
+    !deliveryCheck.checking &&
+    blockedLines.length === 0
 
   const placeOrder = async () => {
-    if (!checkout.delivery || !checkout.payment || sellable.length === 0) return
+    if (!ready || !checkout.delivery || !checkout.payment || sellable.length === 0) return
     setPlacing(true)
     setPlaceError(null)
     try {
@@ -219,9 +241,33 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
                       <OrderLine
                         key={`${item.productId}:${item.variantId ?? ''}`}
                         item={item}
+                        undeliverableTo={
+                          deliveryCheck.undeliverable.has(item.productId)
+                            ? deliveryPincode
+                            : null
+                        }
                       />
                     ))}
                   </ul>
+                  {blockedLines.length > 0 && deliveryPincode && (
+                    <p
+                      role="alert"
+                      className="border-t border-line px-5 py-3 text-xs font-semibold text-danger"
+                    >
+                      {blockedLines.length === 1
+                        ? `1 item can’t be delivered to pincode ${deliveryPincode}.`
+                        : `${blockedLines.length} items can’t be delivered to pincode ${deliveryPincode}.`}{' '}
+                      Choose a different address, or remove{' '}
+                      {blockedLines.length === 1 ? 'it' : 'them'} from your
+                      cart to continue.
+                    </p>
+                  )}
+                  {deliveryCheck.error && (
+                    <p className="border-t border-line px-5 py-3 text-xs font-semibold text-warning">
+                      {deliveryCheck.error} You can still try placing the
+                      order.
+                    </p>
+                  )}
                   {excluded > 0 && (
                     <p className="border-t border-line px-5 py-3 text-xs font-semibold text-warning">
                       {excluded} unavailable item{excluded === 1 ? '' : 's'}{' '}
@@ -282,7 +328,11 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
                   title={
                     ready
                       ? undefined
-                      : 'Complete the delivery and payment steps first'
+                      : blockedLines.length > 0
+                        ? 'Some items can’t be delivered to this address'
+                        : deliveryCheck.checking
+                          ? 'Checking delivery to your address…'
+                          : 'Complete the delivery and payment steps first'
                   }
                   className={`mt-4 h-11 w-full rounded-md text-sm font-bold transition ${
                     ready && !placing
@@ -352,8 +402,17 @@ function SignInToOrder({ storeSlug }: { storeSlug: string }) {
   )
 }
 
-/** One read-only review line: name · variant · qty × price → line total. */
-function OrderLine({ item }: { item: CartItem }) {
+/**
+ * One read-only review line: name · variant · qty × price → line total.
+ * `undeliverableTo` (a pincode) flags a line the chosen address can't receive.
+ */
+function OrderLine({
+  item,
+  undeliverableTo = null,
+}: {
+  item: CartItem
+  undeliverableTo?: string | null
+}) {
   return (
     <li className="flex items-center gap-3 py-3.5">
       {item.imageUrl ? (
@@ -379,6 +438,11 @@ function OrderLine({ item }: { item: CartItem }) {
           )}
           {item.qty} × {formatPrice(item.price)}
         </p>
+        {undeliverableTo && (
+          <p className="mt-1 text-xs font-semibold text-danger">
+            Not deliverable to pincode {undeliverableTo}
+          </p>
+        )}
       </div>
       <span className="shrink-0 text-sm font-bold">
         {formatPrice(lineTotal(item))}

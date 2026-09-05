@@ -1,14 +1,16 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { adminApi } from '../features/adminApi'
 import type { ProductRow } from '../features/adminApi'
-import { useAdminList } from '../features/useAdminQuery'
-import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
-import { Button, Card, Chip, PageHeader, TextArea } from '../ui/primitives'
+import { useAdminList, useAdminQuery } from '../features/useAdminQuery'
+import { Button, Card, Chip, PageHeader } from '../ui/primitives'
 import { DataTable, Pagination } from '../ui/DataTable'
 import type { Column } from '../ui/DataTable'
 import { SearchInput, Tabs, Toolbar } from '../ui/Toolbar'
 import { ActiveChip } from '../ui/statusMeta'
 import { formatCount, formatPriceRange } from '../ui/format'
+import { ProductDetailDialog } from './products/ProductDetailDialog'
+import { ProductVisibilityDialog } from './products/ProductVisibilityDialog'
 
 /**
  * The catalog across every store — inventory oversight plus the one
@@ -19,9 +21,11 @@ import { formatCount, formatPriceRange } from '../ui/format'
  * the very same `isActive` flag the seller toggles — one visibility rule in
  * the system, not two that can contradict each other.
  *
- * Hiding always asks for a reason, because the seller is told what happened
- * the moment it does, and "your product was hidden" with no explanation is
- * a support ticket by construction.
+ * A row is a summary; clicking it opens the listing in full (every image,
+ * the copy, the option matrix, specs, delivery area) in a dialog over the
+ * table, so the admin keeps their filters and page when they close it.
+ * `?storeId=` scopes the table to one store — that is how a store's page
+ * hands over to "all of this seller's products".
  */
 
 const TABS = [
@@ -36,29 +40,17 @@ export default function ProductsPage() {
   const list = useAdminList<ProductRow>((query) => adminApi.listProducts(query), {
     keys: ['q', 'status', 'storeId'],
   })
-  const [target, setTarget] = useState<ProductRow | null>(null)
-  const [reason, setReason] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const storeId = list.filters['storeId'] ?? ''
+  // The store's name for the filter banner. The rows carry it too, but an
+  // empty result (store with no hidden products, say) would leave the banner
+  // with nothing to show — so the store is looked up on its own.
+  const { data: scopedStore } = useAdminQuery(
+    () => (storeId ? adminApi.getStore(storeId) : Promise.resolve(null)),
+    [storeId],
+  )
 
-  const submit = async () => {
-    if (!target) return
-    setBusy(true)
-    setError(null)
-    try {
-      await adminApi.setProductVisibility(target.id, {
-        isActive: !target.isActive,
-        reason: reason.trim() || null,
-      })
-      setTarget(null)
-      setReason('')
-      list.refresh()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not update the product')
-    } finally {
-      setBusy(false)
-    }
-  }
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [target, setTarget] = useState<ProductRow | null>(null)
 
   const columns: Column<ProductRow>[] = [
     {
@@ -110,7 +102,7 @@ export default function ProductsPage() {
       hideOnMobile: true,
       cell: (product) => (
         <span className="text-sm text-muted">
-          {product.variantCount > 0 ? `${product.variantCount} variants` : 'Single'}
+          {product.variantCount > 1 ? `${product.variantCount} variants` : 'Single'}
         </span>
       ),
     },
@@ -120,17 +112,26 @@ export default function ProductsPage() {
       className: 'text-right',
       hideOnMobile: true,
       cell: (product) => (
-        <Button
-          variant={product.isActive ? 'danger' : 'secondary'}
-          onClick={(event) => {
-            event.stopPropagation()
-            setTarget(product)
-            setReason('')
-            setError(null)
-          }}
-        >
-          {product.isActive ? 'Hide' : 'Restore'}
-        </Button>
+        <div className="flex justify-end gap-1.5">
+          <Button
+            variant="ghost"
+            onClick={(event) => {
+              event.stopPropagation()
+              setOpenId(product.id)
+            }}
+          >
+            View
+          </Button>
+          <Button
+            variant={product.isActive ? 'danger' : 'secondary'}
+            onClick={(event) => {
+              event.stopPropagation()
+              setTarget(product)
+            }}
+          >
+            {product.isActive ? 'Hide' : 'Restore'}
+          </Button>
+        </div>
       ),
     },
   ]
@@ -142,6 +143,24 @@ export default function ProductsPage() {
         subtitle="Seller listings across every store — inventory and moderation"
       />
 
+      {storeId ? (
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-accent/30 bg-accent/10 px-4 py-2.5 text-sm">
+          <span className="text-fg">
+            Showing products from{' '}
+            <Link to={`/stores/${storeId}`} className="font-medium text-accent hover:underline">
+              {scopedStore?.name ?? 'one store'}
+            </Link>
+          </span>
+          <button
+            type="button"
+            onClick={() => list.setFilter('storeId', '')}
+            className="ml-auto text-muted hover:text-fg hover:underline"
+          >
+            Show all stores
+          </button>
+        </div>
+      ) : null}
+
       <Card padded={false}>
         <Tabs
           value={list.filters['status'] ?? ''}
@@ -152,7 +171,7 @@ export default function ProductsPage() {
           <SearchInput
             value={list.filters['q'] ?? ''}
             onChange={(value) => list.setFilter('q', value)}
-            placeholder="Product or store name…"
+            placeholder={storeId ? 'Product name…' : 'Product or store name…'}
           />
         </Toolbar>
 
@@ -163,7 +182,11 @@ export default function ProductsPage() {
           loading={list.loading}
           error={list.error}
           onRetry={list.refresh}
-          empty={{ title: 'No products match these filters' }}
+          onRowClick={(product) => setOpenId(product.id)}
+          empty={{
+            title: 'No products match these filters',
+            ...(storeId ? { hint: 'This store has nothing in this view.' } : {}),
+          }}
         />
         <Pagination
           page={list.meta.page}
@@ -174,41 +197,16 @@ export default function ProductsPage() {
         />
       </Card>
 
-      <ConfirmDialog
-        open={target !== null}
-        busy={busy}
-        title={target?.isActive ? 'Hide this product?' : 'Restore this product?'}
-        tone={target?.isActive ? 'danger' : 'neutral'}
-        confirmLabel={target?.isActive ? 'Hide product' : 'Restore product'}
-        description={
-          <div className="space-y-3">
-            <p>
-              {target?.isActive ? (
-                <>
-                  <strong className="text-fg">{target?.name}</strong> will disappear from{' '}
-                  {target?.store.name} immediately, and the seller will be notified.
-                </>
-              ) : (
-                <>
-                  <strong className="text-fg">{target?.name}</strong> will be visible on{' '}
-                  {target?.store.name} again.
-                </>
-              )}
-            </p>
-            {target?.isActive ? (
-              <TextArea
-                label="Reason for the seller"
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                placeholder="e.g. Listing images don't match the product"
-                maxLength={300}
-              />
-            ) : null}
-            {error ? <p className="text-sm text-danger">{error}</p> : null}
-          </div>
-        }
-        onCancel={() => setTarget(null)}
-        onConfirm={() => void submit()}
+      <ProductDetailDialog
+        productId={openId}
+        onClose={() => setOpenId(null)}
+        onChanged={list.refresh}
+      />
+
+      <ProductVisibilityDialog
+        product={target}
+        onClose={() => setTarget(null)}
+        onDone={list.refresh}
       />
     </>
   )

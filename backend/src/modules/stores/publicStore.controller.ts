@@ -4,6 +4,7 @@ import { buildListMeta, list, ok } from "../../utils/response.js";
 import { slugParamSchema } from "../../utils/zodHelpers.js";
 import {
   publicCategoryParamSchema,
+  publicDeliveryCheckQuerySchema,
   publicProductParamSchema,
   publicProductQuerySchema,
   publicStoreListQuerySchema,
@@ -66,5 +67,14 @@ export async function getProduct(request: FastifyRequest) {
       productSlug,
       optionalCustomerId(request),
     ),
+  );
+}
+
+/** Delivery-area check — the requested products against one pincode. */
+export async function checkDelivery(request: FastifyRequest) {
+  const { slug } = slugParamSchema.parse(request.params);
+  const query = publicDeliveryCheckQuerySchema.parse(request.query);
+  return ok(
+    await service.checkPublicDelivery(slug, query, optionalCustomerId(request)),
   );
 }

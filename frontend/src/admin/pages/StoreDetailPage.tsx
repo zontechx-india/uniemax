@@ -4,6 +4,9 @@ import { adminApi } from '../features/adminApi'
 import type { BankAccount, BankVerificationStatus } from '../features/adminApi'
 import { useAdminQuery } from '../features/useAdminQuery'
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
+import { ActiveChip } from '../ui/statusMeta'
+import { formatPriceRange } from '../ui/format'
+import { ProductDetailDialog } from './products/ProductDetailDialog'
 import {
   Button,
   Card,
@@ -31,7 +34,16 @@ import { BackIcon, ExternalIcon } from '../layout/icons'
  *   - **Payout verification** — the MANUAL half of bank-account verification
  *     (the other being a third-party validator). Money settles to a verified
  *     account, so a failure must carry a note the seller can act on.
+ *
+ * It also shows the store's catalog — the first listings inline, each
+ * opening in full — because "what is this store actually selling?" is the
+ * first question behind most reports, and the answer shouldn't require
+ * leaving the page.
  */
+
+/** Listings shown inline before handing over to the filtered catalog page. */
+const PRODUCT_PREVIEW = 6
+
 export default function StoreDetailPage() {
   const { storeId = '' } = useParams()
   const navigate = useNavigate()
@@ -39,6 +51,14 @@ export default function StoreDetailPage() {
     () => adminApi.getStore(storeId),
     [storeId],
   )
+  // The store's newest listings, a page at a time; the catalog page carries
+  // the rest via `?storeId=`. Separate request so a slow product query never
+  // delays the store header the admin came here for.
+  const products = useAdminQuery(
+    () => adminApi.listProducts({ storeId, page: 1, pageSize: PRODUCT_PREVIEW }),
+    [storeId],
+  )
+  const [openProductId, setOpenProductId] = useState<string | null>(null)
 
   const [suspendOpen, setSuspendOpen] = useState(false)
   const [reason, setReason] = useState('')
@@ -175,7 +195,11 @@ export default function StoreDetailPage() {
           <dl>
             <Detail label="Revenue">{formatMoney(store.revenue)}</Detail>
             <Detail label="Orders">{formatCount(store.counts.orders)}</Detail>
-            <Detail label="Products">{formatCount(store.counts.products)}</Detail>
+            <Detail label="Products">
+              <Link to={`/products?storeId=${store.id}`} className="text-accent hover:underline">
+                {formatCount(store.counts.products)}
+              </Link>
+            </Detail>
             <Detail label="Categories">{formatCount(store.counts.categories)}</Detail>
           </dl>
         </Card>
@@ -267,6 +291,79 @@ export default function StoreDetailPage() {
                     </Button>
                   ) : null}
                 </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card className="mt-4">
+        <CardHeader
+          title="Products"
+          subtitle={
+            store.counts.products === 0
+              ? 'Nothing listed yet'
+              : `${formatCount(store.counts.products)} listed · newest first · click one to see it in full`
+          }
+          action={
+            store.counts.products > PRODUCT_PREVIEW ? (
+              <Link
+                to={`/products?storeId=${store.id}`}
+                className="text-sm text-accent hover:underline"
+              >
+                View all {formatCount(store.counts.products)}
+              </Link>
+            ) : null
+          }
+        />
+        {products.error ? (
+          <ErrorState message={products.error} onRetry={products.refresh} />
+        ) : products.loading && !products.data ? (
+          <Skeleton rows={3} />
+        ) : !products.data || products.data.items.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted">
+            The seller hasn't added any products yet.
+          </p>
+        ) : (
+          <ul className="divide-y divide-line">
+            {products.data.items.map((product) => (
+              <li key={product.id}>
+                <button
+                  type="button"
+                  onClick={() => setOpenProductId(product.id)}
+                  className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-md px-2 py-2.5 text-left hover:bg-surface-alt"
+                >
+                  {product.imageUrl ? (
+                    <img
+                      src={product.imageUrl}
+                      alt=""
+                      className="h-11 w-11 shrink-0 rounded-md border border-line object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span className="h-11 w-11 shrink-0 rounded-md bg-surface-alt" aria-hidden />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium text-fg">{product.name}</span>
+                    <span className="block truncate text-xs text-muted">
+                      {product.category.name}
+                      {product.variantCount > 1 ? ` · ${product.variantCount} variants` : ''}
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2">
+                    <span className="text-sm font-medium text-fg">
+                      {formatPriceRange(product.priceMin, product.priceMax)}
+                    </span>
+                    {product.stockTotal === 0 ? (
+                      <Chip tone="danger">Out of stock</Chip>
+                    ) : product.stockTotal <= 5 ? (
+                      <Chip tone="warning">{product.stockTotal} left</Chip>
+                    ) : (
+                      <span className="text-xs text-muted">{formatCount(product.stockTotal)} in stock</span>
+                    )}
+                    <ActiveChip isActive={product.isActive} />
+                  </span>
+                </button>
               </li>
             ))}
           </ul>
@@ -371,6 +468,12 @@ export default function StoreDetailPage() {
         }
         onCancel={() => setBankTarget(null)}
         onConfirm={() => void runVerification()}
+      />
+
+      <ProductDetailDialog
+        productId={openProductId}
+        onClose={() => setOpenProductId(null)}
+        onChanged={products.refresh}
       />
     </>
   )

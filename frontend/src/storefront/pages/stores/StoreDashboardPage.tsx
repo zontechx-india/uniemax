@@ -6,6 +6,7 @@ import type { StoreDashboard } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import { CartIcon, ChevronRightIcon } from '../../layout/icons'
 import { OrderStatusChip, formatOrderDate, paymentLabel } from './orderMeta'
+import { SetupChecklist } from './SetupChecklist'
 
 /**
  * Dashboard section of Store Management — the landing view: today's orders,
@@ -55,6 +56,13 @@ export function StoreDashboardPage() {
         How {store.name} is doing — orders land here the moment customers
         place them.
       </p>
+
+      {/* Above the numbers on purpose: until the store can publish there are
+          no numbers to read, and this is the only thing worth doing. It
+          removes itself once every requirement is met. */}
+      <div className="mt-5">
+        <SetupChecklist readiness={store.readiness} />
+      </div>
 
       {error && (
         <div className="mt-4">

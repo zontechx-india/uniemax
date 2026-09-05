@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { ErrorNote, InfoNote } from '../../../shared/ui/form'
-import { storeBankApi, storesApi } from '../../features/stores/storesApi'
+import { storesApi } from '../../features/stores/storesApi'
 import type { StorePayments } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import { ActiveSwitch } from './ActiveSwitch'
@@ -13,9 +13,14 @@ import { ActiveSwitch } from './ActiveSwitch'
  * receive orders is the Shipping section). Because these switches change
  * the live checkout immediately, a toggle only *requests* the change — a
  * ConfirmDialog spells out the effect and nothing is written until it is
- * accepted, so the switches always reflect saved state. Online payments pay
- * out to the seller's PRIMARY bank account, so the page nudges toward the
- * Bank Accounts section when online payment is on without one.
+ * accepted, so the switches always reflect saved state.
+ *
+ * Turning ONLINE payment on is a real gate, not a nudge: UnieMax starts
+ * collecting money and paying it out, so a PAN and a primary payout account
+ * have to exist first. The condition is read from `store.readiness` — the
+ * same evaluation the endpoint enforces — rather than from a bank-account
+ * lookup this page used to run for itself, so the switch is disabled for
+ * exactly the reasons a save would be rejected.
  */
 
 const METHODS: {
@@ -56,26 +61,11 @@ export function StorePaymentsPage() {
   } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Whether a primary payout account exists — drives the online-payment hint.
-  const [hasPrimaryAccount, setHasPrimaryAccount] = useState<boolean | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    storeBankApi
-      .list(store.id)
-      .then((accounts) => {
-        if (!cancelled) {
-          setHasPrimaryAccount(accounts.some((a) => a.isPrimary))
-        }
-      })
-      .catch(() => {
-        // Hint only — a failed lookup must not degrade the page.
-        if (!cancelled) setHasPrimaryAccount(null)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [store.id])
+  const onlineGate = store.readiness.gates.ONLINE_PAYMENT
+  // Only switching ON is gated. A seller who already has online payment on
+  // must always be able to turn it off, whatever their profile looks like.
+  const onlineBlocked = !payments.acceptOnlinePayment && !onlineGate.allowed
 
   const confirmPending = async () => {
     if (!pending) return
@@ -112,32 +102,46 @@ export function StorePaymentsPage() {
 
       <div className="mt-5 max-w-2xl space-y-3">
         <ul className="space-y-2">
-          {METHODS.map(({ key, title, description }) => (
-            <li
-              key={key}
-              className="flex items-center gap-4 rounded-lg border border-line p-4"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-fg">{title}</p>
-                <p className="mt-0.5 text-sm text-muted">{description}</p>
-              </div>
-              <span className="shrink-0 text-xs font-semibold text-muted">
-                {payments[key] ? 'Yes' : 'No'}
-              </span>
-              <ActiveSwitch
-                checked={payments[key]}
-                disabled={busy || pending !== null}
-                label={title}
-                onChange={(next) => setPending({ key, next })}
-              />
-            </li>
-          ))}
+          {METHODS.map(({ key, title, description }) => {
+            const locked = key === 'acceptOnlinePayment' && onlineBlocked
+            return (
+              <li
+                key={key}
+                className={`flex items-center gap-4 rounded-lg border border-line p-4 ${
+                  locked ? 'opacity-75' : ''
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-fg">{title}</p>
+                  <p className="mt-0.5 text-sm text-muted">{description}</p>
+                </div>
+                <span className="shrink-0 text-xs font-semibold text-muted">
+                  {payments[key] ? 'Yes' : 'No'}
+                </span>
+                <ActiveSwitch
+                  checked={payments[key]}
+                  disabled={busy || pending !== null || locked}
+                  label={title}
+                  onChange={(next) => setPending({ key, next })}
+                />
+              </li>
+            )
+          })}
         </ul>
 
-        {payments.acceptOnlinePayment && hasPrimaryAccount === false && (
+        {/* The switch above is disabled; this says why, and links to each
+            place the missing piece is added. */}
+        {onlineBlocked && (
           <InfoNote>
-            Online payment is on, but you have no primary payout account —
-            payouts stay on hold until you add one in{' '}
+            To accept online payments, first add:{' '}
+            {onlineGate.blockers.join(', ')}. You'll find these under{' '}
+            <Link
+              to="../business"
+              className="font-semibold text-brand hover:underline"
+            >
+              Business Details
+            </Link>{' '}
+            and{' '}
             <Link
               to="../bank-accounts"
               className="font-semibold text-brand hover:underline"

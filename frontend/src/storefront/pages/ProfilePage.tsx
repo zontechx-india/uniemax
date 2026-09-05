@@ -1,16 +1,8 @@
 import { useState } from 'react'
 import { usePageTitle } from '../../shared/usePageTitle'
-import { customerAuth } from '../../shared/auth/authApi'
 import type { Customer } from '../../shared/auth/authApi'
-import {
-  TextField,
-  PrimaryButton,
-  ErrorNote,
-  InfoNote,
-  SuccessNote,
-  PhoneIcon,
-  ShieldIcon,
-} from '../../shared/ui/form'
+import { VerifyPhoneForm } from '../../shared/auth/VerifyPhoneForm'
+import { SuccessNote, PhoneIcon } from '../../shared/ui/form'
 import { useCustomerSession } from '../app/sessionContext'
 import { useMarketSession } from '../app/marketSession'
 import { Avatar } from '../layout/Avatar'
@@ -176,52 +168,12 @@ function VerifiedChip() {
 /* ------------------------------------------------------------------ */
 
 /**
- * Two-step linking against `POST /me/link/request` → `POST /me/link/verify`:
- * enter the number → an SMS code goes to it → entering the code links the
- * number (verified) and returns the updated customer. A number already
- * linked to ANOTHER account is rejected by the request call with a 409 —
- * surfaced here as the inline error.
+ * The row chrome around the shared `VerifyPhoneForm`, which owns the actual
+ * two-step link flow. Collapsed to a prompt until the seller opts in, so an
+ * account that already has a number never shows a form at all.
  */
 function LinkPhoneSection({ onLinked }: { onLinked: (customer: Customer) => void }) {
-  const [step, setStep] = useState<'idle' | 'phone' | 'code'>('idle')
-  const [phone, setPhone] = useState('')
-  const [code, setCode] = useState('')
-  const [devCode, setDevCode] = useState<string | undefined>()
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-
-  // Matches the backend's loose E.164 rule (optional +, 7–15 digits).
-  const cleaned = phone.replace(/[\s-]/g, '')
-  const phoneValid = /^\+?[0-9]{7,15}$/.test(cleaned)
-
-  async function requestCode(e?: React.FormEvent) {
-    e?.preventDefault()
-    setError('')
-    setBusy(true)
-    try {
-      const sent = await customerAuth.linkRequest({ phone: cleaned })
-      setDevCode(sent.devCode)
-      setCode('')
-      setStep('code')
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function verify(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    setBusy(true)
-    try {
-      const updated = await customerAuth.linkVerify({ phone: cleaned, code })
-      onLinked(updated)
-    } catch (err) {
-      setError((err as Error).message)
-      setBusy(false)
-    }
-  }
+  const [step, setStep] = useState<'idle' | 'form'>('idle')
 
   return (
     <div className="flex items-start gap-3 py-4 first:pt-0 last:pb-0">
@@ -242,7 +194,7 @@ function LinkPhoneSection({ onLinked }: { onLinked: (customer: Customer) => void
             </p>
             <button
               type="button"
-              onClick={() => setStep('phone')}
+              onClick={() => setStep('form')}
               className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-line bg-surface-alt px-3 py-1.5 text-sm font-medium text-fg transition hover:border-brand hover:text-brand"
             >
               <PhoneIcon />
@@ -251,91 +203,13 @@ function LinkPhoneSection({ onLinked }: { onLinked: (customer: Customer) => void
           </>
         )}
 
-        {step === 'phone' && (
-          <form className="mt-2 max-w-sm space-y-3" onSubmit={requestCode}>
-            <TextField
-              label="Mobile number"
-              inputMode="tel"
-              placeholder="9876543210"
-              icon={<PhoneIcon />}
-              value={phone}
-              onChange={(e) => {
-                setError('')
-                setPhone(e.target.value)
-              }}
-              autoFocus
+        {step === 'form' && (
+          <div className="mt-2">
+            <VerifyPhoneForm
+              onVerified={onLinked}
+              onCancel={() => setStep('idle')}
             />
-            {error && <ErrorNote>{error}</ErrorNote>}
-            <div className="flex items-center gap-3">
-              <PrimaryButton type="submit" disabled={busy || !phoneValid}>
-                {busy ? 'Sending…' : 'Send verification code'}
-              </PrimaryButton>
-              <button
-                type="button"
-                onClick={() => {
-                  setError('')
-                  setStep('idle')
-                }}
-                className="text-xs text-muted hover:text-fg"
-              >
-                Cancel
-              </button>
-            </div>
-            <p className="text-xs text-muted">
-              We&apos;ll text a code to this number to confirm it&apos;s yours.
-            </p>
-          </form>
-        )}
-
-        {step === 'code' && (
-          <form className="mt-2 max-w-sm space-y-3" onSubmit={verify}>
-            <p className="text-sm text-muted">
-              Enter the code sent to{' '}
-              <span className="font-medium text-fg">{cleaned}</span>
-            </p>
-            {devCode && <InfoNote>Dev mode — use code {devCode}</InfoNote>}
-            <TextField
-              label="Verification code"
-              inputMode="numeric"
-              maxLength={8}
-              placeholder="Enter the code"
-              icon={<ShieldIcon />}
-              value={code}
-              onChange={(e) => {
-                setError('')
-                setCode(e.target.value.replace(/\D/g, ''))
-              }}
-              autoFocus
-              className="tracking-[0.3em]"
-            />
-            {error && <ErrorNote>{error}</ErrorNote>}
-            {/* Real SMS codes are 4 digits (Message Central default); the dev
-                fallback/bypass sends 6 — so gate at the backend's minimum. */}
-            <PrimaryButton type="submit" disabled={busy || code.length < 4}>
-              {busy ? 'Verifying…' : 'Verify & link number'}
-            </PrimaryButton>
-            <div className="flex items-center justify-between text-xs">
-              <button
-                type="button"
-                className="text-muted hover:text-fg"
-                onClick={() => {
-                  setError('')
-                  setCode('')
-                  setStep('phone')
-                }}
-              >
-                ← Change number
-              </button>
-              <button
-                type="button"
-                onClick={() => requestCode()}
-                disabled={busy}
-                className="font-medium text-brand hover:text-brand-hover disabled:text-muted"
-              >
-                Resend code
-              </button>
-            </div>
-          </form>
+          </div>
         )}
       </div>
     </div>

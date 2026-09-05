@@ -4,6 +4,8 @@ import { HttpError } from "../../utils/httpError.js";
 import { buildListMeta } from "../../utils/response.js";
 import { mediaUrl } from "../../package/storage/index.js";
 import { notify } from "../notifications/notifications.service.js";
+import { resolveOptionTypes, resolveSpecifications } from "../stores/storeCatalog.schema.js";
+import { resolveProductDeliveryRule } from "../stores/deliveryRules.js";
 import type { ProductListQuery, ProductVisibilityInput } from "./admin.schema.js";
 
 /**
@@ -89,12 +91,23 @@ export async function listProducts(query: ProductListQuery) {
   };
 }
 
+/**
+ * The full listing, read-only. Everything the seller configured is surfaced
+ * — options, specifications, delivery override, merchandising flags — so a
+ * moderator can judge a report against what the shopper actually sees
+ * without opening the storefront.
+ */
 export async function getProduct(productId: string) {
   const product = await prisma.storeProduct.findUnique({
     where: { id: productId },
     select: {
       ...listSelect,
       description: true,
+      hideFromSearch: true,
+      optionTypes: true,
+      specifications: true,
+      deliveryRule: true,
+      updatedAt: true,
       store: {
         select: { id: true, name: true, slug: true, isPublished: true, ownerId: true },
       },
@@ -107,6 +120,7 @@ export async function getProduct(productId: string) {
           stockQuantity: true,
           isActive: true,
           isDefault: true,
+          optionValues: true,
         },
       },
       media: {
@@ -117,10 +131,14 @@ export async function getProduct(productId: string) {
   });
   if (!product) throw HttpError.notFound("Product not found");
 
-  const { media, _count, ...rest } = product;
+  const { media, _count, optionTypes, specifications, deliveryRule, ...rest } = product;
   return {
     ...rest,
     variantCount: _count.variants,
+    optionTypes: resolveOptionTypes(optionTypes),
+    specifications: resolveSpecifications(specifications),
+    // Null = no override; the product follows the store's default rule.
+    deliveryRule: resolveProductDeliveryRule(deliveryRule),
     media: media.map(({ key, type, ...item }) => ({
       ...item,
       type,

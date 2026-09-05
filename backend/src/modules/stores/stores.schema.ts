@@ -1,4 +1,14 @@
 import { z } from "zod";
+import {
+  DEFAULT_DELIVERY_RULE,
+  deliveryRuleSchema,
+  resolveDeliveryRule,
+} from "./deliveryRules.js";
+import {
+  DEFAULT_SHIPPING_RATE,
+  resolveShippingRate,
+  shippingRateSchema,
+} from "./shippingRates.js";
 
 /**
  * Customer-owned stores. Creation takes a name **and a logo** — both are
@@ -221,34 +231,70 @@ export function resolvePayments(raw: unknown): StorePayments {
 
 /**
  * Fulfilment mode: the seller delivers orders, lets customers pick up from
- * a business location, or both. Default DELIVERY. Stored as JSON so the
- * upcoming shipping-charge configuration (fixed / district / state rules)
- * can join the same column without a migration.
+ * a business location, or both. Default DELIVERY. Stored as JSON alongside
+ * the delivery-area rule and the shipping rate so new shipping settings
+ * join the same column without a migration.
  */
 export const SHIPPING_MODES = ["DELIVERY", "PICKUP", "BOTH"] as const;
 
 export type ShippingMode = (typeof SHIPPING_MODES)[number];
 
+/**
+ * The full shipping settings: the fulfilment mode, the store's DEFAULT
+ * delivery-area rule (`deliveryRule` — WHERE, see `deliveryRules.ts`) and
+ * its DEFAULT shipping rate (`rate` — HOW MUCH, see `shippingRates.ts`).
+ * Both defaults apply to every product that does not carry its own override.
+ */
 export const storeShippingSchema = z.object({
   mode: z.enum(SHIPPING_MODES),
+  deliveryRule: deliveryRuleSchema,
+  rate: shippingRateSchema,
 });
 
 export type StoreShipping = z.infer<typeof storeShippingSchema>;
 
-export const DEFAULT_STORE_SHIPPING: StoreShipping = { mode: "DELIVERY" };
+/** `PATCH /stores/:id/shipping` — any subset; absent keys are kept. */
+export const storeShippingUpdateSchema = z
+  .object({
+    mode: z.enum(SHIPPING_MODES).optional(),
+    deliveryRule: deliveryRuleSchema.optional(),
+    rate: shippingRateSchema.optional(),
+  })
+  .refine((val) => Object.values(val).some((v) => v !== undefined), {
+    message: "Provide at least one shipping setting to update",
+  });
 
-/** Normalise the stored `shipping` JSON — unknown/garbage → default. */
+export type StoreShippingUpdateInput = z.infer<typeof storeShippingUpdateSchema>;
+
+export const DEFAULT_STORE_SHIPPING: StoreShipping = {
+  mode: "DELIVERY",
+  deliveryRule: DEFAULT_DELIVERY_RULE,
+  rate: DEFAULT_SHIPPING_RATE,
+};
+
+/**
+ * Normalise the stored `shipping` JSON — each key independently, so a bad
+ * delivery rule costs the rule (→ ALL) and a bad rate costs the rate
+ * (→ FREE), never the mode.
+ */
 export function resolveShipping(raw: unknown): StoreShipping {
+  const base: StoreShipping = {
+    mode: DEFAULT_STORE_SHIPPING.mode,
+    deliveryRule: { ...DEFAULT_DELIVERY_RULE },
+    rate: { ...DEFAULT_SHIPPING_RATE },
+  };
   if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-    const mode = (raw as Record<string, unknown>).mode;
+    const obj = raw as Record<string, unknown>;
     if (
-      typeof mode === "string" &&
-      (SHIPPING_MODES as readonly string[]).includes(mode)
+      typeof obj.mode === "string" &&
+      (SHIPPING_MODES as readonly string[]).includes(obj.mode)
     ) {
-      return { mode: mode as ShippingMode };
+      base.mode = obj.mode as ShippingMode;
     }
+    base.deliveryRule = resolveDeliveryRule(obj.deliveryRule);
+    base.rate = resolveShippingRate(obj.rate);
   }
-  return { ...DEFAULT_STORE_SHIPPING };
+  return base;
 }
 
 // ---------------------------------------------------------------------------
@@ -553,25 +599,34 @@ export function resolveFooter(raw: unknown): StoreFooter {
     const result = schema.safeParse(value);
     return result.success ? result.data : fallback;
   };
-  const rows = <S extends z.ZodType>(schema: S, value: unknown): z.output<S>[] =>
-    Array.isArray(value)
-      ? value.flatMap((row) => {
-          const result = schema.safeParse(row);
-          return result.success ? [result.data] : [];
-        })
-      : [];
-
   const footer: StoreFooter = {
-    locations: rows(footerLocationSchema, obj.locations).slice(0, 10),
+    locations: parseRows(footerLocationSchema, obj.locations).slice(0, 10),
     social: section(footerSocialSchema, obj.social ?? {}, base.social),
     info: section(footerInfoSchema, obj.info ?? {}, base.info),
     support: section(footerSupportSchema, obj.support ?? {}, base.support),
     policies: section(footerPoliciesSchema, obj.policies ?? {}, base.policies),
-    links: rows(footerLinkSchema, obj.links).slice(0, 10),
+    links: parseRows(footerLinkSchema, obj.links).slice(0, 10),
     copyrightText: section(optionalText(120), obj.copyrightText, null),
   };
   normalizePrimaryLocation(footer.locations);
   return footer;
+}
+
+/**
+ * Parse a stored JSON list row by row, dropping the rows that fail. The
+ * normaliser for every ordered list held in a JSON column: a single malformed
+ * entry (hand-edited, or saved before a rule tightened) costs that one row,
+ * never its siblings and never the whole read.
+ */
+export function parseRows<S extends z.ZodType>(
+  schema: S,
+  value: unknown,
+): z.output<S>[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((row) => {
+    const result = schema.safeParse(row);
+    return result.success ? [result.data] : [];
+  });
 }
 
 /** Keep exactly one primary location (the first wins) whenever any exist. */
@@ -602,3 +657,17 @@ export type StoreTheme = z.infer<typeof storeThemeSchema>;
 export type StoreThemeColors = z.infer<typeof storeThemeColorsSchema>;
 export type StoreThemeUpdateInput = z.infer<typeof storeThemeUpdateSchema>;
 export type StoreHomepageInput = z.infer<typeof storeHomepageSchema>;
+
+// ---------------------------------------------------------------------------
+// Business profile + canonical address
+// ---------------------------------------------------------------------------
+
+/**
+ * Re-exported so consumers keep importing store config from one module. The
+ * definitions live in their own files because both are reused outside this
+ * one (orders and shipping rules read addresses; the readiness registry reads
+ * the profile), and a single 900-line schema file is where that stops being
+ * navigable.
+ */
+export * from "./storeAddress.schema.js";
+export * from "./storeProfile.schema.js";

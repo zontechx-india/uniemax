@@ -1,5 +1,13 @@
 import { call, callList, http } from '../../../shared/auth/http'
 import type { ListMeta } from '../../../shared/auth/http'
+import { EMPTY_PROFILE, PERMISSIVE_READINESS } from './storeProfile'
+import type {
+  Readiness,
+  StoreProfile,
+  StoreProfilePatch,
+} from './storeProfile'
+
+export * from './storeProfile'
 
 /**
  * Stores feature — typed client for the real backend API
@@ -296,11 +304,43 @@ export const DEFAULT_PAYMENTS: StorePayments = {
  */
 export type ShippingMode = 'DELIVERY' | 'PICKUP' | 'BOTH'
 
-export interface StoreShipping {
-  mode: ShippingMode
+/**
+ * Pincode-based delivery-area rule — WHERE orders are delivered:
+ *   ALL      → every pincode (`pincodes` always empty)
+ *   INCLUDE  → only the listed pincodes
+ *   EXCLUDE  → every pincode except the listed ones
+ * The store's `shipping.deliveryRule` is the DEFAULT for every product; a
+ * product's own `deliveryRule` (when not null) replaces it for that product.
+ * Pincodes are 6-digit Indian PIN codes, stored normalised by the server.
+ */
+export type DeliveryRuleType = 'ALL' | 'INCLUDE' | 'EXCLUDE'
+
+export interface DeliveryRule {
+  type: DeliveryRuleType
+  pincodes: string[]
 }
 
-export const DEFAULT_SHIPPING: StoreShipping = { mode: 'DELIVERY' }
+export const DEFAULT_DELIVERY_RULE: DeliveryRule = { type: 'ALL', pincodes: [] }
+
+export interface StoreShipping {
+  mode: ShippingMode
+  /** The store-wide default rule; products without an override follow it. */
+  deliveryRule: DeliveryRule
+}
+
+export const DEFAULT_SHIPPING: StoreShipping = {
+  mode: 'DELIVERY',
+  deliveryRule: DEFAULT_DELIVERY_RULE,
+}
+
+/**
+ * What the PUBLIC shell says about shipping — the mode only. The pincode
+ * lists never leave the server; the storefront asks about one pincode at a
+ * time through `publicStoreApi.checkDelivery`.
+ */
+export interface PublicStoreShipping {
+  mode: ShippingMode
+}
 
 /**
  * Which customer fields this store's checkout collects — seller-toggled,
@@ -350,6 +390,14 @@ export interface Store {
   shipping: StoreShipping
   /** Checkout field toggles (always the complete resolved shape). */
   checkout: StoreCheckoutFields
+  /** Business identity, contact, addresses and tax IDs (resolved shape). */
+  profile: StoreProfile
+  /**
+   * What the store still needs before it can publish, take online payments
+   * or offer pickup. Computed server-side from one requirement registry, so
+   * the checklist the seller sees is exactly what the server enforces.
+   */
+  readiness: Readiness
   /** Whether the store's public page is live for customers. */
   isPublished: boolean
   createdAt: string
@@ -378,8 +426,8 @@ export interface PublicStore {
   footer: StoreFooter
   /** Accepted payment methods — what the checkout can offer. */
   payments: StorePayments
-  /** Fulfilment mode — delivery, pickup or both. */
-  shipping: StoreShipping
+  /** Fulfilment mode — delivery, pickup or both (never the pincode lists). */
+  shipping: PublicStoreShipping
   /** Which customer fields this store's checkout collects. */
   checkout: StoreCheckoutFields
   /** Root categories that have something shoppable, newest-first by creation. */
@@ -437,10 +485,13 @@ export interface PublicProductMediaItem {
 
 export interface PublicStoreVariant {
   id: string
+  /** Derived label — the option values joined in type order ("M / Red"). */
   name: string
   /** Every variant carries its own price (the variant is the unit of sale). */
   price: string
   stockQuantity: number
+  /** One value per option type — what the picker matches on. */
+  optionValues: OptionValues
 }
 
 /** Full product detail — the only payload that carries variants. */
@@ -457,7 +508,20 @@ export interface PublicProductDetail {
     slug: string
     parent: { name: string; slug: string } | null
   }
-  /** Empty for a simple product (the implicit Default is never exposed). */
+  /**
+   * The dimensions the picker renders, in order. Empty for a simple product.
+   * A value may be listed with no sellable variant — the picker greys it.
+   */
+  optionTypes: ProductOptionType[]
+  /** Ordered spec rows; empty means "fall back to the description". */
+  specifications: ProductSpec[]
+  /**
+   * `restricted` — delivery is limited to some pincodes (the product's own
+   * rule or the store default). The list itself is never sent: the page
+   * checks the customer's pincode through `publicStoreApi.checkDelivery`.
+   */
+  delivery: { restricted: boolean }
+  /** Sellable combinations in matrix order. Empty for a simple product. */
   variants: PublicStoreVariant[]
   /** Gallery, ordered: images by display order (first = cover), video last. */
   media: PublicProductMediaItem[]
@@ -551,7 +615,14 @@ const PUBLIC_STORES = '/api/v1/public/stores'
 /** Wire shape: theme/homepage are free JSON columns server-side. */
 type RawStore = Omit<
   Store,
-  'theme' | 'homepage' | 'footer' | 'payments' | 'shipping' | 'checkout'
+  | 'theme'
+  | 'homepage'
+  | 'footer'
+  | 'payments'
+  | 'shipping'
+  | 'checkout'
+  | 'profile'
+  | 'readiness'
 > & {
   theme: Partial<StoreTheme> | null
   homepage: unknown
@@ -559,6 +630,8 @@ type RawStore = Omit<
   payments?: StorePayments | null
   shipping?: StoreShipping | null
   checkout?: StoreCheckoutFields | null
+  profile?: StoreProfile | null
+  readiness?: Readiness | null
 }
 type RawPublicStore = Omit<
   PublicStore,
@@ -567,7 +640,7 @@ type RawPublicStore = Omit<
   theme: Partial<StoreTheme> | null
   footer?: StoreFooter | null
   payments?: StorePayments | null
-  shipping?: StoreShipping | null
+  shipping?: PublicStoreShipping | null
   checkout?: StoreCheckoutFields | null
 }
 
@@ -583,6 +656,10 @@ function normalize(raw: RawStore): Store {
     payments: raw.payments ?? DEFAULT_PAYMENTS,
     shipping: raw.shipping ?? DEFAULT_SHIPPING,
     checkout: raw.checkout ?? DEFAULT_CHECKOUT_FIELDS,
+    profile: raw.profile ?? EMPTY_PROFILE,
+    // A backend that predates readiness allows everything, so a rolling
+    // deploy degrades to the old behaviour instead of locking the seller out.
+    readiness: raw.readiness ?? PERMISSIVE_READINESS,
   }
 }
 
@@ -592,7 +669,7 @@ function normalizePublic(raw: RawPublicStore): PublicStore {
     theme: { ...DEFAULT_THEME, ...(raw.theme ?? {}) },
     footer: raw.footer ?? EMPTY_FOOTER,
     payments: raw.payments ?? DEFAULT_PAYMENTS,
-    shipping: raw.shipping ?? DEFAULT_SHIPPING,
+    shipping: raw.shipping ?? { mode: DEFAULT_SHIPPING.mode },
     checkout: raw.checkout ?? DEFAULT_CHECKOUT_FIELDS,
   }
 }
@@ -638,6 +715,20 @@ export const storesApi = {
 
   async update(storeId: string, patch: { name?: string }): Promise<Store> {
     return normalize(await call<RawStore>(http.patch(`${STORES}/${storeId}`, patch)))
+  },
+
+  /**
+   * Update the business profile. Partial by key — send only the sections the
+   * current screen owns, so the onboarding wizard can save one step at a
+   * time and a seller who abandons midway keeps everything they typed.
+   */
+  async updateProfile(
+    storeId: string,
+    patch: StoreProfilePatch,
+  ): Promise<Store> {
+    return normalize(
+      await call<RawStore>(http.patch(`${STORES}/${storeId}/profile`, patch)),
+    )
   },
 
   /**
@@ -723,6 +814,21 @@ export const storesApi = {
   async updateShipping(storeId: string, mode: ShippingMode): Promise<Store> {
     return normalize(
       await call<RawStore>(http.patch(`${STORES}/${storeId}/shipping`, { mode })),
+    )
+  },
+
+  /**
+   * Set the store's DEFAULT delivery-area rule (same PATCH as the mode —
+   * the endpoint merges whichever keys are sent).
+   */
+  async updateDeliveryRule(
+    storeId: string,
+    deliveryRule: DeliveryRule,
+  ): Promise<Store> {
+    return normalize(
+      await call<RawStore>(
+        http.patch(`${STORES}/${storeId}/shipping`, { deliveryRule }),
+      ),
     )
   },
 
@@ -893,14 +999,37 @@ export interface StoreProductMerchandising {
   hideFromSearch: boolean
 }
 
+/**
+ * One dimension a product is sold along — "Size" → S / M / L. Values are free
+ * text and only ever compared as strings: "500 ml", "42 inch" and "XL" are all
+ * just values, deliberately without a unit system. Mirror of the server's
+ * `ProductOptionType`.
+ */
+export interface ProductOptionType {
+  name: string
+  values: string[]
+}
+
+/** One value per option type, keyed by the type's name. */
+export type OptionValues = Record<string, string>
+
+/** A descriptive, non-purchasable attribute row ("Material: Memory foam"). */
+export interface ProductSpec {
+  label: string
+  value: string
+}
+
 export interface StoreProductVariant {
   id: string
+  /** DERIVED from `optionValues` — the values joined in option-type order ("M / Red"). */
   name: string
   /** Decimal on the wire. Every variant carries its own price. */
   price: string
   stockQuantity: number
   /** Disabled variants are hidden from the public storefront. */
   isActive: boolean
+  /** What this combination IS: one value per product option type. */
+  optionValues: OptionValues
   createdAt: string
 }
 
@@ -942,33 +1071,69 @@ export interface StoreProduct extends StoreProductMerchandising {
   /** Disabled products are hidden from the public storefront. */
   isActive: boolean
   category: { id: string; name: string; parentId: string | null }
-  /** Real options only — the Default variant is never listed here. */
+  /**
+   * The ordered dimensions whose cartesian product the variants are. Empty
+   * for a simple product. A product that predates option types is presented
+   * with one synthesised type ("Option") whose values are its old labels.
+   */
+  optionTypes: ProductOptionType[]
+  /** Ordered spec rows; empty means the storefront falls back to the description. */
+  specifications: ProductSpec[]
+  /**
+   * This product's own delivery-area rule, or `null` when it follows the
+   * store default (`store.shipping.deliveryRule`).
+   */
+  deliveryRule: DeliveryRule | null
+  /** Real combinations only, in matrix order — the Default variant is never listed. */
   variants: StoreProductVariant[]
   /** Ordered media: images by displayOrder (first = cover), video last. */
   media: StoreProductMediaItem[]
   createdAt: string
 }
 
+/**
+ * One combination in a create or options-replace payload. `name` is never
+ * sent — the server derives it. `id` names an existing combination to update
+ * in place (keeping its cart and order links); omit it for new ones.
+ */
 export interface StoreVariantInput {
-  name: string
+  id?: string
+  optionValues: OptionValues
   /** Required — a variant always sets its own price. */
   price: number
   stockQuantity: number
+  /** Defaults to true. */
+  isActive?: boolean
 }
 
 /**
  * `hasVariants` picks the product shape:
- *   false → `price` + `stockQuantity` required, `variants` omitted.
- *   true  → `variants` required (≥ 1), `price`/`stockQuantity` omitted.
+ *   false → `price` + `stockQuantity` required; no option types or variants.
+ *   true  → `optionTypes` (≥ 1) + `variants` = EVERY combination of them;
+ *           `price`/`stockQuantity` omitted.
  */
 export interface StoreProductCreateInput {
   name: string
   categoryId: string
   description?: string
+  specifications?: ProductSpec[]
+  /** Delivery-area override; omit to follow the store default. */
+  deliveryRule?: DeliveryRule
   hasVariants: boolean
   price?: number
   stockQuantity?: number
+  optionTypes?: ProductOptionType[]
   variants?: StoreVariantInput[]
+}
+
+/**
+ * `PUT …/products/:id/options` — the FULL target state. The server reconciles
+ * the stored variants to it atomically. `optionTypes: []` + `variants: []`
+ * turns the product back into a simple one.
+ */
+export interface StoreProductOptionsInput {
+  optionTypes: ProductOptionType[]
+  variants: StoreVariantInput[]
 }
 
 /**
@@ -1057,6 +1222,10 @@ export const storeCatalogApi = {
       name?: string
       description?: string | null
       categoryId?: string
+      /** Ordered spec rows; `null` or `[]` clears them. */
+      specifications?: ProductSpec[] | null
+      /** Delivery-area override; `null` drops it (follow the store default). */
+      deliveryRule?: DeliveryRule | null
     },
   ): Promise<StoreProduct> {
     return call<StoreProduct>(
@@ -1068,16 +1237,19 @@ export const storeCatalogApi = {
     await call(http.delete(`${STORES}/${storeRef}/products/${productId}`))
   },
 
-  // Variants — every mutation returns the full parent product (variants
-  // included), so callers can replace one product row in place.
+  // Options & variants — every mutation returns the full parent product, so
+  // callers can replace one product row in place. Variants are the cartesian
+  // product of the option types and change only as a SET, through the PUT;
+  // per-variant PATCH is for price / stock / on-off alone.
 
-  async createVariant(
+  /** Replace the option types and the whole variant matrix atomically. */
+  async replaceProductOptions(
     storeRef: string,
     productId: string,
-    input: StoreVariantInput,
+    input: StoreProductOptionsInput,
   ): Promise<StoreProduct> {
     return call<StoreProduct>(
-      http.post(`${STORES}/${storeRef}/products/${productId}/variants`, input),
+      http.put(`${STORES}/${storeRef}/products/${productId}/options`, input),
     )
   },
 
@@ -1085,29 +1257,12 @@ export const storeCatalogApi = {
     storeRef: string,
     productId: string,
     variantId: string,
-    patch: {
-      name?: string
-      price?: number | null
-      stockQuantity?: number
-      isActive?: boolean
-    },
+    patch: { price?: number; stockQuantity?: number; isActive?: boolean },
   ): Promise<StoreProduct> {
     return call<StoreProduct>(
       http.patch(
         `${STORES}/${storeRef}/products/${productId}/variants/${variantId}`,
         patch,
-      ),
-    )
-  },
-
-  async deleteVariant(
-    storeRef: string,
-    productId: string,
-    variantId: string,
-  ): Promise<StoreProduct> {
-    return call<StoreProduct>(
-      http.delete(
-        `${STORES}/${storeRef}/products/${productId}/variants/${variantId}`,
       ),
     )
   },
@@ -1252,6 +1407,31 @@ export const publicStoreApi = {
       http.get(`${PUBLIC_STORES}/${slug}/products/${productSlug}`),
     )
   },
+
+  /**
+   * Can these products be delivered to `pincode`? Evaluates each product's
+   * effective delivery-area rule (own override, else the store default) —
+   * the same check the order placement enforces. Products that are no
+   * longer publicly visible are absent from `results`.
+   */
+  async checkDelivery(
+    slug: string,
+    pincode: string,
+    productIds: string[],
+  ): Promise<DeliveryCheck> {
+    const params = new URLSearchParams({
+      pincode,
+      productIds: productIds.join(','),
+    })
+    return call<DeliveryCheck>(
+      http.get(`${PUBLIC_STORES}/${slug}/delivery-check?${params.toString()}`),
+    )
+  },
+}
+
+export interface DeliveryCheck {
+  pincode: string
+  results: { productId: string; deliverable: boolean }[]
 }
 
 // ---------------------------------------------------------------------------

@@ -63,6 +63,7 @@ Auth talks to the live backend (`package/auth`) via `src/shared/auth/`:
 | `http.ts`    | Axios client: `withCredentials`, echoes the surface's CSRF cookie in `X-CSRF-Token` on mutations (`um_admin_csrf` for `/api/v1/admin/**`, `csrf_token` otherwise — chosen from the request URL, so no boot-time initialisation has to be respected), normalizes the error envelope into `ApiError` |
 | `authApi.ts` | Typed endpoints: `customerAuth` (register, login, google, requestOtp/verifyOtp, forgot/resetPassword, linkRequest/linkVerify, me, refresh, logout) + `adminAuth` (login, me, refresh, logout) + `resolveSession` |
 | `useSession.ts` | Session hook: on mount probes `/me` (one refresh retry on 401) → `loading / guest / authed`; exposes `signedIn(user)` / `signOut()` |
+| `VerifyPhoneForm.tsx` | The one way a phone number enters the platform: number → SMS code → `linkRequest`/`linkVerify`, resolving with the updated `Customer`. Renders no `<form>` so it embeds inside host forms |
 
 Both frontends are **web** clients: tokens live in httpOnly cookies (never JS),
 and in dev the Vite proxy (`/api` → `localhost:4000` in `vite.config.ts`) keeps
@@ -311,15 +312,8 @@ none, "My Store" (→ `/stores`) otherwise; `AccountMenu` checks
 Routes: `/stores` (select a store — clicking a card goes straight to its
 management page — or create; first-run empty state; each card shows the
 store's **Published/Draft** status chip and its public `/store/{slug}` path,
-so the list doubles as an at-a-glance health check), `/stores/new` (create:
-name + an **optional logo** — picked, validated against the server's media
-config and cropped 1:1 **locally** (the shared `ImageEditDialog` pipeline —
-square-locked for logos, which are shown in a square everywhere),
-then uploaded to `PUT /stores/:id/logo` right after the store is created —
-an upload failure never strands the flow, Store Details offers the same
-upload again. Its **Back control is history-aware**: `navigate(-1)` when
-in-app history exists — the page is reached from the homepage, the account
-menu and the store list — falling back to `/` on a direct open), and
+so the list doubles as an at-a-glance health check), `/stores/new` (the
+**four-step Create Store wizard** — see below), and
 `/stores/:storeSlug` — a Flipkart-account-style split
 **inside** the main outlet: `StoreManageLayout` renders a left section card
 and the selected section in a right card via a nested `<Outlet/>` (children
@@ -508,7 +502,9 @@ column), which lets the homepage render full-bleed section bands instead.
   "View all" link (which passes its section).
 - **`StoreProductPage`** — the **only** page that renders variants, laid out
   as breadcrumb · gallery + purchase card · Product Highlights · Description ·
-  Specifications · You May Also Like:
+  Specifications (`SpecTable`: the product's real `specifications` rows when
+  present, else the description-parsed ones, plus one row per option type —
+  "Size: S, M, L" — then Category, Availability, Sold by) · You May Also Like:
   - **Media gallery** — main viewer plus a thumbnail rail (vertical beside the
     image on `lg`, a scrollable strip below on phones) whenever there is more
     than one item; the product video plays inline with a play-glyph thumb and
@@ -518,11 +514,30 @@ column), which lets the homepage render full-bleed section bands instead.
     `lg:sticky` so it stays in view while the long right column scrolls.
   - **Purchase card** — everything about buying inside one bordered card:
     category eyebrow → name → price → stock badge → the first few highlights →
-    variant picker (each option shows its own price / "Out of stock") →
+    **`OptionPicker`** (`features/publicStore/OptionPicker.tsx` — one
+    radiogroup per option type; the selection is a `Record<type, value>`
+    resolved to a variant by `findVariant`; a value is greyed via
+    `isValueAvailable` when no in-stock variant has it given the OTHER choices,
+    yet stays clickable so the customer can walk to a valid combination; with
+    a single type each chip shows its price / "Out of stock" as before; an
+    unmatched combination shows "This combination isn't available" and
+    disables purchase through stock 0) →
     **quantity selector + Add to Cart + Buy Now** (`PurchaseActions`; Buy Now
     adds the line then goes straight to `/checkout/{storeSlug}`) → the
     delivery block → trust badges. The **share button** sits in the card
     header beside the name.
+  - **Delivery check** (`features/publicStore/DeliveryCheck.tsx`, right
+    under the purchase buttons) — does this product reach the customer's
+    pincode? Unrestricted products (`product.delivery.restricted` false)
+    just say "Delivers to all pincodes" with no request. Restricted ones
+    run `publicStoreApi.checkDelivery` against the pincode from
+    `useDeliveryPincode` (`deliveryPincode.ts`: a pincode the customer
+    typed, remembered in localStorage across pages and visits, else the
+    signed-in customer's **primary address** via `addressesApi.list`, else
+    nothing) and render "Delivers to 629154" / a red **"Not deliverable to
+    pincode 629154"** with a Change link; with no pincode known, a 6-digit
+    input + Check. Purchase buttons stay enabled — the checkout enforces
+    against the address actually chosen. Hidden for pickup-only stores.
   - **Delivery, returns & trust are read from the seller's own settings** —
     fulfilment mode (delivery / pickup, pickup naming the primary footer
     location), COD and online-payment switches, and the returns/shipping
@@ -608,8 +623,9 @@ slug** (links the row back to its product page and enables revalidation),
 effective price, stock, store name/slug, and the **cover-image URL** — cart
 and checkout rows show a product thumbnail (box-icon placeholder when the
 product has no photo; revalidation refreshes the URL, so pre-thumbnail
-lines and changed covers heal themselves). Cart rows show the variant as
-a chip. Adding to cart from the product page pops a short **"Added to cart —
+lines and changed covers heal themselves; it also refreshes the variant
+label, so a seller renaming a value shows up in the cart). Cart rows show
+the variant as a chip. Adding to cart from the product page pops a short **"Added to cart —
 View cart" toast** (`AddedToast` in `CartControls.tsx`); quantity changes on
 the cart pages stay silent.
 **Logging out empties the cart** (`cart.clear()`, wired into the storefront's
@@ -670,7 +686,13 @@ renders an Inter-titled top bar with a secure-checkout
 cue, compact store identity row, the read-only item list (edit links back
 to the cart), the two interactive checkout steps (below), and an order
 summary whose **Place Order** button goes live once both steps are done.
-Unavailable lines are excluded and called out.
+Unavailable lines are excluded and called out. Once the delivery step
+names an address, `useDeliveryCheck` (`features/cart/useDeliveryCheck.ts`)
+asks `GET /public/stores/:slug/delivery-check` whether every line reaches
+that pincode: blocked lines get a red "Not deliverable to pincode …" under
+the item, a note says to change the address or remove them, and Place Order
+stays disabled while any line is blocked (or the check is in flight). A
+failed check only warns — the server refuses such an order anyway.
 On mount they **revalidate** (`features/cart/useCartRevalidation.ts`):
 each distinct product is re-fetched once and `cart.sync()` applies fresh
 price/stock (quantities clamp down; an amber note reports changes). A
@@ -737,12 +759,87 @@ for crawlers wait for SSR/prerender).
   client defaults; exports `publicStoreUrl(slug)` and the storefront URL
   builders (`storeHomeUrl` / `storeCategoryUrl` / `storeProductUrl` /
   `storeShopUrl`) — the one place that knows the route shape.
+- `storeProfile.ts` — the client mirror of the backend's
+  `storeProfile.schema.ts` / `storeAddress.schema.ts` / `storeReadiness.ts`:
+  the `StoreProfile` / `StoreAddress` / `Readiness` shapes, the format regexes
+  used for inline validation (PIN code, PAN, GSTIN), the Indian state list and
+  the GSTIN state-code map. The server always wins — these exist so the form
+  can guide without a round trip per keystroke. Re-exported through
+  `storesApi.ts`, so screens keep importing from one module.
+- `AddressFields.tsx` — the canonical address form (street, area, PIN code,
+  city, state, read-only country), used by both the wizard and Business
+  Details. Exports `validateAddress` so every caller produces identical
+  messages. PIN code sits above city/state because it is the field sellers
+  know by heart and the one that will later auto-fill the two below it. One
+  column on mobile, a 2-col grid from `sm`.
 - `useStores.ts` — data hooks: `useStores` (list), `useStore` (by id;
   404/foreign → `null` → redirect to `/stores`).
+
+**Create Store (`CreateStorePage`)** — a four-step wizard over the shared
+`Wizard` shell: **Your store** (name + logo, the same
+validate → crop 1:1 → upload pipeline as before, posted as one multipart
+create), **Business & contact**, **Address** and **Tax details**
+(skippable). Its steps map 1:1 onto the `wizard: true` steps of the backend
+requirement registry, so the flow and the publish gate cannot drift.
+
+The store is created at the **end of step 1**, not the end of step 4, which
+makes onboarding resumable: leaving on step 3 still leaves a real store, and
+the dashboard's `SetupChecklist` picks up exactly where the seller stopped. A
+"Finish later" control appears from step 2 onward. Steps 2–4 are
+`PATCH /stores/:id/profile` calls sending only their own keys. Nothing
+already known is asked for again — the server seeds the profile from the
+customer account, and the business name defaults to the store name.
+
+Before step 1 renders, the page loads the seller's stores (`useStores`) and,
+if any is an **unfinished draft** — unpublished with a required wizard step
+still open — shows a `ResumePanel` in place of the wizard: each draft with its
+logo, slug and the step it needs next, a **Continue** that adopts the draft
+and jumps to that step, and "Start a new store instead". Creating at step 1
+made onboarding resumable, but on its own it also made every abandoned run a
+permanent store; this is the counterweight, and it is why returning to Create
+Store no longer mints a duplicate. The optional tax step does not make a store
+a draft (skipping it was a choice, and a seller coming back afterwards wants
+a *second* store), the fetch is gated rather than rendered-then-swapped so
+step 1 never flashes and gets replaced, and `useStores` resolves to `[]` on
+failure so the wizard is never blocked by it.
+
+Step 2 renders the contact phone and email **read-only**, as the seller's
+verified account identifiers, and offers no way to type them: they are what
+order alerts reach and what shoppers see, so a free-text field would invite an
+address nobody controls. A seller with no linked number — the ordinary case,
+since registration is by email — verifies one through the shared
+`VerifyPhoneForm` embedded in the step, and Continue stays disabled until they
+do. `assertVerifiedContact` enforces the same rule server-side, so this is the
+presentation of a constraint rather than the constraint itself.
+
+**`VerifyPhoneForm`** (`shared/auth/`) owns the one way a phone number enters
+the platform: number → SMS code → `POST /auth/me/link/{request,verify}`,
+resolving with the updated `Customer`. Both `ProfilePage` and store onboarding
+render it, which is the point — a second "just type your number" field
+anywhere would quietly reintroduce unverified contact details. It renders no
+`<form>` and no chrome, because it is embedded inside host forms (a wizard
+step) where a nested form would be invalid HTML that browsers silently drop;
+Enter is handled on the inputs instead.
+
+**`SetupChecklist`** renders from `store.readiness` (never from local
+inspection of the profile): a progress bar, the incomplete steps, and each
+expandable to its individual requirements with a "to publish" marker on the
+blocking ones. It returns `null` once `readiness.complete`. Steps with no
+applicable requirements are skipped, so a delivery-only store is never shown
+a pickup-address item.
 - Sections: `StoreDetailsPage` (name update + **logo upload**: pick →
   validate the format → crop 1:1 (`ImageEditDialog`, square-locked) → upload
   as WebP with a progress bar; Replace / Remove with confirmation — saves
   immediately, independent of the name form),
+  `StoreBusinessPage` (**Business Details** — three independently-saving
+  cards over `PATCH /stores/:id/profile`, each sending only its own keys:
+  **Business & contact** (business name and seller name as fields; phone and
+  email read-only as the verified account identifiers, with an inline
+  `VerifyPhoneForm` when no number is linked yet and a link to Profile),
+  **Address** (the business address via `AddressFields` — the one address the
+  platform holds) and **Tax & compliance** (PAN,
+  GSTIN, a not-registered declaration, registration number, with live format
+  hints, the GSTIN's state code decoded, and a PAN-inside-GSTIN cross-check)),
   `StoreHomepagePage` (**arrange** the storefront homepage — drag-and-drop
   (native HTML5 DnD, no dependency) plus ▲/▼ buttons for keyboard/touch to
   reorder Hero · Shop by Category · Featured Products · New Arrivals · Best
@@ -786,14 +883,27 @@ for crawlers wait for SSR/prerender).
   *requests* the change — a `ConfirmDialog` (neutral tone for on, danger
   for off) spells out the effect and nothing is written until accepted →
   `PATCH /stores/:id/payments`; an all-off state warns that customers
-  can't order. The checkout's payment step offers exactly the accepted
-  methods from the public shell's `payments`),
+  can't order. The **online-payment switch is disabled** while
+  `store.readiness.gates.ONLINE_PAYMENT` is blocked, naming the missing
+  requirements and linking to Business Details / Bank Accounts — this
+  replaced a bank-account lookup the page used to run for itself, which
+  only ever produced a hint. The checkout's payment step offers exactly the
+  accepted methods from the public shell's `payments`),
   `StoreShippingPage` (**Shipping** — how customers RECEIVE orders: a
   radio-card choice of Delivery / Store Pickup / Both →
   `PATCH /stores/:id/shipping`, likewise confirmed via `ConfirmDialog`
-  before saving. When pickup is enabled without any footer business
-  location the page links to Footer → Contact Information. The checkout's
-  delivery step follows the mode from the shell's `shipping`),
+  before saving. **Pickup / Both are disabled** while
+  `readiness.gates.PICKUP` is blocked — previously this checked the
+  *footer's* location list, which was never the address orders ship from.
+  The checkout's delivery step follows the mode from the shell's
+  `shipping`. Below the mode (hidden for pickup-only), **Delivery areas**:
+  the store's default pincode rule drafted in `DeliveryRuleEditor`
+  (`pages/stores/DeliveryRuleEditor.tsx` — All / Only selected / All
+  except selected, plus a chip list that accepts pasted comma-separated
+  pincodes, validates 6 digits and reports rejects) and saved with its own
+  button → the same PATCH with `{ deliveryRule }`; helpers
+  (`parsePincodes`, `describeDeliveryRule`, `sameDeliveryRule`,
+  `deliveryRuleProblem`) in `features/stores/deliveryRules.ts`),
   `StoreCheckoutPage` (**Checkout** — which customer details the checkout
   collects: seven toggles (Name / Phone / Email / Address / Pincode /
   State / Country, all on by default) grouped into contact + delivery
@@ -852,15 +962,28 @@ for crawlers wait for SSR/prerender).
   otherwise an Add Product form — name, category select grouped by root
   with "Root › Sub" options, optional description, the **Media Board**
   (`media/MediaBoard.tsx` — required photos plus the optional video, the same
-  screen the product row uses) and a **"This product
-  has variants" checkbox** that picks the product shape. Unchecked (the
-  default) shows required Price + Stock; checked hides them and shows a
-  **variants editor** instead (rows of name / price / stock, each required,
-  with Remove + "Add variant"; one row is always present). Because **the
-  variant is the unit of sale** the two are mutually exclusive — there is
-  never a second competing price — and the checkbox only *hides* fields, so
-  toggling back and forth preserves whatever was typed. The submitted
-  payload carries `hasVariants` plus exactly one side's fields.
+  screen the product row uses), an optional **`SpecificationsEditor`**
+  (`pages/stores/products/` — ordered label/value rows with move up/down;
+  controlled, saved with the form), the **Delivery areas** field
+  (`ProductDeliveryField` in `DeliveryRuleEditor.tsx` — "Use store
+  default", naming the current default, or "Custom for this product",
+  which opens the rule editor; `null` = follow the default, sent as
+  `deliveryRule` on create and as a PATCH from the edit form, where the row
+  then reads "Delivery: Only 12 pincodes") and a **"This product has options"
+  checkbox** that picks the product shape. Unchecked (the default) shows
+  required Price + Stock; checked hides them and shows the
+  **`OptionTypesEditor`** (up to 3 named options, values as chips via the
+  shared `shared/ui/ChipInput.tsx` — Enter/comma adds, click a chip renames,
+  × removes) above the **`VariantMatrix`** — every combination generated as a
+  row with price / stock / on-off (a table from `sm`, one card per combination
+  on phones), with "Set every price / stock" and "Enable all" helpers. The
+  seller never adds or removes a row by hand; the matrix follows the options.
+  Because **the variant is the unit of sale** the two are mutually exclusive —
+  there is never a second competing price — and the checkbox only *hides*
+  fields, so toggling back and forth preserves whatever was typed. The
+  submitted payload carries `hasVariants` plus exactly one side's fields
+  (`optionTypes` + structured `variants` on the options side, checked
+  client-side by `draftToInput` before the round trip).
   **Product name and at least one photo are required** — both marked with a
   `*`, each with its own inline error (the name also on blur, with a danger
   border). The server enforces the name (`storeProductCreateSchema`); a photo
@@ -884,14 +1007,21 @@ for crawlers wait for SSR/prerender).
   list shows "Root › Sub" paths, total stock and a price **range** when
   options differ ("₹89,900 – ₹1,09,999"). Each row has a **pencil** opening
   an inline **details editor** — name, category (same grouped "Root › Sub"
-  select as the add form) and description; only changed fields are PATCHed,
-  an emptied description is cleared to null, and the slug/public URL never
-  changes on rename. Each row also expands into a
-  **variant manager**: for an option-less product that panel edits its
-  implicit Default variant (price + stock); once options exist it lists
-  them, each variant row editable **inline** (pencil → name / price / stock
-  with save/cancel, only changed fields sent) alongside enable/disable,
-  delete, and an inline add-variant form). The expanded panel also carries the
+  select as the add form), description and specification rows; only changed
+  fields are PATCHed, an emptied description is cleared to null, and the
+  slug/public URL never changes on rename. Each row also expands into the
+  **`OptionsPanel`** (`pages/stores/products/OptionsPanel.tsx`): for an
+  option-less product it shows the `DefaultVariantEditor` (price + stock on
+  the implicit Default) and an "Add options" entry; once options exist it
+  holds a **draft** of the option types and matrix (`toDraft` /
+  `reconcileDraft` in `features/stores/productOptions.ts` — keyed, so a
+  rename keeps every row and its variant id; adding a value adds blank rows,
+  adding a type copies each row onto the new type's first value, and removing
+  a value or type drops rows only after a `ConfirmDialog` naming them and
+  their stock). Nothing is written until **Save options**, which sends the
+  whole target state to `PUT …/options`; Cancel discards the draft. Saving
+  with no options at all (confirmed) turns the product back into a simple one.
+  The expanded panel also carries the
   **Storefront placement** checkboxes (Featured Product · Best Seller · New
   Arrival · Hide from Search). Each maps to exactly one storefront row, and
   because ticking one changes what customers see immediately, the checkbox
@@ -997,6 +1127,7 @@ still look like one product.
 | `primitives.tsx` | Card/CardHeader/PageHeader, Chip (6 tones), Button, TextInput/TextArea/SelectInput, Empty/Error/Skeleton, Detail row |
 | `DataTable.tsx` | **The** table + `Pagination`. Below `md` each row re-renders as a stacked card (that's why every column declares a `header` string; one column may be `primary`, and `hideOnMobile` drops detail). One definition per page instead of a desktop table plus a drifting mobile list. |
 | `Toolbar.tsx` | Filter row: debounced `SearchInput`, `FilterSelect`, scrollable status `Tabs` |
+| `Dialog.tsx` | Content dialog — a record opened *in place* over the list that led to it (header, scrollable body, optional action footer; sheet on phones, centred on desktop). Distinct from the shared `ConfirmDialog`, which is a two-button question. Portalled to `<body>` for the same `backdrop-filter` reason. |
 | `statusMeta.tsx` | One label + tone per domain state, defined once — so "Shipped" is the same word and color everywhere. Every chip carries its label; color is a second signal, never the only one. |
 | `charts.tsx` | `TrendChart` · `BarList` · `Donut` · `Sparkline` · `ChartFrame` (see below) |
 | `StatTile.tsx` | Headline number + optional sparkline; a `to` makes it a link |
@@ -1039,8 +1170,8 @@ Rules they follow (constraints, not taste):
 | `/` | **Dashboard** — one request (`GET /admin/dashboard`) feeds everything, so tiles can't disagree with the chart beside them. Range toggle 7/30/90d, revenue/orders trend, payment-split donut, order-pipeline bars, top stores/products, latest orders, low stock, and an integration-health banner when the gateway or push is unconfigured. **Every counter is a link** — pipeline bars and low-stock rows land on the target page already filtered. |
 | `/orders`, `/orders/:id` | Platform-wide orders. Read-only: the seller owns fulfilment. Detail adds the joins the seller can't see (customer account, gateway reference) plus a lifecycle timeline built from the order's own timestamps. |
 | `/payments` | The same order rows through the money lens, with per-status totals for the current filter. |
-| `/products` | Seller catalog across stores, with the hide/restore moderation switch (always asks for a reason — the seller is notified immediately). |
-| `/stores`, `/stores/:id` | Stores + owners. Detail carries suspension and **manual payout-account verification** (account numbers masked to the last 4). |
+| `/products` | Seller catalog across stores, with the hide/restore moderation switch (always asks for a reason — the seller is notified immediately). A row is a summary; **clicking it opens the listing in full** in `products/ProductDetailDialog` (gallery, description, option matrix, per-variant price/stock, spec table, delivery area, homepage flags, storefront link, hide/restore) over the table, so filters and page survive closing it. `?storeId=` scopes the table to one store and shows a banner naming it. The hide/restore confirm lives in `products/ProductVisibilityDialog` because the table's row button and the detail dialog must ask the same question the same way. |
+| `/stores`, `/stores/:id` | Stores + owners. Detail carries suspension, **manual payout-account verification** (account numbers masked to the last 4), and a **Products** card — the store's newest listings inline (each opening the same product dialog), with a "View all" into `/products?storeId=…`. |
 | `/customers`, `/customers/:id` | Buyers and sellers (same account type), with blocking. The dialog states both effects: no future sign-in **and** every session revoked. |
 | `/support`, `/support/:ticketId` | The support queue — **sellers and shoppers in one list** (never a shopper's thread with a shop: those are the seller's to answer), filterable by `scope` (two pages would just mean one of them going unread), each row carrying a Seller/Shopper chip. Defaults to the **Needs reply** tab (open + in progress) sorted **oldest activity first** — a queue's job is to show what is still owed, which is the opposite of every other table here. The detail page carries the thread, the reply box (replying moves OPEN → IN_PROGRESS on its own) and triage: status saves on change and notifies the reporter, priority is internal and silent. |
 | `/notifications` | This admin's feed, the per-device push toggle, and the platform broadcast (confirm-with-preview — a broadcast can't be recalled). |
@@ -1200,6 +1331,12 @@ frontend/
     │   │   │                     #   (mark + name; size by HEIGHT only, the aspect
     │   │   │                     #   ratio sets the width; tone="on-dark" for the
     │   │   │                     #   auth heroes)
+    │   │   ├── ChipInput.tsx     # Keyed chip list (add / rename / remove) — option values
+    │   │   ├── Wizard.tsx        # Generic multi-step form shell: numbered rail
+    │   │   │                     #   (sm+) / "Step 2 of 4" + bar (mobile), titled
+    │   │   │                     #   panel, WizardActions (Back / Skip / Continue;
+    │   │   │                     #   primary under the thumb on mobile via
+    │   │   │                     #   flex-col-reverse). Domain-agnostic.
     │   │   ├── ConfirmDialog.tsx # Reusable confirmation modal (used by logout).
     │   │   │                     #   Portals into document.body — callers mount it
     │   │   │                     #   beside their trigger, and a `backdrop-blur`
@@ -1227,6 +1364,7 @@ frontend/
     │   └── auth/
     │       ├── http.ts           # Axios client (cookies + CSRF + ApiError)
     │       ├── authApi.ts        # Typed customer/admin auth endpoints
+    │       ├── VerifyPhoneForm.tsx # Phone → OTP → verified (shared, form-free)
     │       └── useSession.ts     # Cookie-session hook (loading/guest/authed)
     ├── storefront/
     │   ├── main.tsx              # Mounts <StorefrontApp/>
@@ -1263,7 +1401,8 @@ frontend/
     │   │   │   └── recentActivity.ts # localStorage recent searches + recently viewed stores
     │   │   ├── cart/
     │   │   │   ├── cart.ts       # Client-side cart: localStorage store + hooks + sync()
-    │   │   │   └── useCartRevalidation.ts # Cart-open price/stock refresh
+    │   │   │   ├── useCartRevalidation.ts # Cart-open price/stock refresh
+    │   │   │   └── useDeliveryCheck.ts # Checkout: which lines reach the chosen pincode
     │   │   ├── publicStore/      # The multi-page storefront under /store/{slug}
     │   │   │   ├── useStoreShells.ts # Session-cached shell lookup (logo+theme) for cart/checkout
     │   │   │   ├── PublicStoreLayout.tsx # Shell: fetches store once + usePublicStore()
@@ -1272,6 +1411,7 @@ frontend/
     │   │   │   ├── ShareButton.tsx   # Share/copy-link control (store + product)
     │   │   │   ├── ProductListing.tsx# Shared body for category + search pages
     │   │   │   ├── ListingControls.tsx # Sort/filter bar, breadcrumb, LoadMore, empty states
+    │   │   │   ├── OptionPicker.tsx  # One radiogroup per option type; greys unreachable values
     │   │   │   ├── ProductCard.tsx   # Listing card + responsive ProductGrid
     │   │   │   ├── useProductQuery.ts# Server-paginated listing (debounce + race guard)
     │   │   │   ├── catalog.ts        # Filter state + stock-level presentation only
@@ -1279,9 +1419,13 @@ frontend/
     │   │   │   ├── CartControls.tsx  # PurchaseActions (qty + Add to Cart + Buy Now),
     │   │   │   │                     #   QuantityStepper, AddedToast, StockBadge
     │   │   │   ├── productDescription.ts # Description → highlights / specs / prose
+    │   │   │   ├── DeliveryCheck.tsx # Product page: "Delivers to / Not deliverable to <pincode>"
+    │   │   │   ├── deliveryPincode.ts # useDeliveryPincode: typed pincode (localStorage) → primary address
     │   │   │   └── FilterPanel.tsx   # Availability + Price filters (slide-over/bottom sheet)
     │   │   └── stores/           # Customer-owned stores (see Stores feature above)
     │   │       ├── storesApi.ts  # Typed HTTP client for /api/v1/stores
+    │   │       ├── deliveryRules.ts # Pincode parsing/validation + rule summaries (seller editors)
+    │   │       ├── productOptions.ts # Client mirror of the server option logic + seller draft model
     │   │       ├── useStores.ts  # useStores (list) + useStore (by id) hooks
     │   │       └── useManagedStore.ts # Outlet-context hook for manage sections
     │   └── pages/
@@ -1310,8 +1454,12 @@ frontend/
     │       │   └── CartLine.tsx       # Shared line row (stepper, remove, total)
     │       └── stores/
     │           ├── StoresPage.tsx       # My Stores list / first-run empty state
-    │           ├── CreateStorePage.tsx  # Name + logo (minimal by design)
+    │           ├── CreateStorePage.tsx  # 4-step wizard: store → business →
+    │           │                        #   address → tax (store created at
+    │           │                        #   step 1, so it is resumable)
     │           ├── StoreManageLayout.tsx# Left sections card + right <Outlet/>
+    │           ├── SetupChecklist.tsx   # Dashboard checklist from store.readiness
+    │           ├── StoreBusinessPage.tsx# Business & contact / address / tax cards
     │           ├── StoreDashboardPage.tsx # Manage landing: order stats + latest orders
     │           ├── StoreOrdersPage.tsx  # Seller orders list (status tabs, search, Load More)
     │           ├── StoreOrderDetailPage.tsx # One order: items, timeline, status actions + cancel
@@ -1342,7 +1490,9 @@ frontend/
     │           ├── StorePaymentsPage.tsx # Accept Online Payment / COD switches
     │           │                        #   (confirm-before-save)
     │           ├── StoreShippingPage.tsx # Fulfilment mode: Delivery / Pickup / Both
-    │           │                        #   (confirm-before-save)
+    │           │                        #   (confirm-before-save) + default delivery areas
+    │           ├── DeliveryRuleEditor.tsx # Pincode rule editor (all / only / except + chip
+    │           │                        #   list) + ProductDeliveryField (default vs custom)
     │           ├── StoreCheckoutPage.tsx # Which checkout fields to collect
     │           │                        #   (7 toggles, hidden = not validated)
     │           ├── StoreSupportPage.tsx # UnieMax Support: contact + this store's tickets
@@ -1351,6 +1501,12 @@ frontend/
     │           ├── StoreCustomerSupportTicketPage.tsx # One request + reply + status
     │           ├── StoreCategoriesPage.tsx # Add/list/rename/collapse/toggle/delete categories
     │           ├── StoreProductsPage.tsx # Add/list/toggle/delete products (category-gated)
+    │           ├── products/             # Options & specifications editors for StoreProductsPage
+    │           │   ├── OptionsPanel.tsx      # Draft of option types + matrix → PUT …/options
+    │           │   ├── OptionTypesEditor.tsx # ≤3 named options, values as chips
+    │           │   ├── VariantMatrix.tsx     # Generated combinations: price / stock / on-off
+    │           │   ├── SpecificationsEditor.tsx # Ordered label/value rows
+    │           │   └── DefaultVariantEditor.tsx # Price + stock of the implicit Default
     │           └── ActiveSwitch.tsx     # Enable/disable pill switch (rows)
     └── admin/                   # Platform console — served at /admin
         ├── main.tsx             # Mounts <AdminApp/>
@@ -1364,12 +1520,13 @@ frontend/
         │   ├── NotificationBell.tsx # Unread badge + feed dropdown
         │   └── icons.tsx        # Six inline shell glyphs
         ├── ui/                  # ISOLATED console kit (see "Admin console")
-        │   ├── primitives.tsx · DataTable.tsx · Toolbar.tsx
+        │   ├── primitives.tsx · DataTable.tsx · Toolbar.tsx · Dialog.tsx
         │   ├── statusMeta.tsx · StatTile.tsx · charts.tsx · format.ts
         ├── features/
         │   ├── adminApi.ts      # Typed client for /api/v1/admin/**
         │   └── useAdminQuery.ts # useAdminQuery + useAdminList (URL filters)
         └── pages/               # LoginPage + 11 lazy console pages
+            └── products/        # ProductDetailDialog + ProductVisibilityDialog (used by Products + Store detail)
 ```
 
 Keep app-specific code under `storefront/` or `admin/`, and put anything both
