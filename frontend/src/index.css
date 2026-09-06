@@ -61,6 +61,31 @@
   /* Hover elevation for interactive cards. Same zero-offset principle, just
    * deeper and wider, so a lifted card gains weight rather than a drop shadow. */
   --shadow-lifted: 0 0 24px 0 rgba(0, 0, 0, 0.13);
+
+  /* Dialog entrance (the auth dialog): a short settle rather than a slide —
+   * enters from below per the motion rules, ease-out, well under 300ms. The
+   * reduced-motion rule at the bottom collapses both durations. */
+  --animate-dialog-in: dialog-in 180ms ease-out;
+  --animate-dialog-backdrop: dialog-backdrop 160ms ease-out;
+
+  @keyframes dialog-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes dialog-backdrop {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
 }
 
 /* Color utilities bind to CSS vars so they flip at runtime (dark/light/store). */

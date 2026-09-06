@@ -137,6 +137,9 @@ export function storeVars(theme: StoreThemeVars): React.CSSProperties {
     // --- design-system semantics (flat surfaces) --------------------------
     '--bg': bg,
     '--surface': surface,
+    // Fields (`bg-input`) sit on the surface. Without this they kept the
+    // app's white, which on a dark owner theme meant white text on white.
+    '--input-bg': surface,
     // Wells/borders derive from the surface they sit on, so a custom surface
     // keeps visible card edges and recessed slots.
     '--surface-alt': darkSurface ? lighten(surface, 0.07) : darken(surface, 0.045),

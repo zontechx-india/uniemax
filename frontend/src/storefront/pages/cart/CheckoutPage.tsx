@@ -5,8 +5,9 @@ import { usePageTitle } from '../../../shared/usePageTitle'
 import { trackInitiateCheckout } from '../../../shared/analytics/metaPixel'
 import { customerAuth } from '../../../shared/auth/authApi'
 import { toApiError } from '../../../shared/auth/http'
-import { useSession } from '../../../shared/auth/useSession'
 import { ErrorNote } from '../../../shared/ui/form'
+import { useMarketSession } from '../../app/marketSession'
+import { openAuthDialog, storeAuthRequest } from '../../features/auth/authDialogStore'
 import { cart, groupByStore, lineTotal, useCart } from '../../features/cart/cart'
 import type { CartItem } from '../../features/cart/cart'
 import { useCartRevalidation } from '../../features/cart/useCartRevalidation'
@@ -21,7 +22,7 @@ import {
   publicOrderApi,
   storeHomeUrl,
 } from '../../features/stores/storesApi'
-import type { OrderQuote } from '../../features/stores/storesApi'
+import type { OrderQuote, PublicStore } from '../../features/stores/storesApi'
 import {
   ArrowLeftIcon,
   BoxIcon,
@@ -52,12 +53,16 @@ import { StoreLogo } from './StoreLogo'
  * only the multi-store /cart overview stays in the app's neutral palette.
  *
  * SIGN-IN REQUIRED: browsing and the cart stay anonymous, but placing an
- * order needs an account (the API enforces it with a 401). The page probes
- * the cookie session on mount; guests get a sign-in prompt that returns
- * them here via `/login?next=` instead of the checkout steps.
+ * order needs an account (the API enforces it with a 401). The session comes
+ * from the shell's one probe (`useMarketSession`); guests get a sign-in
+ * prompt instead of the checkout steps, whose CTA opens the auth dialog in
+ * the store's palette over this very page — the steps appear the moment the
+ * session flips, nothing reloads. A 401 on Place Order (cookie expired while
+ * filling the form) refreshes once and retries; only if that fails does the
+ * dialog open, with the cart and the steps still intact.
  */
 export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
-  const { state: session } = useSession(customerAuth)
+  const { state: session } = useMarketSession()
   const items = useCart()
   // Refresh prices/stock before the customer reviews the order.
   const revalidation = useCartRevalidation(storeSlug)
@@ -142,19 +147,21 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
     if (!ready || !checkout.delivery || !checkout.payment || sellable.length === 0) return
     setPlacing(true)
     setPlaceError(null)
-    try {
-      const order = await publicOrderApi.place(storeSlug, {
-        fulfilment: checkout.delivery.fulfilment,
-        paymentMethod: checkout.payment,
-        billingAddress: checkout.delivery.billing,
+    const delivery = checkout.delivery
+    const payment = checkout.payment
+    const submit = () =>
+      publicOrderApi.place(storeSlug, {
+        fulfilment: delivery.fulfilment,
+        paymentMethod: payment,
+        billingAddress: delivery.billing,
         customer: {
-          name: checkout.delivery.values.name ?? null,
-          phone: checkout.delivery.values.phone ?? null,
-          email: checkout.delivery.values.email ?? null,
-          address: checkout.delivery.values.address ?? null,
-          pincode: checkout.delivery.values.pincode ?? null,
-          state: checkout.delivery.values.state ?? null,
-          country: checkout.delivery.values.country ?? null,
+          name: delivery.values.name ?? null,
+          phone: delivery.values.phone ?? null,
+          email: delivery.values.email ?? null,
+          address: delivery.values.address ?? null,
+          pincode: delivery.values.pincode ?? null,
+          state: delivery.values.state ?? null,
+          country: delivery.values.country ?? null,
         },
         items: sellable.map((item) => ({
           productId: item.productId,
@@ -162,6 +169,18 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
           quantity: item.qty,
         })),
       })
+    try {
+      let order: Awaited<ReturnType<typeof submit>>
+      try {
+        order = await submit()
+      } catch (err) {
+        // The access cookie may simply have expired while the customer filled
+        // in the steps. Rotate it once and retry before asking them to sign
+        // in — the old full-page bounce through /login did this implicitly.
+        if (toApiError(err).statusCode !== 401) throw err
+        await customerAuth.refresh()
+        order = await submit()
+      }
       // The order owns these items now — clear them before leaving so a
       // back-navigation doesn't offer to buy them twice.
       cart.clearStore(storeSlug)
@@ -173,14 +192,17 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
       navigate(`/order/${storeSlug}/${order.id}`, { replace: true })
     } catch (err) {
       const apiError = toApiError(err)
+      setPlacing(false)
       if (apiError.statusCode === 401) {
-        // Session expired mid-checkout — sign back in and return here.
-        // Full page load: /login lives in the marketplace router.
-        window.location.href = checkoutLoginUrl(storeSlug)
+        // The refresh failed too — the session is really gone. Sign in right
+        // here, with the cart and the filled-in steps intact; the customer
+        // then presses Place Order again.
+        setPlaceError('Your session expired — sign in to place the order.')
+        const onSignedIn = () => setPlaceError(null)
+        openAuthDialog(shell ? storeAuthRequest(shell, { onSignedIn }) : { onSignedIn })
         return
       }
       setPlaceError(apiError.message)
-      setPlacing(false)
     }
   }
 
@@ -221,7 +243,7 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
             Checking your session…
           </section>
         ) : session.status === 'guest' ? (
-          <SignInToOrder storeSlug={storeSlug} />
+          <SignInToOrder storeSlug={storeSlug} shell={shell} />
         ) : !group || sellable.length === 0 ? (
           <NothingToOrder storeSlug={storeSlug} hasUnavailable={excluded > 0} />
         ) : (
@@ -475,17 +497,18 @@ function describeShippingBasis(quote: OrderQuote): string | null {
   }
 }
 
-/** Login URL that lands the customer back on this checkout after sign-in. */
-function checkoutLoginUrl(storeSlug: string): string {
-  return `/login?next=${encodeURIComponent(`/checkout/${storeSlug}`)}`
-}
-
 /**
- * Guest gate — only signed-in customers can place orders. A plain <a> (not
- * a router Link): /login is served by the marketplace router, so crossing
- * over needs a full page load.
+ * Guest gate — only signed-in customers can place orders. Sign in opens the
+ * auth dialog in the store's palette, right over this page: the checkout
+ * re-renders into the steps the moment the session flips, cart intact.
  */
-function SignInToOrder({ storeSlug }: { storeSlug: string }) {
+function SignInToOrder({
+  storeSlug,
+  shell,
+}: {
+  storeSlug: string
+  shell: PublicStore | null | undefined
+}) {
   return (
     <div className="flex flex-col items-center rounded-xl border border-line bg-surface px-6 py-16 text-center">
       <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-surface-alt text-muted">
@@ -508,12 +531,13 @@ function SignInToOrder({ storeSlug }: { storeSlug: string }) {
         >
           Back to cart
         </Link>
-        <a
-          href={checkoutLoginUrl(storeSlug)}
+        <button
+          type="button"
+          onClick={() => openAuthDialog(shell ? storeAuthRequest(shell) : {})}
           className="metal-cta rounded-md px-5 py-2.5 text-sm font-semibold text-cta-contrast transition"
         >
           Sign in to continue
-        </a>
+        </button>
       </div>
     </div>
   )

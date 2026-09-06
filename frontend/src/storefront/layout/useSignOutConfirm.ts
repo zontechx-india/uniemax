@@ -19,8 +19,15 @@ import { useCustomerSession } from '../app/sessionContext'
  * guard never runs.
  *
  * `replace` so the page they logged out of is not one Back press away.
+ *
+ * `crossRouter` is for the callers inside the anonymous shopping router
+ * (the `/store/{slug}` header): `/` is not a route there, so a client-side
+ * navigate would land on that router's "Page not found". Those sign out
+ * FIRST and then hard-replace the location — the store page underneath is
+ * public, so it survives the moment of being a guest, and the full load
+ * brings up the marketplace router at `/`.
  */
-export function useSignOutConfirm() {
+export function useSignOutConfirm({ crossRouter = false } = {}) {
   const { signOut } = useCustomerSession()
   const navigate = useNavigate()
   const [confirming, setConfirming] = useState(false)
@@ -29,6 +36,11 @@ export function useSignOutConfirm() {
   const confirm = async () => {
     setBusy(true)
     try {
+      if (crossRouter) {
+        await signOut()
+        window.location.replace('/')
+        return
+      }
       navigate('/', { replace: true })
       await signOut()
       // No cleanup needed on success: the session gate unmounts this tree.

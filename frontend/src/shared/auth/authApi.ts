@@ -50,6 +50,38 @@ export interface CustomerLogin {
 const AUTH = '/api/v1/auth'
 const ADMIN_AUTH = '/api/v1/admin/auth'
 
+/**
+ * Collapses overlapping calls into ONE request — everyone who arrives while a
+ * call is in flight awaits the same promise.
+ *
+ * Used for `refresh()`, where it is a correctness guard rather than an
+ * optimisation: refresh tokens **rotate**, and the backend treats a second
+ * presentation of an already-rotated token as theft and revokes every session
+ * (`rotateSession` in `session.service.ts`). Two components probing the
+ * session at the same moment — the app shell and, on a store page, the draft
+ * preview retry — would otherwise sign the customer out of everything.
+ *
+ * A failed call clears the slot, so the next caller genuinely retries.
+ */
+function singleFlight<T>(run: () => Promise<T>): () => Promise<T> {
+  let inFlight: Promise<T> | null = null
+  return () => {
+    if (!inFlight) {
+      inFlight = run().finally(() => {
+        inFlight = null
+      })
+    }
+    return inFlight
+  }
+}
+
+const refreshCustomerSession = singleFlight(() =>
+  call<Record<string, never>>(http.post(`${AUTH}/web/refresh`)),
+)
+const refreshAdminSession = singleFlight(() =>
+  call<Record<string, never>>(http.post(`${ADMIN_AUTH}/web/refresh`)),
+)
+
 // ---- Customer ---------------------------------------------------------------
 
 export const customerAuth = {
@@ -106,7 +138,7 @@ export const customerAuth = {
     return call<Customer>(http.get(`${AUTH}/me`))
   },
   refresh() {
-    return call<Record<string, never>>(http.post(`${AUTH}/web/refresh`))
+    return refreshCustomerSession()
   },
   logout() {
     return call<{ signedOut: boolean }>(http.post(`${AUTH}/web/logout`))
@@ -123,7 +155,7 @@ export const adminAuth = {
     return call<Admin>(http.get(`${ADMIN_AUTH}/me`))
   },
   refresh() {
-    return call<Record<string, never>>(http.post(`${ADMIN_AUTH}/web/refresh`))
+    return refreshAdminSession()
   },
   logout() {
     return call<{ signedOut: boolean }>(http.post(`${ADMIN_AUTH}/web/logout`))

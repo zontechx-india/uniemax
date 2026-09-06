@@ -16,10 +16,20 @@ import { useSignOutConfirm } from './useSignOutConfirm'
  *   - Closes on item click, Escape, or an outside tap.
  *   - Nav items come from `ACCOUNT_MENU_ITEMS`; Logout is a separate
  *     action row that runs the shared confirm-dialog flow.
+ *
+ * `crossRouter` is set by the ONE caller outside the marketplace router —
+ * `StoreHeader`, inside the anonymous shopping router. Every destination here
+ * (`/profile`, `/orders`, `/stores`, …) is a marketplace route that the
+ * public router has never heard of, so there the rows must be plain anchors
+ * (full page load) rather than react-router `Link`s, and logout hard-replaces
+ * the location instead of navigating. Colors need no such switch: the menu is
+ * built from the semantic tokens (`bg-surface`, `text-fg`, `border-line`)
+ * that `storeVars()` re-points, so inside a store it wears the store's
+ * palette automatically.
  */
-export function AccountMenu() {
+export function AccountMenu({ crossRouter = false }: { crossRouter?: boolean } = {}) {
   const { customer } = useCustomerSession()
-  const signOutFlow = useSignOutConfirm()
+  const signOutFlow = useSignOutConfirm({ crossRouter })
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const closeTimer = useRef<number | undefined>(undefined)
@@ -124,26 +134,24 @@ export function AccountMenu() {
             <div className="mx-2 border-t border-line" />
 
             <div className="py-1">
-              <Link
+              <MenuRow
                 to={hasStores === false ? '/stores/new' : '/stores'}
-                role="menuitem"
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-fg transition-colors hover:bg-surface-alt"
+                crossRouter={crossRouter}
+                onNavigate={() => setOpen(false)}
               >
                 <StoreIcon className="h-[18px] w-[18px] text-muted" />
                 {hasStores === false ? 'Create Store' : 'My Store'}
-              </Link>
+              </MenuRow>
               {ACCOUNT_MENU_ITEMS.map(({ label, to, icon: Icon }) => (
-                <Link
+                <MenuRow
                   key={label}
                   to={to}
-                  role="menuitem"
-                  onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-fg transition-colors hover:bg-surface-alt"
+                  crossRouter={crossRouter}
+                  onNavigate={() => setOpen(false)}
                 >
                   <Icon className="h-[18px] w-[18px] text-muted" />
                   {label}
-                </Link>
+                </MenuRow>
               ))}
             </div>
             <div className="mx-2 border-t border-line" />
@@ -174,5 +182,38 @@ export function AccountMenu() {
         onCancel={signOutFlow.cancel}
       />
     </div>
+  )
+}
+
+/**
+ * One navigation row of the dropdown. A react-router `Link` normally; a plain
+ * anchor when the menu is rendered outside the marketplace router (see
+ * `crossRouter` on `AccountMenu`), where these paths don't exist as routes.
+ */
+function MenuRow({
+  to,
+  crossRouter,
+  onNavigate,
+  children,
+}: {
+  to: string
+  crossRouter: boolean
+  onNavigate: () => void
+  children: React.ReactNode
+}) {
+  const className =
+    'flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-fg transition-colors hover:bg-surface-alt'
+
+  if (crossRouter) {
+    return (
+      <a href={to} role="menuitem" onClick={onNavigate} className={className}>
+        {children}
+      </a>
+    )
+  }
+  return (
+    <Link to={to} role="menuitem" onClick={onNavigate} className={className}>
+      {children}
+    </Link>
   )
 }

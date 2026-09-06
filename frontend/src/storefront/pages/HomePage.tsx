@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { usePageTitle } from '../../shared/usePageTitle'
 import { ThemeToggle } from '../../shared/theme/ThemeToggle'
 import { AppLogoLockup } from '../../shared/ui/AppLogo'
@@ -19,6 +19,7 @@ import {
   StoreIcon,
   TagIcon,
 } from '../layout/icons'
+import { openAuthDialog } from '../features/auth/authDialogStore'
 import { useCart } from '../features/cart/cart'
 import { discoveryApi } from '../features/discovery/discoveryApi'
 import type {
@@ -192,12 +193,13 @@ function MarketHeader() {
             <div className="h-10 w-10 animate-pulse rounded-full bg-surface-alt" />
           )}
           {state.status === 'guest' && (
-            <Link
-              to="/login"
+            <button
+              type="button"
+              onClick={() => openAuthDialog()}
               className="rounded-md bg-brand-gradient px-5 py-2.5 text-sm font-semibold text-brand-contrast transition hover:opacity-90"
             >
               Sign in
-            </Link>
+            </button>
           )}
           {state.status === 'authed' && (
             <SessionProvider customer={state.user} signOut={signOut}>
@@ -1267,8 +1269,8 @@ function BecomeSellerSection({ ownsStores }: { ownsStores: boolean }) {
 }
 
 /**
- * "Create a store" CTA that works for everyone: guests are routed through
- * /login with the creation page as the return destination.
+ * "Create a store" CTA that works for everyone: guests get the auth dialog
+ * and land on the creation page once signed in.
  */
 function CreateStoreLink({
   className,
@@ -1278,14 +1280,25 @@ function CreateStoreLink({
   children: React.ReactNode
 }) {
   const { state } = useMarketSession()
-  const to =
-    state.status === 'authed'
-      ? '/stores/new'
-      : `/login?next=${encodeURIComponent('/stores/new')}`
+  const navigate = useNavigate()
+  if (state.status === 'authed') {
+    return (
+      <Link to="/stores/new" className={className}>
+        {children}
+      </Link>
+    )
+  }
+  // Guest (or still probing): sign in right here, then carry on to the
+  // wizard — the dialog can't navigate itself (it sits outside the router),
+  // so the follow-up is passed in.
   return (
-    <Link to={to} className={className}>
+    <button
+      type="button"
+      onClick={() => openAuthDialog({ onSignedIn: () => navigate('/stores/new') })}
+      className={className}
+    >
       {children}
-    </Link>
+    </button>
   )
 }
 

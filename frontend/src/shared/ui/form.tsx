@@ -50,14 +50,17 @@ export function Hero({
   image,
   logo,
   children,
+  className = '',
 }: {
   image: string
   logo: ReactNode
   children: ReactNode
+  /** Appended last, so a host can override radius/padding (the dialog does). */
+  className?: string
 }) {
   return (
     <div
-      className="relative flex h-full w-full flex-col justify-between overflow-hidden rounded-lg bg-cover bg-center p-10 text-white"
+      className={`relative flex h-full w-full flex-col justify-between overflow-hidden rounded-lg bg-cover bg-center p-10 text-white ${className}`}
       style={{ backgroundImage: `url(${image})` }}
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/50" />

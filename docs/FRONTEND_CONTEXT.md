@@ -61,7 +61,7 @@ Auth talks to the live backend (`package/auth`) via `src/shared/auth/`:
 | File | Purpose |
 | ---- | ------- |
 | `http.ts`    | Axios client: `withCredentials`, echoes the surface's CSRF cookie in `X-CSRF-Token` on mutations (`um_admin_csrf` for `/api/v1/admin/**`, `csrf_token` otherwise — chosen from the request URL, so no boot-time initialisation has to be respected), normalizes the error envelope into `ApiError` |
-| `authApi.ts` | Typed endpoints: `customerAuth` (register, login, google, requestOtp/verifyOtp, forgot/resetPassword, linkRequest/linkVerify, me, refresh, logout) + `adminAuth` (login, me, refresh, logout) + `resolveSession` |
+| `authApi.ts` | Typed endpoints: `customerAuth` (register, login, google, requestOtp/verifyOtp, forgot/resetPassword, linkRequest/linkVerify, me, refresh, logout) + `adminAuth` (login, me, refresh, logout) + `resolveSession`. `refresh()` is **single-flight** on both surfaces: refresh tokens rotate and the backend treats a re-presented rotated token as theft (revokes every session), so overlapping callers share one in-flight request |
 | `useSession.ts` | Session hook: on mount probes `/me` (one refresh retry on 401) → `loading / guest / authed`; exposes `signedIn(user)` / `signOut()` |
 | `VerifyPhoneForm.tsx` | The one way a phone number enters the platform: number → SMS code → `linkRequest`/`linkVerify`, resolving with the updated `Customer`. Renders no `<form>` so it embeds inside host forms |
 
@@ -69,8 +69,43 @@ Both frontends are **web** clients: tokens live in httpOnly cookies (never JS),
 and in dev the Vite proxy (`/api` → `localhost:4000` in `vite.config.ts`) keeps
 the API same-origin — matching production, so no CORS/SameSite issues.
 
-**Storefront login** (`storefront/pages/LoginPage.tsx`) — all three backend
-methods, switched by a segmented Email / Mobile-OTP control. The switcher is
+**Storefront sign-in** — the flows live in ONE component,
+`storefront/features/auth/CustomerAuthPanel.tsx`, hosted in two places:
+
+- **The auth dialog** (`features/auth/AuthDialog.tsx` + the tiny external
+  store `features/auth/authDialogStore.ts`: `openAuthDialog(options)`,
+  `closeAuthDialog()`, `useAuthDialog()`, `storeAuthRequest(store, extra?)`)
+  — what EVERY "Sign in" control opens, in place, on whichever page the
+  visitor is on (marketplace header, "Sell on UnieMax", the store header's
+  account slot and mobile drawer, the checkout guest gate, the store Help
+  page). It is mounted once in `StorefrontApp` beside the `RouterProvider`,
+  inside `MarketSessionProvider`, so both routers share it; on success it
+  calls `signedIn(customer)` and closes, and every consumer re-renders as
+  signed in — no reload, no `?next=`. Because it sits OUTSIDE the router it
+  cannot navigate; callers that need a follow-up pass `onSignedIn` (the
+  seller CTA navigates to `/stores/new`). Size: from `sm` an 80vw × 80vh
+  panel capped at `max-w-5xl` (brand column on the left from `md`, form on
+  the right); below `sm` a full-screen sheet. It is portalled to `<body>`
+  (see ConfirmDialog for why), which is OUTSIDE the div where
+  `PublicStoreLayout` sets the store's CSS variables — so callers inside a
+  store pass `theme` and the portal root re-applies `storeVars()`, plus two
+  overrides (`--brand-gradient: var(--brand-metal)`,
+  `--brand-contrast: var(--cta-contrast)`) so `PrimaryButton` renders as
+  the store's metal CTA rather than UnieMax purple. The brand column shows
+  the store's identity (logo, name, "Sign in to shop at {name}", a small
+  "Powered by UnieMax") inside a store, and the UnieMax photo hero
+  (`features/auth/StorefrontHero.tsx`, shared with `/login`) on the
+  marketplace. Escape / backdrop `mousedown` / ✕ close it; body scroll is
+  locked; Tab cycles inside the panel; focus goes to the first field on open
+  and back to the opener on close; opened during the session probe it shows
+  a skeleton and closes itself if the probe resolves authed. Each open is
+  keyed, so a reopened dialog starts fresh at the email view.
+- **`/login`** (`pages/LoginPage.tsx`) — the FALLBACK page: a direct link,
+  or `RequireCustomer` bouncing a guest off an account route. It is
+  `AuthLayout` + `Brand` + the same panel with `variant="page"` (bordered
+  `AuthCard`; the dialog uses `variant="dialog"`, flat).
+
+All three backend methods, switched by a segmented Email / Mobile-OTP control. The switcher is
 a **sign-in** method picker only: it renders on the sign-in views (email
 password, phone, phone-verify) and is hidden on the email-only sub-flows —
 create account (which carries its own "Create your account" heading),
@@ -79,7 +114,7 @@ forgot password and reset — since Mobile OTP cannot create an account:
   code → account created verified + signed in), and the forgot-password flow
   (email → code + new password).
 - **Google** — **hidden for now** (`GOOGLE_SIGNIN_ENABLED = false` in
-  `LoginPage.tsx`); the dev-simulation button and `customerAuth.google()` stay
+  `CustomerAuthPanel.tsx`); the dev-simulation button and `customerAuth.google()` stay
   in place, ready to re-enable when the real integration is planned (the
   backend currently has **no Google verifier registered** either — its
   `/google` endpoints answer 400).
@@ -95,7 +130,8 @@ self-service reset (accounts are provisioned via `npm run create-admin`).
 The **admin** gate (`AdminApp`) restores the session from cookies on load and
 swaps between login and the signed-in app. The **storefront** no longer gates
 at the root — see the marketplace homepage below: the router always mounts,
-sign-in is a route (`/login`), and only the account subtree is guarded.
+sign-in is the in-place dialog (with `/login` as the fallback route), and
+only the account subtree is guarded.
 
 ### Marketplace homepage (`/`) + session structure
 
@@ -109,9 +145,11 @@ for guests and signed-in customers alike and adapts per session state.
   (`useMarketSession()`). The account subtree is wrapped in
   `app/RequireCustomer.tsx`: loading → splash, guest →
   `/login?next={intended}`, authed → the existing `SessionProvider`, so
-  every `useCustomerSession()` consumer works unchanged. `/login`
-  (`pages/LoginRoute.tsx`) renders the same `LoginPage`, honors a sanitized
-  `?next=` (same-origin paths only — no open redirect) and bounces
+  every `useCustomerSession()` consumer works unchanged. That guard redirect
+  and direct links are the only things that reach `/login` any more — every
+  in-app "Sign in" opens the auth dialog instead (see Storefront sign-in
+  above). `/login` (`pages/LoginRoute.tsx`) renders `LoginPage`, honors a
+  sanitized `?next=` (same-origin paths only — no open redirect) and bounces
   already-authed visitors home. A `next` pointing into the anonymous
   shopping router (`/store|/cart|/checkout|/order`, e.g. a guest sent here
   from a checkout) returns via `window.location.replace` — those routes
@@ -123,8 +161,9 @@ for guests and signed-in customers alike and adapts per session state.
   than a dense cluster: brand (logo `h-10`/`md:h-12` + `text-xl`/`sm:text-2xl`
   wordmark) · **global search centered in the toolbar** on md+, dropping to
   its own row under the bar below md · "Sell on UnieMax" link (lg+) · then
-  the utilities (theme toggle · cart link with count · Sign in /
-  `AccountMenu`, all `h-10`, `gap-3` → `lg:gap-6`; the old hairline separator
+  the utilities (theme toggle · cart link with count · Sign in — a button
+  that opens the auth dialog — / `AccountMenu`, all `h-10`, `gap-3` →
+  `lg:gap-6`; the old hairline separator
   was removed — the gap does that job). **Full-bleed** like the storefront
   (`max-w-[1920px]` soft cap, `lg:px-10`; card grids run 2→3→4→5 columns).
   Sections render as **full-bleed alternating bands** (base canvas / `alt`
@@ -167,8 +206,9 @@ for guests and signed-in customers alike and adapts per session state.
   all **wrap** rather than scroll horizontally — no scrollbars on the
   homepage); and a **Become a Seller** gradient panel
   (split layout: pitch + 3 check-mark proof points + CTA on the left —
-  label flips to "Create Another Store" for owners; guests route through
-  `/login?next=/stores/new` — and the live **platform counters**
+  label flips to "Create Another Store" for owners; for guests the CTA opens
+  the auth dialog and navigates to `/stores/new` via `onSignedIn` — and the
+  live **platform counters**
   (Stores / Products / Orders from `GET /public/stats`) on the right as
   social proof; counters fail silently and any zero value hides). The
   **footer** is a structured 4-column block: brand + tagline, Marketplace
@@ -235,7 +275,10 @@ Signed-in account pages mount inside `RequireCustomer` → `AppLayout`
   screen. The trigger's name is single-line and truncates past
   `max-w-36`. The same menu is reused by the marketplace header, whose
   sticky bar carries `backdrop-blur` — which is why the dialog portals to
-  `<body>` (see below).
+  `<body>` (see below) — and by `StoreHeader` on the public storefront, where
+  the `crossRouter` prop swaps every row's `Link` for a plain anchor and makes
+  logout `window.location.replace('/')`: those destinations are marketplace
+  routes the public router has never heard of, so they need a full page load.
 - **Session context** (`app/sessionContext.ts` + `app/SessionProvider.tsx`) —
   provides `{ customer, signOut }` to the authed tree via
   `useCustomerSession()`; no prop drilling.
@@ -404,9 +447,14 @@ open it), and a **Preview** button beside Share opens it in a new tab
 (labelled "View Store" once published).
 
 **Public storefront (multi-page)** — everything under `/store/…`, `/cart…`
-and `/checkout/…` is served **without sign-in**: `StorefrontApp` checks the
-path *before* the session gate and mounts `app/publicRouter.tsx`, a full
-nested router. The
+and `/checkout/…` is served **without sign-in**: `StorefrontApp` picks the
+router from the path once per full page load (at module scope, so a
+client-side navigation can never swap routers) and mounts
+`app/publicRouter.tsx`, a full nested router. Both surfaces sit inside the
+same `MarketSessionProvider`, so the one cookie-session probe feeds the
+store header's account dropdown and the checkout gate alike; nothing waits on
+it — the storefront renders immediately and the account slot resolves from a
+skeleton. The
 storefront is a real multi-page shop rather than one filtering screen, so it
 scales from a few products to thousands:
 
@@ -433,7 +481,10 @@ column), which lets the homepage render full-bleed section bands instead.
 
 - **Help & Support entry points** — a shopper reaches the shop from the
   **top bar** (a `Help` nav item beside Categories, and a row in the mobile
-  drawer) and from the **footer** (first row of Customer Support). Two
+  drawer) and from the **footer** (first row of Customer Support). On the
+  page itself (`StoreHelpPage`) a guest's "Sign in to message this store"
+  panel opens the store-themed auth dialog; the ticket load is keyed on the
+  session status, so after signing in the request list appears in place. Two
   placements because the two reading patterns are different: someone hunting
   for "how do I contact them" scans the toolbar, someone who has read to the
   bottom of a product page is already in the footer. The footer's Customer
@@ -456,7 +507,7 @@ column), which lets the homepage render full-bleed section bands instead.
   print, "Powered by UnieMax". Responsive: 1 → 2 → 4 columns.
 
 - **`StoreHeader`** — logo · Home · Shop · **Categories ▾** · search ·
-  **share** · cart. Hover
+  **share** · cart · **account**. Hover
   dropdown on desktop, hamburger drawer with an accordion below `lg`. The menu
   lists **categories and subcategories only, never products**. The share
   button (`ShareButton.tsx`, backed by `shared/share.ts`) opens the native
@@ -465,6 +516,19 @@ column), which lets the homepage render full-bleed section bands instead.
   uses. Nav items whose
   features don't exist yet (Offers, Track Order, About, Contact) are
   deliberately absent rather than rendered as dead links.
+  The **account block** closes the bar, mirroring the marketplace homepage:
+  a skeleton while the session resolves, a `Sign in` button for guests that
+  opens the auth dialog in the store's palette and identity
+  (`storeAuthRequest(store)`) right over the page, and for signed-in visitors the SAME
+  `layout/AccountMenu.tsx` dropdown the marketplace uses, rendered with
+  `crossRouter` (its destinations are marketplace routes, so its rows become
+  plain anchors and logout hard-replaces the location). It exists here because
+  a seller shares `/store/{slug}`, not `/` — for most visitors this is the
+  only header they ever see. Colors need no special casing: the menu is built
+  from the semantic tokens `storeVars()` re-points, so it wears the store's
+  palette. Below `sm` the bar has no room for it beside the search field, so
+  the same block (avatar, name, the `ACCOUNT_MENU_ITEMS` rows, My Store,
+  Logout) sits at the **top of the mobile drawer** instead.
 - **`StoreHomePage`** — hero, Shop by Category, then the
   merchandising rows (Featured / New Arrivals / Best Sellers) from
   `GET …/home`. Sections render in the **owner-arranged order** (the payload's
@@ -634,8 +698,8 @@ the cart pages stay silent.
 `signOut` in `StorefrontApp.tsx`): there is no server-side cart, so a
 device-local basket would otherwise be inherited by whoever uses the browser
 next. Only an *explicit* logout clears it — an expired session (the 401 path
-out of checkout) redirects to `/login` and leaves the cart intact, so the
-shopper can sign back in and pay.
+out of checkout) refreshes once and retries, else opens the auth dialog over
+the checkout, leaving the cart intact so the shopper can sign back in and pay.
 Three public routes, matched before the session gate like `/store/{slug}`:
 **`/cart`** (`pages/cart/CartPage.tsx`) groups items **by store** — each
 store card shows the store's **logo** (fetched via
@@ -687,13 +751,16 @@ CURRENT delivery/pickup choice (before step 1 is confirmed) so a pickup
 switch re-quotes shipping to ₹0 immediately.
 
 **`/checkout/{storeSlug}`** (`pages/cart/CheckoutPage.tsx`) is the
-per-store **checkout** — **sign-in required**: the page probes the cookie
-session on mount (browsing and the cart stay anonymous; only ordering
+per-store **checkout** — **sign-in required**: the page reads the shell's
+session (`useMarketSession` — one probe per page load, shared with the store
+header's account menu; browsing and the cart stay anonymous, only ordering
 needs an account, matching the API's `requireCustomer` on order
-placement). Guests get a "Sign in to place your order" panel whose CTA is
-a plain `<a>` to `/login?next=/checkout/{slug}` (full page load — /login
-lives in the marketplace router), and a mid-checkout 401 on Place Order
-(expired session) redirects the same way. For signed-in customers it
+placement). Guests get a "Sign in to place your order" panel whose CTA
+opens the auth dialog in the store's palette over the checkout — the steps
+and the quote appear the moment the session flips, nothing reloads. A
+mid-checkout 401 on Place Order (cookie expired while filling the form)
+calls `customerAuth.refresh()` once and retries; only if that fails does the
+dialog open, with the cart and the filled-in steps intact. For signed-in customers it
 renders an Inter-titled top bar with a secure-checkout
 cue, compact store identity row, the read-only item list (edit links back
 to the cart), the two interactive checkout steps (below), and an order
@@ -1397,7 +1464,7 @@ frontend/
     │       └── useSession.ts     # Cookie-session hook (loading/guest/authed)
     ├── storefront/
     │   ├── main.tsx              # Mounts <StorefrontApp/>
-    │   ├── StorefrontApp.tsx     # Session gate (splash ↔ login ↔ routed shell)
+    │   ├── StorefrontApp.tsx     # Session probe + picks marketplace vs public router
     │   ├── app/
     │   │   ├── router.tsx        # Marketplace router: public / + /login + guarded account subtree
     │   │   ├── publicRouter.tsx  # Public storefront + cart routes (no sign-in)
@@ -1433,10 +1500,15 @@ frontend/
     │   │   │   ├── useCartRevalidation.ts # Cart-open price/stock refresh
     │   │   │   ├── useCheckoutQuote.ts # Checkout: server-priced summary (subtotal/shipping/tax/total)
     │   │   │   └── useDeliveryCheck.ts # Checkout: which lines reach the chosen pincode
+    │   │   ├── auth/             # Customer sign-in, shared by the dialog and /login
+    │   │   │   ├── CustomerAuthPanel.tsx # Email+password · register · forgot/reset · phone OTP · Google (dev)
+    │   │   │   ├── AuthDialog.tsx    # In-place sign-in dialog host (portal, store theme, focus trap)
+    │   │   │   ├── authDialogStore.ts # openAuthDialog / closeAuthDialog / useAuthDialog / storeAuthRequest
+    │   │   │   └── StorefrontHero.tsx # UnieMax photo hero (login page + marketplace dialog)
     │   │   ├── publicStore/      # The multi-page storefront under /store/{slug}
     │   │   │   ├── useStoreShells.ts # Session-cached shell lookup (logo+theme) for cart/checkout
     │   │   │   ├── PublicStoreLayout.tsx # Shell: fetches store once + usePublicStore()
-    │   │   │   ├── StoreHeader.tsx   # Logo · Home · Categories ▾ · search · share · cart
+    │   │   │   ├── StoreHeader.tsx   # Logo · Home · Categories ▾ · search · share · cart · account
     │   │   │   ├── StoreFooter.tsx   # Owner-configured footer (locations, social, support…)
     │   │   │   ├── ShareButton.tsx   # Share/copy-link control (store + product)
     │   │   │   ├── ProductListing.tsx# Shared body for category + search pages
@@ -1460,7 +1532,7 @@ frontend/
     │   │       ├── useStores.ts  # useStores (list) + useStore (by id) hooks
     │   │       └── useManagedStore.ts # Outlet-context hook for manage sections
     │   └── pages/
-    │       ├── LoginPage.tsx     # Email+password · Google (dev) · phone OTP
+    │       ├── LoginPage.tsx     # /login fallback page: split-screen frame around CustomerAuthPanel
     │       ├── LoginRoute.tsx    # /login route: ?next= handling + already-authed redirect
     │       ├── HomePage.tsx      # Marketplace homepage: hero+collage, New Stores, Fresh Finds, seller CTA
     │       ├── InfoComingSoonPage.tsx # Public placeholder for /about /privacy /terms /contact
@@ -1794,7 +1866,9 @@ used to put dark text on dark buttons when the two diverged). All three are
 malformed hex would render as flat grey rather than being harmlessly ignored
 by CSS, so `storeVars()` falls back to the default theme colors (and treats
 malformed optional colors as Auto) for any value failing
-`^#[0-9a-fA-F]{6}$`.
+`^#[0-9a-fA-F]{6}$`. It also sets `--input-bg` to the surface, so fields
+(`bg-input`) inside a store page or the store-themed auth dialog sit on the
+owner's surface instead of keeping the app's white.
 
 **Metal accents — deliberately scarce.** Surfaces, bars, chips and wells are
 FLAT semantic colors; the shine is reserved for the places that should read as

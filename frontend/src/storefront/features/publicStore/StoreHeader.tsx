@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
+import type { Customer } from '../../../shared/auth/authApi'
+import type { SessionState } from '../../../shared/auth/useSession'
+import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import {
   cartUrl,
   publicStoreUrl,
@@ -10,11 +13,19 @@ import {
   type PublicStore,
 } from '../stores/storesApi'
 import { useCart } from '../cart/cart'
+import { useMarketSession } from '../../app/marketSession'
+import { SessionProvider } from '../../app/SessionProvider'
+import { ACCOUNT_MENU_ITEMS } from '../../app/navigation'
+import { AccountMenu } from '../../layout/AccountMenu'
+import { Avatar } from '../../layout/Avatar'
+import { useSignOutConfirm } from '../../layout/useSignOutConfirm'
+import { openAuthDialog, storeAuthRequest } from '../auth/authDialogStore'
 import { ShareButton } from './ShareButton'
 import {
   CartIcon,
   ChevronDownIcon,
   CloseIcon,
+  LogoutIcon,
   MenuIcon,
   SearchIcon,
   StoreIcon,
@@ -22,7 +33,8 @@ import {
 import type { Skin } from './storeTheme'
 
 /**
- * Storefront chrome: logo · Home · Shop · Categories ▾ · Help · search · cart.
+ * Storefront chrome: logo · Home · Shop · Categories ▾ · Help · search ·
+ * share · cart · **account**.
  *
  * The Categories menu lists **categories and subcategories only, never
  * products** — a dropdown that enumerated products would be unusable the
@@ -40,13 +52,43 @@ import type { Skin } from './storeTheme'
  *
  * Nav items whose features don't exist yet (Offers, Track Order, About) are
  * deliberately absent rather than rendered as dead links.
+ *
+ * **Account** sits at the end of the bar, exactly as on the marketplace
+ * homepage — a seller shares `/store/{slug}`, not `/`, so this is the only
+ * header most visitors ever see and it has to carry the same avatar dropdown
+ * (orders, addresses, logout) and the same Sign in call to action. Below `sm`
+ * the bar has no room for it beside the search field, so the account block
+ * moves into the hamburger drawer instead.
+ *
+ * The session comes from `useMarketSession()`, and every account destination
+ * lives in the marketplace router — hence `crossRouter`, which turns those
+ * rows into full page loads.
  */
-export function StoreHeader({
+export function StoreHeader({ store, skin }: { store: PublicStore; skin: Skin }) {
+  const { state, signOut } = useMarketSession()
+  const bar = <StoreHeaderBar store={store} skin={skin} session={state} />
+
+  // The dropdown and the drawer's logout row both read the signed-in customer
+  // through `useCustomerSession()`; that context only ever holds a real
+  // customer, so it is provided from here only once there is one.
+  if (state.status === 'authed') {
+    return (
+      <SessionProvider customer={state.user} signOut={signOut}>
+        {bar}
+      </SessionProvider>
+    )
+  }
+  return bar
+}
+
+function StoreHeaderBar({
   store,
   skin,
+  session,
 }: {
   store: PublicStore
   skin: Skin
+  session: SessionState<Customer>
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const location = useLocation()
@@ -121,12 +163,19 @@ export function StoreHeader({
 
         {/* Cart */}
         <CartButton skin={skin} storeSlug={store.slug} />
+
+        {/* Account — from `sm` up; below that it lives in the drawer, where
+            there is room for it beside the search field. */}
+        <div className="hidden shrink-0 sm:block">
+          <AccountSlot store={store} session={session} skin={skin} />
+        </div>
       </div>
 
       {drawerOpen && (
         <MobileDrawer
           store={store}
           skin={skin}
+          session={session}
           onClose={() => setDrawerOpen(false)}
         />
       )}
@@ -247,10 +296,12 @@ function CategoriesMenu({ store, skin }: { store: PublicStore; skin: Skin }) {
 function MobileDrawer({
   store,
   skin,
+  session,
   onClose,
 }: {
   store: PublicStore
   skin: Skin
+  session: SessionState<Customer>
   onClose: () => void
 }) {
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -291,6 +342,11 @@ function MobileDrawer({
         </div>
 
         <nav className="min-h-0 flex-1 overflow-y-auto p-2">
+          {/* Account first: on a phone this drawer is the only place the
+              profile section fits, and it is what a visitor arriving on a
+              shared store link looks for. */}
+          <DrawerAccount store={store} session={session} skin={skin} onClose={onClose} />
+
           <Link
             to={storeHomeUrl(store.slug)}
             onClick={onClose}
@@ -437,5 +493,166 @@ function CartButton({ skin, storeSlug }: { skin: Skin; storeSlug: string }) {
         </span>
       )}
     </a>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Account — the marketplace profile section, carried into the storefront
+// ---------------------------------------------------------------------------
+
+/**
+ * Bar slot (sm+): skeleton → Sign in → the shared avatar dropdown.
+ *
+ * Sign in opens the auth dialog IN PLACE, dressed in this store's palette
+ * and identity (`storeAuthRequest`) — no trip to `/login` and back. The
+ * session flips on success and this slot re-renders into the menu.
+ */
+function AccountSlot({
+  store,
+  session,
+  skin,
+}: {
+  store: PublicStore
+  session: SessionState<Customer>
+  skin: Skin
+}) {
+  if (session.status === 'loading') {
+    return (
+      <div
+        className={`h-10 w-10 animate-pulse rounded-full border ${skin.border} ${skin.chip}`}
+      />
+    )
+  }
+
+  if (session.status === 'guest') {
+    return (
+      <button
+        type="button"
+        onClick={() => openAuthDialog(storeAuthRequest(store))}
+        className={`flex h-10 shrink-0 items-center whitespace-nowrap rounded-md px-4 text-sm font-semibold ${skin.cta} transition hover:opacity-90`}
+      >
+        Sign in
+      </button>
+    )
+  }
+
+  return <AccountMenu crossRouter />
+}
+
+/** Drawer block (below sm, where the bar has no room for the slot above). */
+function DrawerAccount({
+  store,
+  session,
+  skin,
+  onClose,
+}: {
+  store: PublicStore
+  session: SessionState<Customer>
+  skin: Skin
+  onClose: () => void
+}) {
+  if (session.status === 'loading') {
+    return (
+      <div
+        className={`mb-2 h-16 animate-pulse rounded-md border ${skin.border} ${skin.chip}`}
+      />
+    )
+  }
+
+  if (session.status === 'guest') {
+    return (
+      <div className={`mb-2 rounded-md border p-3 ${skin.border} ${skin.surface}`}>
+        <p className={`text-sm font-bold ${skin.text}`}>Your account</p>
+        <p className={`mt-0.5 text-xs ${skin.muted}`}>
+          Sign in to track orders and check out faster.
+        </p>
+        <button
+          type="button"
+          // Close the drawer first: on success the bar behind the dialog
+          // re-renders with the account menu, which is where they'll look.
+          onClick={() => {
+            onClose()
+            openAuthDialog(storeAuthRequest(store))
+          }}
+          className={`mt-3 flex h-10 w-full items-center justify-center rounded-md text-sm font-semibold ${skin.cta} transition hover:opacity-90`}
+        >
+          Sign in
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <DrawerAccountMenu customer={session.user} skin={skin} onClose={onClose} />
+  )
+}
+
+/**
+ * The dropdown's rows, flattened into the drawer. Every link is a plain
+ * anchor (marketplace routes — see `crossRouter` on `AccountMenu`), so the
+ * drawer needs no closing; logout keeps it open because the confirm dialog
+ * portals over it and closing would unmount the dialog with it.
+ *
+ * The store row is a static "My Store" rather than the dropdown's
+ * Create/Manage split: that split costs a `GET /stores` on open, and
+ * `/stores` already handles the "no stores yet" case.
+ */
+function DrawerAccountMenu({
+  customer,
+  skin,
+  onClose,
+}: {
+  customer: Customer
+  skin: Skin
+  onClose: () => void
+}) {
+  const signOutFlow = useSignOutConfirm({ crossRouter: true })
+  const name = customer.name ?? 'Customer'
+  const contact = customer.email ?? customer.phone ?? ''
+  const rowClass = `flex items-center gap-3 rounded-md px-2 py-2.5 text-sm font-semibold ${skin.text}`
+
+  return (
+    <div className={`mb-2 rounded-md border p-3 ${skin.border} ${skin.surface}`}>
+      <div className="flex items-center gap-3">
+        <Avatar customer={customer} className="h-10 w-10" />
+        <div className="min-w-0">
+          <p className={`truncate text-sm font-bold ${skin.text}`}>{name}</p>
+          {contact && (
+            <p className={`truncate text-xs ${skin.muted}`}>{contact}</p>
+          )}
+        </div>
+      </div>
+
+      <div className={`mt-2 border-t pt-1 ${skin.border}`}>
+        <a href="/stores" onClick={onClose} className={rowClass}>
+          <StoreIcon className={`h-[18px] w-[18px] ${skin.muted}`} />
+          My Store
+        </a>
+        {ACCOUNT_MENU_ITEMS.map(({ label, to, icon: Icon }) => (
+          <a key={label} href={to} onClick={onClose} className={rowClass}>
+            <Icon className={`h-[18px] w-[18px] ${skin.muted}`} />
+            {label}
+          </a>
+        ))}
+        <button
+          type="button"
+          onClick={signOutFlow.request}
+          className={`${rowClass} w-full text-danger`}
+        >
+          <LogoutIcon className="h-[18px] w-[18px]" />
+          Logout
+        </button>
+      </div>
+
+      <ConfirmDialog
+        open={signOutFlow.confirming}
+        title="Logout?"
+        description="You'll need to sign in again to access your account."
+        confirmLabel="Logout"
+        busy={signOutFlow.busy}
+        onConfirm={signOutFlow.confirm}
+        onCancel={signOutFlow.cancel}
+      />
+    </div>
   )
 }

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { usePageTitle } from '../../../shared/usePageTitle'
 import { toApiError } from '../../../shared/auth/http'
 import { ErrorNote } from '../../../shared/ui/form'
+import { useMarketSession } from '../../app/marketSession'
+import { openAuthDialog, storeAuthRequest } from '../../features/auth/authDialogStore'
 import { usePublicStore, StorePageShell } from '../../features/publicStore/PublicStoreLayout'
 import { NewTicketForm } from '../../features/support/NewTicketForm'
 import { TicketList } from '../../features/support/TicketList'
@@ -29,13 +31,15 @@ import {
  *      shown to everyone including signed-out visitors — a phone number needs
  *      no account.
  *   2. A **tracked message**, which does need one: a thread has to belong to
- *      somebody. Guests get the sign-in path rather than a form that would
- *      fail on submit.
+ *      somebody. Guests get a Sign in button that opens the auth dialog in
+ *      the store's palette, right here — rather than a form that would fail
+ *      on submit, or a trip to `/login` and back.
  *
- * The session is probed by *attempting the list*: a 401 means guest. The
- * public store router deliberately never calls `/auth/me` (no auth round-trip
- * on a shared store link), and this keeps that true — one request either way,
- * no extra machinery.
+ * Guests are recognised by *attempting the list*: a 401 means signed out. The
+ * shell's session state would answer the same question, but the tickets have
+ * to be fetched either way — so this stays one request rather than a request
+ * plus a branch. The load is re-run when the session status changes, which is
+ * how an in-dialog sign-in turns the guest panel into the request list.
  */
 
 const telLink = (number: string) => `tel:${number.replace(/[^\d+]/g, '')}`
@@ -46,12 +50,18 @@ export function StoreHelpPage() {
   usePageTitle('Help & Support', store.name)
 
   const support = store.footer.support
+  const { state: session } = useMarketSession()
   const [tickets, setTickets] = useState<SupportTicket[] | null>(null)
   const [guest, setGuest] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [composing, setComposing] = useState(false)
 
+  // Keyed on the session status too: signing in through the dialog flips it
+  // to `authed` without a reload, and that is what loads the list.
   useEffect(() => {
+    // One request per RESOLVED status — not a 401 during the probe and
+    // another once it lands.
+    if (session.status === 'loading') return
     let cancelled = false
     setTickets(null)
     setGuest(false)
@@ -71,7 +81,7 @@ export function StoreHelpPage() {
     return () => {
       cancelled = true
     }
-  }, [store.slug])
+  }, [store.slug, session.status])
 
   const hasContact =
     support.phone || support.whatsapp || support.email || support.hours
@@ -163,15 +173,13 @@ export function StoreHelpPage() {
             A request is a tracked conversation, so it has to belong to an
             account. The contact details above need no sign-in.
           </p>
-          {/* Plain <a>: /login lives in the MARKETPLACE router, and the app
-              picks a router per full page load — a client-side Link would hit
-              this router's catch-all. */}
-          <a
-            href={`/login?next=${encodeURIComponent(`/store/${store.slug}/support`)}`}
+          <button
+            type="button"
+            onClick={() => openAuthDialog(storeAuthRequest(store))}
             className={`mt-5 inline-flex h-10 items-center rounded-md px-5 text-sm font-semibold transition hover:opacity-90 ${skin.cta}`}
           >
             Sign in
-          </a>
+          </button>
         </div>
       ) : (
         <>
