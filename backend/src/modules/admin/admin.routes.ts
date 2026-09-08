@@ -39,6 +39,10 @@ export const adminConsoleRoutes: FastifyPluginAsync = async (app) => {
   app.get("/catalog/products/:id", controller.getProduct);
   app.patch("/catalog/products/:id/visibility", controller.setProductVisibility);
 
+  // Pointing sellers' legacy free-text shelves at the global taxonomy.
+  app.get("/catalog/shelves", controller.listShelfMappings);
+  app.patch("/catalog/shelves/:id/category", controller.setShelfMapping);
+
   // Who did what
   app.get("/audit", controller.getAudit);
 

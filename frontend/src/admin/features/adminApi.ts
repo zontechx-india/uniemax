@@ -88,6 +88,42 @@ export interface OrderDetail extends OrderRow {
   }[]
 }
 
+/**
+ * How far a seller has got with setting their store up — the console's
+ * mirror of the backend's `summariseReadiness()`.
+ *
+ * The platform evaluates this from ONE requirement registry
+ * (`storeReadiness.ts`), which is also what the publish and payment
+ * endpoints enforce and what the seller sees on their own pages. So an admin
+ * chasing a seller is never quoting a different rulebook.
+ */
+export interface SetupSummary {
+  complete: boolean
+  metCount: number
+  totalCount: number
+  /** Unfinished steps in registry order. Empty when `complete`. */
+  pending: SetupStep[]
+}
+
+export interface SetupStep {
+  key: string
+  /** "Business & contact", "Address", "Tax details"… */
+  title: string
+  /** Section path under `/mystores/{slug}` — `business`, `products`, … */
+  href: string
+  metCount: number
+  totalCount: number
+}
+
+/** One requirement, from the detail endpoint's full evaluation. */
+export interface SetupRequirement {
+  key: string
+  label: string
+  step: string
+  gates: ('PUBLISH' | 'ONLINE_PAYMENT' | 'PICKUP')[]
+  met: boolean
+}
+
 export interface StoreRow {
   id: string
   name: string
@@ -101,6 +137,7 @@ export interface StoreRow {
   owner: { id: string; name: string | null; email: string | null; phone: string | null }
   counts: { products: number; categories: number; orders: number }
   revenue: string
+  setup: SetupSummary
 }
 
 /**
@@ -154,6 +191,21 @@ export interface BankAccount {
 }
 
 export interface StoreDetail extends StoreRow {
+  /**
+   * The full evaluation, not just the summary — the detail page names the
+   * individual missing requirements ("Contact email", "PAN"), which is what
+   * an admin has to put in the message they send the seller.
+   */
+  readiness: {
+    steps: (SetupStep & {
+      blurb: string
+      complete: boolean
+      requirements: SetupRequirement[]
+    })[]
+    complete: boolean
+    metCount: number
+    totalCount: number
+  }
   settings: {
     payments: { acceptOnlinePayment: boolean; acceptCod: boolean }
     shipping: {
@@ -202,6 +254,26 @@ export interface CustomerDetail extends CustomerRow {
     'id' | 'orderNumber' | 'status' | 'storeName' | 'storeSlug' | 'paymentMethod' | 'paymentStatus' | 'total' | 'placedAt'
   >[]
   revokedSessions?: number
+}
+
+/**
+ * One seller's shelf, seen from the console. Shelves created since the
+ * taxonomy landed already carry a `category`; the ones that do not are free
+ * text a seller typed earlier, and are what the mapping page exists to fix.
+ */
+export interface ShelfRow {
+  id: string
+  name: string
+  slug: string
+  isActive: boolean
+  /** "KTM › Duke 200" — how the shelf reads inside the seller's own shop. */
+  shelfPath: string
+  isSubcategory: boolean
+  store: { id: string; name: string; slug: string }
+  productCount: number
+  subcategoryCount: number
+  categoryId: string | null
+  category: { id: string; name: string; pathLabel: string } | null
 }
 
 export interface ProductRow {
@@ -464,6 +536,23 @@ export const adminApi = {
   },
   setProductVisibility(id: string, body: { isActive: boolean; reason?: string | null }) {
     return call<ProductDetail>(http.patch(`${BASE}/catalog/products/${id}/visibility`, body))
+  },
+
+  // Pointing sellers' legacy free-text shelves at the global taxonomy
+  listShelves(query: Params) {
+    return callList<ShelfRow>(http.get(`${BASE}/catalog/shelves`, params(query)))
+  },
+  /**
+   * `categoryId: null` unmaps the shelf again. `applyToProducts` also re-files
+   * the products sitting on it — the reason for mapping in the first place.
+   */
+  setShelfCategory(
+    id: string,
+    body: { categoryId: string | null; applyToProducts: boolean },
+  ) {
+    return call<{ shelf: ShelfRow; productsUpdated: number }>(
+      http.patch(`${BASE}/catalog/shelves/${id}/category`, body),
+    )
   },
 
   // Support tickets

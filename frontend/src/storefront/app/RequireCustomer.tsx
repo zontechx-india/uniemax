@@ -4,7 +4,7 @@ import { SessionProvider } from './SessionProvider'
 import { useMarketSession } from './marketSession'
 
 /**
- * Route guard for the account subtree (dashboard pages, /stores/…).
+ * Route guard for the account subtree (dashboard pages, /mystores/…).
  *
  *   loading → splash (the probe is one request; don't flash a redirect)
  *   guest   → /login, carrying the intended destination in ?next= so the

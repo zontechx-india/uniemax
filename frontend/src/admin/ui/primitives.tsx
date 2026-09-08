@@ -81,7 +81,14 @@ export function PageHeader({
 // Status
 // ---------------------------------------------------------------------------
 
-export type ChipTone = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'brand'
+export type ChipTone =
+  | 'neutral'
+  | 'success'
+  | 'warning'
+  | 'danger'
+  | 'info'
+  | 'brand'
+  | 'pending'
 
 const CHIP_TONES: Record<ChipTone, string> = {
   neutral: 'bg-surface-alt text-muted border-line',
@@ -90,6 +97,11 @@ const CHIP_TONES: Record<ChipTone, string> = {
   danger: 'bg-danger/10 text-danger border-danger/30',
   info: 'bg-accent/10 text-accent border-accent/30',
   brand: 'bg-brand/15 text-fg border-brand/40',
+  // Setup that is unfinished — NOT a warning (nothing is wrong) and not
+  // danger (nothing is broken); the seller simply owes the platform
+  // something. Shares the storefront's `--pending` orange so a seller and an
+  // admin looking at the same store see the same color mean the same thing.
+  pending: 'bg-pending-soft text-pending border-pending/30',
 }
 
 /**

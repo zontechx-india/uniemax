@@ -5,6 +5,7 @@ import { isProduction } from "../../config/env.js";
 import { HttpError } from "../../utils/httpError.js";
 import { buildListMeta } from "../../utils/response.js";
 import { mediaUrl } from "../../package/storage/index.js";
+import { clearStoreLines } from "../cart/cart.service.js";
 import { recomputeProductAggregates } from "../stores/catalogSlug.js";
 import { getMyStore } from "../stores/stores.service.js";
 import {
@@ -632,6 +633,13 @@ export async function createOrder(
       throw err;
     }
   }
+
+  // The basket that became this order is spent — empty it for this store on
+  // every device the customer is signed in on, not just the tab that checked
+  // out. Deliberately after the gateway step: a placement rolled back above
+  // never happened, and must not cost the shopper their cart. Best-effort —
+  // a paid order is never failed because the cart could not be tidied.
+  void clearStoreLines(customerId, store.id).catch(() => {});
 
   const shaped = shapeOrder(row);
   // Fire-and-forget: confirmation to the customer + alert to the seller.

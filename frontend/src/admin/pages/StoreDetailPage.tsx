@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { adminApi } from '../features/adminApi'
-import type { BankAccount, BankVerificationStatus } from '../features/adminApi'
+import type { BankAccount, BankVerificationStatus, StoreDetail } from '../features/adminApi'
 import { useAdminQuery } from '../features/useAdminQuery'
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
+import { copyToClipboard } from '../../shared/share'
 import { ActiveChip } from '../ui/statusMeta'
 import { formatPriceRange } from '../ui/format'
 import { ProductDetailDialog } from './products/ProductDetailDialog'
@@ -18,7 +19,13 @@ import {
   Skeleton,
   TextArea,
 } from '../ui/primitives'
-import { BankStatusChip, OrderStatusChip, PaymentChip, StoreStatusChip } from '../ui/statusMeta'
+import {
+  BankStatusChip,
+  OrderStatusChip,
+  PaymentChip,
+  SetupChip,
+  StoreStatusChip,
+} from '../ui/statusMeta'
 import {
   formatCount,
   formatDate,
@@ -248,6 +255,8 @@ export default function StoreDetailPage() {
           </dl>
         </Card>
       </div>
+
+      <SellerSetupCard store={store} />
 
       <Card className="mt-4">
         <CardHeader
@@ -491,5 +500,162 @@ export default function StoreDetailPage() {
         onChanged={products.refresh}
       />
     </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Seller setup
+// ---------------------------------------------------------------------------
+
+/**
+ * "What does this seller still owe us, and how do I tell them?"
+ *
+ * The platform cannot finish a seller's setup for them — business details,
+ * tax IDs and payout accounts are theirs to enter, and the contact fields are
+ * verified identifiers the admin could not type even with the data in front
+ * of them. So the only useful thing this card can do is make CHASING easy:
+ * name exactly what is missing, and hand over a link that drops the seller on
+ * the page that fixes it.
+ *
+ * The evaluation is the platform's single requirement registry
+ * (`storeReadiness.ts`) — the same one the seller's own pages render and the
+ * publish endpoint enforces — so an admin is never quoting different rules
+ * from the ones the seller is being held to.
+ */
+function SellerSetupCard({ store }: { store: StoreDetail }) {
+  const pending = store.readiness.steps.filter(
+    (step) => !step.complete && step.totalCount > 0,
+  )
+
+  // The seller's own management pages, absolute: this link is going into a
+  // WhatsApp message or an email, where a bare path resolves to nothing.
+  const linkTo = (href: string) =>
+    `${window.location.origin}/mystores/${store.slug}/${href}`
+
+  const message = [
+    `Hi — your UnieMax store "${store.name}" isn't finished yet.`,
+    '',
+    'Still to complete:',
+    ...pending.map(
+      (step) =>
+        `• ${step.title} — ${step.requirements
+          .filter((req) => !req.met)
+          .map((req) => req.label)
+          .join(', ')}`,
+    ),
+    '',
+    // Two steps often live on the same page (business & contact, address and
+    // tax all sit on Business Details), so the links are de-duplicated —
+    // pasting the same URL three times reads as a mistake.
+    pending.length > 0 ? 'You can finish them here:' : '',
+    ...[...new Set(pending.map((step) => linkTo(step.href)))],
+    '',
+    'Once these are in, your store can go live.',
+  ].join('\n')
+
+  return (
+    <Card className="mt-4">
+      <CardHeader
+        title="Seller setup"
+        subtitle={
+          store.readiness.complete
+            ? 'Everything the platform asks for is in.'
+            : `${store.readiness.metCount} of ${store.readiness.totalCount} details in — the seller finishes these on their own store pages.`
+        }
+        action={<SetupChip setup={store.setup} />}
+      />
+
+      {pending.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted">
+          Nothing outstanding — this seller is fully set up.
+        </p>
+      ) : (
+        <>
+          <ul className="divide-y divide-line">
+            {pending.map((step) => (
+              <li
+                key={step.key}
+                className="flex flex-wrap items-start justify-between gap-3 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-fg">
+                    {step.title}{' '}
+                    <span className="text-muted">
+                      · {step.metCount} of {step.totalCount}
+                    </span>
+                  </p>
+                  {/* The requirement LABELS, not just a count: "2 of 4" is
+                      not something an admin can put in a message. */}
+                  <p className="mt-0.5 text-xs text-pending">
+                    {step.requirements
+                      .filter((req) => !req.met)
+                      .map((req) => req.label)
+                      .join(' · ')}
+                  </p>
+                  <p className="mt-1 truncate font-mono text-xs text-muted">
+                    /mystores/{store.slug}/{step.href}
+                  </p>
+                </div>
+                <CopyButton text={linkTo(step.href)} label="Copy link" />
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <CopyButton
+              text={message}
+              label="Copy message for the seller"
+              variant="primary"
+            />
+            <p className="text-xs text-muted">
+              A ready-to-send note listing everything outstanding, with the links.
+            </p>
+          </div>
+        </>
+      )}
+    </Card>
+  )
+}
+
+/**
+ * Copy, with the confirmation ON the button.
+ *
+ * A toast would be the console's usual answer, but this button can appear
+ * five times in one card and the admin needs to know WHICH one they just
+ * copied — so the feedback stays where the click was.
+ */
+function CopyButton({
+  text,
+  label,
+  variant = 'secondary',
+}: {
+  text: string
+  label: string
+  variant?: 'primary' | 'secondary'
+}) {
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (!copied) return
+    const timer = setTimeout(() => setCopied(false), 1800)
+    return () => clearTimeout(timer)
+  }, [copied])
+
+  return (
+    <Button
+      variant={variant}
+      className="shrink-0"
+      onClick={async () => {
+        try {
+          await copyToClipboard(text)
+          setCopied(true)
+        } catch {
+          // A clipboard the browser refuses is not worth an error dialog —
+          // the path is on screen and can be typed.
+        }
+      }}
+    >
+      {copied ? 'Copied' : label}
+    </Button>
   )
 }

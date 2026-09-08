@@ -125,7 +125,7 @@ export async function createStoreTicket(
     kind: "SUPPORT",
     title: `New customer request · ${ticket.ticketNumber}`,
     body: `${customer?.name ?? "A customer"}: ${input.subject}`,
-    url: `/stores/${store.slug}/customer-support/${ticket.id}`,
+    url: `/mystores/${store.slug}/customer-support/${ticket.id}`,
     data: { ticketId: ticket.id, storeId: store.id },
   });
 

@@ -10,6 +10,7 @@ import * as customers from "./adminCustomers.service.js";
 import * as orders from "./adminOrders.service.js";
 import * as products from "./adminProducts.service.js";
 import * as accounts from "./adminAccounts.service.js";
+import * as categoryMapping from "./adminCategoryMapping.service.js";
 import { listAudit, recordAudit } from "./adminAudit.js";
 
 /**
@@ -157,6 +158,31 @@ export async function setProductVisibility(request: FastifyRequest) {
 }
 
 // ---- Audit trail ----------------------------------------------------------
+
+/** Shelves a seller typed before the taxonomy existed. */
+export async function listShelfMappings(request: FastifyRequest) {
+  const query = schema.shelfListQuery.parse(request.query);
+  const result = await categoryMapping.listShelves(query);
+  return list(result.rows, result.meta);
+}
+
+export async function setShelfMapping(request: FastifyRequest) {
+  const { id } = idParamSchema.parse(request.params);
+  const input = schema.shelfMappingSchema.parse(request.body);
+  const result = await categoryMapping.setShelfCategory(id, input);
+  recordAudit(request, {
+    action: input.categoryId ? "storeCategory.map" : "storeCategory.unmap",
+    entityType: "storeCategory",
+    entityId: id,
+    meta: {
+      store: result.shelf.store.name,
+      shelf: result.shelf.shelfPath,
+      category: result.shelf.category?.pathLabel ?? null,
+      productsUpdated: result.productsUpdated,
+    },
+  });
+  return ok(result);
+}
 
 export async function getAudit(request: FastifyRequest) {
   const query = schema.auditListQuery.parse(request.query);

@@ -365,3 +365,53 @@ export function evaluateReadiness(ctx: ReadinessContext): Readiness {
     totalCount: states.length,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Summary — readiness for a LIST
+// ---------------------------------------------------------------------------
+
+export interface ReadinessStepSummary {
+  key: StepKey;
+  title: string;
+  /** Where the seller finishes it, relative to `/mystores/{slug}`. */
+  href: string;
+  metCount: number;
+  totalCount: number;
+}
+
+/**
+ * What a store's setup looks like from a distance — for the admin console's
+ * store LIST, which needs "is this seller done, and if not, what is missing?"
+ * for every row on the page.
+ *
+ * The full evaluation carries every requirement of every step; multiplied by
+ * a page of rows that is kilobytes of detail nobody reads until they open one
+ * store. This keeps the counts and names the unfinished steps, and the detail
+ * endpoint still returns the whole thing.
+ */
+export interface ReadinessSummary {
+  complete: boolean;
+  metCount: number;
+  totalCount: number;
+  /** Unfinished steps in registry order. Empty when `complete`. */
+  pending: ReadinessStepSummary[];
+}
+
+export function summariseReadiness(readiness: Readiness): ReadinessSummary {
+  return {
+    complete: readiness.complete,
+    metCount: readiness.metCount,
+    totalCount: readiness.totalCount,
+    pending: readiness.steps
+      // A step with no applicable requirements is not unfinished, it does
+      // not apply — the same rule the seller's own checklist follows.
+      .filter((step) => !step.complete && step.totalCount > 0)
+      .map(({ key, title, href, metCount, totalCount }) => ({
+        key,
+        title,
+        href,
+        metCount,
+        totalCount,
+      })),
+  };
+}

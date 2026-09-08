@@ -36,7 +36,7 @@ import { StorefrontHero } from './StorefrontHero'
  * dark/light mode, which lives on `<html>`).
  *
  * The host sits outside both routers, so it cannot navigate; callers pass
- * `onSignedIn` for any follow-up (e.g. "Sell on UnieMax" → `/stores/new`).
+ * `onSignedIn` for any follow-up (e.g. "Sell on UnieMax" → `/mystores/new`).
  */
 export function AuthDialog() {
   const req = useAuthDialog()

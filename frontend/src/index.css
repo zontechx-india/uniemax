@@ -119,6 +119,10 @@
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-grid: var(--chart-grid);
+
+  /* Setup-status marks — see the pending block in the palette below. */
+  --color-pending: var(--pending);
+  --color-pending-soft: var(--pending-soft);
 }
 
 /* ------------------------------------------------------------------ *
@@ -220,6 +224,19 @@
   --chart-2: #c2410c;
   --chart-grid: #ececec;
 
+  /* --- pending (setup status) --------------------------------------
+   * "This section still needs you." Green already means done, and the
+   * brand purple means *selected*, so neither can carry "unfinished"
+   * without collapsing two meanings into one color. Burnt orange is the
+   * complementary side of the wheel from the brand, stays separable under
+   * every CVD simulation, and is the same hex the charts already use for
+   * their second series — so this adds a ROLE, not a new color. 5.2:1 on
+   * the white surface as text; the gradient below is only ever a shape
+   * (a dot, a ring, a progress bar), never a text background. */
+  --pending: #c2410c;
+  --pending-soft: #fff4ec;
+  --pending-gradient: linear-gradient(120deg, #f97316 0%, #c2410c 50%, #f97316 100%);
+
   color-scheme: light;
 }
 
@@ -253,6 +270,11 @@
   --chart-1: #9574f7;
   --chart-2: #f08c4b;
   --chart-grid: #2f2f2f;
+
+  /* Pending steps up to the dark chart step, selected against #1e1e1e. */
+  --pending: #f08c4b;
+  --pending-soft: rgba(240, 140, 75, 0.14);
+  --pending-gradient: linear-gradient(120deg, #f8b078 0%, #f08c4b 50%, #f8b078 100%);
 
   color-scheme: dark;
 }
@@ -295,6 +317,29 @@
     background-clip: text;
     -webkit-text-fill-color: transparent;
     color: transparent;
+  }
+
+  /* Pending-status mark — the ONE animated gradient in the app, and the
+   * second sanctioned deviation from "solid colors only" after the brand
+   * gradient above. It exists because a static orange dot in a fourteen-row
+   * nav reads as decoration; a slow sweep reads as "unfinished, come back".
+   * Scoped to setup-status marks (dots, rings, progress bars) — never a text
+   * background, and never more than a handful on screen at once. The global
+   * `prefers-reduced-motion` rule freezes the sweep to a flat gradient. */
+  .bg-pending-gradient {
+    background-image: var(--pending-gradient);
+    background-size: 220% 100%;
+    animation: pending-sweep 2800ms ease-in-out infinite;
+  }
+
+  @keyframes pending-sweep {
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
   }
 }
 

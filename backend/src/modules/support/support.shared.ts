@@ -135,7 +135,7 @@ export function reporterUrl(ticket: {
   if (!ticket.store) return `/support/${ticket.id}`;
   return ticket.recipient === "STORE"
     ? `/store/${ticket.store.slug}/support/${ticket.id}`
-    : `/stores/${ticket.store.slug}/support/${ticket.id}`;
+    : `/mystores/${ticket.store.slug}/support/${ticket.id}`;
 }
 
 /** The message a reporter gets when they post to a finished thread. */

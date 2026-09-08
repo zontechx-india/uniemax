@@ -8,6 +8,7 @@ import { router } from './app/router'
 import { publicRouter } from './app/publicRouter'
 import { AuthDialog } from './features/auth/AuthDialog'
 import { cart } from './features/cart/cart'
+import { stopCartSync, useCartSync } from './features/cart/cartSync'
 
 /**
  * Storefront root.
@@ -57,20 +58,32 @@ export function StorefrontApp() {
   const { state, signedIn, signOut } = useSession(customerAuth)
 
   /**
-   * Logging out empties the cart as well as the session.
+   * Mirror the cart to the server while a customer is signed in: their basket
+   * then survives a new device or a cleared browser, and a guest cart filled
+   * before signing in is merged into the account's rather than lost. Guests
+   * (`null`) shop from localStorage alone, exactly as before.
+   */
+  useCartSync(state.status === 'authed' ? state.user.id : null)
+
+  /**
+   * Logging out empties the cart in THIS BROWSER — not the account's.
    *
-   * The cart is device-local (localStorage, no server copy — public store
-   * pages are anonymous), so signing out otherwise leaves the previous
-   * customer's basket sitting there for whoever uses the browser next. It
-   * runs in `finally`: `useSession.signOut` drops to guest even when the
-   * revoke request fails, and a locally-signed-out account must not keep a
-   * cart either.
+   * Without it, the next person to use the browser inherits the previous
+   * customer's basket. The server copy is deliberately kept, so signing back
+   * in (here or anywhere else) restores it.
+   *
+   * Order matters: `stopCartSync` first, so the clear below is never
+   * mirrored — pushing an empty cart would destroy the stored one on every
+   * device. The clear then runs in `finally`, because `useSession.signOut`
+   * drops to guest even when the revoke request fails and a locally
+   * signed-out account must not keep a cart either.
    *
    * Only an EXPLICIT logout gets here. An expired session (the 401 path out
    * of checkout) redirects to `/login` without calling this, so the cart
    * survives to be paid for after signing back in.
    */
   const signOutAndClearCart = useCallback(async () => {
+    stopCartSync()
     try {
       await signOut()
     } finally {

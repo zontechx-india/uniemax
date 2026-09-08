@@ -20,36 +20,48 @@ import type {
  * encode the setup sequence: category first, then products.
  */
 
+/**
+ * A seller CHOOSES a shelf from the global taxonomy; they never type one.
+ * Both the shelf's name and its place in the hierarchy come from the chosen
+ * node, so a shop cannot invent its own vocabulary and every shelf created
+ * from here is classified by construction.
+ *
+ * Shelves that predate this rule keep their free-text names (brands like
+ * "KTM", tiers like "Pro Edition"). Re-pointing one of those at the taxonomy
+ * is an ADMIN action — see `adminCategoryMapping.service.ts` — which is why
+ * neither schema here accepts a name or a taxonomy id on update.
+ */
 export const storeCategoryCreateSchema = z.object({
-  name: z.string().trim().min(1, "Category name is required").max(60),
-  /** Parent category id → creates a subcategory (one level only). */
-  parentId: z.string().min(1).optional(),
+  /** The taxonomy node this shelf represents. Its parent, if any, is created
+   *  alongside it, so picking "Electronics › Mobiles" yields both shelves. */
+  categoryId: z.string().min(1, "Choose a category"),
+  /** Optional shelf artwork — a URL the seller pastes; `null` clears it. */
+  imageUrl: z.string().trim().url().max(2000).nullable().optional(),
+  sortOrder: z.number().int().min(0).max(9999).optional(),
 });
 
 /**
- * Partial update of a category. Covers both renaming and the
- * enable/disable toggle, so one PATCH serves the whole row.
- * Re-parenting is deliberately not supported yet (it would have to revalidate
- * the one-level nesting rule for every descendant).
+ * Partial update of a shelf — presentation and visibility only.
+ *
+ * The name and the taxonomy link are both absent on purpose: the name is
+ * derived from the chosen category, and re-pointing a shelf at a different
+ * category is an admin action. Re-parenting is likewise unsupported (it would
+ * have to revalidate the one-level nesting rule for every descendant).
  */
 export const storeCategoryUpdateSchema = z
   .object({
-    name: z
-      .string()
-      .trim()
-      .min(1, "Category name is required")
-      .max(60)
-      .optional(),
     isActive: z.boolean().optional(),
     /** Surfaces the category in the storefront homepage's Featured row. */
     isFeatured: z.boolean().optional(),
+    imageUrl: z.string().trim().url().max(2000).nullable().optional(),
+    sortOrder: z.number().int().min(0).max(9999).optional(),
   })
   .refine(
-    (patch) =>
-      patch.name !== undefined ||
-      patch.isActive !== undefined ||
-      patch.isFeatured !== undefined,
-    { message: "Provide a name, isActive or isFeatured to update" },
+    (patch) => Object.values(patch).some((value) => value !== undefined),
+    {
+      message:
+        "Provide isActive, isFeatured, imageUrl or sortOrder to update",
+    },
   );
 
 

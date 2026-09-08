@@ -12,7 +12,7 @@ import { ChatIcon, ChevronRightIcon, LifebuoyIcon } from '../../layout/icons'
  * array is a real answer and gets the empty state, so the two are never
  * confused. Rows link **relatively** (`to={ticket.id}`), which is what lets
  * the same list sit under `/support` and under
- * `/stores/{slug}/support` without knowing either path.
+ * `/mystores/{slug}/support` without knowing either path.
  */
 export function TicketList({
   tickets,

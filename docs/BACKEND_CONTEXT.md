@@ -47,7 +47,7 @@ library, VAPID; console fallback without keys — see
 ```
 backend/
 ├── prisma/
-│   ├── schema.prisma          # Data model (26 models, source of truth)
+│   ├── schema.prisma          # Data model (28 models, source of truth)
 │   └── check.sql              # Connectivity probe for `npm run db:check`
 ├── prisma.config.ts           # Prisma 7 config — migration datasource (DIRECT_URL)
 ├── src/
@@ -102,6 +102,10 @@ backend/
 │   │   │                      #   (active only) + admin CRUD; colors only
 │   │   ├── addresses/         # customer address book (schema · service ·
 │   │   │                      #   controller · routes, requireCustomer)
+│   │   ├── cart/              # durable cart for signed-in customers
+│   │   │                      #   (requireCustomer): read / replace / merge
+│   │   │                      #   / clear; the browser owns the cart, this
+│   │   │                      #   module keeps it
 │   │   ├── orders/            # storefront order placement (requireCustomer)
 │   │   │                      #   + confirmation lookup (public) + history
 │   │   │                      #   + seller order management (list/detail/
@@ -133,6 +137,14 @@ backend/
 │   │   ├── seedThemeTemplates.ts # Starter appearance templates, colors
 │   │   │                      #   lifted from real stores (npm run
 │   │   │                      #   seed-theme-templates)
+│   │   ├── seedCategories.ts  # Global category taxonomy, upserted by slug
+│   │   │                      #   (npm run seed-categories)
+│   │   ├── migrateStoreCategories.ts # One-off bulk classify of seller
+│   │   │                      #   shelves/products (superseded for day-to-day
+│   │   │                      #   work by the admin mapping page)
+│   │   │                      #   against the taxonomy (dry-run/apply/rollback)
+│   │   ├── data/              # globalCategories.ts — the seeded taxonomy
+│   │   │                      # categoryMigrationRules.ts — old text -> node
 │   │   ├── generatePushKeys.ts# VAPID key pair (npm run push-keys)
 │   │   ├── backfillCatalog.ts # Slugs + price aggregates (npm run backfill-catalog)
 │   │   └── backfillProductOptions.ts # Legacy variants → one "Option" type (npm run backfill-product-options)
@@ -372,6 +384,23 @@ no endpoint, no UI and no migration change.
 - Turning a capability **off** is never gated, and the `PUBLISH` gate applies
   only to a store's **first** publish (`publishedAt === null`), so stores that
   went live before the requirements existed are grandfathered.
+- `summariseReadiness(readiness)` trims the evaluation to
+  `{ complete, metCount, totalCount, pending[] }` for LISTS, where the full
+  per-requirement detail would be kilobytes nobody reads until they open one
+  row. Each `pending` entry keeps the step's `href`, which is what lets the
+  admin console hand a seller a direct link to the page that fixes it.
+- **The admin console evaluates the same registry.** `adminStores.service.ts`
+  imports `loadReadinessCounts` from `stores.service.ts` rather than
+  re-deriving anything, so a seller and an admin can never be shown different
+  answers to "is this store finished?". The list carries `setup` (the
+  summary), the detail carries both `setup` and the full `readiness`.
+  The `setup=COMPLETE|INCOMPLETE` filter evaluates the matching set and pages
+  in **memory** — readiness is computed from the profile JSON plus three
+  aggregate counts and deliberately not stored, so it cannot be a `WHERE`
+  clause. The cost scales with seller count, not order or product count; if
+  that ever stops being small, the fix is a denormalised `setupCompleteAt`
+  column maintained on profile writes, **not** a second copy of the rules in
+  SQL.
 
 ### Support tickets — `modules/support`
 
@@ -439,7 +468,7 @@ Decisions worth keeping:
   to is clear before anything is opened.
 - The reporter's notifications deep-link to **their** view of the ticket,
   which differs per flow (`reporterUrl` in `support.shared.ts`):
-  `/support/{id}` for an account thread, `/stores/{slug}/support/{id}` for a
+  `/support/{id}` for an account thread, `/mystores/{slug}/support/{id}` for a
   seller's platform thread, `/store/{slug}/support/{id}` for a shopper's
   thread with a shop.
 - **A message's `authorRole` is derived server-side** (`REPORTER`/`STORE`/
@@ -540,6 +569,23 @@ White-label design — one codebase, any business:
 - **StoreSetting** — single-row branding/contact/defaults.
 - **Category** — self-relation (`parentId`) → arbitrary trees (Sports > Cricket Bat),
   `displayOrder`, `isActive`. Add categories without code changes.
+  Ships with a seeded global taxonomy — 29 top-level categories, 125
+  subcategories, source of truth in `scripts/data/globalCategories.ts`, applied
+  by `npm run seed-categories` (upsert by unique `slug`, so re-running is a
+  no-op). Child slugs are namespaced under the parent because `slug` is unique
+  platform-wide while names repeat across branches ("Men" under both Fashion
+  and Shoes & Footwear). The seed is only two levels deep; nothing limits the
+  depth. Sellers proposing new categories is a separate, not-yet-built
+  suggestion workflow.
+  Two optional inbound links classify a seller's catalog against it:
+  `StoreCategory.categoryId` (a shelf's tag) and `StoreProduct.globalCategoryId`
+  (the product's own). Both are `SetNull` on delete, so retiring a node
+  unclassifies rows and never removes a shelf or a product — which is why
+  **disabling** a node is the safe way to retire it.
+  Read models for the tree/children/search endpoints live in
+  `category/categoryTree.ts`, which caches the whole table in-process
+  (60 s TTL, invalidated on every admin write) — the seller product form asks
+  for the taxonomy constantly and it changes almost never.
 - **Product** — price/discount as `Decimal(10,2)`, `stockQuantity`, JSON `specifications`
   (any product type, no schema change), `status`, `isFeatured`, unique `sku`/`slug`.
 - **ProductImage** — multiple per product, one `isCover`, `displayOrder`.
@@ -675,7 +721,24 @@ White-label design — one codebase, any business:
   homepage row and nothing else — the sections are strictly flag-driven with no
   fallback, so a flag never leaks a product into another row.
   `StoreCategory.isFeatured` drives the Shop-by-Category row (when no category is
-  starred, that row falls back to all categories).
+  starred, that row falls back to all categories). A StoreCategory also carries
+  `sortOrder` (lower first, ties by age), an optional `imageUrl` (a pasted URL —
+  no upload pipeline) and `categoryId`, the global `Category` this shelf **is**.
+
+  A seller CHOOSES that category; they never type a shelf name. The shelf takes
+  the node's name and position, so every shelf created today is classified by
+  construction and one shop cannot invent vocabulary the rest of the platform
+  is measured by. `StoreProduct.globalCategoryId` always follows its shelf —
+  taken on create, re-taken when the product moves shelf — so a product's
+  classification can never contradict where it sits.
+
+  `categoryId` is nonetheless **nullable**, for the shelves that predate the
+  rule: free text a seller typed, very often a brand ("KTM"), a vehicle model
+  ("Duke 200") or a tier ("Pro Edition"), none of which is a category — vehicle
+  brands and models belong to the future compatibility system. Those keep their
+  names forever; only an admin re-points one at the taxonomy, through
+  `adminCategoryMapping.service.ts`, which also re-files everything on it.
+  Nothing renames a seller's shelf: their storefront navigation is theirs.
   `StoreProduct` requires a category — root or subcategory — of the
   same store, and holds `name`, optional `description`, and two JSON columns:
   **`optionTypes`** (ordered `[{ name, values[] }]` — the dimensions it is
@@ -787,14 +850,49 @@ White-label design — one codebase, any business:
   accounts, an address book should always have a default). Module:
   `modules/addresses` behind `requireCustomer` at `/api/v1/addresses`;
   checkout reads the list as selectable suggestions.
+- **Cart / CartLine** (+ **CartLineStatus** `ACTIVE | SAVED`) — the
+  signed-in customer's **durable cart**: one `Cart` per customer (unique
+  `customerId`, cascade delete), spanning every store they shop from.
+  `CartLine` is one unit of sale — `cartId` + `storeId` + `productId` +
+  `variantId` + `quantity` + `status`, unique on `(cartId, variantId)`.
+  Design notes:
+  - **The browser owns the cart; the server keeps it.** localStorage is the
+    hot path (guests, instant taps, offline); this table is the durable copy
+    that survives a new device or a cleared browser. The storefront mirrors
+    its cart with `PUT /cart` and reconciles once at sign-in with
+    `POST /cart/merge` (quantity-wise union, so signing in never costs an
+    item and signing out and back in never doubles one).
+  - **No money is read from it.** Prices/stock come from the live catalog on
+    every read and checkout re-prices independently — a line is a reference,
+    a quantity and an intent. `priceAtAdd` is written on create only and is
+    for "cheaper since you added it" hints, never for charging.
+  - **A line always points at a real variant** (the unit of sale), including
+    a product's implicit `isDefault` one; the service maps that to/from the
+    `variantId: null` the public API uses, so `(cartId, variantId)` is a
+    true unique with no nullable caveat. Store/product ids are stored
+    alongside because grouping by store and "how many carts hold this
+    product" are what the table is read for.
+  - **Extension points that need no migration:** `status` (save-for-later /
+    wishlist), `Cart.metadata` (coupon code, gift note) and
+    `CartLine.metadata` (gift wrap, engraving, subscription interval) —
+    JSON like `Store.theme`. `@@index([updatedAt])` on `Cart` exists for
+    abandoned-cart sweeps; `@@index([storeId])` for seller demand signals.
+  - Deleting the store, product or variant cascades the line away: a cart
+    line is a pointer at something buyable, and there is nothing to keep
+    when that stops existing. Placing an order clears that store's lines
+    (best-effort, after the placement fully succeeds), so the basket empties
+    on every signed-in device. Module: `modules/cart` behind
+    `requireCustomer` at `/api/v1/cart`.
 - **OAuthAccount** — social identity linked to a Customer; unique on
   `(provider, providerAccountId)` (the provider's stable `sub`). Supports Google now,
   Apple later (enum value already present).
 - **Order / OrderItem** — customer orders, placed **per store** at the
   storefront checkout (`modules/orders`; placement runs behind
   `requireCustomer` — only signed-in customers can order, and every order
-  is attached to its account; browsing and the cart stay anonymous, and
-  the confirmation lookup is public). Order snapshots the store
+  is attached to its account; browsing stays anonymous, and the
+  confirmation lookup is public. A guest's cart is anonymous too — it
+  lives in their browser until they sign in; see **Cart / CartLine**).
+  Order snapshots the store
   (`storeId` SetNull + `storeName`/`storeSlug`), fulfilment
   (`OrderFulfilment`: DELIVERY/PICKUP), the contact + delivery fields (all
   **nullable** — sellers choose what their checkout collects), an optional
@@ -869,7 +967,12 @@ White-label design — one codebase, any business:
   principal. `kind` (`ORDER_PLACED`/`ORDER_STATUS`/`PAYMENT`/`STORE`/
   `ACCOUNT`/`ANNOUNCEMENT`), `title`, `body`, optional in-app `url` and `data`
   JSON, `readAt`. Indexed for the two queries that exist: the feed and the
-  unread count.
+  unread count. Seller-facing `url`s point at `/mystores/{slug}/…` (the store
+  management prefix); admin-facing ones at the console's own `/stores/{id}`.
+  Rows written before the seller prefix was renamed still carry `/stores/…`,
+  which the storefront router forwards — a stored URL is a permanent record,
+  so the *frontend* absorbs the rename rather than a migration rewriting
+  history.
 - **SupportTicket / SupportTicketMessage** — the seller↔platform
   conversation (`modules/support`). The ticket is owned by the `Customer`
   who raised it (cascade) and optionally points at the `Store` it is about
@@ -946,6 +1049,8 @@ Enums: `ProductStatus`, `OrderStatus`, `PaymentMethod`, `PaymentStatus`, `Shippi
 | `npm run push-keys` | Generate a VAPID key pair for Web Push (run once per environment) |
 | `npm run backfill-catalog` | Fill missing category/product slugs, recompute price aggregates, stamp `publishedAt` on pre-column published stores (idempotent) |
 | `npm run seed-theme-templates` | Create the five starter store appearance templates — palettes (colors only) lifted from real configured stores, topped up from curated fallbacks. Idempotent; `-- --force` tops an existing table back up to five |
+| `npm run seed-categories` | Seed the global category taxonomy (29 top-level + 125 sub) from `scripts/data/globalCategories.ts` — upserts by slug, idempotent, never deletes; `-- --dry-run` reports without writing |
+| `npm run migrate-store-categories` | Classify existing seller shelves/products against the taxonomy from `scripts/data/categoryMigrationRules.ts`. Dry run by default; `-- --apply` snapshots then writes in one transaction; `-- --rollback <snapshot.json>` restores. Only ever null → value, so it is idempotent and non-destructive; writes a markdown report listing everything it refused to decide |
 | `npx prisma generate` | Regenerate client after schema edits            |
 
 **Environment files are layered, never edited to switch.** `config/loadEnv.ts`

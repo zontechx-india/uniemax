@@ -36,6 +36,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/orders', label: 'Orders' },
       { to: '/payments', label: 'Payments' },
       { to: '/products', label: 'Products' },
+      { to: '/categories', label: 'Categories' },
+      { to: '/category-mapping', label: 'Category mapping' },
     ],
   },
   {
@@ -62,6 +64,8 @@ const TITLES: [string, string][] = [
   ['/orders', 'Orders'],
   ['/payments', 'Payments'],
   ['/products', 'Products'],
+  ['/categories', 'Categories'],
+  ['/category-mapping', 'Category mapping'],
   ['/stores', 'Stores'],
   ['/customers', 'Customers'],
   ['/support', 'Support'],

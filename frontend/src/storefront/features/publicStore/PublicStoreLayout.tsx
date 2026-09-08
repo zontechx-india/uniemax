@@ -150,10 +150,10 @@ function DraftPreviewBanner({ storeSlug }: { storeSlug: string }) {
   return (
     <div className="bg-warning px-4 py-2 text-center text-xs font-semibold text-white sm:px-6 lg:px-10">
       Draft preview — this store isn't published yet, so only you can see it.{' '}
-      {/* Plain <a>: /stores/… lives in the AUTHED router, and the gate picks
+      {/* Plain <a>: /mystores/… lives in the AUTHED router, and the gate picks
           a router per full page load — a client-side Link can't cross it. */}
       <a
-        href={`/stores/${storeSlug}`}
+        href={`/mystores/${storeSlug}`}
         className="underline underline-offset-2 hover:opacity-80"
       >
         Manage &amp; publish

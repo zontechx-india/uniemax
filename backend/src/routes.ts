@@ -18,6 +18,7 @@ import {
 } from "./modules/themeTemplates/themeTemplates.routes.js";
 import { publicDiscoveryRoutes } from "./modules/discovery/discovery.routes.js";
 import { addressRoutes } from "./modules/addresses/addresses.routes.js";
+import { cartRoutes } from "./modules/cart/cart.routes.js";
 import {
   publicOrderRoutes,
   customerOrderRoutes,
@@ -59,6 +60,9 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       await api.register(sellerThemeTemplateRoutes, { prefix: "/theme-templates" });
       // Customer address book (guarded inside the plugin — requireCustomer).
       await api.register(addressRoutes, { prefix: "/addresses" });
+      // Durable cart for signed-in customers (guarded — requireCustomer).
+      // Guests shop from a localStorage cart that is merged in at sign-in.
+      await api.register(cartRoutes, { prefix: "/cart" });
       // Customer order history (guarded inside the plugin — requireCustomer).
       await api.register(customerOrderRoutes, { prefix: "/orders" });
       // Notification feed + push subscriptions (guarded — requireCustomer).

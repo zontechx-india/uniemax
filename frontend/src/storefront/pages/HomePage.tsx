@@ -1141,7 +1141,7 @@ function MyStoresSection({ stores }: { stores: Store[] }) {
         {stores.map((store) => (
           <Link
             key={store.id}
-            to={`/stores/${store.slug}`}
+            to={`/mystores/${store.slug}`}
             className="flex items-center gap-3 rounded-lg border border-line bg-surface py-3 pl-3 pr-4 shadow-floating transition-colors hover:border-accent"
           >
             <StoreLogoTile logoUrl={store.logoUrl} className="h-9 w-9 shrink-0" />
@@ -1162,7 +1162,7 @@ function MyStoresSection({ stores }: { stores: Store[] }) {
         ))}
 
         <Link
-          to="/stores/new"
+          to="/mystores/new"
           className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-line px-4 py-3 text-sm font-semibold text-muted transition-colors hover:border-accent hover:text-fg"
         >
           <PlusIcon className="h-4 w-4" />
@@ -1283,7 +1283,7 @@ function CreateStoreLink({
   const navigate = useNavigate()
   if (state.status === 'authed') {
     return (
-      <Link to="/stores/new" className={className}>
+      <Link to="/mystores/new" className={className}>
         {children}
       </Link>
     )
@@ -1294,7 +1294,7 @@ function CreateStoreLink({
   return (
     <button
       type="button"
-      onClick={() => openAuthDialog({ onSignedIn: () => navigate('/stores/new') })}
+      onClick={() => openAuthDialog({ onSignedIn: () => navigate('/mystores/new') })}
       className={className}
     >
       {children}

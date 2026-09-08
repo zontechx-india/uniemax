@@ -10,10 +10,10 @@ import { useCustomerSession } from '../app/sessionContext'
  * **Logging out always lands on the marketplace homepage.**
  *
  * The navigation happens BEFORE the session is revoked, and that order is
- * deliberate. Signing out from a guarded route (`/stores/motocore`, `/orders`
+ * deliberate. Signing out from a guarded route (`/mystores/motocore`, `/orders`
  * …) flips the session to guest while that route is still mounted, so
  * `RequireCustomer` sees a guest on a protected path and redirects to
- * `/login?next=/stores/motocore` — logout dumped the customer on a login
+ * `/login?next=/mystores/motocore` — logout dumped the customer on a login
  * page, and signing back in returned them to the page they had just left.
  * Moving to `/` first means the guest state lands on a public route and the
  * guard never runs.

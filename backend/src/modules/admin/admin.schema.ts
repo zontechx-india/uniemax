@@ -25,6 +25,12 @@ export const rangeQuery = z.object({
 export const storeListQuery = searchQuery.extend({
   /** Lifecycle filter — mirrors the chips above the table. */
   status: z.enum(["PUBLISHED", "DRAFT", "SUSPENDED"]).optional(),
+  /**
+   * Setup filter — "who still owes us something?", the console's usual
+   * reason for opening this list. Independent of `status`: a store can be
+   * published and still be missing its PAN.
+   */
+  setup: z.enum(["COMPLETE", "INCOMPLETE"]).optional(),
   // Revenue is deliberately NOT a sort option: summing a Decimal across a
   // relation can't be expressed in the query, and sorting a page in memory
   // would rank only that page. Order count is a relation count, which can.
@@ -85,6 +91,27 @@ export const productVisibilitySchema = z.object({
   reason: z.string().trim().max(300).optional().nullable(),
 });
 
+// ---- Store category → taxonomy mapping ------------------------------------
+
+export const shelfListQuery = searchQuery.extend({
+  storeId: z.string().min(1).optional(),
+  /**
+   * UNMAPPED is the working queue — shelves a seller typed before the
+   * taxonomy existed, which are the only ones needing a decision.
+   */
+  status: z.enum(["UNMAPPED", "MAPPED"]).optional(),
+});
+
+export const shelfMappingSchema = z.object({
+  /** The taxonomy node this shelf stands for; `null` unmaps it again. */
+  categoryId: z.string().min(1).nullable(),
+  /**
+   * Also re-file the products sitting on the shelf. Defaults to true: making
+   * those products findable platform-wide is the point of mapping at all.
+   */
+  applyToProducts: z.boolean().default(true),
+});
+
 // ---- Payments -------------------------------------------------------------
 
 export const paymentListQuery = searchQuery.extend({
@@ -139,6 +166,8 @@ export type CustomerBlockInput = z.infer<typeof customerBlockSchema>;
 export type OrderListQuery = z.infer<typeof orderListQuery>;
 export type ProductListQuery = z.infer<typeof productListQuery>;
 export type ProductVisibilityInput = z.infer<typeof productVisibilitySchema>;
+export type ShelfListQuery = z.infer<typeof shelfListQuery>;
+export type ShelfMappingInput = z.infer<typeof shelfMappingSchema>;
 export type PaymentListQuery = z.infer<typeof paymentListQuery>;
 export type AuditListQuery = z.infer<typeof auditListQuery>;
 export type AdminCreateInput = z.infer<typeof adminCreateSchema>;

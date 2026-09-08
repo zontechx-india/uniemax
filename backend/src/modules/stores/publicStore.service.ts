@@ -281,7 +281,9 @@ export async function getPublicStoreShell(slug: string, viewerId?: string) {
       parentId: true,
       isFeatured: true,
     },
-    orderBy: { createdAt: "asc" },
+    // Seller-set order first; ties keep the historical creation order, so a
+    // catalog nobody has reordered looks exactly as it always did.
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
   });
 
   // One grouped count instead of N queries.
@@ -515,7 +517,7 @@ export async function getPublicCategory(
       children: {
         where: { isActive: true },
         select: { id: true, name: true, slug: true },
-        orderBy: { createdAt: "asc" },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       },
     },
   });

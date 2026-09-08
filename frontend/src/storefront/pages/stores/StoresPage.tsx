@@ -36,7 +36,7 @@ export function StoresPage() {
           </p>
         </div>
         <Link
-          to="/stores/new"
+          to="/mystores/new"
           className="inline-flex h-10 items-center gap-2 rounded-md bg-brand-gradient px-4 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90"
         >
           <PlusIcon className="h-4 w-4" />
@@ -56,7 +56,7 @@ export function StoresPage() {
 function StoreCard({ store }: { store: Store }) {
   return (
     <Link
-      to={`/stores/${store.slug}`}
+      to={`/mystores/${store.slug}`}
       className="group flex flex-col rounded-xl border border-line bg-surface p-5 shadow-floating transition duration-200 hover:-translate-y-0.5 hover:border-brand/50 focus:outline-none"
     >
       <div className="flex items-start justify-between gap-3">
@@ -126,7 +126,7 @@ function EmptyState() {
         everything else can be set up later.
       </p>
       <Link
-        to="/stores/new"
+        to="/mystores/new"
         className="mt-6 inline-flex h-11 items-center gap-2 rounded-md bg-brand-gradient px-5 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90"
       >
         <PlusIcon className="h-4 w-4" />

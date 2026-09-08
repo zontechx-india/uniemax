@@ -1029,6 +1029,19 @@ export const storeBankApi = {
 // Store catalog (categories + products inside one store)
 // ---------------------------------------------------------------------------
 
+/**
+ * A node of the GLOBAL taxonomy a shelf or product is tagged with, resolved
+ * to its full path by the server so the UI never has to fetch the tree to
+ * render it.
+ */
+export interface TaxonomyRef {
+  id: string
+  name: string
+  slug: string
+  /** "Automotive > Motorcycle Parts". */
+  pathLabel: string
+}
+
 export interface StoreCategory {
   id: string
   name: string
@@ -1040,9 +1053,46 @@ export interface StoreCategory {
   isActive: boolean
   /** Shows this root category in the storefront homepage's Featured row. */
   isFeatured: boolean
+  /** Position among siblings on the storefront; ties fall back to age. */
+  sortOrder: number
+  /** Optional shelf artwork (a URL the seller pastes). */
+  imageUrl: string | null
+  /**
+   * Tag onto the GLOBAL taxonomy, or null. Null is a legitimate state, not a
+   * gap: a brand shelf ("KTM") or a merchandising tier ("Pro Edition") has no
+   * taxonomy answer and must not be forced into one.
+   */
+  categoryId: string | null
+  /** The tagged node with its ancestors; null whenever categoryId is null. */
+  taxonomy: TaxonomyRef | null
   productCount: number
   subcategoryCount: number
   createdAt: string
+}
+
+/**
+ * Adding a shelf means CHOOSING a platform category, never naming one. The
+ * shelf takes the chosen node's name and position, so picking a subcategory
+ * creates its parent shelf too.
+ */
+export interface StoreCategoryCreateInput {
+  categoryId: string
+  /** null clears the artwork. */
+  imageUrl?: string | null
+  sortOrder?: number
+}
+
+/**
+ * What a seller may change about an existing shelf: how it looks and whether
+ * it shows. The name and the platform category are both fixed — the name is
+ * the chosen category's, and re-pointing a legacy shelf is an admin action.
+ */
+export interface StoreCategoryInput {
+  isActive?: boolean
+  isFeatured?: boolean
+  /** null clears the artwork. */
+  imageUrl?: string | null
+  sortOrder?: number
 }
 
 /**
@@ -1130,6 +1180,10 @@ export interface StoreProduct extends StoreProductMerchandising {
   /** Disabled products are hidden from the public storefront. */
   isActive: boolean
   category: { id: string; name: string; parentId: string | null }
+  /** Where this product sits in the GLOBAL taxonomy, independent of its shelf. */
+  globalCategoryId: string | null
+  /** The taxonomy node with its ancestors; null when unclassified. */
+  globalCategory: TaxonomyRef | null
   /**
    * The ordered dimensions whose cartesian product the variants are. Empty
    * for a simple product. A product that predates option types is presented
@@ -1180,6 +1234,7 @@ export interface StoreVariantInput {
  */
 export interface StoreProductCreateInput {
   name: string
+  /** The shelf. Its platform category is what classifies the product. */
   categoryId: string
   description?: string
   specifications?: ProductSpec[]
@@ -1218,14 +1273,24 @@ export const storeCatalogApi = {
 
   async createCategory(
     storeRef: string,
-    name: string,
-    parentId?: string,
+    input: StoreCategoryCreateInput,
   ): Promise<StoreCategory> {
     return call<StoreCategory>(
-      http.post(`${STORES}/${storeRef}/categories`, {
-        name,
-        ...(parentId ? { parentId } : {}),
-      }),
+      http.post(`${STORES}/${storeRef}/categories`, input),
+    )
+  },
+
+  /**
+   * Partial shelf update — one PATCH serves the whole row (the active and
+   * featured switches, artwork and sort order).
+   */
+  async updateCategory(
+    storeRef: string,
+    categoryId: string,
+    patch: StoreCategoryInput,
+  ): Promise<StoreCategory> {
+    return call<StoreCategory>(
+      http.patch(`${STORES}/${storeRef}/categories/${categoryId}`, patch),
     )
   },
 
@@ -1291,6 +1356,7 @@ export const storeCatalogApi = {
       isActive?: boolean
       name?: string
       description?: string | null
+      /** Move to another shelf; the classification follows it. */
       categoryId?: string
       /** Ordered spec rows; `null` or `[]` clears them. */
       specifications?: ProductSpec[] | null

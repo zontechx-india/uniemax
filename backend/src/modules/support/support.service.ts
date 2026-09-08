@@ -232,7 +232,7 @@ export async function addCustomerMessage(
       kind: "SUPPORT",
       title: `Reply on ${ticket.ticketNumber}`,
       body: `${customer?.name ?? "A customer"}: ${ticket.subject}`,
-      url: `/stores/${ticket.store.slug}/customer-support/${ticketId}`,
+      url: `/mystores/${ticket.store.slug}/customer-support/${ticketId}`,
       data: { ticketId, storeId: ticket.store.id },
     });
   } else {

@@ -6,7 +6,7 @@ import { Card, PageHeader } from '../ui/primitives'
 import { DataTable, Pagination } from '../ui/DataTable'
 import type { Column } from '../ui/DataTable'
 import { FilterSelect, SearchInput, Tabs, Toolbar } from '../ui/Toolbar'
-import { StoreStatusChip } from '../ui/statusMeta'
+import { SetupChip, StoreStatusChip } from '../ui/statusMeta'
 import { formatCount, formatDate, formatMoney } from '../ui/format'
 
 /**
@@ -54,7 +54,7 @@ export function StoreAvatar({
 export default function StoresPage() {
   const navigate = useNavigate()
   const list = useAdminList<StoreRow>((query) => adminApi.listStores(query), {
-    keys: ['q', 'status', 'sort'],
+    keys: ['q', 'status', 'setup', 'sort'],
   })
 
   const columns: Column<StoreRow>[] = [
@@ -85,6 +85,14 @@ export default function StoresPage() {
       cell: (store) => (
         <StoreStatusChip isPublished={store.isPublished} suspendedAt={store.suspendedAt} />
       ),
+    },
+    {
+      // Independent of Status on purpose: a store can be published and still
+      // owe us a PAN, and it is the unfinished ones an admin comes here to
+      // chase. The chip names the first outstanding step; the store page
+      // lists them all with a link to send the seller.
+      header: 'Setup',
+      cell: (store) => <SetupChip setup={store.setup} />,
     },
     {
       header: 'Catalog',
@@ -128,6 +136,16 @@ export default function StoresPage() {
             value={list.filters['q'] ?? ''}
             onChange={(value) => list.setFilter('q', value)}
             placeholder="Store name, slug or owner email…"
+          />
+          <FilterSelect
+            label="Setup"
+            value={list.filters['setup'] ?? ''}
+            onChange={(value) => list.setFilter('setup', value)}
+            options={[
+              { value: '', label: 'Any' },
+              { value: 'INCOMPLETE', label: 'Not finished' },
+              { value: 'COMPLETE', label: 'Complete' },
+            ]}
           />
           <FilterSelect
             label="Sort"

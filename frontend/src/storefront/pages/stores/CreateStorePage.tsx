@@ -114,11 +114,11 @@ export function CreateStorePage() {
    */
   const goBack = useGoBack('/')
   const finishLater = () =>
-    store ? navigate(`/stores/${store.slug}`) : goBack()
+    store ? navigate(`/mystores/${store.slug}`) : goBack()
 
   const next = () => setIndex((i) => Math.min(i + 1, STEPS.length - 1))
   const back = () => setIndex((i) => Math.max(i - 1, 0))
-  const done = (finished: Store) => navigate(`/stores/${finished.slug}`)
+  const done = (finished: Store) => navigate(`/mystores/${finished.slug}`)
 
   /** Adopt an existing draft and land on the first step it still needs. */
   const resume = (draft: Store) => {

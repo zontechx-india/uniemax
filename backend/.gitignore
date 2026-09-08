@@ -13,3 +13,6 @@ dist
 
 # Local storage driver output (dev uploads)
 /uploads
+
+# Migration snapshots + reports (contain live store data)
+/migration-backups

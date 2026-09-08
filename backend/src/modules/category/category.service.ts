@@ -3,6 +3,7 @@ import { Prisma } from "../../generated/prisma/client.js";
 import { slugify } from "../../utils/slug.js";
 import { buildListMeta } from "../../utils/response.js";
 import { HttpError } from "../../utils/httpError.js";
+import { invalidateCategoryCache } from "./categoryTree.js";
 import type {
   CategoryCreateInput,
   CategoryUpdateInput,
@@ -99,13 +100,42 @@ export async function createCategory(input: CategoryCreateInput) {
   if (input.isActive !== undefined) data.isActive = input.isActive;
   if (input.parentId !== undefined) data.parentId = input.parentId;
 
-  return prisma.category.create({ data, select: categorySelect });
+  const category = await prisma.category.create({ data, select: categorySelect });
+  invalidateCategoryCache();
+  return category;
+}
+
+/**
+ * Walks up from `parentId` to make sure `id` is not already an ancestor of
+ * it — reparenting a category under its own descendant would detach the
+ * branch from every root and make the tree walk cycle.
+ */
+async function assertNoCycle(id: string, parentId: string) {
+  let cursor: string | null = parentId;
+  const seen = new Set<string>();
+  while (cursor) {
+    if (cursor === id) {
+      throw HttpError.badRequest(
+        "A category cannot be moved under one of its own subcategories.",
+      );
+    }
+    if (seen.has(cursor)) break; // pre-existing loop — not this edit's to fix
+    seen.add(cursor);
+    const parent: { parentId: string | null } | null =
+      await prisma.category.findUnique({
+        where: { id: cursor },
+        select: { parentId: true },
+      });
+    if (!parent) throw HttpError.badRequest("Parent category not found.");
+    cursor = parent.parentId;
+  }
 }
 
 export async function updateCategory(id: string, input: CategoryUpdateInput) {
   if (input.parentId && input.parentId === id) {
     throw HttpError.badRequest("A category cannot be its own parent.");
   }
+  if (input.parentId) await assertNoCycle(id, input.parentId);
 
   const data: Prisma.CategoryUncheckedUpdateInput = {};
   if (input.name !== undefined) data.name = input.name;
@@ -116,7 +146,13 @@ export async function updateCategory(id: string, input: CategoryUpdateInput) {
   if (input.parentId !== undefined) data.parentId = input.parentId;
 
   // Throws P2025 -> 404 via the global handler if the id doesn't exist.
-  return prisma.category.update({ where: { id }, data, select: categorySelect });
+  const category = await prisma.category.update({
+    where: { id },
+    data,
+    select: categorySelect,
+  });
+  invalidateCategoryCache();
+  return category;
 }
 
 export async function deleteCategory(id: string) {
@@ -138,5 +174,6 @@ export async function deleteCategory(id: string) {
   }
 
   await prisma.category.delete({ where: { id } });
+  invalidateCategoryCache();
   return { id };
 }

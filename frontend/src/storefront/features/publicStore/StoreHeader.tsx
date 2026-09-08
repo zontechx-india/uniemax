@@ -595,7 +595,7 @@ function DrawerAccount({
  *
  * The store row is a static "My Store" rather than the dropdown's
  * Create/Manage split: that split costs a `GET /stores` on open, and
- * `/stores` already handles the "no stores yet" case.
+ * `/mystores` already handles the "no stores yet" case.
  */
 function DrawerAccountMenu({
   customer,
@@ -624,7 +624,7 @@ function DrawerAccountMenu({
       </div>
 
       <div className={`mt-2 border-t pt-1 ${skin.border}`}>
-        <a href="/stores" onClick={onClose} className={rowClass}>
+        <a href="/mystores" onClick={onClose} className={rowClass}>
           <StoreIcon className={`h-[18px] w-[18px] ${skin.muted}`} />
           My Store
         </a>

@@ -13,7 +13,7 @@ import type { ThemeNavState } from './ThemeTemplateStrip'
 import { ArrowLeftIcon } from '../../layout/icons'
 
 /**
- * `/stores/{slug}/appearance/preview` — the theme preview at full width.
+ * `/mystores/{slug}/appearance/preview` — the theme preview at full width.
  *
  * It sits OUTSIDE `StoreManageLayout` on purpose. Inside the management
  * workbench the preview shares the row with a 260px section nav and two sets
@@ -74,9 +74,9 @@ export function StoreThemePreviewPage() {
       </div>
     )
   }
-  if (store === null) return <Navigate to="/stores" replace />
+  if (store === null) return <Navigate to="/mystores" replace />
 
-  const appearanceUrl = `/stores/${storeSlug}/appearance`
+  const appearanceUrl = `/mystores/${storeSlug}/appearance`
   const dirty = JSON.stringify(theme) !== JSON.stringify(store.theme)
   const activeTemplate = findActiveTemplate(templates, theme)
 

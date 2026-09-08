@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
@@ -21,8 +21,19 @@ import {
   PAN_RE,
   gstinContainsPan,
 } from '../../features/stores/storeProfile'
-import type { StoreAddress, StoreProfilePatch } from '../../features/stores/storeProfile'
+import type {
+  StepKey,
+  StoreAddress,
+  StoreProfilePatch,
+} from '../../features/stores/storeProfile'
 import { useManagedStore } from '../../features/stores/useManagedStore'
+import {
+  SectionJumpBar,
+  StatusBadge,
+  sectionStatus,
+  stepsByKey,
+} from './SetupStatus'
+import type { SectionStatus } from './SetupStatus'
 
 /**
  * Business Details — the permanent home of everything the onboarding wizard
@@ -32,24 +43,172 @@ import { useManagedStore } from '../../features/stores/useManagedStore'
  * saves only its own section (`PATCH /stores/:id/profile` is partial by key),
  * so a seller correcting a phone number never has to re-validate their
  * address, and a failure in one card cannot discard edits in another.
+ *
+ * Because the cards are independent, "am I done?" is three questions, not
+ * one — and on a phone the answer to the third is two screens below the fold.
+ * So every card carries its own status in its header, and a strip of chips
+ * above them repeats all three and scrolls to whichever the seller taps. Both
+ * render from `store.readiness` — the same server-computed registry the
+ * publish and payment endpoints enforce — so the marks can never disagree
+ * with what the server will accept. See `SetupStatus.tsx`.
  */
+
+/**
+ * The three cards, in page order. Each maps to one readiness step.
+ *
+ * The heading lives HERE rather than inside each card because two things
+ * render it — the card's own header and its chip in the jump bar — and a chip
+ * reading "Tax" above a card headed "Tax & compliance" makes the seller stop
+ * and check whether they are the same section. One string, no drift.
+ */
+const SECTIONS: {
+  id: string
+  title: string
+  description: string
+  step: StepKey
+}[] = [
+  {
+    id: 'business-contact',
+    title: 'Business & contact',
+    description: 'The trading entity and the person we reach about orders.',
+    step: 'business',
+  },
+  {
+    id: 'business-address',
+    title: 'Address',
+    description: 'Where your business is registered and operates from.',
+    step: 'address',
+  },
+  {
+    id: 'business-tax',
+    title: 'Tax & compliance',
+    description: 'Needed before UnieMax can collect payments and pay you out.',
+    step: 'tax',
+  },
+]
+
 export function StoreBusinessPage() {
   const { store, onStoreChange } = useManagedStore()
 
+  // Unsaved edits live here rather than in each card because the chip strip
+  // has to agree with the card it points at: readiness only moves once the
+  // server confirms a save, so without this a chip would still read "1 of 4"
+  // while the card below it says "Unsaved changes".
+  const [dirty, setDirty] = useState<Record<string, boolean>>({})
+  const markDirty = useCallback((id: string, value: boolean) => {
+    setDirty((current) =>
+      current[id] === value ? current : { ...current, [id]: value },
+    )
+  }, [])
+
+  // A new object per jump so tapping the same chip twice re-triggers the
+  // highlight; a bare id would compare equal and the second tap would look
+  // like nothing happened.
+  const [flash, setFlash] = useState<{ id: string } | null>(null)
+
+  useEffect(() => {
+    if (!flash) return
+    const timer = setTimeout(() => setFlash(null), 1400)
+    return () => clearTimeout(timer)
+  }, [flash])
+
+  const jump = useCallback((id: string) => {
+    const el = document.getElementById(id)
+    if (!el) return
+    // `scroll-mt-28` on the card keeps the heading clear of both sticky bars.
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // Keyboard and screen-reader users land IN the section, not back at the
+    // top of the page on their next Tab. `preventScroll` because the smooth
+    // scroll above already owns the movement.
+    el.focus({ preventScroll: true })
+    setFlash({ id })
+  }, [])
+
+  const status = (step: StepKey): SectionStatus =>
+    sectionStatus(stepsByKey(store.readiness, [step]))
+
+  const statuses = SECTIONS.map((section) => ({
+    ...section,
+    // The chip's label IS the card's heading — see SECTIONS.
+    label: section.title,
+    status: status(section.step),
+    dirty: dirty[section.id] ?? false,
+  }))
+
+  const met = statuses.reduce((sum, s) => sum + s.status.met, 0)
+  const total = statuses.reduce((sum, s) => sum + s.status.total, 0)
+  const allComplete = statuses.every((s) => s.status.complete)
+  const percent = total ? Math.round((met / total) * 100) : 100
+
+  const cardProps = (id: string): CardStatusProps => {
+    const section = statuses.find((s) => s.id === id)!
+    return {
+      id,
+      title: section.title,
+      description: section.description,
+      status: section.status,
+      dirty: section.dirty,
+      flashing: flash?.id === id,
+      onDirtyChange: markDirty,
+    }
+  }
+
   return (
     <div>
-      <h2 className="font-body text-xl font-semibold tracking-normal text-fg">
-        Business Details
-      </h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 className="font-body text-xl font-semibold tracking-normal text-fg">
+          Business Details
+        </h2>
+        <span className="text-xs font-medium text-muted">
+          {met} of {total} details added
+        </span>
+      </div>
       <p className="mt-1 text-sm text-muted">
         Who's behind {store.name}, where you trade from, and the tax details we
         need before paying you out.
       </p>
 
+      {/* The one number that survives a phone screen. The bar carries the
+          animated gradient while anything is outstanding and settles to solid
+          green when it is not — motion stops when the work does. */}
+      <div
+        className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-alt"
+        role="progressbar"
+        aria-valuenow={percent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Business details progress"
+      >
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${
+            allComplete ? 'bg-success' : 'bg-pending-gradient'
+          }`}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+
+      {/* Deliberately NOT wrapped in a positioning div: a sticky element is
+          confined to its parent's box, so a wrapper sized to the strip itself
+          would let it unstick the moment it scrolled. Its parent has to be
+          the page. */}
+      <SectionJumpBar targets={statuses} onJump={jump} />
+
       <div className="mt-5 space-y-5">
-        <ContactCard store={store} onStoreChange={onStoreChange} />
-        <AddressCard store={store} onStoreChange={onStoreChange} />
-        <TaxCard store={store} onStoreChange={onStoreChange} />
+        <ContactCard
+          {...cardProps('business-contact')}
+          store={store}
+          onStoreChange={onStoreChange}
+        />
+        <AddressCard
+          {...cardProps('business-address')}
+          store={store}
+          onStoreChange={onStoreChange}
+        />
+        <TaxCard
+          {...cardProps('business-tax')}
+          store={store}
+          onStoreChange={onStoreChange}
+        />
       </div>
     </div>
   )
@@ -59,19 +218,55 @@ export function StoreBusinessPage() {
 // Shared card chrome
 // ---------------------------------------------------------------------------
 
-function Card({
-  title,
-  description,
-  children,
-}: {
+/** What every card needs to render its own header. Supplied by `SECTIONS`. */
+interface CardStatusProps {
+  id: string
   title: string
   description: string
-  children: ReactNode
-}) {
+  status: SectionStatus
+  dirty: boolean
+  /** Briefly ringed because the seller just jumped here from a chip. */
+  flashing: boolean
+  onDirtyChange: (id: string, dirty: boolean) => void
+}
+
+function Card({
+  id,
+  title,
+  description,
+  status,
+  dirty,
+  flashing,
+  children,
+}: Omit<CardStatusProps, 'onDirtyChange'> & { children: ReactNode }) {
   return (
-    <section className="rounded-lg border border-line bg-surface p-4 shadow-floating sm:p-5">
-      <h3 className="font-body text-base font-semibold text-fg">{title}</h3>
-      <p className="mt-1 text-sm text-muted">{description}</p>
+    <section
+      id={id}
+      // Focusable only programmatically (`jump`), never in the tab order.
+      tabIndex={-1}
+      className={`scroll-mt-28 rounded-lg border bg-surface p-4 shadow-floating outline-none transition duration-300 sm:p-5 ${
+        flashing ? 'border-pending shadow-lifted' : 'border-line'
+      }`}
+    >
+      <header className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="font-body text-base font-semibold text-fg">{title}</h3>
+          <p className="mt-1 text-sm text-muted">{description}</p>
+        </div>
+        <StatusBadge status={status} dirty={dirty} />
+      </header>
+
+      {/* Naming the missing fields beats a bare counter: "2 of 4 done" still
+          leaves the seller hunting the form for which two. Hidden while there
+          are unsaved edits, because it would then be describing the state the
+          seller is in the middle of leaving. */}
+      {!dirty && !status.complete && status.missing.length > 0 && (
+        <p className="mt-3 rounded-md bg-pending-soft px-3 py-2 text-xs text-pending">
+          <span className="font-semibold">Still needed: </span>
+          {status.missing.join(' · ')}
+        </p>
+      )}
+
       <div className="mt-4">{children}</div>
     </section>
   )
@@ -92,31 +287,45 @@ function SaveButton({ busy, disabled }: { busy: boolean; disabled: boolean }) {
 /**
  * Save plumbing every card repeats: run the patch, push the fresh store up to
  * the layout, show a confirmation that clears the moment the seller edits
- * again (a stale "Saved." next to unsaved changes is worse than none).
+ * again (a stale "Saved." next to unsaved changes is worse than none), and
+ * report unsaved-edit state up so the page's status chips stay honest.
  */
 function useProfileSave(
   store: Store,
   onStoreChange: (store: Store) => void,
+  section: { id: string; onDirtyChange: (id: string, dirty: boolean) => void },
 ): {
   busy: boolean
   error: string | null
   saved: boolean
   setError: (message: string | null) => void
-  clearStatus: () => void
+  /** Call on every edit — clears the stale notes and flags unsaved changes. */
+  markEdited: () => void
   save: (patch: StoreProfilePatch) => Promise<void>
 } {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [dirty, setDirty] = useState(false)
+
+  const { id, onDirtyChange } = section
+  useEffect(() => {
+    onDirtyChange(id, dirty)
+  }, [id, dirty, onDirtyChange])
+
+  // A card that unmounts (the seller navigates away) must not leave a stale
+  // "unsaved" flag behind on the page.
+  useEffect(() => () => onDirtyChange(id, false), [id, onDirtyChange])
 
   return {
     busy,
     error,
     saved,
     setError,
-    clearStatus: () => {
+    markEdited: () => {
       setSaved(false)
       setError(null)
+      setDirty(true)
     },
     save: async (patch) => {
       setError(null)
@@ -124,6 +333,7 @@ function useProfileSave(
       try {
         onStoreChange(await storesApi.updateProfile(store.id, patch))
         setSaved(true)
+        setDirty(false)
       } catch (err) {
         setError(toApiError(err).message)
       } finally {
@@ -140,14 +350,17 @@ function useProfileSave(
 function ContactCard({
   store,
   onStoreChange,
+  onDirtyChange,
+  ...card
 }: {
   store: Store
   onStoreChange: (store: Store) => void
-}) {
+} & CardStatusProps) {
   const { profile } = store
-  const { busy, error, saved, setError, clearStatus, save } = useProfileSave(
+  const { busy, error, saved, setError, markEdited, save } = useProfileSave(
     store,
     onStoreChange,
+    { id: card.id, onDirtyChange },
   )
   const { customer } = useCustomerSession()
   const { signedIn } = useMarketSession()
@@ -161,7 +374,7 @@ function ContactCard({
   const phone = customer.phoneVerifiedAt ? customer.phone : null
 
   const edit = (setter: (value: string) => void) => (value: string) => {
-    clearStatus()
+    markEdited()
     setter(value)
   }
 
@@ -180,10 +393,7 @@ function ContactCard({
   }
 
   return (
-    <Card
-      title="Business & contact"
-      description="The trading entity and the person we reach about orders."
-    >
+    <Card {...card}>
       <form onSubmit={submit} className="space-y-4" noValidate>
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField
@@ -276,14 +486,17 @@ function VerifiedContact({
 function AddressCard({
   store,
   onStoreChange,
+  onDirtyChange,
+  ...card
 }: {
   store: Store
   onStoreChange: (store: Store) => void
-}) {
+} & CardStatusProps) {
   const { profile } = store
-  const { busy, error, saved, setError, clearStatus, save } = useProfileSave(
+  const { busy, error, saved, setError, markEdited, save } = useProfileSave(
     store,
     onStoreChange,
+    { id: card.id, onDirtyChange },
   )
   const [address, setAddress] = useState<StoreAddress>(
     profile.address ?? EMPTY_ADDRESS,
@@ -301,15 +514,12 @@ function AddressCard({
   }
 
   return (
-    <Card
-      title="Address"
-      description="Where your business is registered and operates from."
-    >
+    <Card {...card}>
       <form onSubmit={submit} className="space-y-5" noValidate>
         <AddressFields
           value={address}
           onChange={(next) => {
-            clearStatus()
+            markEdited()
             setAddress(next)
           }}
           errors={errors}
@@ -332,14 +542,17 @@ function AddressCard({
 function TaxCard({
   store,
   onStoreChange,
+  onDirtyChange,
+  ...card
 }: {
   store: Store
   onStoreChange: (store: Store) => void
-}) {
+} & CardStatusProps) {
   const { tax } = store.profile
-  const { busy, error, saved, setError, clearStatus, save } = useProfileSave(
+  const { busy, error, saved, setError, markEdited, save } = useProfileSave(
     store,
     onStoreChange,
+    { id: card.id, onDirtyChange },
   )
   const [pan, setPan] = useState(tax.pan ?? '')
   const [gstin, setGstin] = useState(tax.gstin ?? '')
@@ -382,10 +595,7 @@ function TaxCard({
   }
 
   return (
-    <Card
-      title="Tax & compliance"
-      description="Needed before UnieMax can collect payments and pay you out."
-    >
+    <Card {...card}>
       <form onSubmit={submit} className="space-y-4" noValidate>
         {onlineBlocked && (
           <p className="rounded-md border border-accent/30 bg-accent/10 px-3.5 py-3 text-sm text-accent">
@@ -400,7 +610,7 @@ function TaxCard({
             placeholder="ABCDE1234F"
             value={pan}
             onChange={(e) => {
-              clearStatus()
+              markEdited()
               setPan(e.target.value.toUpperCase().slice(0, 10))
             }}
             disabled={busy}
@@ -420,7 +630,7 @@ function TaxCard({
             placeholder="33ABCDE1234F1Z5"
             value={gstin}
             onChange={(e) => {
-              clearStatus()
+              markEdited()
               setGstin(e.target.value.toUpperCase().slice(0, 15))
             }}
             disabled={busy || gstExempt}
@@ -446,7 +656,7 @@ function TaxCard({
             type="checkbox"
             checked={gstExempt}
             onChange={(e) => {
-              clearStatus()
+              markEdited()
               setGstExempt(e.target.checked)
               if (e.target.checked) setGstin('')
             }}
@@ -468,7 +678,7 @@ function TaxCard({
           placeholder="CIN, LLPIN, Udyam or shop licence"
           value={registrationNumber}
           onChange={(e) => {
-            clearStatus()
+            markEdited()
             setRegistrationNumber(e.target.value)
           }}
           maxLength={60}

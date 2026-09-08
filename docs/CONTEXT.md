@@ -284,7 +284,7 @@ A single account can own multiple stores and switch between them.
   with no horizontal scroll or shrunken text at any size.
 
   **Open full preview** takes the same sample shop to its own page
-  (`/stores/{slug}/appearance/preview`), outside the management workbench, so
+  (`/mystores/{slug}/appearance/preview`), outside the management workbench, so
   it gets the entire window — roughly 300–400px more than the panel can give
   it on a laptop. The template strip travels with it and stays pinned while
   the preview scrolls, so a seller can click through every template at close
@@ -485,6 +485,15 @@ A single account can own multiple stores and switch between them.
   the cart **refreshes prices and stock** against the live catalog (stale
   quantities clamp down, and items no longer sold are flagged unavailable
   instead of silently vanishing). Quantities are capped by stock.
+  **The cart follows the customer, not the device.** Shopping without an
+  account keeps the basket in that browser, as before; signing in saves it
+  to the account, so it is there on a phone, a laptop, after clearing the
+  browser, or after signing back in. A basket filled before signing in is
+  **merged** with whatever the account already held rather than replacing
+  it, so nothing is lost either way, and signing out leaves the browser
+  empty for the next person without discarding the account's cart. Placing
+  an order empties that store's basket everywhere, not just on the device
+  that ordered.
   **Theming:** the cart continues the look of the store the customer
   opened it from — every cart link inside a store carries that store's
   identity, and the combined `/cart` overview wears that store's theme

@@ -63,6 +63,8 @@ Verify: `curl http://localhost:4000/health`
 | `npm run push-keys` | Print a fresh VAPID key pair for Web Push — run once per environment and paste into `.env` |
 | `npm run backfill-catalog` | Fill missing store category/product slugs and recompute product price/stock aggregates. Idempotent — safe to re-run. |
 | `npm run seed-theme-templates` | Create the five starter store appearance templates. Copies the **colors only** from real, well-configured stores (never any other store data), topped up from curated fallbacks. Idempotent — does nothing when templates exist; `-- --force` tops the table back up to five. |
+| `npm run seed-categories` | Seed the global category taxonomy (29 top-level + 125 sub) from `src/scripts/data/globalCategories.ts`. Upserts by slug — idempotent, never duplicates, never deletes. Realigns `name`/`parentId`/`displayOrder`; leaves `isActive`/`description`/`imageUrl` as the admin set them. `-- --dry-run` reports without writing. |
+| `npm run migrate-store-categories` | Classify existing seller shelves and products against the global taxonomy. Dry run by default; `-- --apply` snapshots then writes in one transaction; `-- --rollback <snapshot.json>` undoes it. Only fills nulls — idempotent and non-destructive. Writes a markdown report of every row it refused to decide to `backend/migration-backups/`. |
 
 ## Environment (`.env`)
 

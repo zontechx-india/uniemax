@@ -5,8 +5,20 @@ import {
   categoryCreateSchema,
   categoryUpdateSchema,
   categoryListQuerySchema,
+  categoryTreeQuerySchema,
+  categoryChildrenQuerySchema,
+  categorySearchQuerySchema,
 } from "./category.schema.js";
 import * as service from "./category.service.js";
+import * as tree from "./categoryTree.js";
+
+/**
+ * Customers and sellers only ever see live branches; an admin can ask for the
+ * disabled ones too (that is the whole point of the management screen).
+ */
+function activeOnlyFor(scope: "public" | "admin", asked?: boolean) {
+  return scope === "public" ? true : (asked ?? true);
+}
 
 // ---- Public --------------------------------------------------------------
 
@@ -24,6 +36,10 @@ export async function publicGetCategory(request: FastifyRequest) {
   const { slug } = slugParamSchema.parse(request.params);
   return ok(await service.getCategoryBySlug(slug));
 }
+
+export const publicCategoryTree = treeHandler("public");
+export const publicCategoryChildren = childrenHandler("public");
+export const publicCategorySearch = searchHandler("public");
 
 // ---- Admin ---------------------------------------------------------------
 
@@ -57,3 +73,43 @@ export async function adminDeleteCategory(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   return ok(await service.deleteCategory(id));
 }
+
+// ---- Tree / children / search (shared by both scopes) --------------------
+//
+// Same read models either side of the guard; only the "may I see disabled
+// nodes" answer differs, so the handlers are built once from a scope.
+
+function treeHandler(scope: "public" | "admin") {
+  return async function handler(request: FastifyRequest) {
+    const { activeOnly } = categoryTreeQuerySchema.parse(request.query);
+    return ok(await tree.getCategoryTree(activeOnlyFor(scope, activeOnly)));
+  };
+}
+
+function childrenHandler(scope: "public" | "admin") {
+  return async function handler(request: FastifyRequest) {
+    const { parentSlug, activeOnly } = categoryChildrenQuerySchema.parse(
+      request.query,
+    );
+    const result = await tree.getCategoryChildren(
+      parentSlug ?? null,
+      activeOnlyFor(scope, activeOnly),
+    );
+    return ok(result);
+  };
+}
+
+function searchHandler(scope: "public" | "admin") {
+  return async function handler(request: FastifyRequest) {
+    const { q, limit, activeOnly } = categorySearchQuerySchema.parse(
+      request.query,
+    );
+    return ok(
+      await tree.searchCategories(q, limit, activeOnlyFor(scope, activeOnly)),
+    );
+  };
+}
+
+export const adminCategoryTree = treeHandler("admin");
+export const adminCategoryChildren = childrenHandler("admin");
+export const adminCategorySearch = searchHandler("admin");

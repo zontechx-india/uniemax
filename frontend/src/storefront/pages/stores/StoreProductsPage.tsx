@@ -926,6 +926,11 @@ function AddProductForm({
    */
   const [nameError, setNameError] = useState<string | null>(null)
   const [categoryId, setCategoryId] = useState(categories[0]?.id ?? '')
+  /**
+   * Platform classification. Left null the server inherits whatever the
+   * chosen shelf is tagged with, which is right most of the time and keeps
+   * this form to one required category decision.
+   */
   const [price, setPrice] = useState('')
   const [stock, setStock] = useState('')
   const [description, setDescription] = useState('')

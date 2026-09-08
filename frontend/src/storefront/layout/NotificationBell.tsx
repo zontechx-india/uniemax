@@ -79,7 +79,7 @@ export function NotificationBell() {
       await api.markRead(notification.id).catch(() => undefined)
     }
     if (!notification.url) return
-    // Seller notifications point into the authed router (`/stores/…`);
+    // Seller notifications point into the authed router (`/mystores/…`);
     // order confirmations point at the anonymous public router
     // (`/order/…`), which this router doesn't know — those need a real
     // navigation, not a client-side one.

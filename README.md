@@ -38,7 +38,9 @@ never ships to a shopper.
 - Browse by category (two levels), product detail with a variant picker, search
   and filtered/sorted listing.
 - One cart that spans multiple stores, but **orders are placed per store** — each
-  "Place Order" carries exactly one store's items.
+  "Place Order" carries exactly one store's items. Guests keep it in the browser;
+  signing in saves it to the account (merging, never replacing, whatever was
+  already there) so it follows the customer across devices.
 - Checkout collects only the fields that store enabled; COD or online payment
   (Cashfree), delivery or pickup, per the seller's configuration.
 - Order history, saved addresses, notification feed with Web Push.

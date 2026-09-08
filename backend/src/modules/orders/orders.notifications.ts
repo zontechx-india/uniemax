@@ -118,7 +118,7 @@ export function notifyOrderPlaced(
     kind: "ORDER_PLACED",
     title: `New order · ${order.storeName}`,
     body: `${order.orderNumber} — ${itemCount} item${itemCount === 1 ? "" : "s"}, ${formatTotal(order.total)}. Confirm it to get started.`,
-    url: `/stores/${order.storeSlug}/orders/${order.id}`,
+    url: `/mystores/${order.storeSlug}/orders/${order.id}`,
     data: { orderId: order.id },
   });
   notifyAdmins({

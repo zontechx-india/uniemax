@@ -312,7 +312,7 @@ on, so the two can never disagree.
       "title": "Business & contact",
       "blurb": "Who is selling, and how we reach you about orders.",
       "wizard": true,                 // a numbered Create Store step
-      "href": "business",             // relative to /stores/:slug
+      "href": "business",             // relative to /mystores/:slug
       "stepNumber": 2,                // 1-based; null for checklist-only steps
       "requirements": [
         { "key": "business.phone", "label": "Contact phone number",
@@ -756,36 +756,67 @@ product requires a category (root **or** subcategory) of the same store,
 so at least one category must exist before the first product can be added.
 Category nesting is one level deep — a subcategory cannot have children.
 
+A store category is the seller's own **shelf**, but it is **chosen from the
+global taxonomy, never named**: create takes a `categoryId` and the shelf
+inherits that node's name and position. So every shelf created through this API
+is classified by construction, which is what makes catalogs comparable across
+tenants and what every product on the shelf takes as its own classification.
+
+Shelves that predate this rule keep the free text a seller typed — often a brand
+("KTM"), a vehicle model ("Duke 200") or a tier ("Pro Edition"), none of which
+is a category. Those keep `categoryId: null`, which is a **legitimate state,
+not a gap**. Re-pointing one at the taxonomy is an admin action
+(`PATCH /admin/catalog/shelves/:id/category`); nothing on this API can rename
+a shelf or change what it is tagged with.
+
 **`GET /api/v1/stores/:id/categories`** — the store's categories (roots and
-subcategories, flat), oldest first. Each: `{ id, name, slug, parentId,
-isActive, isFeatured, productCount, subcategoryCount, createdAt }`
+subcategories, flat), by `sortOrder` then oldest first. Each:
+`{ id, name, slug, parentId, isActive, isFeatured, sortOrder, imageUrl,
+categoryId, taxonomy, productCount, subcategoryCount, createdAt }`
 (`parentId` is `null` for root categories). `slug` is the category's URL
 identity on the storefront (`/store/{storeSlug}/category/{slug}`), generated
 from the name on create and **stable across renames**. `isFeatured` surfaces a
 root category in the storefront homepage's Featured Categories row.
+`categoryId` is the global-taxonomy tag or `null`, and `taxonomy` resolves it
+to `{ id, name, slug, pathLabel }` (`null` whenever `categoryId` is), so a
+client can print "Automotive > Motorcycle Parts" without fetching the tree.
+**`null` is a legitimate state, not a gap** — a brand or tier shelf has no
+taxonomy answer and must not be forced into one.
 
 **`POST /api/v1/stores/:id/categories`** → `201`
 ```jsonc
-{ "name": "Cricket Bats", "parentId": "cmr…" }   // parentId optional → subcategory
+{ "categoryId": "cmr…",       // required — the taxonomy node this shelf IS
+  "imageUrl": "https://…",    // optional shelf artwork (a URL; no upload here)
+  "sortOrder": 0 }            // optional, default 0
 ```
-`name` required (1–60 chars), unique per store case-insensitively (`409` on
-duplicate). `parentId` must be a **root** category of the same store
-(`400` otherwise — one level of nesting only). Created enabled.
+There is no `name` and no `parentId`: both come from the chosen node. Picking a
+**subcategory creates its parent shelf too**, so one call to add
+"Electronics › Mobiles" yields both rows — and the response is the shelf for the
+node that was actually picked.
+
+`categoryId` must name an **active** taxonomy node (`400` otherwise — a seller
+must not be able to file their catalog under a category an admin retired), and
+must be at most one level deep (`400`, since store shelves nest one level).
+`409` if the store already has that category. A shelf that is already tagged
+with the node is reused rather than duplicated, and an **untagged shelf of the
+same name in the same position is adopted** — that is how an "Electronics" typed
+before the taxonomy existed becomes the classified one instead of gaining a
+twin. A name held by some other shelf is a `409`. Created enabled.
 
 **`PATCH /api/v1/stores/:id/categories/:categoryId`** — partial update;
 send any subset (at least one required, `422` otherwise).
 ```jsonc
-{ "name": "Mobiles" }        // rename (slug does NOT change)
 { "isActive": false }        // enable/disable
 { "isFeatured": true }       // show in the homepage Featured Categories row
+{ "imageUrl": "https://…" }  // null clears the artwork
+{ "sortOrder": 3 }           // lower sorts first; ties fall back to age
 ```
-`name` (1–60 chars) must stay unique per store case-insensitively, ignoring
-the row being edited, so re-saving an unchanged name is not a conflict
-(`409` on a real duplicate). `isActive` enables/disables the category on the
-public storefront (a disabled category hides everything inside it publicly —
-products and subcategories; their own flags are untouched). `slug` is
-deliberately **not** updatable — renaming keeps shared links working.
-Re-parenting is not supported. Returns the updated category.
+Presentation and visibility only. `name`, `slug`, `categoryId` and the parent
+are all **absent on purpose**: the name is the chosen category's, the slug keeps
+shared links working, and re-pointing a shelf at a different category is an
+admin action. `isActive` enables/disables the category on the public storefront
+(a disabled category hides everything inside it publicly — products and
+subcategories; their own flags are untouched). Returns the updated category.
 
 **`DELETE /api/v1/stores/:id/categories/:categoryId`** — `409` if the
 category still has products **or subcategories**. → `{ "data": { "id" } }`
@@ -822,6 +853,11 @@ Each:
   // Merchandising — each flag maps to exactly one storefront section
   "isFeatured": false, "isBestSeller": false, "isNewArrival": false,
   "hideFromSearch": false,
+  // Where the product sits in the GLOBAL taxonomy, independent of its shelf.
+  // null = deliberately unclassified. globalCategory resolves the id to
+  // { id, name, slug, pathLabel } so a client can print the full path.
+  // Read-only here: it is the shelf's category, set when the shelf was chosen.
+  "globalCategoryId": "cmr…", "globalCategory": { "pathLabel": "Electronics > Mobiles" },
   "category": { "id": "cmr…", "name": "Smartphones", "slug": "smartphones", "parentId": "cmr…" },
   "optionTypes": [ { "name": "Storage", "values": ["128 GB", "256 GB"] } ],   // [] for a simple product
   "specifications": [ { "label": "Chip", "value": "A19" } ],                  // ordered; [] = none
@@ -917,7 +953,12 @@ subset (at least one field required, `422` otherwise).
 { "codAvailable": false }                                                 // cash on delivery allowed for this product
 ```
 `categoryId` must reference a category (root or subcategory) of the same
-store — anything else is a `400`, exactly as on create. `isActive` controls
+store — anything else is a `400`, exactly as on create. A product's
+**`globalCategoryId` is never sent by a client**: it is always the shelf's
+`categoryId`, taken on create and re-taken whenever `categoryId` moves the
+product to another shelf, so a product's classification can never contradict
+where it sits. A product on a legacy untagged shelf stays unclassified until an
+admin maps that shelf, which re-files everything on it in the same move. `isActive` controls
 storefront visibility (visible publicly only when the product **and** its
 category — and, for subcategories, the parent — are active). The `is*`/`hide*`
 booleans are **merchandising** flags letting a merchant curate the homepage
@@ -1052,6 +1093,102 @@ another). Returns the updated address.
 
 **`DELETE /api/v1/addresses/:addressId`** → `{ "data": { "id" } }` — the
 oldest remaining address becomes primary when the primary was deleted.
+
+---
+
+## Customer Cart — `/api/v1/cart` 🔒 customer
+
+The signed-in customer's **durable cart** — one per account, spanning every
+store they shop from (orders are still placed one store at a time). Guests
+have no server cart: their basket lives in the browser and is merged in at
+sign-in, so there is no anonymous variant of this surface.
+
+**The browser owns the cart; the server keeps it.** localStorage stays the
+hot path (instant taps, guests, offline) and the storefront mirrors it here,
+so a basket survives a new device or a cleared browser. Consequences:
+
+- **Money is never read from this table.** A line is a reference + quantity +
+  intent; prices, stock and totals are resolved from the live catalog on
+  every read, and checkout re-prices independently.
+- **A line always points at a real variant.** `variantId: null` (a product
+  without options) resolves to that product's implicit default variant on the
+  way in and is returned as `null` again, so the storefront's line identity
+  is unchanged. A (product, variant) pair that does not match is rejected.
+- **Unresolvable lines are skipped, not rejected.** A tab left open while a
+  seller deletes a product would otherwise fail every write from then on. The
+  response is the authoritative cart, so the client sees what persisted.
+- Limits: **100** lines per cart, quantity **1–999**, `metadata` under
+  **2000** serialized characters. Mutations are rate-limited to **120/min**.
+
+Every endpoint answers with the **whole cart**, in the shape:
+```jsonc
+{
+  "lines": [{
+    "id",
+    "storeSlug", "storeName",
+    "productId", "productSlug", "name",
+    "variantId",        // null for a product without options
+    "variantName",      // null likewise
+    "imageUrl",         // cover image, or null
+    "price",            // decimal string — LIVE catalog price
+    "stockQuantity",    // 0 for anything unbuyable, whatever the reason
+    "quantity",
+    "status",           // "ACTIVE" | "SAVED"
+    "priceAtAdd",       // decimal string — for "cheaper now" hints only
+    "unavailableReason",// null | STORE_UNAVAILABLE | PRODUCT_UNAVAILABLE
+                        //      | VARIANT_UNAVAILABLE | OUT_OF_STOCK
+    "metadata",         // free-form object, or null
+    "addedAt"
+  }],
+  "metadata",           // cart-level free-form object, or null
+  "updatedAt"           // null when the customer has no cart yet
+}
+```
+
+A line is unbuyable when its store is unpublished, its product fails the
+public visibility rule (inactive, nothing sellable, or a disabled category
+chain), its variant is disabled, or stock is zero. All four report
+`stockQuantity: 0`; `unavailableReason` carries the distinction.
+
+**`GET /api/v1/cart`** — the stored cart, re-priced. Empty for a customer
+who has never had one.
+
+**`PUT /api/v1/cart`** — replace the whole cart. This is the routine mirror
+of the browser's cart: one authoritative write means a removal propagates as
+naturally as an addition, with no tombstones and no per-line race.
+```jsonc
+{
+  "lines": [{
+    "productId": "ckx…",       // required
+    "variantId": "ckv…",       // null / omitted → the product's default variant
+    "quantity": 2,             // 1–999
+    "status": "ACTIVE",        // optional, defaults to ACTIVE
+    "metadata": { }            // optional, free-form
+  }],
+  "metadata": { }              // optional cart-level blob (coupon, note…)
+}
+```
+Lines kept from the previous state retain their `priceAtAdd` and `addedAt`.
+Duplicates that resolve to one variant collapse to the **largest** quantity
+(never the sum), so pushing the same cart twice is a no-op.
+
+**`POST /api/v1/cart/merge`** — same body; **unions** these lines into the
+stored cart instead of replacing it. The sign-in reconciliation: quantities
+are taken pairwise as the **larger** of the two (never the sum, so signing
+out and back in cannot double a line), and lines only the account knows
+about survive untouched. Overflow past 100 lines drops the excess *incoming*
+lines rather than failing — a sign-in is never blocked by a full cart.
+
+**`DELETE /api/v1/cart`** — empty the cart everywhere. Idempotent.
+
+**`DELETE /api/v1/cart/stores/:slug`** — empty one store's lines, leaving
+the other stores' baskets alone. `404` when the slug is not a store.
+
+**Placing an order clears that store's lines automatically**, server-side and
+best-effort, so the basket empties on every device the customer is signed in
+on — not just the tab that checked out. It runs only after the placement has
+fully succeeded (a gateway failure rolls the order back and leaves the cart
+intact), and never fails an order.
 
 ---
 
@@ -1486,12 +1623,62 @@ Each item includes `_count: { products, children }`.
 Category detail by slug, including `parent` and **active** `children`.
 `404` if not found.
 
+### `GET /api/v1/categories/tree`
+The whole taxonomy, nested. Depth is unbounded — the shape follows `parentId`,
+so "category" and "subcategory" are the same kind of row at different depths.
+
+| Query        | Type    | Default | Notes                                            |
+| ------------ | ------- | ------- | ------------------------------------------------ |
+| `activeOnly` | boolean | `true`  | Public forces `true`; a disabled node hides its whole branch |
+
+Every node carries its ancestry so a client never has to walk the tree to
+label one:
+```jsonc
+{ "id", "name", "slug", "imageUrl", "displayOrder", "isActive", "parentId",
+  "path": [ { "id", "name", "slug" } ],   // root-first, self LAST
+  "pathLabel": "Automotive > Motorcycle Parts",
+  "depth": 1,                              // 0 for a root
+  "childCount": 3,
+  "children": [ /* same shape, recursive */ ] }
+```
+
+### `GET /api/v1/categories/children`
+One level only — the drill-down half of a category selector, so a large
+taxonomy never has to ship whole.
+
+| Query         | Type    | Default | Notes                                      |
+| ------------- | ------- | ------- | ------------------------------------------ |
+| `parentSlug`  | string  | —       | Omit for the **roots**                     |
+| `activeOnly`  | boolean | `true`  |                                            |
+
+→ `{ "data": { "parent": Node \| null, "items": [ Node ] } }` — `children` is
+empty on these nodes; use `childCount` to decide whether to offer a drill-in.
+An unknown or hidden `parentSlug` returns an empty `items`, never the roots.
+
+### `GET /api/v1/categories/search`
+Free-text across the taxonomy; each hit carries its full `path`, so "brake"
+renders as `Automotive > Motorcycle Parts > Brake Parts`. A node also matches
+on its ancestors' names, so `automotive brake` narrows rather than widens.
+Ranked name-prefix → name-substring → path-only, shallower first.
+
+| Query        | Type    | Default | Notes                    |
+| ------------ | ------- | ------- | ------------------------ |
+| `q`          | string  | —       | required, 1–120 chars    |
+| `limit`      | number  | 20      | max 50                   |
+| `activeOnly` | boolean | `true`  |                          |
+
+The taxonomy is cached in-process (60 s TTL, dropped on any admin write), so
+these three endpoints cost no query in the common case.
+
 ---
 
 ## Categories (Admin) — `/api/v1/admin/categories` 🔒 admin
 
 All routes require an admin token. Same list query as public, but returns **all**
-categories (`isActive` filterable).
+categories (`isActive` filterable). `GET /tree`, `GET /children` and
+`GET /search` exist here too with identical shapes, except that `activeOnly`
+defaults to `true` but may be set `false` to include disabled branches — which
+is how the console shows a node an admin wants to re-enable.
 
 ### `POST /api/v1/admin/categories` → `201`
 ```jsonc
@@ -1853,16 +2040,34 @@ misread the trend.
 
 Query: `q` (name / slug / owner email), `status` (`PUBLISHED` · `DRAFT` ·
 `SUSPENDED` — suspension outranks the publish flag, so the filters never
-overlap), `sort` (`NEWEST` · `OLDEST` · `NAME` · `ORDERS`), `page`, `pageSize`.
+overlap), `setup` (`COMPLETE` · `INCOMPLETE`), `sort` (`NEWEST` · `OLDEST` ·
+`NAME` · `ORDERS`), `page`, `pageSize`.
 → rows of `{ id, name, slug, logoUrl, isPublished, publishedAt, suspendedAt,
-suspendedReason, createdAt, owner{…}, counts{products,categories,orders}, revenue }`
+suspendedReason, createdAt, owner{…}, counts{products,categories,orders},
+revenue, setup{…} }`
+
+`setup` is `{ complete, metCount, totalCount, pending[] }` — the same
+requirement registry the seller's own checklist and the publish gate use
+(`storeReadiness.ts`), summarised. Each `pending` entry is
+`{ key, title, href, metCount, totalCount }`, where `href` is the section
+under `/mystores/{slug}` that finishes it, so the console can hand the seller
+a direct link.
+
+`setup` is **independent of `status`** — a published store can still be
+missing its PAN. Filtering by it evaluates the matching set and pages in
+memory: readiness is computed from the profile plus three aggregate counts,
+never stored, so it cannot be a `WHERE` clause. The cost scales with the
+seller count, not the order or product count.
 
 ### `GET /api/v1/admin/stores/:id`
 
 `:id` accepts an id or a slug. Adds `settings` (resolved payments / shipping /
 checkout — the same effective values the storefront sees), `bankAccounts`
 (**account numbers masked to the last 4**), `orderStatus` counts, `theme`,
-`footer` and the 10 latest orders.
+`footer`, the 10 latest orders, and `readiness` — the **full** evaluation
+(every step with its individual requirements), not just the `setup` summary,
+so the console can name what is missing ("Contact email", "PAN") in the
+message an admin sends the seller.
 
 ### `PATCH /api/v1/admin/stores/:id/suspend`
 
@@ -1936,6 +2141,43 @@ Body `{ "isActive": false, "reason"?: "…" }` — content moderation. Flips the
 **same `isActive` flag the seller toggles**, so there is one visibility rule
 in the system rather than two that can contradict each other. The seller is
 notified with the reason. Already in that state → `409`.
+
+### `GET /api/v1/admin/catalog/shelves`
+
+Sellers' shelves across every store, for pointing the legacy ones at the global
+taxonomy. Query: `q` (shelf or store name), `storeId`,
+`status` (`UNMAPPED` | `MAPPED`), `page`, `pageSize`. Ordered by store, then
+roots before their own subcategories.
+→ rows of `{ id, name, slug, isActive, shelfPath, isSubcategory, store,
+productCount, subcategoryCount, categoryId, category }`, where `shelfPath` is
+"KTM › Duke 200" (the shelf as the seller sees it) and `category` resolves
+`categoryId` to `{ id, name, pathLabel }` or is `null`.
+
+`status=UNMAPPED` is the working queue. Every shelf created since the taxonomy
+landed is already classified — the seller picks a category rather than typing
+one — so what is left is free text typed earlier, usually a brand, a vehicle
+model or a merchandising tier. No rule can map those without guessing, which is
+why an admin decides one at a time.
+
+### `PATCH /api/v1/admin/catalog/shelves/:id/category`
+
+Body `{ "categoryId": "cmr…" | null, "applyToProducts"?: true }`.
+→ `{ shelf, productsUpdated }`.
+
+Points one shelf at a taxonomy node; `null` unmaps it again. `categoryId` must
+name an existing node (`400` otherwise) — **including a disabled one**, since an
+admin may legitimately file a shelf under a category that is currently retired.
+
+`applyToProducts` (default `true`) also re-files the products sitting directly
+on the shelf, which is the reason to map at all: a shelf is only worth mapping
+because it makes the products under it findable platform-wide. Both writes share
+one transaction, so a shelf never ends up pointing somewhere its own products do
+not. It is opt-**out** so a shelf whose products were already classified by hand
+can be mapped without undoing that work.
+
+This **never renames the shelf**. A seller's storefront navigation is theirs;
+the mapping only records what the shelf *means*. Audited as
+`storeCategory.map` / `storeCategory.unmap`.
 
 ### `GET /api/v1/admin/audit`
 

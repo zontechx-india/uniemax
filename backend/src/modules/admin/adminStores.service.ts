@@ -8,6 +8,13 @@ import {
   resolvePayments,
   resolveShipping,
 } from "../stores/stores.schema.js";
+import { resolveProfile } from "../stores/storeProfile.schema.js";
+import { loadReadinessCounts } from "../stores/stores.service.js";
+import {
+  evaluateReadiness,
+  summariseReadiness,
+} from "../stores/storeReadiness.js";
+import type { Readiness } from "../stores/storeReadiness.js";
 import { notify } from "../notifications/notifications.service.js";
 import type {
   BankVerificationInput,
@@ -30,6 +37,9 @@ const listSelect = {
   name: true,
   slug: true,
   logoKey: true,
+  // Read only by the readiness evaluation below — the raw profile never
+  // reaches the console, which sees the verdict rather than the fields.
+  profile: true,
   isPublished: true,
   publishedAt: true,
   suspendedAt: true,
@@ -42,7 +52,7 @@ const listSelect = {
 type StoreListRow = Prisma.StoreGetPayload<{ select: typeof listSelect }>;
 
 function shapeListRow(row: StoreListRow, revenue: Prisma.Decimal) {
-  const { logoKey, _count, ...rest } = row;
+  const { logoKey, profile, _count, ...rest } = row;
   return {
     ...rest,
     logoUrl: mediaUrl("logo", logoKey),
@@ -53,6 +63,30 @@ function shapeListRow(row: StoreListRow, revenue: Prisma.Decimal) {
     },
     revenue,
   };
+}
+
+/**
+ * Store readiness, from the platform's side.
+ *
+ * The admin's job here is chasing sellers who have stalled — "who has not
+ * finished their business details?" is the console's most common question
+ * about a draft store — so every store the console shows carries the same
+ * evaluation the seller sees on their own pages. It is computed, never
+ * stored, which is why it is assembled per response rather than selected.
+ */
+async function readinessFor(rows: StoreListRow[]): Promise<Map<string, Readiness>> {
+  const counts = await loadReadinessCounts(rows.map((row) => row.id));
+  return new Map(
+    rows.map((row) => [
+      row.id,
+      evaluateReadiness({
+        name: row.name,
+        logoKey: row.logoKey,
+        profile: resolveProfile(row.profile),
+        ...counts.get(row.id)!,
+      }),
+    ]),
+  );
 }
 
 /** Revenue per store for exactly the rows on this page — one extra query. */
@@ -98,6 +132,39 @@ export async function listStores(query: StoreListQuery) {
           ? { orders: { _count: "desc" } }
           : { createdAt: "desc" };
 
+  /**
+   * The setup filter cannot be expressed in SQL — readiness is COMPUTED from
+   * the profile JSON plus three aggregate counts, and deliberately not stored
+   * (one registry, evaluated everywhere, so it can never go stale). So when
+   * it is asked for, the matching set is evaluated and paged in memory rather
+   * than pretending a WHERE clause exists.
+   *
+   * The cost is honest and bounded by the seller count, not the order or
+   * product count: `listSelect` per store plus three grouped aggregates. If
+   * this platform ever carries tens of thousands of sellers, the fix is a
+   * denormalised `setupCompleteAt` column maintained on profile writes —
+   * NOT a second copy of the rules here.
+   */
+  if (query.setup) {
+    const all = await prisma.store.findMany({ where, orderBy, select: listSelect });
+    const readiness = await readinessFor(all);
+    const matching = all.filter(
+      (row) => readiness.get(row.id)!.complete === (query.setup === "COMPLETE"),
+    );
+    const page = matching.slice(
+      (query.page - 1) * query.pageSize,
+      query.page * query.pageSize,
+    );
+    const revenue = await revenueByStore(page.map((row) => row.id));
+    return {
+      rows: page.map((row) => ({
+        ...shapeListRow(row, revenue.get(row.id) ?? new Prisma.Decimal(0)),
+        setup: summariseReadiness(readiness.get(row.id)!),
+      })),
+      meta: buildListMeta(matching.length, query.page, query.pageSize),
+    };
+  }
+
   const [total, rows] = await Promise.all([
     prisma.store.count({ where }),
     prisma.store.findMany({
@@ -109,11 +176,15 @@ export async function listStores(query: StoreListQuery) {
     }),
   ]);
 
-  const revenue = await revenueByStore(rows.map((row) => row.id));
+  const [revenue, readiness] = await Promise.all([
+    revenueByStore(rows.map((row) => row.id)),
+    readinessFor(rows),
+  ]);
   return {
-    rows: rows.map((row) =>
-      shapeListRow(row, revenue.get(row.id) ?? new Prisma.Decimal(0)),
-    ),
+    rows: rows.map((row) => ({
+      ...shapeListRow(row, revenue.get(row.id) ?? new Prisma.Decimal(0)),
+      setup: summariseReadiness(readiness.get(row.id)!),
+    })),
     meta: buildListMeta(total, query.page, query.pageSize),
   };
 }
@@ -152,7 +223,8 @@ export async function getStore(storeRef: string) {
   });
   if (!store) throw HttpError.notFound("Store not found");
 
-  const [revenue, orderStatus, recentOrders] = await Promise.all([
+  const [readiness, revenue, orderStatus, recentOrders] = await Promise.all([
+    readinessFor([store as StoreListRow]),
     prisma.order.aggregate({
       where: { storeId: store.id, status: { not: "CANCELLED" } },
       _sum: { total: true },
@@ -183,6 +255,11 @@ export async function getStore(storeRef: string) {
     store;
   return {
     ...shapeListRow(rest as StoreListRow, revenue._sum.total ?? new Prisma.Decimal(0)),
+    // Both shapes: `setup` so the detail page renders the same chip the list
+    // does, and the full evaluation so it can name the individual missing
+    // requirements ("Contact email", "PAN") rather than only the step.
+    setup: summariseReadiness(readiness.get(store.id)!),
+    readiness: readiness.get(store.id)!,
     theme,
     footer,
     // Resolved rather than raw, so the console reads the same effective

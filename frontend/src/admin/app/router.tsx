@@ -24,6 +24,8 @@ const OrdersPage = lazy(() => import('../pages/OrdersPage'))
 const OrderDetailPage = lazy(() => import('../pages/OrderDetailPage'))
 const PaymentsPage = lazy(() => import('../pages/PaymentsPage'))
 const ProductsPage = lazy(() => import('../pages/ProductsPage'))
+const CategoriesPage = lazy(() => import('../pages/CategoriesPage'))
+const CategoryMappingPage = lazy(() => import('../pages/CategoryMappingPage'))
 const SupportPage = lazy(() => import('../pages/SupportPage'))
 const SupportTicketPage = lazy(() => import('../pages/SupportTicketPage'))
 const ThemeTemplatesPage = lazy(() => import('../pages/ThemeTemplatesPage'))
@@ -51,6 +53,8 @@ export function AdminRouter() {
                 <Route path="orders/:orderId" element={<OrderDetailPage />} />
                 <Route path="payments" element={<PaymentsPage />} />
                 <Route path="products" element={<ProductsPage />} />
+                <Route path="categories" element={<CategoriesPage />} />
+                <Route path="category-mapping" element={<CategoryMappingPage />} />
                 <Route path="support" element={<SupportPage />} />
                 <Route path="support/:ticketId" element={<SupportTicketPage />} />
                 <Route path="theme-templates" element={<ThemeTemplatesPage />} />

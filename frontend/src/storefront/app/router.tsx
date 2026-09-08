@@ -1,7 +1,23 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter, Navigate, useLocation, useParams } from 'react-router-dom'
 import { AppLayout } from '../layout/AppLayout'
 import { RequireCustomer } from './RequireCustomer'
 import { LoginRoute } from '../pages/LoginRoute'
+
+/**
+ * `/stores/**` → `/mystores/**`, forwarding the rest of the path, the query
+ * and the hash untouched.
+ *
+ * Store management moved off `/stores` because it read as the public
+ * storefront (`/store/{slug}`). This keeps every link already in the wild
+ * working — notification rows in the database, a seller's bookmark, a link
+ * someone pasted into a support thread — and `replace` keeps the dead prefix
+ * out of the seller's back button.
+ */
+function LegacyStoresRedirect() {
+  const rest = useParams()['*'] ?? ''
+  const { search, hash } = useLocation()
+  return <Navigate to={`/mystores${rest ? `/${rest}` : ''}${search}${hash}`} replace />
+}
 
 /**
  * Marketplace router — everything that is not the per-store shopping surface
@@ -77,15 +93,29 @@ export const router = createBrowserRouter([
               Component: (await import('../pages/SupportTicketPage')).SupportTicketPage,
             }),
           },
-          // Store creation & management (a customer can own multiple stores)
+          // Store creation & management (a customer can own multiple stores).
+          //
+          // `/mystores`, not `/stores`: the public storefront lives at
+          // `/store/{slug}`, and one plural letter between "the shop you are
+          // buying from" and "the shops you own" was not enough — support
+          // threads and internal links kept landing on the wrong one.
+          //
+          // The old prefix REDIRECTS rather than 404s (below): notification
+          // rows already written to the database carry `/stores/{slug}/...`
+          // deep links, and those have to keep resolving for as long as the
+          // rows live.
           {
-            path: 'stores',
+            path: 'stores/*',
+            Component: LegacyStoresRedirect,
+          },
+          {
+            path: 'mystores',
             lazy: async () => ({
               Component: (await import('../pages/stores/StoresPage')).StoresPage,
             }),
           },
           {
-            path: 'stores/new',
+            path: 'mystores/new',
             lazy: async () => ({
               Component: (await import('../pages/stores/CreateStorePage')).CreateStorePage,
             }),
@@ -96,20 +126,20 @@ export const router = createBrowserRouter([
           // than a 768px tablet gets. React Router ranks by specificity, so
           // this four-segment path wins over the layout's 'appearance' child.
           {
-            path: 'stores/:storeSlug/appearance/preview',
+            path: 'mystores/:storeSlug/appearance/preview',
             lazy: async () => ({
               Component: (await import('../pages/stores/StoreThemePreviewPage'))
                 .StoreThemePreviewPage,
             }),
           },
           {
-            path: 'stores/:storeSlug',
+            path: 'mystores/:storeSlug',
             lazy: async () => ({
               Component: (await import('../pages/stores/StoreManageLayout')).StoreManageLayout,
             }),
             children: [
               // Dashboard is the manage landing; Store Details lives at
-              // /stores/{slug}/details.
+              // /mystores/{slug}/details.
               {
                 index: true,
                 lazy: async () => ({

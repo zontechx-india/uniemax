@@ -30,7 +30,7 @@ import { EyeIcon, PaletteIcon } from '../../layout/icons'
  *
  * The inline preview is deliberately compact — it fits the panel and gives
  * immediate feedback while picking colors. **Open full preview** hands the
- * current draft to `/stores/{slug}/appearance/preview`, which renders the same
+ * current draft to `/mystores/{slug}/appearance/preview`, which renders the same
  * sample shop across the whole window with no section nav stealing 260px.
  *
  * The preview below is one sample shop, identical for every seller — see
@@ -240,7 +240,7 @@ export function StoreAppearancePage() {
             {/* Carries the DRAFT, so opening the big preview mid-edit shows
                 what you were editing rather than the last saved palette. */}
             <Link
-              to={`/stores/${storeSlug}/appearance/preview`}
+              to={`/mystores/${storeSlug}/appearance/preview`}
               state={{ theme } satisfies ThemeNavState}
               className="inline-flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-fg transition-colors hover:border-brand"
             >

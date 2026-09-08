@@ -16,8 +16,9 @@ import { StoreLogo } from './StoreLogo'
 const PREVIEW_LINES = 3
 
 /**
- * Shopping cart (/cart) — public like the store pages themselves (the cart
- * is client-side, so no sign-in is needed). Items are **grouped by store**;
+ * Shopping cart (/cart) — public like the store pages themselves: the local
+ * cart needs no sign-in, and signing in only adds the server mirror behind
+ * it (`cartSync`). Items are **grouped by store**;
  * a store with many items previews the first few and links to its dedicated
  * page (/cart/{storeSlug}) for the full list.
  *

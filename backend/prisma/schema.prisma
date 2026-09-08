@@ -134,21 +134,26 @@ model StoreSetting {
 // ---------------------------------------------------------------------------
 
 model Category {
-  id           String     @id @default(cuid())
-  name         String
-  slug         String     @unique
-  description  String?
-  imageUrl     String?
-  displayOrder Int        @default(0)
-  isActive     Boolean    @default(true)
+  id              String          @id @default(cuid())
+  name            String
+  slug            String          @unique
+  description     String?
+  imageUrl        String?
+  displayOrder    Int             @default(0)
+  isActive        Boolean         @default(true)
   // Self-relation enables arbitrary category trees (Sports > Cricket Bat)
   // without code changes — core to the white-label requirement.
-  parentId     String?
-  parent       Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
-  children     Category[] @relation("CategoryTree")
-  products     Product[]
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  parentId        String?
+  parent          Category?       @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children        Category[]      @relation("CategoryTree")
+  products        Product[]
+  /// Store shelves and store products tagged with this taxonomy node. Both
+  /// links are optional and `SetNull` on delete: retiring a taxonomy node
+  /// unclassifies rows, it never removes a shelf or a product.
+  storeCategories StoreCategory[] @relation("StoreCategoryTaxonomy")
+  storeProducts   StoreProduct[]  @relation("StoreProductTaxonomy")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   @@index([parentId])
   @@index([isActive])
@@ -233,6 +238,7 @@ model Customer {
   stores         Store[]
   addresses      CustomerAddress[]
   supportTickets SupportTicket[]
+  cart           Cart?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -266,6 +272,108 @@ model CustomerAddress {
 
   @@index([customerId])
   @@map("customer_addresses")
+}
+
+/// Which basket a line currently sits in. ACTIVE lines are what checkout
+/// prices and what the badge counts; anything else is parked and ignored by
+/// both. The enum (rather than a boolean) is what lets "Save for later",
+/// "Move to wishlist" and similar parking lots land as one value, with no
+/// migration and no second table.
+enum CartLineStatus {
+  ACTIVE
+  SAVED
+}
+
+/// The signed-in customer's SERVER-SIDE cart — one per account, spanning
+/// every store they shop from (lines carry their own store; orders are still
+/// placed one store at a time).
+///
+/// This is the DURABLE copy, not the hot path. The browser keeps its own
+/// localStorage cart (`features/cart/cart.ts`) so guests can shop with no
+/// account and every +/- tap stays instant and offline-tolerant; while a
+/// customer is signed in the client mirrors that cart here (debounced full
+/// replace) and re-hydrates from it on a fresh device. Guest-cart → account
+/// -cart reconciliation at sign-in is a quantity-wise union, so signing in
+/// never costs the shopper an item.
+///
+/// Money is NEVER read from this table. Prices and stock come from the live
+/// catalog at quote/placement time exactly as before — a cart line is a
+/// reference plus a quantity plus the shopper's intent, nothing more.
+model Cart {
+  id         String   @id @default(cuid())
+  customerId String   @unique
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  lines CartLine[]
+
+  /// Cart-level extras the checkout may grow into — coupon code, gift note,
+  /// preferred fulfilment… JSON like `Store.theme`, so a new checkout
+  /// feature is a field in `cart.schema.ts` rather than a migration.
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Abandoned-cart sweeps ("carts untouched for N days") scan by recency.
+  @@index([updatedAt])
+  @@map("carts")
+}
+
+/// One unit of sale in a customer's cart.
+///
+/// The VARIANT is the unit of sale (see StoreProductVariant), so a line
+/// always points at a real variant row — including the implicit `isDefault`
+/// one an option-less product carries. That makes @@unique([cartId,
+/// variantId]) express the rule exactly ("one line per buyable thing") with
+/// no nullable-column caveats. The public API hides the default variant, so
+/// the service emits `variantId: null` for those lines and resolves null
+/// back to the default variant on the way in — the storefront's line
+/// identity is unchanged by this table existing.
+///
+/// `storeId` and `productId` are stored alongside the variant even though
+/// both are reachable through it: grouping a cart by store and answering
+/// "how many carts hold this product" are the two things this table is read
+/// for, and neither should need a join to a join.
+///
+/// Deleting the store, product or variant deletes the line. A cart line is a
+/// pointer at something buyable; when that stops existing there is nothing
+/// left to buy and nothing worth keeping a dangling row for.
+model CartLine {
+  id     String @id @default(cuid())
+  cartId String
+  cart   Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  storeId   String
+  store     Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  productId String
+  product   StoreProduct        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String
+  variant   StoreProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  quantity Int            @default(1)
+  status   CartLineStatus @default(ACTIVE)
+
+  /// The variant's price when the line was created — never used to charge
+  /// (checkout re-prices from the catalog), only to TELL the shopper what
+  /// moved: "₹200 cheaper since you added this". Refreshed whenever the line
+  /// is created, not on every sync, so the comparison stays meaningful.
+  priceAtAdd Decimal @db.Decimal(10, 2)
+
+  /// Per-line extras a future product page may attach — gift wrap, engraving
+  /// text, a subscription interval, the campaign the item was added from.
+  /// JSON for the same reason as `Cart.metadata`.
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, variantId])
+  /// The cart read: one basket's lines, filtered by status.
+  @@index([cartId, status])
+  /// Seller-side demand signals ("in N carts") and store-scoped clears.
+  @@index([storeId])
+  @@index([productId])
+  @@map("cart_lines")
 }
 
 /// A customer-owned online store (a single account can own several).
@@ -345,6 +453,7 @@ model Store {
   bankAccounts   StoreBankAccount[]
   orders         Order[]
   supportTickets SupportTicket[]
+  cartLines      CartLine[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -382,11 +491,29 @@ model StoreCategory {
   // Disabled categories (and everything inside them, subcategories
   // included) are hidden from the public storefront but stay manageable —
   // the store-catalog analogue of the store-level publish switch.
-  isActive   Boolean        @default(true)
+  isActive   Boolean @default(true)
   /// Surfaces this root category in the storefront homepage's
   /// "Featured Categories" row. Owner-controlled merchandising.
-  isFeatured Boolean        @default(false)
-  products   StoreProduct[]
+  isFeatured Boolean @default(false)
+  /// Position among its siblings on the storefront. Lower sorts first;
+  /// ties fall back to name, so an untouched catalog stays alphabetical.
+  sortOrder  Int     @default(0)
+  /// Optional shelf artwork. A URL only — no upload pipeline here; the
+  /// seller pastes a link (product media has its own S3 flow).
+  imageUrl   String?
+
+  /// OPTIONAL tag onto the GLOBAL taxonomy (`Category`). The shelf keeps its
+  /// own name and slug — a seller organises the storefront however they like
+  /// ("KTM", "Pro Edition") — and this says which taxonomy node that shelf
+  /// belongs under, for cross-tenant search and reporting. Null means
+  /// "not classified yet", which is a legitimate resting state: brand and
+  /// merchandising shelves have no taxonomy answer and must not be forced
+  /// into one (vehicle brands/models belong to the future compatibility
+  /// system, never to categories).
+  categoryId String?
+  category   Category? @relation("StoreCategoryTaxonomy", fields: [categoryId], references: [id], onDelete: SetNull)
+
+  products StoreProduct[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -396,6 +523,7 @@ model StoreCategory {
   @@index([storeId])
   @@index([parentId])
   @@index([isActive])
+  @@index([categoryId])
   @@map("store_categories")
 }
 
@@ -409,6 +537,17 @@ model StoreProduct {
 
   categoryId String
   category   StoreCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  /// OPTIONAL classification of the product itself on the GLOBAL taxonomy
+  /// (`Category`), independent of which shelf it sits on. Seeded from the
+  /// shelf's tag and overridable per product, because the two genuinely
+  /// differ: a product on motocore's "KTM > Duke 200" shelf is an
+  /// Automotive > Motorcycle Parts item, and the KTM/Duke-200 facts belong
+  /// to the vehicle-compatibility system rather than to a category. This is
+  /// the id Part 8's selector writes — the leaf node, never a name, and
+  /// never a copy of the category text.
+  globalCategoryId String?
+  globalCategory   Category? @relation("StoreProductTaxonomy", fields: [globalCategoryId], references: [id], onDelete: SetNull)
 
   name        String
   /// URL identity within the store — /store/{storeSlug}/product/{slug}.
@@ -440,17 +579,17 @@ model StoreProduct {
   /// cartesian product is always present and the seller disables what they
   /// don't sell. Read through resolveOptionTypes(); written as
   /// InputJsonValue / DbNull.
-  optionTypes    Json?
+  optionTypes      Json?
   /// Ordered descriptive rows [{ label, value }] for the storefront spec table
   /// ("Material: Memory foam"). Not purchasable dimensions — those are
   /// optionTypes. Read through resolveSpecifications().
-  specifications Json?
+  specifications   Json?
   /// Per-product delivery-area OVERRIDE: { type: ALL | INCLUDE | EXCLUDE,
   /// pincodes: [...] }. Null = no override — the product follows the store's
   /// default rule (Store.shipping.deliveryRule). When set it REPLACES the
   /// default for this product. Read through resolveProductDeliveryRule();
   /// precedence + matching live in deliveryRules.ts.
-  deliveryRule   Json?
+  deliveryRule     Json?
   /// Per-product shipping-charge OVERRIDE: { type: FREE | FLAT, amount }.
   /// Null = the product follows the store's default rate
   /// (Store.shipping.rate). An order's charge is the HIGHEST applicable
@@ -459,7 +598,7 @@ model StoreProduct {
   /// Whether this product may be bought with cash on delivery. Only
   /// meaningful while the store accepts COD (Store.payments.acceptCod);
   /// one false product in an order removes COD from that order's checkout.
-  codAvailable   Boolean @default(true)
+  codAvailable     Boolean @default(true)
 
   /// DENORMALISED aggregates over the product's **sellable** variants (active
   /// only), maintained by `recomputeProductAggregates()` on every variant
@@ -475,6 +614,7 @@ model StoreProduct {
   variants   StoreProductVariant[]
   media      StoreProductMedia[]
   orderItems OrderItem[]
+  cartLines  CartLine[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -482,6 +622,7 @@ model StoreProduct {
   @@unique([storeId, slug])
   @@index([storeId])
   @@index([categoryId])
+  @@index([globalCategoryId])
   @@index([isActive])
   @@index([priceMin])
   @@index([isFeatured])
@@ -517,6 +658,7 @@ model StoreProductVariant {
   optionValues  Json?
 
   orderItems OrderItem[]
+  cartLines  CartLine[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -623,17 +765,17 @@ model StoreProductMedia {
 /// Sellers only ever see rows with `isActive`; the admin console
 /// (`/admin/theme-templates`) owns the full list.
 model StoreThemeTemplate {
-  id          String  @id @default(cuid())
-  name        String
+  id           String  @id @default(cuid())
+  name         String
   /// One line of positioning shown under the name in the picker
   /// ("Warm, high-contrast - good for food and fashion").
-  description String?
+  description  String?
   /// { backgroundColor, primaryColor, secondaryColor, surfaceColor,
   /// buttonTextColor } - validated by `storeThemeColorsSchema`. JSON, like
   /// `Store.theme`, so the two shapes evolve together without a migration.
-  theme       Json
+  theme        Json
   /// Only active templates are offered to sellers.
-  isActive    Boolean @default(true)
+  isActive     Boolean @default(true)
   /// Ascending; ties break on `createdAt`.
   displayOrder Int     @default(0)
 

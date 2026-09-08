@@ -83,7 +83,7 @@ the API same-origin — matching production, so no CORS/SameSite issues.
   calls `signedIn(customer)` and closes, and every consumer re-renders as
   signed in — no reload, no `?next=`. Because it sits OUTSIDE the router it
   cannot navigate; callers that need a follow-up pass `onSignedIn` (the
-  seller CTA navigates to `/stores/new`). Size: from `sm` an 80vw × 80vh
+  seller CTA navigates to `/mystores/new`). Size: from `sm` an 80vw × 80vh
   panel capped at `max-w-5xl` (brand column on the left from `md`, form on
   the right); below `sm` a full-screen sheet. It is portalled to `<body>`
   (see ConfirmDialog for why), which is OUTSIDE the div where
@@ -207,7 +207,7 @@ for guests and signed-in customers alike and adapts per session state.
   homepage); and a **Become a Seller** gradient panel
   (split layout: pitch + 3 check-mark proof points + CTA on the left —
   label flips to "Create Another Store" for owners; for guests the CTA opens
-  the auth dialog and navigates to `/stores/new` via `onSignedIn` — and the
+  the auth dialog and navigates to `/mystores/new` via `onSignedIn` — and the
   live **platform counters**
   (Stores / Products / Orders from `GET /public/stats`) on the right as
   social proof; counters fail silently and any zero value hides). The
@@ -270,7 +270,7 @@ Signed-in account pages mount inside `RequireCustomer` → `AppLayout`
   server-side, and **confirming navigates to `/` (replace) before revoking**:
   flipping to guest while a guarded route is still mounted would let
   `RequireCustomer` redirect to `/login?next=…`, so logging out of
-  `/stores/{slug}` landed on the login page and signing back in returned to
+  `/mystores/{slug}` landed on the login page and signing back in returned to
   the page just left. Logout ends on the marketplace homepage from every
   screen. The trigger's name is single-line and truncates past
   `max-w-36`. The same menu is reused by the marketplace header, whose
@@ -340,7 +340,7 @@ and the six pages are thin compositions:
 | `supportApi.ts` | Three typed clients — `supportApi` (→ UnieMax), `storeSupportApi` (shopper → a shop) and `storeInboxApi` (the seller's side) — plus `CATEGORY_LABELS` (**one wording per enum value**, audience-neutral: two wordings is how a queue starts disagreeing with itself) and the three **option lists** `SELLER_CATEGORIES` / `CUSTOMER_CATEGORIES` / `STORE_CATEGORIES`, which is where the audiences actually differ |
 | `SupportContactCard.tsx` | Email / phone / hours. Renders from a **local fallback copy first** and never blocks on `GET /public/support-contact` — a support page showing no way to contact support is the one failure it must not have, so a failed fetch is silently ignored |
 | `NewTicketForm.tsx` | Subject · topic · details · reply-to email/phone. Topic options **and the submit target** (`submitTo`) are props, since the flows post to different endpoints; **priority is never offered** — given the choice everyone picks Urgent and the field stops sorting anything |
-| `TicketList.tsx` | The reporter's tickets. Rows link **relatively** (`to={ticket.id}`), which is what lets one list sit under both `/support` and `/stores/{slug}/support` without knowing either path. `null` = loading, `[]` = the empty state — never confused |
+| `TicketList.tsx` | The reporter's tickets. Rows link **relatively** (`to={ticket.id}`), which is what lets one list sit under both `/support` and `/mystores/{slug}/support` without knowing either path. `null` = loading, `[]` = the empty state — never confused |
 | `TicketThread.tsx` | Fetch + conversation + reply + Close, for all three flows. Each message is labelled from its server-derived **`authorRole`** — "You", the shop's name, or "UnieMax Support" — never an individual (the reporter is talking to an organisation, and naming a staff member invites chasing that person instead of the queue). `authorType` can't do this job: on a store thread both sides are `CUSTOMER`. Bodies render `whitespace-pre-wrap` so a pasted error log stays readable; the reply box warns when replying will **reopen** a resolved ticket; a closed ticket is read-only. Only the back link is a prop |
 | `ticketMeta.tsx` | Status chip + thread timestamp format |
 
@@ -348,16 +348,27 @@ and the six pages are thin compositions:
 
 A customer can own multiple stores, backed by the real API
 (`/api/v1/stores` — see API.md). Entry point: a **dynamic row in the
-account menu** — "Create Store" (→ `/stores/new`) when the customer owns
-none, "My Store" (→ `/stores`) otherwise; `AccountMenu` checks
+account menu** — "Create Store" (→ `/mystores/new`) when the customer owns
+none, "My Store" (→ `/mystores`) otherwise; `AccountMenu` checks
 `storesApi.list()` on mount and on each open.
 
-Routes: `/stores` (select a store — clicking a card goes straight to its
+**The prefix is `/mystores`, not `/stores`.** The public storefront lives at
+`/store/{slug}`, and one plural letter between "the shop you are buying from"
+and "the shops you own" was not enough to keep links and support threads on
+the right one. `/stores/**` still resolves: `LegacyStoresRedirect`
+(`router.tsx`) forwards the rest of the path, the query and the hash to
+`/mystores/**` with `replace`, because notification rows already written to
+the database carry `/stores/{slug}/…` deep links and have to keep working for
+as long as those rows live. New seller notification URLs are emitted as
+`/mystores/…` (see BACKEND_CONTEXT). The admin console's own `/stores` route
+is a different app on a different mount and is unaffected.
+
+Routes: `/mystores` (select a store — clicking a card goes straight to its
 management page — or create; first-run empty state; each card shows the
 store's **Published/Draft** status chip and its public `/store/{slug}` path,
-so the list doubles as an at-a-glance health check), `/stores/new` (the
+so the list doubles as an at-a-glance health check), `/mystores/new` (the
 **four-step Create Store wizard** — see below), and
-`/stores/:storeSlug` — a Flipkart-account-style split
+`/mystores/:storeSlug` — a Flipkart-account-style split
 **inside** the main outlet: `StoreManageLayout` renders a left section card
 and the selected section in a right card via a nested `<Outlet/>` (children
 read the loaded store through `useManagedStore()` outlet context).
@@ -374,7 +385,7 @@ navigation and hide the item being hunted for):
 | ----- | -------- |
 | **Overview** | Dashboard · Orders *(pending-count badge)* |
 | **Catalog** | Categories · Products |
-| **Storefront** | Store Details · Appearance · Homepage · Footer |
+| **Storefront** | Store Details · Business Details · Appearance · Homepage · Footer |
 | **Settings** | Payments · Bank Accounts · Shipping · Checkout |
 | **Help** | Customer Support · UnieMax Support |
 
@@ -392,8 +403,21 @@ shop's own inbox (buyers writing to the seller, so it leads: daily work) and
 *who is on the other end* is the only labelling that stays unambiguous once
 both exist.
 
+Rows that a readiness step points at (`step.href` → Store Details, Business
+Details, Products, Bank Accounts) also carry a **setup mark** (`StatusTag`,
+`SetupStatus.tsx`), and it is asymmetric on purpose: an unfinished row says
+the **word** "Pending" beside the orange animated ring, a finished one keeps
+the bare green tick. A mark alone is ambiguous in a list — nobody should have
+to learn that orange-ring means unfinished — while "Complete" repeated down a
+column of fourteen rows is noise.
+The grouping is read off `store.readiness.steps` rather than a second
+hardcoded list, so a requirement added to `storeReadiness.ts` appears against
+the right row with no change to the layout. Marks vanish entirely once
+`readiness.complete` — a column of ticks that can never change again is
+decoration, the same reason `SetupChecklist` hides itself at 100%.
+
 **Dashboard** (`StoreDashboardPage`, the manage landing at
-`/stores/{slug}`; Store Details moved to `/stores/{slug}/details`) — over
+`/mystores/{slug}`; Store Details moved to `/mystores/{slug}/details`) — over
 `GET /stores/:id/dashboard`, **fetched by the layout, not the page**
 (`ManagedStoreContext.dashboard` / `dashboardError` / `refreshDashboard`),
 because the nav's Orders badge needs the same counters. The layout outlives
@@ -412,7 +436,7 @@ filtered to its status; Processing spans two statuses so it links to the
 full list), and the latest 8 orders, each row linking to its order detail
 page (plus a "View all orders" link).
 
-**Orders** (`StoreOrdersPage` at `/stores/{slug}/orders` +
+**Orders** (`StoreOrdersPage` at `/mystores/{slug}/orders` +
 `StoreOrderDetailPage` at `…/orders/{orderId}`, shared chips/labels in
 `orderMeta.tsx`) — the seller's order management over
 `/api/v1/stores/:id/orders`:
@@ -674,16 +698,20 @@ exception: the signed-in **owner** of an unpublished store gets a **draft
 preview** (the API resolves the cookie session best-effort and serves the
 store with `isPublished: false`; `PublicStoreLayout` then shows a solid
 warning banner above the header — "Draft preview … only you can see it" —
-with a plain `<a>` to `/stores/{slug}`, since the manage page lives in the
+with a plain `<a>` to `/mystores/{slug}`, since the manage page lives in the
 authed router and needs a full page load to cross the gate). On a 404 the
 layout retries once after `customerAuth.refresh()`, so an owner whose
 15-minute access token expired mid-preview isn't bounced to the
 unavailable screen.
 
-**Shopping cart (grouped by store)** — the cart is **client-side**
-(`features/cart/cart.ts`: localStorage-backed with `useSyncExternalStore`
-hooks + cross-tab sync), so anonymous visitors can shop across multiple
-stores; a line's identity is store + product + **variant** (null for
+**Shopping cart (grouped by store)** — **the browser owns the cart; the
+server keeps it.** `features/cart/cart.ts` is the hot path: localStorage
+with `useSyncExternalStore` hooks + cross-tab sync, so anonymous visitors
+can shop across multiple stores and every +/- tap lands instantly whatever
+the network is doing. While a customer is signed in, `features/cart/
+cartSync.ts` mirrors that cart to `/api/v1/cart` (see **Cart sync** below),
+which is what makes a basket survive a new device or a cleared browser.
+A line's identity is store + product + **variant** (null for
 plain products), and each line snapshots product/variant name, **product
 slug** (links the row back to its product page and enables revalidation),
 effective price, stock, store name/slug, and the **cover-image URL** — cart
@@ -694,12 +722,45 @@ label, so a seller renaming a value shows up in the cart). Cart rows show
 the variant as a chip. Adding to cart from the product page pops a short **"Added to cart —
 View cart" toast** (`AddedToast` in `CartControls.tsx`); quantity changes on
 the cart pages stay silent.
-**Logging out empties the cart** (`cart.clear()`, wired into the storefront's
-`signOut` in `StorefrontApp.tsx`): there is no server-side cart, so a
-device-local basket would otherwise be inherited by whoever uses the browser
-next. Only an *explicit* logout clears it — an expired session (the 401 path
-out of checkout) refreshes once and retries, else opens the auth dialog over
-the checkout, leaving the cart intact so the shopper can sign back in and pay.
+Lines also carry `status` (`ACTIVE` — the basket — or `SAVED`, the parking
+lot a future save-for-later fills; `groupByStore` and `useCartQty` count
+ACTIVE only), `priceAtAdd` and a free-form `metadata` object. All three
+round-trip to the server untouched, so a new cart feature is a field rather
+than a migration plus a protocol change. `cart.add` takes a `CartItemDraft`
+in which they are optional, so callers that don't know about them are
+unchanged.
+
+**Cart sync** (`features/cart/cartSync.ts` + `cartApi.ts`, mounted once via
+`useCartSync` in `StorefrontApp.tsx`, keyed on the signed-in customer's id):
+- **At sign-in / a page load with a session** — one reconciliation. A
+  non-empty local cart is **merged** into the account's (`POST /cart/merge`,
+  quantity-wise union server-side); an empty one just reads (`GET /cart`).
+  The result is applied with `cart.replaceAll()`, so both halves agree from
+  then on. The server response carries everything renderable, so a fresh
+  device needs no follow-up product fetches.
+- **While signed in** — each local change is pushed as a whole-cart replace
+  (`PUT /cart`), debounced 800 ms so a burst of stepper taps costs one
+  request, and flushed on `visibilitychange → hidden` so closing the tab
+  never loses the last one. A push is skipped when the cart's *server-visible*
+  fingerprint is unchanged, so a revalidation refreshing a price or thumbnail
+  causes no traffic.
+- **Failures are silent and safe.** A cart that cannot reach the server is
+  still a working cart. Until the reconciliation has succeeded the sync stays
+  *un-hydrated* and the next local change **retries the reconciliation instead
+  of pushing** — a cart that was never reconciled can never overwrite the
+  stored one.
+**Logging out empties the cart in this browser** — `stopCartSync()` **then**
+`cart.clear()`, wired into the storefront's `signOut` in `StorefrontApp.tsx`.
+The order matters: clearing first would mirror the empty cart and destroy the
+account's basket on every device. The server copy is deliberately kept, so
+signing back in restores it; the local clear exists only so the next person to
+use the browser doesn't inherit the previous customer's basket. Only an
+*explicit* logout clears it — an expired session (the 401 path out of
+checkout) refreshes once and retries, else opens the auth dialog over the
+checkout, leaving the cart intact so the shopper can sign back in and pay.
+**Placing an order also clears that store's lines server-side**, so the
+basket empties on every signed-in device rather than only the tab that
+checked out.
 Three public routes, matched before the session gate like `/store/{slug}`:
 **`/cart`** (`pages/cart/CartPage.tsx`) groups items **by store** — each
 store card shows the store's **logo** (fetched via
@@ -857,7 +918,7 @@ for crawlers wait for SSR/prerender).
   know by heart and the one that will later auto-fill the two below it. One
   column on mobile, a 2-col grid from `sm`.
 - `useStores.ts` — data hooks: `useStores` (list), `useStore` (by id;
-  404/foreign → `null` → redirect to `/stores`).
+  404/foreign → `null` → redirect to `/mystores`).
 
 **Create Store (`CreateStorePage`)** — a four-step wizard over the shared
 `Wizard` shell: **Your store** (name + logo, the same
@@ -923,7 +984,25 @@ a pickup-address item.
   **Address** (the business address via `AddressFields` — the one address the
   platform holds) and **Tax & compliance** (PAN,
   GSTIN, a not-registered declaration, registration number, with live format
-  hints, the GSTIN's state code decoded, and a PAN-inside-GSTIN cross-check)),
+  hints, the GSTIN's state code decoded, and a PAN-inside-GSTIN cross-check).
+  Because the three save independently, each carries its **own status** in
+  its header (`StatusBadge`: Complete / *n* of *m* done / Unsaved changes)
+  plus, when incomplete, the missing requirements named in a line — "2 of 4"
+  alone still leaves the seller hunting the form. Above them a
+  `SectionJumpBar` repeats all three as **equal-width tiles**
+  (`flex-1 basis-0`, so the columns come from the count and not from label
+  length) that scroll to their card (`scroll-mt-28` clears both sticky bars,
+  and the card is focused and briefly ringed on arrival); the strip **pins
+  under the app header only while something is pending**, which is what makes
+  the page usable on a phone where the third card is two screens down. Each
+  tile shows the section's heading **verbatim** — headings and blurbs live
+  once in the page's `SECTIONS` table and feed both the tile and the card, so
+  a tile can never read "Tax" over a card headed "Tax & compliance"; the
+  wrapping label keeps its count line only from `sm` up. A header progress
+  bar sums all three. Everything derives from `store.readiness` steps
+  `business` / `address` / `tax`; unsaved edits are lifted to the page so a
+  tile can never claim "1 of 4" while the card below it says "Unsaved
+  changes"),
   `StoreHomepagePage` (**arrange** the storefront homepage — drag-and-drop
   (native HTML5 DnD, no dependency) plus ▲/▼ buttons for keyboard/touch to
   reorder Hero · Shop by Category · Featured Products · New Arrivals · Best
@@ -1036,9 +1115,17 @@ a pickup-address item.
   rendered with the real page's own `storeVars()` semantics (flat
   surfaces, chrome CTAs) so it previews truthfully →
   `PATCH /stores/:id/theme`), `StoreCategoriesPage`
-  (inline add form with an optional **parent select** — top-level or
-  "Inside {root}" for a subcategory, one level only — and a **collapsible
-  nested list**: roots with indented "Sub"-chipped children,
+  (add form of **two selects and nothing else** — Category, then an optional
+  Subcategory drawn from the first one's children. There is no name field: a
+  seller chooses from the platform taxonomy and cannot type one, so no shop
+  invents its own vocabulary. Picking a subcategory adds its parent shelf too,
+  making "Electronics › Mobiles" one action; categories already added stay
+  visible but disabled ("— already added") rather than vanishing, so the list
+  reads the same every time. A per-row **edit panel** covers artwork and sort
+  order only — the name is the category's. Shelves that predate the rule keep
+  their free-text names and read "Added before platform categories existed",
+  which is the seller's cue that only support can link it. Plus a
+  **collapsible nested list**: roots with indented "Sub"-chipped children,
   product/subcategory counts, guarded delete via `ConfirmDialog`. Roots
   with children get an expand/collapse chevron plus an Expand-all /
   Collapse-all control; the open set is remembered per store in
@@ -1051,7 +1138,9 @@ a pickup-address item.
   (**gated**: with zero categories it shows an "Add a category first"
   state linking to the Categories section — the category-first sequence;
   otherwise an Add Product form — name, category select grouped by root
-  with "Root › Sub" options, optional description, the **Media Board**
+  with "Root › Sub" options (the shelf's own category classifies the product,
+  so the form asks once rather than twice), optional description, the
+  **Media Board**
   (`media/MediaBoard.tsx` — required photos plus the optional video, the same
   screen the product row uses), an optional **`SpecificationsEditor`**
   (`pages/stores/products/` — ordered label/value rows with move up/down;
@@ -1267,12 +1356,30 @@ Rules they follow (constraints, not taste):
 | `/orders`, `/orders/:id` | Platform-wide orders. Read-only: the seller owns fulfilment. Detail adds the joins the seller can't see (customer account, gateway reference) plus a lifecycle timeline built from the order's own timestamps. |
 | `/payments` | The same order rows through the money lens, with per-status totals for the current filter. |
 | `/products` | Seller catalog across stores, with the hide/restore moderation switch (always asks for a reason — the seller is notified immediately). A row is a summary; **clicking it opens the listing in full** in `products/ProductDetailDialog` (gallery, description, option matrix, per-variant price/stock, spec table, delivery area, homepage flags, storefront link, hide/restore) over the table, so filters and page survive closing it. `?storeId=` scopes the table to one store and shows a banner naming it. The hide/restore confirm lives in `products/ProductVisibilityDialog` because the table's row button and the detail dialog must ask the same question the same way. |
-| `/stores`, `/stores/:id` | Stores + owners. Detail carries suspension, **manual payout-account verification** (account numbers masked to the last 4), and a **Products** card — the store's newest listings inline (each opening the same product dialog), with a "View all" into `/products?storeId=…`. |
+| `/category-mapping` | Pointing sellers' **legacy** shelves at the taxonomy. Shelves created today are classified by construction (the seller picks a category rather than typing one), so this queue is the free text typed before that rule — usually a brand ("KTM"), a vehicle model ("Duke 200") or a tier ("Pro Edition"). No rule maps those without guessing, so an admin decides one at a time with the same two selects the seller sees. Mapping **never renames the shelf** — a seller's navigation is theirs; it records what the shelf *means*. An opt-out checkbox re-files the products on it in the same transaction, which is the reason to map at all. Leaving a brand unmapped is a valid answer, so the queue is not meant to reach zero. |
+| `/categories` | The **global category taxonomy** — the one place it can be edited. An indented tree of arbitrary depth (the shape follows `parentId`; "category" and "subcategory" are the same row at different depths), with create/edit/enable/disable/delete, sort order, image URL and a parent select. Searching flattens the view and shows each hit's full path, because a match inside a collapsed branch has to be reachable without guessing which parent to open. Disabling hides a whole branch from sellers and shoppers while leaving every existing tag intact — the safe way to retire a category, since deleting is refused while a node still has children or products. Sellers only ever *select* from this list. |
+| `/stores`, `/stores/:id` | Stores + owners. The table carries a **Setup** column (`SetupChip`, naming the first outstanding step) and a **Setup: Not finished / Complete** filter — independent of Published/Draft, because a live store can still be missing its PAN, and "who has not finished?" is the console's usual reason for opening this list. Detail carries suspension, **manual payout-account verification** (account numbers masked to the last 4), a **Products** card — the store's newest listings inline (each opening the same product dialog), with a "View all" into `/products?storeId=…` — and a **Seller setup** card (below). |
 | `/customers`, `/customers/:id` | Buyers and sellers (same account type), with blocking. The dialog states both effects: no future sign-in **and** every session revoked. |
 | `/support`, `/support/:ticketId` | The support queue — **sellers and shoppers in one list** (never a shopper's thread with a shop: those are the seller's to answer), filterable by `scope` (two pages would just mean one of them going unread), each row carrying a Seller/Shopper chip. Defaults to the **Needs reply** tab (open + in progress) sorted **oldest activity first** — a queue's job is to show what is still owed, which is the opposite of every other table here. The detail page carries the thread, the reply box (replying moves OPEN → IN_PROGRESS on its own) and triage: status saves on change and notifies the reporter, priority is internal and silent. |
 | `/notifications` | This admin's feed, the per-device push toggle, and the platform broadcast (confirm-with-preview — a broadcast can't be recalled). |
 | `/activity` | The append-only admin audit trail, filterable by action and record type. |
 | `/admins` | SUPER_ADMIN only: create, promote/demote, deactivate, reset password. |
+
+**Seller setup (`SellerSetupCard`, `StoreDetailPage`)** — the console's answer
+to "who has not finished, and how do I tell them?". The platform cannot
+complete a seller's setup for them (tax IDs are theirs to enter; the contact
+fields are *verified* identifiers an admin could not type even with the data
+in hand), so the card's whole job is making the chase easy: each unfinished
+step lists its **missing requirements by name** — "2 of 4" is not something
+you can put in a message — shows the path (`/mystores/{slug}/business`), and
+carries a **Copy link** button giving the absolute URL. A **Copy message for
+the seller** button assembles the whole note: what is outstanding, with the
+links de-duplicated (business, address and tax all live on one page, so the
+same URL three times would read as a mistake). Confirmation lands **on the
+button** rather than in a toast, because there can be five of them in one card
+and the admin needs to know which one they just copied. Everything comes from
+`store.readiness` — the same registry the seller's own pages render and the
+publish endpoint enforces, so an admin is never quoting different rules.
 
 `features/adminApi.ts` is the one place that knows the admin API's shape;
 `features/useAdminQuery.ts` holds the two data hooks — `useAdminQuery` (one
@@ -1403,6 +1510,11 @@ frontend/
     │   ├── favicon.ts           # Runtime tab-icon control: store pages swap the
     │   │                        #   favicon to the store's logo (app default when
     │   │                        #   none / on leaving — used by PublicStoreLayout)
+    │   ├── categories/          # The GLOBAL taxonomy, shared by both apps
+    │   │   ├── taxonomyApi.ts    # tree / children / search (public) + admin CRUD
+    │   │   └── CategoryPicker.tsx # Search-or-browse selector for deep trees
+    │   │                        #   (admin side); the seller's own forms use
+    │   │                        #   two plain selects instead
     │   ├── usePageTitle.ts      # Per-page document.title ("Part · Part · UnieMax")
     │   ├── useGoBack.ts         # Back controls that STEP BACK (navigate(-1)) instead
     │   │                        #   of pushing the previous page again, with a
@@ -1562,6 +1674,8 @@ frontend/
     │           │                        #   step 1, so it is resumable)
     │           ├── StoreManageLayout.tsx# Left sections card + right <Outlet/>
     │           ├── SetupChecklist.tsx   # Dashboard checklist from store.readiness
+    │           ├── SetupStatus.tsx      # Shared setup marks: StatusMark / StatusBadge /
+    │           │                        #   SectionJumpBar, all from store.readiness
     │           ├── StoreBusinessPage.tsx# Business & contact / address / tax cards
     │           ├── StoreDashboardPage.tsx # Manage landing: order stats + latest orders
     │           ├── StoreOrdersPage.tsx  # Seller orders list (status tabs, search, Load More)
@@ -1603,7 +1717,9 @@ frontend/
     │           ├── StoreSupportTicketPage.tsx # One UnieMax thread + reply/close
     │           ├── StoreCustomerSupportPage.tsx # The shop's inbox (buyers' requests)
     │           ├── StoreCustomerSupportTicketPage.tsx # One request + reply + status
-    │           ├── StoreCategoriesPage.tsx # Add/list/rename/collapse/toggle/delete categories
+    │           ├── StoreCategoriesPage.tsx # Choose shelves from the platform
+    │           │                        #   taxonomy (two selects, no free text)
+    │           │                        #   + image URL, sort order
     │           ├── StoreProductsPage.tsx # Add/list/toggle/delete products (category-gated)
     │           ├── products/             # Options & specifications editors for StoreProductsPage
     │           │   ├── OptionsPanel.tsx      # Draft of option types + matrix → PUT …/options
@@ -1744,6 +1860,7 @@ whole palette as CSS variables and maps them into Tailwind v4 via
 | `text-brand-contrast` | text on brand (white) | `bg-accent` / `text-accent` | focus / active (blue) |
 | `bg-brand-soft` | brand tint (Light Purple) | `logo-lockup` | the brand lockup (see *Brand art*) |
 | `text-danger` / `success` / `warning` | status | `shadow-floating` | elevation |
+| `text-pending` / `bg-pending-soft` | setup not finished (orange) | `bg-pending-gradient` | the animated pending mark |
 | `rounded-md` (4px) · `rounded-lg` (6px) · `rounded-pill` (50px) | radius | `font-heading` / `font-body` | Oswald / Inter |
 
 **Card hover language** (marketplace grids): `shadow-floating` at rest →
@@ -1764,7 +1881,7 @@ variants after their base utilities, which is what makes `text-fg
 dark:text-brand` resolve correctly).
 
 **Nothing uses it today.** Its one user was the selected-state rule on
-`/stores/{slug}`, which swapped carrier per scheme because the light gold was
+`/mystores/{slug}`, which swapped carrier per scheme because the light gold was
 illegible on white; now that the brand carries its own dark step, the section
 nav and the Today's Orders tile use one rule in both schemes — a solid brand
 **left bar** over the `bg-brand-soft` tint with an ink label. Every nav row
@@ -1786,6 +1903,8 @@ on `:root` and are shared by both schemes.
 | `--brand-hover` | `#5428d9` | `#aa90f9` |
 | `--brand-contrast` (`text-brand-contrast`) | `#ffffff` | `#111111` |
 | `--brand-soft` (`bg-brand-soft`) | `#f3f0ff` | `rgba(149,116,247,.16)` |
+| `--pending` (`text-pending`) | `#c2410c` | `#f08c4b` |
+| `--pending-soft` (`bg-pending-soft`) | `#fff4ec` | `rgba(240,140,75,.14)` |
 | `--logo-lockup` | `app_logo_with_name.png` | `…_dark.png` |
 
 Only `#121212` was specified for the dark scheme; the other six neutrals are
@@ -1807,6 +1926,19 @@ derived from it, and the secondary text is lifted to `#9a9a9a` because
   (see *Metal accents* below), never this brand one.
   Gradient CTAs use `hover:opacity-90` and `disabled:bg-none` (so the muted
   disabled color shows through).
+- **Pending gradient.** `--pending-gradient` + `.bg-pending-gradient` — the
+  app's only *animated* gradient (a 2.8s `pending-sweep` of the background
+  position) and the second sanctioned exception to "solid colors only". It
+  exists because a static orange dot in a fourteen-row nav reads as
+  decoration where a slow sweep reads as "unfinished". Scoped to **setup
+  status marks** — the ring in `StatusMark`, the Business Details progress
+  bar — never as a text background, and the global `prefers-reduced-motion`
+  rule freezes it to a flat gradient. `--pending` itself adds a **role**, not
+  a color: it is the burnt orange the charts already use as `--chart-2`,
+  reused because green already means done and the brand purple already means
+  *selected*, so neither could carry "unfinished" without collapsing two
+  meanings into one hue. It is also the complementary side of the wheel from
+  the brand and stays separable under CVD simulation.
 - **Light is the default** (the brand palette is light-first). The mode lives
   on `<html data-theme>`; `:root` holds the light values — so the pre-JS paint
   already matches the default and never flashes — and
@@ -1834,7 +1966,7 @@ derived from it, and the secondary text is lifted to `#9a9a9a` because
   the "Managing …" header) render in the body face instead — add `font-body
   tracking-normal` to the heading element — because the condensed display
   face suits page headings and storefront display, not people's own names.
-  The **store-management section headings** (`/stores/{slug}` — Store
+  The **store-management section headings** (`/mystores/{slug}` — Store
   Details, Appearance, Homepage, Footer, Categories, Products and their
   in-card subheads) also use `font-body font-semibold tracking-normal`:
   they are workbench UI, and bolded condensed Oswald read cramped at those

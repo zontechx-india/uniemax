@@ -19,7 +19,7 @@ import { useSignOutConfirm } from './useSignOutConfirm'
  *
  * `crossRouter` is set by the ONE caller outside the marketplace router —
  * `StoreHeader`, inside the anonymous shopping router. Every destination here
- * (`/profile`, `/orders`, `/stores`, …) is a marketplace route that the
+ * (`/profile`, `/orders`, `/mystores`, …) is a marketplace route that the
  * public router has never heard of, so there the rows must be plain anchors
  * (full page load) rather than react-router `Link`s, and logout hard-replaces
  * the location instead of navigating. Colors need no such switch: the menu is
@@ -37,7 +37,7 @@ export function AccountMenu({ crossRouter = false }: { crossRouter?: boolean } =
   // Store row: "Create Store" when the customer owns none, "My Store"
   // otherwise. Refreshed every time the menu opens so it flips right after
   // a store is created. `null` = not known yet (treated like "My Store" —
-  // /stores handles the empty case gracefully anyway).
+  // /mystores handles the empty case gracefully anyway).
   const [hasStores, setHasStores] = useState<boolean | null>(null)
   const checkedStores = useRef(false)
   useEffect(() => {
@@ -135,7 +135,7 @@ export function AccountMenu({ crossRouter = false }: { crossRouter?: boolean } =
 
             <div className="py-1">
               <MenuRow
-                to={hasStores === false ? '/stores/new' : '/stores'}
+                to={hasStores === false ? '/mystores/new' : '/mystores'}
                 crossRouter={crossRouter}
                 onNavigate={() => setOpen(false)}
               >

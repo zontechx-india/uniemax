@@ -100,8 +100,12 @@ type ReadinessCounts = Pick<
  *
  * Three grouped queries regardless of how many stores are asked about, so a
  * seller's whole portfolio costs the same as loading one store.
+ *
+ * Exported because the admin console evaluates the SAME readiness over stores
+ * it does not own (`adminStores.service`) — one assembly, so the seller and
+ * the admin can never be shown different answers to "is this store finished?".
  */
-async function loadReadinessCounts(
+export async function loadReadinessCounts(
   storeIds: string[],
 ): Promise<Map<string, ReadinessCounts>> {
   if (storeIds.length === 0) return new Map();

@@ -5,8 +5,10 @@ import { toApiError } from '../../../shared/auth/http'
 import { storesApi } from '../../features/stores/storesApi'
 import type { StoreDashboard } from '../../features/stores/storesApi'
 import { useStore } from '../../features/stores/useStores'
+import type { StepState } from '../../features/stores/storeProfile'
 import type { ManagedStoreContext } from '../../features/stores/useManagedStore'
 import { StorePublishCard } from './StorePublishCard'
+import { StatusTag, sectionStatus } from './SetupStatus'
 import {
   ArrowLeftIcon,
   BankIcon,
@@ -174,16 +176,36 @@ export function StoreManageLayout() {
   }
 
   // Unknown/foreign store id → back to the list.
-  if (store === null) return <Navigate to="/stores" replace />
+  if (store === null) return <Navigate to="/mystores" replace />
 
   const pendingOrders = dashboard?.stats.pending ?? 0
+
+  /**
+   * Setup marks per nav row.
+   *
+   * A readiness step already declares the section it is edited in (`href`),
+   * so this is grouped straight off the server's registry rather than a
+   * second hardcoded list here — add a requirement to `storeReadiness.ts` and
+   * its mark appears against the right row with no change to this file.
+   *
+   * Empty once the store is fully set up: a column of green ticks that can
+   * never change again is decoration, and the same reasoning already hides
+   * `SetupChecklist` at 100%.
+   */
+  const setupSteps = new Map<string, StepState[]>()
+  if (!store.readiness.complete) {
+    for (const step of store.readiness.steps) {
+      if (step.totalCount === 0) continue
+      setupSteps.set(step.href, [...(setupSteps.get(step.href) ?? []), step])
+    }
+  }
 
   return (
     // The shell is full-width now; this workbench self-caps so form fields
     // and catalog rows stay a readable length on wide screens.
     <div className="mx-auto max-w-7xl space-y-3">
       <Link
-        to="/stores"
+        to="/mystores"
         className="inline-flex items-center gap-1.5 text-sm font-medium text-muted transition hover:text-fg"
       >
         <ArrowLeftIcon className="h-4 w-4" />
@@ -219,39 +241,49 @@ export function StoreManageLayout() {
                 <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted">
                   {group.caption}
                 </p>
-                {group.items.map(({ label, to, icon: Icon, end, badge }) => (
-                  <NavLink
-                    key={label}
-                    to={to}
-                    end={end}
-                    // Selection is carried by the solid left BAR plus the
-                    // Light-Purple tint, with the label staying ink in both
-                    // schemes — the brand purple has its own dark step, so
-                    // this no longer needs to swap carrier per scheme (the
-                    // gold did). The transparent border on every row keeps
-                    // the text from shifting 3px.
-                    className={({ isActive }) =>
-                      `flex items-center gap-3 rounded-md border-l-[3px] px-3 py-2 text-sm transition-colors ${
-                        isActive
-                          ? 'border-brand bg-brand-soft font-semibold text-fg'
-                          : 'border-transparent font-medium text-muted hover:bg-surface-alt hover:text-fg'
-                      }`
-                    }
-                  >
-                    <Icon className="h-[18px] w-[18px] shrink-0" />
-                    <span className="min-w-0 flex-1 truncate">{label}</span>
-                    {badge && pendingOrders > 0 && (
-                      <span
-                        // Not aria-hidden: "3 orders waiting" is the whole
-                        // point of the badge for a screen-reader user too.
-                        aria-label={`${pendingOrders} pending`}
-                        className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-pill bg-brand px-1.5 text-[11px] font-bold text-brand-contrast"
-                      >
-                        {pendingOrders > 99 ? '99+' : pendingOrders}
-                      </span>
-                    )}
-                  </NavLink>
-                ))}
+                {group.items.map(({ label, to, icon: Icon, end, badge }) => {
+                  const steps = setupSteps.get(to)
+                  const setup = steps ? sectionStatus(steps) : null
+
+                  return (
+                    <NavLink
+                      key={label}
+                      to={to}
+                      end={end}
+                      // Selection is carried by the solid left BAR plus the
+                      // Light-Purple tint, with the label staying ink in both
+                      // schemes — the brand purple has its own dark step, so
+                      // this no longer needs to swap carrier per scheme (the
+                      // gold did). The transparent border on every row keeps
+                      // the text from shifting 3px.
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 rounded-md border-l-[3px] px-3 py-2 text-sm transition-colors ${
+                          isActive
+                            ? 'border-brand bg-brand-soft font-semibold text-fg'
+                            : 'border-transparent font-medium text-muted hover:bg-surface-alt hover:text-fg'
+                        }`
+                      }
+                    >
+                      <Icon className="h-[18px] w-[18px] shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">{label}</span>
+                      {setup && (
+                        // Not aria-hidden: "this section is unfinished" is the
+                        // whole point of the mark for a screen-reader user too.
+                        <StatusTag status={setup} section={label} />
+                      )}
+                      {badge && pendingOrders > 0 && (
+                        <span
+                          // Not aria-hidden: "3 orders waiting" is the whole
+                          // point of the badge for a screen-reader user too.
+                          aria-label={`${pendingOrders} pending`}
+                          className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-pill bg-brand px-1.5 text-[11px] font-bold text-brand-contrast"
+                        >
+                          {pendingOrders > 99 ? '99+' : pendingOrders}
+                        </span>
+                      )}
+                    </NavLink>
+                  )
+                })}
               </div>
             ))}
           </nav>

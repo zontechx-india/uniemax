@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../../utils/httpError.js";
+import { getCategoryPath } from "../category/categoryTree.js";
 import {
   mediaUrl,
   newObjectKey,
@@ -75,6 +76,7 @@ const productSelect = {
   shippingOverride: true,
   codAvailable: true,
   category: { select: { id: true, name: true, slug: true, parentId: true } },
+  globalCategoryId: true,
   variants: {
     orderBy: { createdAt: "asc" },
     select: {
@@ -130,6 +132,24 @@ type ProductRow = Prisma.StoreProductGetPayload<{ select: typeof productSelect }
  *   - `variants`    — the real options only, each with its `optionValues`,
  *                     in matrix order; the default one is never listed.
  */
+/**
+ * Decorates shaped products with their resolved taxonomy path. Separate from
+ * shapeProduct because resolving a path is async (it reads the cached
+ * taxonomy); shapeProduct itself stays a pure transform.
+ */
+async function withProductTaxonomy<T extends { globalCategoryId: string | null }>(
+  rows: T[],
+) {
+  return Promise.all(
+    rows.map(async (row) => ({
+      ...row,
+      globalCategory: row.globalCategoryId
+        ? await taxonomyRef(row.globalCategoryId)
+        : null,
+    })),
+  );
+}
+
 function shapeProduct(row: ProductRow) {
   const {
     variants: storedVariants,
@@ -195,20 +215,18 @@ const categorySelect = {
   parentId: true,
   isActive: true,
   isFeatured: true,
+  sortOrder: true,
+  imageUrl: true,
+  categoryId: true,
   createdAt: true,
   _count: { select: { products: true, children: true } },
 } satisfies Prisma.StoreCategorySelect;
 
-function shapeCategory(row: {
-  id: string;
-  name: string;
-  slug: string;
-  parentId: string | null;
-  isActive: boolean;
-  isFeatured: boolean;
-  createdAt: Date;
-  _count: { products: number; children: number };
-}) {
+type CategoryRow = Prisma.StoreCategoryGetPayload<{
+  select: typeof categorySelect;
+}>;
+
+function shapeCategory(row: CategoryRow) {
   return {
     id: row.id,
     name: row.name,
@@ -216,10 +234,38 @@ function shapeCategory(row: {
     parentId: row.parentId,
     isActive: row.isActive,
     isFeatured: row.isFeatured,
+    sortOrder: row.sortOrder,
+    imageUrl: row.imageUrl,
+    /** Global-taxonomy tag; null when the shelf is deliberately unclassified. */
+    categoryId: row.categoryId,
     productCount: row._count.products,
     subcategoryCount: row._count.children,
     createdAt: row.createdAt,
   };
+}
+
+/**
+ * Resolves a taxonomy id to its node + ancestor path so the client can render
+ * "Automotive > Motorcycle Parts" without fetching the whole tree first. This
+ * reads the cached taxonomy, so decorating a full catalog costs no extra
+ * queries.
+ */
+async function withTaxonomy<T extends { categoryId: string | null }>(rows: T[]) {
+  return Promise.all(
+    rows.map(async (row) => ({
+      ...row,
+      taxonomy: row.categoryId ? await taxonomyRef(row.categoryId) : null,
+    })),
+  );
+}
+
+async function taxonomyRef(id: string) {
+  // activeOnly: false — a shelf tagged before an admin disabled that node must
+  // still show what it points at, rather than silently reading as untagged.
+  const node = await getCategoryPath(id, false);
+  return node
+    ? { id: node.id, name: node.name, slug: node.slug, pathLabel: node.pathLabel }
+    : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -230,12 +276,88 @@ export async function listCategories(ownerId: string, storeRef: string) {
   const store = await getMyStore(ownerId, storeRef);
   const rows = await prisma.storeCategory.findMany({
     where: { storeId: store.id },
+    // Seller-set order first; ties keep the historical creation order, so a
+    // catalog nobody has reordered looks exactly as it did before.
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     select: categorySelect,
-    orderBy: { createdAt: "asc" },
   });
-  return rows.map(shapeCategory);
+  return withTaxonomy(rows.map(shapeCategory));
 }
 
+/**
+ * Find or create the shelf standing for one taxonomy node.
+ *
+ * A shelf already tagged with the node is reused outright. Failing that, an
+ * UNTAGGED shelf of the same name in the same position is adopted rather than
+ * duplicated — that is how an "Electronics" a seller typed before the taxonomy
+ * existed becomes the classified one instead of gaining a confusing twin.
+ */
+async function ensureShelf(
+  storeId: string,
+  node: { id: string; name: string },
+  parentId: string | null,
+  extras: { imageUrl?: string | null | undefined; sortOrder?: number | undefined },
+): Promise<string> {
+  const tagged = await prisma.storeCategory.findFirst({
+    where: { storeId, categoryId: node.id },
+    select: { id: true },
+  });
+  if (tagged) return tagged.id;
+
+  const adoptable = await prisma.storeCategory.findFirst({
+    where: {
+      storeId,
+      parentId,
+      categoryId: null,
+      name: { equals: node.name, mode: "insensitive" },
+    },
+    select: { id: true },
+  });
+  if (adoptable) {
+    await prisma.storeCategory.update({
+      where: { id: adoptable.id },
+      data: { categoryId: node.id },
+    });
+    return adoptable.id;
+  }
+
+  // A name still held by some other shelf would break the per-store
+  // uniqueness rule, and there is no sane automatic answer to that.
+  const clash = await prisma.storeCategory.findFirst({
+    where: { storeId, name: { equals: node.name, mode: "insensitive" } },
+    select: { id: true },
+  });
+  if (clash) {
+    throw HttpError.conflict(
+      `You already have a category called "${node.name}".`,
+    );
+  }
+
+  const row = await prisma.storeCategory.create({
+    data: {
+      storeId,
+      name: node.name,
+      // Generated once, here — the slug deliberately never changes again, so
+      // any link already shared to this category keeps resolving.
+      slug: await uniqueCategorySlug(storeId, node.name),
+      parentId,
+      categoryId: node.id,
+      imageUrl: extras.imageUrl ?? null,
+      sortOrder: extras.sortOrder ?? 0,
+    },
+    select: { id: true },
+  });
+  return row.id;
+}
+
+/**
+ * Add a shelf by CHOOSING a node from the global taxonomy.
+ *
+ * The seller supplies an id, never a name: the shelf is named after the node
+ * and placed under the node's parent, so picking "Electronics › Mobiles"
+ * yields both shelves in one go and every shelf created here is classified by
+ * construction. Sellers cannot invent categories; that is the whole point.
+ */
 export async function createCategory(
   ownerId: string,
   storeRef: string,
@@ -243,50 +365,59 @@ export async function createCategory(
 ) {
   const store = await getMyStore(ownerId, storeRef);
 
-  // A subcategory's parent must be a ROOT category of the same store — one
-  // level of nesting only.
-  if (input.parentId) {
-    const parent = await prisma.storeCategory.findFirst({
-      where: { id: input.parentId, storeId: store.id },
-      select: { id: true, parentId: true },
-    });
-    if (!parent) throw HttpError.badRequest("Parent category not found");
-    if (parent.parentId) {
-      throw HttpError.badRequest(
-        "Subcategories cannot have their own subcategories",
-      );
-    }
+  // activeOnly — a seller must not be able to file their catalog under a
+  // category an admin has retired.
+  const node = await getCategoryPath(input.categoryId, true);
+  if (!node) throw HttpError.badRequest("Selected category was not found");
+  if (node.depth > 1) {
+    throw HttpError.badRequest(
+      "Store categories nest one level deep — choose a category or one of its subcategories.",
+    );
   }
 
-  const duplicate = await prisma.storeCategory.findFirst({
-    where: { storeId: store.id, name: { equals: input.name, mode: "insensitive" } },
+  const already = await prisma.storeCategory.findFirst({
+    where: { storeId: store.id, categoryId: node.id },
     select: { id: true },
   });
-  if (duplicate) {
-    throw HttpError.conflict("A category with this name already exists");
+  if (already) {
+    throw HttpError.conflict(
+      `"${node.pathLabel}" is already in your categories.`,
+    );
   }
 
-  const row = await prisma.storeCategory.create({
-    data: {
-      storeId: store.id,
-      name: input.name,
-      // Generated once, here — renames deliberately keep the original slug so
-      // any link already shared to this category keeps resolving.
-      slug: await uniqueCategorySlug(store.id, input.name),
-      parentId: input.parentId ?? null,
-    },
+  // The parent shelf first, so a subcategory never lands without its root. It
+  // inherits nothing from the form: the artwork and position the seller chose
+  // are meant for the shelf they actually picked.
+  let parentShelfId: string | null = null;
+  if (node.parentId) {
+    const parentNode = await getCategoryPath(node.parentId, true);
+    if (!parentNode) {
+      throw HttpError.badRequest("Selected category was not found");
+    }
+    parentShelfId = await ensureShelf(store.id, parentNode, null, {});
+  }
+
+  const id = await ensureShelf(store.id, node, parentShelfId, {
+    imageUrl: input.imageUrl,
+    sortOrder: input.sortOrder,
+  });
+
+  const row = await prisma.storeCategory.findUniqueOrThrow({
+    where: { id },
     select: categorySelect,
   });
-  return shapeCategory(row);
+  const [shaped] = await withTaxonomy([shapeCategory(row)]);
+  return shaped!;
 }
 
 /**
- * Partial update of a category — rename and/or enable/disable.
+ * Partial update of a shelf — presentation and visibility only.
  *
  * `isActive` controls visibility on the public storefront (products keep their
  * own flags — a hidden category hides everything inside it, subcategories
- * included). Renaming re-checks the per-store name uniqueness rule, ignoring
- * the row being edited so saving an unchanged name is not a conflict.
+ * included). The name and the taxonomy link are not editable here: the name is
+ * the chosen category's, and re-pointing a legacy shelf at the taxonomy is an
+ * admin action.
  */
 export async function updateCategory(
   ownerId: string,
@@ -302,31 +433,20 @@ export async function updateCategory(
   });
   if (!category) throw HttpError.notFound("Category not found");
 
-  if (patch.name !== undefined) {
-    const duplicate = await prisma.storeCategory.findFirst({
-      where: {
-        storeId: store.id,
-        name: { equals: patch.name, mode: "insensitive" },
-        id: { not: categoryId },
-      },
-      select: { id: true },
-    });
-    if (duplicate) {
-      throw HttpError.conflict("A category with this name already exists");
-    }
-  }
-
   const row = await prisma.storeCategory.update({
     where: { id: categoryId },
     data: {
-      // `slug` is intentionally absent — it never changes after creation.
-      ...(patch.name !== undefined ? { name: patch.name } : {}),
+      // `name` and `slug` are intentionally absent — neither changes again.
       ...(patch.isActive !== undefined ? { isActive: patch.isActive } : {}),
       ...(patch.isFeatured !== undefined ? { isFeatured: patch.isFeatured } : {}),
+      // null clears the artwork; undefined leaves it untouched.
+      ...(patch.imageUrl !== undefined ? { imageUrl: patch.imageUrl } : {}),
+      ...(patch.sortOrder !== undefined ? { sortOrder: patch.sortOrder } : {}),
     },
     select: categorySelect,
   });
-  return shapeCategory(row);
+  const [shaped] = await withTaxonomy([shapeCategory(row)]);
+  return shaped!;
 }
 
 export async function deleteCategory(
@@ -367,7 +487,7 @@ export async function listProducts(ownerId: string, storeRef: string) {
     select: productSelect,
     orderBy: { createdAt: "desc" },
   });
-  return rows.map(shapeProduct);
+  return withProductTaxonomy(rows.map(shapeProduct));
 }
 
 export async function createProduct(
@@ -381,11 +501,17 @@ export async function createProduct(
   // what makes a category a prerequisite for adding products.
   const category = await prisma.storeCategory.findFirst({
     where: { id: input.categoryId, storeId: store.id },
-    select: { id: true },
+    select: { id: true, categoryId: true },
   });
   if (!category) {
     throw HttpError.badRequest("Category not found in this store");
   }
+
+  // Classification follows the shelf, always. The seller picked a real
+  // category when they created that shelf, so there is nothing left to ask
+  // here — and a legacy brand shelf ("KTM") stays unclassified until an admin
+  // maps it, which reclassifies everything on it in the same move.
+  const globalCategoryId = category.categoryId;
 
   // A product always ships with at least one variant. With option types, the
   // variants are the full cartesian product the schema has already validated,
@@ -415,6 +541,7 @@ export async function createProduct(
     data: {
       storeId: store.id,
       categoryId: input.categoryId,
+      globalCategoryId,
       name: input.name,
       slug: await uniqueProductSlug(store.id, input.name),
       description: input.description ?? null,
@@ -453,7 +580,8 @@ export async function createProduct(
     where: { id: created.id },
     select: productSelect,
   });
-  return shapeProduct(row);
+  const [shaped] = await withProductTaxonomy([shapeProduct(row)]);
+  return shaped!;
 }
 
 /**
@@ -512,7 +640,16 @@ export async function updateProduct(
     // An emptied-out description means "no description", not an empty string.
     data.description = patch.description || null;
   }
-  if (patch.categoryId !== undefined) data.categoryId = patch.categoryId;
+  if (patch.categoryId !== undefined) {
+    data.categoryId = patch.categoryId;
+    // Moving a product to another shelf re-files it under that shelf's
+    // category, so the classification can never contradict where it sits.
+    const target = await prisma.storeCategory.findFirst({
+      where: { id: patch.categoryId, storeId: store.id },
+      select: { categoryId: true },
+    });
+    data.globalCategoryId = target?.categoryId ?? null;
+  }
   if (patch.isActive !== undefined) data.isActive = patch.isActive;
   if (patch.isFeatured !== undefined) data.isFeatured = patch.isFeatured;
   if (patch.isBestSeller !== undefined) data.isBestSeller = patch.isBestSeller;
@@ -548,7 +685,8 @@ export async function updateProduct(
     data,
     select: productSelect,
   });
-  return shapeProduct(row);
+  const [shaped] = await withProductTaxonomy([shapeProduct(row)]);
+  return shaped!;
 }
 
 export async function deleteProduct(
@@ -739,7 +877,8 @@ export async function replaceProductOptions(
     where: { id },
     select: productSelect,
   });
-  return shapeProduct(row);
+  const [shaped] = await withProductTaxonomy([shapeProduct(row)]);
+  return shaped!;
 }
 
 export async function updateVariant(
@@ -771,7 +910,8 @@ export async function updateVariant(
     where: { id },
     select: productSelect,
   });
-  return shapeProduct(row);
+  const [shaped] = await withProductTaxonomy([shapeProduct(row)]);
+  return shaped!;
 }
 
 // ---------------------------------------------------------------------------
@@ -801,7 +941,8 @@ async function productWithMedia(productId: string) {
     where: { id: productId },
     select: productSelect,
   });
-  return shapeProduct(row);
+  const [shaped] = await withProductTaxonomy([shapeProduct(row)]);
+  return shaped!;
 }
 
 /**

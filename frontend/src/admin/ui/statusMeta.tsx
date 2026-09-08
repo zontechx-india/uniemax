@@ -5,6 +5,7 @@ import type {
   OrderStatus,
   PaymentMethod,
   PaymentStatus,
+  SetupSummary,
   TicketCategory,
   TicketPriority,
   TicketStatus,
@@ -88,6 +89,25 @@ export function StoreStatusChip({
 }) {
   if (suspendedAt) return <Chip tone="danger">Suspended</Chip>
   return isPublished ? <Chip tone="success">Published</Chip> : <Chip>Draft</Chip>
+}
+
+/**
+ * How far the seller has got with setup.
+ *
+ * Names the *first* unfinished step rather than only counting them: "who has
+ * not done their business details?" is the question the console gets asked,
+ * and "3 pending" does not answer it. The rest is one open away.
+ */
+export function SetupChip({ setup }: { setup: SetupSummary }) {
+  if (setup.complete) return <Chip tone="success">Setup complete</Chip>
+  const [first, ...rest] = setup.pending
+  if (!first) return <Chip tone="success">Setup complete</Chip>
+  return (
+    <Chip tone="pending">
+      {first.title}
+      {rest.length > 0 ? ` +${rest.length}` : ''}
+    </Chip>
+  )
 }
 
 export function ActiveChip({ isActive }: { isActive: boolean }) {
