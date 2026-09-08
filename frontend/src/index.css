@@ -181,17 +181,30 @@
   /* --- invariants (identical across themes) ------------------------- */
   --cta-contrast: #ffffff;
   --accent: #1863dc;
-  /* Metal-CTA fallbacks cut from the app brand purple — store pages override
-   * these via storeVars() with the OWNER's colors; the fallbacks keep
-   * metal CTAs rendering on store-themed-but-neutral pages (e.g. a /cart
-   * with no known store). Mirrors the storeVars() derivation for #6c3ef4,
-   * so they do NOT flip per scheme — `--cta-contrast` (white) pairs with
-   * this chrome in both. */
+  /* Brand-metal fallback cut from the app brand purple — store pages override
+   * it via storeVars() with the OWNER's colors; the fallback keeps the brand
+   * mark rendering on store-themed-but-neutral pages (e.g. a /cart with no
+   * known store). Mirrors the storeVars() derivation for #6c3ef4, so it does
+   * NOT flip per scheme. Used by `.metal-text` and `.metal-chip` only — the
+   * CTA fills are composed from the `--cta-*` stops below. */
   --brand-metal: linear-gradient(180deg, #9574f7 0%, #6c3ef4 48%, #5632c3 100%);
-  --brand-metal-hover: linear-gradient(180deg, #a487f8 0%, #784df5 48%, #5f37d7 100%);
+
+  /* CTA stops. The three button fills (`btn-rise` / `btn-sheen` / `btn-ring`)
+   * compose their own gradients from these rather than consuming a pre-baked
+   * gradient string, because each variant needs a different pair of steps and
+   * a different angle. All are derived from the primary — storeVars() emits
+   * the same five for the owner's color. Fallbacks mirror #6c3ef4 and do NOT
+   * flip per scheme: `--cta-contrast` (white) pairs with them in both. */
+  --cta: #6c3ef4;
+  --cta-top: #7850f5; /* lighten(p, .06) — rise, resting top       */
+  --cta-bottom: #5d35d2; /* darken(p, .14)  — rise, resting bottom    */
+  --cta-hi: #8a66f6; /* lighten(p, .18) — hover top, ring's light */
+  --cta-lo: #5833c8; /* darken(p, .18)  — pressed / ring's deep   */
+  --cta-pressed: #6138dc; /* darken(p, .10)  — hover bottom, press top */
   /* storeVars() picks the dimmer edge for a DARK primary. */
-  --brand-metal-edge: rgba(255, 255, 255, 0.34);
-  --brand-glow: 0 6px 18px -8px rgba(108, 62, 244, 0.65);
+  --cta-edge: rgba(255, 255, 255, 0.34);
+  /* Glow COLOR (not a whole shadow) — each variant sets its own spread. */
+  --cta-glow: rgba(108, 62, 244, 0.65);
 
   /* Brand lockup (mark + name). The artwork sets "Unie" in near-black, so the
    * dark scheme swaps in the twin whose name is white. A variable rather than
@@ -387,18 +400,110 @@
     color: transparent;
   }
 
-  /* Primary CTA, chrome cut from the owner's brand color. */
-  .metal-cta {
+  /* Static brand-filled square — store-avatar fallbacks (the auth dialog's
+   * store mark, the Appearance preview's). Shares the CTA's chrome so the
+   * mark matches the buttons, but has no interactive states: it is not a
+   * control and must not light up under the cursor. */
+  .metal-chip {
     background-image: var(--brand-metal);
+    box-shadow: inset 0 1px 0 var(--cta-edge);
+  }
+
+  /* ---------------------------------------------------------------- *
+   * CTA fills — three variants, one shape. `Button` (shared/ui) owns the
+   * shape (height, radius, weight); these own only the fill, so a variant
+   * can be swapped on a button without touching its sizing.
+   *
+   * Which to use — the rule is about IMPORTANCE, not looks:
+   *   btn-sheen  the ONE committing action on the view (Buy Now, Place
+   *              Order). Max one per screen, or the sweep becomes noise.
+   *   btn-rise   every other primary. The default.
+   *   btn-ring   the secondary standing BESIDE a primary (Add to Cart next
+   *              to Buy Now) — same gradient family, no competing weight.
+   *
+   * All three derive from the owner's primary via the `--cta-*` stops, so
+   * they re-cut themselves per store. See docs/FRONTEND_CONTEXT.md.
+   * ---------------------------------------------------------------- */
+
+  /* Rise — two stops inside a ~20% lightness spread, so the fill reads
+   * identically at 36px and 48px (the old three-stop chrome put its 48%
+   * midpoint seam through the label on compact buttons). The glow is a
+   * HOVER state: a cart page with six CTAs shows six buttons, not six
+   * flares. Pressed inverts the gradient, so the button feels clickable. */
+  .btn-rise {
+    background-image: linear-gradient(180deg, var(--cta-top) 0%, var(--cta-bottom) 100%);
+    box-shadow: inset 0 1px 0 var(--cta-edge);
+  }
+  .btn-rise:hover:not(:disabled) {
+    background-image: linear-gradient(180deg, var(--cta-hi) 0%, var(--cta-pressed) 100%);
     box-shadow:
-      inset 0 1px 0 var(--brand-metal-edge),
-      var(--brand-glow);
+      inset 0 1px 0 var(--cta-edge),
+      0 5px 14px -7px var(--cta-glow);
   }
-  .metal-cta:hover {
-    background-image: var(--brand-metal-hover);
+  .btn-rise:active:not(:disabled) {
+    background-image: linear-gradient(180deg, var(--cta-pressed) 0%, var(--cta-lo) 100%);
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.22);
   }
-  .metal-cta:disabled:hover {
-    background-image: var(--brand-metal);
+
+  /* Sheen — flat at rest; a highlight sweeps across once on hover. The
+   * resting state carries the button on its own, because the sweep never
+   * fires on touch, which is most of this storefront's traffic. */
+  .btn-sheen {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    background-color: var(--cta);
+    background-image: none;
+    box-shadow: inset 0 1px 0 var(--cta-edge);
+  }
+  .btn-sheen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image: linear-gradient(
+      104deg,
+      transparent 34%,
+      rgb(255 255 255 / 0.3) 47%,
+      transparent 60%
+    );
+    transform: translateX(-62%);
+    transition: transform 620ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .btn-sheen:hover:not(:disabled)::after {
+    transform: translateX(62%);
+  }
+  .btn-sheen:hover:not(:disabled) {
+    box-shadow:
+      inset 0 1px 0 var(--cta-edge),
+      0 5px 16px -8px var(--cta-glow);
+  }
+  .btn-sheen:active:not(:disabled) {
+    background-color: var(--cta-pressed);
+  }
+
+  /* Ring — gradient border, transparent centre, fills on hover. Two
+   * backgrounds: the padding box paints `--surface` (the STORE's surface, so
+   * the centre never punches a white hole in a dark storefront), the border
+   * box paints the gradient. The label color is set by the caller, since it
+   * flips from brand to CTA-contrast between rest and hover. */
+  .btn-ring {
+    border: 1.5px solid transparent;
+    background-image:
+      linear-gradient(var(--surface), var(--surface)),
+      linear-gradient(135deg, var(--cta-hi) 0%, var(--cta-lo) 100%);
+    background-origin: border-box;
+    background-clip: padding-box, border-box;
+  }
+  .btn-ring:hover:not(:disabled) {
+    background-image:
+      linear-gradient(135deg, var(--cta-top) 0%, var(--cta-lo) 100%),
+      linear-gradient(135deg, var(--cta-hi) 0%, var(--cta-lo) 100%);
+  }
+  .btn-ring:active:not(:disabled) {
+    background-image:
+      linear-gradient(135deg, var(--cta-pressed) 0%, var(--cta-lo) 100%),
+      linear-gradient(135deg, var(--cta-hi) 0%, var(--cta-lo) 100%);
   }
 }
 

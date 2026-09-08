@@ -18,6 +18,7 @@ one file (no duplication).
 | Product scope / features / requirements          | [`docs/CONTEXT.md`](./docs/CONTEXT.md) |
 | High-level project overview or features list     | [`README.md`](./README.md)          |
 | Prisma schema models/enums                       | [`docs/BACKEND_CONTEXT.md`](./docs/BACKEND_CONTEXT.md) (Data Model section) |
+| Frontend structure, shared UI, theme tokens, per-store theming | [`docs/FRONTEND_CONTEXT.md`](./docs/FRONTEND_CONTEXT.md) |
 
 Rules:
 - If a change spans several concerns, update **each** relevant doc.
@@ -52,3 +53,16 @@ Rules:
   migration locally) and **commit `prisma/migrations/`** — that committed folder is how
   the change reaches production, which runs `npm run db:deploy`. Never `prisma db push`:
   it mutates the local DB without producing a migration, so production never learns of it.
+
+## Frontend Conventions (summary — full detail in FRONTEND_CONTEXT.md)
+
+- **Never hand-size a button.** Every CTA comes from `shared/ui/Button.tsx` —
+  `<Button variant size>` for `<button>`, `buttonClass({…})` for a `<Link>`. Height,
+  radius, padding and weight live there; a call site picks only variant + size
+  (`sm` 36px / `md` 44px / `lg` 48px) and may add layout classes (`flex-1`, margins).
+- **Pick the variant by importance, not looks:**
+  `sheen` = the ONE committing action on the view (Buy Now, Place Order) — **max one
+  per screen**; `rise` = every other primary, the default; `ring` = a secondary sitting
+  *beside* a primary (Add to Cart next to Buy Now).
+- All three fills are cut from the **store owner's** primary via the `--cta-*` stops in
+  `storeVars()` — never hardcode a gradient or a brand color in a component.

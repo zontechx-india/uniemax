@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { toApiError } from '../../../shared/auth/http'
 import { ErrorNote, InfoNote, TextField } from '../../../shared/ui/form'
+import { buttonClass } from '../../../shared/ui/Button'
 import {
   addressesApi,
   formatAddressLine,
@@ -703,7 +704,7 @@ function SavedAddressPicker({
             <button
               type="button"
               onClick={confirm}
-              className="metal-cta flex h-11 items-center justify-center rounded-md px-6 text-sm font-bold text-cta-contrast transition"
+              className={buttonClass({ size: 'lg' })}
             >
               Deliver to This Address
             </button>
@@ -808,7 +809,7 @@ function ManualDetailsForm({
       <div className="flex sm:justify-end">
         <button
           type="submit"
-          className="metal-cta h-11 w-full rounded-md text-sm font-bold text-cta-contrast transition sm:w-auto sm:px-6"
+          className={buttonClass({ full: true, className: 'sm:w-auto sm:px-6' })}
         >
           {withAddress ? 'Deliver to This Address' : 'Continue'}
         </button>

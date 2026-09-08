@@ -96,20 +96,17 @@ export const productVisibilitySchema = z.object({
 export const shelfListQuery = searchQuery.extend({
   storeId: z.string().min(1).optional(),
   /**
-   * UNMAPPED is the working queue — shelves a seller typed before the
-   * taxonomy existed, which are the only ones needing a decision.
+   * PENDING is the working queue: shelves still wearing a name a seller
+   * typed, whether never linked or linked-but-not-yet-converted.
    */
-  status: z.enum(["UNMAPPED", "MAPPED"]).optional(),
+  status: z.enum(["PENDING", "CONVERTED"]).optional(),
 });
 
-export const shelfMappingSchema = z.object({
-  /** The taxonomy node this shelf stands for; `null` unmaps it again. */
-  categoryId: z.string().min(1).nullable(),
-  /**
-   * Also re-file the products sitting on the shelf. Defaults to true: making
-   * those products findable platform-wide is the point of mapping at all.
-   */
-  applyToProducts: z.boolean().default(true),
+export const shelfConvertSchema = z.object({
+  /** The platform category this shelf becomes. */
+  categoryId: z.string().min(1),
+  /** Return the plan without writing anything — what the confirm dialog shows. */
+  dryRun: z.boolean().default(false),
 });
 
 // ---- Payments -------------------------------------------------------------
@@ -167,7 +164,7 @@ export type OrderListQuery = z.infer<typeof orderListQuery>;
 export type ProductListQuery = z.infer<typeof productListQuery>;
 export type ProductVisibilityInput = z.infer<typeof productVisibilitySchema>;
 export type ShelfListQuery = z.infer<typeof shelfListQuery>;
-export type ShelfMappingInput = z.infer<typeof shelfMappingSchema>;
+export type ShelfConvertInput = z.infer<typeof shelfConvertSchema>;
 export type PaymentListQuery = z.infer<typeof paymentListQuery>;
 export type AuditListQuery = z.infer<typeof auditListQuery>;
 export type AdminCreateInput = z.infer<typeof adminCreateSchema>;

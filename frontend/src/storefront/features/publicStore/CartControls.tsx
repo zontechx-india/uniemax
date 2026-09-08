@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { cart, useCartQty } from '../cart/cart'
 import { cartUrl } from '../stores/storesApi'
 import { CartIcon, CheckIcon, MinusIcon, PlusIcon } from '../../layout/icons'
+import { Button } from '../../../shared/ui/Button'
 import { stockLevel } from './catalog'
 import type { Skin } from './storeTheme'
 
@@ -100,21 +101,15 @@ export function PurchaseActions({
   if (compact) {
     return (
       <>
-        <button
-          type="button"
-          onClick={addToCart}
-          className={`inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-md border px-3 text-sm font-bold transition hover:border-brand ${skin.border} ${skin.chip} ${skin.text}`}
-        >
+        {/* Add sits beside Buy Now, so it takes the Ring: same gradient
+            family, no competing weight. Buy Now is the committing action. */}
+        <Button variant="ring" onClick={addToCart} className="flex-1">
           <CartIcon className="h-4 w-4" />
           Add
-        </button>
-        <button
-          type="button"
-          onClick={buyNow}
-          className={`inline-flex h-11 flex-1 items-center justify-center rounded-md px-3 text-sm font-bold transition ${skin.cta}`}
-        >
+        </Button>
+        <Button variant="sheen" onClick={buyNow} className="flex-1">
           Buy Now
-        </button>
+        </Button>
         {added && <AddedToast name={target.name} storeSlug={target.storeSlug} />}
       </>
     )
@@ -129,23 +124,16 @@ export function PurchaseActions({
           onChange={setQty}
           skin={skin}
         />
-        <button
-          type="button"
-          onClick={addToCart}
-          className={`inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md border px-4 text-sm font-bold transition hover:border-brand ${skin.border} ${skin.chip} ${skin.text}`}
-        >
+        <Button variant="ring" onClick={addToCart} className="flex-1">
           <CartIcon className="h-4 w-4" />
           Add to Cart
-        </button>
+        </Button>
       </div>
 
-      <button
-        type="button"
-        onClick={buyNow}
-        className={`inline-flex h-11 w-full items-center justify-center rounded-md px-4 text-sm font-bold transition ${skin.cta}`}
-      >
+      {/* The one committing action on the product page. */}
+      <Button variant="sheen" onClick={buyNow} full>
         Buy Now
-      </button>
+      </Button>
 
       {inCart > 0 && (
         <p className={`text-xs ${skin.muted}`}>

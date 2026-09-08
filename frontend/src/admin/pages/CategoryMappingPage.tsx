@@ -1,31 +1,31 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '../features/adminApi'
-import type { ShelfRow } from '../features/adminApi'
+import type { ShelfConversionPlan, ShelfRow } from '../features/adminApi'
 import { useAdminList } from '../features/useAdminQuery'
 import { taxonomyApi } from '../../shared/categories/taxonomyApi'
 import type { CategoryNode } from '../../shared/categories/taxonomyApi'
 import { toApiError } from '../../shared/auth/http'
+import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
 import { Button, Card, Chip, EmptyState, ErrorState, PageHeader, Skeleton } from '../ui/primitives'
 import { Pagination } from '../ui/DataTable'
 import { SearchInput, Tabs, Toolbar } from '../ui/Toolbar'
 
 /**
- * Pointing sellers' own shelves at the global category taxonomy.
+ * Converting sellers' typed shelves into platform categories.
  *
- * Every shelf a seller creates today is classified by construction — they
- * choose a category rather than typing one. This page exists for the shelves
- * that predate that rule: free text someone typed, which is very often a brand
- * ("KTM"), a vehicle model ("Duke 200") or a merchandising tier ("Pro
- * Edition") rather than a category at all. No automatic rule can map those
- * without guessing, so an admin decides one shelf at a time.
+ * Every shelf a seller creates today IS a platform category — they choose one
+ * rather than typing a name. This page exists to retire the shelves that
+ * predate that rule: free text someone typed ("Bag", "Cricket Bats", "KTM").
+ * Converting one replaces it: the shelf is renamed and re-parented to match
+ * the chosen category, its products move with it, and if the store already
+ * holds that category the legacy shelf merges into it and disappears.
  *
- * Mapping never renames the shelf. A seller's storefront navigation is theirs,
- * and rewriting it would rebuild their shop out from under them — the mapping
- * only records what the shelf MEANS, which is what makes its products
- * findable across the platform.
+ * Conversion is one-way — a merge cannot be un-merged — so the server plans
+ * it first and the confirm dialog shows exactly that plan. What the admin
+ * approves is what runs; nothing is folded in silently.
  */
 
-type Status = 'UNMAPPED' | 'MAPPED' | 'ALL'
+type Status = 'PENDING' | 'CONVERTED' | 'ALL'
 
 export default function CategoryMappingPage() {
   const [taxonomy, setTaxonomy] = useState<CategoryNode[] | null>(null)
@@ -44,13 +44,13 @@ export default function CategoryMappingPage() {
     (query) => adminApi.listShelves(query),
     { keys: ['q', 'status'], pageSize: 20 },
   )
-  const status = (list.filters.status as Status) ?? 'UNMAPPED'
+  const status = (list.filters.status as Status) ?? 'PENDING'
 
   return (
     <div>
       <PageHeader
         title="Category mapping"
-        subtitle="Shelves sellers named themselves, before categories were chosen from a list. Map each one so its products are findable platform-wide — a brand or a special edition has no category, so leaving it unmapped is a valid answer."
+        subtitle="Shelves sellers typed themselves, before categories were chosen from a list. Convert each one into the platform category it stands for — the typed shelf is replaced, and its products move with it."
       />
 
       {error && (
@@ -64,8 +64,8 @@ export default function CategoryMappingPage() {
           value={status}
           onChange={(next) => list.setFilter('status', next === 'ALL' ? '' : next)}
           options={[
-            { value: 'UNMAPPED', label: 'Needs a decision' },
-            { value: 'MAPPED', label: 'Mapped' },
+            { value: 'PENDING', label: 'Not changed' },
+            { value: 'CONVERTED', label: 'Changed' },
             { value: 'ALL', label: 'All' },
           ]}
         />
@@ -88,22 +88,22 @@ export default function CategoryMappingPage() {
         ) : list.rows.length === 0 ? (
           <EmptyState
             title={
-              status === 'UNMAPPED'
-                ? 'Every shelf is mapped'
+              status === 'PENDING'
+                ? 'Every shelf is a platform category'
                 : 'No shelves match these filters'
             }
-            {...(status === 'UNMAPPED'
-              ? { hint: 'Nothing is waiting on a decision.' }
+            {...(status === 'PENDING'
+              ? { hint: 'Nothing left to convert.' }
               : {})}
           />
         ) : (
           <div className="divide-y divide-line">
             {list.rows.map((shelf) => (
-              <ShelfMappingRow
+              <ShelfRowView
                 key={shelf.id}
                 shelf={shelf}
                 taxonomy={taxonomy}
-                onMapped={list.refresh}
+                onConverted={list.refresh}
               />
             ))}
           </div>
@@ -123,21 +123,21 @@ export default function CategoryMappingPage() {
 
 /**
  * One shelf and its decision. The two selects mirror the seller's own form, so
- * an admin and a seller are picking from the same list in the same shape.
+ * an admin and a seller pick from the same list in the same shape.
  */
-function ShelfMappingRow({
+function ShelfRowView({
   shelf,
   taxonomy,
-  onMapped,
+  onConverted,
 }: {
   shelf: ShelfRow
   taxonomy: CategoryNode[] | null
-  onMapped: () => void
+  onConverted: () => void
 }) {
   const roots = taxonomy ?? []
 
-  // Seed the selects from whatever the shelf already points at, so opening a
-  // mapped row shows the current answer rather than an empty form.
+  // Seed the selects from whatever the shelf is already linked to, so a
+  // half-converted row opens on its current answer rather than blank.
   const currentRoot =
     roots.find((r) => r.id === shelf.categoryId) ??
     roots.find((r) => r.children.some((c) => c.id === shelf.categoryId))
@@ -147,39 +147,49 @@ function ShelfMappingRow({
       ? (shelf.categoryId ?? '')
       : '',
   )
-  const [applyToProducts, setApplyToProducts] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const [plan, setPlan] = useState<ShelfConversionPlan | null>(null)
+  const [planning, setPlanning] = useState(false)
+  const [converting, setConverting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<string | null>(null)
 
   const subs = roots.find((r) => r.id === rootId)?.children ?? []
   const chosen = subId || rootId || null
-  const dirty = chosen !== shelf.categoryId
+  // A converted shelf re-chosen as itself has nothing to do.
+  const noop = shelf.converted && chosen === shelf.categoryId
 
-  const save = async (next: string | null) => {
+  const preview = async () => {
+    if (!chosen) return
     setError(null)
-    setSaving(true)
+    setPlanning(true)
     try {
-      const result = await adminApi.setShelfCategory(shelf.id, {
-        categoryId: next,
-        applyToProducts,
-      })
-      setDone(
-        next === null
-          ? 'Unmapped.'
-          : `Mapped${
-              result.productsUpdated > 0
-                ? ` · ${result.productsUpdated} product${
-                    result.productsUpdated === 1 ? '' : 's'
-                  } re-filed`
-                : ''
-            }`,
-      )
-      onMapped()
+      const next = await adminApi.planShelfConversion(shelf.id, chosen)
+      if (next.blocked) setError(next.blocked)
+      else setPlan(next)
     } catch (err) {
       setError(toApiError(err).message)
     } finally {
-      setSaving(false)
+      setPlanning(false)
+    }
+  }
+
+  const convert = async () => {
+    if (!chosen) return
+    setConverting(true)
+    try {
+      const result = await adminApi.convertShelf(shelf.id, chosen)
+      setPlan(null)
+      setDone(
+        result.plan.action === 'merge'
+          ? `Merged into "${result.shelf.name}"`
+          : `Converted to ${result.shelf.category?.pathLabel ?? result.shelf.name}`,
+      )
+      onConverted()
+    } catch (err) {
+      setPlan(null)
+      setError(toApiError(err).message)
+    } finally {
+      setConverting(false)
     }
   }
 
@@ -187,9 +197,7 @@ function ShelfMappingRow({
     <div className="px-4 py-3.5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-fg">
-            {shelf.shelfPath}
-          </p>
+          <p className="truncate text-sm font-medium text-fg">{shelf.shelfPath}</p>
           <p className="mt-0.5 truncate text-xs text-muted">
             {shelf.store.name} · {shelf.productCount} product
             {shelf.productCount === 1 ? '' : 's'}
@@ -200,20 +208,23 @@ function ShelfMappingRow({
             {!shelf.isActive && ' · disabled'}
           </p>
         </div>
-        {shelf.category ? (
+        {shelf.state === 'converted' && shelf.category ? (
           <Chip tone="success">{shelf.category.pathLabel}</Chip>
+        ) : shelf.state === 'tagged' && shelf.category ? (
+          <Chip tone="neutral">Tagged {shelf.category.pathLabel} · not converted</Chip>
         ) : (
-          <Chip tone="neutral">Not mapped</Chip>
+          <Chip tone="neutral">Typed by seller</Chip>
         )}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-end gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <select
           value={rootId}
           onChange={(e) => {
             setRootId(e.target.value)
             setSubId('')
             setDone(null)
+            setError(null)
           }}
           aria-label={`Category for ${shelf.shelfPath}`}
           className="h-9 min-w-44 rounded-md border border-line bg-input px-2.5 text-sm text-fg outline-none focus:border-accent"
@@ -233,6 +244,7 @@ function ShelfMappingRow({
           onChange={(e) => {
             setSubId(e.target.value)
             setDone(null)
+            setError(null)
           }}
           aria-label={`Subcategory for ${shelf.shelfPath}`}
           className="h-9 min-w-44 rounded-md border border-line bg-input px-2.5 text-sm text-fg outline-none focus:border-accent disabled:opacity-50"
@@ -253,33 +265,80 @@ function ShelfMappingRow({
 
         <Button
           variant="primary"
-          disabled={saving || !chosen || !dirty}
-          onClick={() => void save(chosen)}
+          disabled={planning || converting || !chosen || noop}
+          onClick={() => void preview()}
         >
-          {saving ? 'Saving…' : 'Map'}
+          {planning ? 'Checking…' : 'Convert'}
         </Button>
-        {shelf.categoryId && (
-          <Button disabled={saving} onClick={() => void save(null)}>
-            Unmap
-          </Button>
-        )}
-
-        {shelf.productCount > 0 && (
-          <label className="flex items-center gap-1.5 text-xs text-muted">
-            <input
-              type="checkbox"
-              checked={applyToProducts}
-              onChange={(e) => setApplyToProducts(e.target.checked)}
-              className="h-3.5 w-3.5 rounded border-line accent-[var(--brand)]"
-            />
-            Also re-file its {shelf.productCount} product
-            {shelf.productCount === 1 ? '' : 's'}
-          </label>
-        )}
 
         {done && <span className="text-xs font-medium text-success">{done}</span>}
         {error && <span className="text-xs font-medium text-danger">{error}</span>}
       </div>
+
+      <ConfirmDialog
+        open={plan !== null}
+        title={plan?.action === 'merge' ? 'Merge this shelf?' : 'Convert this shelf?'}
+        tone="neutral"
+        description={plan ? <PlanSummary plan={plan} store={shelf.store.name} /> : null}
+        confirmLabel={plan?.action === 'merge' ? 'Merge' : 'Convert'}
+        busy={converting}
+        onConfirm={() => void convert()}
+        onCancel={() => setPlan(null)}
+      />
+    </div>
+  )
+}
+
+/** The server's plan, in the admin's words — this is what they are approving. */
+function PlanSummary({ plan, store }: { plan: ShelfConversionPlan; store: string }) {
+  const products =
+    plan.productsMoved === 0
+      ? 'No products are affected.'
+      : `${plan.productsMoved} product${plan.productsMoved === 1 ? '' : 's'} move with it.`
+  return (
+    <div className="space-y-2">
+      <p>
+        In <span className="font-medium text-fg">{store}</span>,{' '}
+        <span className="font-medium text-fg">“{plan.from.shelfPath}”</span> becomes{' '}
+        <span className="font-medium text-fg">{plan.to.pathLabel}</span>.
+      </p>
+      <ul className="list-disc space-y-1 pl-5">
+        {plan.action === 'merge' ? (
+          <li>
+            The store already has a “{plan.mergeInto?.name}” shelf for this category,
+            so “{plan.from.name}” is <span className="font-medium text-fg">merged into it and deleted</span>
+            {plan.from.subcategoryCount > 0 &&
+              `, along with its ${plan.from.subcategoryCount} subcategor${
+                plan.from.subcategoryCount === 1 ? 'y' : 'ies'
+              }`}
+            .
+          </li>
+        ) : (
+          <li>
+            {plan.nameChanges ? (
+              <>
+                Renamed to <span className="font-medium text-fg">“{plan.to.name}”</span>
+                {plan.parent ? ' and ' : '.'}
+              </>
+            ) : plan.parent ? (
+              'Moved '
+            ) : (
+              'Linked to the platform category.'
+            )}
+            {plan.parent && (
+              <>
+                placed under <span className="font-medium text-fg">“{plan.parent.name}”</span>
+                {plan.parent.created ? ' (created for it)' : ''}.
+              </>
+            )}
+          </li>
+        )}
+        <li>{products}</li>
+        {plan.nameChanges && plan.action === 'rename' && (
+          <li>The storefront link changes; the old one stops working.</li>
+        )}
+      </ul>
+      <p className="text-xs">This cannot be undone.</p>
     </div>
   )
 }

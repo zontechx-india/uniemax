@@ -251,7 +251,7 @@ function StoreLogo({
     return <img src={brand.logoUrl} alt="" className={`shrink-0 object-cover ${className}`} />
   }
   return (
-    <span className={`flex shrink-0 items-center justify-center metal-cta text-cta-contrast ${className}`}>
+    <span className={`flex shrink-0 items-center justify-center metal-chip text-cta-contrast ${className}`}>
       <StoreIcon className="h-1/2 w-1/2" />
     </span>
   )

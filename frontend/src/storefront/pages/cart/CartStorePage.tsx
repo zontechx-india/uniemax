@@ -6,6 +6,7 @@ import { useStoreShell } from '../../features/publicStore/useStoreShells'
 import { cartUrl, formatPrice, storeHomeUrl } from '../../features/stores/storesApi'
 import { useGoBack } from '../../../shared/useGoBack'
 import { usePageTitle } from '../../../shared/usePageTitle'
+import { buttonClass } from '../../../shared/ui/Button'
 import {
   ArrowLeftIcon,
   CartIcon,
@@ -120,7 +121,7 @@ export function CartStorePage({ storeSlug }: { storeSlug: string }) {
                 {group.itemCount > 0 ? (
                   <Link
                     to={`/checkout/${group.storeSlug}`}
-                    className="metal-cta mt-4 flex h-11 items-center justify-center rounded-md text-sm font-bold text-cta-contrast transition"
+                    className={buttonClass({ full: true, className: 'mt-4' })}
                   >
                     Place Order
                   </Link>
@@ -165,7 +166,7 @@ function NothingFromStore({ storeSlug }: { storeSlug: string }) {
       <Link
         to={cartUrl(storeSlug)}
         replace
-        className="metal-cta mt-5 rounded-md px-5 py-2.5 text-sm font-semibold text-cta-contrast transition"
+        className={buttonClass({ className: 'mt-5' })}
       >
         Back to cart
       </Link>

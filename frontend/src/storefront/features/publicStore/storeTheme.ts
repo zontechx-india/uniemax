@@ -12,9 +12,10 @@
  * light and dark store backgrounds both stay legible.
  *
  * **Metal accents are deliberately scarce.** Surfaces, bars, chips and wells
- * are FLAT — the metallic treatment (chrome gradient + glow) is reserved for
- * the places that should shine: primary CTAs (`metal-cta`) and the card hover
- * elevation (`metal-lift`), both cut from the owner's own colors. An earlier
+ * are FLAT — the metallic treatment (gradient + glow) is reserved for the
+ * places that should shine: the three CTA fills (`btn-rise` / `btn-sheen` /
+ * `btn-ring`) and the card hover elevation (`metal-lift`), all cut from the
+ * owner's own colors via the `--cta-*` stops below. An earlier
  * iteration brushed every surface with gradients; it read as noise, so the
  * shine now marks importance instead of texture.
  */
@@ -95,8 +96,9 @@ export interface StoreThemeVars {
 
 /**
  * Map the owner's colors onto the design-system CSS variables for this
- * page's subtree, plus the two metal-accent tokens (`--brand-metal*` for CTAs,
- * `--metal-glow` for hover elevation).
+ * page's subtree, plus the metal-accent tokens (`--cta-*` stops for the three
+ * button fills, `--brand-metal` for the brand mark, `--metal-glow` for hover
+ * elevation).
  *
  * Roles: the **primary** color owns everything metallic (CTA chrome, hover
  * glow, brand-mark gradient); the optional **secondary** re-points the FLAT
@@ -157,13 +159,25 @@ export function storeVars(theme: StoreThemeVars): React.CSSProperties {
     '--accent': secondary,
 
     // --- metal accents (CTAs + hover glow ONLY) ---------------------------
-    // Chrome CTA cut from the owner's primary color.
+    // Brand mark chrome cut from the owner's primary (`metal-text`,
+    // `metal-chip`). The BUTTONS no longer read this: they compose their own
+    // gradients from the `--cta-*` stops below, because each of the three
+    // variants needs a different pair of steps and a different angle.
     '--brand-metal': `linear-gradient(180deg, ${lighten(primary, 0.28)} 0%, ${primary} 48%, ${darken(primary, 0.2)} 100%)`,
-    '--brand-metal-hover': `linear-gradient(180deg, ${lighten(primary, 0.38)} 0%, ${lighten(primary, 0.08)} 48%, ${darken(primary, 0.12)} 100%)`,
-    '--brand-metal-edge': isDarkColor(primary)
+
+    // CTA stops — consumed by `btn-rise` / `btn-sheen` / `btn-ring`. Same five
+    // derivations as the `index.css` fallbacks, cut from the owner's primary.
+    '--cta': primary,
+    '--cta-top': lighten(primary, 0.06),
+    '--cta-bottom': darken(primary, 0.14),
+    '--cta-hi': lighten(primary, 0.18),
+    '--cta-lo': darken(primary, 0.18),
+    '--cta-pressed': darken(primary, 0.1),
+    '--cta-edge': isDarkColor(primary)
       ? 'rgba(255,255,255,0.34)'
       : 'rgba(255,255,255,0.6)',
-    '--brand-glow': `0 6px 18px -8px ${rgba(primary, 0.65)}`,
+    // Glow COLOR only — each variant sets its own spread.
+    '--cta-glow': rgba(primary, 0.65),
 
     // Hover elevation. Zero x/y offset on purpose: the halo spreads EQUALLY
     // on all four sides instead of pooling under the card (the same principle
@@ -187,9 +201,16 @@ export const SKIN = {
   well: 'bg-surface-alt text-muted',
   /** Secondary control: chips, selects, ghost buttons. */
   chip: 'bg-surface',
-  /** Primary call to action — the one place the metal shines. Text color
-   *  contrasts the CTA background (owner-overridable), NOT the flat brand. */
-  cta: 'metal-cta text-cta-contrast',
+  /** Primary call to action (Rise) — the default fill for any CTA that is
+   *  not the single committing action on the view. Text color contrasts the
+   *  CTA background (owner-overridable), NOT the flat brand. */
+  cta: 'btn-rise text-cta-contrast',
+  /** The ONE committing action on a view — Buy Now, Place Order (Sheen).
+   *  Max one per screen; past that the sweep reads as noise. */
+  ctaSheen: 'btn-sheen text-cta-contrast',
+  /** The secondary standing BESIDE a primary — Add to Cart next to Buy Now
+   *  (Ring). Same gradient family, no competing weight. */
+  ctaRing: 'btn-ring text-brand hover:text-cta-contrast',
 } as const
 
 export type Skin = typeof SKIN

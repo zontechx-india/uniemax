@@ -166,19 +166,29 @@ export async function listShelfMappings(request: FastifyRequest) {
   return list(result.rows, result.meta);
 }
 
-export async function setShelfMapping(request: FastifyRequest) {
+/**
+ * Convert a typed shelf into a platform category. `dryRun` returns the plan
+ * only — no write, no audit line — which is what the console shows before
+ * asking for confirmation.
+ */
+export async function convertShelf(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
-  const input = schema.shelfMappingSchema.parse(request.body);
-  const result = await categoryMapping.setShelfCategory(id, input);
+  const input = schema.shelfConvertSchema.parse(request.body);
+  if (input.dryRun) {
+    return ok(await categoryMapping.planConversion(id, input.categoryId));
+  }
+  const result = await categoryMapping.convertShelf(id, input.categoryId);
   recordAudit(request, {
-    action: input.categoryId ? "storeCategory.map" : "storeCategory.unmap",
+    action: "storeCategory.convert",
     entityType: "storeCategory",
-    entityId: id,
+    entityId: result.shelf.id,
     meta: {
       store: result.shelf.store.name,
-      shelf: result.shelf.shelfPath,
-      category: result.shelf.category?.pathLabel ?? null,
-      productsUpdated: result.productsUpdated,
+      from: result.plan.from.shelfPath,
+      to: result.plan.to.pathLabel,
+      how: result.plan.action,
+      productsMoved: result.plan.productsMoved,
+      parentCreated: result.plan.parent?.created ?? false,
     },
   });
   return ok(result);

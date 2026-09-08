@@ -257,10 +257,24 @@ export interface CustomerDetail extends CustomerRow {
 }
 
 /**
- * One seller's shelf, seen from the console. Shelves created since the
- * taxonomy landed already carry a `category`; the ones that do not are free
- * text a seller typed earlier, and are what the mapping page exists to fix.
+ * One seller's shelf, seen from the console. `state` says how far it is from
+ * being a platform category: typed and never linked, linked by the earlier
+ * bulk migration but still wearing its typed name, or fully converted.
  */
+export type ShelfState = 'unmapped' | 'tagged' | 'converted'
+
+export interface ShelfConversionPlan {
+  action: 'rename' | 'merge'
+  /** Why it must not run, in the admin's words; null when it can. */
+  blocked: string | null
+  from: { name: string; shelfPath: string; productCount: number; subcategoryCount: number }
+  to: { name: string; pathLabel: string }
+  parent: { name: string; created: boolean } | null
+  mergeInto: { id: string; name: string } | null
+  productsMoved: number
+  nameChanges: boolean
+}
+
 export interface ShelfRow {
   id: string
   name: string
@@ -274,6 +288,8 @@ export interface ShelfRow {
   subcategoryCount: number
   categoryId: string | null
   category: { id: string; name: string; pathLabel: string } | null
+  state: ShelfState
+  converted: boolean
 }
 
 export interface ProductRow {
@@ -538,20 +554,20 @@ export const adminApi = {
     return call<ProductDetail>(http.patch(`${BASE}/catalog/products/${id}/visibility`, body))
   },
 
-  // Pointing sellers' legacy free-text shelves at the global taxonomy
+  // Converting sellers' legacy free-text shelves into platform categories
   listShelves(query: Params) {
     return callList<ShelfRow>(http.get(`${BASE}/catalog/shelves`, params(query)))
   },
-  /**
-   * `categoryId: null` unmaps the shelf again. `applyToProducts` also re-files
-   * the products sitting on it — the reason for mapping in the first place.
-   */
-  setShelfCategory(
-    id: string,
-    body: { categoryId: string | null; applyToProducts: boolean },
-  ) {
-    return call<{ shelf: ShelfRow; productsUpdated: number }>(
-      http.patch(`${BASE}/catalog/shelves/${id}/category`, body),
+  /** What convertShelf would do — nothing is written. */
+  planShelfConversion(id: string, categoryId: string) {
+    return call<ShelfConversionPlan>(
+      http.post(`${BASE}/catalog/shelves/${id}/convert`, { categoryId, dryRun: true }),
+    )
+  },
+  /** One-way: renames/re-parents the shelf, or merges it into the one already standing for the category. */
+  convertShelf(id: string, categoryId: string) {
+    return call<{ shelf: ShelfRow; plan: ShelfConversionPlan }>(
+      http.post(`${BASE}/catalog/shelves/${id}/convert`, { categoryId }),
     )
   },
 

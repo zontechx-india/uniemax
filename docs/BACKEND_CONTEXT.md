@@ -733,12 +733,15 @@ White-label design — one codebase, any business:
   classification can never contradict where it sits.
 
   `categoryId` is nonetheless **nullable**, for the shelves that predate the
-  rule: free text a seller typed, very often a brand ("KTM"), a vehicle model
-  ("Duke 200") or a tier ("Pro Edition"), none of which is a category — vehicle
-  brands and models belong to the future compatibility system. Those keep their
-  names forever; only an admin re-points one at the taxonomy, through
-  `adminCategoryMapping.service.ts`, which also re-files everything on it.
-  Nothing renames a seller's shelf: their storefront navigation is theirs.
+  rule: free text a seller typed ("Bag", "Cricket Bats", "KTM"). The intent is
+  for those to go away. An admin **converts** each one through
+  `adminCategoryMapping.service.ts`: the row is renamed and re-parented to
+  match the chosen node (products reclassified in place), or, when the store
+  already holds that node, merged into it and deleted. It is one-way and
+  planned first — the console shows the server's plan before it runs. A root
+  that still has subcategories cannot become a subcategory (children are
+  decided first, never folded in silently). Brand and model shelves are the
+  admin's call: convert them to the nearest category, or leave them typed.
   `StoreProduct` requires a category — root or subcategory — of the
   same store, and holds `name`, optional `description`, and two JSON columns:
   **`optionTypes`** (ordered `[{ name, values[] }]` — the dimensions it is

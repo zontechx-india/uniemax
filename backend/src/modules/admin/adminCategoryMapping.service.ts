@@ -3,43 +3,65 @@ import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../../utils/httpError.js";
 import { buildListMeta } from "../../utils/response.js";
 import { getCategoryPath } from "../category/categoryTree.js";
-import type { ShelfListQuery, ShelfMappingInput } from "./admin.schema.js";
+import type { CategoryNode } from "../category/categoryTree.js";
+import { uniqueCategorySlug } from "../stores/catalogSlug.js";
+import type { ShelfListQuery } from "./admin.schema.js";
 
 /**
- * Mapping sellers' SHELVES onto the global category taxonomy.
+ * CONVERTING sellers' typed shelves into platform categories.
  *
- * Every shelf created since the taxonomy landed is classified by construction
- * — the seller picks a category rather than typing one. What this module
- * exists for is the shelves that predate that rule: free text a seller once
- * typed, which is often a brand ("KTM"), a vehicle model ("Duke 200") or a
- * merchandising tier ("Pro Edition") rather than a category at all.
+ * Every shelf created since the taxonomy landed is a platform category by
+ * construction — the seller picks one rather than typing a name. What this
+ * module exists for is the shelves that predate that rule: free text a seller
+ * once typed ("Bag", "Cricket Bats", "KTM"). The goal is to make those go
+ * away, so converting a shelf REPLACES it: the row is renamed and re-parented
+ * to match the chosen node, its products move with it, and if the store
+ * already holds that node the legacy shelf is merged into it and deleted.
  *
- * Those cannot be mapped automatically without guessing, so an admin decides
- * one shelf at a time. Mapping is deliberately reversible (clear it and the
- * shelf is unclassified again) and never touches the shelf's NAME: the
- * seller's storefront navigation is theirs, and rewriting it would rebuild
- * their shop out from under them.
+ * Conversion is one-way. A merge cannot be un-merged, so there is no unmap;
+ * instead every conversion is planned first (`planConversion`) and the
+ * console shows that plan before anything is written.
  */
 
 const shelfSelect = {
   id: true,
   name: true,
   slug: true,
+  parentId: true,
+  storeId: true,
   isActive: true,
   categoryId: true,
-  parent: { select: { id: true, name: true } },
+  parent: { select: { id: true, name: true, categoryId: true } },
   store: { select: { id: true, name: true, slug: true } },
   _count: { select: { products: true, children: true } },
 } satisfies Prisma.StoreCategorySelect;
 
 type ShelfRow = Prisma.StoreCategoryGetPayload<{ select: typeof shelfSelect }>;
 
+/**
+ * unmapped  — no taxonomy link at all (typed, never touched)
+ * tagged    — linked by the earlier bulk migration, but still wearing its
+ *             typed name / sitting in its typed position: half-converted
+ * converted — name and position both match the platform node
+ */
+export type ShelfState = "unmapped" | "tagged" | "converted";
+
+function stateOf(row: ShelfRow, node: CategoryNode | null): ShelfState {
+  if (!row.categoryId || !node) return "unmapped";
+  const nameMatches = row.name === node.name;
+  const placeMatches = node.parentId
+    ? row.parent?.categoryId === node.parentId
+    : row.parentId === null;
+  return nameMatches && placeMatches ? "converted" : "tagged";
+}
+
 async function shape(row: ShelfRow) {
-  // activeOnly: false — a shelf mapped before an admin retired that node must
+  // activeOnly: false — a shelf linked to a node an admin later disabled must
   // still show what it points at rather than reading as unmapped.
   const node = row.categoryId
     ? await getCategoryPath(row.categoryId, false)
     : null;
+  const state = stateOf(row, node);
   return {
     id: row.id,
     name: row.name,
@@ -55,6 +77,8 @@ async function shape(row: ShelfRow) {
     category: node
       ? { id: node.id, name: node.name, pathLabel: node.pathLabel }
       : null,
+    state,
+    converted: state === "converted",
   };
 }
 
@@ -67,74 +91,301 @@ export async function listShelves(query: ShelfListQuery) {
     ];
   }
   if (query.storeId) where.storeId = query.storeId;
-  if (query.status === "UNMAPPED") where.categoryId = null;
-  if (query.status === "MAPPED") where.categoryId = { not: null };
 
-  const [total, rows] = await Promise.all([
-    prisma.storeCategory.count({ where }),
-    prisma.storeCategory.findMany({
-      where,
-      // Grouped by shop, then roots before their own subcategories, so the
-      // list reads the way the seller's catalog is actually shaped.
-      orderBy: [
-        { store: { name: "asc" } },
-        { parentId: { sort: "asc", nulls: "first" } },
-        { name: "asc" },
-      ],
-      skip: (query.page - 1) * query.pageSize,
-      take: query.pageSize,
-      select: shelfSelect,
-    }),
-  ]);
+  // "Converted" is name-and-position-match against another table, which no
+  // where-clause can express, so the status filter runs in memory. A platform
+  // has tens of shelves per store, not millions; this is fine.
+  const rows = await prisma.storeCategory.findMany({
+    where,
+    // Grouped by shop, then roots before their own subcategories, so the
+    // list reads the way the seller's catalog is actually shaped.
+    orderBy: [
+      { store: { name: "asc" } },
+      { parentId: { sort: "asc", nulls: "first" } },
+      { name: "asc" },
+    ],
+    select: shelfSelect,
+  });
+  const shaped = await Promise.all(rows.map(shape));
+  const filtered =
+    query.status === "PENDING"
+      ? shaped.filter((s) => !s.converted)
+      : query.status === "CONVERTED"
+        ? shaped.filter((s) => s.converted)
+        : shaped;
 
+  const start = (query.page - 1) * query.pageSize;
   return {
-    rows: await Promise.all(rows.map(shape)),
-    meta: buildListMeta(total, query.page, query.pageSize),
+    rows: filtered.slice(start, start + query.pageSize),
+    meta: buildListMeta(filtered.length, query.page, query.pageSize),
   };
 }
 
-/**
- * Point one shelf at a taxonomy node, or clear it with `categoryId: null`.
- *
- * `applyToProducts` also re-files the products sitting directly on the shelf,
- * which is the reason an admin is here at all: a shelf is only worth mapping
- * because it makes the products under it findable platform-wide. It is opt-out
- * rather than automatic so that a shelf whose products were already classified
- * by hand can be mapped without undoing that work.
- */
-export async function setShelfCategory(
-  shelfId: string,
-  input: ShelfMappingInput,
-) {
+// ---------------------------------------------------------------------------
+// Conversion
+// ---------------------------------------------------------------------------
+
+export interface ConversionPlan {
+  /** rename = this row becomes the category; merge = it folds into one that already stands for it. */
+  action: "rename" | "merge";
+  /** Set when the conversion must not run — the reason, in the admin's words. */
+  blocked: string | null;
+  from: { name: string; shelfPath: string; productCount: number; subcategoryCount: number };
+  to: { name: string; pathLabel: string };
+  /** The root shelf a subcategory lands under; `created` when it does not exist yet. */
+  parent: { name: string; created: boolean } | null;
+  mergeInto: { id: string; name: string } | null;
+  productsMoved: number;
+  nameChanges: boolean;
+}
+
+interface Resolved {
+  shelf: ShelfRow;
+  node: CategoryNode;
+  plan: ConversionPlan;
+  /** How the parent shelf is obtained; only meaningful when the node is a subcategory. */
+  parent:
+    | { kind: "existing"; id: string }
+    | { kind: "adopt"; id: string }
+    | { kind: "create"; node: CategoryNode }
+    | null;
+  /** Merge target, and whether it must first be linked to the node. */
+  target: { id: string; adopt: boolean } | null;
+}
+
+const sameName = (name: string) => ({ equals: name, mode: "insensitive" as const });
+
+async function resolve(shelfId: string, nodeId: string): Promise<Resolved> {
   const shelf = await prisma.storeCategory.findUnique({
-    where: { id: shelfId },
-    select: { id: true, name: true, store: { select: { name: true } } },
-  });
-  if (!shelf) throw HttpError.notFound("Store category not found");
-
-  if (input.categoryId) {
-    const node = await getCategoryPath(input.categoryId, false);
-    if (!node) throw HttpError.badRequest("Selected category was not found");
-  }
-
-  // One transaction: a shelf must never end up pointing somewhere its own
-  // products do not.
-  const productsUpdated = await prisma.$transaction(async (tx) => {
-    await tx.storeCategory.update({
-      where: { id: shelfId },
-      data: { categoryId: input.categoryId },
-    });
-    if (!input.applyToProducts) return 0;
-    const { count } = await tx.storeProduct.updateMany({
-      where: { categoryId: shelfId },
-      data: { globalCategoryId: input.categoryId },
-    });
-    return count;
-  });
-
-  const row = await prisma.storeCategory.findUniqueOrThrow({
     where: { id: shelfId },
     select: shelfSelect,
   });
-  return { shelf: await shape(row), productsUpdated };
+  if (!shelf) throw HttpError.notFound("Store category not found");
+
+  // activeOnly: false — an admin may legitimately file a shelf under a
+  // category that is currently retired.
+  const node = await getCategoryPath(nodeId, false);
+  if (!node) throw HttpError.badRequest("Selected category was not found");
+  if (node.depth > 1) {
+    throw HttpError.badRequest(
+      "Store categories nest one level deep — choose a category or one of its subcategories.",
+    );
+  }
+
+  const plan: ConversionPlan = {
+    action: "rename",
+    blocked: null,
+    from: {
+      name: shelf.name,
+      shelfPath: shelf.parent ? `${shelf.parent.name} › ${shelf.name}` : shelf.name,
+      productCount: shelf._count.products,
+      subcategoryCount: shelf._count.children,
+    },
+    to: { name: node.name, pathLabel: node.pathLabel },
+    parent: null,
+    mergeInto: null,
+    productsMoved: shelf._count.products,
+    nameChanges: shelf.name !== node.name,
+  };
+  const out: Resolved = { shelf, node, plan, parent: null, target: null };
+  const storeId = shelf.storeId;
+
+  if (stateOf(shelf, node) === "converted") {
+    plan.blocked = `Already converted to ${node.pathLabel}.`;
+    return out;
+  }
+
+  // A subcategory cannot hold subcategories. Nothing is folded in silently:
+  // the children are in the queue and get their own decision first.
+  if (node.parentId && shelf._count.children > 0) {
+    const n = shelf._count.children;
+    plan.blocked = `"${shelf.name}" still has ${n} subcategor${n === 1 ? "y" : "ies"}. Convert or delete those first, then convert this one.`;
+    return out;
+  }
+
+  // --- where the converted shelf lands -----------------------------------
+  let parentShelfId: string | null = null;
+  if (node.parentId) {
+    const parentNode = await getCategoryPath(node.parentId, false);
+    if (!parentNode) throw HttpError.badRequest("Selected category was not found");
+
+    const existing = await prisma.storeCategory.findFirst({
+      where: { storeId, categoryId: parentNode.id, id: { not: shelf.id } },
+      select: { id: true, name: true },
+    });
+    if (existing) {
+      out.parent = { kind: "existing", id: existing.id };
+      parentShelfId = existing.id;
+      plan.parent = { name: existing.name, created: false };
+    } else {
+      // An untagged root the seller typed with the same name IS this parent;
+      // adopt it rather than standing a twin next to it.
+      const adoptable = await prisma.storeCategory.findFirst({
+        where: {
+          storeId,
+          parentId: null,
+          categoryId: null,
+          id: { not: shelf.id },
+          name: sameName(parentNode.name),
+        },
+        select: { id: true, name: true },
+      });
+      if (adoptable) {
+        out.parent = { kind: "adopt", id: adoptable.id };
+        parentShelfId = adoptable.id;
+        plan.parent = { name: adoptable.name, created: false };
+      } else {
+        out.parent = { kind: "create", node: parentNode };
+        plan.parent = { name: parentNode.name, created: true };
+      }
+    }
+  }
+
+  // --- does something already stand for this node? → merge ---------------
+  let target = await prisma.storeCategory.findFirst({
+    where: { storeId, categoryId: node.id, id: { not: shelf.id } },
+    select: { id: true, name: true },
+  });
+  let adoptTarget = false;
+  if (!target && out.parent?.kind !== "create") {
+    // Same name, same position, never linked: that shelf is this category in
+    // all but the link, so it becomes the merge target rather than a clash.
+    target = await prisma.storeCategory.findFirst({
+      where: {
+        storeId,
+        parentId: parentShelfId,
+        categoryId: null,
+        id: { not: shelf.id },
+        name: sameName(node.name),
+      },
+      select: { id: true, name: true },
+    });
+    adoptTarget = target !== null;
+  }
+
+  if (target) {
+    plan.action = "merge";
+    plan.mergeInto = { id: target.id, name: target.name };
+    out.target = { id: target.id, adopt: adoptTarget };
+
+    if (shelf._count.children > 0) {
+      const [mine, theirs] = await Promise.all([
+        prisma.storeCategory.findMany({
+          where: { parentId: shelf.id },
+          select: { name: true },
+        }),
+        prisma.storeCategory.findMany({
+          where: { parentId: target.id },
+          select: { name: true },
+        }),
+      ]);
+      const taken = new Set(theirs.map((c) => c.name.toLowerCase()));
+      const clash = mine.find((c) => taken.has(c.name.toLowerCase()));
+      if (clash) {
+        plan.blocked = `Both "${shelf.name}" and "${target.name}" have a subcategory called "${clash.name}". Convert that one first.`;
+      }
+    }
+    return out;
+  }
+
+  // --- plain rename: the name must be free ---------------------------------
+  const clash = await prisma.storeCategory.findFirst({
+    where: { storeId, id: { not: shelf.id }, name: sameName(node.name) },
+    select: { name: true, categoryId: true, parent: { select: { name: true } } },
+  });
+  if (clash) {
+    const where = clash.parent ? ` under "${clash.parent.name}"` : "";
+    plan.blocked = `This store already has a shelf called "${clash.name}"${where}${
+      clash.categoryId ? " linked to a different category" : ""
+    }. Convert that one first.`;
+  }
+  return out;
+}
+
+/** What `convertShelf` would do, without doing it. */
+export async function planConversion(shelfId: string, nodeId: string) {
+  return (await resolve(shelfId, nodeId)).plan;
+}
+
+/**
+ * Turn a typed shelf into the platform category it stands for.
+ *
+ * Rename: the row keeps its id, takes the node's name and position, gets a
+ * fresh slug only if the name changed (an unchanged name keeps shared links
+ * working), and its products are reclassified where they are. Merge: the
+ * products and any subcategories move onto the shelf that already stands for
+ * the node, and the legacy row is deleted. One transaction either way.
+ */
+export async function convertShelf(shelfId: string, nodeId: string) {
+  const { shelf, node, plan, parent, target } = await resolve(shelfId, nodeId);
+  if (plan.blocked) throw HttpError.conflict(plan.blocked);
+
+  const resultId = await prisma.$transaction(async (tx) => {
+    let parentShelfId: string | null = null;
+    if (parent?.kind === "existing") parentShelfId = parent.id;
+    if (parent?.kind === "adopt") {
+      await tx.storeCategory.update({
+        where: { id: parent.id },
+        data: { categoryId: node.parentId },
+      });
+      parentShelfId = parent.id;
+    }
+    if (parent?.kind === "create") {
+      const created = await tx.storeCategory.create({
+        data: {
+          storeId: shelf.storeId,
+          name: parent.node.name,
+          slug: await uniqueCategorySlug(shelf.storeId, parent.node.name, tx),
+          parentId: null,
+          categoryId: parent.node.id,
+        },
+        select: { id: true },
+      });
+      parentShelfId = created.id;
+    }
+
+    if (target) {
+      if (target.adopt) {
+        await tx.storeCategory.update({
+          where: { id: target.id },
+          data: { categoryId: node.id },
+        });
+      }
+      await tx.storeProduct.updateMany({
+        where: { categoryId: shelf.id },
+        data: { categoryId: target.id, globalCategoryId: node.id },
+      });
+      await tx.storeCategory.updateMany({
+        where: { parentId: shelf.id },
+        data: { parentId: target.id },
+      });
+      await tx.storeCategory.delete({ where: { id: shelf.id } });
+      return target.id;
+    }
+
+    await tx.storeCategory.update({
+      where: { id: shelf.id },
+      data: {
+        name: node.name,
+        ...(plan.nameChanges
+          ? { slug: await uniqueCategorySlug(shelf.storeId, node.name, tx, shelf.id) }
+          : {}),
+        parentId: parentShelfId,
+        categoryId: node.id,
+        // Featuring is a root-only merchandising flag.
+        ...(parentShelfId ? { isFeatured: false } : {}),
+      },
+    });
+    await tx.storeProduct.updateMany({
+      where: { categoryId: shelf.id },
+      data: { globalCategoryId: node.id },
+    });
+    return shelf.id;
+  });
+
+  const row = await prisma.storeCategory.findUniqueOrThrow({
+    where: { id: resultId },
+    select: shelfSelect,
+  });
+  return { shelf: await shape(row), plan };
 }

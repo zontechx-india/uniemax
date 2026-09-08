@@ -8,6 +8,7 @@ import { useStoreShells } from '../../features/publicStore/useStoreShells'
 import { formatPrice, storeHomeUrl } from '../../features/stores/storesApi'
 import type { PublicStore } from '../../features/stores/storesApi'
 import { usePageTitle } from '../../../shared/usePageTitle'
+import { buttonClass } from '../../../shared/ui/Button'
 import { ArrowLeftIcon, CartIcon, ChevronRightIcon } from '../../layout/icons'
 import { CartLine } from './CartLine'
 import { StoreLogo } from './StoreLogo'
@@ -275,7 +276,7 @@ function StoreGroupCard({
         {canOrder ? (
           <Link
             to={`/checkout/${group.storeSlug}`}
-            className="metal-cta shrink-0 rounded-md px-3.5 py-2 text-xs font-bold text-cta-contrast transition"
+            className={buttonClass({ size: 'sm' })}
           >
             Place Order
           </Link>

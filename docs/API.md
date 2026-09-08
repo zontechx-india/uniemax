@@ -765,9 +765,9 @@ tenants and what every product on the shelf takes as its own classification.
 Shelves that predate this rule keep the free text a seller typed — often a brand
 ("KTM"), a vehicle model ("Duke 200") or a tier ("Pro Edition"), none of which
 is a category. Those keep `categoryId: null`, which is a **legitimate state,
-not a gap**. Re-pointing one at the taxonomy is an admin action
-(`PATCH /admin/catalog/shelves/:id/category`); nothing on this API can rename
-a shelf or change what it is tagged with.
+not a gap** until an admin converts it (`POST /admin/catalog/shelves/:id/convert`),
+which replaces the typed shelf with the platform one. Nothing on this API can
+rename a shelf or change what it is tagged with.
 
 **`GET /api/v1/stores/:id/categories`** — the store's categories (roots and
 subcategories, flat), by `sortOrder` then oldest first. Each:
@@ -2144,40 +2144,64 @@ notified with the reason. Already in that state → `409`.
 
 ### `GET /api/v1/admin/catalog/shelves`
 
-Sellers' shelves across every store, for pointing the legacy ones at the global
-taxonomy. Query: `q` (shelf or store name), `storeId`,
-`status` (`UNMAPPED` | `MAPPED`), `page`, `pageSize`. Ordered by store, then
+Sellers' shelves across every store, for converting the typed ones into
+platform categories. Query: `q` (shelf or store name), `storeId`,
+`status` (`PENDING` | `CONVERTED`), `page`, `pageSize`. Ordered by store, then
 roots before their own subcategories.
 → rows of `{ id, name, slug, isActive, shelfPath, isSubcategory, store,
-productCount, subcategoryCount, categoryId, category }`, where `shelfPath` is
-"KTM › Duke 200" (the shelf as the seller sees it) and `category` resolves
-`categoryId` to `{ id, name, pathLabel }` or is `null`.
+productCount, subcategoryCount, categoryId, category, state, converted }`, where
+`shelfPath` is "KTM › Duke 200" (the shelf as the seller sees it), `category`
+resolves `categoryId` to `{ id, name, pathLabel }` or is `null`, and `state` is
+`unmapped` (typed, never linked), `tagged` (linked by the earlier bulk
+migration but still wearing its typed name / position) or `converted` (name
+and position both match the node). `status` filters on that in memory, since
+"name matches the node" cannot be expressed as a where-clause.
 
-`status=UNMAPPED` is the working queue. Every shelf created since the taxonomy
-landed is already classified — the seller picks a category rather than typing
-one — so what is left is free text typed earlier, usually a brand, a vehicle
-model or a merchandising tier. No rule can map those without guessing, which is
-why an admin decides one at a time.
+`status=PENDING` is the working queue. Every shelf created since the taxonomy
+landed is a platform category by construction — the seller picks one rather
+than typing a name — so what is left is free text typed earlier. No rule can
+convert those without guessing, which is why an admin decides one at a time.
 
-### `PATCH /api/v1/admin/catalog/shelves/:id/category`
+### `POST /api/v1/admin/catalog/shelves/:id/convert`
 
-Body `{ "categoryId": "cmr…" | null, "applyToProducts"?: true }`.
-→ `{ shelf, productsUpdated }`.
+Body `{ "categoryId": "cmr…", "dryRun"?: false }`.
+→ with `dryRun: true`, the **plan** only (no write, no audit line); otherwise
+`{ shelf, plan }` after it has run.
 
-Points one shelf at a taxonomy node; `null` unmaps it again. `categoryId` must
-name an existing node (`400` otherwise) — **including a disabled one**, since an
-admin may legitimately file a shelf under a category that is currently retired.
+Plan: `{ action: "rename" | "merge", blocked: string | null, from: { name,
+shelfPath, productCount, subcategoryCount }, to: { name, pathLabel },
+parent: { name, created } | null, mergeInto: { id, name } | null,
+productsMoved, nameChanges }`. The console shows this before asking for
+confirmation, so what the admin approves is exactly what runs.
 
-`applyToProducts` (default `true`) also re-files the products sitting directly
-on the shelf, which is the reason to map at all: a shelf is only worth mapping
-because it makes the products under it findable platform-wide. Both writes share
-one transaction, so a shelf never ends up pointing somewhere its own products do
-not. It is opt-**out** so a shelf whose products were already classified by hand
-can be mapped without undoing that work.
+**Converting REPLACES the typed shelf.** The goal is for seller-typed
+categories to go away, not to sit beside a tag:
 
-This **never renames the shelf**. A seller's storefront navigation is theirs;
-the mapping only records what the shelf *means*. Audited as
-`storeCategory.map` / `storeCategory.unmap`.
+- **rename** — the row keeps its id, takes the node's name, and is moved to
+  the node's position: a subcategory lands under the root shelf standing for
+  its parent node (reused when the store has it, an untagged root of the same
+  name adopted, otherwise created — `parent.created`). A root that becomes a
+  subcategory loses `isFeatured` (root-only flag). The slug is regenerated only
+  when the name actually changes, so an unchanged name keeps shared links
+  working. Products stay on the row and are reclassified.
+- **merge** — when a shelf already stands for the node (linked, or untagged
+  with the same name in the same position, which is adopted), the products and
+  any subcategories of the legacy shelf move onto it and **the legacy row is
+  deleted**.
+
+`blocked` (returned in the plan; `409` if the real call is attempted) when:
+the shelf is already converted to that node; the node is a subcategory and the
+shelf still has subcategories of its own (a subcategory cannot hold
+subcategories — nothing is folded in silently; the children are in the queue
+and get their own decision first); a merge would put two same-named
+subcategories under one root; or a plain rename would collide with another
+shelf's name. `categoryId` must name an existing node (`400` otherwise) —
+**including a disabled one**, since an admin may legitimately file a shelf
+under a category that is currently retired — and be at most one level deep.
+
+One transaction either way. **One-way**: a merge cannot be un-merged, so there
+is no unmap. Audited as `storeCategory.convert` with `{ from, to, how,
+productsMoved, parentCreated }`.
 
 ### `GET /api/v1/admin/audit`
 

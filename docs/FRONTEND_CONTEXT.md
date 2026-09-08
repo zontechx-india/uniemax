@@ -1110,7 +1110,7 @@ a pickup-address item.
   follows primary; surface follows the background; button text is
   white/black from the primary's luminance) — and a live mini-storefront
   preview — top bar, category chip bar, product card grid **and a real
-  labeled CTA button** (same `metal-cta text-cta-contrast` classes as the
+  labeled CTA button** (same `SKIN.cta` fill as the
   live storefront, so button-text contrast is checked before saving),
   rendered with the real page's own `storeVars()` semantics (flat
   surfaces, chrome CTAs) so it previews truthfully →
@@ -1356,7 +1356,7 @@ Rules they follow (constraints, not taste):
 | `/orders`, `/orders/:id` | Platform-wide orders. Read-only: the seller owns fulfilment. Detail adds the joins the seller can't see (customer account, gateway reference) plus a lifecycle timeline built from the order's own timestamps. |
 | `/payments` | The same order rows through the money lens, with per-status totals for the current filter. |
 | `/products` | Seller catalog across stores, with the hide/restore moderation switch (always asks for a reason — the seller is notified immediately). A row is a summary; **clicking it opens the listing in full** in `products/ProductDetailDialog` (gallery, description, option matrix, per-variant price/stock, spec table, delivery area, homepage flags, storefront link, hide/restore) over the table, so filters and page survive closing it. `?storeId=` scopes the table to one store and shows a banner naming it. The hide/restore confirm lives in `products/ProductVisibilityDialog` because the table's row button and the detail dialog must ask the same question the same way. |
-| `/category-mapping` | Pointing sellers' **legacy** shelves at the taxonomy. Shelves created today are classified by construction (the seller picks a category rather than typing one), so this queue is the free text typed before that rule — usually a brand ("KTM"), a vehicle model ("Duke 200") or a tier ("Pro Edition"). No rule maps those without guessing, so an admin decides one at a time with the same two selects the seller sees. Mapping **never renames the shelf** — a seller's navigation is theirs; it records what the shelf *means*. An opt-out checkbox re-files the products on it in the same transaction, which is the reason to map at all. Leaving a brand unmapped is a valid answer, so the queue is not meant to reach zero. |
+| `/category-mapping` | **Converting** sellers' typed shelves into platform categories. Shelves created today are platform categories by construction (the seller picks one rather than typing a name), so this queue is the free text typed before that rule. An admin picks the category with the same two selects the seller sees and clicks Convert; the page asks the server for its **plan** (rename and re-parent, or merge into the shelf already standing for that category and delete the typed one) and shows it in the confirm dialog — what the admin approves is exactly what runs, nothing is folded in silently, and a root that still has subcategories is refused until those are decided. One-way; there is no unmap. Rows are chipped **Typed by seller** / **Tagged … · not converted** (linked by the earlier bulk migration but still wearing its typed name) / the converted path. |
 | `/categories` | The **global category taxonomy** — the one place it can be edited. An indented tree of arbitrary depth (the shape follows `parentId`; "category" and "subcategory" are the same row at different depths), with create/edit/enable/disable/delete, sort order, image URL and a parent select. Searching flattens the view and shows each hit's full path, because a match inside a collapsed branch has to be reachable without guessing which parent to open. Disabling hides a whole branch from sellers and shoppers while leaving every existing tag intact — the safe way to retire a category, since deleting is refused while a node still has children or products. Sellers only ever *select* from this list. |
 | `/stores`, `/stores/:id` | Stores + owners. The table carries a **Setup** column (`SetupChip`, naming the first outstanding step) and a **Setup: Not finished / Complete** filter — independent of Published/Draft, because a live store can still be missing its PAN, and "who has not finished?" is the console's usual reason for opening this list. Detail carries suspension, **manual payout-account verification** (account numbers masked to the last 4), a **Products** card — the store's newest listings inline (each opening the same product dialog), with a "View all" into `/products?storeId=…` — and a **Seller setup** card (below). |
 | `/customers`, `/customers/:id` | Buyers and sellers (same account type), with blocking. The dialog states both effects: no future sign-in **and** every session revoked. |
@@ -1551,6 +1551,11 @@ frontend/
     │   │   │                     #   ancestor (the sticky headers) is a containing
     │   │   │                     #   block for `fixed`, which pinned the overlay to
     │   │   │                     #   the header instead of centring it on screen
+    │   │   ├── Button.tsx       # THE button. Owns height/radius/padding/weight, so
+    │   │   │                     #   a call site picks only variant + size. Variants:
+    │   │   │                     #   rise (default primary) · sheen (the one committing
+    │   │   │                     #   action per view) · ring (secondary beside a
+    │   │   │                     #   primary). `buttonClass()` for <Link> CTAs.
     │   │   └── socialIcons.tsx   # Social brand glyphs + SOCIAL_META (label + icon per platform)
     │   ├── analytics/
     │   │   └── metaPixel.ts     # Meta Pixel: SPA PageView, CompleteRegistration,
@@ -1803,8 +1808,9 @@ at 5.8:1 on white but only 3:1 on the dark canvas, which fails AA for links
 and prices — so the dark scheme steps `--brand` up to `#9574f7` (5.0:1) and,
 because that is now a *light* fill, flips `--brand-contrast` to the palette's
 Black. `--brand-gradient` follows suit. Two things deliberately do **not**
-flip: `--brand-metal*` (the metal-CTA fallbacks, cut from `#6c3ef4`) and
-`--cta-contrast` (white), which pair with each other in both schemes.
+flip: the CTA chrome (`--brand-metal` for the brand mark, the `--cta-*`
+stops for the three button fills, all cut from `#6c3ef4`) and `--cta-contrast`
+(white), which pair with each other in both schemes.
 
 ### Brand art (`public/` + `AppLogoLockup`)
 
@@ -2004,15 +2010,19 @@ owner's surface instead of keeping the app's white.
 
 **Metal accents — deliberately scarce.** Surfaces, bars, chips and wells are
 FLAT semantic colors; the shine is reserved for the places that should read as
-important. Only three `.metal-*` utilities exist (`index.css`):
+important. Six gradient utilities exist (`index.css`) — three CTA fills and
+three marks:
 
 | Utility | Role |
 | ------- | ---- |
-| `metal-cta` | primary CTA, chrome gradient cut from the owner's brand color |
+| `btn-rise` | **default primary CTA.** Two stops in a ~20% lightness spread; glow on hover only |
+| `btn-sheen` | **the ONE committing action on a view** (Buy Now, Place Order). Flat at rest, a highlight sweeps across on hover |
+| `btn-ring` | **the secondary standing beside a primary** (Add to Cart next to Buy Now). Gradient border, fills on hover |
 | `metal-lift` | interactive card hover: small rise + evenly-spread brand halo |
 | `metal-text` | gradient display text for the store's brand mark (header/footer name) |
+| `metal-chip` | static brand-filled square for store-avatar fallbacks — no interactive states, since it is not a control |
 
-Both are tinted from the **owner's own colors** (never a fixed grey), so each
+All are tinted from the **owner's own colors** (never a fixed grey), so each
 store's shine matches its brand. `metal-lift`'s hover shadow (`--metal-glow`)
 deliberately has **zero x/y offset**, so the halo spreads equally on all four
 sides instead of pooling under the card — the same principle as the skill's
@@ -2020,19 +2030,45 @@ sides instead of pooling under the card — the same principle as the skill's
 surface — header, chips, wells, cards; it read as noise and was flattened, so
 the metal now marks importance rather than texture.)
 
+**Choosing a CTA fill is about importance, not looks.** `sheen` is capped at
+one per view — past that the sweep reads as noise, and it never fires on touch
+anyway, so its resting state has to carry the button alone. `ring` exists so a
+secondary can sit *beside* a primary in the same gradient family without
+competing for weight; its resting label is `text-brand` (it has no fill to
+contrast, so it takes the color that contrasts the surface) and flips to
+`text-cta-contrast` as the ring fills. Everything else is `rise`.
+
+**The stops, not a gradient string.** Each variant needs a different pair of
+steps and a different angle, so `storeVars()` emits *stops* — `--cta`,
+`--cta-top` / `--cta-bottom` (resting), `--cta-hi` / `--cta-lo` (hover and
+press), `--cta-pressed`, plus `--cta-edge` (inset top highlight, dimmer for a
+dark primary) and `--cta-glow` (a *color*; each variant sets its own spread).
+`--brand-metal` survives as a ready-made gradient for the two brand *marks*
+(`metal-text`, `metal-chip`), which do want one fixed chrome.
+
+**Sizing lives in `shared/ui/Button.tsx`, not at the call site.** Height,
+radius, padding and weight are fixed there behind `variant` + `size`
+(`sm` 36px / `md` 44px / `lg` 48px); `buttonClass()` returns the same string
+for the CTAs that are `<Link>` rather than `<button>`, and `loading` disables
+the button and shows an inline `currentColor` spinner. This replaced seven
+hand-sized CTAs that had drifted into four height systems, three font weights
+and two radii.
+
 > These gradients are a **deliberate, scoped deviation** from the skill's
 > "solid colors only" rule (same precedent as the brand gradient). They apply
 > to the store-themed shopping surfaces only — `/store/{slug}` plus the
 > cart/checkout pages' primary CTAs (Place Order, Deliver to This Address),
-> which follow the owner's palette; `index.css` carries neutral `--brand-metal*`
-> fallbacks cut from the app red so a `/cart` with no known store still
-> renders them. The rest of both apps stays flat and solid. Using `metal-cta
-> text-cta-contrast` is also what makes the owner's **Button text color**
-> setting apply to these buttons.
+> which follow the owner's palette; `index.css` carries neutral `--cta-*` and
+> `--brand-metal` fallbacks cut from the app purple so a `/cart` with no known
+> store still renders them. The rest of both apps stays flat and solid. The
+> `text-cta-contrast` that `Button` pairs with every filled variant is what
+> makes the owner's **Button text color** setting apply to these buttons
+> (`ring` at rest is the exception — with no fill to contrast it uses the flat
+> brand, and picks up `cta-contrast` once it fills).
 
 The `SKIN` object in `storeTheme.ts` maps semantic slots (`surface`, `well`,
-`chip` — all flat — and `cta` → `metal-cta`), so storefront components stay
-declarative. `StoreAppearancePage` edits the two colors with a live
+`chip` — all flat — plus `cta` → `btn-rise`, `ctaSheen` → `btn-sheen` and
+`ctaRing` → `btn-ring`), so storefront components stay declarative. `StoreAppearancePage` edits the two colors with a live
 mini-preview built from the same semantics, so the preview is a true
 miniature.
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { usePageTitle } from '../../../shared/usePageTitle'
+import { Button, buttonClass } from '../../../shared/ui/Button'
 import { trackPurchase } from '../../../shared/analytics/metaPixel'
 import { toApiError } from '../../../shared/auth/http'
 import { storeVars } from '../../features/publicStore/storeTheme'
@@ -156,7 +157,7 @@ export function OrderSuccessPage({
             </p>
             <Link
               to={storeHomeUrl(storeSlug)}
-              className="metal-cta mt-5 rounded-md px-5 py-2.5 text-sm font-semibold text-cta-contrast transition"
+              className={buttonClass({ className: 'mt-5' })}
             >
               Back to the store
             </Link>
@@ -206,18 +207,13 @@ export function OrderSuccessPage({
               </p>
               {(paymentState === 'pending' || paymentState === 'failed') && (
                 <div className="mt-4 flex flex-col items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={retrying}
-                    onClick={() => void retryPayment()}
-                    className="metal-cta rounded-md px-6 py-2.5 text-sm font-bold text-cta-contrast transition disabled:opacity-60"
-                  >
+                  <Button loading={retrying} onClick={() => void retryPayment()}>
                     {retrying
                       ? 'Opening payment…'
                       : paymentState === 'failed'
                         ? 'Retry payment'
                         : 'Pay now'}
-                  </button>
+                  </Button>
                   {retryError && (
                     <p className="text-xs font-semibold text-danger">
                       {retryError}
@@ -342,7 +338,7 @@ export function OrderSuccessPage({
             <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:justify-center">
               <Link
                 to={storeHomeUrl(order.storeSlug)}
-                className="metal-cta flex h-11 items-center justify-center gap-1 rounded-md px-6 text-sm font-bold text-cta-contrast transition"
+                className={buttonClass({ size: 'lg' })}
               >
                 Continue shopping
                 <ChevronRightIcon className="h-4 w-4" />

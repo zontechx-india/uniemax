@@ -6,6 +6,7 @@ import { trackInitiateCheckout } from '../../../shared/analytics/metaPixel'
 import { customerAuth } from '../../../shared/auth/authApi'
 import { toApiError } from '../../../shared/auth/http'
 import { ErrorNote } from '../../../shared/ui/form'
+import { buttonClass } from '../../../shared/ui/Button'
 import { useMarketSession } from '../../app/marketSession'
 import { openAuthDialog, storeAuthRequest } from '../../features/auth/authDialogStore'
 import { cart, groupByStore, lineTotal, useCart } from '../../features/cart/cart'
@@ -371,11 +372,12 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
                           ? 'Checking delivery to your address…'
                           : 'Complete the delivery and payment steps first'
                   }
-                  className={`mt-4 h-11 w-full rounded-md text-sm font-bold transition ${
+                  className={
                     ready && !placing
-                      ? 'metal-cta text-cta-contrast'
-                      : 'cursor-not-allowed bg-surface-alt text-muted'
-                  }`}
+                      ? // The one committing action in checkout — Sheen.
+                        buttonClass({ variant: 'sheen', full: true, className: 'mt-4' })
+                      : 'mt-4 h-11 w-full cursor-not-allowed rounded-md bg-surface-alt text-sm font-bold text-muted'
+                  }
                 >
                   {placing ? 'Placing your order…' : 'Place Order'}
                 </button>
@@ -534,7 +536,7 @@ function SignInToOrder({
         <button
           type="button"
           onClick={() => openAuthDialog(shell ? storeAuthRequest(shell) : {})}
-          className="metal-cta rounded-md px-5 py-2.5 text-sm font-semibold text-cta-contrast transition"
+          className={buttonClass()}
         >
           Sign in to continue
         </button>
@@ -624,7 +626,7 @@ function NothingToOrder({
         </Link>
         <Link
           to={storeHomeUrl(storeSlug)}
-          className="metal-cta rounded-md px-5 py-2.5 text-sm font-semibold text-cta-contrast transition"
+          className={buttonClass()}
         >
           Browse the store
         </Link>
