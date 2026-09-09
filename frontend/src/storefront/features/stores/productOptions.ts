@@ -164,16 +164,42 @@ export interface OptionTypeDraft {
 
 /**
  * One matrix row. `valueKeys` names this combination by the KEYS of the
- * values it holds (one per type key), so it survives any rename. `price` and
- * `stock` stay strings while editing — they are what the seller typed.
+ * values it holds (one per type key), so it survives any rename. The money
+ * and text fields stay strings while editing — they are what the seller
+ * typed. `removed` rows are combinations the seller does not offer: they stay
+ * in the grid so they can be brought back, but are never saved.
  */
 export interface VariantDraft {
   id?: string
   valueKeys: Record<string, string>
   price: string
+  compareAt: string
   stock: string
+  sku: string
+  mediaId: string | null
   isActive: boolean
+  removed: boolean
 }
+
+const blankRow = (
+  valueKeys: Record<string, string>,
+  removed = false,
+): VariantDraft => ({
+  valueKeys,
+  price: '',
+  compareAt: '',
+  stock: '',
+  sku: '',
+  mediaId: null,
+  isActive: true,
+  removed,
+})
+
+const comboKey = (valueKeys: Record<string, string>) =>
+  Object.keys(valueKeys)
+    .sort()
+    .map((key) => `${key}=${valueKeys[key]}`)
+    .join('|')
 
 let counter = 0
 /** A stable client-side key; never sent to the server. */
@@ -198,7 +224,7 @@ export function toDraft(product: Pick<StoreProduct, 'optionTypes' | 'variants'>)
     const type = types.find((t) => t.name === typeName)
     return type?.values.find((v) => v.value === value)?.key
   }
-  const rows: VariantDraft[] = []
+  const saved = new Map<string, VariantDraft>()
   for (const variant of product.variants) {
     const valueKeys: Record<string, string> = {}
     let complete = true
@@ -211,14 +237,23 @@ export function toDraft(product: Pick<StoreProduct, 'optionTypes' | 'variants'>)
       valueKeys[type.key] = key
     }
     if (!complete) continue
-    rows.push({
+    saved.set(comboKey(valueKeys), {
       id: variant.id,
       valueKeys,
       price: variant.price,
+      compareAt: variant.compareAtPrice ?? '',
       stock: String(variant.stockQuantity),
+      sku: variant.sku ?? '',
+      mediaId: variant.mediaId,
       isActive: variant.isActive,
+      removed: false,
     })
   }
+  // The grid is the full matrix: combinations the seller does not offer are
+  // rows marked removed, so any of them can be brought back later.
+  const rows = draftCombos(types).map(
+    (combo) => saved.get(comboKey(combo)) ?? blankRow(combo, true),
+  )
   return { types, rows }
 }
 
@@ -273,7 +308,7 @@ export function reconcileDraft(
       used.add(source)
       return { ...source, valueKeys: target }
     }
-    return { valueKeys: target, price: '', stock: '', isActive: true }
+    return blankRow(target)
   })
 
   return { rows, dropped: previous.filter((row) => !used.has(row)) }
@@ -289,9 +324,9 @@ export function draftLabel(types: OptionTypeDraft[], row: VariantDraft): string 
     .join(LABEL_SEPARATOR)
 }
 
-/** Draft rows still missing a valid price. */
+/** Offered rows still missing a valid price. */
 export function rowsNeedingPrice(rows: VariantDraft[]): number {
-  return rows.filter((row) => !isValidPrice(row.price)).length
+  return rows.filter((row) => !row.removed && !isValidPrice(row.price)).length
 }
 
 const isValidPrice = (value: string) => {
@@ -342,18 +377,34 @@ export function draftToInput(
     }
   }
 
+  const offered = rows.filter((row) => !row.removed)
+  if (offered.length === 0) {
+    return { error: 'Offer at least one combination.' }
+  }
   const missing = rowsNeedingPrice(rows)
   if (missing > 0) {
     return {
       error: `${missing} combination${missing === 1 ? ' still needs' : 's still need'} a price.`,
     }
   }
-  const badStock = rows.find((row) => !isValidStock(row.stock))
+  const badStock = offered.find((row) => !isValidStock(row.stock))
   if (badStock) {
     return { error: `Stock for "${draftLabel(types, badStock)}" must be a whole number.` }
   }
+  const badMrp = offered.find(
+    (row) =>
+      row.compareAt.trim() !== '' &&
+      (!isValidPrice(row.compareAt) || Number(row.compareAt) <= Number(row.price)),
+  )
+  if (badMrp) {
+    return { error: `MRP for "${draftLabel(types, badMrp)}" must be higher than its price.` }
+  }
+  const badSku = offered.find((row) => row.sku.trim().length > 64)
+  if (badSku) {
+    return { error: `SKU for "${draftLabel(types, badSku)}" is too long (max 64).` }
+  }
 
-  const variants: StoreVariantInput[] = rows.map((row) => {
+  const variants: StoreVariantInput[] = offered.map((row) => {
     const optionValues: OptionValues = {}
     for (const type of types) {
       const value = type.values.find((v) => v.key === row.valueKeys[type.key])
@@ -365,6 +416,9 @@ export function draftToInput(
       price: Number(row.price),
       stockQuantity: row.stock.trim() === '' ? 0 : Number(row.stock),
       isActive: row.isActive,
+      sku: row.sku.trim() || null,
+      compareAtPrice: row.compareAt.trim() === '' ? null : Number(row.compareAt),
+      mediaId: row.mediaId,
     }
   })
 

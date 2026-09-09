@@ -14,10 +14,10 @@ import type {
 } from "./productOptions.js";
 
 /**
- * Catalog inside a customer-owned store, following the hierarchy
- * Store → Category → Subcategory (optional) → Product → Variants.
- * Products require a category (root or subcategory), so the create schemas
- * encode the setup sequence: category first, then products.
+ * Catalog inside a customer-owned store: Store → Categories (a tree
+ * mirroring the global taxonomy) → Product → Variants. Products require a
+ * category, so the create schemas encode the setup sequence: category
+ * first, then products.
  */
 
 /**
@@ -32,8 +32,8 @@ import type {
  * neither schema here accepts a name or a taxonomy id on update.
  */
 export const storeCategoryCreateSchema = z.object({
-  /** The taxonomy node this shelf represents. Its parent, if any, is created
-   *  alongside it, so picking "Electronics › Mobiles" yields both shelves. */
+  /** The taxonomy node this shelf represents. Its ancestors are created
+   *  alongside it, so picking "Electronics › Mobiles" yields the whole chain. */
   categoryId: z.string().min(1, "Choose a category"),
   /** Optional shelf artwork — a URL the seller pastes; `null` clears it. */
   imageUrl: z.string().trim().url().max(2000).nullable().optional(),
@@ -45,8 +45,8 @@ export const storeCategoryCreateSchema = z.object({
  *
  * The name and the taxonomy link are both absent on purpose: the name is
  * derived from the chosen category, and re-pointing a shelf at a different
- * category is an admin action. Re-parenting is likewise unsupported (it would
- * have to revalidate the one-level nesting rule for every descendant).
+ * category is an admin action. Re-parenting is likewise unsupported: a
+ * shelf's place is its category's.
  */
 export const storeCategoryUpdateSchema = z
   .object({
@@ -133,7 +133,8 @@ export const specificationsSchema = z
 /**
  * Zod `superRefine` body that attaches every matrix problem to its path.
  * Shared by product create (with options) and the options PUT, so both
- * enforce the identical invariant: the variants ARE the cartesian product.
+ * enforce the identical invariant: the variants are a valid subset of the
+ * cartesian product.
  */
 export function refineOptionMatrix(
   input: {
@@ -207,98 +208,57 @@ export function resolveSpecifications(raw: unknown): ProductSpec[] {
  * an existing combination in place (keeping its cart and order links); it is
  * absent on create and for newly generated combinations.
  */
-const variantInputSchema = z.object({
-  id: z.string().min(1).optional(),
-  optionValues: optionValuesSchema,
-  price: z.number().min(0).max(99_999_999.99),
-  stockQuantity: z.number().int().min(0),
-  isActive: z.boolean().default(true),
-});
+const skuSchema = z.string().trim().min(1).max(64);
+const compareAtSchema = z.number().min(0).max(99_999_999.99);
+
+const variantInputSchema = z
+  .object({
+    id: z.string().min(1).optional(),
+    optionValues: optionValuesSchema,
+    price: z.number().min(0).max(99_999_999.99),
+    stockQuantity: z.number().int().min(0),
+    isActive: z.boolean().default(true),
+    /** Stock-keeping code, unique within the store. `null` clears it. */
+    sku: skuSchema.nullable().optional(),
+    /** Strike-through MRP; must be above `price`. `null` clears it. */
+    compareAtPrice: compareAtSchema.nullable().optional(),
+    /** One of the product's own images that shows this variant; `null` = cover. */
+    mediaId: z.string().min(1).nullable().optional(),
+  })
+  .refine((v) => v.compareAtPrice == null || v.compareAtPrice > v.price, {
+    path: ["compareAtPrice"],
+    message: "MRP must be higher than the price",
+  });
 
 /**
- * Creating a product. `hasVariants` is the explicit discriminator between the
- * two product shapes, so a payload is never ambiguous:
- *
- *   false → `price` + `stockQuantity` required; no option types or variants.
- *           The product gets one implicit `Default` variant carrying them.
- *   true  → `optionTypes` (≥ 1) plus `variants` — EVERY combination of those
- *           values, each with its own price and stock; `price`/`stockQuantity`
- *           are not accepted. The matrix is validated as a whole.
- *
- * Either way exactly one price source exists — never two competing fields.
+ * Creating a product makes a DRAFT. A name and a category are all it takes:
+ * the product exists (disabled, `publishedAt` null) from that moment and the
+ * seller fills in the rest step by step — photos upload against the id,
+ * options arrive through `PUT …/options`, everything else through `PATCH`.
+ * A simple product may bring its price along; otherwise the implicit Default
+ * variant starts at ₹0 / 0 stock, which the publish guard refuses.
  */
 export const storeProductCreateSchema = z
   .object({
     name: z.string().trim().min(1, "Product name is required").max(120),
     categoryId: z.string().min(1, "Category is required"),
     description: z.string().trim().max(2000).optional(),
-    specifications: specificationsSchema.optional(),
-    /**
-     * Delivery-area override for this product. Absent / null = follow the
-     * store's default rule (`Store.shipping.deliveryRule`).
-     */
-    deliveryRule: deliveryRuleSchema.nullable().optional(),
-    /**
-     * Shipping-charge override for this product. Absent / null = follow the
-     * store's default rate (`Store.shipping.rate`).
-     */
-    shippingOverride: productShippingOverrideSchema.nullable().optional(),
-    /** Cash on delivery allowed for this product (default true). */
-    codAvailable: z.boolean().default(true),
-    hasVariants: z.boolean().default(false),
-    /** Simple products only. */
+    /** The single variant's price, stock, SKU and MRP — all optional on a draft. */
     price: z.number().min(0).max(99_999_999.99).optional(),
     stockQuantity: z.number().int().min(0).optional(),
-    /** Variant products only. */
-    optionTypes: optionTypesSchema.optional(),
-    variants: z.array(variantInputSchema).max(OPTION_LIMITS.variants).optional(),
+    sku: skuSchema.nullable().optional(),
+    compareAtPrice: compareAtSchema.nullable().optional(),
   })
-  .superRefine((input, ctx) => {
-    if (input.hasVariants) {
-      if (!input.optionTypes || input.optionTypes.length === 0) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["optionTypes"],
-          message: "Add at least one option type",
-        });
-        return;
-      }
-      refineOptionMatrix(
-        { optionTypes: input.optionTypes, variants: input.variants ?? [] },
-        ctx,
-      );
-      return;
-    }
-
-    if (input.price === undefined) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["price"],
-        message: "Price is required",
-      });
-    }
-    if (input.stockQuantity === undefined) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["stockQuantity"],
-        message: "Stock quantity is required",
-      });
-    }
-    if (
-      (input.optionTypes && input.optionTypes.length > 0) ||
-      (input.variants && input.variants.length > 0)
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["variants"],
-        message: "Enable hasVariants to submit options",
-      });
-    }
-  });
-
+  .refine(
+    (input) =>
+      input.compareAtPrice == null ||
+      input.price === undefined ||
+      input.compareAtPrice > input.price,
+    { path: ["compareAtPrice"], message: "MRP must be higher than the price" },
+  );
 /**
  * `PUT …/products/:productId/options` — the FULL target state: every option
- * type and every combination. The server reconciles the stored variants to
+ * type and every combination sold. The server reconciles the stored variants to
  * it in one transaction (update by `id`, create the rest, delete the
  * remainder), so option types and variants can never disagree — a guarantee
  * N separate POST/DELETE calls could not make. `optionTypes: []` with
@@ -311,12 +271,15 @@ export const storeProductOptionsSchema = z
   })
   .superRefine(refineOptionMatrix);
 
-/** Price / stock / on-off for one combination. `name` is derived, never edited. */
+/** Price / MRP / stock / SKU / photo / on-off for one combination. `name` is derived, never edited. */
 export const storeVariantUpdateSchema = z.object({
   /** A variant always has a price — it can be changed but never cleared. */
   price: z.number().min(0).max(99_999_999.99).optional(),
   stockQuantity: z.number().int().min(0).optional(),
   isActive: z.boolean().optional(),
+  sku: skuSchema.nullable().optional(),
+  compareAtPrice: compareAtSchema.nullable().optional(),
+  mediaId: z.string().min(1).nullable().optional(),
 });
 
 /**

@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { adminApi } from '../features/adminApi'
 import type { ShelfConversionPlan, ShelfRow } from '../features/adminApi'
 import { useAdminList } from '../features/useAdminQuery'
-import { taxonomyApi } from '../../shared/categories/taxonomyApi'
-import type { CategoryNode } from '../../shared/categories/taxonomyApi'
+import { CategoryPicker } from '../../shared/categories/CategoryPicker'
 import { toApiError } from '../../shared/auth/http'
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
 import { Button, Card, Chip, EmptyState, ErrorState, PageHeader, Skeleton } from '../ui/primitives'
@@ -28,18 +27,6 @@ import { SearchInput, Tabs, Toolbar } from '../ui/Toolbar'
 type Status = 'PENDING' | 'CONVERTED' | 'ALL'
 
 export default function CategoryMappingPage() {
-  const [taxonomy, setTaxonomy] = useState<CategoryNode[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    // activeOnly: false — an admin may need to file a shelf under a category
-    // that is currently disabled, and hiding it would look like a missing one.
-    taxonomyApi
-      .adminTree(false)
-      .then(setTaxonomy)
-      .catch((err) => setError(toApiError(err).message))
-  }, [])
-
   const list = useAdminList<ShelfRow>(
     (query) => adminApi.listShelves(query),
     { keys: ['q', 'status'], pageSize: 20 },
@@ -52,12 +39,6 @@ export default function CategoryMappingPage() {
         title="Category mapping"
         subtitle="Shelves sellers typed themselves, before categories were chosen from a list. Convert each one into the platform category it stands for — the typed shelf is replaced, and its products move with it."
       />
-
-      {error && (
-        <div className="mb-4">
-          <ErrorState message={error} />
-        </div>
-      )}
 
       <Card>
         <Tabs<Status>
@@ -99,12 +80,7 @@ export default function CategoryMappingPage() {
         ) : (
           <div className="divide-y divide-line">
             {list.rows.map((shelf) => (
-              <ShelfRowView
-                key={shelf.id}
-                shelf={shelf}
-                taxonomy={taxonomy}
-                onConverted={list.refresh}
-              />
+              <ShelfRowView key={shelf.id} shelf={shelf} onConverted={list.refresh} />
             ))}
           </div>
         )}
@@ -122,39 +98,25 @@ export default function CategoryMappingPage() {
 }
 
 /**
- * One shelf and its decision. The two selects mirror the seller's own form, so
- * an admin and a seller pick from the same list in the same shape.
+ * One shelf and its decision. The picker is the same one sellers use, so an
+ * admin and a seller pick from the same tree in the same way — any depth.
  */
 function ShelfRowView({
   shelf,
-  taxonomy,
   onConverted,
 }: {
   shelf: ShelfRow
-  taxonomy: CategoryNode[] | null
   onConverted: () => void
 }) {
-  const roots = taxonomy ?? []
-
-  // Seed the selects from whatever the shelf is already linked to, so a
-  // half-converted row opens on its current answer rather than blank.
-  const currentRoot =
-    roots.find((r) => r.id === shelf.categoryId) ??
-    roots.find((r) => r.children.some((c) => c.id === shelf.categoryId))
-  const [rootId, setRootId] = useState(currentRoot?.id ?? '')
-  const [subId, setSubId] = useState(
-    currentRoot && currentRoot.id !== shelf.categoryId
-      ? (shelf.categoryId ?? '')
-      : '',
-  )
+  // Seeded from whatever the shelf is already linked to, so a half-converted
+  // row opens on its current answer rather than blank.
+  const [chosen, setChosen] = useState<string | null>(shelf.categoryId)
   const [plan, setPlan] = useState<ShelfConversionPlan | null>(null)
   const [planning, setPlanning] = useState(false)
   const [converting, setConverting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<string | null>(null)
 
-  const subs = roots.find((r) => r.id === rootId)?.children ?? []
-  const chosen = subId || rootId || null
   // A converted shelf re-chosen as itself has nothing to do.
   const noop = shelf.converted && chosen === shelf.categoryId
 
@@ -217,51 +179,22 @@ function ShelfRowView({
         )}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <select
-          value={rootId}
-          onChange={(e) => {
-            setRootId(e.target.value)
-            setSubId('')
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        {/* includeInactive: an admin may need to file a shelf under a category
+            that is currently disabled, and hiding it would look like a missing one. */}
+        <CategoryPicker
+          value={chosen}
+          onChange={(id) => {
+            setChosen(id)
             setDone(null)
             setError(null)
           }}
-          aria-label={`Category for ${shelf.shelfPath}`}
-          className="h-9 min-w-44 rounded-md border border-line bg-input px-2.5 text-sm text-fg outline-none focus:border-accent"
-        >
-          <option value="">{taxonomy === null ? 'Loading…' : 'Category…'}</option>
-          {roots.map((node) => (
-            <option key={node.id} value={node.id}>
-              {node.name}
-              {node.isActive ? '' : ' (disabled)'}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={subId}
-          disabled={subs.length === 0}
-          onChange={(e) => {
-            setSubId(e.target.value)
-            setDone(null)
-            setError(null)
-          }}
-          aria-label={`Subcategory for ${shelf.shelfPath}`}
-          className="h-9 min-w-44 rounded-md border border-line bg-input px-2.5 text-sm text-fg outline-none focus:border-accent disabled:opacity-50"
-        >
-          <option value="">
-            {rootId === ''
-              ? 'Subcategory…'
-              : subs.length === 0
-                ? 'No subcategories'
-                : 'All of this category'}
-          </option>
-          {subs.map((node) => (
-            <option key={node.id} value={node.id}>
-              {node.name}
-            </option>
-          ))}
-        </select>
+          selected={shelf.category}
+          label=""
+          placeholder="Choose the platform category…"
+          includeInactive
+          className="min-w-72 flex-1"
+        />
 
         <Button
           variant="primary"
@@ -271,8 +204,8 @@ function ShelfRowView({
           {planning ? 'Checking…' : 'Convert'}
         </Button>
 
-        {done && <span className="text-xs font-medium text-success">{done}</span>}
-        {error && <span className="text-xs font-medium text-danger">{error}</span>}
+        {done && <span className="pb-2.5 text-xs font-medium text-success">{done}</span>}
+        {error && <span className="pb-2.5 text-xs font-medium text-danger">{error}</span>}
       </div>
 
       <ConfirmDialog
@@ -295,6 +228,12 @@ function PlanSummary({ plan, store }: { plan: ShelfConversionPlan; store: string
     plan.productsMoved === 0
       ? 'No products are affected.'
       : `${plan.productsMoved} product${plan.productsMoved === 1 ? '' : 's'} move with it.`
+  const subs =
+    plan.from.subcategoryCount > 0
+      ? `, along with its ${plan.from.subcategoryCount} subcategor${
+          plan.from.subcategoryCount === 1 ? 'y' : 'ies'
+        }`
+      : ''
   return (
     <div className="space-y-2">
       <p>
@@ -307,18 +246,14 @@ function PlanSummary({ plan, store }: { plan: ShelfConversionPlan; store: string
           <li>
             The store already has a “{plan.mergeInto?.name}” shelf for this category,
             so “{plan.from.name}” is <span className="font-medium text-fg">merged into it and deleted</span>
-            {plan.from.subcategoryCount > 0 &&
-              `, along with its ${plan.from.subcategoryCount} subcategor${
-                plan.from.subcategoryCount === 1 ? 'y' : 'ies'
-              }`}
-            .
+            {subs}.
           </li>
         ) : (
           <li>
             {plan.nameChanges ? (
               <>
                 Renamed to <span className="font-medium text-fg">“{plan.to.name}”</span>
-                {plan.parent ? ' and ' : '.'}
+                {plan.parent ? ' and ' : subs ? ' ' : '.'}
               </>
             ) : plan.parent ? (
               'Moved '
@@ -328,7 +263,8 @@ function PlanSummary({ plan, store }: { plan: ShelfConversionPlan; store: string
             {plan.parent && (
               <>
                 placed under <span className="font-medium text-fg">“{plan.parent.name}”</span>
-                {plan.parent.created ? ' (created for it)' : ''}.
+                {plan.parent.created ? ' (created for it)' : ''}
+                {subs.replace(/^,/, '')}.
               </>
             )}
           </li>

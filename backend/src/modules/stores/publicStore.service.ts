@@ -15,7 +15,8 @@ import {
   resolveOptionValues,
   resolveSpecifications,
 } from "./storeCatalog.schema.js";
-import { deriveProductOptions, sortByOptionOrder } from "./productOptions.js";
+import { sortByOptionOrder } from "./productOptions.js";
+import { activeShelfChain, loadShelves, shelfIndex } from "./shelfTree.js";
 import {
   effectiveDeliveryRule,
   isDeliverable,
@@ -118,10 +119,7 @@ export async function getVisibleStore(slug: string, viewerId?: string) {
 export const PUBLIC_PRODUCT_VISIBILITY = {
   isActive: true,
   priceMin: { not: null },
-  category: {
-    isActive: true,
-    OR: [{ parentId: null }, { parent: { isActive: true } }],
-  },
+  category: activeShelfChain(),
 } satisfies Prisma.StoreProductWhereInput;
 
 /** `PUBLIC_PRODUCT_VISIBILITY` scoped to one store. */
@@ -233,8 +231,7 @@ export async function listPublicStores(query: PublicStoreListQuery) {
           },
         },
       },
-      // publishedAt is stamped on first publish; nulls (pre-column rows the
-      // backfill hasn't touched yet) sink to the end instead of floating up.
+      // publishedAt is stamped on first publish; nulls sink to the end.
       orderBy: [
         { publishedAt: { sort: "desc", nulls: "last" } },
         { createdAt: "desc" },
@@ -269,22 +266,20 @@ export async function listPublicStores(query: PublicStoreListQuery) {
  * Categories with nothing shoppable are omitted, so the dropdown never offers
  * a dead end.
  */
+export interface PublicCategoryNode {
+  id: string;
+  name: string;
+  slug: string;
+  isFeatured: boolean;
+  /** Visible products in this shelf and everything beneath it. */
+  productCount: number;
+  subcategories: PublicCategoryNode[];
+}
+
 export async function getPublicStoreShell(slug: string, viewerId?: string) {
   const store = await getVisibleStore(slug, viewerId);
 
-  const categories = await prisma.storeCategory.findMany({
-    where: { storeId: store.id, isActive: true },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      parentId: true,
-      isFeatured: true,
-    },
-    // Seller-set order first; ties keep the historical creation order, so a
-    // catalog nobody has reordered looks exactly as it always did.
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-  });
+  const idx = shelfIndex(await loadShelves(store.id));
 
   // One grouped count instead of N queries.
   const grouped = await prisma.storeProduct.groupBy({
@@ -294,31 +289,27 @@ export async function getPublicStoreShell(slug: string, viewerId?: string) {
   });
   const countOf = new Map(grouped.map((g) => [g.categoryId, g._count._all]));
 
-  const roots = categories.filter((c) => c.parentId === null);
-  const tree = roots
-    .map((root) => {
-      const subcategories = categories
-        .filter((c) => c.parentId === root.id)
-        .map((sub) => ({
-          id: sub.id,
-          name: sub.name,
-          slug: sub.slug,
-          productCount: countOf.get(sub.id) ?? 0,
-        }))
-        .filter((sub) => sub.productCount > 0);
-
-      return {
-        id: root.id,
-        name: root.name,
-        slug: root.slug,
-        isFeatured: root.isFeatured,
-        productCount:
-          (countOf.get(root.id) ?? 0) +
-          subcategories.reduce((sum, sub) => sum + sub.productCount, 0),
-        subcategories,
-      };
-    })
-    .filter((root) => root.productCount > 0);
+  // Any depth. A shelf counts its whole subtree, and branches with nothing
+  // shoppable are pruned so the menu never offers a dead end.
+  const build = (parentId: string | null): PublicCategoryNode[] =>
+    idx
+      .childrenOf(parentId)
+      .filter((shelf) => shelf.isActive)
+      .map((shelf) => {
+        const subcategories = build(shelf.id);
+        return {
+          id: shelf.id,
+          name: shelf.name,
+          slug: shelf.slug,
+          isFeatured: shelf.isFeatured,
+          productCount:
+            (countOf.get(shelf.id) ?? 0) +
+            subcategories.reduce((sum, sub) => sum + sub.productCount, 0),
+          subcategories,
+        };
+      })
+      .filter((shelf) => shelf.productCount > 0);
+  const tree = build(null);
 
   // Clients get a derived logo URL, never the storage key. The footer and
   // payments JSON are resolved to their complete shapes so the storefront
@@ -373,22 +364,14 @@ export async function listPublicProducts(
   const and: Prisma.StoreProductWhereInput[] = [];
 
   if (query.category) {
-    const category = await prisma.storeCategory.findFirst({
-      where: { storeId: store.id, slug: query.category, isActive: true },
-      select: { id: true, parentId: true },
-    });
-    if (!category) throw HttpError.notFound("Category not found");
-    // A root category also covers everything in its subcategories.
-    and.push(
-      category.parentId === null
-        ? {
-            OR: [
-              { categoryId: category.id },
-              { category: { parentId: category.id } },
-            ],
-          }
-        : { categoryId: category.id },
-    );
+    const shelves = await loadShelves(store.id);
+    const idx = shelfIndex(shelves);
+    const category = shelves.find((shelf) => shelf.slug === query.category);
+    if (!category || !idx.visible(category.id)) {
+      throw HttpError.notFound("Category not found");
+    }
+    // A category covers everything beneath it.
+    and.push({ categoryId: { in: idx.descendantIds(category.id) } });
   }
 
   // Scope to one homepage merchandising section — the flag IS the section
@@ -507,22 +490,10 @@ export async function getPublicCategory(
 ) {
   const store = await getVisibleStore(slug, viewerId);
 
-  const category = await prisma.storeCategory.findFirst({
-    where: { storeId: store.id, slug: categorySlug, isActive: true },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      parent: { select: { name: true, slug: true, isActive: true } },
-      children: {
-        where: { isActive: true },
-        select: { id: true, name: true, slug: true },
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      },
-    },
-  });
-  // A subcategory under a disabled root is itself unreachable.
-  if (!category || (category.parent && !category.parent.isActive)) {
+  const shelves = await loadShelves(store.id);
+  const idx = shelfIndex(shelves);
+  const category = shelves.find((shelf) => shelf.slug === categorySlug);
+  if (!category || !idx.visible(category.id)) {
     throw HttpError.notFound("Category not found");
   }
 
@@ -532,20 +503,26 @@ export async function getPublicCategory(
     _count: { _all: true },
   });
   const countOf = new Map(grouped.map((g) => [g.categoryId, g._count._all]));
+  const countBelow = (id: string) =>
+    idx.descendantIds(id).reduce((sum, each) => sum + (countOf.get(each) ?? 0), 0);
 
   return {
     id: category.id,
     name: category.name,
     slug: category.slug,
-    parent: category.parent
-      ? { name: category.parent.name, slug: category.parent.slug }
-      : null,
-    subcategories: category.children
+    /** Root first — the breadcrumb above this category. */
+    ancestors: idx
+      .pathOf(category.id)
+      .slice(0, -1)
+      .map((shelf) => ({ name: shelf.name, slug: shelf.slug })),
+    subcategories: idx
+      .childrenOf(category.id)
+      .filter((child) => child.isActive)
       .map((child) => ({
         id: child.id,
         name: child.name,
         slug: child.slug,
-        productCount: countOf.get(child.id) ?? 0,
+        productCount: countBelow(child.id),
       }))
       .filter((child) => child.productCount > 0),
   };
@@ -578,15 +555,9 @@ export async function getPublicProduct(
       deliveryRule: true,
       shippingOverride: true,
       codAvailable: true,
-      category: {
-        select: {
-          name: true,
-          slug: true,
-          parent: { select: { name: true, slug: true } },
-        },
-      },
+      category: { select: { name: true, slug: true } },
       variants: {
-        where: { isActive: true, isDefault: false },
+        where: { isActive: true },
         orderBy: { createdAt: "asc" },
         select: {
           id: true,
@@ -594,6 +565,10 @@ export async function getPublicProduct(
           price: true,
           stockQuantity: true,
           optionValues: true,
+          isDefault: true,
+          sku: true,
+          compareAtPrice: true,
+          mediaId: true,
         },
       },
       media: {
@@ -616,21 +591,20 @@ export async function getPublicProduct(
     take: RELATED_LIMIT,
   });
 
-  // The structured view — synthesising the single implicit option type for a
-  // product that predates option types, so the picker has one shape to render.
-  // Only ACTIVE variants are selected, so for such a legacy product the
-  // synthesised values are the sellable ones; once the backfill has persisted
-  // its option types, the stored list is used and the picker greys out values
-  // with no active variant, exactly as for a new product.
-  const { optionTypes, variants } = deriveProductOptions(
-    resolveOptionTypes(product.optionTypes),
-    product.variants.map((variant) => ({
+  // Only ACTIVE variants are selected, so the picker greys out values that
+  // have no sellable variant.
+  const optionTypes = resolveOptionTypes(product.optionTypes);
+  // The implicit Default is never exposed as a variant; for a simple product
+  // its MRP and SKU are the product's own.
+  const fallback = product.variants.find((variant) => variant.isDefault) ?? null;
+  const variants = product.variants
+    .filter((variant) => !variant.isDefault)
+    .map((variant) => ({
       ...variant,
-      isDefault: false,
       optionValues: resolveOptionValues(variant.optionValues),
-    })),
-  );
+    }));
 
+  const idx = shelfIndex(await loadShelves(store.id));
   const storeShipping = resolveShipping(store.shipping);
   return {
     id: product.id,
@@ -639,16 +613,18 @@ export async function getPublicProduct(
     description: product.description,
     price: product.priceMin,
     priceMax: product.priceMax,
+    /** Strike-through MRP and SKU of a simple product; option products carry them per variant. */
+    compareAtPrice: fallback?.compareAtPrice ?? null,
+    sku: fallback?.sku ?? null,
     stockQuantity: product.stockTotal,
     category: {
       name: product.category.name,
       slug: product.category.slug,
-      parent: product.category.parent
-        ? {
-            name: product.category.parent.name,
-            slug: product.category.parent.slug,
-          }
-        : null,
+      /** Root first — the breadcrumb above the product's category. */
+      ancestors: idx
+        .pathOf(product.categoryId)
+        .slice(0, -1)
+        .map((shelf) => ({ name: shelf.name, slug: shelf.slug })),
     },
     /** The dimensions the picker renders, in order. Empty for a simple product. */
     optionTypes,
@@ -686,6 +662,10 @@ export async function getPublicProduct(
       id: variant.id,
       name: variant.name,
       price: variant.price,
+      compareAtPrice: variant.compareAtPrice,
+      sku: variant.sku,
+      /** The gallery item that shows this variant; null = the cover. */
+      mediaId: variant.mediaId,
       stockQuantity: variant.stockQuantity,
       optionValues: variant.optionValues,
     })),

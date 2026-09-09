@@ -606,7 +606,11 @@ column), which lets the homepage render full-bleed section bands instead.
     radiogroup per option type; the selection is a `Record<type, value>`
     resolved to a variant by `findVariant`; a value is greyed via
     `isValueAvailable` when no in-stock variant has it given the OTHER choices,
-    yet stays clickable so the customer can walk to a valid combination; with
+    yet stays clickable so the customer can walk to a valid combination; a
+    value whose variants carry their own photo renders as a **photo swatch**
+    (the picture with the name under it, resolved through the gallery's
+    `mediaId` and preferring the variant that matches the other choices),
+    while a type with no photos stays text chips; with
     a single type each chip shows its price / "Out of stock" as before; an
     unmatched combination shows "This combination isn't available" and
     disables purchase through stock 0) →
@@ -1115,19 +1119,18 @@ a pickup-address item.
   rendered with the real page's own `storeVars()` semantics (flat
   surfaces, chrome CTAs) so it previews truthfully →
   `PATCH /stores/:id/theme`), `StoreCategoriesPage`
-  (add form of **two selects and nothing else** — Category, then an optional
-  Subcategory drawn from the first one's children. There is no name field: a
-  seller chooses from the platform taxonomy and cannot type one, so no shop
-  invents its own vocabulary. Picking a subcategory adds its parent shelf too,
-  making "Electronics › Mobiles" one action; categories already added stay
-  visible but disabled ("— already added") rather than vanishing, so the list
-  reads the same every time. A per-row **edit panel** covers artwork and sort
-  order only — the name is the category's. Shelves that predate the rule keep
-  their free-text names and read "Added before platform categories existed",
-  which is the seller's cue that only support can link it. Plus a
-  **collapsible nested list**: roots with indented "Sub"-chipped children,
-  product/subcategory counts, guarded delete via `ConfirmDialog`. Roots
-  with children get an expand/collapse chevron plus an Expand-all /
+  (add form of **one `CategoryPicker` and nothing else** — search or browse
+  the platform taxonomy to any depth. There is no name field: a seller
+  chooses a category and cannot type one, so no shop invents its own
+  vocabulary. Picking a deep category adds its ancestors too, making
+  "Fashion › Women › Sarees" one action; a category already added is named
+  as such and Add is disabled. A per-row **edit panel** covers artwork and
+  sort order only — the name is the category's. Shelves that predate the rule
+  keep their free-text names and read "Added before platform categories
+  existed", which is the seller's cue that only support can link it. Plus a
+  **collapsible nested list** of any depth, each level indented, children
+  "Sub"-chipped, product/subcategory counts, guarded delete via
+  `ConfirmDialog`. Branches get an expand/collapse chevron plus an Expand-all /
   Collapse-all control; the open set is remembered per store in
   localStorage (`storefront.categories.expanded.{storeId}`) and a root
   auto-expands when a subcategory is added to it, so long catalogs stay
@@ -1137,94 +1140,51 @@ a pickup-address item.
   and `StoreProductsPage`
   (**gated**: with zero categories it shows an "Add a category first"
   state linking to the Categories section — the category-first sequence;
-  otherwise an Add Product form — name, category select grouped by root
-  with "Root › Sub" options (the shelf's own category classifies the product,
-  so the form asks once rather than twice), optional description, the
-  **Media Board**
-  (`media/MediaBoard.tsx` — required photos plus the optional video, the same
-  screen the product row uses), an optional **`SpecificationsEditor`**
-  (`pages/stores/products/` — ordered label/value rows with move up/down;
-  controlled, saved with the form), the **Delivery areas** field
-  (`ProductDeliveryField` in `DeliveryRuleEditor.tsx` — "Use store
-  default", naming the current default, or "Custom for this product",
-  which opens the rule editor; `null` = follow the default, sent as
-  `deliveryRule` on create and as a PATCH from the edit form, where the row
-  then reads "Delivery: Only 12 pincodes"), the **Shipping charge** field
-  (`ProductShippingField` in `ShippingRateEditor.tsx` — "Use store rate",
-  naming it, "Free for this product", or "Custom rate" with a rupee input;
-  `null` = follow the store rate, sent as `shippingOverride`; the row reads
-  "Shipping: ₹200 per order"), a **Cash on Delivery available** checkbox
-  (`codAvailable`, default on; the row reads "No COD" when off) and a
-  **"This product has options" checkbox** that picks the product shape. Unchecked (the default) shows
-  required Price + Stock; checked hides them and shows the
-  **`OptionTypesEditor`** (up to 3 named options, values as chips via the
-  shared `shared/ui/ChipInput.tsx` — Enter/comma adds, click a chip renames,
-  × removes) above the **`VariantMatrix`** — every combination generated as a
-  row with price / stock / on-off (a table from `sm`, one card per combination
-  on phones), with "Set every price / stock" and "Enable all" helpers. The
-  seller never adds or removes a row by hand; the matrix follows the options.
-  Because **the variant is the unit of sale** the two are mutually exclusive —
-  there is never a second competing price — and the checkbox only *hides*
-  fields, so toggling back and forth preserves whatever was typed. The
-  submitted payload carries `hasVariants` plus exactly one side's fields
-  (`optionTypes` + structured `variants` on the options side, checked
-  client-side by `draftToInput` before the round trip).
-  **Product name and at least one photo are required** — both marked with a
-  `*`, each with its own inline error (the name also on blur, with a danger
-  border). The server enforces the name (`storeProductCreateSchema`); a photo
-  cannot be required at create time — media addresses a product by id, so it
-  can only follow it — so the server's matching rule is that a product with no
-  image cannot be **enabled**.
-  **Media at add time** is the shared **Media Board** (see below) running on
-  `usePendingMedia`: media uploads need a
-  product id (`POST …/products/:productId/media`), so up to 8 images are
-  checked for FORMAT, optimized (downscaled to 1600px + WebP, **aspect ratio
-  untouched**) and held as blobs **locally**, alongside at most **one optional
-  video** held as the picked file (validated against the video rule, never
-  cropped or re-encoded). All of it is uploaded one file at a time straight
-  after `createProduct`, photos first and the video last — the
-  deferred-upload shape
-  `CreateStorePage` uses for a new store's logo. The button counts them
-  ("Uploading photo 2 of 3…", then "Uploading video…").
-  A failed upload never
-  strands the flow — the product row still appears and the page shows which
-  photos or video to re-add. The product
-  list shows "Root › Sub" paths, total stock and a price **range** when
-  options differ ("₹89,900 – ₹1,09,999"). Each row has a **pencil** opening
-  an inline **details editor** — name, category (same grouped "Root › Sub"
-  select as the add form), description and specification rows; only changed
-  fields are PATCHed, an emptied description is cleared to null, and the
-  slug/public URL never changes on rename. Each row also expands into the
-  **`OptionsPanel`** (`pages/stores/products/OptionsPanel.tsx`): for an
-  option-less product it shows the `DefaultVariantEditor` (price + stock on
-  the implicit Default) and an "Add options" entry; once options exist it
-  holds a **draft** of the option types and matrix (`toDraft` /
-  `reconcileDraft` in `features/stores/productOptions.ts` — keyed, so a
-  rename keeps every row and its variant id; adding a value adds blank rows,
-  adding a type copies each row onto the new type's first value, and removing
-  a value or type drops rows only after a `ConfirmDialog` naming them and
-  their stock). Nothing is written until **Save options**, which sends the
-  whole target state to `PUT …/options`; Cancel discards the draft. Saving
-  with no options at all (confirmed) turns the product back into a simple one.
-  The expanded panel also carries the
+  otherwise the **`ProductWizard`**
+  (`pages/stores/products/wizard/`) for adding *and* editing — one question
+  per step, written for sellers who are not technical: **1 What is it?**
+  (name + category; Continue creates the product as a **draft** on the
+  server, so every later step saves on Continue and "Finish later" always
+  keeps what was done) · **2 Photos** (the shared Media Board on
+  `useLiveMedia`, uploading straight onto the draft) · **3 Price & choices**
+  (two cards — "One version" = price, MRP, stock, item code; "Comes in
+  choices" = the category's **suggested options** as one-tap chips with
+  their usual values, the `OptionTypesEditor` for anything else, and the
+  `VariantMatrix` with "Set every price / MRP / stock" so a grid is one
+  number, a photo per combination picked by sight — the thumbnail opens the
+  product's own photos, "Cover" meaning the first — or for a whole value at
+  once ("same photo for every Pink"); saved as one `PUT …/options`, dropped
+  saved combinations confirmed first) · **4
+  Tell customers more** (optional: description, specification rows
+  pre-filled from the category's suggested labels) · **5 Delivery &
+  payment** (one sentence naming the store settings and a "Different for
+  this product" switch that reveals `ProductDeliveryField`,
+  `ProductShippingField` and the COD checkbox) · **6 Review & publish** (the
+  storefront card as it will look, a checklist from the server's
+  `completeness`, and Publish — enabled once a photo and a price exist, the
+  only two requirements). The step header lets the seller jump anywhere
+  once the draft exists, and its ticks reflect the product's real state
+  (photo, price, description, published) rather than position; a bar reads
+  "Product N% complete". Every field
+  has a one-line hint with an example — no tooltips. The product list shows
+  "Root › Sub" paths, price ranges, a **Draft** badge, and a small
+  completeness bar with the one next thing to do ("70% — add a
+  description") that opens the wizard at that step, so a shop fills up
+  gradually. Renames keep the slug/public URL.  A **Placement** toggle on each row opens the
   **Storefront placement** checkboxes (Featured Product · Best Seller · New
   Arrival · Hide from Search). Each maps to exactly one storefront row, and
   because ticking one changes what customers see immediately, the checkbox
   only *requests* the change — a `ConfirmDialog` names the affected row and
   nothing is written until it is accepted, so the boxes always reflect saved
   state. Root categories get a matching **star** toggle.
-  The expanded panel opens with **Photos & video** — the same **Media Board**
-  the Add Product form uses (`ProductMediaManager.tsx` is now a ~30-line
-  wrapper that supplies the `useLiveMedia` driver).
 
-  **The Media Board** (`pages/stores/media/`) is one component for both
-  places, because a seller should meet one screen, not two. It owns
-  everything visible — picking, the crop question, the editor, the grid, the
-  per-photo sheet, the confirms — while a **driver** owns only where the
-  finished blob goes: `usePendingMedia` (blobs in memory until a product id
-  exists) or `useLiveMedia` (every action an API call, uploads chained so
-  product snapshots never race, optimistic reorder). Both satisfy
-  `MediaDriver` in `media/types.ts`.
+  **The Media Board** (`pages/stores/media/`) is the wizard's Photos step. It
+  owns everything visible — picking, the crop question, the editor, the grid,
+  the per-photo sheet, the confirms — while a **driver** owns only where the
+  finished blob goes: `useLiveMedia` (every action an API call against the
+  draft, uploads chained so product snapshots never race, optimistic
+  reorder), the one implementation of `MediaDriver` in `media/types.ts` now
+  that a product exists before its photos do.
   Built for sellers who read slowly and work on a phone:
   - **A status line, not a guess** — "Add 1 photo to put this product on your
     shop" (red) → "Ready — 4 photos and a video" (green), the same rule the
@@ -1356,8 +1316,8 @@ Rules they follow (constraints, not taste):
 | `/orders`, `/orders/:id` | Platform-wide orders. Read-only: the seller owns fulfilment. Detail adds the joins the seller can't see (customer account, gateway reference) plus a lifecycle timeline built from the order's own timestamps. |
 | `/payments` | The same order rows through the money lens, with per-status totals for the current filter. |
 | `/products` | Seller catalog across stores, with the hide/restore moderation switch (always asks for a reason — the seller is notified immediately). A row is a summary; **clicking it opens the listing in full** in `products/ProductDetailDialog` (gallery, description, option matrix, per-variant price/stock, spec table, delivery area, homepage flags, storefront link, hide/restore) over the table, so filters and page survive closing it. `?storeId=` scopes the table to one store and shows a banner naming it. The hide/restore confirm lives in `products/ProductVisibilityDialog` because the table's row button and the detail dialog must ask the same question the same way. |
-| `/category-mapping` | **Converting** sellers' typed shelves into platform categories. Shelves created today are platform categories by construction (the seller picks one rather than typing a name), so this queue is the free text typed before that rule. An admin picks the category with the same two selects the seller sees and clicks Convert; the page asks the server for its **plan** (rename and re-parent, or merge into the shelf already standing for that category and delete the typed one) and shows it in the confirm dialog — what the admin approves is exactly what runs, nothing is folded in silently, and a root that still has subcategories is refused until those are decided. One-way; there is no unmap. Rows are chipped **Typed by seller** / **Tagged … · not converted** (linked by the earlier bulk migration but still wearing its typed name) / the converted path. |
-| `/categories` | The **global category taxonomy** — the one place it can be edited. An indented tree of arbitrary depth (the shape follows `parentId`; "category" and "subcategory" are the same row at different depths), with create/edit/enable/disable/delete, sort order, image URL and a parent select. Searching flattens the view and shows each hit's full path, because a match inside a collapsed branch has to be reachable without guessing which parent to open. Disabling hides a whole branch from sellers and shoppers while leaving every existing tag intact — the safe way to retire a category, since deleting is refused while a node still has children or products. Sellers only ever *select* from this list. |
+| `/category-mapping` | **Converting** sellers' typed shelves into platform categories. Shelves created today are platform categories by construction (the seller picks one rather than typing a name), so this queue is the free text typed before that rule. An admin picks the category with the same search-or-browse picker the seller uses and clicks Convert; the page asks the server for its **plan** (rename and re-parent, or merge into the shelf already standing for that category and delete the typed one) and shows it in the confirm dialog — what the admin approves is exactly what runs, and a shelf's own subcategories come along. One-way; there is no unmap. Rows are chipped **Typed by seller** / **Tagged … · not converted** (linked by the earlier bulk migration but still wearing its typed name) / the converted path. |
+| `/categories` | The **global category taxonomy** — the one place it can be edited. An indented tree of arbitrary depth (the shape follows `parentId`; "category" and "subcategory" are the same row at different depths), with create/edit/enable/disable/delete, sort order, image URL and a parent select. Searching flattens the view and shows each hit's full path, because a match inside a collapsed branch has to be reachable without guessing which parent to open. Disabling hides a whole branch from sellers and shoppers while leaving every existing tag intact — the safe way to retire a category, since deleting is refused while a node still has children or products. Sellers only ever *select* from this list. Each node also carries the product form's **suggested options** (one per line, `Size: S, M, L`) and **suggested specification labels**; blank means inherited from the parent, shown as a hint. |
 | `/stores`, `/stores/:id` | Stores + owners. The table carries a **Setup** column (`SetupChip`, naming the first outstanding step) and a **Setup: Not finished / Complete** filter — independent of Published/Draft, because a live store can still be missing its PAN, and "who has not finished?" is the console's usual reason for opening this list. Detail carries suspension, **manual payout-account verification** (account numbers masked to the last 4), a **Products** card — the store's newest listings inline (each opening the same product dialog), with a "View all" into `/products?storeId=…` — and a **Seller setup** card (below). |
 | `/customers`, `/customers/:id` | Buyers and sellers (same account type), with blocking. The dialog states both effects: no future sign-in **and** every session revoked. |
 | `/support`, `/support/:ticketId` | The support queue — **sellers and shoppers in one list** (never a shopper's thread with a shop: those are the seller's to answer), filterable by `scope` (two pages would just mean one of them going unread), each row carrying a Seller/Shopper chip. Defaults to the **Needs reply** tab (open + in progress) sorted **oldest activity first** — a queue's job is to show what is still owed, which is the opposite of every other table here. The detail page carries the thread, the reply box (replying moves OPEN → IN_PROGRESS on its own) and triage: status saves on change and notifies the reporter, priority is internal and silent. |
@@ -1512,9 +1472,8 @@ frontend/
     │   │                        #   none / on leaving — used by PublicStoreLayout)
     │   ├── categories/          # The GLOBAL taxonomy, shared by both apps
     │   │   ├── taxonomyApi.ts    # tree / children / search (public) + admin CRUD
-    │   │   └── CategoryPicker.tsx # Search-or-browse selector for deep trees
-    │   │                        #   (admin side); the seller's own forms use
-    │   │                        #   two plain selects instead
+    │   │   └── CategoryPicker.tsx # Search-or-browse selector for deep trees,
+    │   │                        #   used by admins and sellers alike
     │   ├── usePageTitle.ts      # Per-page document.title ("Part · Part · UnieMax")
     │   ├── useGoBack.ts         # Back controls that STEP BACK (navigate(-1)) instead
     │   │                        #   of pushing the previous page again, with a
@@ -1688,15 +1647,12 @@ frontend/
     │           ├── orderMeta.tsx        # Shared status chips / payment labels / date formats
     │           ├── StorePublishCard.tsx # Publish/Unpublish toggle + Share Store
     │           ├── StoreDetailsPage.tsx # Name + logo upload (crop → progress → replace/remove)
-    │           ├── ProductMediaManager.tsx # Thin wrapper: MediaBoard + useLiveMedia
-    │           ├── media/               # The Media Board — one Photos & video
-    │           │   │                    #   screen for the add form AND the row
+    │           ├── media/               # The Media Board — the wizard's Photos step
     │           │   ├── MediaBoard.tsx   # Status line, grid, tiles, video slot,
     │           │   │                    #   storefront preview, all dialogs
     │           │   ├── ReviewQueue.tsx  # "Use this photo" / "Cut or turn it first"
     │           │   ├── PhotoSheet.tsx   # Per-photo actions, in words
     │           │   ├── DescribeDialog.tsx # Alt text, renamed for sellers
-    │           │   ├── usePendingMedia.ts # Driver: blobs held until a product id
     │           │   ├── useLiveMedia.ts  # Driver: uploads + API mutations
     │           │   ├── types.ts         # MediaDriver contract
     │           │   ├── strings.ts       # Every seller-facing word, one file
@@ -1723,15 +1679,21 @@ frontend/
     │           ├── StoreCustomerSupportPage.tsx # The shop's inbox (buyers' requests)
     │           ├── StoreCustomerSupportTicketPage.tsx # One request + reply + status
     │           ├── StoreCategoriesPage.tsx # Choose shelves from the platform
-    │           │                        #   taxonomy (two selects, no free text)
-    │           │                        #   + image URL, sort order
-    │           ├── StoreProductsPage.tsx # Add/list/toggle/delete products (category-gated)
-    │           ├── products/             # Options & specifications editors for StoreProductsPage
-    │           │   ├── OptionsPanel.tsx      # Draft of option types + matrix → PUT …/options
+    │           │                        #   taxonomy (CategoryPicker, any depth,
+    │           │                        #   no free text) + image URL, sort order
+    │           ├── StoreProductsPage.tsx # List with completeness + Draft badges; opens the wizard
+    │           ├── products/             # Editors the product wizard composes
+    │           │   ├── wizard/               # ProductWizard — steps, progress, review/publish
+    │           │   │   ├── ProductWizard.tsx    # Container + step header + Review step
+    │           │   │   ├── BasicsStep.tsx       # Name + category → creates the draft
+    │           │   │   ├── PhotosStep.tsx       # Media Board on the draft
+    │           │   │   ├── PricingStep.tsx      # One version / choices, presets, matrix
+    │           │   │   ├── DetailsStep.tsx      # Description + suggested spec rows
+    │           │   │   ├── DeliveryStep.tsx     # Store settings vs per-product overrides
+    │           │   │   └── shared.tsx           # Steps, Field/Hint/StepShell, categoryOptions
     │           │   ├── OptionTypesEditor.tsx # ≤3 named options, values as chips
-    │           │   ├── VariantMatrix.tsx     # Generated combinations: price / stock / on-off
-    │           │   ├── SpecificationsEditor.tsx # Ordered label/value rows
-    │           │   └── DefaultVariantEditor.tsx # Price + stock of the implicit Default
+    │           │   ├── VariantMatrix.tsx     # Generated combinations: photo / SKU / price / MRP / stock / on-off / not offered
+    │           │   └── SpecificationsEditor.tsx # Ordered label/value rows
     │           └── ActiveSwitch.tsx     # Enable/disable pill switch (rows)
     └── admin/                   # Platform console — served at /admin
         ├── main.tsx             # Mounts <AdminApp/>

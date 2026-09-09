@@ -3,6 +3,7 @@ import { Prisma } from "../../generated/prisma/client.js";
 import type { CartLineStatus } from "../../generated/prisma/client.js";
 import { mediaUrl } from "../../package/storage/index.js";
 import { HttpError } from "../../utils/httpError.js";
+import { PUBLIC_PRODUCT_VISIBILITY } from "../stores/publicStore.service.js";
 import { MAX_CART_LINES } from "./cart.schema.js";
 import type { CartLineInput, CartMergeInput, CartReplaceInput } from "./cart.schema.js";
 
@@ -44,11 +45,6 @@ const cartLineSelect = {
       id: true,
       name: true,
       slug: true,
-      isActive: true,
-      priceMin: true,
-      category: {
-        select: { isActive: true, parent: { select: { isActive: true } } },
-      },
       // Cover image only — the lowest displayOrder, exactly as the public
       // product endpoints pick it, so a cart thumbnail always matches the
       // storefront's.
@@ -68,6 +64,8 @@ const cartLineSelect = {
       stockQuantity: true,
       isActive: true,
       isDefault: true,
+      // The variant's own photo, when it has one, is what the cart shows.
+      media: { select: { key: true } },
     },
   },
 } satisfies Prisma.CartLineSelect;
@@ -87,27 +85,24 @@ export type CartLineUnavailable =
   | "OUT_OF_STOCK";
 
 /**
- * Mirrors `PUBLIC_PRODUCT_VISIBILITY` (publicStore.service.ts) row-wise: a
- * cart holds specific ids, so it filters in memory rather than in SQL, but
- * the RULE must stay identical — a product hidden from the storefront is not
- * buyable from the cart either.
+ * `visible` is the set of the cart's products that pass
+ * `PUBLIC_PRODUCT_VISIBILITY` (publicStore.service.ts) — the SAME rule the
+ * storefront applies, asked in one query, so a product hidden from the
+ * storefront is not buyable from the cart either.
  */
-function unavailableReason(row: CartLineRow): CartLineUnavailable | null {
+function unavailableReason(
+  row: CartLineRow,
+  visible: Set<string>,
+): CartLineUnavailable | null {
   if (!row.store.isPublished) return "STORE_UNAVAILABLE";
-  const { product } = row;
-  const categoryActive =
-    product.category.isActive &&
-    (product.category.parent === null || product.category.parent.isActive);
-  if (!product.isActive || product.priceMin === null || !categoryActive) {
-    return "PRODUCT_UNAVAILABLE";
-  }
+  if (!visible.has(row.product.id)) return "PRODUCT_UNAVAILABLE";
   if (!row.variant.isActive) return "VARIANT_UNAVAILABLE";
   if (row.variant.stockQuantity <= 0) return "OUT_OF_STOCK";
   return null;
 }
 
-function shapeLine(row: CartLineRow) {
-  const unavailable = unavailableReason(row);
+function shapeLine(row: CartLineRow, visible: Set<string>) {
+  const unavailable = unavailableReason(row, visible);
   return {
     id: row.id,
     storeSlug: row.store.slug,
@@ -118,7 +113,7 @@ function shapeLine(row: CartLineRow) {
     /** Null for the implicit default variant — see the module note. */
     variantId: row.variant.isDefault ? null : row.variant.id,
     variantName: row.variant.isDefault ? null : row.variant.name,
-    imageUrl: mediaUrl("media", row.product.media[0]?.key ?? null),
+    imageUrl: mediaUrl("media", row.variant.media?.key ?? row.product.media[0]?.key ?? null),
     /** Live catalog price (Decimal → JSON string), never a stored one. */
     price: row.variant.price,
     /**
@@ -152,8 +147,22 @@ async function readCart(customerId: string) {
       },
     },
   });
+  const lines = cart?.lines ?? [];
+  const visible = new Set(
+    lines.length > 0
+      ? (
+          await prisma.storeProduct.findMany({
+            where: {
+              id: { in: lines.map((line) => line.product.id) },
+              ...PUBLIC_PRODUCT_VISIBILITY,
+            },
+            select: { id: true },
+          })
+        ).map((product) => product.id)
+      : [],
+  );
   return {
-    lines: cart ? cart.lines.map(shapeLine) : [],
+    lines: lines.map((line) => shapeLine(line, visible)),
     metadata: cart?.metadata ?? null,
     /** Lets a client detect that another device moved the cart on. */
     updatedAt: cart?.updatedAt ?? null,

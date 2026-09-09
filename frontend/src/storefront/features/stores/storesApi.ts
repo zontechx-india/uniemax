@@ -482,14 +482,8 @@ export interface PublicCategory {
   isFeatured: boolean
   /** Visible products in this category *including* its subcategories. */
   productCount: number
-  subcategories: PublicSubcategory[]
-}
-
-export interface PublicSubcategory {
-  id: string
-  name: string
-  slug: string
-  productCount: number
+  /** Any depth — the tree mirrors the seller's shelves. */
+  subcategories: PublicCategory[]
 }
 
 /**
@@ -531,6 +525,11 @@ export interface PublicStoreVariant {
   stockQuantity: number
   /** One value per option type — what the picker matches on. */
   optionValues: OptionValues
+  /** Strike-through MRP; null = no discount shown. */
+  compareAtPrice: string | null
+  sku: string | null
+  /** The gallery item that shows this variant; null = the cover. */
+  mediaId: string | null
 }
 
 /** Full product detail — the only payload that carries variants. */
@@ -541,11 +540,15 @@ export interface PublicProductDetail {
   description: string | null
   price: string | null
   priceMax: string | null
+  /** Simple products: strike-through MRP and SKU; option products carry them per variant. */
+  compareAtPrice: string | null
+  sku: string | null
   stockQuantity: number
   category: {
     name: string
     slug: string
-    parent: { name: string; slug: string } | null
+    /** Root first — the breadcrumb above it. */
+    ancestors: { name: string; slug: string }[]
   }
   /**
    * The dimensions the picker renders, in order. Empty for a simple product.
@@ -580,8 +583,9 @@ export interface PublicCategoryDetail {
   id: string
   name: string
   slug: string
-  parent: { name: string; slug: string } | null
-  subcategories: PublicSubcategory[]
+  /** Root first — the breadcrumb above it. */
+  ancestors: { name: string; slug: string }[]
+  subcategories: { id: string; name: string; slug: string; productCount: number }[]
 }
 
 /** Homepage merchandising payload. */
@@ -620,7 +624,7 @@ export const SECTION_TITLES: Record<PublicSection, string> = {
 
 /** Everything narrows server-side; nothing is filtered in the browser. */
 export interface PublicProductQuery {
-  /** Category SLUG — a root also covers its subcategories. */
+  /** Category SLUG — covers everything beneath it. */
   category?: string
   q?: string
   /** Scope to one homepage merchandising section. */
@@ -1040,6 +1044,9 @@ export interface TaxonomyRef {
   slug: string
   /** "Automotive > Motorcycle Parts". */
   pathLabel: string
+  /** What the product form suggests for things filed here — one-tap presets, never mandatory. */
+  optionTemplates: ProductOptionType[]
+  specTemplates: string[]
 }
 
 export interface StoreCategory {
@@ -1047,7 +1054,7 @@ export interface StoreCategory {
   name: string
   /** URL identity, generated on create and stable across renames. */
   slug: string
-  /** Parent category id — null for root categories (one level of nesting). */
+  /** Parent shelf id — null for roots. The tree mirrors the platform taxonomy, any depth. */
   parentId: string | null
   /** Disabled categories (and everything inside) are hidden from the public storefront. */
   isActive: boolean
@@ -1058,9 +1065,8 @@ export interface StoreCategory {
   /** Optional shelf artwork (a URL the seller pastes). */
   imageUrl: string | null
   /**
-   * Tag onto the GLOBAL taxonomy, or null. Null is a legitimate state, not a
-   * gap: a brand shelf ("KTM") or a merchandising tier ("Pro Edition") has no
-   * taxonomy answer and must not be forced into one.
+   * The platform category this shelf IS. Null only for shelves typed before
+   * the taxonomy existed, which an admin converts.
    */
   categoryId: string | null
   /** The tagged node with its ancestors; null whenever categoryId is null. */
@@ -1072,8 +1078,8 @@ export interface StoreCategory {
 
 /**
  * Adding a shelf means CHOOSING a platform category, never naming one. The
- * shelf takes the chosen node's name and position, so picking a subcategory
- * creates its parent shelf too.
+ * shelf takes the chosen node's name and position, so picking a deep
+ * category creates its ancestors too.
  */
 export interface StoreCategoryCreateInput {
   categoryId: string
@@ -1139,6 +1145,12 @@ export interface StoreProductVariant {
   isActive: boolean
   /** What this combination IS: one value per product option type. */
   optionValues: OptionValues
+  /** Stock-keeping code, unique within the store; null when unset. */
+  sku: string | null
+  /** Strike-through MRP (Decimal on the wire); null = no discount shown. */
+  compareAtPrice: string | null
+  /** The product photo that shows this variant; null = the cover. */
+  mediaId: string | null
   createdAt: string
 }
 
@@ -1175,8 +1187,21 @@ export interface StoreProduct extends StoreProductMerchandising {
   stockQuantity: number
   /** False when the product only carries its implicit Default variant. */
   hasVariants: boolean
+  /** Never published yet — created step by step and not finished. */
+  isDraft: boolean
+  /** How finished it is, and what to do next. Photo and price are what publishing needs. */
+  completeness: {
+    percent: number
+    missing: ('photo' | 'price' | 'description' | 'specifications')[]
+  }
   /** The implicit variant of an option-less product (null once options exist). */
-  defaultVariant: { id: string; price: string; stockQuantity: number } | null
+  defaultVariant: {
+    id: string
+    price: string
+    stockQuantity: number
+    sku: string | null
+    compareAtPrice: string | null
+  } | null
   /** Disabled products are hidden from the public storefront. */
   isActive: boolean
   category: { id: string; name: string; parentId: string | null }
@@ -1224,31 +1249,28 @@ export interface StoreVariantInput {
   stockQuantity: number
   /** Defaults to true. */
   isActive?: boolean
+  /** Stock-keeping code; null clears it. Unique within the store. */
+  sku?: string | null
+  /** Strike-through MRP; must be above `price`. null clears it. */
+  compareAtPrice?: number | null
+  /** One of the product's own photos; null = the cover. */
+  mediaId?: string | null
 }
 
 /**
- * `hasVariants` picks the product shape:
- *   false → `price` + `stockQuantity` required; no option types or variants.
- *   true  → `optionTypes` (≥ 1) + `variants` = EVERY combination of them;
- *           `price`/`stockQuantity` omitted.
+ * Creating a product makes a DRAFT: a name and a category are all it takes.
+ * It exists (disabled) from that moment and the wizard fills in the rest
+ * step by step. A simple product may bring its price along.
  */
 export interface StoreProductCreateInput {
   name: string
   /** The shelf. Its platform category is what classifies the product. */
   categoryId: string
   description?: string
-  specifications?: ProductSpec[]
-  /** Delivery-area override; omit to follow the store default. */
-  deliveryRule?: DeliveryRule
-  /** Shipping-charge override; omit to follow the store rate. */
-  shippingOverride?: ProductShippingOverride
-  /** Defaults to true. */
-  codAvailable?: boolean
-  hasVariants: boolean
   price?: number
   stockQuantity?: number
-  optionTypes?: ProductOptionType[]
-  variants?: StoreVariantInput[]
+  sku?: string | null
+  compareAtPrice?: number | null
 }
 
 /**
@@ -1396,7 +1418,14 @@ export const storeCatalogApi = {
     storeRef: string,
     productId: string,
     variantId: string,
-    patch: { price?: number; stockQuantity?: number; isActive?: boolean },
+    patch: {
+      price?: number
+      stockQuantity?: number
+      isActive?: boolean
+      sku?: string | null
+      compareAtPrice?: number | null
+      mediaId?: string | null
+    },
   ): Promise<StoreProduct> {
     return call<StoreProduct>(
       http.patch(
@@ -1671,6 +1700,8 @@ export interface PlacedOrderItem {
   id: string
   productName: string
   variantName: string | null
+  /** The variant's SKU when the order was placed. */
+  sku: string | null
   productSlug: string | null
   imageUrl: string | null
   /** Decimal strings on the wire. */

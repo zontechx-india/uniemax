@@ -87,10 +87,9 @@ backend/
 │   ├── modules/               # Feature modules (one folder each)
 │   │   ├── health/
 │   │   ├── category/          # schema · service · controller · routes
-│   │   ├── product/
 │   │   ├── stores/            # customer stores: stores.* · storeCatalog.* ·
 │   │   │                      #   storeBank.* (payout accounts) ·
-│   │   │                      #   publicStore.* (storefront) · catalogSlug.ts
+│   │   │                      #   publicStore.* (storefront) · catalogSlug.ts · shelfTree.ts
 │   │   │                      #   storeAddress.schema.ts (canonical address) ·
 │   │   │                      #   storeProfile.schema.ts (business identity) ·
 │   │   │                      #   storeReadiness.ts (requirement registry) ·
@@ -139,15 +138,10 @@ backend/
 │   │   │                      #   seed-theme-templates)
 │   │   ├── seedCategories.ts  # Global category taxonomy, upserted by slug
 │   │   │                      #   (npm run seed-categories)
-│   │   ├── migrateStoreCategories.ts # One-off bulk classify of seller
-│   │   │                      #   shelves/products (superseded for day-to-day
-│   │   │                      #   work by the admin mapping page)
-│   │   │                      #   against the taxonomy (dry-run/apply/rollback)
-│   │   ├── data/              # globalCategories.ts — the seeded taxonomy
-│   │   │                      # categoryMigrationRules.ts — old text -> node
+│   │   ├── data/              # globalCategories.ts — the seeded taxonomy;
+│   │   │                      # categoryPresets.ts — its option/spec suggestions
 │   │   ├── generatePushKeys.ts# VAPID key pair (npm run push-keys)
-│   │   ├── backfillCatalog.ts # Slugs + price aggregates (npm run backfill-catalog)
-│   │   └── backfillProductOptions.ts # Legacy variants → one "Option" type (npm run backfill-product-options)
+│   │   └── auditMedia.ts      # S3 objects vs DB media keys, per env + merged (npm run audit-media)
 │   ├── utils/                 # response, slug, httpError, zodHelpers, logger, password
 │   └── generated/prisma/      # Prisma client (generated, git-ignored)
 └── .env                       # runtime, DB, JWT, cookie, OTP config (see Environment below)
@@ -325,11 +319,6 @@ module repeats the guard. Deliberate scope decisions:
 `admin.schema.ts` keeps every request shape in one file (unlike the per-area
 split in `modules/stores`) because admin input is almost entirely list
 filters, which read better side by side.
-
-Endpoint naming note: the console's catalog lives under
-`/api/v1/admin/catalog/products` because `/admin/products` is already the
-original single-tenant catalog (`modules/product`) — these are the *sellers'*
-products, a different thing.
 
 ### Store appearance templates — `modules/themeTemplates`
 
@@ -577,18 +566,21 @@ White-label design — one codebase, any business:
   and Shoes & Footwear). The seed is only two levels deep; nothing limits the
   depth. Sellers proposing new categories is a separate, not-yet-built
   suggestion workflow.
-  Two optional inbound links classify a seller's catalog against it:
-  `StoreCategory.categoryId` (a shelf's tag) and `StoreProduct.globalCategoryId`
-  (the product's own). Both are `SetNull` on delete, so retiring a node
-  unclassifies rows and never removes a shelf or a product — which is why
-  **disabling** a node is the safe way to retire it.
+  Each node may carry `optionTemplates` / `specTemplates` (JSON) — the
+  product form's suggestions for things filed there, inherited down the tree
+  (nearest ancestor with a value wins; `categoryTree.ts` resolves the
+  effective set and names `templatesFrom`), admin-edited, seeded once from
+  `scripts/data/categoryPresets.ts` where nothing was set
+  (`category/categoryTemplates.ts` holds the shapes).
+  Two inbound links classify a seller's catalog against it:
+  `StoreCategory.categoryId` (the node a shelf *is*) and
+  `StoreProduct.globalCategoryId` (the product's own). Deleting a node any
+  store still uses is refused (`409`) — **disabling** it is how a node is
+  retired.
   Read models for the tree/children/search endpoints live in
   `category/categoryTree.ts`, which caches the whole table in-process
   (60 s TTL, invalidated on every admin write) — the seller product form asks
   for the taxonomy constantly and it changes almost never.
-- **Product** — price/discount as `Decimal(10,2)`, `stockQuantity`, JSON `specifications`
-  (any product type, no schema change), `status`, `isFeatured`, unique `sku`/`slug`.
-- **ProductImage** — multiple per product, one `isCover`, `displayOrder`.
 - **Customer** — identified by `email` and/or `phone` (each nullable + unique, so an
   identifier maps to one account), with `emailVerifiedAt` / `phoneVerifiedAt`, optional
   `passwordHash` (null for social/OTP-only accounts) and `avatarUrl`. Guest checkout;
@@ -705,13 +697,24 @@ White-label design — one codebase, any business:
   so a store with thousands of products never ships its whole catalog to
   render a page. Implemented in `publicStore.{schema,service,controller}.ts`.
 - **StoreCategory / StoreProduct / StoreProductVariant** — the catalog
-  *inside* a customer store (separate from the admin's global
-  Category/Product), following Store → Category → Subcategory (optional) →
-  Product → Variants. `StoreCategory` has an optional `parentId`
-  self-relation, **one level deep** (a subcategory can't have children —
-  service-enforced; parent must be a root of the same store), `name` unique
-  per store, deletes `Restrict`ed (category with products or subcategories
-  → 409). Both `StoreCategory` and `StoreProduct` carry a **`slug`** that is
+  *inside* a customer store, following Store → Categories (a tree) →
+  Product → Variants. A product is created as a **draft** (`isActive`
+  false, `publishedAt` null) and filled in step by step; publishing needs a
+  photo and a price above ₹0 and stamps `publishedAt` once. `shapeProduct`
+  derives `isDraft` and a `completeness` score (photo 35 · price 35 ·
+  description 20 · specifications 10) with the `missing` list the seller's
+  UI turns into next steps. `StoreCategory` has a `parentId` self-relation of
+  **any depth** — shelves mirror the global taxonomy, so they nest as deep
+  as it does (`MAX_CATEGORY_DEPTH` = 5 levels, enforced on the taxonomy).
+  One shelf per taxonomy node per store (`@@unique([storeId, categoryId])`);
+  names are unique among siblings (service-enforced), so "Accessories" can
+  sit under both Men and Women. Deletes are `Restrict`ed (category with
+  products or subcategories → 409). Tree questions (visibility down the
+  chain, descendants, breadcrumbs) are answered in memory by
+  `stores/shelfTree.ts` from one query per store — the same approach as
+  `categoryTree.ts` — and `activeShelfChain()` expresses "whole chain
+  active" as a fixed Prisma nesting for cross-store queries (discovery,
+  product visibility). Both `StoreCategory` and `StoreProduct` carry a **`slug`** that is
   unique per store, generated from the name on create and **stable across
   renames** — it is the storefront's URL identity
   (`/store/{storeSlug}/category/{slug}`, `.../product/{slug}`), so a rename
@@ -738,10 +741,9 @@ White-label design — one codebase, any business:
   `adminCategoryMapping.service.ts`: the row is renamed and re-parented to
   match the chosen node (products reclassified in place), or, when the store
   already holds that node, merged into it and deleted. It is one-way and
-  planned first — the console shows the server's plan before it runs. A root
-  that still has subcategories cannot become a subcategory (children are
-  decided first, never folded in silently). Brand and model shelves are the
-  admin's call: convert them to the nearest category, or leave them typed.
+  planned first — the console shows the server's plan before it runs; a
+  shelf's own subcategories come along with it. Brand and model shelves are
+  the admin's call: convert them to the nearest category, or leave them typed.
   `StoreProduct` requires a category — root or subcategory — of the
   same store, and holds `name`, optional `description`, and two JSON columns:
   **`optionTypes`** (ordered `[{ name, values[] }]` — the dimensions it is
@@ -750,19 +752,24 @@ White-label design — one codebase, any business:
   column**. **The variant is the unit of sale** — `StoreProductVariant`
   (cascade delete with its product) is **one combination of option values**,
   carrying `optionValues` (`{ Size: "M", Colour: "Red" }`), a **required**
-  `price Decimal(10,2)`, its own `stockQuantity`, and a `name` that is
+  `price Decimal(10,2)`, its own `stockQuantity`, an optional `sku` (unique
+  within the store, service-checked case-insensitively — a packing slip must
+  never be ambiguous), an optional `compareAtPrice` (strike-through MRP,
+  kept above `price`), an optional `mediaId` → `StoreProductMedia` (the
+  photo that shows this variant; `SetNull` when it is deleted; null = the
+  cover — the cart and order snapshots prefer it), and a `name` that is
   **derived** from the values (joined `" / "` in type order → `"M / Red"`) and
   unique per product — which is what keeps `OrderItem.variantName`, the cart
-  and every label render unchanged. **The variant set is always the full
-  cartesian product** of the option types (the seller disables combinations
-  they don't sell), and it changes only as a set through
+  and every label render unchanged. **The variant set is any subset of the
+  cartesian product** of the option types (at least one — a seller lists only
+  what they sell), and it changes only as a set through
   `replaceProductOptions` (`PUT …/options`), which reconciles rows by `id` in
   one transaction (update in place → cart/order links survive; create the
   rest; delete the remainder) with a two-pass rename so label swaps cannot
   trip the unique constraint. Limits (`OPTION_LIMITS`): ≤ 3 types, ≤ 30
   values/type, ≤ 100 combinations, 40-char names/values, ≤ 30 spec rows.
   Values are strings only — deliberately **no unit system**. The pure logic
-  (`variantLabel`, `cartesian`, `validateOptionMatrix`, `deriveProductOptions`)
+  (`variantLabel`, `cartesian`, `validateOptionMatrix`)
   lives in `productOptions.ts`, Prisma- and Zod-free, mirrored line-for-line
   on the frontend; the JSON columns are read through `resolveOptionTypes` /
   `resolveOptionValues` / `resolveSpecifications` (`resolveFooter` pattern,
@@ -770,12 +777,7 @@ White-label design — one codebase, any business:
   product without options carries a single implicit one flagged `isDefault`,
   so there is exactly one place a price can live; `PUT …/options` with
   `optionTypes: []` demotes back to it (cheapest price, summed stock) and
-  clears both JSON columns. **Legacy products** (free-text variants from
-  before option types) are presented with one synthesised type `"Option"`
-  whose values are their old names — persisted by
-  `scripts/backfillProductOptions.ts` (`npm run backfill-product-options`,
-  `--dry-run` supported) and, as a safety net, synthesised at read time by
-  `deriveProductOptions`, so there is exactly one product shape everywhere.
+  clears both JSON columns.
   Product-level `price` (cheapest), `priceMax`, `stockQuantity` (total) and
   `hasVariants` are **derived** in the service and are read-only; the public
   storefront never sees the default variant, so a simple product still arrives
@@ -837,7 +839,8 @@ White-label design — one codebase, any business:
 - **StoreProductMedia** — media attached to a store product (cascade delete):
   up to **8 IMAGEs + 1 VIDEO** (service-enforced), each holding a storage
   **object key** (never a URL), optional `altText` (accessibility) and
-  `displayOrder`. The image with the lowest `displayOrder` is the product's
+  `displayOrder`; a variant may point at one of the images as its own photo.
+  The image with the lowest `displayOrder` is the product's
   **cover** — there is no separate cover flag to fall out of sync. Reordering
   rewrites the image orders 0..n-1; the video sits at a high order outside
   the image sequence. Owner endpoints under
@@ -1009,7 +1012,7 @@ White-label design — one codebase, any business:
   blocks the account; every sign-in strategy checks it and blocking revokes
   all sessions.
 
-Enums: `ProductStatus`, `OrderStatus`, `PaymentMethod`, `PaymentStatus`, `ShippingType`,
+Enums: `OrderStatus`, `PaymentMethod`, `PaymentStatus`, `ShippingType`,
 `OtpChannel`, `OtpPurpose`, `AuthProvider`, `AdminRole`, `StoreMediaType`,
 `BankVerificationStatus`, `BankVerificationMethod`, `PrincipalType`,
 `NotificationKind` (includes `SUPPORT`), `SupportRecipient`,
@@ -1050,10 +1053,9 @@ Enums: `ProductStatus`, `OrderStatus`, `PaymentMethod`, `PaymentStatus`, `Shippi
 | `npm run db:status` | Show applied/pending migrations                    |
 | `npm run create-admin -- <email> <pw> [name]` | Bootstrap/reset an admin account |
 | `npm run push-keys` | Generate a VAPID key pair for Web Push (run once per environment) |
-| `npm run backfill-catalog` | Fill missing category/product slugs, recompute price aggregates, stamp `publishedAt` on pre-column published stores (idempotent) |
 | `npm run seed-theme-templates` | Create the five starter store appearance templates — palettes (colors only) lifted from real configured stores, topped up from curated fallbacks. Idempotent; `-- --force` tops an existing table back up to five |
-| `npm run seed-categories` | Seed the global category taxonomy (29 top-level + 125 sub) from `scripts/data/globalCategories.ts` — upserts by slug, idempotent, never deletes; `-- --dry-run` reports without writing |
-| `npm run migrate-store-categories` | Classify existing seller shelves/products against the taxonomy from `scripts/data/categoryMigrationRules.ts`. Dry run by default; `-- --apply` snapshots then writes in one transaction; `-- --rollback <snapshot.json>` restores. Only ever null → value, so it is idempotent and non-destructive; writes a markdown report listing everything it refused to decide |
+| `npm run seed-categories` | Seed the global category taxonomy (29 top-level + 125 sub) from `scripts/data/globalCategories.ts` — upserts by slug, idempotent, never deletes; fills `optionTemplates`/`specTemplates` from `scripts/data/categoryPresets.ts` only where never set; `-- --dry-run` reports without writing |
+| `npm run audit-media` | List every S3 object and which DB rows reference it (logo/media/order-item keys + bucket-hosted legacy URLs); run per env, `-- --merge <other-env.json>` on the second run yields objects referenced by neither DB. Read-only unless `--delete-orphans --yes` on a merged run. Reports go to `migration-backups/` |
 | `npx prisma generate` | Regenerate client after schema edits            |
 
 **Environment files are layered, never edited to switch.** `config/loadEnv.ts`

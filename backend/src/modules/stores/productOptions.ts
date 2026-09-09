@@ -2,9 +2,9 @@
  * Product options — the pure logic behind structured variants.
  *
  * A product declares ordered OPTION TYPES ("Size" → S/M/L, "Colour" →
- * Red/Blue). Its variants are exactly the cartesian product of those values,
- * every combination present, each carrying its own price and stock; the
- * seller switches off the combinations they don't sell. A variant's `name` is
+ * Red/Blue). Its variants are combinations of those values — any subset of
+ * the cartesian product, each carrying its own price and stock, so a seller
+ * lists only what they sell. A variant's `name` is
  * DERIVED — the values joined in type order ("M / Red") — so the existing
  * `@@unique([productId, name])` constraint, `OrderItem.variantName` snapshot,
  * the cart, and every place that renders a variant label keep working as they
@@ -49,14 +49,6 @@ export const OPTION_LIMITS = {
 
 /** Separator between values in a derived variant name. */
 export const LABEL_SEPARATOR = " / ";
-
-/**
- * The option type synthesised for products that predate structured options.
- * Their variants were free text ("Red / 128 GB"), so the whole label becomes
- * the single value of one type. The seller renames it ("Size") from the
- * editor; nothing else changes.
- */
-export const LEGACY_OPTION_NAME = "Option";
 
 /** The derived variant name: values in option-type order, joined. */
 export function variantLabel(
@@ -131,8 +123,8 @@ interface MatrixVariant {
 }
 
 /**
- * Check that a set of variants is exactly the cartesian product of the option
- * types — no combination missing, none duplicated, none invented, and every
+ * Check that a set of variants is a valid subset of the option types'
+ * cartesian product — at least one, none duplicated, none invented, and every
  * derived label unique. Returns issues rather than throwing so the Zod schema
  * can attach each to its path; an empty array means the matrix is valid.
  *
@@ -157,12 +149,8 @@ export function validateOptionMatrix(input: {
     return issues;
   }
 
-  const expected = cartesianSize(optionTypes);
-  if (variants.length !== expected) {
-    issues.push({
-      path: ["variants"],
-      message: `Expected ${expected} combinations, received ${variants.length}`,
-    });
+  if (variants.length === 0) {
+    issues.push({ path: ["variants"], message: "Keep at least one combination" });
   }
 
   const typeNames = optionTypes.map((type) => type.name);
@@ -230,44 +218,3 @@ export function validateOptionMatrix(input: {
   return issues;
 }
 
-interface DerivableVariant {
-  name: string;
-  isDefault: boolean;
-  optionValues: OptionValues;
-}
-
-/**
- * Present every product through the structured model, including those that
- * predate it.
- *
- * A product created before option types existed has free-text variants and no
- * `optionTypes`. Rather than teach every consumer a second, legacy shape, this
- * synthesises the one option type such a product implicitly has — one value
- * per variant, the old label — so the storefront picker, the seller's matrix
- * and the public API see exactly one kind of product. The backfill script
- * persists the same synthesis; this is the read-time safety net for any row it
- * has not reached. Nothing is written here.
- *
- * Products that already carry option types, and simple products (only the
- * implicit Default), pass through untouched.
- */
-export function deriveProductOptions<V extends DerivableVariant>(
-  optionTypes: ProductOptionType[],
-  variants: V[],
-): { optionTypes: ProductOptionType[]; variants: V[] } {
-  if (optionTypes.length > 0) return { optionTypes, variants };
-
-  const real = variants.filter((variant) => !variant.isDefault);
-  if (real.length === 0) return { optionTypes, variants };
-
-  return {
-    optionTypes: [
-      { name: LEGACY_OPTION_NAME, values: real.map((variant) => variant.name) },
-    ],
-    variants: variants.map((variant) =>
-      variant.isDefault
-        ? variant
-        : { ...variant, optionValues: { [LEGACY_OPTION_NAME]: variant.name } },
-    ),
-  };
-}

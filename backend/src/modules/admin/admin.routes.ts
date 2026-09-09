@@ -32,9 +32,7 @@ export const adminConsoleRoutes: FastifyPluginAsync = async (app) => {
   app.get("/orders/:id", controller.getOrder);
   app.get("/payments", controller.listPayments);
 
-  // Catalog oversight. Namespaced under /catalog because /admin/products is
-  // already taken by the original single-tenant catalog (`modules/product`);
-  // these are the SELLERS' products, which is a different thing entirely.
+  // Catalog oversight — the sellers' products, platform-wide.
   app.get("/catalog/products", controller.listProducts);
   app.get("/catalog/products/:id", controller.getProduct);
   app.patch("/catalog/products/:id/visibility", controller.setProductVisibility);

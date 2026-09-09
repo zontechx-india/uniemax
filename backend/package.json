@@ -14,11 +14,9 @@
     "db:status": "prisma migrate status",
     "create-admin": "tsx src/scripts/createAdmin.ts",
     "push-keys": "tsx src/scripts/generatePushKeys.ts",
-    "backfill-catalog": "tsx src/scripts/backfillCatalog.ts",
-    "backfill-product-options": "tsx src/scripts/backfillProductOptions.ts",
     "seed-theme-templates": "tsx src/scripts/seedThemeTemplates.ts",
     "seed-categories": "tsx src/scripts/seedCategories.ts",
-    "migrate-store-categories": "tsx src/scripts/migrateStoreCategories.ts",
+    "audit-media": "tsx src/scripts/auditMedia.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

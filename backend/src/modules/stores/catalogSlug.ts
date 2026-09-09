@@ -2,8 +2,7 @@ import { prisma } from "../../config/prisma.js";
 import { slugify } from "../../utils/slug.js";
 
 /**
- * Slug + aggregate maintenance shared by the catalog service and the
- * `backfill-catalog` script.
+ * Slug + aggregate maintenance for the store catalog.
  *
  * Categories and products are addressed by slug on the storefront
  * (`/store/{storeSlug}/category/{slug}`), so each slug must be unique **within
@@ -16,7 +15,7 @@ type Db = Pick<typeof prisma, "storeCategory" | "storeProduct" | "storeProductVa
 
 /**
  * A store-unique slug, appending -2, -3, … on collision. `ignoreId` lets a row
- * keep its own slug when re-checking (used by the backfill).
+ * keep its own slug when a rename re-checks.
  */
 async function uniqueSlug(
   base: string,

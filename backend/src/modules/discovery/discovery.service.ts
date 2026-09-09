@@ -5,6 +5,7 @@ import {
   PUBLIC_PRODUCT_VISIBILITY,
   PUBLIC_STORE_VISIBILITY,
 } from "../stores/publicStore.service.js";
+import { activeShelfChain } from "../stores/shelfTree.js";
 import type { NewProductsQuery, SearchQuery } from "./discovery.schema.js";
 
 /**
@@ -83,8 +84,7 @@ function shapeMarketProduct(product: MarketProductRow) {
 function discoverableCategoryWhere(q: string): Prisma.StoreCategoryWhereInput {
   return {
     name: { contains: q, mode: "insensitive" },
-    isActive: true,
-    OR: [{ parentId: null }, { parent: { isActive: true } }],
+    ...activeShelfChain(),
     store: publishedStore,
     products: { some: PUBLIC_PRODUCT_VISIBILITY },
   };
@@ -211,8 +211,7 @@ export async function getPopularCategories(): Promise<PopularCategory[]> {
   const grouped = await prisma.storeCategory.groupBy({
     by: ["name"],
     where: {
-      isActive: true,
-      OR: [{ parentId: null }, { parent: { isActive: true } }],
+      ...activeShelfChain(),
       store: publishedStore,
       products: { some: PUBLIC_PRODUCT_VISIBILITY },
     },

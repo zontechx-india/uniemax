@@ -747,14 +747,14 @@ silently unset. Returns the updated account.
 another account (payouts must never silently retarget) — the seller picks
 the next primary explicitly, and payouts stay on hold until they do.
 
-### Store catalog — categories, subcategories, products & variants
+### Store catalog — categories, products & variants
 
-The catalog **inside one customer store** (separate from the admin's global
-catalog), following the hierarchy **Store → Category → Subcategory
-(optional) → Product → Option types → Variants**. The setup sequence is enforced: a
-product requires a category (root **or** subcategory) of the same store,
-so at least one category must exist before the first product can be added.
-Category nesting is one level deep — a subcategory cannot have children.
+The catalog **inside one customer store**, following the hierarchy **Store →
+Categories (a tree) → Product → Option types → Variants**. The setup sequence
+is enforced: a product requires a category of the same store, so at least one
+category must exist before the first product can be added. Shelves mirror the
+global taxonomy, so they nest as deep as it does — at most
+`MAX_CATEGORY_DEPTH` (5) levels, root included.
 
 A store category is the seller's own **shelf**, but it is **chosen from the
 global taxonomy, never named**: create takes a `categoryId` and the shelf
@@ -769,19 +769,20 @@ not a gap** until an admin converts it (`POST /admin/catalog/shelves/:id/convert
 which replaces the typed shelf with the platform one. Nothing on this API can
 rename a shelf or change what it is tagged with.
 
-**`GET /api/v1/stores/:id/categories`** — the store's categories (roots and
-subcategories, flat), by `sortOrder` then oldest first. Each:
+**`GET /api/v1/stores/:id/categories`** — the store's categories (the whole
+tree, flat — nest by `parentId`), by `sortOrder` then oldest first. Each:
 `{ id, name, slug, parentId, isActive, isFeatured, sortOrder, imageUrl,
 categoryId, taxonomy, productCount, subcategoryCount, createdAt }`
 (`parentId` is `null` for root categories). `slug` is the category's URL
 identity on the storefront (`/store/{storeSlug}/category/{slug}`), generated
 from the name on create and **stable across renames**. `isFeatured` surfaces a
 root category in the storefront homepage's Featured Categories row.
-`categoryId` is the global-taxonomy tag or `null`, and `taxonomy` resolves it
-to `{ id, name, slug, pathLabel }` (`null` whenever `categoryId` is), so a
-client can print "Automotive > Motorcycle Parts" without fetching the tree.
-**`null` is a legitimate state, not a gap** — a brand or tier shelf has no
-taxonomy answer and must not be forced into one.
+`categoryId` is the global taxonomy node the shelf IS, and `taxonomy` resolves
+it to `{ id, name, slug, pathLabel, optionTemplates, specTemplates }` (the
+last two being the product form's presets for this shelf), so a client can print
+"Automotive > Motorcycle Parts" without fetching the tree. `null` (with
+`taxonomy: null`) only on shelves typed before the taxonomy existed, until an
+admin converts them.
 
 **`POST /api/v1/stores/:id/categories`** → `201`
 ```jsonc
@@ -790,13 +791,12 @@ taxonomy answer and must not be forced into one.
   "sortOrder": 0 }            // optional, default 0
 ```
 There is no `name` and no `parentId`: both come from the chosen node. Picking a
-**subcategory creates its parent shelf too**, so one call to add
-"Electronics › Mobiles" yields both rows — and the response is the shelf for the
-node that was actually picked.
+deep node **creates its ancestor shelves too**, so one call to add
+"Fashion › Women › Sarees" yields the whole chain — and the response is the
+shelf for the node that was actually picked.
 
 `categoryId` must name an **active** taxonomy node (`400` otherwise — a seller
-must not be able to file their catalog under a category an admin retired), and
-must be at most one level deep (`400`, since store shelves nest one level).
+must not be able to file their catalog under a category an admin retired).
 `409` if the store already has that category. A shelf that is already tagged
 with the node is reused rather than duplicated, and an **untagged shelf of the
 same name in the same position is adopted** — that is how an "Electronics" typed
@@ -829,15 +829,19 @@ category still has products **or subcategories**. → `{ "data": { "id" } }`
 >
 > **Variants are combinations of option values.** A product declares ordered
 > `optionTypes` — `[{ "name": "Size", "values": ["S","M"] }, { "name":
-> "Colour", "values": ["Red","Blue"] }]` — and its variants are **exactly the
-> cartesian product** of those values (every combination present; the seller
-> disables the ones they don't sell). Each variant carries `optionValues`
+> "Colour", "values": ["Red","Blue"] }]` — and its variants are **any subset
+> of the cartesian product** of those values (at least one; a seller lists
+> only the combinations they sell). Each variant carries `optionValues`
 > (`{ "Size": "M", "Colour": "Red" }`) and its `name` is **derived** from them
 > (values joined `" / "` in type order → `"M / Red"`) — clients never send it.
+> Every variant may also carry a **`sku`** (free text ≤ 64, unique within the
+> store, case-insensitive → `409` naming the product that holds it), a
+> **`compareAtPrice`** (strike-through MRP, must be above `price` → `422`) and
+> a **`mediaId`** — one of the product's own images that shows this variant
+> (`400` otherwise; `null` = the cover; cleared when that photo is deleted).
 > Limits: ≤ 3 option types, ≤ 30 values per type, ≤ 100 combinations; names
 > and values ≤ 40 chars, free text (`"500 ml"` is a value — there is no unit
-> system). A product that predates option types is presented with one
-> synthesised type, `"Option"`, whose values are its old variant names.
+> system).
 
 **`GET /api/v1/stores/:id/products`** — the store's products, newest first.
 Each:
@@ -848,7 +852,9 @@ Each:
   "priceMax": "109999.00",  // dearest variant — equal to price unless options differ
   "stockQuantity": 28,      // total across variants
   "hasVariants": true,      // false → only the implicit Default variant
-  "defaultVariant": null,   // { id, price, stockQuantity } when hasVariants is false
+  "isDraft": false,         // never published yet — created step by step, not finished
+  "completeness": { "percent": 70, "missing": ["description", "specifications"] },  // photo 35 · price 35 · description 20 · specs 10
+  "defaultVariant": null,   // { id, price, stockQuantity, sku, compareAtPrice } when hasVariants is false
   "isActive": true,
   // Merchandising — each flag maps to exactly one storefront section
   "isFeatured": false, "isBestSeller": false, "isNewArrival": false,
@@ -862,7 +868,8 @@ Each:
   "optionTypes": [ { "name": "Storage", "values": ["128 GB", "256 GB"] } ],   // [] for a simple product
   "specifications": [ { "label": "Chip", "value": "A19" } ],                  // ordered; [] = none
   "deliveryRule": { "type": "INCLUDE", "pincodes": ["629154"] } | null,        // own override; null = store default
-  "variants": [ { "id", "name", "price", "stockQuantity", "isActive",
+  "variants": [ { "id", "name", "price", "compareAtPrice", "stockQuantity", "isActive", "sku",
+                  "mediaId",                                  // one of media[] (IMAGE), or null = cover
                   "optionValues": { "Storage": "128 GB" }, "createdAt" } ],
   "media":    [ { "id", "type": "IMAGE|VIDEO", "url", "altText", "displayOrder" } ],
   "createdAt": "…"
@@ -876,62 +883,30 @@ config, the DB holds only object keys.
 
 **`POST /api/v1/stores/:id/products`** → `201`
 
-`hasVariants` (default `false`) is the explicit discriminator between the two
-product shapes, so a payload is never ambiguous.
-
-**Simple product** — `price` + `stockQuantity` required, `variants` rejected:
+Creates a **draft**: disabled, `publishedAt` null, `isDraft: true`. A name
+and a category are all it takes — the product exists from that moment and
+the seller fills in the rest step by step (photos against the id, options
+through `PUT …/options`, everything else through `PATCH`). A simple product
+may bring its price along; otherwise the implicit Default variant starts at
+₹0 / 0 stock, which the publish guard refuses.
 ```jsonc
 {
   "name": "English Willow Bat",   // required (1–120 chars)
-  "categoryId": "cmr…",           // required — root or subcategory of this store (400 otherwise)
+  "categoryId": "cmr…",           // required — a category of this store (400 otherwise)
   "description": "…",             // optional (max 2000)
-  "hasVariants": false,
-  "price": 4999,                  // required (>= 0)
-  "stockQuantity": 20             // required (int >= 0)
+  "price": 4999,                  // optional (>= 0) — the single variant's price
+  "stockQuantity": 20,            // optional (int >= 0)
+  "compareAtPrice": 5999,         // optional MRP, must be > price (422 otherwise)
+  "sku": "BAT-EW-01"              // optional, unique within the store (409 otherwise)
 }
 ```
-**Variant product** — `optionTypes` (≥ 1) plus `variants` = **every**
-combination of their values, each with price + stock; top-level
-`price`/`stockQuantity` are not accepted:
-```jsonc
-{
-  "name": "Tee", "categoryId": "cmr…",
-  "hasVariants": true,
-  "optionTypes": [
-    { "name": "Size",   "values": ["S", "M"] },
-    { "name": "Colour", "values": ["Red", "Blue"] }
-  ],
-  "variants": [                    // exactly 2 × 2 = 4 rows, one per combination
-    { "optionValues": { "Size": "S", "Colour": "Red"  }, "price": 499, "stockQuantity": 10 },
-    { "optionValues": { "Size": "S", "Colour": "Blue" }, "price": 499, "stockQuantity": 0, "isActive": false },
-    { "optionValues": { "Size": "M", "Colour": "Red"  }, "price": 549, "stockQuantity": 4 },
-    { "optionValues": { "Size": "M", "Colour": "Blue" }, "price": 549, "stockQuantity": 4 }
-  ],
-  "specifications": [ { "label": "Fabric", "value": "100% cotton" } ],  // optional, ordered, ≤ 30
-  "deliveryRule": { "type": "EXCLUDE", "pincodes": ["629154"] },        // optional — see below
-  "shippingOverride": { "type": "FLAT", "amount": 200 },                // optional — see below
-  "codAvailable": false                                                 // optional, default true
-}
-```
-Both shapes accept an optional **`deliveryRule`** — this product's own
-delivery areas (same shape and validation as the store's
-`PATCH …/shipping` `deliveryRule`). Omitted / `null` = the product follows
-the store default; when set it **replaces** the default for this product.
-Likewise an optional **`shippingOverride`** — this product's own shipping
-charge, `{ type: FREE }` or `{ type: FLAT, amount > 0 }` (no threshold);
-omitted / `null` = follow the store's `shipping.rate`. An order's charge is
-the highest applicable rate among its lines (see `PATCH …/shipping`).
-**`codAvailable`** (default `true`) says whether cash on delivery may be
-chosen for an order containing this product — one `false` product removes
-COD from that order's checkout even when the store accepts it.
+Delivery areas, shipping charge and cash on delivery for the product are set
+afterwards through `PATCH …/products/:productId` (`deliveryRule`,
+`shippingOverride`, `codAvailable` — see below); they default to the store's
+settings. Options and their combinations arrive through `PUT …/options`.
 
-`422` with a field-level `issues[]` when: `hasVariants` is false and `price`
-or `stockQuantity` is missing (or options were sent anyway); or `hasVariants`
-is true and `optionTypes` is empty, option names or values collide
-(case-insensitive), the combinations exceed 100, or `variants` is not exactly
-the cartesian product — a combination missing or duplicated, a row with the
-wrong keys, a value not in its type, or two rows whose derived labels collide
-(possible when a value itself contains `" / "`).
+`422` with a field-level `issues[]` for a missing name / category or an MRP
+not above the price; `400` for a category of another store.
 
 > The wire field is `stockQuantity` (not `stock`) everywhere — request bodies,
 > responses and the DB column all use the same name.
@@ -976,7 +951,8 @@ Variants are deleted with the product.
 in place. Variants change only **as a set**:
 
 **`PUT /api/v1/stores/:id/products/:productId/options`** — the **full target
-state**: every option type and every combination. The server reconciles the
+state**: every option type and every combination sold (a combination left out
+is simply not offered and can be added back later). The server reconciles the
 stored variants to it in **one transaction** — rows sent with an `id` are
 updated in place (new values, label, price, stock, on/off — so a renamed or
 re-priced combination keeps its variant id and every cart line and order
@@ -987,7 +963,7 @@ at one revalidates to "no longer available").
 {
   "optionTypes": [ { "name": "Size", "values": ["S", "M", "XL"] } ],
   "variants": [
-    { "id": "cmr…", "optionValues": { "Size": "S" },  "price": 499, "stockQuantity": 3, "isActive": true },
+    { "id": "cmr…", "optionValues": { "Size": "S" },  "price": 499, "stockQuantity": 3, "isActive": true, "sku": "TEE-S", "compareAtPrice": 699, "mediaId": "cmr…" },
     { "id": "cmr…", "optionValues": { "Size": "M" },  "price": 499, "stockQuantity": 0, "isActive": false },
     {               "optionValues": { "Size": "XL" }, "price": 549, "stockQuantity": 2 }   // new combination
   ]
@@ -1003,16 +979,20 @@ own.
 
 **`PATCH /api/v1/stores/:id/products/:productId/variants/:variantId`**
 ```jsonc
-{ "price": 5499, "stockQuantity": 2, "isActive": false }  // all optional; no `name` — it is derived
+{ "price": 5499, "stockQuantity": 2, "isActive": false,           // all optional; no `name` — it is derived
+  "sku": "IP17-256", "compareAtPrice": 5999, "mediaId": "cmr…" }  // null clears each of these three
 ```
-A variant's price can be changed but never cleared. This is also how the price
-and stock of an option-less product are edited — patch its `defaultVariant.id`.
+A variant's price can be changed but never cleared; the MRP rule
+(`compareAtPrice` above `price`) holds for the resulting state whichever half
+is patched. This is also how the price, MRP, stock and SKU of an option-less
+product are edited — patch its `defaultVariant.id`.
 
-A product cannot be **enabled** without a photo: `PATCH …/products/:productId`
-with `isActive: true` is a `400` while the product has no `IMAGE` media
-("Add at least one photo before enabling this product"). Disabling is always
-allowed, and creating is unaffected — media can only be attached after the
-product exists.
+A product cannot be **published** (`PATCH …/products/:productId` with
+`isActive: true`) without a photo (`400` "Add at least one photo before
+enabling this product") or without a price above ₹0 on an active variant
+(`400` "Set a price before publishing this product"). The first successful
+publish stamps `publishedAt`; from then on `isDraft` is false for good, even
+when the product is disabled again. Disabling is always allowed.
 
 **Media** — up to **8 images + 1 video** per product; the image with the
 lowest `displayOrder` is the **cover**. Files go to the product-media bucket;
@@ -1129,7 +1109,7 @@ Every endpoint answers with the **whole cart**, in the shape:
     "productId", "productSlug", "name",
     "variantId",        // null for a product without options
     "variantName",      // null likewise
-    "imageUrl",         // cover image, or null
+    "imageUrl",         // the variant's own photo, else the cover, or null
     "price",            // decimal string — LIVE catalog price
     "stockQuantity",    // 0 for anything unbuyable, whatever the reason
     "quantity",
@@ -1249,8 +1229,8 @@ products**. Small and cacheable; fetched once per store visit.
   "checkout": { "name", "phone", "email", "address", "pincode", "state", "country" },
   "categories": [                 // enabled ROOT categories with something shoppable
     { "id", "name", "slug", "isFeatured",
-      "productCount",             // includes its subcategories' products
-      "subcategories": [ { "id", "name", "slug", "productCount" } ] }
+      "productCount",             // includes everything beneath it
+      "subcategories": [ /* same shape, recursively — any depth */ ] }
   ] }
 ```
 Categories with nothing shoppable are omitted, so the header dropdown never
@@ -1261,7 +1241,7 @@ Paginated product listing — powers the category page and search results.
 
 | Query      | Type   | Default  | Notes                                            |
 | ---------- | ------ | -------- | ------------------------------------------------ |
-| `category` | string | –        | Category **slug**; a root also covers its subcategories (`404` if unknown) |
+| `category` | string | –        | Category **slug**; covers everything beneath it (`404` if unknown or hidden) |
 | `q`        | string | –        | Matches name + description; skips `hideFromSearch` products |
 | `section`  | enum   | –        | `featured` · `newArrivals` · `bestSellers` — only products flagged for that homepage row (the "View all" scope) |
 | `sort`     | enum   | `newest` | `newest` · `popular` · `bestselling` · `price-asc` · `price-desc` · `alphabetical` |
@@ -1315,24 +1295,26 @@ set otherwise.
 Category header + breadcrumb ancestry for the category page.
 ```jsonc
 { "id", "name", "slug",
-  "parent": { "name", "slug" } | null,
-  "subcategories": [ { "id", "name", "slug", "productCount" } ] }
+  "ancestors": [ { "name", "slug" } ],                       // root first
+  "subcategories": [ { "id", "name", "slug", "productCount" } ] }  // direct children; counts include everything beneath
 ```
-A subcategory whose parent is disabled is itself unreachable (`404`).
+A category with a disabled ancestor is itself unreachable (`404`).
 
 ### `GET /api/v1/public/stores/:slug/products/:productSlug`
 Full product detail — the **only** endpoint that returns variants, because the
 product page is where a customer picks one.
 ```jsonc
 { "id", "name", "slug", "description", "price", "priceMax", "stockQuantity",
-  "category": { "name", "slug", "parent": { "name", "slug" } | null },
+  "category": { "name", "slug", "ancestors": [ { "name", "slug" } ] },   // root first
   "optionTypes": [ { "name": "Size", "values": ["S", "M", "XL"] } ],     // picker dimensions, in order
   "specifications": [ { "label": "Fabric", "value": "100% cotton" } ],   // ordered; [] → description fallback
   "delivery": { "restricted": false },                          // true = limited to some pincodes (see delivery-check)
   "shipping": { "type": "FLAT", "amount": 80, "freeAbove": 1000,
                 "source": "STORE | PRODUCT" },                  // the rate this product advertises (own override or store rate)
   "codAvailable": true,                                         // effective: store accepts COD AND the product allows it
-  "variants": [ { "id", "name", "price", "stockQuantity",
+  "compareAtPrice": null, "sku": null,                            // simple products: the single variant's MRP / SKU
+  "variants": [ { "id", "name", "price", "compareAtPrice", "sku", "stockQuantity",
+                  "mediaId",                                      // the gallery item that shows this variant; null = cover
                   "optionValues": { "Size": "M" } } ],            // enabled combinations only, matrix order
   "media": [ { "id", "type": "IMAGE|VIDEO", "url", "altText" } ], // gallery, cover first
   "related": [ … ] }                                           // same category, max 8
@@ -1471,8 +1453,8 @@ Response: the full order —
   "placedAt",
   "confirmedAt", "packedAt", "shippedAt",         // lifecycle stamps — null
   "deliveredAt", "cancelledAt", "cancelReason",   // until the seller gets there
-  "items": [ { "id", "productName", "variantName", "productSlug",
-               "imageUrl",          // cover snapshot (key-derived)
+  "items": [ { "id", "productName", "variantName", "sku", "productSlug",
+               "imageUrl",          // snapshot: the variant's photo, else the cover (key-derived)
                "unitPrice", "quantity", "lineTotal" } ],
   "payment": {                      // ONLY on a gateway ONLINE placement —
     "paymentSessionId": "session_…",// feed to the Cashfree web SDK checkout()
@@ -1691,7 +1673,19 @@ is how the console shows a node an admin wants to re-enable.
   "parentId": "cmr…"             // optional (null/omit for root)
 }
 ```
-`slug` is auto-generated and made unique.
+`slug` is auto-generated and made unique. `parentId` may be any node; the
+taxonomy nests to at most `MAX_CATEGORY_DEPTH` (5) levels, root included
+(`400` beyond that — also when a move would push a subtree past it). Store
+shelves mirror the taxonomy, so this is the storefront's depth too.
+
+`optionTemplates` (`[{ name, values[] }]`, ≤ 3) and `specTemplates`
+(`string[]`, ≤ 30) are the product form's **suggestions** for things filed
+here — option presets a seller adds with one tap (Size with the usual sizes)
+and specification labels pre-filled as empty rows. They inherit down the
+tree: every node in `tree` / `children` / `search` answers carries the
+effective `optionTemplates` / `specTemplates` plus `templatesFrom` (the
+ancestor they come from, or `null` when the node's own). `null` on a node =
+inherit again. Seeded once from `scripts/data/categoryPresets.ts`.
 
 ### `GET /api/v1/admin/categories/:id`
 By id. `404` if not found.
@@ -1700,78 +1694,7 @@ By id. `404` if not found.
 Partial update (any create field). A category cannot be its own parent (`400`).
 
 ### `DELETE /api/v1/admin/categories/:id`
-`409` if the category still has products or sub-categories. → `{ "data": { "id" } }`
-
----
-
-## Products (Public)
-
-### `GET /api/v1/products`
-List **active** products in **active** categories.
-
-| Query          | Type    | Default  | Notes                                                        |
-| -------------- | ------- | -------- | ------------------------------------------------------------ |
-| `q`            | string  | —        | Search name / description / brand / sku                      |
-| `categoryId`   | string  | —        | Filter by category id                                        |
-| `categorySlug` | string  | —        | Filter by category slug                                      |
-| `brand`        | string  | —        | Exact brand (case-insensitive)                               |
-| `minPrice`     | number  | —        |                                                              |
-| `maxPrice`     | number  | —        |                                                              |
-| `isFeatured`   | boolean | —        |                                                              |
-| `inStock`      | boolean | —        | `true` → `stockQuantity > 0`                                 |
-| `sort`         | enum    | `newest` | `newest·oldest·price_asc·price_desc·name_asc·name_desc`      |
-| `page`         | number  | 1        |                                                              |
-| `pageSize`     | number  | 20       | max 100                                                      |
-
-List items include `category` (id/name/slug) and the cover image.
-
-### `GET /api/v1/products/:slug`
-Product detail by slug: all images (cover first), `specifications`, `category`, and up
-to 8 `related` products from the same category. `404` if not found or inactive.
-
----
-
-## Products (Admin) — `/api/v1/admin/products` 🔒 admin
-
-All routes require an admin token. `GET /` and `GET /:id` return **all** products (any
-status); `status` is filterable on the list.
-
-### `POST /api/v1/admin/products` → `201`
-```jsonc
-{
-  "name": "SS Ton Reserve Edition",   // required
-  "sku": "SS-TON-001",                // required (unique)
-  "categoryId": "cmr…",               // required
-  "price": 8999.00,                   // required (>= 0)
-  "brand": "SS",                      // optional
-  "description": "…",                 // optional
-  "discountPrice": 7499.00,           // optional (<= price, else 422)
-  "stockQuantity": 12,                // optional (default 0)
-  "lowStockThreshold": 3,             // optional (overrides store default)
-  "specifications": {                  // optional key/value map (any keys)
-    "Willow": "English", "Weight": "1180g"
-  },
-  "status": "ACTIVE",                 // optional: ACTIVE | INACTIVE
-  "isFeatured": true,                 // optional
-  "images": [                          // optional (max 20)
-    { "url": "https://…/a.jpg" },
-    { "url": "https://…/b.jpg", "isCover": true, "displayOrder": 1 }
-  ]
-}
-```
-Exactly one image is marked cover (first image defaults to cover if none set).
-Duplicate `sku` → `409`.
-
-### `GET /api/v1/admin/products/:id`
-Full product detail by id. `404` if not found.
-
-### `PATCH /api/v1/admin/products/:id`
-Partial update. Providing `images` **replaces the entire image set**. `sku`/`categoryId`
-changeable. `discountPrice > price` → `422`; duplicate `sku` → `409`.
-
-### `DELETE /api/v1/admin/products/:id`
-Deletes the product. Order history is preserved (order items keep a product snapshot).
-→ `{ "data": { "id" } }`
+`409` if any store still uses the category (a shelf or a product) or it has sub-categories — disable it instead. → `{ "data": { "id" } }`
 
 ---
 
@@ -2125,14 +2048,14 @@ payment status for the current filter.
 
 ### `GET /api/v1/admin/catalog/products` · `GET …/:id`
 
-Namespaced under `/catalog` because `/admin/products` belongs to the original
-single-tenant catalog (`modules/product`); these are the **sellers'** products.
+The **sellers'** products, platform-wide.
 Query: `q` (product / store name), `storeId`, `status` (`ACTIVE` · `DISABLED` ·
 `LOW_STOCK` ≤ 5 · `OUT_OF_STOCK`), `page`, `pageSize`. Detail adds
 `description`, `hideFromSearch`, `updatedAt`, `optionTypes[]` (`{ name,
 values[] }`), `specifications[]` (`{ label, value }`), `deliveryRule`
 (`{ type: ALL | INCLUDE | EXCLUDE, pincodes[] }`, or `null` = follows the
-store default), `variants[]` (each with `optionValues`) and the full
+store default), `variants[]` (each with `optionValues`, `sku`, `compareAtPrice`,
+`mediaId`) and the full
 `media[]` — everything the seller configured, read-only.
 
 ### `PATCH /api/v1/admin/catalog/products/:id/visibility`
@@ -2178,9 +2101,10 @@ confirmation, so what the admin approves is exactly what runs.
 categories to go away, not to sit beside a tag:
 
 - **rename** — the row keeps its id, takes the node's name, and is moved to
-  the node's position: a subcategory lands under the root shelf standing for
-  its parent node (reused when the store has it, an untagged root of the same
-  name adopted, otherwise created — `parent.created`). A root that becomes a
+  the node's position: it lands under the chain of shelves standing for the
+  node's ancestors (each reused when the store has it, adopted from an untagged
+  shelf of the same name in the same place, otherwise created —
+  `parent.created`), and its own subcategories come along. A root that becomes a
   subcategory loses `isFeatured` (root-only flag). The slug is regenerated only
   when the name actually changes, so an unchanged name keeps shared links
   working. Products stay on the row and are reclassified.
@@ -2190,14 +2114,12 @@ categories to go away, not to sit beside a tag:
   deleted**.
 
 `blocked` (returned in the plan; `409` if the real call is attempted) when:
-the shelf is already converted to that node; the node is a subcategory and the
-shelf still has subcategories of its own (a subcategory cannot hold
-subcategories — nothing is folded in silently; the children are in the queue
-and get their own decision first); a merge would put two same-named
-subcategories under one root; or a plain rename would collide with another
-shelf's name. `categoryId` must name an existing node (`400` otherwise) —
-**including a disabled one**, since an admin may legitimately file a shelf
-under a category that is currently retired — and be at most one level deep.
+the shelf is already converted to that node; the node sits beneath the one the
+shelf already is (a shelf cannot become its own descendant); a merge would put
+two same-named subcategories under one shelf; or a plain rename would collide
+with a sibling's name. `categoryId` must name an existing node (`400`
+otherwise) — **including a disabled one**, since an admin may legitimately
+file a shelf under a category that is currently retired.
 
 One transaction either way. **One-way**: a merge cannot be un-merged, so there
 is no unmap. Audited as `storeCategory.convert` with `{ from, to, how,

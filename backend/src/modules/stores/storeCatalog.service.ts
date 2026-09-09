@@ -32,19 +32,17 @@ import type {
   StoreVariantUpdateInput,
 } from "./storeCatalog.schema.js";
 import {
-  deriveProductOptions,
   sortByOptionOrder,
   variantLabel,
 } from "./productOptions.js";
 
 /**
- * Catalog of a customer-owned store, following the hierarchy
- * Store → Category → Subcategory (optional) → Product → Variants.
+ * Catalog of a customer-owned store: Store → Categories (a tree mirroring
+ * the global taxonomy, any depth) → Product → Variants.
  * Every call resolves the store through `getMyStore` first, so ownership is
  * enforced identically to the store routes (foreign store → 404). Products
- * require a category (root or subcategory) of the same store — "category
- * first, then products" is a hard rule here, not just UI. Category nesting
- * is one level deep: a subcategory can never be a parent.
+ * require a category of the same store — "category first, then products"
+ * is a hard rule here, not just UI.
  */
 
 /** Name of the implicit variant a product without options sells through. */
@@ -75,6 +73,7 @@ const productSelect = {
   deliveryRule: true,
   shippingOverride: true,
   codAvailable: true,
+  publishedAt: true,
   category: { select: { id: true, name: true, slug: true, parentId: true } },
   globalCategoryId: true,
   variants: {
@@ -87,6 +86,9 @@ const productSelect = {
       isActive: true,
       isDefault: true,
       optionValues: true,
+      sku: true,
+      compareAtPrice: true,
+      mediaId: true,
       createdAt: true,
     },
   },
@@ -110,10 +112,7 @@ type ProductRow = Prisma.StoreProductGetPayload<{ select: typeof productSelect }
  * own — everything money- or stock-related is derived from its variants:
  *
  *   - `optionTypes` — the ordered dimensions ("Size", "Colour") whose
- *                     cartesian product the variants are. Products that
- *                     predate option types get their single implicit one
- *                     synthesised here (`deriveProductOptions`), so every
- *                     consumer sees one shape.
+ *                     cartesian product the variants are.
  *   - `specifications` — ordered descriptive rows for the spec table.
  *   - `deliveryRule` — the product's own delivery-area rule, or null when
  *                     it follows the store default (never resolved to the
@@ -150,8 +149,30 @@ async function withProductTaxonomy<T extends { globalCategoryId: string | null }
   );
 }
 
-function shapeProduct(row: ProductRow) {
-  const {
+/**
+ * How finished a product is, for the seller's list — the four things a
+ * customer notices, weighted by how much each one sells. `missing` names
+ * what to do next; photo and price are also what publishing requires.
+ */
+function completeness(input: {
+  hasPhoto: boolean;
+  hasPrice: boolean;
+  description: string | null;
+  specs: number;
+}) {
+  const checks = [
+    { key: "photo" as const, weight: 35, done: input.hasPhoto },
+    { key: "price" as const, weight: 35, done: input.hasPrice },
+    { key: "description" as const, weight: 20, done: !!input.description?.trim() },
+    { key: "specifications" as const, weight: 10, done: input.specs > 0 },
+  ];
+  return {
+    percent: checks.reduce((sum, check) => sum + (check.done ? check.weight : 0), 0),
+    missing: checks.filter((check) => !check.done).map((check) => check.key),
+  };
+}
+
+function shapeProduct(row: ProductRow) {  const {
     variants: storedVariants,
     media,
     optionTypes: storedTypes,
@@ -161,13 +182,11 @@ function shapeProduct(row: ProductRow) {
     ...rest
   } = row;
 
-  const { optionTypes, variants } = deriveProductOptions(
-    resolveOptionTypes(storedTypes),
-    storedVariants.map((variant) => ({
-      ...variant,
-      optionValues: resolveOptionValues(variant.optionValues),
-    })),
-  );
+  const optionTypes = resolveOptionTypes(storedTypes);
+  const variants = storedVariants.map((variant) => ({
+    ...variant,
+    optionValues: resolveOptionValues(variant.optionValues),
+  }));
 
   const options = sortByOptionOrder(
     optionTypes,
@@ -194,6 +213,14 @@ function shapeProduct(row: ProductRow) {
     deliveryRule: resolveProductDeliveryRule(deliveryRule),
     shippingOverride: resolveProductShippingOverride(shippingOverride),
     hasVariants: optionTypes.length > 0,
+    /** Never published yet — created step by step and not finished. */
+    isDraft: rest.publishedAt === null,
+    completeness: completeness({
+      hasPhoto: media.some((item) => item.type === "IMAGE"),
+      hasPrice: pricing.some((variant) => variant.isActive && Number(variant.price) > 0),
+      description: rest.description,
+      specs: resolveSpecifications(specifications).length,
+    }),
     price: pricing.length > 0 ? pricing[prices.indexOf(Math.min(...prices))]!.price : null,
     priceMax: pricing.length > 0 ? pricing[prices.indexOf(Math.max(...prices))]!.price : null,
     stockQuantity: variants.reduce((sum, variant) => sum + variant.stockQuantity, 0),
@@ -202,6 +229,8 @@ function shapeProduct(row: ProductRow) {
           id: fallback.id,
           price: fallback.price,
           stockQuantity: fallback.stockQuantity,
+          sku: fallback.sku,
+          compareAtPrice: fallback.compareAtPrice,
         }
       : null,
     variants: options,
@@ -236,7 +265,7 @@ function shapeCategory(row: CategoryRow) {
     isFeatured: row.isFeatured,
     sortOrder: row.sortOrder,
     imageUrl: row.imageUrl,
-    /** Global-taxonomy tag; null when the shelf is deliberately unclassified. */
+    /** The platform category this shelf is; null only for shelves typed before the taxonomy. */
     categoryId: row.categoryId,
     productCount: row._count.products,
     subcategoryCount: row._count.children,
@@ -264,12 +293,20 @@ async function taxonomyRef(id: string) {
   // still show what it points at, rather than silently reading as untagged.
   const node = await getCategoryPath(id, false);
   return node
-    ? { id: node.id, name: node.name, slug: node.slug, pathLabel: node.pathLabel }
+    ? {
+        id: node.id,
+        name: node.name,
+        slug: node.slug,
+        pathLabel: node.pathLabel,
+        // What the product form suggests for things filed here.
+        optionTemplates: node.optionTemplates,
+        specTemplates: node.specTemplates,
+      }
     : null;
 }
 
 // ---------------------------------------------------------------------------
-// Categories (roots + one level of subcategories)
+// Categories (a tree mirroring the global taxonomy)
 // ---------------------------------------------------------------------------
 
 export async function listCategories(ownerId: string, storeRef: string) {
@@ -321,10 +358,10 @@ async function ensureShelf(
     return adoptable.id;
   }
 
-  // A name still held by some other shelf would break the per-store
-  // uniqueness rule, and there is no sane automatic answer to that.
+  // Names are unique among siblings; a typed shelf already holding this one
+  // in the same place has no sane automatic answer.
   const clash = await prisma.storeCategory.findFirst({
-    where: { storeId, name: { equals: node.name, mode: "insensitive" } },
+    where: { storeId, parentId, name: { equals: node.name, mode: "insensitive" } },
     select: { id: true },
   });
   if (clash) {
@@ -354,8 +391,8 @@ async function ensureShelf(
  * Add a shelf by CHOOSING a node from the global taxonomy.
  *
  * The seller supplies an id, never a name: the shelf is named after the node
- * and placed under the node's parent, so picking "Electronics › Mobiles"
- * yields both shelves in one go and every shelf created here is classified by
+ * and placed where the node sits, so picking "Electronics › Mobiles" yields
+ * the whole chain in one go and every shelf created here is classified by
  * construction. Sellers cannot invent categories; that is the whole point.
  */
 export async function createCategory(
@@ -369,11 +406,6 @@ export async function createCategory(
   // category an admin has retired.
   const node = await getCategoryPath(input.categoryId, true);
   if (!node) throw HttpError.badRequest("Selected category was not found");
-  if (node.depth > 1) {
-    throw HttpError.badRequest(
-      "Store categories nest one level deep — choose a category or one of its subcategories.",
-    );
-  }
 
   const already = await prisma.storeCategory.findFirst({
     where: { storeId: store.id, categoryId: node.id },
@@ -385,16 +417,12 @@ export async function createCategory(
     );
   }
 
-  // The parent shelf first, so a subcategory never lands without its root. It
-  // inherits nothing from the form: the artwork and position the seller chose
-  // are meant for the shelf they actually picked.
+  // Every ancestor shelf first, root downwards, so a shelf never lands without
+  // the chain above it. They inherit nothing from the form: the artwork and
+  // position the seller chose are meant for the shelf they actually picked.
   let parentShelfId: string | null = null;
-  if (node.parentId) {
-    const parentNode = await getCategoryPath(node.parentId, true);
-    if (!parentNode) {
-      throw HttpError.badRequest("Selected category was not found");
-    }
-    parentShelfId = await ensureShelf(store.id, parentNode, null, {});
+  for (const crumb of node.path.slice(0, -1)) {
+    parentShelfId = await ensureShelf(store.id, crumb, parentShelfId, {});
   }
 
   const id = await ensureShelf(store.id, node, parentShelfId, {
@@ -490,8 +518,46 @@ export async function listProducts(ownerId: string, storeRef: string) {
   return withProductTaxonomy(rows.map(shapeProduct));
 }
 
-export async function createProduct(
-  ownerId: string,
+/** SKUs are unique within a store — a packing slip must never be ambiguous. */
+async function assertSkusFree(
+  storeId: string,
+  entries: { sku: string | null | undefined; variantId?: string | undefined }[],
+) {
+  const wanted = new Map<string, string>();
+  for (const { sku } of entries) {
+    if (!sku) continue;
+    const folded = sku.toLowerCase();
+    if (wanted.has(folded)) throw HttpError.badRequest(`SKU "${sku}" is used twice`);
+    wanted.set(folded, sku);
+  }
+  if (wanted.size === 0) return;
+  const own = entries.flatMap((entry) => (entry.variantId ? [entry.variantId] : []));
+  const clash = await prisma.storeProductVariant.findFirst({
+    where: {
+      product: { storeId },
+      sku: { in: [...wanted.values()], mode: "insensitive" },
+      ...(own.length > 0 ? { id: { notIn: own } } : {}),
+    },
+    select: { sku: true, product: { select: { name: true } } },
+  });
+  if (clash) {
+    throw HttpError.conflict(`SKU "${clash.sku}" is already used by "${clash.product.name}".`);
+  }
+}
+
+/** A variant's photo must be one of its own product's images. */
+async function assertOwnImages(productId: string, mediaIds: (string | null | undefined)[]) {
+  const ids = [...new Set(mediaIds.filter((id): id is string => !!id))];
+  if (ids.length === 0) return;
+  const owned = await prisma.storeProductMedia.count({
+    where: { id: { in: ids }, productId, type: "IMAGE" },
+  });
+  if (owned !== ids.length) {
+    throw HttpError.badRequest("Choose one of this product's own photos");
+  }
+}
+
+export async function createProduct(  ownerId: string,
   storeRef: string,
   input: StoreProductCreateInput,
 ) {
@@ -513,30 +579,11 @@ export async function createProduct(
   // maps it, which reclassifies everything on it in the same move.
   const globalCategoryId = category.categoryId;
 
-  // A product always ships with at least one variant. With option types, the
-  // variants are the full cartesian product the schema has already validated,
-  // each NAMED by its values ("M / Red"); otherwise the implicit `Default`
-  // carries the single price/stock — so there is exactly one place a price
-  // lives.
-  const variants = input.hasVariants
-    ? input.variants!.map((variant) => ({
-        name: variantLabel(input.optionTypes!, variant.optionValues),
-        optionValues: variant.optionValues as unknown as Prisma.InputJsonValue,
-        price: variant.price,
-        stockQuantity: variant.stockQuantity,
-        isActive: variant.isActive,
-        isDefault: false,
-      }))
-    : [
-        {
-          name: DEFAULT_VARIANT_NAME,
-          // Both guaranteed by the schema: required when hasVariants is false.
-          price: input.price!,
-          stockQuantity: input.stockQuantity!,
-          isDefault: true,
-        },
-      ];
+  await assertSkusFree(store.id, [{ sku: input.sku }]);
 
+  // A DRAFT: disabled, unpublished, and always with its one implicit Default
+  // variant so there is exactly one place a price lives. Photos, options and
+  // everything else follow step by step against the id.
   const created = await prisma.storeProduct.create({
     data: {
       storeId: store.id,
@@ -545,30 +592,17 @@ export async function createProduct(
       name: input.name,
       slug: await uniqueProductSlug(store.id, input.name),
       description: input.description ?? null,
-      // Casts: typed object literals without an index signature don't satisfy
-      // Prisma's InputJsonValue (same as the store JSON columns). Spread
-      // conditionally — under exactOptionalPropertyTypes an explicit
-      // `undefined` is not an accepted value for these fields.
-      ...(input.hasVariants
-        ? { optionTypes: input.optionTypes as unknown as Prisma.InputJsonValue }
-        : {}),
-      ...(input.specifications && input.specifications.length > 0
-        ? {
-            specifications:
-              input.specifications as unknown as Prisma.InputJsonValue,
-          }
-        : {}),
-      ...(input.deliveryRule
-        ? { deliveryRule: input.deliveryRule as unknown as Prisma.InputJsonValue }
-        : {}),
-      ...(input.shippingOverride
-        ? {
-            shippingOverride:
-              input.shippingOverride as unknown as Prisma.InputJsonValue,
-          }
-        : {}),
-      codAvailable: input.codAvailable,
-      variants: { create: variants },
+      isActive: false,
+      variants: {
+        create: {
+          name: DEFAULT_VARIANT_NAME,
+          price: input.price ?? 0,
+          stockQuantity: input.stockQuantity ?? 0,
+          isDefault: true,
+          sku: input.sku ?? null,
+          compareAtPrice: input.compareAtPrice ?? null,
+        },
+      },
     },
     select: { id: true },
   });
@@ -603,7 +637,7 @@ export async function updateProduct(
 
   const product = await prisma.storeProduct.findFirst({
     where: { id: productId, storeId: store.id },
-    select: { id: true },
+    select: { id: true, publishedAt: true },
   });
   if (!product) throw HttpError.notFound("Product not found");
 
@@ -632,6 +666,13 @@ export async function updateProduct(
         "Add at least one photo before enabling this product",
       );
     }
+    // A draft starts at ₹0; nothing sells for nothing.
+    const priced = await prisma.storeProductVariant.count({
+      where: { productId, isActive: true, price: { gt: 0 } },
+    });
+    if (priced === 0) {
+      throw HttpError.badRequest("Set a price before publishing this product");
+    }
   }
 
   const data: Prisma.StoreProductUncheckedUpdateInput = {};
@@ -651,6 +692,8 @@ export async function updateProduct(
     data.globalCategoryId = target?.categoryId ?? null;
   }
   if (patch.isActive !== undefined) data.isActive = patch.isActive;
+  // The first time it goes live the draft is over — for good.
+  if (patch.isActive === true && product.publishedAt === null) data.publishedAt = new Date();
   if (patch.isFeatured !== undefined) data.isFeatured = patch.isFeatured;
   if (patch.isBestSeller !== undefined) data.isBestSeller = patch.isBestSeller;
   if (patch.isNewArrival !== undefined) data.isNewArrival = patch.isNewArrival;
@@ -765,7 +808,7 @@ export async function replaceProductOptions(
   productId: string,
   input: StoreProductOptionsInput,
 ) {
-  const id = await getMyProductId(ownerId, storeRef, productId);
+  const { productId: id, storeId } = await getMyProductRef(ownerId, storeRef, productId);
 
   const existing = await prisma.storeProductVariant.findMany({
     where: { productId: id },
@@ -785,6 +828,11 @@ export async function replaceProductOptions(
       );
     }
   }
+  await assertSkusFree(
+    storeId,
+    input.variants.map((variant) => ({ sku: variant.sku, variantId: variant.id })),
+  );
+  await assertOwnImages(id, input.variants.map((variant) => variant.mediaId));
 
   await prisma.$transaction(async (tx) => {
     if (input.optionTypes.length === 0) {
@@ -841,6 +889,9 @@ export async function replaceProductOptions(
             price: variant.price,
             stockQuantity: variant.stockQuantity,
             isActive: variant.isActive,
+            sku: variant.sku ?? null,
+            compareAtPrice: variant.compareAtPrice ?? null,
+            mediaId: variant.mediaId ?? null,
           },
         });
       }
@@ -856,6 +907,9 @@ export async function replaceProductOptions(
             stockQuantity: variant.stockQuantity,
             isActive: variant.isActive,
             isDefault: false,
+            sku: variant.sku ?? null,
+            compareAtPrice: variant.compareAtPrice ?? null,
+            mediaId: variant.mediaId ?? null,
           })),
         });
       }
@@ -888,11 +942,11 @@ export async function updateVariant(
   variantId: string,
   patch: StoreVariantUpdateInput,
 ) {
-  const id = await getMyProductId(ownerId, storeRef, productId);
+  const { productId: id, storeId } = await getMyProductRef(ownerId, storeRef, productId);
 
   const variant = await prisma.storeProductVariant.findFirst({
     where: { id: variantId, productId: id },
-    select: { id: true },
+    select: { id: true, price: true, compareAtPrice: true },
   });
   if (!variant) throw HttpError.notFound("Variant not found");
 
@@ -902,6 +956,21 @@ export async function updateVariant(
   if (patch.price !== undefined) data.price = patch.price;
   if (patch.stockQuantity !== undefined) data.stockQuantity = patch.stockQuantity;
   if (patch.isActive !== undefined) data.isActive = patch.isActive;
+  if (patch.sku !== undefined) data.sku = patch.sku;
+  if (patch.compareAtPrice !== undefined) data.compareAtPrice = patch.compareAtPrice;
+  if (patch.mediaId !== undefined) data.mediaId = patch.mediaId;
+
+  // The MRP rule holds for the resulting state, whichever half was patched.
+  const price = patch.price ?? Number(variant.price);
+  const compareAt =
+    patch.compareAtPrice === undefined
+      ? variant.compareAtPrice === null ? null : Number(variant.compareAtPrice)
+      : patch.compareAtPrice;
+  if (compareAt !== null && compareAt <= price) {
+    throw HttpError.badRequest("MRP must be higher than the price");
+  }
+  if (patch.sku) await assertSkusFree(storeId, [{ sku: patch.sku, variantId }]);
+  if (patch.mediaId) await assertOwnImages(id, [patch.mediaId]);
 
   await prisma.storeProductVariant.update({ where: { id: variantId }, data });
   // Price / stock / isActive all move the aggregates.

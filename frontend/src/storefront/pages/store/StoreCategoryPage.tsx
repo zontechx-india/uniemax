@@ -17,9 +17,8 @@ import type { Crumb } from '../../features/publicStore/ListingControls'
  * `/store/{storeSlug}/category/{categorySlug}` — a dedicated page per
  * category, replacing the old "one page filters everything" model.
  *
- * A root category shows its subcategories as chips (each its own page) and
- * lists products from itself *and* its subcategories; a subcategory lists only
- * its own.
+ * A category shows its subcategories as chips (each its own page) and lists
+ * products from itself and everything beneath it.
  */
 export function StoreCategoryPage() {
   const { store, skin } = usePublicStore()
@@ -74,15 +73,13 @@ export function StoreCategoryPage() {
     )
   }
 
-  const trail: Crumb[] = category.parent
-    ? [
-        {
-          label: category.parent.name,
-          to: storeCategoryUrl(store.slug, category.parent.slug),
-        },
-        { label: category.name },
-      ]
-    : [{ label: category.name }]
+  const trail: Crumb[] = [
+    ...category.ancestors.map((crumb) => ({
+      label: crumb.name,
+      to: storeCategoryUrl(store.slug, crumb.slug),
+    })),
+    { label: category.name },
+  ]
 
   return (
     <ProductListing

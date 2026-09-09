@@ -7,10 +7,6 @@ import {
   publicCategoryRoutes,
   adminCategoryRoutes,
 } from "./modules/category/category.routes.js";
-import {
-  publicProductRoutes,
-  adminProductRoutes,
-} from "./modules/product/product.routes.js";
 import { storeRoutes, publicStoreRoutes } from "./modules/stores/stores.routes.js";
 import {
   sellerThemeTemplateRoutes,
@@ -52,7 +48,6 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       // ---- Public (customer) ------------------------------------------
       await api.register(authRoutes, { prefix: "/auth" });
       await api.register(publicCategoryRoutes, { prefix: "/categories" });
-      await api.register(publicProductRoutes, { prefix: "/products" });
       // Customer-owned stores (guarded inside the plugin — requireCustomer).
       await api.register(storeRoutes, { prefix: "/stores" });
       // Curated storefront palettes a seller applies from Appearance —
@@ -105,7 +100,6 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
           await admin.register(async (guarded) => {
             guarded.addHook("preHandler", requireAdmin);
             await guarded.register(adminCategoryRoutes, { prefix: "/categories" });
-            await guarded.register(adminProductRoutes, { prefix: "/products" });
             // Notification feed + broadcast for the admin principal.
             await guarded.register(adminNotificationRoutes, {
               prefix: "/notifications",

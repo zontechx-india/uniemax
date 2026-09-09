@@ -61,10 +61,9 @@ Verify: `curl http://localhost:4000/health`
 | `npm run db:status` | Show applied/pending migrations                  |
 | `npm run create-admin -- <email> <pw> [name]` | Create/reset an admin account  |
 | `npm run push-keys` | Print a fresh VAPID key pair for Web Push — run once per environment and paste into `.env` |
-| `npm run backfill-catalog` | Fill missing store category/product slugs and recompute product price/stock aggregates. Idempotent — safe to re-run. |
 | `npm run seed-theme-templates` | Create the five starter store appearance templates. Copies the **colors only** from real, well-configured stores (never any other store data), topped up from curated fallbacks. Idempotent — does nothing when templates exist; `-- --force` tops the table back up to five. |
-| `npm run seed-categories` | Seed the global category taxonomy (29 top-level + 125 sub) from `src/scripts/data/globalCategories.ts`. Upserts by slug — idempotent, never duplicates, never deletes. Realigns `name`/`parentId`/`displayOrder`; leaves `isActive`/`description`/`imageUrl` as the admin set them. `-- --dry-run` reports without writing. |
-| `npm run migrate-store-categories` | Classify existing seller shelves and products against the global taxonomy. Dry run by default; `-- --apply` snapshots then writes in one transaction; `-- --rollback <snapshot.json>` undoes it. Only fills nulls — idempotent and non-destructive. Writes a markdown report of every row it refused to decide to `backend/migration-backups/`. |
+| `npm run seed-categories` | Seed the global category taxonomy (29 top-level + 125 sub) from `src/scripts/data/globalCategories.ts`. Upserts by slug — idempotent, never duplicates, never deletes. Realigns `name`/`parentId`/`displayOrder`; leaves `isActive`/`description`/`imageUrl` as the admin set them; fills `optionTemplates`/`specTemplates` from `data/categoryPresets.ts` only where never set. `-- --dry-run` reports without writing. |
+| `npm run audit-media` | Compare every S3 object against the media keys the current environment's DB references (`Store.logoKey`, `StoreProductMedia.key`, `OrderItem.imageKey`, plus bucket-hosted legacy URL columns). Writes `media-audit-<mode>.{json,md}` + CSVs to `backend/migration-backups/`. Both envs share one bucket, so run once per env and pass `-- --merge migration-backups/media-audit-<other>.json` on the second run to get true orphans (referenced by neither DB). Read-only unless `--delete-orphans --yes` is added to a merged run. |
 
 ## Environment (`.env`)
 
@@ -120,7 +119,7 @@ Verify: `curl http://localhost:4000/health`
 ## Adding a feature module
 
 Create four files under `src/modules/<name>/` (`schema` · `service` · `controller` ·
-`routes`) and register the routes in `src/routes.ts`. See `modules/product/` for the
+`routes`) and register the routes in `src/routes.ts`. See `modules/category/` for the
 reference pattern, documented in [`docs/BACKEND_CONTEXT.md`](../docs/BACKEND_CONTEXT.md).
 
 ## The admin console API

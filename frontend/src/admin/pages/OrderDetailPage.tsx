@@ -119,6 +119,9 @@ export default function OrderDetailPage() {
                     {item.variantName ? (
                       <Chip className="mt-1">{item.variantName}</Chip>
                     ) : null}
+                    {item.sku ? (
+                      <p className="mt-1 font-mono text-xs text-muted">SKU {item.sku}</p>
+                    ) : null}
                   </div>
                   <div className="text-right text-sm">
                     <p className="text-muted">

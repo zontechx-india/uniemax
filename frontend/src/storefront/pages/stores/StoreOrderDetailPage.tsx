@@ -254,6 +254,9 @@ export function StoreOrderDetailPage() {
                               {item.variantName}
                             </span>
                           )}
+                          {item.sku && (
+                            <span className="mr-2 font-mono text-[11px]">SKU {item.sku}</span>
+                          )}
                           {item.quantity} × {formatPrice(item.unitPrice)}
                         </p>
                       </div>

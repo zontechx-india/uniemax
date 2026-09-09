@@ -1,4 +1,6 @@
 import { prisma } from "../../config/prisma.js";
+import { resolveOptionTemplates, resolveSpecTemplates } from "./categoryTemplates.js";
+import type { OptionTemplate } from "./categoryTemplates.js";
 
 /**
  * Read models for the GLOBAL category taxonomy.
@@ -14,6 +16,12 @@ import { prisma } from "../../config/prisma.js";
 
 const CACHE_TTL_MS = 60_000;
 
+/**
+ * Levels a category may nest, root included. Store shelves mirror the
+ * taxonomy, so this bounds them too (see `activeShelfChain`).
+ */
+export const MAX_CATEGORY_DEPTH = 5;
+
 export type CategoryRow = {
   id: string;
   name: string;
@@ -22,6 +30,8 @@ export type CategoryRow = {
   displayOrder: number;
   isActive: boolean;
   parentId: string | null;
+  optionTemplates: unknown;
+  specTemplates: unknown;
 };
 
 /** A node plus its ancestors — what a selector needs to show a full path. */
@@ -35,6 +45,12 @@ export type CategoryNode = CategoryRow & {
   depth: number;
   childCount: number;
   children: CategoryNode[];
+  /** Suggested option types for products filed here — the node's own, else the nearest ancestor's. */
+  optionTemplates: OptionTemplate[];
+  /** Suggested specification labels, likewise. */
+  specTemplates: string[];
+  /** The ancestor the suggestions come from; null when they are the node's own (or there are none). */
+  templatesFrom: string | null;
 };
 
 let cache: { rows: CategoryRow[]; loadedAt: number } | null = null;
@@ -55,6 +71,8 @@ async function allCategories(): Promise<CategoryRow[]> {
       displayOrder: true,
       isActive: true,
       parentId: true,
+      optionTemplates: true,
+      specTemplates: true,
     },
     orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
   });
@@ -123,11 +141,47 @@ function crumbs(row: CategoryRow, byId: Map<string, CategoryRow>): CategoryCrumb
 
 const label = (path: CategoryCrumb[]) => path.map((c) => c.name).join(" > ");
 
+/** The node's own suggestions, else the nearest ancestor's — a saree inherits Fashion's sizes. */
+function inheritedTemplates(row: CategoryRow, byId: Map<string, CategoryRow>) {
+  let options: OptionTemplate[] = [];
+  let specs: string[] = [];
+  let optionsFrom: CategoryRow | null = null;
+  let specsFrom: CategoryRow | null = null;
+  const guard = new Set<string>();
+  let cursor: CategoryRow | undefined = row;
+  while (cursor && !guard.has(cursor.id)) {
+    guard.add(cursor.id);
+    if (!optionsFrom) {
+      const own = resolveOptionTemplates(cursor.optionTemplates);
+      if (own.length > 0) {
+        options = own;
+        optionsFrom = cursor;
+      }
+    }
+    if (!specsFrom) {
+      const own = resolveSpecTemplates(cursor.specTemplates);
+      if (own.length > 0) {
+        specs = own;
+        specsFrom = cursor;
+      }
+    }
+    if (optionsFrom && specsFrom) break;
+    cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
+  }
+  const from = optionsFrom ?? specsFrom;
+  return {
+    optionTemplates: options,
+    specTemplates: specs,
+    templatesFrom: from && from.id !== row.id ? from.name : null,
+  };
+}
+
 function toNode(row: CategoryRow, idx: Index, deep: boolean): CategoryNode {
   const path = crumbs(row, idx.byId);
   const kids = idx.childrenOf.get(row.id) ?? [];
   return {
     ...row,
+    ...inheritedTemplates(row, idx.byId),
     path,
     pathLabel: label(path),
     depth: path.length - 1,
@@ -216,4 +270,17 @@ export async function getCategoryPath(
   const idx = await index(activeOnly);
   const row = idx.byId.get(id);
   return row ? toNode(row, idx, false) : null;
+}
+
+/** Longest chain below a node — 0 for a leaf. */
+export async function getCategoryHeight(id: string): Promise<number> {
+  const idx = await index(false);
+  const seen = new Set<string>();
+  const height = (nodeId: string): number => {
+    if (seen.has(nodeId)) return 0;
+    seen.add(nodeId);
+    const kids = idx.childrenOf.get(nodeId) ?? [];
+    return kids.length === 0 ? 0 : 1 + Math.max(...kids.map((kid) => height(kid.id)));
+  };
+  return height(id);
 }

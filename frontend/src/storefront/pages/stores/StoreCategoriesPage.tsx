@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactElement } from 'react'
 import { Link } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
-import { taxonomyApi } from '../../../shared/categories/taxonomyApi'
-import type { CategoryNode } from '../../../shared/categories/taxonomyApi'
+import { CategoryPicker } from '../../../shared/categories/CategoryPicker'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
-import { ErrorNote, Select } from '../../../shared/ui/form'
+import { ErrorNote } from '../../../shared/ui/form'
 import { storeCatalogApi } from '../../features/stores/storesApi'
 import type {
   StoreCategory,
@@ -24,27 +23,24 @@ import { ActiveSwitch } from './ActiveSwitch'
 
 /**
  * Categories section of the store manage page — first step of the hierarchy
- * Store → Category → Subcategory (optional) → Product → Variants. Products
- * can only be added once at least one category exists.
+ * Store → Categories → Product → Variants. Products can only be added once
+ * at least one category exists.
  *
- * A category is CHOSEN from the platform taxonomy, never typed. Two selects —
- * category, then an optional subcategory — are the whole form: it is the
- * shortest path to a correct answer, and it makes one shop's catalog
- * comparable with every other shop's by construction. Picking a subcategory
- * creates its parent shelf too, so "Electronics › Mobiles" is one action.
+ * A category is CHOSEN from the platform taxonomy, never typed, through the
+ * same search-or-browse picker the whole platform uses. The tree goes as deep
+ * as the taxonomy does: picking "Fashion › Women › Sarees" adds Fashion and
+ * Women as well, so the shop's navigation always mirrors the platform's and
+ * one shop's catalog is comparable with every other shop's by construction.
  *
- * Shelves created before this rule keep the free text a seller typed — often a
- * brand ("KTM") or a tier ("Pro Edition"), neither of which is a category.
- * Those stay exactly as they are; re-pointing one at the taxonomy is an admin
- * action, so nothing here can rewrite a shop's existing navigation.
+ * Shelves created before this rule keep the free text a seller typed. Those
+ * stay exactly as they are; converting one is an admin action, so nothing
+ * here can rewrite a shop's existing navigation.
  */
 export function StoreCategoriesPage() {
   const { store } = useManagedStore()
 
   const [categories, setCategories] = useState<StoreCategory[] | null>(null)
-  const [taxonomy, setTaxonomy] = useState<CategoryNode[] | null>(null)
-  const [rootId, setRootId] = useState('')
-  const [subId, setSubId] = useState('')
+  const [choice, setChoice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [toDelete, setToDelete] = useState<StoreCategory | null>(null)
@@ -52,14 +48,12 @@ export function StoreCategoriesPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
 
-  // Which roots are expanded. Long catalogs collapse by default so the list
-  // stays scannable; the choice is remembered per store.
+  // Which branches are expanded. Long catalogs collapse by default so the
+  // list stays scannable; the choice is remembered per store.
   const expandKey = `storefront.categories.expanded.${store.id}`
   const [expanded, setExpanded] = useState<Set<string>>(() => {
     try {
-      const raw = localStorage.getItem(
-        `storefront.categories.expanded.${store.id}`,
-      )
+      const raw = localStorage.getItem(expandKey)
       return new Set<string>(raw ? (JSON.parse(raw) as string[]) : [])
     } catch {
       return new Set<string>()
@@ -75,33 +69,18 @@ export function StoreCategoriesPage() {
     }
   }
 
-  const toggleExpanded = (rootId: string) => {
+  const toggleExpanded = (id: string) => {
     const next = new Set(expanded)
-    if (next.has(rootId)) next.delete(rootId)
-    else next.add(rootId)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
     persistExpanded(next)
   }
 
-  useEffect(() => {
-    let cancelled = false
-    taxonomyApi
-      .tree()
-      .then((nodes) => {
-        if (!cancelled) setTaxonomy(nodes)
-      })
-      .catch(() => {
-        if (!cancelled) setTaxonomy([])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const reload = () =>
-    storeCatalogApi
-      .listCategories(store.id)
-      .then(setCategories)
-      .catch((err) => setError(toApiError(err).message))
+  const reload = async () => {
+    const list = await storeCatalogApi.listCategories(store.id)
+    setCategories(list)
+    return list
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -121,25 +100,23 @@ export function StoreCategoriesPage() {
     }
   }, [store.id])
 
-  const roots = (categories ?? []).filter((c) => c.parentId === null)
-  const childrenOf = (parent: string) =>
+  const childrenOf = (parent: string | null) =>
     (categories ?? []).filter((c) => c.parentId === parent)
 
-  /** Categories already on the shelf list — shown but not selectable again. */
-  const claimed = new Set(
-    (categories ?? []).map((c) => c.categoryId).filter(Boolean) as string[],
-  )
-  const taken = (nodeId: string) => claimed.has(nodeId)
-  const subOptions =
-    (taxonomy ?? []).find((n) => n.id === rootId)?.children ?? []
+  /** The shelf already standing for the picked category, if any. */
+  const alreadyAdded = choice
+    ? ((categories ?? []).find((c) => c.categoryId === choice) ?? null)
+    : null
 
-  const nestedRoots = roots.filter((root) => childrenOf(root.id).length > 0)
+  const branches = (categories ?? []).filter(
+    (c) => childrenOf(c.id).length > 0,
+  )
   const allExpanded =
-    nestedRoots.length > 0 && nestedRoots.every((root) => expanded.has(root.id))
+    branches.length > 0 && branches.every((b) => expanded.has(b.id))
 
   const toggleAll = () =>
     persistExpanded(
-      allExpanded ? new Set<string>() : new Set(nestedRoots.map((r) => r.id)),
+      allExpanded ? new Set<string>() : new Set(branches.map((b) => b.id)),
     )
 
   const replaceRow = (updated: StoreCategory) =>
@@ -149,25 +126,26 @@ export function StoreCategoriesPage() {
 
   const add = async (e: FormEvent) => {
     e.preventDefault()
-    // The subcategory is the more specific answer, so it wins when both are set.
-    const chosen = subId || rootId
-    if (!chosen) return setError('Choose a category to add.')
+    if (!choice) return setError('Choose a category to add.')
 
     setError(null)
     setBusy(true)
     try {
       const category = await storeCatalogApi.createCategory(store.id, {
-        categoryId: chosen,
+        categoryId: choice,
       })
-      // Refetch rather than append: picking a subcategory can create its
-      // parent shelf too, and only the server knows whether it did.
-      await reload()
-      setRootId('')
-      setSubId('')
-      // Reveal the new subcategory instead of hiding it in a collapsed parent.
-      if (category.parentId) {
-        persistExpanded(new Set(expanded).add(category.parentId))
+      // Refetch rather than append: picking a deep category creates its
+      // ancestors too, and only the server knows which ones it did.
+      const list = await reload()
+      setChoice(null)
+      // Reveal the new shelf instead of hiding it in collapsed ancestors.
+      const next = new Set(expanded)
+      let cursor = list.find((c) => c.id === category.parentId)
+      while (cursor) {
+        next.add(cursor.id)
+        cursor = list.find((c) => c.id === cursor?.parentId)
       }
+      persistExpanded(next)
     } catch (err) {
       setError(toApiError(err).message)
     } finally {
@@ -244,43 +222,49 @@ export function StoreCategoriesPage() {
     }
   }
 
-  const renderRow = (category: StoreCategory, isSub: boolean) => {
-    const subs = isSub ? [] : childrenOf(category.id)
-    const isExpanded = expanded.has(category.id)
-    return (
-      <div key={category.id}>
-        <CategoryRow
-          category={category}
-          isSub={isSub}
-          toggling={togglingId === category.id}
-          expandable={!isSub && subs.length > 0}
-          isExpanded={isExpanded}
-          isEditing={editingId === category.id}
-          onToggleExpand={() => toggleExpanded(category.id)}
-          onToggle={(next) => toggleActive(category, next)}
-          {...(isSub
-            ? {}
-            : { onToggleFeatured: (next: boolean) => toggleFeatured(category, next) })}
-          onDelete={() => setToDelete(category)}
-          onEdit={() =>
-            setEditingId(editingId === category.id ? null : category.id)
-          }
-        />
-        {editingId === category.id && (
-          <CategoryEditPanel
+  /**
+   * The tree as a flat run of rows, each indented by its depth, so one
+   * divided list keeps every row aligned however deep the shelves nest.
+   */
+  const rows = (parentId: string | null, depth: number): ReactElement[] =>
+    childrenOf(parentId).flatMap((category) => {
+      const expandable = childrenOf(category.id).length > 0
+      const isExpanded = expanded.has(category.id)
+      return [
+        <li key={category.id}>
+          <CategoryRow
             category={category}
-            isSub={isSub}
-            onCancel={() => setEditingId(null)}
-            onSave={async (patch) => {
-              const done = await saveEdit(category, patch)
-              if (done) setEditingId(null)
-              return done
-            }}
+            depth={depth}
+            toggling={togglingId === category.id}
+            expandable={expandable}
+            isExpanded={isExpanded}
+            isEditing={editingId === category.id}
+            onToggleExpand={() => toggleExpanded(category.id)}
+            onToggle={(next) => toggleActive(category, next)}
+            {...(depth === 0
+              ? { onToggleFeatured: (next: boolean) => toggleFeatured(category, next) }
+              : {})}
+            onDelete={() => setToDelete(category)}
+            onEdit={() =>
+              setEditingId(editingId === category.id ? null : category.id)
+            }
           />
-        )}
-      </div>
-    )
-  }
+          {editingId === category.id && (
+            <CategoryEditPanel
+              category={category}
+              depth={depth}
+              onCancel={() => setEditingId(null)}
+              onSave={async (patch) => {
+                const done = await saveEdit(category, patch)
+                if (done) setEditingId(null)
+                return done
+              }}
+            />
+          )}
+        </li>,
+        ...(expandable && isExpanded ? rows(category.id, depth + 1) : []),
+      ]
+    })
 
   return (
     <div>
@@ -288,97 +272,39 @@ export function StoreCategoriesPage() {
         Categories
       </h2>
       <p className="mt-1 text-sm text-muted">
-        Choose the categories you sell in. Pick a category, then a subcategory
-        if you want to be more specific — adding a subcategory adds its
-        category too. Add at least one, then you can start adding products.
+        Choose the categories you sell in — search or browse the platform list
+        and pick as specific a category as you like. Picking a deeper one adds
+        the categories above it too. Add at least one, then you can start
+        adding products.
       </p>
 
-      {/* Add form — two selects, no free text: a shop cannot invent a
-          category, so every shelf is findable across the whole platform. */}
+      {/* Add form — a picker, no free text: a shop cannot invent a category,
+          so every shelf is findable across the whole platform. */}
       <form onSubmit={add} className="mt-4 max-w-3xl" noValidate>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="w-full">
-            <label
-              htmlFor="cat-root"
-              className="mb-1.5 block text-sm font-medium text-fg"
-            >
-              Category
-            </label>
-            <Select
-              id="cat-root"
-              value={rootId}
-              onChange={(e) => {
-                setRootId(e.target.value)
-                setSubId('')
-              }}
-              className="h-11"
-              containerClassName="w-full"
-            >
-              <option value="">
-                {taxonomy === null ? 'Loading…' : 'Choose a category…'}
-              </option>
-              {(taxonomy ?? []).map((node) => (
-                <option key={node.id} value={node.id} disabled={taken(node.id)}>
-                  {node.name}
-                  {taken(node.id) ? ' — already added' : ''}
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          <div className="w-full">
-            <label
-              htmlFor="cat-sub"
-              className="mb-1.5 block text-sm font-medium text-fg"
-            >
-              Subcategory{' '}
-              <span className="font-normal text-muted">(optional)</span>
-            </label>
-            <Select
-              id="cat-sub"
-              value={subId}
-              disabled={subOptions.length === 0}
-              onChange={(e) => setSubId(e.target.value)}
-              className="h-11"
-              containerClassName="w-full"
-            >
-              <option value="">
-                {rootId === ''
-                  ? 'Choose a category first'
-                  : subOptions.length === 0
-                    ? 'No subcategories'
-                    : 'All of this category'}
-              </option>
-              {subOptions.map((node) => (
-                <option key={node.id} value={node.id} disabled={taken(node.id)}>
-                  {node.name}
-                  {taken(node.id) ? ' — already added' : ''}
-                </option>
-              ))}
-            </Select>
-          </div>
-
+          <CategoryPicker
+            value={choice}
+            onChange={(id) => {
+              setChoice(id)
+              setError(null)
+            }}
+            label="Category"
+            placeholder="Search or browse categories…"
+            className="w-full"
+          />
           <button
             type="submit"
-            disabled={busy || !(subId || rootId)}
+            disabled={busy || !choice || alreadyAdded !== null}
             className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-md bg-brand-gradient px-4 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
           >
             <PlusIcon className="h-4 w-4" />
             {busy ? 'Adding…' : 'Add'}
           </button>
         </div>
-
-        {rootId !== '' && (
+        {alreadyAdded && (
           <p className="mt-2 text-xs text-muted">
-            Adding{' '}
-            <span className="font-medium text-fg">
-              {[
-                (taxonomy ?? []).find((n) => n.id === rootId)?.name,
-                subOptions.find((n) => n.id === subId)?.name,
-              ]
-                .filter(Boolean)
-                .join(' › ')}
-            </span>
+            <span className="font-medium text-fg">{alreadyAdded.name}</span> is
+            already in your categories.
           </p>
         )}
       </form>
@@ -389,7 +315,7 @@ export function StoreCategoriesPage() {
         </div>
       )}
 
-      {/* Nested list: roots with their subcategories indented */}
+      {/* Nested list, any depth, each level indented */}
       <div className="mt-4">
         {categories === null ? (
           <p className="text-sm text-muted">Loading categories…</p>
@@ -406,7 +332,7 @@ export function StoreCategoriesPage() {
           </div>
         ) : (
           <>
-            {nestedRoots.length > 0 && (
+            {branches.length > 0 && (
               <div className="mb-2 flex justify-end">
                 <button
                   type="button"
@@ -418,13 +344,7 @@ export function StoreCategoriesPage() {
               </div>
             )}
             <ul className="divide-y divide-line rounded-lg border border-line">
-              {roots.map((root) => (
-                <li key={root.id}>
-                  {renderRow(root, false)}
-                  {expanded.has(root.id) &&
-                    childrenOf(root.id).map((sub) => renderRow(sub, true))}
-                </li>
-              ))}
+              {rows(null, 0)}
             </ul>
           </>
         )}
@@ -444,7 +364,7 @@ export function StoreCategoriesPage() {
 
       <ConfirmDialog
         open={toDelete !== null}
-        title={toDelete?.parentId ? 'Delete subcategory?' : 'Delete category?'}
+        title="Delete category?"
         description={
           toDelete ? (
             <>
@@ -463,21 +383,24 @@ export function StoreCategoriesPage() {
   )
 }
 
+/** Left inset for a row at `depth`: the root inset plus one step per level. */
+const indent = (depth: number) => ({ paddingLeft: 16 + depth * 28 })
+
 /**
  * The expanded editor for one shelf — artwork and position only.
  *
  * The name is deliberately not editable: it is the platform category's name,
  * and for a legacy shelf it is the seller's own wording, which only an admin
- * re-maps. That keeps every shelf name on the platform meaningful.
+ * converts. That keeps every shelf name on the platform meaningful.
  */
 function CategoryEditPanel({
   category,
-  isSub,
+  depth,
   onSave,
   onCancel,
 }: {
   category: StoreCategory
-  isSub: boolean
+  depth: number
   onSave: (patch: StoreCategoryInput) => Promise<boolean>
   onCancel: () => void
 }) {
@@ -502,9 +425,7 @@ function CategoryEditPanel({
   }
 
   return (
-    <div
-      className={`border-t border-line bg-surface-alt px-4 py-4 ${isSub ? 'pl-18' : ''}`}
-    >
+    <div className="border-t border-line bg-surface-alt py-4 pr-4" style={indent(depth)}>
       <div className="grid max-w-3xl gap-4 sm:grid-cols-2">
         <div>
           <label className="mb-1.5 block text-sm font-medium text-fg">
@@ -584,11 +505,11 @@ function CategoryEditPanel({
 
 function CategoryRow({
   category,
-  isSub = false,
+  depth,
   toggling,
-  expandable = false,
-  isExpanded = false,
-  isEditing = false,
+  expandable,
+  isExpanded,
+  isEditing,
   onToggleExpand,
   onToggle,
   onToggleFeatured,
@@ -596,54 +517,49 @@ function CategoryRow({
   onEdit,
 }: {
   category: StoreCategory
-  isSub?: boolean
+  depth: number
   toggling: boolean
-  /** Root rows with subcategories get the expand/collapse chevron. */
-  expandable?: boolean
-  isExpanded?: boolean
-  isEditing?: boolean
-  onToggleExpand?: () => void
+  /** Rows with children get the expand/collapse chevron. */
+  expandable: boolean
+  isExpanded: boolean
+  isEditing: boolean
+  onToggleExpand: () => void
   onToggle: (next: boolean) => void
   /** Root rows only — features the category on the storefront homepage. */
   onToggleFeatured?: (next: boolean) => void
   onDelete: () => void
   onEdit: () => void
 }) {
+  const isSub = depth > 0
   const meta: string[] = [
     `${category.productCount} ${category.productCount === 1 ? 'product' : 'products'}`,
   ]
-  if (!isSub && category.subcategoryCount > 0) {
+  if (category.subcategoryCount > 0) {
     meta.push(
       `${category.subcategoryCount} ${category.subcategoryCount === 1 ? 'subcategory' : 'subcategories'}`,
     )
   }
 
   return (
-    // Root content starts at 48px (pl-4 + the 20px chevron slot + 12px gap), so
-    // subcategories need to clear that before their own indent reads as nested.
-    <div
-      className={`flex items-center gap-3 py-3 pr-4 ${isSub ? 'pl-18' : 'pl-4'}`}
-    >
+    <div className="flex items-center gap-3 py-3 pr-4" style={indent(depth)}>
       {/* Expand/collapse — a fixed-width slot keeps every row aligned. */}
-      {!isSub && (
-        <div className="w-5 shrink-0">
-          {expandable && (
-            <button
-              type="button"
-              onClick={onToggleExpand}
-              aria-expanded={isExpanded}
-              aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${category.name}`}
-              className="flex h-5 w-5 items-center justify-center rounded-sm text-muted transition-colors hover:text-fg"
-            >
-              <ChevronDownIcon
-                className={`h-4 w-4 transition-transform ${
-                  isExpanded ? '' : '-rotate-90'
-                }`}
-              />
-            </button>
-          )}
-        </div>
-      )}
+      <div className="w-5 shrink-0">
+        {expandable && (
+          <button
+            type="button"
+            onClick={onToggleExpand}
+            aria-expanded={isExpanded}
+            aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${category.name}`}
+            className="flex h-5 w-5 items-center justify-center rounded-sm text-muted transition-colors hover:text-fg"
+          >
+            <ChevronDownIcon
+              className={`h-4 w-4 transition-transform ${
+                isExpanded ? '' : '-rotate-90'
+              }`}
+            />
+          </button>
+        )}
+      </div>
 
       {category.imageUrl ? (
         <img
@@ -688,8 +604,8 @@ function CategoryRow({
             </span>
           )}
         </p>
-        {/* The platform tag, shown as its full path — "Accessories" on its own
-            would not tell the seller which Accessories they picked. */}
+        {/* The platform category, shown as its full path — "Accessories" on
+            its own would not tell the seller which Accessories they picked. */}
         <p className="mt-0.5 truncate text-xs">
           {category.taxonomy ? (
             <span className="text-brand">{category.taxonomy.pathLabel}</span>
@@ -701,7 +617,7 @@ function CategoryRow({
 
       {/* Featuring only applies to top-level categories — the homepage row
           shows roots, never subcategories. */}
-      {!isSub && onToggleFeatured && (
+      {onToggleFeatured && (
         <button
           type="button"
           onClick={() => onToggleFeatured(!category.isFeatured)}

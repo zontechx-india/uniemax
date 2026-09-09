@@ -35,7 +35,8 @@ never ships to a shopper.
   categories / products, platform stats.
 - Per-store storefronts with the seller's own colors, logo, footer and homepage
   section order.
-- Browse by category (two levels), product detail with a variant picker, search
+- Browse by category (nested as deep as the taxonomy), product detail with a
+  variant picker, MRP strike-through and per-variant photos, search
   and filtered/sorted listing.
 - One cart that spans multiple stores, but **orders are placed per store** — each
   "Place Order" carries exactly one store's items. Guests keep it in the browser;
@@ -57,7 +58,7 @@ never ships to a shopper.
 - Business identity kept separately from storefront presentation: legal name,
   accountable seller, contact details, a structured business address,
   PAN / GSTIN.
-- Catalog: categories → optional subcategories → products → variants. **The
+- Catalog: categories (a tree) → products → variants (SKU, MRP, photo). **The
   variant is the unit of sale** — price and stock live only on variants; a simple
   product carries one hidden default variant.
 - Merchandising flags (`isFeatured`, `isBestSeller`, `isNewArrival`,
@@ -226,9 +227,9 @@ env config — see [`backend/docs/PACKAGE_AUTH.md`](./backend/docs/PACKAGE_AUTH.
   the **first** publish only, so re-publishing an old store doesn't bump it back
   to the top of "New Stores".
 - **StoreCategory / StoreProduct / StoreProductVariant** — the catalog *inside* a
-  seller's store, separate from the admin's global `Category` / `Product`.
-  Categories are one level deep; products require a category; variants carry price
-  and stock. Product-level `price`, `priceMax`, `stockQuantity` and `hasVariants`
+  seller's store, classified against the admin's global `Category` taxonomy.
+  Categories nest as deep as the taxonomy (≤ 5 levels); products require a
+  category; variants carry price and stock. Product-level `price`, `priceMax`, `stockQuantity` and `hasVariants`
   are **derived and read-only**.
 - **Order / OrderItem** — placed per store, re-priced from the live catalog at
   placement, stock decremented transactionally.
@@ -296,7 +297,6 @@ Backend scripts (run in `backend/`):
 | `npm run create-admin` | seed an admin account |
 | `npm run push-keys` | generate VAPID keys |
 | `npm run seed-theme-templates` | seed the appearance templates |
-| `npm run backfill-catalog` | one-off catalog backfill |
 
 Setup detail and the full env-var list: [`backend/README.md`](./backend/README.md).
 

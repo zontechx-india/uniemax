@@ -432,7 +432,7 @@ function FeaturedCategories({
                   <span
                     className={`mt-0.5 block truncate text-[11px] ${skin.muted}`}
                   >
-                    {category.subcategories.map((s) => s.name).join(' · ')}
+                    {namesBelow(category).join(' · ')}
                   </span>
                 )}
               </span>
@@ -496,4 +496,9 @@ function ProductRow({
       </ul>
     </Band>
   )
+}
+
+/** Every shelf beneath a category, however deep, as a flat list of names. */
+function namesBelow(category: PublicCategory): string[] {
+  return category.subcategories.flatMap((sub) => [sub.name, ...namesBelow(sub)])
 }

@@ -36,6 +36,12 @@ export interface CategoryNode {
   childCount: number
   /** Populated by `tree()`; empty from `children()` and `search()`. */
   children: CategoryNode[]
+  /** Suggested option types for products filed here — own, else inherited. */
+  optionTemplates: { name: string; values: string[] }[]
+  /** Suggested specification labels, likewise. */
+  specTemplates: string[]
+  /** The ancestor the suggestions come from; null when they are this node's own (or none). */
+  templatesFrom: string | null
 }
 
 /** How a selected path is rendered everywhere in the UI. */
@@ -63,6 +69,10 @@ export interface CategoryWriteInput {
   imageUrl?: string
   displayOrder?: number
   isActive?: boolean
+  /** Suggested option types; `null` = inherit from the parent again. */
+  optionTemplates?: { name: string; values: string[] }[] | null
+  /** Suggested specification labels; `null` = inherit. */
+  specTemplates?: string[] | null
 }
 
 export const taxonomyApi = {

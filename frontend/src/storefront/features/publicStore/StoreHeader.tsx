@@ -10,6 +10,7 @@ import {
   storeHomeUrl,
   storeShopUrl,
   storeSupportUrl,
+  type PublicCategory,
   type PublicStore,
 } from '../stores/storesApi'
 import { useCart } from '../cart/cart'
@@ -265,27 +266,65 @@ function CategoriesMenu({ store, skin }: { store: PublicStore; skin: Skin }) {
                     {category.productCount}
                   </span>
                 </Link>
-                {category.subcategories.length > 0 && (
-                  <ul className="mt-1.5 space-y-1">
-                    {category.subcategories.map((sub) => (
-                      <li key={sub.id}>
-                        <Link
-                          to={storeCategoryUrl(store.slug, sub.slug)}
-                          onClick={() => setOpen(false)}
-                          className={`block text-xs hover:text-brand ${skin.muted}`}
-                        >
-                          {sub.name}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <SubTree
+                  category={category}
+                  store={store}
+                  listClass="mt-1.5 space-y-1"
+                  nestedListClass="mt-1 space-y-1 pl-3"
+                  linkClass={`block text-xs hover:text-brand ${skin.muted}`}
+                  onPick={() => setOpen(false)}
+                />
               </li>
             ))}
           </ul>
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * Everything beneath a category, each level indented — the menu follows the
+ * shelves however deep they nest.
+ */
+function SubTree({
+  category,
+  store,
+  listClass,
+  nestedListClass,
+  linkClass,
+  onPick,
+}: {
+  category: PublicCategory
+  store: PublicStore
+  listClass: string
+  nestedListClass: string
+  linkClass: string
+  onPick: () => void
+}) {
+  if (category.subcategories.length === 0) return null
+  return (
+    <ul className={listClass}>
+      {category.subcategories.map((sub) => (
+        <li key={sub.id}>
+          <Link
+            to={storeCategoryUrl(store.slug, sub.slug)}
+            onClick={onPick}
+            className={linkClass}
+          >
+            {sub.name}
+          </Link>
+          <SubTree
+            category={sub}
+            store={store}
+            listClass={nestedListClass}
+            nestedListClass={nestedListClass}
+            linkClass={linkClass}
+            onPick={onPick}
+          />
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -407,19 +446,14 @@ function MobileDrawer({
                     )}
                   </div>
                   {hasSubs && isOpen && (
-                    <ul className="mb-1 ml-3 border-l border-line pl-3">
-                      {category.subcategories.map((sub) => (
-                        <li key={sub.id}>
-                          <Link
-                            to={storeCategoryUrl(store.slug, sub.slug)}
-                            onClick={onClose}
-                            className={`block py-2 text-xs ${skin.muted}`}
-                          >
-                            {sub.name}
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
+                    <SubTree
+                      category={category}
+                      store={store}
+                      listClass="mb-1 ml-3 border-l border-line pl-3"
+                      nestedListClass="ml-3 border-l border-line pl-3"
+                      linkClass={`block py-2 text-xs ${skin.muted}`}
+                      onPick={onClose}
+                    />
                   )}
                 </li>
               )

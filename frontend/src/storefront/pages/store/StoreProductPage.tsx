@@ -147,6 +147,12 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
   const buyCardVisible = useIsVisible(buyCardRef)
 
   const price = variant ? variant.price : (product.price ?? '0')
+  const compareAt = variant ? variant.compareAtPrice : product.compareAtPrice
+  const sku = variant ? variant.sku : product.sku
+  // The variant's own photo leads (the pink saree shows pink); else the cover.
+  const variantImage = variant?.mediaId
+    ? (product.media.find((item) => item.id === variant.mediaId)?.url ?? null)
+    : null
   // Options but no matching variant means the chosen combination is not sold:
   // stock 0 disables purchase, and the picker says why.
   const stock = variant
@@ -168,7 +174,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
     variantId: variant?.id ?? null,
     name: product.name,
     variantName: variant?.name ?? null,
-    imageUrl: cover,
+    imageUrl: variantImage ?? cover,
     price,
     stock,
   }
@@ -185,14 +191,10 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
   }, [product.slug])
 
   const trail: Crumb[] = [
-    ...(product.category.parent
-      ? [
-          {
-            label: product.category.parent.name,
-            to: storeCategoryUrl(store.slug, product.category.parent.slug),
-          },
-        ]
-      : []),
+    ...product.category.ancestors.map((crumb) => ({
+      label: crumb.name,
+      to: storeCategoryUrl(store.slug, crumb.slug),
+    })),
     {
       label: product.category.name,
       to: storeCategoryUrl(store.slug, product.category.slug),
@@ -214,7 +216,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
       <div className="grid items-start gap-6 lg:grid-cols-2 lg:gap-10">
         {/* The gallery stays put while the long right column scrolls. */}
         <div className="lg:sticky lg:top-[5.5rem]">
-          <MediaGallery product={product} />
+          <MediaGallery product={product} focusId={variant?.mediaId ?? null} />
         </div>
 
         {/* Everything about buying lives inside one card. */}
@@ -249,11 +251,22 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
             <span className="font-heading text-3xl font-bold text-brand">
               {formatPrice(price)}
             </span>
+            {compareAt && Number(compareAt) > Number(price) && (
+              <span className={`text-sm ${skin.muted}`}>
+                <s>{formatPrice(compareAt)}</s>{' '}
+                <span className="font-semibold text-brand">
+                  {Math.round((1 - Number(price) / Number(compareAt)) * 100)}% off
+                </span>
+              </span>
+            )}
             <StockBadge stock={stock} />
             {variant && (
               <span className={`text-xs font-semibold ${skin.muted}`}>
                 {variant.name}
               </span>
+            )}
+            {sku && (
+              <span className={`font-mono text-[11px] ${skin.muted}`}>SKU {sku}</span>
             )}
           </div>
 
@@ -274,6 +287,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
           <OptionPicker
             optionTypes={product.optionTypes}
             variants={product.variants}
+            media={product.media}
             selection={selection}
             onChange={setSelection}
             skin={skin}
@@ -615,9 +629,10 @@ function SpecTable({
     product.specifications.length > 0
       ? [...product.specifications]
       : [...specs]
-  const path = product.category.parent
-    ? `${product.category.parent.name} › ${product.category.name}`
-    : product.category.name
+  const path = [
+    ...product.category.ancestors.map((crumb) => crumb.name),
+    product.category.name,
+  ].join(' › ')
   rows.push({ label: 'Category', value: path })
   // One row per option type ("Size: S, M, L") — what the product comes in.
   for (const type of product.optionTypes) {
@@ -746,7 +761,13 @@ function useIsVisible<T extends HTMLElement>(
  * magnifier that follows a finger is useless), **swipe** between items on
  * touch, arrow buttons, and a position counter. Video is never zoomed.
  */
-function MediaGallery({ product }: { product: PublicProductDetail }) {
+function MediaGallery({
+  product,
+  focusId,
+}: {
+  product: PublicProductDetail
+  focusId: string | null
+}) {
   const { skin } = usePublicStore()
   const media = product.media
   const [index, setIndex] = useState(0)
@@ -757,6 +778,14 @@ function MediaGallery({ product }: { product: PublicProductDetail }) {
   useEffect(() => {
     setIndex(0)
   }, [product.id])
+
+  // Choosing a variant with its own photo brings that photo forward.
+  useEffect(() => {
+    if (!focusId) return
+    const at = media.findIndex((item) => item.id === focusId)
+    if (at >= 0) setIndex(at)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- react to the variant, not the array identity
+  }, [focusId])
 
   if (!active?.url) {
     return (

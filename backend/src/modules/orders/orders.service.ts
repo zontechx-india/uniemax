@@ -134,6 +134,7 @@ const orderSelect = {
       id: true,
       productName: true,
       variantName: true,
+      sku: true,
       productSlug: true,
       imageKey: true,
       unitPrice: true,
@@ -203,6 +204,8 @@ const pricingProductSelect = {
       price: true,
       stockQuantity: true,
       isDefault: true,
+      sku: true,
+      media: { select: { key: true } },
     },
   },
   media: {
@@ -224,6 +227,7 @@ interface PricedLine {
   variantId: string | null;
   productName: string;
   variantName: string | null;
+  sku: string | null;
   productSlug: string;
   imageKey: string | null;
   unitPrice: Prisma.Decimal;
@@ -299,8 +303,9 @@ function priceLine(
     variantId: item.variantId,
     productName: product.name,
     variantName: item.variantId ? variant.name : null,
+    sku: variant.sku,
     productSlug: product.slug,
-    imageKey: product.media[0]?.key ?? null,
+    imageKey: variant.media?.key ?? product.media[0]?.key ?? null,
     unitPrice,
     quantity: item.quantity,
     lineTotal: unitPrice.mul(item.quantity),
@@ -589,6 +594,7 @@ export async function createOrder(
             variantId: line.variantId,
             productName: line.productName,
             variantName: line.variantName,
+            sku: line.sku,
             productSlug: line.productSlug,
             imageKey: line.imageKey,
             unitPrice: line.unitPrice,

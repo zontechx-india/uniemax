@@ -41,6 +41,10 @@ interface DraftState {
   imageUrl: string
   displayOrder: string
   isActive: boolean
+  /** One option per line — `Size: S, M, L`. Empty = inherit from the parent. */
+  optionTemplates: string
+  /** Comma-separated labels — `Fabric, Wash care`. Empty = inherit. */
+  specTemplates: string
 }
 
 const BLANK: DraftState = {
@@ -50,6 +54,8 @@ const BLANK: DraftState = {
   imageUrl: '',
   displayOrder: '0',
   isActive: true,
+  optionTemplates: '',
+  specTemplates: '',
 }
 
 export default function CategoriesPage() {
@@ -109,6 +115,10 @@ export default function CategoriesPage() {
       imageUrl: node.imageUrl ?? '',
       displayOrder: String(node.displayOrder),
       isActive: node.isActive,
+      // Inherited suggestions stay blank here (and show as a hint) so saving
+      // the form does not silently turn them into this node's own copy.
+      optionTemplates: node.templatesFrom ? '' : templatesToText(node.optionTemplates),
+      specTemplates: node.templatesFrom ? '' : node.specTemplates.join(', '),
     })
 
   const save = async () => {
@@ -126,6 +136,7 @@ export default function CategoriesPage() {
         ...(draft.imageUrl.trim() ? { imageUrl: draft.imageUrl.trim() } : {}),
         ...(Number.isFinite(order) && order >= 0 ? { displayOrder: order } : {}),
         isActive: draft.isActive,
+        ...templatePayload(draft),
       }
       if (draft.node) await taxonomyApi.update(draft.node.id, payload)
       else await taxonomyApi.create(payload)
@@ -247,6 +258,44 @@ export default function CategoriesPage() {
                 hint="Optional. A link only — there is no upload here."
                 onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })}
               />
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-fg">
+                  Suggested options
+                </span>
+                <textarea
+                  value={draft.optionTemplates}
+                  onChange={(e) =>
+                    setDraft({ ...draft, optionTemplates: e.target.value })
+                  }
+                  rows={3}
+                  placeholder={'Size: S, M, L, XL\nColour: Black, White, Blue'}
+                  className="w-full rounded-md border border-line bg-input px-3 py-2 font-mono text-xs text-fg outline-none focus:border-accent"
+                />
+                <p className="mt-1 text-xs text-muted">
+                  {draft.node?.templatesFrom
+                    ? `Inherits from ${draft.node.templatesFrom}: ${templatesToText(draft.node.optionTemplates).replace(/\n/g, ' · ') || 'none'}. Fill this in to give this category its own.`
+                    : 'One option per line, values after a colon. Sellers see these as one-tap presets when adding a product here.'}
+                </p>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-fg">
+                  Suggested specification labels
+                </span>
+                <textarea
+                  value={draft.specTemplates}
+                  onChange={(e) =>
+                    setDraft({ ...draft, specTemplates: e.target.value })
+                  }
+                  rows={3}
+                  placeholder="Fabric, Fit, Wash care"
+                  className="w-full rounded-md border border-line bg-input px-3 py-2 font-mono text-xs text-fg outline-none focus:border-accent"
+                />
+                <p className="mt-1 text-xs text-muted">
+                  {draft.node?.templatesFrom
+                    ? `Inherits from ${draft.node.templatesFrom}: ${draft.node.specTemplates.join(', ') || 'none'}.`
+                    : 'Comma-separated. Pre-filled as empty rows in the product form.'}
+                </p>
+              </label>
             </div>
 
             <label className="mt-4 flex items-center gap-2 text-sm text-fg">
@@ -421,4 +470,52 @@ function CategoryRow({
       </Button>
     </div>
   )
+}
+
+/** `[{ name: 'Size', values: ['S','M'] }]` → `Size: S, M` per line. */
+function templatesToText(templates: { name: string; values: string[] }[]): string {
+  return templates.map((t) => `${t.name}: ${t.values.join(', ')}`).join('\n')
+}
+
+function parseTemplates(text: string): { name: string; values: string[] }[] {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const at = line.indexOf(':')
+      const name = (at >= 0 ? line.slice(0, at) : line).trim()
+      const values = (at >= 0 ? line.slice(at + 1) : '')
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean)
+      return { name, values }
+    })
+    .filter((t) => t.name)
+}
+
+/**
+ * Blank fields mean different things: on a node with its own suggestions,
+ * blank clears them (`null` = inherit again); on one that inherits, blank
+ * changes nothing.
+ */
+function templatePayload(draft: DraftState) {
+  const own = draft.node !== null && !draft.node.templatesFrom
+  const options = parseTemplates(draft.optionTemplates)
+  const specs = draft.specTemplates
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean)
+  return {
+    ...(options.length > 0
+      ? { optionTemplates: options }
+      : own && draft.node!.optionTemplates.length > 0
+        ? { optionTemplates: null }
+        : {}),
+    ...(specs.length > 0
+      ? { specTemplates: specs }
+      : own && draft.node!.specTemplates.length > 0
+        ? { specTemplates: null }
+        : {}),
+  }
 }

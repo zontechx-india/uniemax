@@ -81,6 +81,7 @@ export interface OrderDetail extends OrderRow {
     productId: string | null
     productName: string
     variantName: string | null
+    sku: string | null
     imageUrl: string | null
     unitPrice: string
     quantity: number

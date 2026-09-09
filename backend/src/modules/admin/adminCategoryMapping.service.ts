@@ -3,8 +3,10 @@ import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../../utils/httpError.js";
 import { buildListMeta } from "../../utils/response.js";
 import { getCategoryPath } from "../category/categoryTree.js";
-import type { CategoryNode } from "../category/categoryTree.js";
+import type { CategoryCrumb, CategoryNode } from "../category/categoryTree.js";
 import { uniqueCategorySlug } from "../stores/catalogSlug.js";
+import { loadShelves, shelfIndex } from "../stores/shelfTree.js";
+import type { Shelf } from "../stores/shelfTree.js";
 import type { ShelfListQuery } from "./admin.schema.js";
 
 /**
@@ -55,7 +57,9 @@ function stateOf(row: ShelfRow, node: CategoryNode | null): ShelfState {
   return nameMatches && placeMatches ? "converted" : "tagged";
 }
 
-async function shape(row: ShelfRow) {
+const PATH_SEPARATOR = " › ";
+
+async function shape(row: ShelfRow, shelfPath: string) {
   // activeOnly: false — a shelf linked to a node an admin later disabled must
   // still show what it points at rather than reading as unmapped.
   const node = row.categoryId
@@ -68,7 +72,7 @@ async function shape(row: ShelfRow) {
     slug: row.slug,
     isActive: row.isActive,
     /** "KTM › Duke 200" — the shelf as the seller sees it in their own shop. */
-    shelfPath: row.parent ? `${row.parent.name} › ${row.name}` : row.name,
+    shelfPath,
     isSubcategory: row.parent !== null,
     store: row.store,
     productCount: row._count.products,
@@ -106,7 +110,12 @@ export async function listShelves(query: ShelfListQuery) {
     ],
     select: shelfSelect,
   });
-  const shaped = await Promise.all(rows.map(shape));
+  // A search narrows the rows, so ancestors may be missing from them; the
+  // path is read from the full set so it never truncates.
+  const all = query.q ? await prisma.storeCategory.findMany({ select: shelfSelect }) : rows;
+  const idx = shelfIndex(all);
+  const pathOf = (id: string) => idx.pathOf(id).map((s) => s.name).join(PATH_SEPARATOR);
+  const shaped = await Promise.all(rows.map((row) => shape(row, pathOf(row.id))));
   const filtered =
     query.status === "PENDING"
       ? shaped.filter((s) => !s.converted)
@@ -132,28 +141,29 @@ export interface ConversionPlan {
   blocked: string | null;
   from: { name: string; shelfPath: string; productCount: number; subcategoryCount: number };
   to: { name: string; pathLabel: string };
-  /** The root shelf a subcategory lands under; `created` when it does not exist yet. */
+  /** The chain of shelves a converted shelf lands under; `created` when any of them does not exist yet. */
   parent: { name: string; created: boolean } | null;
   mergeInto: { id: string; name: string } | null;
   productsMoved: number;
   nameChanges: boolean;
 }
 
+/** One ancestor shelf, root downwards: reused, adopted from an untagged twin, or created. */
+type ParentStep =
+  | { kind: "existing"; id: string; name: string }
+  | { kind: "adopt"; id: string; name: string; nodeId: string }
+  | { kind: "create"; node: CategoryCrumb };
+
 interface Resolved {
   shelf: ShelfRow;
   node: CategoryNode;
   plan: ConversionPlan;
-  /** How the parent shelf is obtained; only meaningful when the node is a subcategory. */
-  parent:
-    | { kind: "existing"; id: string }
-    | { kind: "adopt"; id: string }
-    | { kind: "create"; node: CategoryNode }
-    | null;
+  parents: ParentStep[];
   /** Merge target, and whether it must first be linked to the node. */
   target: { id: string; adopt: boolean } | null;
 }
 
-const sameName = (name: string) => ({ equals: name, mode: "insensitive" as const });
+const sameName = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
 async function resolve(shelfId: string, nodeId: string): Promise<Resolved> {
   const shelf = await prisma.storeCategory.findUnique({
@@ -166,18 +176,17 @@ async function resolve(shelfId: string, nodeId: string): Promise<Resolved> {
   // category that is currently retired.
   const node = await getCategoryPath(nodeId, false);
   if (!node) throw HttpError.badRequest("Selected category was not found");
-  if (node.depth > 1) {
-    throw HttpError.badRequest(
-      "Store categories nest one level deep — choose a category or one of its subcategories.",
-    );
-  }
+
+  const shelves = await loadShelves(shelf.storeId);
+  const idx = shelfIndex(shelves);
+  const others = shelves.filter((s) => s.id !== shelf.id);
 
   const plan: ConversionPlan = {
     action: "rename",
     blocked: null,
     from: {
       name: shelf.name,
-      shelfPath: shelf.parent ? `${shelf.parent.name} › ${shelf.name}` : shelf.name,
+      shelfPath: idx.pathOf(shelf.id).map((s) => s.name).join(PATH_SEPARATOR),
       productCount: shelf._count.products,
       subcategoryCount: shelf._count.children,
     },
@@ -187,79 +196,66 @@ async function resolve(shelfId: string, nodeId: string): Promise<Resolved> {
     productsMoved: shelf._count.products,
     nameChanges: shelf.name !== node.name,
   };
-  const out: Resolved = { shelf, node, plan, parent: null, target: null };
-  const storeId = shelf.storeId;
+  const out: Resolved = { shelf, node, plan, parents: [], target: null };
 
   if (stateOf(shelf, node) === "converted") {
     plan.blocked = `Already converted to ${node.pathLabel}.`;
     return out;
   }
-
-  // A subcategory cannot hold subcategories. Nothing is folded in silently:
-  // the children are in the queue and get their own decision first.
-  if (node.parentId && shelf._count.children > 0) {
-    const n = shelf._count.children;
-    plan.blocked = `"${shelf.name}" still has ${n} subcategor${n === 1 ? "y" : "ies"}. Convert or delete those first, then convert this one.`;
+  // A shelf cannot become a descendant of the node it already is: its own row
+  // would have to be duplicated above itself.
+  if (shelf.categoryId && node.path.slice(0, -1).some((c) => c.id === shelf.categoryId)) {
+    plan.blocked = `"${shelf.name}" already is ${node.path.find((c) => c.id === shelf.categoryId)?.name}. Add "${node.name}" as a new subcategory in the store instead.`;
     return out;
   }
 
-  // --- where the converted shelf lands -----------------------------------
+  // --- the chain of ancestors the converted shelf lands under --------------
   let parentShelfId: string | null = null;
-  if (node.parentId) {
-    const parentNode = await getCategoryPath(node.parentId, false);
-    if (!parentNode) throw HttpError.badRequest("Selected category was not found");
-
-    const existing = await prisma.storeCategory.findFirst({
-      where: { storeId, categoryId: parentNode.id, id: { not: shelf.id } },
-      select: { id: true, name: true },
-    });
-    if (existing) {
-      out.parent = { kind: "existing", id: existing.id };
-      parentShelfId = existing.id;
-      plan.parent = { name: existing.name, created: false };
-    } else {
-      // An untagged root the seller typed with the same name IS this parent;
-      // adopt it rather than standing a twin next to it.
-      const adoptable = await prisma.storeCategory.findFirst({
-        where: {
-          storeId,
-          parentId: null,
-          categoryId: null,
-          id: { not: shelf.id },
-          name: sameName(parentNode.name),
-        },
-        select: { id: true, name: true },
-      });
-      if (adoptable) {
-        out.parent = { kind: "adopt", id: adoptable.id };
-        parentShelfId = adoptable.id;
-        plan.parent = { name: adoptable.name, created: false };
-      } else {
-        out.parent = { kind: "create", node: parentNode };
-        plan.parent = { name: parentNode.name, created: true };
-      }
+  let creating = false;
+  for (const crumb of node.path.slice(0, -1)) {
+    if (creating) {
+      out.parents.push({ kind: "create", node: crumb });
+      continue;
     }
+    const existing = others.find((s) => s.categoryId === crumb.id);
+    if (existing) {
+      out.parents.push({ kind: "existing", id: existing.id, name: existing.name });
+      parentShelfId = existing.id;
+      continue;
+    }
+    // An untagged shelf the seller typed with the same name in the same place
+    // IS this ancestor; adopt it rather than standing a twin next to it.
+    const adoptable = others.find(
+      (s) => s.parentId === parentShelfId && s.categoryId === null && sameName(s.name, crumb.name),
+    );
+    if (adoptable) {
+      out.parents.push({ kind: "adopt", id: adoptable.id, name: adoptable.name, nodeId: crumb.id });
+      parentShelfId = adoptable.id;
+      continue;
+    }
+    out.parents.push({ kind: "create", node: crumb });
+    creating = true;
+    parentShelfId = null;
+  }
+  if (out.parents.length > 0) {
+    plan.parent = {
+      name: out.parents
+        .map((step) => (step.kind === "create" ? step.node.name : step.name))
+        .join(PATH_SEPARATOR),
+      created: creating,
+    };
   }
 
   // --- does something already stand for this node? → merge ---------------
-  let target = await prisma.storeCategory.findFirst({
-    where: { storeId, categoryId: node.id, id: { not: shelf.id } },
-    select: { id: true, name: true },
-  });
+  let target: Shelf | null = others.find((s) => s.categoryId === node.id) ?? null;
   let adoptTarget = false;
-  if (!target && out.parent?.kind !== "create") {
+  if (!target && !creating) {
     // Same name, same position, never linked: that shelf is this category in
     // all but the link, so it becomes the merge target rather than a clash.
-    target = await prisma.storeCategory.findFirst({
-      where: {
-        storeId,
-        parentId: parentShelfId,
-        categoryId: null,
-        id: { not: shelf.id },
-        name: sameName(node.name),
-      },
-      select: { id: true, name: true },
-    });
+    target =
+      others.find(
+        (s) => s.parentId === parentShelfId && s.categoryId === null && sameName(s.name, node.name),
+      ) ?? null;
     adoptTarget = target !== null;
   }
 
@@ -268,36 +264,23 @@ async function resolve(shelfId: string, nodeId: string): Promise<Resolved> {
     plan.mergeInto = { id: target.id, name: target.name };
     out.target = { id: target.id, adopt: adoptTarget };
 
-    if (shelf._count.children > 0) {
-      const [mine, theirs] = await Promise.all([
-        prisma.storeCategory.findMany({
-          where: { parentId: shelf.id },
-          select: { name: true },
-        }),
-        prisma.storeCategory.findMany({
-          where: { parentId: target.id },
-          select: { name: true },
-        }),
-      ]);
-      const taken = new Set(theirs.map((c) => c.name.toLowerCase()));
-      const clash = mine.find((c) => taken.has(c.name.toLowerCase()));
-      if (clash) {
-        plan.blocked = `Both "${shelf.name}" and "${target.name}" have a subcategory called "${clash.name}". Convert that one first.`;
-      }
+    // Subcategories move onto the target too, so no two may share a name.
+    const theirs = idx.childrenOf(target.id);
+    const clash = idx.childrenOf(shelf.id).find((mine) => theirs.some((t) => sameName(t.name, mine.name)));
+    if (clash) {
+      plan.blocked = `Both "${shelf.name}" and "${target.name}" have a subcategory called "${clash.name}". Convert that one first.`;
     }
     return out;
   }
 
-  // --- plain rename: the name must be free ---------------------------------
-  const clash = await prisma.storeCategory.findFirst({
-    where: { storeId, id: { not: shelf.id }, name: sameName(node.name) },
-    select: { name: true, categoryId: true, parent: { select: { name: true } } },
-  });
-  if (clash) {
-    const where = clash.parent ? ` under "${clash.parent.name}"` : "";
-    plan.blocked = `This store already has a shelf called "${clash.name}"${where}${
-      clash.categoryId ? " linked to a different category" : ""
-    }. Convert that one first.`;
+  // --- plain rename: the name must be free among its new siblings ----------
+  if (!creating) {
+    const clash = others.find((s) => s.parentId === parentShelfId && sameName(s.name, node.name));
+    if (clash) {
+      plan.blocked = `This store already has a shelf called "${clash.name}" there${
+        clash.categoryId ? ", linked to a different category" : ""
+      }. Convert that one first.`;
+    }
   }
   return out;
 }
@@ -312,36 +295,39 @@ export async function planConversion(shelfId: string, nodeId: string) {
  *
  * Rename: the row keeps its id, takes the node's name and position, gets a
  * fresh slug only if the name changed (an unchanged name keeps shared links
- * working), and its products are reclassified where they are. Merge: the
- * products and any subcategories move onto the shelf that already stands for
- * the node, and the legacy row is deleted. One transaction either way.
+ * working), and its products are reclassified where they are; its own
+ * subcategories come along. Merge: the products and subcategories move onto
+ * the shelf that already stands for the node, and the legacy row is deleted.
+ * One transaction either way.
  */
 export async function convertShelf(shelfId: string, nodeId: string) {
-  const { shelf, node, plan, parent, target } = await resolve(shelfId, nodeId);
+  const { shelf, node, plan, parents, target } = await resolve(shelfId, nodeId);
   if (plan.blocked) throw HttpError.conflict(plan.blocked);
 
   const resultId = await prisma.$transaction(async (tx) => {
     let parentShelfId: string | null = null;
-    if (parent?.kind === "existing") parentShelfId = parent.id;
-    if (parent?.kind === "adopt") {
-      await tx.storeCategory.update({
-        where: { id: parent.id },
-        data: { categoryId: node.parentId },
-      });
-      parentShelfId = parent.id;
-    }
-    if (parent?.kind === "create") {
-      const created = await tx.storeCategory.create({
-        data: {
-          storeId: shelf.storeId,
-          name: parent.node.name,
-          slug: await uniqueCategorySlug(shelf.storeId, parent.node.name, tx),
-          parentId: null,
-          categoryId: parent.node.id,
-        },
-        select: { id: true },
-      });
-      parentShelfId = created.id;
+    for (const step of parents) {
+      if (step.kind === "create") {
+        const created: { id: string } = await tx.storeCategory.create({
+          data: {
+            storeId: shelf.storeId,
+            name: step.node.name,
+            slug: await uniqueCategorySlug(shelf.storeId, step.node.name, tx),
+            parentId: parentShelfId,
+            categoryId: step.node.id,
+          },
+          select: { id: true },
+        });
+        parentShelfId = created.id;
+        continue;
+      }
+      if (step.kind === "adopt") {
+        await tx.storeCategory.update({
+          where: { id: step.id },
+          data: { categoryId: step.nodeId },
+        });
+      }
+      parentShelfId = step.id;
     }
 
     if (target) {
@@ -387,5 +373,7 @@ export async function convertShelf(shelfId: string, nodeId: string) {
     where: { id: resultId },
     select: shelfSelect,
   });
-  return { shelf: await shape(row), plan };
+  const idx = shelfIndex(await loadShelves(row.storeId));
+  const shelfPath = idx.pathOf(row.id).map((s) => s.name).join(PATH_SEPARATOR);
+  return { shelf: await shape(row, shelfPath), plan };
 }

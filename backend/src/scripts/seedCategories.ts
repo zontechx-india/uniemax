@@ -6,6 +6,8 @@ import {
   GLOBAL_CATEGORIES,
   type SeedCategory,
 } from "./data/globalCategories.js";
+import { CATEGORY_PRESETS } from "./data/categoryPresets.js";
+import { Prisma } from "../generated/prisma/client.js";
 
 /**
  * Seed the global category taxonomy (`Category`) from `data/globalCategories.ts`.
@@ -105,7 +107,14 @@ async function main() {
     (
       await prisma.category.findMany({
         where: { slug: { in: flat.map((row) => row.slug) } },
-        select: { slug: true, name: true, parentId: true, displayOrder: true },
+        select: {
+          slug: true,
+          name: true,
+          parentId: true,
+          displayOrder: true,
+          optionTemplates: true,
+          specTemplates: true,
+        },
       })
     ).map((row) => [row.slug, row]),
   );
@@ -114,6 +123,12 @@ async function main() {
   let created = 0;
   let updated = 0;
   let unchanged = 0;
+  let presetsFilled = 0;
+  for (const key of Object.keys(CATEGORY_PRESETS)) {
+    if (!flat.some((row) => row.slug === key)) {
+      console.warn(`! preset for unknown slug "${key}" — check data/categoryPresets.ts`);
+    }
+  }
 
   for (const row of flat) {
     const parentId = row.parentSlug ? idBySlug.get(row.parentSlug)! : null;
@@ -135,6 +150,7 @@ async function main() {
       continue;
     }
 
+    const preset = CATEGORY_PRESETS[row.slug];
     const saved = await prisma.category.upsert({
       where: { slug: row.slug },
       create: {
@@ -143,6 +159,10 @@ async function main() {
         parentId,
         displayOrder: row.displayOrder,
         isActive: true,
+        ...(preset?.options
+          ? { optionTemplates: preset.options as unknown as Prisma.InputJsonValue }
+          : {}),
+        ...(preset?.specs ? { specTemplates: preset.specs } : {}),
       },
       // isActive / description / imageUrl stay as the admin left them.
       update: {
@@ -153,6 +173,20 @@ async function main() {
       select: { id: true },
     });
     idBySlug.set(row.slug, saved.id);
+
+    // Presets fill in only where nothing was ever set (null). An admin who
+    // wants none saves an empty list, which the seed leaves alone.
+    if (before && preset) {
+      const fill: Prisma.CategoryUncheckedUpdateInput = {};
+      if (before.optionTemplates === null && preset.options) {
+        fill.optionTemplates = preset.options as unknown as Prisma.InputJsonValue;
+      }
+      if (before.specTemplates === null && preset.specs) fill.specTemplates = preset.specs;
+      if (Object.keys(fill).length > 0) {
+        await prisma.category.update({ where: { id: saved.id }, data: fill });
+        presetsFilled += 1;
+      }
+    }
 
     if (!before) {
       created += 1;
@@ -173,7 +207,8 @@ async function main() {
   console.log(
     `\n${dryRun ? "[dry run] " : ""}${flat.length} categories in the taxonomy ` +
       `(${roots} top-level, ${flat.length - roots} sub): ` +
-      `${created} created, ${updated} updated, ${unchanged} already current.`,
+      `${created} created, ${updated} updated, ${unchanged} already current, ` +
+      `${presetsFilled} given their preset suggestions.`,
   );
 }
 

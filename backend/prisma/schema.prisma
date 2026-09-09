@@ -16,11 +16,6 @@ datasource db {
 // Enums
 // ---------------------------------------------------------------------------
 
-enum ProductStatus {
-  ACTIVE
-  INACTIVE
-}
-
 enum OrderStatus {
   PENDING
   CONFIRMED
@@ -139,6 +134,12 @@ model Category {
   slug            String          @unique
   description     String?
   imageUrl        String?
+  /// Suggested option types for products filed here, offered to sellers as
+  /// one-tap presets: [{ name: "Size", values: ["S","M","L"] }]. Inherited
+  /// down the tree — the nearest ancestor with a value wins. Admin-edited.
+  optionTemplates Json?
+  /// Suggested specification labels, likewise: ["Fabric", "Wash care"].
+  specTemplates   Json?
   displayOrder    Int             @default(0)
   isActive        Boolean         @default(true)
   // Self-relation enables arbitrary category trees (Sports > Cricket Bat)
@@ -146,7 +147,6 @@ model Category {
   parentId        String?
   parent          Category?       @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
   children        Category[]      @relation("CategoryTree")
-  products        Product[]
   /// Store shelves and store products tagged with this taxonomy node. Both
   /// links are optional and `SetNull` on delete: retiring a taxonomy node
   /// unclassifies rows, it never removes a shelf or a product.
@@ -158,48 +158,6 @@ model Category {
   @@index([parentId])
   @@index([isActive])
   @@map("categories")
-}
-
-model Product {
-  id                String         @id @default(cuid())
-  name              String
-  slug              String         @unique
-  sku               String         @unique
-  brand             String?
-  description       String?
-  price             Decimal        @db.Decimal(10, 2)
-  discountPrice     Decimal?       @db.Decimal(10, 2)
-  stockQuantity     Int            @default(0)
-  // Overrides StoreSetting.lowStockThreshold when set.
-  lowStockThreshold Int?
-  // Flexible per-product spec map so any product type works without schema
-  // changes: { "Weight": "1.2kg", "Willow": "English", ... }
-  specifications    Json?
-  status            ProductStatus  @default(ACTIVE)
-  isFeatured        Boolean        @default(false)
-  categoryId        String
-  category          Category       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  images            ProductImage[]
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-
-  @@index([categoryId])
-  @@index([status])
-  @@index([isFeatured])
-  @@map("products")
-}
-
-model ProductImage {
-  id           String   @id @default(cuid())
-  productId    String
-  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  url          String
-  isCover      Boolean  @default(false)
-  displayOrder Int      @default(0)
-  createdAt    DateTime @default(now())
-
-  @@index([productId])
-  @@map("product_images")
 }
 
 // ---------------------------------------------------------------------------
@@ -476,8 +434,9 @@ model StoreCategory {
   storeId String
   store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
-  // Optional parent — null for root categories. Deleting a category with
-  // subcategories is a 409 (Restrict), mirroring the products guard.
+  // Parent shelf — null for roots. The tree mirrors the global taxonomy, so
+  // it nests as deep as that does (MAX_CATEGORY_DEPTH). Deleting a shelf
+  // with children is a 409 (Restrict), mirroring the products guard.
   parentId String?
   parent   StoreCategory?  @relation("StoreCategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
   children StoreCategory[] @relation("StoreCategoryTree")
@@ -502,14 +461,10 @@ model StoreCategory {
   /// seller pastes a link (product media has its own S3 flow).
   imageUrl   String?
 
-  /// OPTIONAL tag onto the GLOBAL taxonomy (`Category`). The shelf keeps its
-  /// own name and slug — a seller organises the storefront however they like
-  /// ("KTM", "Pro Edition") — and this says which taxonomy node that shelf
-  /// belongs under, for cross-tenant search and reporting. Null means
-  /// "not classified yet", which is a legitimate resting state: brand and
-  /// merchandising shelves have no taxonomy answer and must not be forced
-  /// into one (vehicle brands/models belong to the future compatibility
-  /// system, never to categories).
+  /// The GLOBAL taxonomy node (`Category`) this shelf IS: a seller chooses a
+  /// node, and the shelf takes its name and its place in the tree. Null only
+  /// for shelves typed before the taxonomy existed, which an admin converts
+  /// (`adminCategoryMapping.service.ts`).
   categoryId String?
   category   Category? @relation("StoreCategoryTaxonomy", fields: [categoryId], references: [id], onDelete: SetNull)
 
@@ -518,7 +473,10 @@ model StoreCategory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([storeId, name])
+  /// One shelf per taxonomy node per store — the shelf IS the node. Names are
+  /// unique among siblings only (checked in the service), so "Accessories"
+  /// can sit under both Men and Women.
+  @@unique([storeId, categoryId])
   @@unique([storeId, slug])
   @@index([storeId])
   @@index([parentId])
@@ -562,6 +520,9 @@ model StoreProduct {
   // Disabled products are hidden from the public storefront (a product is
   // publicly visible only when it AND its category are active).
   isActive    Boolean @default(true)
+  /// When the seller first made it visible. Null = still a draft: created
+  /// step by step and never published, which the seller's list shows as such.
+  publishedAt DateTime?
 
   /// Owner-controlled merchandising. Each flag maps to exactly ONE storefront
   /// homepage section and nothing else — a product appears in a section if and
@@ -575,10 +536,9 @@ model StoreProduct {
 
   /// Ordered seller-defined option types: [{ name: "Size", values: ["S","M"] }].
   /// Free text only — "500 ml" is a value, never a quantity. Null/[] = simple
-  /// product. Every variant is one combination of these values; the FULL
-  /// cartesian product is always present and the seller disables what they
-  /// don't sell. Read through resolveOptionTypes(); written as
-  /// InputJsonValue / DbNull.
+  /// product. Every variant is one combination of these values — any subset
+  /// of the cartesian product, so a seller lists only what they sell. Read
+  /// through resolveOptionTypes(); written as InputJsonValue / DbNull.
   optionTypes      Json?
   /// Ordered descriptive rows [{ label, value }] for the storefront spec table
   /// ("Material: Memory foam"). Not purchasable dimensions — those are
@@ -656,6 +616,15 @@ model StoreProductVariant {
   /// what keeps @@unique([productId, name]), OrderItem.variantName and the
   /// cart working unchanged. Null on the implicit Default variant.
   optionValues  Json?
+  /// Seller's stock-keeping code — optional; unique within the store when set
+  /// (checked in the service: the store is one join away).
+  sku            String?
+  /// Strike-through price (MRP). Null = no discount shown; above `price` when set.
+  compareAtPrice Decimal? @db.Decimal(10, 2)
+  /// The product photo that shows this variant (the pink saree's own photo).
+  /// Null = the product's cover. Cleared when that photo is deleted.
+  mediaId String?
+  media   StoreProductMedia? @relation(fields: [mediaId], references: [id], onDelete: SetNull)
 
   orderItems OrderItem[]
   cartLines  CartLine[]
@@ -665,6 +634,8 @@ model StoreProductVariant {
 
   @@unique([productId, name])
   @@index([productId])
+  @@index([sku])
+  @@index([mediaId])
   @@map("store_product_variants")
 }
 
@@ -744,6 +715,9 @@ model StoreProductMedia {
   /// Optional alternative text for accessibility (images only in practice).
   altText      String?
   displayOrder Int            @default(0)
+
+  /// Variants that show this photo (the pink saree → its pink photo).
+  variants StoreProductVariant[]
 
   createdAt DateTime @default(now())
 
@@ -914,6 +888,8 @@ model OrderItem {
   productName String
   /// Chosen option label ("Red / 128 GB") — null for simple products.
   variantName String?
+  /// The variant's SKU when the order was placed — what a packing slip needs.
+  sku         String?
   productSlug String?
   imageKey    String?
   unitPrice   Decimal @db.Decimal(10, 2)

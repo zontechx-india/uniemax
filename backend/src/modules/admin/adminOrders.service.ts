@@ -127,6 +127,7 @@ export async function getOrder(orderId: string) {
           productId: true,
           productName: true,
           variantName: true,
+          sku: true,
           productSlug: true,
           imageKey: true,
           unitPrice: true,

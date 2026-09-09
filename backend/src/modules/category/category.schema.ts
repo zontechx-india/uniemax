@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { boolQuery, paginationQuery } from "../../utils/zodHelpers.js";
+import { optionTemplatesSchema, specTemplatesSchema } from "./categoryTemplates.js";
 
 export const categoryCreateSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -8,6 +9,10 @@ export const categoryCreateSchema = z.object({
   displayOrder: z.number().int().min(0).optional(),
   isActive: z.boolean().optional(),
   parentId: z.string().min(1).nullable().optional(),
+  /** Suggested option types for products filed here; `null` = inherit from the parent. */
+  optionTemplates: optionTemplatesSchema.nullable().optional(),
+  /** Suggested specification labels; `null` = inherit. */
+  specTemplates: specTemplatesSchema.nullable().optional(),
 });
 
 export const categoryUpdateSchema = categoryCreateSchema.partial();

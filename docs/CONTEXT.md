@@ -292,14 +292,13 @@ A single account can own multiple stores and switch between them.
   **Customize** hands the draft back to it. Unsaved work survives the trip in
   both directions, so opening the full preview mid-edit shows what was being
   edited rather than the last saved palette.
-- **Store catalog** — hierarchy: **Store → Category → Subcategory
-  (optional) → Product → Variants**. The Categories section lets the owner
-  add, list, **rename**, and delete the store's own categories, each
-  optionally nested one level inside a parent (e.g. Electronics → Mobiles;
-  subcategories cannot have their own subcategories). Long catalogs stay
-  readable: each parent collapses/expands its subcategories, and renaming
-  happens inline on the row. Products can only be added
-  **after** at least one category exists: every product must belong to a
+- **Store catalog** — hierarchy: **Store → Categories (a tree mirroring the
+  platform taxonomy, up to 5 levels) → Product → Variants**. The Categories
+  section lets the owner add (chosen from the platform list by search or
+  browse — never typed), list, and delete the store's categories; picking a
+  deep category adds the ones above it (e.g. Fashion → Women → Sarees). Long
+  catalogs stay readable: each branch collapses/expands. Products can only be
+  added **after** at least one category exists: every product must belong to a
   category — root or subcategory — of the same store (enforced by the API,
   and the Products section shows an "Add a category first" gate until
   then). A product has a name, category, an optional description and an
@@ -319,9 +318,9 @@ A single account can own multiple stores and switch between them.
   only downscales and compresses them; nothing is cut off), reorderable (the
   **first photo is the cover** customers see on listing cards), each
   replaceable, deletable and carrying optional alt text — plus **one optional
-  video** (replace/delete). Photos and the video can both be attached while
-  the product is being added, or later from the product's Photos & video
-  panel; a product with no photo cannot be enabled for the storefront.
+  video** (replace/delete). Photos and the video are added in the Photos step,
+  when the product is first set up or any time later; a product with no
+  photo cannot be published to the storefront.
   **Cropping is a choice, not a step**: a seller can crop, rotate or zoom any
   photo before it uploads (square, portrait, landscape or its own ratio), and
   a photo they leave alone reaches the storefront untouched, shown whole
@@ -329,22 +328,31 @@ A single account can own multiple stores and switch between them.
   Upload hints (allowed formats) come from
   server configuration and files are checked before uploading; big photos are
   resized automatically to fit the server's limits —
-  **5 MB per photo, 50 MB for the video** as currently configured. A product with no options is entered with a single price and
-  stock (kept on one implicit variant behind the scenes). A product that comes
+  **5 MB per photo, 50 MB for the video** as currently configured. Products are added **step by step** — name and category first (that
+  alone saves a draft), then photos, price, words, delivery — with a progress
+  bar, one plain hint with an example under every field, and a review screen
+  that says exactly what is still needed (a photo and a price; nothing
+  else). Drafts show in the list with a completeness bar and the next thing
+  to do, so a shop fills up gradually. A product with no options is entered
+  with a single price and stock (kept on one implicit variant behind the
+  scenes). A product that comes
   in choices declares up to three **options** — any names, any values: Size
-  (S, M, L), Colour (Red, Blue), Volume (500 ml, 1 L) — and **every
-  combination** of their values becomes a variant with its own price and stock
-  (the seller switches off combinations they don't sell; "Set all" helpers
-  fill a whole matrix in one go). Values are plain text on purpose — "500 ml"
+  (S, M, L), Colour (Red, Blue), Volume (500 ml, 1 L) — and each
+  **combination** of their values the seller offers becomes a variant with its
+  own price, optional MRP (shown struck through with the % off), stock,
+  optional SKU (unique within the store; printed on order lines) and its own
+  photo when one of the product's pictures shows that variant (the pink saree
+  shows pink — choosing it on the product page brings its photo forward, and
+  the cart and the order keep it). Combinations not sold are left out ("not
+  offered"; one click brings one back); "Set all" helpers fill a whole matrix
+  in one go. Values are plain text on purpose — "500 ml"
   and "42 inch" are just values, so any product type fits without the platform
   learning about units. Adding a value adds its combinations (blank price
   until filled); removing one drops them, after confirming which — past orders
   keep their details, and a customer with one in their cart sees it as no
   longer available. Listings show the cheapest combination as a "from" price.
   Removing every option turns the product back into a simple one (cheapest
-  price and total stock carry over). Products created before options existed
-  show one option named "Option" holding their old variant labels — rename it
-  to what it really was. Categories that still contain products or
+  price and total stock carry over). Categories that still contain products or
   subcategories cannot be deleted. Every category, product, and variant
   can be **enabled/disabled** individually (the catalog-level
   publish/unpublish): disabled items stay manageable but are hidden from
@@ -409,7 +417,10 @@ A single account can own multiple stores and switch between them.
   swipe on touch, thumbnail rail, inline video) beside a **purchase card**:
   name, price, stock, **one picker per option** (Size, then Colour… — a value
   greys out when no in-stock combination has it given the other choices, but
-  stays clickable so the customer can always walk to one that exists; with a
+  stays clickable so the customer can always walk to one that exists; a
+  colour whose variants have their own photo is shown **as that photo** with
+  its name underneath, the way big marketplaces do it, and choosing it brings
+  the photo forward in the gallery; with a
   single option each value also shows its price), a **quantity selector**,
   **Add to Cart** and **Buy Now** (straight to this store's checkout), a
   **delivery check** and share. The delivery check tells the customer
