@@ -231,7 +231,10 @@ function AddedToast({ name, storeSlug }: { name: string; storeSlug: string }) {
   )
 }
 
-/** In Stock / Low Stock / Out of Stock pill driven by total stock. */
+/**
+ * Low Stock / Out of Stock pill driven by total stock. Plenty in stock says
+ * nothing — availability is only worth a label when it is news.
+ */
 export function StockBadge({ stock }: { stock: number }) {
   const level = stockLevel(stock)
   if (level === 'out') {
@@ -248,9 +251,17 @@ export function StockBadge({ stock }: { stock: number }) {
       </span>
     )
   }
+  return null
+}
+
+/**
+ * "Sale" — shown only where a variant's MRP is above its selling price, so the
+ * word always means a real discount. Callers decide that; this is the pill.
+ */
+export function SaleTag() {
   return (
-    <span className="rounded-full bg-success/15 px-1.5 py-0.5 text-[10px] font-semibold text-success">
-      In Stock
+    <span className="rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-contrast">
+      Sale
     </span>
   )
 }

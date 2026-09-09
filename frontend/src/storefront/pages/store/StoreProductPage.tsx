@@ -20,6 +20,7 @@ import { ProductGrid } from '../../features/publicStore/ProductCard'
 import { ShareButton } from '../../features/publicStore/ShareButton'
 import {
   PurchaseActions,
+  SaleTag,
   StockBadge,
   type PurchaseTarget,
 } from '../../features/publicStore/CartControls'
@@ -252,12 +253,15 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
               {formatPrice(price)}
             </span>
             {compareAt && Number(compareAt) > Number(price) && (
-              <span className={`text-sm ${skin.muted}`}>
-                <s>{formatPrice(compareAt)}</s>{' '}
-                <span className="font-semibold text-brand">
-                  {Math.round((1 - Number(price) / Number(compareAt)) * 100)}% off
+              <>
+                <span className={`text-sm ${skin.muted}`}>
+                  <s>{formatPrice(compareAt)}</s>{' '}
+                  <span className="font-semibold text-brand">
+                    {Math.round((1 - Number(price) / Number(compareAt)) * 100)}% off
+                  </span>
                 </span>
-              </span>
+                <SaleTag />
+              </>
             )}
             <StockBadge stock={stock} />
             {variant && (
@@ -638,10 +642,10 @@ function SpecTable({
   for (const type of product.optionTypes) {
     rows.push({ label: type.name, value: type.values.join(', ') })
   }
-  rows.push({
-    label: 'Availability',
-    value: product.stockQuantity > 0 ? 'In stock' : 'Out of stock',
-  })
+  // Availability is only worth a row when it is bad news.
+  if (product.stockQuantity <= 0) {
+    rows.push({ label: 'Availability', value: 'Out of stock' })
+  }
   rows.push({ label: 'Sold by', value: store.name })
 
   return (

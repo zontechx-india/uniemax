@@ -1257,6 +1257,7 @@ represented by a **count**, never sent in full:
 { "id", "name", "slug", "description",
   "price",          // cheapest sellable variant — the "from" price
   "priceMax",
+  "compareAtPrice", // that variant's MRP when above its price (the card's "Sale"); null = no sale
   "stockQuantity",  // total across sellable variants
   "variantCount",   // real options; 0 = simple product, no picker needed
   "category": { "name", "slug" },
@@ -1527,7 +1528,7 @@ grouped** — stores / categories / products, never interleaved.
   "categories": [ { "id", "name", "slug", "parentName",      // "Cricket" in "Power Sports"
                     "store": { "name", "slug" } } ],
   "products":   [ { "id", "name", "slug", "price", "stockQuantity",
-                    "categoryName", "store": { "name", "slug" },
+                    "compareAtPrice", "categoryName", "store": { "name", "slug" },
                     "image": { "url", "altText" } | null } ] } }
 ```
 
@@ -1555,7 +1556,7 @@ global search: `PUBLIC_PRODUCT_VISIBILITY`, published store, and the owner's
 ```jsonc
 { "success": true,
   "data": [ { "id", "name", "slug", "price", "stockQuantity",
-              "categoryName", "store": { "name", "slug" },
+              "compareAtPrice", "categoryName", "store": { "name", "slug" },
               "image": { "url", "altText" } | null } ],
   "meta": { "total", "page", "pageSize", "totalPages" } }
 ```

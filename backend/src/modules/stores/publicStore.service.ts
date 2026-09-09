@@ -148,6 +148,11 @@ const listProductSelect = {
   _count: {
     select: { variants: { where: { isActive: true, isDefault: false } } },
   },
+  // Only what a card's "Sale" needs: the MRP behind the cheapest price.
+  variants: {
+    where: { isActive: true },
+    select: { price: true, compareAtPrice: true },
+  },
   // Cover image only — the image with the lowest displayOrder. A listing
   // card never needs more, so a page of cards stays one row per product.
   media: {
@@ -162,6 +167,20 @@ type ListProductRow = Prisma.StoreProductGetPayload<{
   select: typeof listProductSelect;
 }>;
 
+/**
+ * The MRP that belongs to a listing's "From" price — the cheapest variant's,
+ * and only when it is genuinely above that price. Null means "no sale".
+ */
+export function saleCompareAt(
+  priceMin: Prisma.Decimal | null,
+  variants: { price: Prisma.Decimal; compareAtPrice: Prisma.Decimal | null }[],
+): Prisma.Decimal | null {
+  if (priceMin === null) return null;
+  const cheapest = variants.find((variant) => variant.price.equals(priceMin));
+  if (!cheapest?.compareAtPrice) return null;
+  return cheapest.compareAtPrice.greaterThan(cheapest.price) ? cheapest.compareAtPrice : null;
+}
+
 function shapeListProduct(row: ListProductRow) {
   const cover = row.media[0] ?? null;
   return {
@@ -172,6 +191,8 @@ function shapeListProduct(row: ListProductRow) {
     /** Cheapest sellable variant — the "From ₹X" price. */
     price: row.priceMin,
     priceMax: row.priceMax,
+    /** That variant's MRP when it is above the price — the honest "Sale" signal. */
+    compareAtPrice: saleCompareAt(row.priceMin, row.variants),
     stockQuantity: row.stockTotal,
     /** Real options only; 0 means a simple product (no picker needed). */
     variantCount: row._count.variants,

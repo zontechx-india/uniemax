@@ -6,7 +6,7 @@ import {
   type PublicStore,
 } from '../stores/storesApi'
 import { BoxIcon } from '../../layout/icons'
-import { StockBadge } from './CartControls'
+import { SaleTag, StockBadge } from './CartControls'
 import type { Skin } from './storeTheme'
 
 /**
@@ -81,6 +81,7 @@ export function ProductCard({
           <PriceLabel product={product} />
 
           <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-1.5">
+            {product.compareAtPrice && <SaleTag />}
             <StockBadge stock={product.stockQuantity} />
             <VariantCount count={product.variantCount} />
           </div>
@@ -90,7 +91,10 @@ export function ProductCard({
   )
 }
 
-/** "From ₹X" when options exist, a plain price otherwise. */
+/**
+ * "From ₹X" when options exist, a plain price otherwise — with the MRP
+ * struck through beside it when the product is genuinely on sale.
+ */
 export function PriceLabel({ product }: { product: PublicProduct }) {
   if (product.price === null) return null
   return (
@@ -99,6 +103,11 @@ export function PriceLabel({ product }: { product: PublicProduct }) {
         <span className="text-[11px] font-semibold text-muted">From </span>
       )}
       {formatPrice(product.price)}
+      {product.compareAtPrice && (
+        <s className="ml-1.5 font-body text-xs font-normal text-muted">
+          {formatPrice(product.compareAtPrice)}
+        </s>
+      )}
     </span>
   )
 }

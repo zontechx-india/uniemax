@@ -1077,8 +1077,18 @@ function ProductCard({ product }: { product: MarketProduct }) {
           {product.name}
         </p>
         {product.price !== null && (
-          <p className="mt-1.5 text-sm font-semibold text-brand">
+          <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-sm font-semibold text-brand">
             {formatPrice(product.price)}
+            {product.compareAtPrice && (
+              <>
+                <s className="text-xs font-normal text-muted">
+                  {formatPrice(product.compareAtPrice)}
+                </s>
+                <span className="rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-contrast">
+                  Sale
+                </span>
+              </>
+            )}
           </p>
         )}
       </div>

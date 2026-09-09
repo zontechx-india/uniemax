@@ -449,8 +449,10 @@ A single account can own multiple stores and switch between them.
   catalog in the same grid, or search it by name and description. This is the
   target of the header's **Shop** link and every "View all".
 
-  Listing cards are **compact** — image, category, name, a "from" price, a
-  stock badge (In/Low/Out) and a **variant count** for products with options
+  Listing cards are **compact** — image, category, name, a "from" price (the
+  MRP struck through and a **"Sale"** tag when that price is a genuine
+  discount — "Sale" never appears without one), a stock badge only when it
+  matters (Low / Out of stock) and a **variant count** for products with options
   (never the full option list) — so a wide screen shows up to six per row
   instead of a few oversized tiles. The **whole card is a link** to the
   product page — there
@@ -775,8 +777,9 @@ Future categories can be added without development.
 
 - Stock Quantity
 - Low Stock Alert
-- In Stock
+- In Stock (not labelled on the storefront — only Low / Out of stock are)
 - Out of Stock
+- Sale — shown wherever a variant's MRP is above its selling price, and only there
 
 ---
 

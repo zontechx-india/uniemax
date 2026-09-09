@@ -30,6 +30,8 @@ export interface MarketProduct {
   slug: string
   /** "From" price (cheapest sellable variant). Decimal on the wire. */
   price: string | null
+  /** That variant's MRP when above its price — "Sale"; null = no sale. */
+  compareAtPrice: string | null
   stockQuantity: number
   categoryName: string
   store: { name: string; slug: string }
@@ -58,6 +60,8 @@ export interface SearchProductHit {
   slug: string
   /** "From" price (cheapest sellable variant). Decimal on the wire. */
   price: string | null
+  /** That variant's MRP when above its price — "Sale"; null = no sale. */
+  compareAtPrice: string | null
   stockQuantity: number
   categoryName: string
   store: { name: string; slug: string }

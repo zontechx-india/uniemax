@@ -601,7 +601,9 @@ column), which lets the homepage render full-bleed section bands instead.
     touch, hover arrows and an `n / total` counter. The gallery is
     `lg:sticky` so it stays in view while the long right column scrolls.
   - **Purchase card** — everything about buying inside one bordered card:
-    category eyebrow → name → price → stock badge → the first few highlights →
+    category eyebrow → name → price (MRP struck through, % off and a "Sale"
+    tag when the selected variant's MRP is above its price) → stock badge
+    (Low / Out only) → the first few highlights →
     **`OptionPicker`** (`features/publicStore/OptionPicker.tsx` — one
     radiogroup per option type; the selection is a `Record<type, value>`
     resolved to a variant by `findVariant`; a value is greyed via
@@ -680,7 +682,10 @@ column), which lets the homepage render full-bleed section bands instead.
   every card the same shape whether or not the product has options, so a grid
   of thousands stays uniform. Shows the **cover image** (lazy-loaded
   `loading="lazy"`/`decoding="async"`, icon fallback while no photo exists),
-  category label, name, a **"From ₹X"** price, a **stock badge** and **"N
+  category label, name, a **"From ₹X"** price (with the MRP struck through
+  and a **"Sale"** tag when that variant's MRP is above its price — the tag
+  is never shown without a real discount), a **stock badge** only when it
+  matters (Low / Out of Stock — plenty in stock says nothing) and **"N
   Variants Available"** (never the options themselves). Hover applies `metal-lift`:
   a small rise plus an **evenly-spread halo** (zero-offset shadow, so it
   radiates equally on all four sides rather than pooling underneath) and the

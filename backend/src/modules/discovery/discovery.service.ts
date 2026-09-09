@@ -4,6 +4,7 @@ import { mediaUrl } from "../../package/storage/index.js";
 import {
   PUBLIC_PRODUCT_VISIBILITY,
   PUBLIC_STORE_VISIBILITY,
+  saleCompareAt,
 } from "../stores/publicStore.service.js";
 import { activeShelfChain } from "../stores/shelfTree.js";
 import type { NewProductsQuery, SearchQuery } from "./discovery.schema.js";
@@ -48,6 +49,10 @@ const marketProductSelect = {
   stockTotal: true,
   category: { select: { name: true } },
   store: { select: { name: true, slug: true } },
+  variants: {
+    where: { isActive: true },
+    select: { price: true, compareAtPrice: true },
+  },
   media: {
     where: { type: "IMAGE" },
     orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
@@ -67,6 +72,7 @@ function shapeMarketProduct(product: MarketProductRow) {
     name: product.name,
     slug: product.slug,
     price: product.priceMin,
+    compareAtPrice: saleCompareAt(product.priceMin, product.variants),
     stockQuantity: product.stockTotal,
     categoryName: product.category.name,
     store: product.store,

@@ -499,6 +499,8 @@ export interface PublicProduct {
   /** Cheapest sellable variant ("From ₹X"). Decimal serialized as a string. */
   price: string | null
   priceMax: string | null
+  /** That variant's MRP when above its price — the card's "Sale"; null = no sale. */
+  compareAtPrice: string | null
   /** Total stock across sellable variants. */
   stockQuantity: number
   /** Real options only; 0 means a simple product with no picker. */
