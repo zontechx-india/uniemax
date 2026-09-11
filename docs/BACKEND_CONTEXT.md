@@ -358,11 +358,19 @@ before payout, three products before a marketplace feature — is one entry;
 no endpoint, no UI and no migration change.
 
 - **Gates** are capabilities a requirement can block: `PUBLISH`,
+  `PAYOUT_SETUP` (adding a payout bank account — enforced in
+  `storeBank.service.ts` off the readiness `getMyStore` already returns),
   `ONLINE_PAYMENT`, `PICKUP`. `gates: []` makes a requirement advisory
-  (it shows in the checklist but blocks nothing).
+  (it shows in the checklist but blocks nothing). `gateBlockedMessage` is
+  the one place the 400 wording lives.
 - **Steps** group requirements into a screen's worth of fields.
-  `wizard: true` steps are the numbered pages of Create Store; the rest are
-  checklist-only (you cannot add a product from a signup wizard).
+  `wizard: true` steps are the numbered pages of Create Store — only
+  `store` and `business`; the rest are checklist-only (you cannot add a
+  product from a signup wizard). Address and tax were wizard steps until
+  sellers kept abandoning the flow on them; they now gate `PAYOUT_SETUP`
+  instead of `PUBLISH`, so a COD shop opens without them and they become
+  mandatory the moment a bank account is added. Step order follows the
+  seller's journey: store · business · catalog, then address · tax · payout.
 - `appliesWhen` makes a requirement conditional — for a field that only
   matters once the seller switches a capability on. Inapplicable requirements
   are dropped from the evaluation, never reported unmet.
@@ -703,7 +711,9 @@ White-label design — one codebase, any business:
   photo and a price above ₹0 and stamps `publishedAt` once. `shapeProduct`
   derives `isDraft` and a `completeness` score (photo 35 · price 35 ·
   description 20 · specifications 10) with the `missing` list the seller's
-  UI turns into next steps. `StoreCategory` has a `parentId` self-relation of
+  UI turns into next steps. A product may also belong to product
+  **families** — separate products that are the same item in another colour
+  — see **ProductGroup** below. `StoreCategory` has a `parentId` self-relation of
   **any depth** — shelves mirror the global taxonomy, so they nest as deep
   as it does (`MAX_CATEGORY_DEPTH` = 5 levels, enforced on the taxonomy).
   One shelf per taxonomy node per store (`@@unique([storeId, categoryId])`);
@@ -846,6 +856,32 @@ White-label design — one codebase, any business:
   the image sequence. Owner endpoints under
   `/stores/:id/products/:productId/media` (upload/replace are multipart);
   the public listing sends only the cover, the product page the full gallery.
+- **ProductGroup / ProductGroupMember** — a product **family**: separate
+  `StoreProduct`s that are the same item on ONE axis ("Colour": Maroon /
+  Blue / Tan), each keeping its own photos, price, offer, stock, variants and
+  URL — the **"Other products"** mode of an option in the seller wizard,
+  beside the typed mode whose values become variants. One `ProductGroup` per
+  family (`storeId`, `optionName` for display, `optionKey` = trimmed
+  lower-case, **immutable** — renaming the axis is a new family) and one
+  `ProductGroupMember` per product (`value` = its position on the axis,
+  `position` = the seller's order, and a copy of `optionKey`). Two uniques
+  make the model self-policing: `[groupId, value]` (each colour once per
+  family) and `[productId, optionKey]` (one family per axis per product). A
+  product may be in several families on different axes; an axis is never
+  both typed and a family on one product (service check in both
+  `replaceProductOptions` and `replaceProductGroups`, since `optionTypes` is
+  JSON) and `OPTION_LIMITS.types` counts both kinds. **Membership changes
+  nothing about visibility**: every member is an ordinary product — listed,
+  searchable, countable and buyable under `PUBLIC_PRODUCT_VISIBILITY` like
+  any other; the family only appears as the swatch row on each member's
+  page (the public product detail carries `groups`: members as listing
+  cards + `value` + `isCurrent`). `replaceProductGroups` replaces the
+  caller's whole membership set in one transaction (delete-all + recreate
+  per family, so two members swapping values never hit the unique);
+  `deleteProduct` dissolves a family left with one member; `copyProduct`
+  makes a draft twin (shared details, never photos or variants) behind the
+  wizard's "Create new product for this value". Owner routes:
+  `/stores/:id/products/:productId/{groups,group-candidates,copy}`.
 - **CustomerAddress** — the customer's **address book** (cascade delete
   with the customer; service caps at 10). Fields: optional `label`
   ("Home"/"Work"), name, phone, optional email, addressLine, pincode,

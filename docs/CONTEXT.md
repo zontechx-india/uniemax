@@ -59,7 +59,7 @@ A single account can own multiple stores and switch between them.
   no stores (straight to the creation page) and "My Store" otherwise
   (select a store → its management page, or create another). The selection
   page shows a "Create Your First Store" empty state for first-timers.
-- **Create Store** — a **four-step guided wizard**, numbered so the seller
+- **Create Store** — a **two-step guided wizard**, numbered so the seller
   always knows how much is left:
   1. **Your store** — name + logo (pick an image → crop it square, the one
      place a square is required → staged locally and uploaded with the
@@ -68,27 +68,30 @@ A single account can own multiple stores and switch between them.
      phone and email shown read-only as the seller's verified account
      identifiers. A seller who has no mobile number yet (the ordinary case —
      registration is by email) verifies one by OTP without leaving the step.
-  3. **Address** — the business address (street, PIN code, city, state). The
-     one address the platform holds: sellers drop parcels at a courier office
-     themselves, so nothing is collected from a warehouse and no second
-     address is asked for.
-  4. **Tax details** — PAN and GSTIN, **skippable**, with a "not registered
-     for GST" declaration.
+
+  The wizard used to have two more steps — **Address** and **Tax details** —
+  and sellers were leaving before the end. Neither is needed to open a shop
+  (a cash-on-delivery store never touches them), so they moved out of the
+  wizard and into Business Details, where they become **mandatory the moment
+  the seller adds a payout bank account**: the address (street, PIN code,
+  city, state — the one address the platform holds), the PAN, and the GST
+  status (a GSTIN or a "not registered for GST" declaration). Until then they
+  are optional and the checklist marks them "to get paid".
 
   Two rules keep it fast. **The store is created at the end of step 1**, so
-  onboarding is resumable: a seller who leaves on step 3 still owns a store,
+  onboarding is resumable: a seller who leaves on step 2 still owns a store,
   keeps what they typed, and is met by the setup checklist on their dashboard.
   And **nothing is asked twice** — the seller name, phone and email are
   pre-filled from the account, and the business name defaults to the store
-  name. A "Finish later" control is available from step 2 onward.
+  name. A "Finish later" control is available on step 2.
 
   Because the store exists from step 1, an abandoned run would otherwise
   leave a store behind — and a seller returning to **Create store** is far
   more likely to be coming back to it than wanting a duplicate of it. So if
-  they own any unfinished draft (unpublished, with a required step still
+  they own any unfinished draft (unpublished, with a wizard step still
   open), they are first offered to **continue** it, landing on the step it
   needs next; starting a new store stays one click away. A store missing only
-  the optional tax step is not a draft — skipping it was a choice.
+  checklist items (address, tax, products, bank account) is not a draft.
 
   The contact phone and email are deliberately **not editable anywhere**, in
   the wizard or later in Business Details. They are the channels order alerts
@@ -103,9 +106,10 @@ A single account can own multiple stores and switch between them.
   The logo can be replaced at any time from Store Details (same pick → crop →
   upload pipeline, with progress, to a dedicated storage bucket).
 - **Setup checklist** — on the store dashboard until every requirement is
-  met: a progress bar, the remaining steps grouped as in the wizard, and each
-  step expandable to the individual fields still missing (with a "to publish"
-  marker on the ones that block going live). It renders from the same
+  met: a progress bar, the remaining steps in the seller's order (open the
+  shop, then get paid), and each step expandable to the individual fields
+  still missing (with a "to publish" marker on the ones that block going
+  live and "to get paid" on the payout prerequisites). It renders from the same
   server-side evaluation the endpoints enforce, so it can never tell a seller
   they are done while the server disagrees. It removes itself at 100%.
 - **What is required, and when** — a seller can build their whole catalog
@@ -134,11 +138,12 @@ A single account can own multiple stores and switch between them.
   Appearance, Homepage, Footer, Payments, Bank Accounts, Shipping, Checkout,
   plus Customer Support and UnieMax Support; right: the selected section),
   addressed by the store's slug (`/stores/{storeSlug}`).
-- **Business Details** — the permanent home of everything the wizard
-  collects: three independently-saved cards for **Business & contact**,
-  **Address** and **Tax & compliance** (PAN, GSTIN,
-  registration number). Correcting a phone number never means re-validating
-  an address.
+- **Business Details** — the permanent home of what the wizard collects and
+  what it deliberately leaves for later: three independently-saved cards for
+  **Business & contact**, **Address** and **Tax & compliance** (PAN, GSTIN,
+  registration number). Address and tax are required before a bank account
+  can be added. Correcting a phone number never means re-validating an
+  address.
 - **Seller dashboard** — the management page's landing view: **Today's
   Orders**, Total Orders and Revenue up top, then the order pipeline —
   **Pending / Processing / Shipped / Completed / Cancelled / Refunded** —
@@ -743,6 +748,18 @@ Each Product contains
 - Multiple Images
 - Specifications
 - Status
+
+Product groups (families)
+
+- An option's values can be typed (variants of the product) or be other
+  products of the store — a family of separate products that are the same
+  item on one axis (Colour: Maroon / Blue / Tan), each with its own photos,
+  price, offer, stock and URL
+- Every member is listed, searchable and buyable like any other product;
+  on each member's page the family shows as a row of swatches that switch
+  to the others
+- "Create new product for this value" makes a draft copy of the shared
+  details (name, category, description, specifications, delivery, COD)
 
 ---
 

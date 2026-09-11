@@ -307,11 +307,12 @@ on, so the two can never disagree.
 ```jsonc
 {
   "steps": [                          // registry order; wizard steps first
-    { "key": "business",              // store · business · address · tax ·
-                                      //   catalog · payout
+    { "key": "business",              // store · business · catalog ·
+                                      //   address · tax · payout
       "title": "Business & contact",
       "blurb": "Who is selling, and how we reach you about orders.",
       "wizard": true,                 // a numbered Create Store step
+                                      //   (only `store` and `business` are)
       "href": "business",             // relative to /mystores/:slug
       "stepNumber": 2,                // 1-based; null for checklist-only steps
       "requirements": [
@@ -322,24 +323,32 @@ on, so the two can never disagree.
   ],
   "gates": {
     "PUBLISH":        { "gate": "PUBLISH", "allowed": false,
-                        "blockers": ["Contact phone number", "Business address"],
-                        "blockerKeys": ["business.phone", "address.business"] },
+                        "blockers": ["Contact phone number", "At least one product"],
+                        "blockerKeys": ["business.phone", "catalog.product"] },
+    "PAYOUT_SETUP":   { "gate": "PAYOUT_SETUP", "allowed": false,
+                        "blockers": ["Business address", "PAN"],
+                        "blockerKeys": ["address.business", "tax.pan"] },
     "ONLINE_PAYMENT": { "gate": "ONLINE_PAYMENT", "allowed": false,
                         "blockers": ["PAN"], "blockerKeys": ["tax.pan"] },
-    "PICKUP":         { "gate": "PICKUP", "allowed": true,
-                        "blockers": [], "blockerKeys": [] }
+    "PICKUP":         { "gate": "PICKUP", "allowed": false,
+                        "blockers": ["Business address"], "blockerKeys": ["address.business"] }
   },
   "complete": false, "metCount": 8, "totalCount": 12
 }
 ```
 
-**The three gates and what they require**
+**The four gates and what they require**
 
 | Gate | Blocks | Requirements |
 | --- | --- | --- |
-| `PUBLISH` | `PATCH …/publish` with `isPublished: true` | store name + logo · business name · seller name · contact phone · contact email · business address · ≥ 1 category · ≥ 1 product |
+| `PUBLISH` | `PATCH …/publish` with `isPublished: true` | store name + logo · business name · seller name · contact phone · contact email · ≥ 1 category · ≥ 1 product |
+| `PAYOUT_SETUP` | `POST …/bank-accounts` (adding any payout account) | business address · PAN · GST registration status (a GSTIN or the not-registered declaration) |
 | `ONLINE_PAYMENT` | `PATCH …/payments` turning `acceptOnlinePayment` **on** | PAN · a primary payout bank account |
 | `PICKUP` | `PATCH …/shipping` with mode `PICKUP` / `BOTH` | the business address |
+
+The address and tax details are **not** needed to publish — a cash-on-delivery
+shop can open without them. They become mandatory at `PAYOUT_SETUP`, the first
+point at which the platform has to know who it is paying and where.
 
 A blocked request returns `400` naming every missing requirement at once, e.g.
 `"Before you can publish your store, please add: Business address, At least one product."`
@@ -733,8 +742,10 @@ first. Each:
                                           // primary automatically regardless
 }
 ```
-`409` on the 6th account or when the same `accountNumber` + `ifsc` is
-already saved for this store. Created `PENDING`.
+`400` while the `PAYOUT_SETUP` gate is blocked (see *Store readiness*) —
+the business address, PAN and GST registration status must be in first; the
+message names every missing one. `409` on the 6th account or when the same
+`accountNumber` + `ifsc` is already saved for this store. Created `PENDING`.
 
 **`PATCH /api/v1/stores/:id/bank-accounts/:accountId`** — partial update
 (≥ 1 field). Any changed bank detail resets the verification to `PENDING`.
@@ -872,6 +883,10 @@ Each:
                   "mediaId",                                  // one of media[] (IMAGE), or null = cover
                   "optionValues": { "Storage": "128 GB" }, "createdAt" } ],
   "media":    [ { "id", "type": "IMAGE|VIDEO", "url", "altText", "displayOrder" } ],
+  // Product families this one is in — the "Other products" option mode (see PUT …/groups)
+  "groups":   [ { "id", "optionName": "Colour", "value": "Maroon",
+                  "members": [ { "productId", "name", "slug", "imageUrl", "price", "isDraft",
+                                 "value", "position" } ] } ],
   "createdAt": "…"
 }
 ```
@@ -986,6 +1001,52 @@ A variant's price can be changed but never cleared; the MRP rule
 (`compareAtPrice` above `price`) holds for the resulting state whichever half
 is patched. This is also how the price, MRP, stock and SKU of an option-less
 product are edited — patch its `defaultVariant.id`.
+
+**Product groups** — the **"Other products"** option mode. Where a typed
+option's values become variants *inside* the product, a products option's
+values are **other products of the store**: a *family* of separate products
+that are the same item on one axis ("Colour": Maroon / Blue / Tan), each with
+its own photos, price, offer, stock, variants and URL, **listed like any
+other product**. The group only ties them together so each one's storefront
+page can switch to the others. Every mutation returns the **full parent
+product** (with `groups`), and every member sees the same family from its
+own row.
+
+**`PUT /api/v1/stores/:id/products/:productId/groups`** — the **full set** of
+families this product is in (set semantics, like `…/options`): a family in
+the body is written member-for-member (an existing family on that axis keeps
+its id), one missing from the body is dissolved, `{ "groups": [] }` leaves
+them all. One transaction. Member order is the storefront's swatch order.
+```jsonc
+{ "groups": [ { "optionName": "Colour",
+                "members": [ { "productId": "cmr…A", "value": "Maroon" },
+                             { "productId": "cmr…B", "value": "Blue" } ] } ] }
+```
+Rules: 2–30 members, the calling product among them, every member a product
+of this store; values unique per family (case-insensitive); ≤ 3 option
+names per product counting typed options **and** families; an axis is one
+kind or the other — `400` when any member carries the same name as a typed
+option (and `PUT …/options` refuses a typed option named like one of the
+product's families); `409` when a member is already in a *different* family
+on that axis. `optionName` is immutable per family — renaming the axis makes
+a new family.
+
+**`GET /api/v1/stores/:id/products/:productId/group-candidates?optionName=Colour&q=`**
+— the store's other products as candidates for that axis, same shelf first,
+each saying why it can or cannot be picked:
+```jsonc
+[ { "id", "name", "slug", "imageUrl", "price", "isDraft", "category": { "id", "name" }, "sameShelf": true,
+    "eligibility": "eligible | in-this-group | in-other-group | has-typed-option | too-many-options",
+    "conflictGroup": { "optionName", "otherName" } | null } ]   // set for in-other-group: names another member of that family
+```
+
+**`POST /api/v1/stores/:id/products/:productId/copy`** → `201` — a new
+**draft** that starts as this product's twin: name (or `{ "name" }` from the
+body), shelf, description, specifications, delivery rule, shipping override
+and COD copied once. **Not** copied: photos, variants, option types,
+merchandising flags, group memberships. The copy is independent from then
+on — the wizard's "Create new product for this value" uses it, then adds the
+copy to the family through `PUT …/groups`.
 
 A product cannot be **published** (`PATCH …/products/:productId` with
 `isActive: true`) without a photo (`400` "Add at least one photo before
@@ -1318,8 +1379,15 @@ product page is where a customer picks one.
                   "mediaId",                                      // the gallery item that shows this variant; null = cover
                   "optionValues": { "Size": "M" } } ],            // enabled combinations only, matrix order
   "media": [ { "id", "type": "IMAGE|VIDEO", "url", "altText" } ], // gallery, cover first
+  "groups": [ { "optionName": "Colour", "value": "Maroon",         // product families this one is in
+                "members": [ { …listing shape…, "value": "Blue", "isCurrent": false } ] } ],
   "related": [ … ] }                                           // same category, max 8
 ```
+`groups` carries the product's families (the "Other products" option mode)
+for the storefront's swatch row: every member the shopper may see as a
+listing card plus its `value` on the axis, `isCurrent` marking this page. A
+family with nobody else visible is omitted. Members are ordinary products —
+each is listed, searchable and reachable by its own URL like any other.
 A product with no options arrives with `optionTypes: []` and `variants: []`
 (the implicit `Default` is never exposed) and its price/stock come from the
 product fields. A value may appear in `optionTypes` with no enabled variant

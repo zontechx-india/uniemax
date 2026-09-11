@@ -478,3 +478,13 @@ export function ChatIcon({ className }: { className?: string }) {
     </Svg>
   )
 }
+
+/** Sidebar frame with a filled left rail — the collapse/expand nav toggle. */
+export function PanelLeftIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9 4v16" />
+    </Svg>
+  )
+}

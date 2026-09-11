@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { ErrorNote, InfoNote, SuccessNote, TextField } from '../../../shared/ui/form'
@@ -26,6 +27,15 @@ import {
  * manually by a UnieMax admin (admin panel is a future module — the status
  * fields are provisioned now). Editing a verified account's bank details
  * resets it to pending.
+ *
+ * **Adding an account is gated.** The business address and tax details are
+ * no longer asked for at signup — they were the two steps sellers abandoned
+ * the wizard on — so this is where they become mandatory: a payout account
+ * is the first thing that needs to know who is being paid and where. The
+ * condition is `store.readiness.gates.PAYOUT_SETUP`, the same evaluation
+ * `POST /bank-accounts` enforces, so the button is hidden for exactly the
+ * reasons a save would be rejected. Editing, re-prioritising and deleting
+ * existing accounts are never gated.
  */
 
 const MAX_ACCOUNTS = 5
@@ -121,6 +131,9 @@ export function StoreBankPage() {
   const noPrimary =
     accounts !== null && accounts.length > 0 && !accounts.some((a) => a.isPrimary)
 
+  const payoutGate = store.readiness.gates.PAYOUT_SETUP
+  const addBlocked = !payoutGate.allowed
+
   return (
     <div>
       <h2 className="font-body text-xl font-semibold tracking-normal text-fg">
@@ -150,10 +163,27 @@ export function StoreBankPage() {
               No bank account yet
             </p>
             <p className="mt-1 max-w-sm text-sm text-muted">
-              Add your payout account so UnieMax can transfer your sales
-              earnings to you.
+              {addBlocked
+                ? 'Complete your business address and tax details first, then add the account UnieMax should pay you into.'
+                : 'Add your payout account so UnieMax can transfer your sales earnings to you.'}
             </p>
           </div>
+        )}
+
+        {/* The Add button below is withheld; this says why, and links to the
+            one page where every missing piece is filled in. */}
+        {addBlocked && accounts !== null && (
+          <InfoNote>
+            Before you can add a bank account, add:{' '}
+            {payoutGate.blockers.join(', ')}. You'll find these under{' '}
+            <Link
+              to="../business"
+              className="font-semibold text-brand hover:underline"
+            >
+              Business Details
+            </Link>
+            .
+          </InfoNote>
         )}
 
         {noPrimary && (
@@ -195,6 +225,7 @@ export function StoreBankPage() {
           />
         ) : (
           accounts !== null &&
+          !addBlocked &&
           accounts.length < MAX_ACCOUNTS && (
             <button
               type="button"

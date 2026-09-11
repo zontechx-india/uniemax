@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../../utils/httpError.js";
 import { getMyStore } from "./stores.service.js";
+import { gateBlockedMessage } from "./storeReadiness.js";
 import { BANK_DETAIL_FIELDS } from "./storeBank.schema.js";
 import type {
   BankAccountCreateInput,
@@ -12,6 +13,11 @@ import type {
  * Seller payout accounts — owner-scoped like the rest of the stores module
  * (a foreign store ref 404s via `getMyStore`). Rules:
  *
+ *  - adding the FIRST or any later account is gated by `PAYOUT_SETUP`
+ *    (`storeReadiness.ts`): the business address and tax details are not
+ *    asked for at signup, so this is where they become mandatory — a payout
+ *    account is the first thing that needs to know who is being paid and
+ *    where. Editing, re-prioritising and deleting are never gated;
  *  - at most MAX_ACCOUNTS saved accounts per store;
  *  - exactly one account may be `isPrimary` — the payout target. The first
  *    saved account becomes primary automatically. Deleting the primary does
@@ -57,6 +63,14 @@ export async function createBankAccount(
   input: BankAccountCreateInput,
 ) {
   const store = await getMyStore(ownerId, storeRef); // ownership check
+
+  // `getMyStore` already carries the readiness evaluation, so the gate is
+  // read straight off it rather than evaluated a second time.
+  const gate = store.readiness.gates.PAYOUT_SETUP;
+  if (!gate.allowed) {
+    throw HttpError.badRequest(gateBlockedMessage("PAYOUT_SETUP", gate));
+  }
+
   const count = await prisma.storeBankAccount.count({
     where: { storeId: store.id },
   });

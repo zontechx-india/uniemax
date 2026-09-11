@@ -325,6 +325,66 @@ export const storeProductUpdateSchema = z
     message: "Provide at least one field to update",
   });
 
+// ---------------------------------------------------------------------------
+// Product groups — the "Other products" option mode
+// ---------------------------------------------------------------------------
+
+/**
+ * One family: the axis it varies on and every member with its value. Members
+ * are full products of the same store; the calling product must be one of
+ * them (checked in the service, which knows the caller). At least two — a
+ * family of one is just a product.
+ */
+const productGroupInputSchema = z
+  .object({
+    optionName: optionText,
+    /** In the seller's order — the order of the storefront's swatch row. */
+    members: z
+      .array(z.object({ productId: z.string().min(1), value: optionText }))
+      .min(2, "A group needs at least two products")
+      .max(
+        OPTION_LIMITS.valuesPerType,
+        `At most ${OPTION_LIMITS.valuesPerType} products in a group`,
+      ),
+  })
+  .refine(
+    (group) =>
+      new Set(group.members.map((member) => member.productId)).size ===
+      group.members.length,
+    { path: ["members"], message: "A product can be in a group only once" },
+  )
+  .refine(
+    (group) => uniqueCaseInsensitive(group.members.map((member) => member.value)),
+    { path: ["members"], message: "Values must be unique within a group" },
+  );
+
+/**
+ * `PUT …/products/:productId/groups` — the FULL set of families this product
+ * belongs to, one per option name (set semantics, like `…/options`): groups
+ * absent from the body are left, groups present are replaced member-for-
+ * member. `groups: []` takes the product out of every family.
+ */
+export const storeProductGroupsSchema = z.object({
+  groups: z
+    .array(productGroupInputSchema)
+    .max(OPTION_LIMITS.types, `At most ${OPTION_LIMITS.types} options`)
+    .refine(
+      (groups) => uniqueCaseInsensitive(groups.map((group) => group.optionName)),
+      { message: "Option names must be unique" },
+    ),
+});
+
+/** `POST …/products/:productId/copy` — an optional name for the new draft. */
+export const storeProductCopySchema = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+});
+
+/** `GET …/products/:productId/group-candidates` — which axis, optional name filter. */
+export const groupCandidatesQuerySchema = z.object({
+  optionName: optionText,
+  q: z.string().trim().max(120).optional(),
+});
+
 /**
  * Media metadata update — alt text only (the binary is replaced via the
  * dedicated /file endpoint; order via /order). `null` clears the alt text.
@@ -372,3 +432,6 @@ export type StoreProductCreateInput = z.infer<typeof storeProductCreateSchema>;
 export type StoreProductUpdateInput = z.infer<typeof storeProductUpdateSchema>;
 export type StoreProductOptionsInput = z.infer<typeof storeProductOptionsSchema>;
 export type StoreVariantUpdateInput = z.infer<typeof storeVariantUpdateSchema>;
+export type StoreProductGroupsInput = z.infer<typeof storeProductGroupsSchema>;
+export type StoreProductCopyInput = z.infer<typeof storeProductCopySchema>;
+export type GroupCandidatesQuery = z.infer<typeof groupCandidatesQuerySchema>;

@@ -121,7 +121,7 @@ export interface SetupRequirement {
   key: string
   label: string
   step: string
-  gates: ('PUBLISH' | 'ONLINE_PAYMENT' | 'PICKUP')[]
+  gates: ('PUBLISH' | 'PAYOUT_SETUP' | 'ONLINE_PAYMENT' | 'PICKUP')[]
   met: boolean
 }
 

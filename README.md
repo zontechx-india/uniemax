@@ -50,11 +50,12 @@ never ships to a shopper.
 
 ### For sellers
 
-- Create multiple stores through a **four-step guided wizard** (store → business
-  → address → tax), pre-filled from the account and resumable: the store is
-  created at step 1, so leaving midway loses nothing and a dashboard checklist
-  shows exactly what's left. Each store gets a stable slug that survives
-  renames.
+- Create multiple stores through a **two-step guided wizard** (store → business
+  & contact), pre-filled from the account and resumable: the store is created
+  at step 1, so leaving midway loses nothing and a dashboard checklist shows
+  exactly what's left. Address and tax details are collected later and become
+  mandatory only when a payout bank account is added. Each store gets a stable
+  slug that survives renames.
 - Business identity kept separately from storefront presentation: legal name,
   accountable seller, contact details, a structured business address,
   PAN / GSTIN.

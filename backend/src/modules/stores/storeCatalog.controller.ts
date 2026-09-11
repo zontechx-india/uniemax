@@ -3,13 +3,16 @@ import { ok } from "../../utils/response.js";
 import { readUpload } from "../../package/storage/index.js";
 import { idParamSchema } from "../../utils/zodHelpers.js";
 import {
+  groupCandidatesQuerySchema,
   storeCategoryCreateSchema,
   storeCategoryUpdateSchema,
   storeMediaOrderSchema,
   storeMediaParamSchema,
   storeMediaUpdateSchema,
+  storeProductCopySchema,
   storeProductCreateSchema,
   storeCategoryParamSchema,
+  storeProductGroupsSchema,
   storeProductParamSchema,
   storeProductOptionsSchema,
   storeVariantUpdateSchema,
@@ -100,6 +103,35 @@ export async function replaceProductOptions(request: FastifyRequest) {
       input,
     ),
   );
+}
+
+/**
+ * Replace every product family this product belongs to (set semantics, one
+ * transaction). The response is the product with its `groups`.
+ */
+export async function replaceProductGroups(request: FastifyRequest) {
+  const { id, productId } = storeProductParamSchema.parse(request.params);
+  const input = storeProductGroupsSchema.parse(request.body);
+  return ok(
+    await service.replaceProductGroups(request.customer!.id, id, productId, input),
+  );
+}
+
+/** The store's products as candidates for one axis of this product's family. */
+export async function listGroupCandidates(request: FastifyRequest) {
+  const { id, productId } = storeProductParamSchema.parse(request.params);
+  const query = groupCandidatesQuerySchema.parse(request.query);
+  return ok(
+    await service.listGroupCandidates(request.customer!.id, id, productId, query),
+  );
+}
+
+/** A new draft copying this product's shared details (not its photos or variants). */
+export async function copyProduct(request: FastifyRequest, reply: FastifyReply) {
+  const { id, productId } = storeProductParamSchema.parse(request.params);
+  const input = storeProductCopySchema.parse(request.body ?? {});
+  const product = await service.copyProduct(request.customer!.id, id, productId, input);
+  return reply.status(201).send(ok(product));
 }
 
 /** Price / stock / on-off for one combination. */

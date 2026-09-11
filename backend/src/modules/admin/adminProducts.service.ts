@@ -111,6 +111,15 @@ export async function getProduct(productId: string) {
       shippingOverride: true,
       codAvailable: true,
       updatedAt: true,
+      // The families the product belongs to — why its page shows swatches.
+      groupMemberships: {
+        select: {
+          value: true,
+          group: {
+            select: { id: true, optionName: true, _count: { select: { members: true } } },
+          },
+        },
+      },
       store: {
         select: { id: true, name: true, slug: true, isPublished: true, ownerId: true },
       },
@@ -134,11 +143,25 @@ export async function getProduct(productId: string) {
   });
   if (!product) throw HttpError.notFound("Product not found");
 
-  const { media, _count, optionTypes, specifications, deliveryRule, shippingOverride, ...rest } =
-    product;
+  const {
+    media,
+    _count,
+    optionTypes,
+    specifications,
+    deliveryRule,
+    shippingOverride,
+    groupMemberships,
+    ...rest
+  } = product;
   return {
     ...rest,
     variantCount: _count.variants,
+    groups: groupMemberships.map((membership) => ({
+      id: membership.group.id,
+      optionName: membership.group.optionName,
+      value: membership.value,
+      memberCount: membership.group._count.members,
+    })),
     optionTypes: resolveOptionTypes(optionTypes),
     specifications: resolveSpecifications(specifications),
     // Null = no override; the product follows the store's default rule.

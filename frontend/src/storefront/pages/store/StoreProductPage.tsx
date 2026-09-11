@@ -34,6 +34,7 @@ import {
   type ProductSpec,
 } from '../../features/publicStore/productDescription'
 import { OptionPicker } from '../../features/publicStore/OptionPicker'
+import { GroupSwatchRow } from '../../features/publicStore/GroupSwatchRow'
 import { DeliveryCheck } from '../../features/publicStore/DeliveryCheck'
 import {
   findVariant,
@@ -286,6 +287,11 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
               ))}
             </ul>
           )}
+
+          {/* Product family — other products that are this one in another
+              colour (or whatever the axis is). A swatch here is a link to
+              that product's own page. */}
+          <GroupSwatchRow groups={product.groups} storeSlug={store.slug} skin={skin} />
 
           {/* Option pickers — the reason this page exists. One per dimension. */}
           <OptionPicker

@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
-import { CloseIcon } from '../layout/icons'
 
 /**
- * The console's content dialog — a record opened *in place* over the list
- * that led to it, so the admin keeps their filters, page and scroll
- * position when they close it.
+ * A content dialog — a record or a picker opened *in place* over the list
+ * that led to it, so the user keeps their filters, page and scroll position
+ * when they close it. Shared by the admin console and the seller's store
+ * pages.
  *
  * Distinct from `ConfirmDialog` on purpose: that one is a two-button
  * question; this one is a scrollable panel with its own header and an
@@ -110,5 +110,22 @@ export function Dialog({
       </div>
     </div>,
     document.body,
+  )
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
   )
 }

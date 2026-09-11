@@ -76,13 +76,15 @@ const SECTIONS: {
   {
     id: 'business-address',
     title: 'Address',
-    description: 'Where your business is registered and operates from.',
+    description:
+      'Where your business operates from. Needed before you add a bank account or offer pickup.',
     step: 'address',
   },
   {
     id: 'business-tax',
     title: 'Tax & compliance',
-    description: 'Needed before UnieMax can collect payments and pay you out.',
+    description:
+      'PAN and GST status. Needed before you add a bank account and get paid.',
     step: 'tax',
   },
 ]

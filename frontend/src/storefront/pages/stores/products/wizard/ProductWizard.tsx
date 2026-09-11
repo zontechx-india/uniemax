@@ -31,6 +31,7 @@ export function ProductWizard({
   product: initial,
   startAt = 'basics',
   onProductChange,
+  onCatalogChanged,
   onClose,
 }: {
   storeId: string
@@ -39,6 +40,8 @@ export function ProductWizard({
   product: StoreProduct | null
   startAt?: StepKey
   onProductChange: (product: StoreProduct) => void
+  /** Other products changed server-side (a family was saved) — reload the list. */
+  onCatalogChanged?: () => void
   onClose: () => void
 }) {
   const [product, setProduct] = useState<StoreProduct | null>(initial)
@@ -52,6 +55,12 @@ export function ProductWizard({
   const saved = (next: StoreProduct) => {
     setProduct(next)
     onProductChange(next)
+  }
+  /** Carry on in another product — "Create new product for this value" lands on its Photos. */
+  const switchTo = (next: StoreProduct, at: StepKey) => {
+    setProduct(next)
+    onProductChange(next)
+    setStep(at)
   }
 
   // A tick means the step's work is actually done, wherever the seller is
@@ -170,6 +179,9 @@ export function ProductWizard({
             categories={categories}
             product={product}
             onSaved={saved}
+            onOtherProductChange={onProductChange}
+            onCatalogChanged={() => onCatalogChanged?.()}
+            onSwitchProduct={switchTo}
             onBack={() => go(-1)}
             onNext={() => go(1)}
           />

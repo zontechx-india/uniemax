@@ -367,7 +367,7 @@ Routes: `/mystores` (select a store — clicking a card goes straight to its
 management page — or create; first-run empty state; each card shows the
 store's **Published/Draft** status chip and its public `/store/{slug}` path,
 so the list doubles as an at-a-glance health check), `/mystores/new` (the
-**four-step Create Store wizard** — see below), and
+**two-step Create Store wizard** — see below), and
 `/mystores/:storeSlug` — a Flipkart-account-style split
 **inside** the main outlet: `StoreManageLayout` renders a left section card
 and the selected section in a right card via a nested `<Outlet/>` (children
@@ -375,25 +375,53 @@ read the loaded store through `useManagedStore()` outlet context).
 Management URLs use the store's **slug** (the backend resolves id or slug
 interchangeably).
 
-The section list is **grouped by what the seller is doing** (`SECTION_GROUPS`),
-because a flat list of twelve made a once-ever setting look as important as a
-daily job — captions only, **deliberately not collapsible** (twelve items over
-four groups fit on screen; an accordion would add a click before every
-navigation and hide the item being hunted for):
+The section list lives in its own file (`StoreSectionNav.tsx` — the layout
+keeps only the shell and the store/dashboard fetches) and is **grouped by what
+the seller is doing** (`SECTION_GROUPS`), because a flat list of sixteen made a
+once-ever setting look as important as a daily job:
 
 | Group | Sections |
 | ----- | -------- |
 | **Overview** | Dashboard · Orders *(pending-count badge)* |
 | **Catalog** | Categories · Products |
 | **Storefront** | Store Details · Business Details · Appearance · Homepage · Footer |
-| **Settings** | Payments · Bank Accounts · Shipping · Checkout |
+| **Payments & Delivery** | Payments · Bank Accounts · Shipping · Checkout |
 | **Help** | Customer Support · UnieMax Support |
+
+One list, **three presentations**:
+
+- **Desktop, expanded** — each group is a collapsible disclosure. The caption
+  is a real header (a button with a chevron, at ink contrast, 11px bold) rather
+  than the 10px grey whisper it was: with sixteen rows the captions are the
+  only thing making the list scannable, and they read as decoration when they
+  are quieter than the rows they label.
+- **Desktop, rail** — icon-only at 64px (grid track `64px_1fr` instead of
+  `264px_1fr`), toggled by the `PanelLeftIcon` button in the store header.
+  Setup marks and the order badge become corner dots; `StorePublishCard`
+  collapses to a single published/not-published dot.
+- **Mobile** (`< lg`) — one dropdown row naming where you are
+  (`Catalog / Products`), opening the same grouped list in a sheet. It replaces
+  a stack of sixteen rows that pushed the actual page a screen and a half down.
+
+Collapsing costs a click before a cross-group jump, so it is paid for three
+ways: **the group you navigate into opens itself** (keyed on the group
+changing, so deliberately collapsing the group you are standing in sticks); a
+**collapsed group still shows what it hides** — the pending-setup ring, the
+waiting-order badge, and its item count, tinting its caption brand when the
+active row is inside it; and the state is **remembered**
+(`uniemax.storeNav.collapsed` / `.rail` in `localStorage`, keyed on a stable
+group `key` so renaming a caption does not reset anyone). Defaults: Overview
+and Catalog open (the daily work), the other three closed. Panels animate on
+`grid-template-rows` and are `inert` while closed, so a keyboard never lands on
+a hidden row.
 
 Ordering rationale, so it isn't re-shuffled by accident: Catalog leads because
 Products is the most-opened section after Orders (it used to sit last);
 Categories precedes Products because the app gates Products until a category
 exists; **Storefront** is what a customer sees (safe to experiment with) while
-**Settings** is money + fulfilment (three of which confirm before saving);
+**Payments & Delivery** is money + fulfilment (three of which confirm before
+saving) — named for its contents rather than the old "Settings", which
+described nothing since every group here is settings;
 Store Details is branding rather than configuration, so it sits under
 Storefront; Payments precedes Bank Accounts because payout accounts only
 matter once online payment is on; and **Help** sits last, holding the two
@@ -409,7 +437,7 @@ Details, Products, Bank Accounts) also carry a **setup mark** (`StatusTag`,
 the **word** "Pending" beside the orange animated ring, a finished one keeps
 the bare green tick. A mark alone is ambiguous in a list — nobody should have
 to learn that orange-ring means unfinished — while "Complete" repeated down a
-column of fourteen rows is noise.
+column of sixteen rows is noise.
 The grouping is read off `store.readiness.steps` rather than a second
 hardcoded list, so a requirement added to `storeReadiness.ts` appears against
 the right row with no change to the layout. Marks vanish entirely once
@@ -647,6 +675,13 @@ column), which lets the homepage render full-bleed section bands instead.
     on one screen read as padding). The Specifications table always renders:
     parsed rows first, then the catalog facts (category path, option count,
     availability, sold-by).
+  - **Product family swatches** (`GroupSwatchRow`) sit above the option
+    pickers: one row per family the product is in ("Colour · Maroon"), a
+    swatch per member — its cover, value, own price and Sale — where the
+    current page is ringed and every other swatch is a `Link` to that
+    product's page. Choosing a colour here IS another product (gallery,
+    price, sizes and stock all change; `ProductDetail` remounts on the new
+    id); the picker beneath changes only this product's variant.
   - **Sticky purchase bar** — an IntersectionObserver watches the purchase
     card; once it scrolls out of view a fixed bottom bar (thumbnail, name,
     live price, Add + Buy Now) takes over on every breakpoint, and the page
@@ -929,33 +964,40 @@ for crawlers wait for SSR/prerender).
 - `useStores.ts` — data hooks: `useStores` (list), `useStore` (by id;
   404/foreign → `null` → redirect to `/mystores`).
 
-**Create Store (`CreateStorePage`)** — a four-step wizard over the shared
+**Create Store (`CreateStorePage`)** — a two-step wizard over the shared
 `Wizard` shell: **Your store** (name + logo, the same
 validate → crop 1:1 → upload pipeline as before, posted as one multipart
-create), **Business & contact**, **Address** and **Tax details**
-(skippable). Its steps map 1:1 onto the `wizard: true` steps of the backend
-requirement registry, so the flow and the publish gate cannot drift.
+create) and **Business & contact**. Its steps map 1:1 onto the
+`wizard: true` steps of the backend requirement registry, so the flow and
+the publish gate cannot drift.
 
-The store is created at the **end of step 1**, not the end of step 4, which
-makes onboarding resumable: leaving on step 3 still leaves a real store, and
+It was four steps — **Address** and **Tax details** followed — and sellers
+were abandoning it on those. Neither is needed to open a shop, so both left
+the wizard: they are filled in on Business Details and become mandatory only
+when a payout bank account is added (the backend `PAYOUT_SETUP` gate; see
+`StoreBankPage` below). The wizard itself no longer knows about them.
+
+The store is created at the **end of step 1**, not the end of step 2, which
+makes onboarding resumable: leaving on step 2 still leaves a real store, and
 the dashboard's `SetupChecklist` picks up exactly where the seller stopped. A
-"Finish later" control appears from step 2 onward. Steps 2–4 are
-`PATCH /stores/:id/profile` calls sending only their own keys. Nothing
-already known is asked for again — the server seeds the profile from the
-customer account, and the business name defaults to the store name.
+"Finish later" control appears on step 2, which is a
+`PATCH /stores/:id/profile` sending only its own keys. Nothing already known
+is asked for again — the server seeds the profile from the customer account,
+and the business name defaults to the store name.
 
 Before step 1 renders, the page loads the seller's stores (`useStores`) and,
-if any is an **unfinished draft** — unpublished with a required wizard step
-still open — shows a `ResumePanel` in place of the wizard: each draft with its
+if any is an **unfinished draft** — unpublished with a wizard step still
+open — shows a `ResumePanel` in place of the wizard: each draft with its
 logo, slug and the step it needs next, a **Continue** that adopts the draft
 and jumps to that step, and "Start a new store instead". Creating at step 1
 made onboarding resumable, but on its own it also made every abandoned run a
 permanent store; this is the counterweight, and it is why returning to Create
-Store no longer mints a duplicate. The optional tax step does not make a store
-a draft (skipping it was a choice, and a seller coming back afterwards wants
-a *second* store), the fetch is gated rather than rendered-then-swapped so
-step 1 never flashes and gets replaced, and `useStores` resolves to `[]` on
-failure so the wizard is never blocked by it.
+Store no longer mints a duplicate. Open checklist items (address, tax,
+products, bank account) do not make a store a draft — a seller coming back
+with only those outstanding wants a *second* store — the fetch is gated
+rather than rendered-then-swapped so step 1 never flashes and gets replaced,
+and `useStores` resolves to `[]` on failure so the wizard is never blocked
+by it.
 
 Step 2 renders the contact phone and email **read-only**, as the seller's
 verified account identifiers, and offers no way to type them: they are what
@@ -976,9 +1018,11 @@ step) where a nested form would be invalid HTML that browsers silently drop;
 Enter is handled on the inputs instead.
 
 **`SetupChecklist`** renders from `store.readiness` (never from local
-inspection of the profile): a progress bar, the incomplete steps, and each
-expandable to its individual requirements with a "to publish" marker on the
-blocking ones. It returns `null` once `readiness.complete`. Steps with no
+inspection of the profile): a progress bar, the incomplete steps in registry
+order (open the shop, then get paid), and each expandable to its individual
+requirements with a "to publish" marker on the publish blockers and a "to get
+paid" marker on the payout prerequisites (`PAYOUT_SETUP` / `ONLINE_PAYMENT`
+gates). It returns `null` once `readiness.complete`. Steps with no
 applicable requirements are skipped, so a delivery-only store is never shown
 a pickup-address item.
 - Sections: `StoreDetailsPage` (name update + **logo upload**: pick →
@@ -1047,7 +1091,11 @@ a pickup-address item.
   form validates holder name, 9–18-digit account number with a
   **confirm-account-number** field, IFSC shape, bank, branch and optional
   UPI VPA. A banner flags "no primary selected" whenever accounts exist
-  without one),
+  without one. **Add Bank Account is withheld** while
+  `store.readiness.gates.PAYOUT_SETUP` is blocked — the business address,
+  PAN and GST status moved out of the signup wizard and this is where they
+  become mandatory — with a note naming the missing pieces and linking to
+  Business Details; editing, re-prioritising and deleting are never gated),
   `StorePaymentsPage` (**Payments** — how customers PAY: Accept Online
   Payment (pays out to the primary bank account — the page warns and links
   to Bank Accounts when it's on without a primary account) and Accept Cash
@@ -1159,7 +1207,20 @@ a pickup-address item.
   number, a photo per combination picked by sight — the thumbnail opens the
   product's own photos, "Cover" meaning the first — or for a whole value at
   once ("same photo for every Pink"); saved as one `PUT …/options`, dropped
-  saved combinations confirmed first) · **4
+  saved combinations confirmed first. Every option card has a kind switch —
+  **Typed here** (the above) or **Other products**: the values are other
+  products of the store, a *family* (`features/stores/productGroups.ts`
+  draft — one row per member with its cover and an editable value, in
+  swatch order, and two buttons: **Select products** opens
+  `GroupMemberPicker`, a ticked list of the store's products, same shelf
+  first, ineligible rows disabled with the reason; **Create new product for
+  this value** opens `CreateMemberDialog`, which makes a draft twin via
+  `POST …/copy`, saves the family and switches the wizard onto the new
+  product at Photos). Both kinds sit in one ordered list and a card converts
+  in place. Continue validates everything locally, then saves typed options
+  (or the single price fields when the product has only a family) and, if
+  changed, the family through `PUT …/groups`; the product list reloads
+  because other members' rows changed) · **4
   Tell customers more** (optional: description, specification rows
   pre-filled from the category's suggested labels) · **5 Delivery &
   payment** (one sentence naming the store settings and a "Different for
@@ -1172,7 +1233,8 @@ a pickup-address item.
   (photo, price, description, published) rather than position; a bar reads
   "Product N% complete". Every field
   has a one-line hint with an example — no tooltips. The product list shows
-  "Root › Sub" paths, price ranges, a **Draft** badge, and a small
+  "Root › Sub" paths, price ranges, a **Draft** badge, one chip per family
+  ("Colour · Blue"), and a small
   completeness bar with the one next thing to do ("70% — add a
   description") that opens the wizard at that step, so a shop fills up
   gradually. Renames keep the slug/public URL.  A **Placement** toggle on each row opens the
@@ -1277,7 +1339,7 @@ still look like one product.
 | `primitives.tsx` | Card/CardHeader/PageHeader, Chip (6 tones), Button, TextInput/TextArea/SelectInput, Empty/Error/Skeleton, Detail row |
 | `DataTable.tsx` | **The** table + `Pagination`. Below `md` each row re-renders as a stacked card (that's why every column declares a `header` string; one column may be `primary`, and `hideOnMobile` drops detail). One definition per page instead of a desktop table plus a drifting mobile list. |
 | `Toolbar.tsx` | Filter row: debounced `SearchInput`, `FilterSelect`, scrollable status `Tabs` |
-| `Dialog.tsx` | Content dialog — a record opened *in place* over the list that led to it (header, scrollable body, optional action footer; sheet on phones, centred on desktop). Distinct from the shared `ConfirmDialog`, which is a two-button question. Portalled to `<body>` for the same `backdrop-filter` reason. |
+| `shared/ui/Dialog.tsx` | Content dialog — a record opened *in place* over the list that led to it (header, scrollable body, optional action footer; sheet on phones, centred on desktop). Distinct from the shared `ConfirmDialog`, which is a two-button question. Portalled to `<body>` for the same `backdrop-filter` reason. Lives in `shared/ui` because the seller's product wizard uses it too (`GroupMemberPicker`, `CreateMemberDialog`). |
 | `statusMeta.tsx` | One label + tone per domain state, defined once — so "Shipped" is the same word and color everywhere. Every chip carries its label; color is a second signal, never the only one. |
 | `charts.tsx` | `TrendChart` · `BarList` · `Donut` · `Sparkline` · `ChartFrame` (see below) |
 | `StatTile.tsx` | Headline number + optional sparkline; a `to` makes it a link |
@@ -1510,6 +1572,7 @@ frontend/
     │   │   │                     #   primary under the thumb on mobile via
     │   │   │                     #   flex-col-reverse). Domain-agnostic.
     │   │   ├── ConfirmDialog.tsx # Reusable confirmation modal (used by logout).
+    │   │   ├── Dialog.tsx        # Content dialog (header / scrolling body / footer) — admin + seller pickers
     │   │   │                     #   Portals into document.body — callers mount it
     │   │   │                     #   beside their trigger, and a `backdrop-blur`
     │   │   │                     #   ancestor (the sticky headers) is a containing
@@ -1595,6 +1658,7 @@ frontend/
     │   │   │   ├── ProductListing.tsx# Shared body for category + search pages
     │   │   │   ├── ListingControls.tsx # Sort/filter bar, breadcrumb, LoadMore, empty states
     │   │   │   ├── OptionPicker.tsx  # One radiogroup per option type; greys unreachable values
+    │   │   │   ├── GroupSwatchRow.tsx # Product-family swatches — each a Link to that member's page
     │   │   │   ├── ProductCard.tsx   # Listing card + responsive ProductGrid
     │   │   │   ├── useProductQuery.ts# Server-paginated listing (debounce + race guard)
     │   │   │   ├── catalog.ts        # Filter state + stock-level presentation only
@@ -1610,6 +1674,7 @@ frontend/
     │   │       ├── deliveryRules.ts # Pincode parsing/validation + rule summaries (seller editors)
     │   │       ├── shippingRates.ts # Shipping-rate summaries/validation (seller editors; no charge math)
     │   │       ├── productOptions.ts # Client mirror of the server option logic + seller draft model
+    │   │       ├── productGroups.ts  # Product-family draft (members, values, primary) + PUT body / validation
     │   │       ├── useStores.ts  # useStores (list) + useStore (by id) hooks
     │   │       └── useManagedStore.ts # Outlet-context hook for manage sections
     │   └── pages/
@@ -1638,10 +1703,12 @@ frontend/
     │       │   └── CartLine.tsx       # Shared line row (stepper, remove, total)
     │       └── stores/
     │           ├── StoresPage.tsx       # My Stores list / first-run empty state
-    │           ├── CreateStorePage.tsx  # 4-step wizard: store → business →
-    │           │                        #   address → tax (store created at
-    │           │                        #   step 1, so it is resumable)
+    │           ├── CreateStorePage.tsx  # 2-step wizard: store → business
+    │           │                        #   (store created at step 1, so it
+    │           │                        #   is resumable; address/tax gate
+    │           │                        #   bank accounts instead)
     │           ├── StoreManageLayout.tsx# Left sections card + right <Outlet/>
+    │           ├── StoreSectionNav.tsx  # Collapsible groups / icon rail / mobile dropdown
     │           ├── SetupChecklist.tsx   # Dashboard checklist from store.readiness
     │           ├── SetupStatus.tsx      # Shared setup marks: StatusMark / StatusBadge /
     │           │                        #   SectionJumpBar, all from store.readiness
@@ -1696,7 +1763,9 @@ frontend/
     │           │   │   ├── DetailsStep.tsx      # Description + suggested spec rows
     │           │   │   ├── DeliveryStep.tsx     # Store settings vs per-product overrides
     │           │   │   └── shared.tsx           # Steps, Field/Hint/StepShell, categoryOptions
-    │           │   ├── OptionTypesEditor.tsx # ≤3 named options, values as chips
+    │           │   ├── OptionTypesEditor.tsx # ≤3 options, each "Typed here" (chips) or "Other products" (a family)
+    │           │   ├── GroupMemberPicker.tsx # Tick the store's products as a family's members
+    │           │   ├── CreateMemberDialog.tsx # "Create new product for this value" — draft twin
     │           │   ├── VariantMatrix.tsx     # Generated combinations: photo / SKU / price / MRP / stock / on-off / not offered
     │           │   └── SpecificationsEditor.tsx # Ordered label/value rows
     │           └── ActiveSwitch.tsx     # Enable/disable pill switch (rows)
@@ -1712,7 +1781,7 @@ frontend/
         │   ├── NotificationBell.tsx # Unread badge + feed dropdown
         │   └── icons.tsx        # Six inline shell glyphs
         ├── ui/                  # ISOLATED console kit (see "Admin console")
-        │   ├── primitives.tsx · DataTable.tsx · Toolbar.tsx · Dialog.tsx
+        │   ├── primitives.tsx · DataTable.tsx · Toolbar.tsx   (Dialog moved to shared/ui)
         │   ├── statusMeta.tsx · StatTile.tsx · charts.tsx · format.ts
         ├── features/
         │   ├── adminApi.ts      # Typed client for /api/v1/admin/**

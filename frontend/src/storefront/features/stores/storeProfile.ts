@@ -201,15 +201,20 @@ export type StoreProfilePatch = Partial<StoreProfile>
 // Readiness — mirror of storeReadiness.ts
 // ---------------------------------------------------------------------------
 
-export const GATES = ['PUBLISH', 'ONLINE_PAYMENT', 'PICKUP'] as const
+export const GATES = [
+  'PUBLISH',
+  'PAYOUT_SETUP',
+  'ONLINE_PAYMENT',
+  'PICKUP',
+] as const
 export type Gate = (typeof GATES)[number]
 
 export const STEP_KEYS = [
   'store',
   'business',
+  'catalog',
   'address',
   'tax',
-  'catalog',
   'payout',
 ] as const
 export type StepKey = (typeof STEP_KEYS)[number]
@@ -262,6 +267,12 @@ export const PERMISSIVE_READINESS: Readiness = {
   steps: [],
   gates: {
     PUBLISH: { gate: 'PUBLISH', allowed: true, blockers: [], blockerKeys: [] },
+    PAYOUT_SETUP: {
+      gate: 'PAYOUT_SETUP',
+      allowed: true,
+      blockers: [],
+      blockerKeys: [],
+    },
     ONLINE_PAYMENT: {
       gate: 'ONLINE_PAYMENT',
       allowed: true,

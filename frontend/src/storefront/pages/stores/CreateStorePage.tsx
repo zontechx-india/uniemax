@@ -13,38 +13,31 @@ import { ErrorNote, TextField } from '../../../shared/ui/form'
 import { Wizard, WizardActions } from '../../../shared/ui/Wizard'
 import type { WizardStep } from '../../../shared/ui/Wizard'
 import { useGoBack } from '../../../shared/useGoBack'
-import {
-  AddressFields,
-  validateAddress,
-} from '../../features/stores/AddressFields'
-import type { AddressErrors } from '../../features/stores/AddressFields'
 import { storesApi } from '../../features/stores/storesApi'
 import type { Store } from '../../features/stores/storesApi'
 import { useStores } from '../../features/stores/useStores'
-import {
-  EMPTY_ADDRESS,
-  GST_STATE_CODES,
-  GSTIN_RE,
-  PAN_RE,
-  gstinContainsPan,
-} from '../../features/stores/storeProfile'
-import type { StoreAddress } from '../../features/stores/storeProfile'
 import { VerifyPhoneForm } from '../../../shared/auth/VerifyPhoneForm'
 import { useCustomerSession } from '../../app/sessionContext'
 import { useMarketSession } from '../../app/marketSession'
 import { ArrowLeftIcon, CheckIcon, ImageIcon } from '../../layout/icons'
 
 /**
- * Create Store — a four-step guided flow.
+ * Create Store — a two-step guided flow.
  *
- * Two decisions shape everything here.
+ * Three decisions shape everything here.
  *
- * **The store is created at the end of step 1, not at the end of step 4.**
- * Onboarding is therefore RESUMABLE: a seller who closes the tab on step 3
+ * **Only what a shop needs to open is asked.** This used to be four steps —
+ * address and tax details were steps 3 and 4 — and sellers were leaving
+ * before the end. Neither is needed to sell: a cash-on-delivery shop never
+ * touches them. They are collected later, in Business Details, and become
+ * mandatory only when the seller adds a payout bank account — the first time
+ * the platform actually has to know who it is paying and where they are.
+ * The backend `PAYOUT_SETUP` gate enforces that; nothing here has to.
+ *
+ * **The store is created at the end of step 1, not at the end of step 2.**
+ * Onboarding is therefore RESUMABLE: a seller who closes the tab on step 2
  * still owns a store, keeps what they typed, and is met by the setup
- * checklist on their dashboard listing exactly what is left. The alternative
- * — holding four steps of state and committing once — throws all of it away
- * on a refresh and makes the last step the riskiest.
+ * checklist on their dashboard listing exactly what is left.
  *
  * **Nothing is asked twice.** The server seeds the profile from the account
  * at creation, so step 2 opens with the seller's name, phone and email
@@ -57,7 +50,7 @@ import { ArrowLeftIcon, CheckIcon, ImageIcon } from '../../layout/icons'
  * store may publish — so the flow and the gate can never drift apart.
  */
 
-type StepKey = 'store' | 'business' | 'address' | 'tax'
+type StepKey = 'store' | 'business'
 
 const STEPS: (WizardStep & { key: StepKey })[] = [
   {
@@ -69,17 +62,6 @@ const STEPS: (WizardStep & { key: StepKey })[] = [
     key: 'business',
     title: 'Business & contact',
     blurb: "Who's selling, and how we reach you about orders.",
-  },
-  {
-    key: 'address',
-    title: 'Address',
-    blurb: 'Where your business is registered and operates from.',
-  },
-  {
-    key: 'tax',
-    title: 'Tax details',
-    blurb: 'Only needed when you start taking online payments.',
-    optional: true,
   },
 ]
 
@@ -183,32 +165,7 @@ export function CreateStorePage() {
             />
           )}
           {step.key === 'business' && store && (
-            <BusinessStep
-              store={store}
-              onDone={(updated) => {
-                setStore(updated)
-                next()
-              }}
-              onBack={back}
-            />
-          )}
-          {step.key === 'address' && store && (
-            <AddressStep
-              store={store}
-              onDone={(updated) => {
-                setStore(updated)
-                next()
-              }}
-              onBack={back}
-            />
-          )}
-          {step.key === 'tax' && store && (
-            <TaxStep
-              store={store}
-              onDone={done}
-              onSkip={() => done(store)}
-              onBack={back}
-            />
+            <BusinessStep store={store} onDone={done} onBack={back} />
           )}
         </Wizard>
       )}
@@ -224,16 +181,16 @@ export function CreateStorePage() {
  * The wizard index of the first step this store still has to do, or `null`
  * when the wizard is finished with it.
  *
- * Optional steps do not count. A seller who skipped the tax step made a
- * choice, not a mess, and coming back to "Create store" afterwards means they
- * want a second store — not to be nagged about the first. And the `store`
- * step is always complete for any store that exists, since one cannot be
- * created without a name and logo, so in practice this is never 0.
+ * Only wizard steps count. Address, tax and everything else the checklist
+ * lists are finished from the dashboard, and coming back to "Create store"
+ * with those open means the seller wants a second store — not to be nagged
+ * about the first. And the `store` step is always complete for any store
+ * that exists, since one cannot be created without a name and logo, so in
+ * practice this is never 0.
  */
 function firstUnfinishedStep(store: Store): number | null {
   const byKey = new Map(store.readiness.steps.map((s) => [s.key, s]))
   const index = STEPS.findIndex((step) => {
-    if (step.optional) return false
     const state = byKey.get(step.key)
     return state !== undefined && !state.complete && state.totalCount > 0
   })
@@ -241,10 +198,10 @@ function firstUnfinishedStep(store: Store): number | null {
 }
 
 /**
- * Stores worth offering to resume: not yet live, with a required wizard step
- * still open. A published store is never a draft, whatever its checklist
- * says; a store lacking only the optional tax step finished the wizard as far
- * as the wizard cares.
+ * Stores worth offering to resume: not yet live, with a wizard step still
+ * open. A published store is never a draft, whatever its checklist says; a
+ * store that only lacks checklist items finished the wizard as far as the
+ * wizard cares.
  */
 function unfinishedDrafts(stores: Store[]): Store[] {
   return stores.filter(
@@ -479,7 +436,7 @@ function StoreStep({
 }
 
 // ---------------------------------------------------------------------------
-// Step 2 — who is selling
+// Step 2 — who is selling (the last step)
 // ---------------------------------------------------------------------------
 
 /**
@@ -599,7 +556,12 @@ function BusinessStep({
       </div>
 
       {error && <ErrorNote>{error}</ErrorNote>}
-      <WizardActions onBack={onBack} busy={busy} disabled={!phone} />
+      <WizardActions
+        onBack={onBack}
+        submitLabel="Finish setup"
+        busy={busy}
+        disabled={!phone}
+      />
     </form>
   )
 }
@@ -622,215 +584,3 @@ function ContactRow({ label, value }: { label: string; value: string | null }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Step 3 — where
-// ---------------------------------------------------------------------------
-
-function AddressStep({
-  store,
-  onDone,
-  onBack,
-}: {
-  store: Store
-  onDone: (store: Store) => void
-  onBack: () => void
-}) {
-  const { profile } = store
-  const [address, setAddress] = useState<StoreAddress>(
-    profile.address ?? EMPTY_ADDRESS,
-  )
-  const [errors, setErrors] = useState<AddressErrors>({})
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault()
-    const addressErrors = validateAddress(address)
-    setErrors(addressErrors)
-    if (Object.keys(addressErrors).length > 0) {
-      return setError('Please complete the highlighted fields.')
-    }
-
-    setError(null)
-    setBusy(true)
-    try {
-      onDone(await storesApi.updateProfile(store.id, { address }))
-    } catch (err) {
-      setError(toApiError(err).message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <form onSubmit={submit} className="space-y-5" noValidate>
-      <AddressFields
-        value={address}
-        onChange={setAddress}
-        errors={errors}
-        disabled={busy}
-        idPrefix="business"
-      />
-
-      {error && <ErrorNote>{error}</ErrorNote>}
-      <WizardActions onBack={onBack} busy={busy} />
-    </form>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Step 4 — tax (optional)
-// ---------------------------------------------------------------------------
-
-/**
- * The only skippable step, and it says so.
- *
- * Neither ID is needed to sell: a COD store never touches them. PAN becomes
- * mandatory the moment the seller switches on online payment, because that is
- * when UnieMax starts collecting and paying out money on their behalf — and
- * without a PAN, TDS under 194-O is withheld at 5% instead of 1%. GSTIN stays
- * optional for good, since small intra-state sellers may trade on a
- * marketplace unregistered; the form asks them to say which they are rather
- * than demanding a number.
- */
-function TaxStep({
-  store,
-  onDone,
-  onSkip,
-  onBack,
-}: {
-  store: Store
-  onDone: (store: Store) => void
-  onSkip: () => void
-  onBack: () => void
-}) {
-  const { tax } = store.profile
-  const [pan, setPan] = useState(tax.pan ?? '')
-  const [gstin, setGstin] = useState(tax.gstin ?? '')
-  const [gstExempt, setGstExempt] = useState(tax.gstExempt)
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-
-  // Live, non-blocking hints — everything here is optional, so these guide
-  // rather than gate. The submit handler still rejects a malformed value.
-  const panValid = pan === '' || PAN_RE.test(pan)
-  const gstinValid = gstin === '' || GSTIN_RE.test(gstin)
-  const gstState = gstinValid && gstin ? GST_STATE_CODES[gstin.slice(0, 2)] : null
-  const panMismatch =
-    gstinValid && gstin !== '' && panValid && pan !== ''
-      ? !gstinContainsPan(gstin, pan)
-      : false
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault()
-    if (pan && !PAN_RE.test(pan)) {
-      return setError('Enter a valid PAN like ABCDE1234F, or leave it blank.')
-    }
-    if (gstin && !GSTIN_RE.test(gstin)) {
-      return setError('Enter a valid 15-character GSTIN, or leave it blank.')
-    }
-    if (panMismatch) {
-      return setError(
-        "This GSTIN doesn't contain the PAN above — please check both.",
-      )
-    }
-
-    setError(null)
-    setBusy(true)
-    try {
-      onDone(
-        await storesApi.updateProfile(store.id, {
-          tax: {
-            pan: pan || null,
-            gstin: gstin || null,
-            gstExempt: gstin ? false : gstExempt,
-            registrationNumber: store.profile.tax.registrationNumber,
-          },
-        }),
-      )
-    } catch (err) {
-      setError(toApiError(err).message)
-      setBusy(false)
-    }
-  }
-
-  return (
-    <form onSubmit={submit} className="space-y-4" noValidate>
-      <div className="rounded-md border border-accent/30 bg-accent/10 px-3.5 py-3 text-sm text-accent">
-        You can skip this and start selling with cash on delivery right away.
-        We'll ask again when you turn on online payments.
-      </div>
-
-      <div>
-        <TextField
-          label="PAN"
-          placeholder="ABCDE1234F"
-          value={pan}
-          onChange={(e) => setPan(e.target.value.toUpperCase().slice(0, 10))}
-          disabled={busy}
-          autoFocus
-        />
-        <p
-          className={`mt-1.5 text-xs ${panValid ? 'text-muted' : 'text-danger'}`}
-        >
-          {panValid
-            ? 'Required later for online payments — 1% TDS instead of 5%.'
-            : 'PAN looks like ABCDE1234F — 5 letters, 4 digits, 1 letter.'}
-        </p>
-      </div>
-
-      <div>
-        <TextField
-          label="GSTIN"
-          placeholder="33ABCDE1234F1Z5"
-          value={gstin}
-          onChange={(e) => setGstin(e.target.value.toUpperCase().slice(0, 15))}
-          disabled={busy || gstExempt}
-          className={gstExempt ? 'opacity-60' : ''}
-        />
-        <p
-          className={`mt-1.5 text-xs ${
-            !gstinValid || panMismatch ? 'text-danger' : 'text-muted'
-          }`}
-        >
-          {!gstinValid
-            ? 'A GSTIN is 15 characters, e.g. 33ABCDE1234F1Z5.'
-            : panMismatch
-              ? "This GSTIN doesn't match the PAN above."
-              : gstState
-                ? `Registered in ${gstState}.`
-                : 'Leave blank if you are not GST-registered.'}
-        </p>
-      </div>
-
-      <label className="flex cursor-pointer items-start gap-3 rounded-md border border-line bg-surface-alt p-3.5">
-        <input
-          type="checkbox"
-          checked={gstExempt}
-          onChange={(e) => {
-            setGstExempt(e.target.checked)
-            if (e.target.checked) setGstin('')
-          }}
-          disabled={busy}
-          className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
-        />
-        <span className="min-w-0">
-          <span className="block text-sm font-medium text-fg">
-            I'm not registered for GST
-          </span>
-          <span className="mt-0.5 block text-xs text-muted">
-            Fine for small sellers supplying within their own state.
-          </span>
-        </span>
-      </label>
-
-      {error && <ErrorNote>{error}</ErrorNote>}
-      <WizardActions
-        onBack={onBack}
-        onSkip={onSkip}
-        submitLabel="Finish setup"
-        busy={busy}
-      />
-    </form>
-  )
-}

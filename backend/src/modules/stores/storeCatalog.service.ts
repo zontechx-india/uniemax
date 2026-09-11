@@ -22,16 +22,20 @@ import {
 import { resolveProductDeliveryRule } from "./deliveryRules.js";
 import { resolveProductShippingOverride } from "./shippingRates.js";
 import type {
+  GroupCandidatesQuery,
   StoreCategoryCreateInput,
   StoreCategoryUpdateInput,
   StoreMediaOrderInput,
   StoreMediaUpdateInput,
+  StoreProductCopyInput,
   StoreProductCreateInput,
+  StoreProductGroupsInput,
   StoreProductOptionsInput,
   StoreProductUpdateInput,
   StoreVariantUpdateInput,
 } from "./storeCatalog.schema.js";
 import {
+  OPTION_LIMITS,
   sortByOptionOrder,
   variantLabel,
 } from "./productOptions.js";
@@ -102,10 +106,68 @@ const productSelect = {
       displayOrder: true,
     },
   },
+  // The families this product is in, each with every member — the owner UI
+  // shows the same list from whichever member's wizard is open.
+  groupMemberships: {
+    orderBy: { group: { createdAt: "asc" } },
+    select: {
+      value: true,
+      position: true,
+      group: {
+        select: {
+          id: true,
+          optionName: true,
+          members: {
+            orderBy: { position: "asc" },
+            select: {
+              productId: true,
+              value: true,
+              position: true,
+              product: {
+                select: {
+                  name: true,
+                  slug: true,
+                  priceMin: true,
+                  publishedAt: true,
+                  media: {
+                    where: { type: "IMAGE" },
+                    orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+                    take: 1,
+                    select: { key: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
   createdAt: true,
 } satisfies Prisma.StoreProductSelect;
 
 type ProductRow = Prisma.StoreProductGetPayload<{ select: typeof productSelect }>;
+
+/** One family as the owner UI sees it: the axis, this product's value, everyone in it. */
+function shapeGroup(membership: ProductRow["groupMemberships"][number]) {
+  return {
+    id: membership.group.id,
+    optionName: membership.group.optionName,
+    value: membership.value,
+    members: membership.group.members.map((member) => ({
+      productId: member.productId,
+      name: member.product.name,
+      slug: member.product.slug,
+      imageUrl: member.product.media[0]
+        ? mediaUrl("media", member.product.media[0].key)
+        : null,
+      price: member.product.priceMin,
+      isDraft: member.product.publishedAt === null,
+      value: member.value,
+      position: member.position,
+    })),
+  };
+}
 
 /**
  * The variant is the unit of sale, so a product has no price column of its
@@ -179,6 +241,7 @@ function shapeProduct(row: ProductRow) {  const {
     specifications,
     deliveryRule,
     shippingOverride,
+    groupMemberships,
     ...rest
   } = row;
 
@@ -213,6 +276,8 @@ function shapeProduct(row: ProductRow) {  const {
     deliveryRule: resolveProductDeliveryRule(deliveryRule),
     shippingOverride: resolveProductShippingOverride(shippingOverride),
     hasVariants: optionTypes.length > 0,
+    /** The families this product belongs to ("Colour": Maroon / Blue / Tan). */
+    groups: groupMemberships.map(shapeGroup),
     /** Never published yet — created step by step and not finished. */
     isDraft: rest.publishedAt === null,
     completeness: completeness({
@@ -741,11 +806,29 @@ export async function deleteProduct(
 
   const product = await prisma.storeProduct.findFirst({
     where: { id: productId, storeId: store.id },
-    select: { id: true, media: { select: { key: true } } },
+    select: {
+      id: true,
+      media: { select: { key: true } },
+      groupMemberships: {
+        select: {
+          groupId: true,
+          group: { select: { _count: { select: { members: true } } } },
+        },
+      },
+    },
   });
   if (!product) throw HttpError.notFound("Product not found");
 
-  await prisma.storeProduct.delete({ where: { id: productId } });
+  await prisma.$transaction(async (tx) => {
+    // Membership rows cascade with the product; a family it leaves with a
+    // single member is dissolved — a family of one is just a product.
+    await tx.storeProduct.delete({ where: { id: productId } });
+    for (const membership of product.groupMemberships) {
+      if (membership.group._count.members <= 2) {
+        await tx.productGroup.delete({ where: { id: membership.groupId } });
+      }
+    }
+  });
 
   // Media rows cascade with the product; the stored objects are cleaned up
   // best-effort afterwards (an orphaned object must never fail the delete).
@@ -809,6 +892,26 @@ export async function replaceProductOptions(
   input: StoreProductOptionsInput,
 ) {
   const { productId: id, storeId } = await getMyProductRef(ownerId, storeRef, productId);
+
+  // An axis is EITHER typed values (here) or other products (a group) — never
+  // both under one name — and groups count towards the option cap.
+  const memberships = await prisma.productGroupMember.findMany({
+    where: { productId: id },
+    select: { optionKey: true, group: { select: { optionName: true } } },
+  });
+  for (const type of input.optionTypes) {
+    const taken = memberships.find((m) => m.optionKey === optionKeyOf(type.name));
+    if (taken) {
+      throw HttpError.badRequest(
+        `"${taken.group.optionName}" is already an "Other products" option of this product`,
+      );
+    }
+  }
+  if (input.optionTypes.length + memberships.length > OPTION_LIMITS.types) {
+    throw HttpError.badRequest(
+      `At most ${OPTION_LIMITS.types} options per product, counting product groups`,
+    );
+  }
 
   const existing = await prisma.storeProductVariant.findMany({
     where: { productId: id },
@@ -933,6 +1036,348 @@ export async function replaceProductOptions(
   });
   const [shaped] = await withProductTaxonomy([shapeProduct(row)]);
   return shaped!;
+}
+
+// ---------------------------------------------------------------------------
+// Product groups — the "Other products" option mode. A family is separate
+// products (each with its own photos, price, stock, variants and URL) that
+// are the same item on one axis. The group is the only thing that ties them;
+// nothing about a member changes when it joins or leaves — every member is
+// listed like any other product, and its page shows the family as swatches.
+// ---------------------------------------------------------------------------
+
+/** The identity of an axis: "Colour", "colour" and " Colour " are one axis. */
+const optionKeyOf = (name: string) => name.trim().toLowerCase();
+
+/** A member may not ALSO carry the axis as typed values. */
+function assertNoTypedOption(
+  rows: { name: string; optionTypes: ProductRow["optionTypes"] }[],
+  optionName: string,
+) {
+  const key = optionKeyOf(optionName);
+  for (const row of rows) {
+    const clash = resolveOptionTypes(row.optionTypes).some(
+      (type) => optionKeyOf(type.name) === key,
+    );
+    if (clash) {
+      throw HttpError.badRequest(
+        `"${row.name}" already has "${optionName}" as typed values — remove that option first`,
+      );
+    }
+  }
+}
+
+const shapedProduct = async (id: string) => {
+  const row = await prisma.storeProduct.findUniqueOrThrow({
+    where: { id },
+    select: productSelect,
+  });
+  const [shaped] = await withProductTaxonomy([shapeProduct(row)]);
+  return shaped!;
+};
+
+/**
+ * Replace every family this product is in — set semantics, like
+ * `replaceProductOptions`: a group in the body is written member-for-member
+ * (an existing family with that axis keeps its id; a new axis makes a new
+ * family), a family missing from the body is dissolved, and `groups: []`
+ * takes the product out of all of them. One transaction, so a family can
+ * never be half-applied.
+ *
+ * Invariants checked before writing: every member is a product of this
+ * store; the caller is in every group; no member carries the axis as typed
+ * values; no member is already in a DIFFERENT family on the same axis
+ * (`@@unique([productId, optionKey])` backs this up); nobody ends up with
+ * more than `OPTION_LIMITS.types` options counting typed ones and groups.
+ * Values are unique per family case-insensitively (the DB rule is
+ * case-sensitive; the schema refine covers the rest).
+ */
+export async function replaceProductGroups(
+  ownerId: string,
+  storeRef: string,
+  productId: string,
+  input: StoreProductGroupsInput,
+) {
+  const { productId: id, storeId } = await getMyProductRef(ownerId, storeRef, productId);
+
+  for (const group of input.groups) {
+    if (!group.members.some((member) => member.productId === id)) {
+      throw HttpError.badRequest(
+        `This product must be one of the "${group.optionName}" products`,
+      );
+    }
+  }
+
+  const ids = new Set<string>([id]);
+  for (const group of input.groups) {
+    for (const member of group.members) ids.add(member.productId);
+  }
+  const rows = await prisma.storeProduct.findMany({
+    where: { id: { in: [...ids] }, storeId },
+    select: {
+      id: true,
+      name: true,
+      optionTypes: true,
+      groupMemberships: { select: { groupId: true, optionKey: true } },
+    },
+  });
+  if (rows.length !== ids.size) {
+    throw HttpError.badRequest("Choose products of this store");
+  }
+  const byId = new Map(rows.map((row) => [row.id, row]));
+
+  // The caller's families today — the set being replaced.
+  const current = await prisma.productGroup.findMany({
+    where: { members: { some: { productId: id } } },
+    select: { id: true, optionKey: true },
+  });
+  const currentByKey = new Map(current.map((group) => [group.optionKey, group]));
+  const replacedGroupIds = new Set(current.map((group) => group.id));
+
+  const incomingKeys = new Set<string>();
+  for (const group of input.groups) {
+    const key = optionKeyOf(group.optionName);
+    incomingKeys.add(key);
+    const target = currentByKey.get(key);
+    const members = group.members.map((member) => byId.get(member.productId)!);
+    assertNoTypedOption(members, group.optionName);
+    for (const row of members) {
+      const elsewhere = row.groupMemberships.find(
+        (membership) => membership.optionKey === key && membership.groupId !== target?.id,
+      );
+      if (elsewhere) {
+        throw HttpError.conflict(
+          `"${row.name}" is already in another "${group.optionName}" group`,
+        );
+      }
+    }
+  }
+  for (const row of rows) {
+    const typed = resolveOptionTypes(row.optionTypes).length;
+    const kept = row.groupMemberships.filter(
+      (membership) => !replacedGroupIds.has(membership.groupId),
+    ).length;
+    const joining = input.groups.filter((group) =>
+      group.members.some((member) => member.productId === row.id),
+    ).length;
+    if (typed + kept + joining > OPTION_LIMITS.types) {
+      throw HttpError.badRequest(
+        `"${row.name}" would have more than ${OPTION_LIMITS.types} options`,
+      );
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const dissolved = current
+      .filter((group) => !incomingKeys.has(group.optionKey))
+      .map((group) => group.id);
+    if (dissolved.length > 0) {
+      await tx.productGroup.deleteMany({ where: { id: { in: dissolved } } });
+    }
+
+    for (const group of input.groups) {
+      const key = optionKeyOf(group.optionName);
+      const members = group.members.map((member, position) => ({
+        productId: member.productId,
+        optionKey: key,
+        value: member.value,
+        position,
+      }));
+      const target = currentByKey.get(key);
+      if (target) {
+        // Delete-all + recreate: nothing references a member row, and it
+        // sidesteps `[groupId, value]` when two members swap values. The
+        // display name follows the seller's latest casing.
+        await tx.productGroup.update({
+          where: { id: target.id },
+          data: { optionName: group.optionName },
+        });
+        await tx.productGroupMember.deleteMany({ where: { groupId: target.id } });
+        await tx.productGroupMember.createMany({
+          data: members.map((member) => ({ ...member, groupId: target.id })),
+        });
+      } else {
+        await tx.productGroup.create({
+          data: {
+            storeId,
+            optionName: group.optionName,
+            optionKey: key,
+            members: { create: members },
+          },
+        });
+      }
+    }
+  });
+
+  return shapedProduct(id);
+}
+
+/**
+ * The store's products as candidates for one axis of this product's family,
+ * each with why it can or cannot be picked. Same shelf first — that is where
+ * the other colours usually live.
+ */
+export async function listGroupCandidates(
+  ownerId: string,
+  storeRef: string,
+  productId: string,
+  query: GroupCandidatesQuery,
+) {
+  const { productId: id, storeId } = await getMyProductRef(ownerId, storeRef, productId);
+  const key = optionKeyOf(query.optionName);
+
+  const caller = await prisma.storeProduct.findUniqueOrThrow({
+    where: { id },
+    select: {
+      categoryId: true,
+      groupMemberships: { where: { optionKey: key }, select: { groupId: true } },
+    },
+  });
+  const callerGroupId = caller.groupMemberships[0]?.groupId ?? null;
+
+  const rows = await prisma.storeProduct.findMany({
+    where: {
+      storeId,
+      id: { not: id },
+      ...(query.q ? { name: { contains: query.q, mode: "insensitive" } } : {}),
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      priceMin: true,
+      publishedAt: true,
+      categoryId: true,
+      optionTypes: true,
+      category: { select: { id: true, name: true } },
+      media: {
+        where: { type: "IMAGE" },
+        orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+        take: 1,
+        select: { key: true },
+      },
+      groupMemberships: {
+        select: {
+          groupId: true,
+          optionKey: true,
+          group: {
+            select: {
+              optionName: true,
+              // The first two members are enough to name one OTHER product
+              // of the family the row is already in.
+              members: {
+                orderBy: { position: "asc" },
+                take: 2,
+                select: { productId: true, product: { select: { name: true } } },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: { name: "asc" },
+    take: 200,
+  });
+
+  const candidates = rows.map((row) => {
+    const sameAxis = row.groupMemberships.find((m) => m.optionKey === key);
+    const typed = resolveOptionTypes(row.optionTypes);
+    let eligibility:
+      | "eligible"
+      | "in-this-group"
+      | "in-other-group"
+      | "has-typed-option"
+      | "too-many-options" = "eligible";
+    let conflictGroup: { optionName: string; otherName: string | null } | null = null;
+    if (sameAxis && sameAxis.groupId === callerGroupId) {
+      eligibility = "in-this-group";
+    } else if (sameAxis) {
+      eligibility = "in-other-group";
+      conflictGroup = {
+        optionName: sameAxis.group.optionName,
+        otherName:
+          sameAxis.group.members.find((member) => member.productId !== row.id)?.product
+            .name ?? null,
+      };
+    } else if (typed.some((type) => optionKeyOf(type.name) === key)) {
+      eligibility = "has-typed-option";
+    } else if (typed.length + row.groupMemberships.length >= OPTION_LIMITS.types) {
+      eligibility = "too-many-options";
+    }
+    return {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      imageUrl: row.media[0] ? mediaUrl("media", row.media[0].key) : null,
+      price: row.priceMin,
+      isDraft: row.publishedAt === null,
+      category: row.category,
+      sameShelf: row.categoryId === caller.categoryId,
+      eligibility,
+      conflictGroup,
+    };
+  });
+  candidates.sort(
+    (a, b) => Number(b.sameShelf) - Number(a.sameShelf) || a.name.localeCompare(b.name),
+  );
+  return candidates;
+}
+
+/**
+ * A new DRAFT that starts as this product's twin — everything a family shares
+ * (name, shelf, description, specifications, delivery rule, shipping override,
+ * COD) copied once, so a seller adding "the same polo in Blue" only has to
+ * add Blue's photos and price. Photos, variants, option types, merchandising
+ * flags and group memberships are NOT copied: those are what makes the copy
+ * a different product. The copy is independent from here on — later edits to
+ * either do not propagate.
+ */
+export async function copyProduct(
+  ownerId: string,
+  storeRef: string,
+  productId: string,
+  input: StoreProductCopyInput,
+) {
+  const store = await getMyStore(ownerId, storeRef);
+  const source = await prisma.storeProduct.findFirst({
+    where: { id: productId, storeId: store.id },
+    select: {
+      name: true,
+      categoryId: true,
+      globalCategoryId: true,
+      description: true,
+      specifications: true,
+      deliveryRule: true,
+      shippingOverride: true,
+      codAvailable: true,
+    },
+  });
+  if (!source) throw HttpError.notFound("Product not found");
+
+  const json = (value: Prisma.JsonValue | null) =>
+    value === null ? Prisma.DbNull : (value as Prisma.InputJsonValue);
+  const name = input.name ?? source.name;
+  const created = await prisma.storeProduct.create({
+    data: {
+      storeId: store.id,
+      categoryId: source.categoryId,
+      globalCategoryId: source.globalCategoryId,
+      name,
+      slug: await uniqueProductSlug(store.id, name),
+      description: source.description,
+      specifications: json(source.specifications),
+      deliveryRule: json(source.deliveryRule),
+      shippingOverride: json(source.shippingOverride),
+      codAvailable: source.codAvailable,
+      isActive: false,
+      variants: {
+        create: { name: DEFAULT_VARIANT_NAME, price: 0, stockQuantity: 0, isDefault: true },
+      },
+    },
+    select: { id: true },
+  });
+  await recomputeProductAggregates(created.id);
+  return shapedProduct(created.id);
 }
 
 export async function updateVariant(

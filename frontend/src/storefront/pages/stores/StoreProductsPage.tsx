@@ -101,6 +101,18 @@ export function StoreProductsPage() {
     }
   }
 
+  /**
+   * Silent re-fetch. Saving a product family changes OTHER products' rows
+   * (their `groups`), and deleting a member can dissolve a family — the
+   * server is the only one who knows.
+   */
+  const reload = () => {
+    storeCatalogApi
+      .listProducts(store.id)
+      .then(setProducts)
+      .catch(() => {})
+  }
+
   const toggleActive = async (product: StoreProduct, next: boolean) => {
     setError(null)
     setTogglingId(product.id)
@@ -154,6 +166,7 @@ export function StoreProductsPage() {
             : c,
         ),
       )
+      if (toDelete.groups.length > 0) reload()
     } catch (err) {
       setError(toApiError(err).message)
     } finally {
@@ -244,6 +257,7 @@ export function StoreProductsPage() {
           product={wizard.product}
           startAt={wizard.startAt}
           onProductChange={absorb}
+          onCatalogChanged={reload}
           onClose={() => setWizard(null)}
         />
       ) : (
@@ -453,6 +467,15 @@ function ProductRow({
                 </span>
               )
             )}
+            {product.groups.map((group) => (
+              <span
+                key={group.id}
+                className="ml-1.5 rounded-sm bg-brand/10 px-1.5 py-0.5 text-[10px] font-semibold text-brand"
+                title={`One of ${group.members.length} "${group.optionName}" products`}
+              >
+                {group.optionName} · {group.value}
+              </span>
+            ))}
           </p>
           <p className="truncate text-xs text-muted">
             {categoryPath(product.category, categories)} · {priceLabel(product)}

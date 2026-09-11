@@ -412,6 +412,7 @@ model Store {
   orders         Order[]
   supportTickets SupportTicket[]
   cartLines      CartLine[]
+  productGroups  ProductGroup[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -571,10 +572,11 @@ model StoreProduct {
   priceMax   Decimal? @db.Decimal(10, 2)
   stockTotal Int      @default(0)
 
-  variants   StoreProductVariant[]
-  media      StoreProductMedia[]
-  orderItems OrderItem[]
-  cartLines  CartLine[]
+  variants         StoreProductVariant[]
+  media            StoreProductMedia[]
+  orderItems       OrderItem[]
+  cartLines        CartLine[]
+  groupMemberships ProductGroupMember[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -589,6 +591,58 @@ model StoreProduct {
   @@index([isBestSeller])
   @@index([isNewArrival])
   @@map("store_products")
+}
+
+/// A family of products that are the same item differing on ONE named axis
+/// ("Colour": Maroon / Blue / Tan). Each member is a full StoreProduct with
+/// its own photos, price, offer, stock, variants and URL, listed like any
+/// other product; the group only makes them switchable on each other's
+/// storefront page. Sizes and other per-member choices stay variants INSIDE
+/// each member — the seller picks, per option, whether its values are typed
+/// (variants) or are other products (a group), and a product never has both
+/// kinds under one name. A product may sit in several groups, one per
+/// option name. `optionName`/`optionKey` are immutable: renaming the axis is
+/// a delete + recreate.
+model ProductGroup {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  /// Display name of the axis — "Colour".
+  optionName String
+  /// `optionName.trim().toLowerCase()` — the identity of the axis, copied
+  /// onto every member so uniqueness can be a database rule.
+  optionKey  String
+
+  members ProductGroupMember[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([storeId])
+  @@map("product_groups")
+}
+
+/// One product's place in a ProductGroup. `value` is the product's position
+/// on the axis ("Maroon") and is unique within the family; `optionKey` is a
+/// copy of the group's so "one group per option name per product" is a
+/// constraint, not a convention. `position` is the seller's order — the
+/// order of the swatch row.
+model ProductGroupMember {
+  groupId   String
+  group     ProductGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  productId String
+  product   StoreProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  optionKey String
+  value     String
+  position  Int    @default(0)
+
+  @@id([groupId, productId])
+  @@unique([groupId, value])
+  @@unique([productId, optionKey])
+  @@index([productId])
+  @@map("product_group_members")
 }
 
 /// A purchasable variation of a store product — one label covers whatever

@@ -577,7 +577,20 @@ export interface PublicProductDetail {
   variants: PublicStoreVariant[]
   /** Gallery, ordered: images by display order (first = cover), video last. */
   media: PublicProductMediaItem[]
+  /**
+   * The product families this one is in ("Colour": Maroon / Blue / Tan) —
+   * each member a listing card plus its value, one of them the current
+   * page. Rendered as a swatch row that navigates between the members.
+   */
+  groups: PublicProductGroup[]
   related: PublicProduct[]
+}
+
+/** One family on the product page: the axis, this page's value, every member. */
+export interface PublicProductGroup {
+  optionName: string
+  value: string
+  members: (PublicProduct & { value: string; isCurrent: boolean })[]
 }
 
 /** Category page header + breadcrumb ancestry. */
@@ -1235,7 +1248,78 @@ export interface StoreProduct extends StoreProductMerchandising {
   variants: StoreProductVariant[]
   /** Ordered media: images by displayOrder (first = cover), video last. */
   media: StoreProductMediaItem[]
+  /**
+   * The product families this one belongs to — the "Other products" option
+   * mode ("Colour": Maroon / Blue / Tan, each its own product). Every member
+   * sees the same list from its own wizard.
+   */
+  groups: StoreProductGroup[]
   createdAt: string
+}
+
+/** One product in a family, as the owner UI lists it. */
+export interface StoreProductGroupMember {
+  productId: string
+  name: string
+  slug: string
+  imageUrl: string | null
+  /** Cheapest price, or null while it has none. */
+  price: string | null
+  isDraft: boolean
+  /** Its position on the axis — "Maroon". */
+  value: string
+  /** The seller's order — the order of the storefront's swatch row. */
+  position: number
+}
+
+/**
+ * A family of separate products that are the same item on ONE axis. Sizes
+ * and other typed options stay variants inside each member; every member is
+ * listed like any other product, and the group only makes them switchable
+ * on each other's storefront page.
+ */
+export interface StoreProductGroup {
+  id: string
+  /** The axis — "Colour". */
+  optionName: string
+  /** THIS product's value on it. */
+  value: string
+  members: StoreProductGroupMember[]
+}
+
+/**
+ * `PUT …/products/:id/groups` — the FULL set of families this product is in
+ * (set semantics, like `…/options`): a family in the body is written
+ * member-for-member, one missing is dissolved, `groups: []` leaves them all.
+ */
+export interface StoreProductGroupsInput {
+  groups: {
+    optionName: string
+    members: { productId: string; value: string }[]
+  }[]
+}
+
+/**
+ * A product of the store as a candidate for one axis of a family, with why
+ * it can or cannot be picked. Same-shelf products come first.
+ */
+export interface GroupCandidate {
+  id: string
+  name: string
+  slug: string
+  imageUrl: string | null
+  price: string | null
+  isDraft: boolean
+  category: { id: string; name: string }
+  sameShelf: boolean
+  eligibility:
+    | 'eligible'
+    | 'in-this-group'
+    | 'in-other-group'
+    | 'has-typed-option'
+    | 'too-many-options'
+  /** Set for `in-other-group`: which family already has it, named by another member. */
+  conflictGroup: { optionName: string; otherName: string | null } | null
 }
 
 /**
@@ -1413,6 +1497,50 @@ export const storeCatalogApi = {
   ): Promise<StoreProduct> {
     return call<StoreProduct>(
       http.put(`${STORES}/${storeRef}/products/${productId}/options`, input),
+    )
+  },
+
+  // Product groups — the "Other products" option mode. Replaced as a set,
+  // like options; the response is the product with its `groups`.
+
+  /** Replace every family this product is in, atomically. */
+  async replaceProductGroups(
+    storeRef: string,
+    productId: string,
+    input: StoreProductGroupsInput,
+  ): Promise<StoreProduct> {
+    return call<StoreProduct>(
+      http.put(`${STORES}/${storeRef}/products/${productId}/groups`, input),
+    )
+  },
+
+  /** The store's products as candidates for one axis of this product's family. */
+  async listGroupCandidates(
+    storeRef: string,
+    productId: string,
+    query: { optionName: string; q?: string },
+  ): Promise<GroupCandidate[]> {
+    const params = new URLSearchParams({ optionName: query.optionName })
+    if (query.q) params.set('q', query.q)
+    return call<GroupCandidate[]>(
+      http.get(
+        `${STORES}/${storeRef}/products/${productId}/group-candidates?${params}`,
+      ),
+    )
+  },
+
+  /**
+   * A new draft that starts as this product's twin — name, shelf,
+   * description, specifications, delivery rule, shipping override and COD
+   * copied once; photos, variants and options are not.
+   */
+  async copyProduct(
+    storeRef: string,
+    productId: string,
+    input: { name?: string } = {},
+  ): Promise<StoreProduct> {
+    return call<StoreProduct>(
+      http.post(`${STORES}/${storeRef}/products/${productId}/copy`, input),
     )
   },
 

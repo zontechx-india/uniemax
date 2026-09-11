@@ -32,7 +32,7 @@ import {
   resolveProfile,
 } from "./storeProfile.schema.js";
 import type { StoreProfileUpdateInput } from "./storeProfile.schema.js";
-import { evaluateReadiness, GATE_LABELS } from "./storeReadiness.js";
+import { evaluateReadiness, gateBlockedMessage } from "./storeReadiness.js";
 import type { Gate, ReadinessContext } from "./storeReadiness.js";
 import { randomUUID } from "node:crypto";
 
@@ -217,9 +217,7 @@ async function assertGate(store: ShapedStore, gate: Gate): Promise<void> {
   const readiness = await evaluateFor(store);
   const state = readiness.gates[gate];
   if (!state.allowed) {
-    throw HttpError.badRequest(
-      `Before you can ${GATE_LABELS[gate]}, please add: ${state.blockers.join(", ")}.`,
-    );
+    throw HttpError.badRequest(gateBlockedMessage(gate, state));
   }
 }
 

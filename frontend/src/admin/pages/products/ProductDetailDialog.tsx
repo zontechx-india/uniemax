@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { adminApi } from '../../features/adminApi'
 import type { ProductDetail } from '../../features/adminApi'
 import { useAdminQuery } from '../../features/useAdminQuery'
-import { Dialog } from '../../ui/Dialog'
+import { Dialog } from '../../../shared/ui/Dialog'
 import { Button, Chip, ErrorState, Skeleton } from '../../ui/primitives'
 import { ActiveChip } from '../../ui/statusMeta'
 import {

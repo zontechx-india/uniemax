@@ -73,6 +73,20 @@ export const storeRoutes: FastifyPluginAsync = async (app) => {
     catalogController.updateVariant,
   );
 
+  // Product groups — the "Other products" option mode: a family of separate
+  // products that are the same item on one axis (Colour). Replaced as a set,
+  // like options; the candidates list feeds the picker; copy makes the next
+  // member as a draft twin of this one.
+  app.put(
+    "/:id/products/:productId/groups",
+    catalogController.replaceProductGroups,
+  );
+  app.get(
+    "/:id/products/:productId/group-candidates",
+    catalogController.listGroupCandidates,
+  );
+  app.post("/:id/products/:productId/copy", catalogController.copyProduct);
+
   // Product media — up to 8 images + 1 video; first image = cover. Uploads
   // are multipart; every mutation returns the full parent product.
   app.post("/:id/products/:productId/media", catalogController.addProductMedia);

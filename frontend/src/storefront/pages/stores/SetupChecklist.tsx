@@ -144,11 +144,20 @@ function StepRow({
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-line" />
               )}
               <span className={req.met ? 'line-through' : ''}>{req.label}</span>
-              {!req.met && req.gates.includes('PUBLISH') && (
+              {/* What the missing piece is FOR. Publishing wins when both
+                  apply; "to get paid" covers the payout prerequisites
+                  (address, tax IDs, the bank account itself). */}
+              {!req.met && req.gates.includes('PUBLISH') ? (
                 <span className="rounded-sm bg-surface-alt px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
                   to publish
                 </span>
-              )}
+              ) : !req.met &&
+                (req.gates.includes('PAYOUT_SETUP') ||
+                  req.gates.includes('ONLINE_PAYMENT')) ? (
+                <span className="rounded-sm bg-surface-alt px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
+                  to get paid
+                </span>
+              ) : null}
             </li>
           ))}
         </ul>

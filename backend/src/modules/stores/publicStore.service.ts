@@ -596,6 +596,28 @@ export async function getPublicProduct(
         orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
         select: { id: true, type: true, key: true, altText: true },
       },
+      // The families this product is in, with every member a shopper may
+      // see — the swatch row that switches to the Blue one.
+      groupMemberships: {
+        orderBy: { group: { createdAt: "asc" } },
+        select: {
+          value: true,
+          group: {
+            select: {
+              optionName: true,
+              members: {
+                where: { product: PUBLIC_PRODUCT_VISIBILITY },
+                orderBy: { position: "asc" },
+                select: {
+                  productId: true,
+                  value: true,
+                  product: { select: listProductSelect },
+                },
+              },
+            },
+          },
+        },
+      },
     },
   });
   if (!product) throw HttpError.notFound("Product not found");
@@ -697,6 +719,23 @@ export async function getPublicProduct(
       url: mediaUrl("media", item.key),
       altText: item.altText,
     })),
+    /**
+     * The product families this one belongs to ("Colour": Maroon / Blue /
+     * Tan), each member a listing card plus its value on the axis. Only
+     * members a shopper may see; a family with nobody else visible is
+     * omitted, so the page never shows a row of one.
+     */
+    groups: product.groupMemberships
+      .map((membership) => ({
+        optionName: membership.group.optionName,
+        value: membership.value,
+        members: membership.group.members.map((member) => ({
+          ...shapeListProduct(member.product),
+          value: member.value,
+          isCurrent: member.productId === product.id,
+        })),
+      }))
+      .filter((group) => group.members.length >= 2),
     related: related.map(shapeListProduct),
   };
 }

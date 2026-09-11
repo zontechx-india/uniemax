@@ -142,7 +142,7 @@ function statusText(status: SectionStatus, dirty: boolean): string {
  * mark while a section is unfinished, and the bare tick once it is done.
  *
  * Asymmetric on purpose. A mark alone is ambiguous in a list — a seller
- * scanning fourteen rows should not have to learn that orange-ring means
+ * scanning sixteen rows should not have to learn that orange-ring means
  * unfinished — so the row that still wants something says so in words. A
  * finished row has nothing to ask for, and "Complete" repeated down a column
  * is noise, so it keeps the tick and stays quiet.

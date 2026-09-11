@@ -28,20 +28,38 @@ import type { StoreProfile } from "./storeProfile.schema.js";
 
 /**
  * `PUBLISH` — make the storefront publicly reachable.
+ * `PAYOUT_SETUP` — save a payout bank account. This is where the address and
+ *   tax identity are collected: they are the KYC behind a payout, and asking
+ *   for them at signup instead was costing sellers before they had a store.
  * `ONLINE_PAYMENT` — accept platform-processed payment (money moves, so the
  *   payout identity has to be real).
  * `PICKUP` — offer collection from a physical location, which is meaningless
  *   without an address to collect from.
  */
-export const GATES = ["PUBLISH", "ONLINE_PAYMENT", "PICKUP"] as const;
+export const GATES = [
+  "PUBLISH",
+  "PAYOUT_SETUP",
+  "ONLINE_PAYMENT",
+  "PICKUP",
+] as const;
 
 export type Gate = (typeof GATES)[number];
 
 export const GATE_LABELS: Record<Gate, string> = {
   PUBLISH: "publish your store",
+  PAYOUT_SETUP: "add a payout bank account",
   ONLINE_PAYMENT: "accept online payments",
   PICKUP: "offer store pickup",
 };
+
+/**
+ * The one sentence a blocked gate is refused with — naming every missing
+ * requirement so the seller fixes them in a single pass. Shared by every
+ * service that enforces a gate, so the wording cannot drift between them.
+ */
+export function gateBlockedMessage(gate: Gate, state: GateState): string {
+  return `Before you can ${GATE_LABELS[gate]}, please add: ${state.blockers.join(", ")}.`;
+}
 
 // ---------------------------------------------------------------------------
 // Steps — how requirements are grouped for the seller
@@ -52,6 +70,15 @@ export const GATE_LABELS: Record<Gate, string> = {
  * numbered pages of the Create Store flow, in this order; the rest are
  * checklist-only items the seller completes from the management sections
  * (you cannot add a product from a signup wizard).
+ *
+ * The wizard is deliberately two steps. It used to be four — address and tax
+ * were steps 3 and 4 — and sellers were leaving before finishing it. Neither
+ * is needed to open a shop: they become mandatory the moment the seller adds
+ * a payout bank account (`PAYOUT_SETUP`), which is the first time the
+ * platform actually needs to know who it is paying and where they are.
+ *
+ * Step order is the seller's journey: open the shop (store, business,
+ * catalog), then get paid (address, tax, payout).
  */
 export interface StepDefinition {
   key: StepKey;
@@ -68,9 +95,9 @@ export interface StepDefinition {
 export const STEP_KEYS = [
   "store",
   "business",
+  "catalog",
   "address",
   "tax",
-  "catalog",
   "payout",
 ] as const;
 
@@ -92,25 +119,25 @@ export const STEPS: StepDefinition[] = [
     href: "business",
   },
   {
-    key: "address",
-    title: "Address",
-    blurb: "Where you trade from, and where orders are picked up.",
-    wizard: true,
-    href: "business",
-  },
-  {
-    key: "tax",
-    title: "Tax details",
-    blurb: "Needed only when you start accepting online payments.",
-    wizard: true,
-    href: "business",
-  },
-  {
     key: "catalog",
     title: "Your first products",
     blurb: "A category and at least one product to sell.",
     wizard: false,
     href: "products",
+  },
+  {
+    key: "address",
+    title: "Address",
+    blurb: "Where you trade from. Needed before you add a bank account.",
+    wizard: false,
+    href: "business",
+  },
+  {
+    key: "tax",
+    title: "Tax details",
+    blurb: "PAN and GST status. Needed before you add a bank account.",
+    wizard: false,
+    href: "business",
   },
   {
     key: "payout",
@@ -208,39 +235,6 @@ export const REQUIREMENTS: Requirement[] = [
     isMet: (ctx) => filled(ctx.profile.email),
   },
 
-  // --- Step 3: where ------------------------------------------------------
-  {
-    key: "address.business",
-    label: "Business address",
-    step: "address",
-    // The one address the platform holds. Should store pickup ever be
-    // offered, customers must be told where to collect, and this is that
-    // place too — so the PICKUP gate reads it rather than a second field.
-    gates: ["PUBLISH", "PICKUP"],
-    isMet: (ctx) => ctx.profile.address !== null,
-  },
-
-  // --- Step 4: tax --------------------------------------------------------
-  {
-    key: "tax.pan",
-    label: "PAN",
-    step: "tax",
-    // Not a publish blocker: a COD-only store never needs one. It gates the
-    // moment the platform starts handling money on the seller's behalf —
-    // without a PAN, 194-O TDS is withheld at 5% instead of 1% (206AA).
-    gates: ["ONLINE_PAYMENT"],
-    isMet: (ctx) => filled(ctx.profile.tax.pan),
-  },
-  {
-    key: "tax.gst",
-    label: "GST registration status",
-    step: "tax",
-    // Advisory only. Small sellers supplying within one state may trade on a
-    // marketplace unregistered, so this asks for an ANSWER, not a number.
-    gates: [],
-    isMet: (ctx) => filled(ctx.profile.tax.gstin) || ctx.profile.tax.gstExempt,
-  },
-
   // --- Catalog ------------------------------------------------------------
   {
     key: "catalog.category",
@@ -255,6 +249,44 @@ export const REQUIREMENTS: Requirement[] = [
     step: "catalog",
     gates: ["PUBLISH"],
     isMet: (ctx) => ctx.productCount > 0,
+  },
+
+  // --- Address ------------------------------------------------------------
+  {
+    key: "address.business",
+    label: "Business address",
+    step: "address",
+    // Not a publish blocker: a COD shop can open without it. It is the one
+    // address the platform holds, so two things read it — the payout KYC
+    // (a bank account is added against a real place of business) and store
+    // pickup, where customers must be told where to collect.
+    gates: ["PAYOUT_SETUP", "PICKUP"],
+    isMet: (ctx) => ctx.profile.address !== null,
+  },
+
+  // --- Tax ----------------------------------------------------------------
+  {
+    key: "tax.pan",
+    label: "PAN",
+    step: "tax",
+    // Not a publish blocker: a COD-only store never needs one. It gates the
+    // moment the platform starts handling money on the seller's behalf —
+    // without a PAN, 194-O TDS is withheld at 5% instead of 1% (206AA).
+    // Collected when the bank account is added, and re-checked when online
+    // payment is switched on in case it was cleared in between.
+    gates: ["PAYOUT_SETUP", "ONLINE_PAYMENT"],
+    isMet: (ctx) => filled(ctx.profile.tax.pan),
+  },
+  {
+    key: "tax.gst",
+    label: "GST registration status",
+    step: "tax",
+    // Small sellers supplying within one state may trade on a marketplace
+    // unregistered, so this asks for an ANSWER, not a number — a GSTIN or
+    // the "not registered" declaration. Either is enough to add a bank
+    // account; the platform just needs to know which it is before paying out.
+    gates: ["PAYOUT_SETUP"],
+    isMet: (ctx) => filled(ctx.profile.tax.gstin) || ctx.profile.tax.gstExempt,
   },
 
   // --- Payout -------------------------------------------------------------
