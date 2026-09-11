@@ -2220,4 +2220,17 @@ Other scripts: `npm run build` (typecheck + build both), `npm run preview`
 - `push-sw.js` is served from the site root (`/push-sw.js`) — it must not be
   rewritten by either fallback, which `try_files $uri` already guarantees
   since the file exists. Push also requires **HTTPS** (localhost excepted).
+- **Cache policy is part of the deploy contract.** Chunks under `/assets/` are
+  content-addressed → `Cache-Control: public, max-age=31536000, immutable`, and
+  a missing one must **404** rather than fall through to a shell. The two
+  shells (`index.html`, `admin.html`) are not content-addressed → `no-cache`.
+  Getting this wrong produces `Failed to fetch dynamically imported module`
+  after every deploy, because the browser boots an old shell and asks for chunk
+  hashes the deploy just deleted.
+- **`shared/staleBuildReload.ts`** closes the remaining window: both `main.tsx`
+  entrypoints call `initStaleBuildReload()`, which cancels Vite's
+  `vite:preloadError` and reloads once (rate-limited via sessionStorage) so a
+  tab that was open across a deploy recovers itself instead of hitting the
+  router's error boundary. See `docs/DEPLOYMENT.md` → "Stale-build errors
+  after a deploy" for the nginx half.
 - Set `VITE_API_URL` per environment at build time.

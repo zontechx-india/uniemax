@@ -375,7 +375,7 @@ Notes:
 
 The admin app is a **second SPA** (`admin.html`) served at `/admin` on the same
 origin, with client-side routes like `/admin/orders/abc`. All four site configs
-(`uniemax`, `uniemax-domain`, `uniemax-prod`, `uniemax-prod-domain`) **already
+(`uniemax`, `uniemax-domain`, `uniemax-prod`, `uniemax-com`) **already
 carry** these two blocks ahead of the catch-all — verified on the server:
 
 ```nginx
@@ -391,6 +391,60 @@ of the storefront. Verify after a deploy (`8080` = dev, `8081` = prod):
 ```bash
 curl -s -H 'Accept: text/html' http://127.0.0.1:8080/admin/orders | grep -c assets/admin   # 1
 curl -s http://127.0.0.1:8080/ | grep -c assets/storefront                                 # 1
+```
+
+### Stale-build errors after a deploy
+
+Both SPAs are code-split, so a route pulls a hash-named chunk
+(`/assets/StoresPage-DPQOZI4D.js`). Every build renames those chunks and every
+deploy does `rm -rf /var/www/<root>/*`, so the previous build's files are gone
+the moment a deploy lands. A browser still holding the old `index.html` then
+asks for a chunk that no longer exists and the SPA fallback answers it with
+`index.html` — HTML served as JavaScript, which the module loader rejects:
+
+```
+Failed to fetch dynamically imported module: https://uniemax.com/assets/StoresPage-DPQOZI4D.js
+```
+
+The symptom is a React Router error screen that a manual refresh clears, most
+often right after a deploy. Three things prevent it, all live since 2026-09-11:
+
+**1 + 2 — nginx** (`/etc/nginx/snippets/uniemax-spa-cache.conf`, `include`d by
+all four uniemax vhosts so the policy has one source of truth):
+
+```nginx
+location ^~ /assets/ {
+    try_files $uri =404;                                       # never fall back to HTML
+    add_header Cache-Control "public, max-age=31536000, immutable";
+}
+location = /index.html { add_header Cache-Control "no-cache"; }
+location = /admin.html { add_header Cache-Control "no-cache"; }
+```
+
+The shells previously went out with **no `Cache-Control` at all** — only an
+ETag — so browsers cached them heuristically and a returning visitor could boot
+last week's build without ever having a tab open. `no-cache` means "revalidate
+every time", not "don't store", so the ETag still saves the bytes on a 304.
+`location = /admin` needs its own `add_header` because its `try_files
+/admin.html =404` serves the shell **without** an internal redirect, so it
+never re-enters `location = /admin.html`.
+
+Pre-change backups: `/etc/nginx/sites-available/*.pre-spa-cache`.
+
+**3 — the app** (`frontend/src/shared/staleBuildReload.ts`, called from both
+`main.tsx` entrypoints): listens for Vite's `vite:preloadError`, cancels it and
+reloads once, so the tab that *was* open across a deploy recovers itself on the
+same URL instead of showing the error screen. A sessionStorage stamp caps it at
+one attempt per 30s, so an offline user or a genuinely broken deploy cannot put
+the tab in a reload loop.
+
+Verify after a deploy (`8080` = dev, `8081` = prod):
+
+```bash
+curl -sI http://127.0.0.1:8081/ | grep -i cache-control              # no-cache
+curl -s -o /dev/null -w '%{http_code}\n' \
+  http://127.0.0.1:8081/assets/does-not-exist.js                     # 404, not 200
+curl -sI http://127.0.0.1:8081/assets/<a real file>.js | grep -i cache-control   # immutable
 ```
 
 ### Web Push env (`VAPID_*`)
