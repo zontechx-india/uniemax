@@ -217,14 +217,14 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
 
       <div className="grid items-start gap-6 lg:grid-cols-2 lg:gap-10">
         {/* The gallery stays put while the long right column scrolls. */}
-        <div className="lg:sticky lg:top-[5.5rem]">
+        <div className="min-w-0 lg:sticky lg:top-[5.5rem]">
           <MediaGallery product={product} focusId={variant?.mediaId ?? null} />
         </div>
 
         {/* Everything about buying lives inside one card. */}
         <div
           ref={buyCardRef}
-          className={`rounded-xl border p-5 sm:p-6 ${skin.border} ${skin.surface}`}
+          className={`min-w-0 rounded-xl border p-5 sm:p-6 ${skin.border} ${skin.surface}`}
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -665,11 +665,11 @@ function SpecTable({
             >
               <th
                 scope="row"
-                className={`w-2/5 px-4 py-2.5 text-left align-top font-semibold ${skin.muted}`}
+                className={`w-2/5 break-words px-4 py-2.5 text-left align-top font-semibold ${skin.muted}`}
               >
                 {row.label}
               </th>
-              <td className={`px-4 py-2.5 align-top ${skin.text}`}>
+              <td className={`break-words px-4 py-2.5 align-top ${skin.text}`}>
                 {row.value}
               </td>
             </tr>
@@ -762,10 +762,12 @@ function useIsVisible<T extends HTMLElement>(
 
 /**
  * Gallery — main viewer plus a thumbnail rail when there is more than one
- * item (vertical beside the image on desktop, a scrollable strip below it on
- * phones). Images and the optional video share the rail (the video thumb shows
- * a play glyph); the empty state keeps the icon frame so photoless products
- * still render a stable layout. Thumbs are lazy-loaded.
+ * item (vertical beside the image on desktop, a snap-scrolling strip below it
+ * on phones — every ancestor is `min-w-0` so the rail's min-content width, the
+ * sum of every thumb, can never widen the page). Images and the optional video
+ * share the rail (the video thumb shows a play glyph); the empty state keeps
+ * the icon frame so photoless products still render a stable layout. Thumbs
+ * are lazy-loaded.
  *
  * Interactions: **hover-zoom** on desktop (pointer-anchored, mouse only — a
  * magnifier that follows a finger is useless), **swipe** between items on
@@ -813,11 +815,11 @@ function MediaGallery({
   const isImage = active.type === 'IMAGE'
 
   return (
-    <div className="flex flex-col-reverse gap-3 lg:flex-row">
+    <div className="flex min-w-0 flex-col-reverse gap-3 lg:flex-row">
       {media.length > 1 && (
-        <ul className="flex gap-2 overflow-x-auto pb-1 lg:max-h-[34rem] lg:flex-col lg:overflow-y-auto lg:overflow-x-visible lg:pb-0">
+        <ul className="flex min-w-0 max-w-full snap-x gap-2 overflow-x-auto overscroll-x-contain pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:max-w-none lg:max-h-[34rem] lg:snap-none lg:flex-col lg:overflow-y-auto lg:overflow-x-visible lg:pb-0">
           {media.map((item, i) => (
-            <li key={item.id} className="shrink-0">
+            <li key={item.id} className="shrink-0 snap-start">
               <button
                 type="button"
                 onClick={() => setIndex(i)}
@@ -860,7 +862,7 @@ function MediaGallery({
       )}
 
       <div
-        className={`group relative flex aspect-square flex-1 items-center justify-center overflow-hidden rounded-xl border ${skin.border} ${skin.well}`}
+        className={`group relative flex aspect-square w-full min-w-0 flex-1 items-center justify-center overflow-hidden rounded-xl border ${skin.border} ${skin.well}`}
         onTouchStart={(e) => {
           touchStart.current = e.touches[0]?.clientX ?? null
         }}

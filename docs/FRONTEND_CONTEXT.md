@@ -622,12 +622,15 @@ column), which lets the homepage render full-bleed section bands instead.
   present, else the description-parsed ones, plus one row per option type —
   "Size: S, M, L" — then Category, Availability, Sold by) · You May Also Like:
   - **Media gallery** — main viewer plus a thumbnail rail (vertical beside the
-    image on `lg`, a scrollable strip below on phones) whenever there is more
-    than one item; the product video plays inline with a play-glyph thumb and
-    thumbs lazy-load. Interactions: pointer-anchored **hover zoom** (mouse
-    only — `pointerType` guarded, images only), **swipe** between items on
-    touch, hover arrows and an `n / total` counter. The gallery is
-    `lg:sticky` so it stays in view while the long right column scrolls.
+    image on `lg`, a snap-scrolling strip below on phones) whenever there is
+    more than one item; the rail is a nowrap flex row, so its min-content width
+    is the sum of every thumb — the gallery and both grid columns carry
+    `min-w-0` to keep that from widening the page on a phone; the product
+    video plays inline with a play-glyph thumb and thumbs lazy-load.
+    Interactions: pointer-anchored **hover zoom** (mouse only — `pointerType`
+    guarded, images only), **swipe** between items on touch, hover arrows and
+    an `n / total` counter. The gallery is `lg:sticky` so it stays in view
+    while the long right column scrolls.
   - **Purchase card** — everything about buying inside one bordered card:
     category eyebrow → name → price (MRP struck through, % off and a "Sale"
     tag when the selected variant's MRP is above its price) → stock badge
