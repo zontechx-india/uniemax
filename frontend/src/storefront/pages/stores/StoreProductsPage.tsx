@@ -515,22 +515,29 @@ function ProductRow({
               )}
             </span>
           </div>
+          {/* On phones the trigger rides here as a chip — the action line is full. */}
+          <PlacementToggle
+            open={placementOpen}
+            onToggle={onTogglePlacement}
+            productName={product.name}
+            className={`mt-2 inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 sm:hidden ${
+              placementOpen
+                ? 'border-accent bg-accent/10 text-accent'
+                : 'border-line bg-surface text-muted'
+            }`}
+          />
         </div>
-        <button
-          type="button"
-          onClick={onTogglePlacement}
-          aria-expanded={placementOpen}
-          className={`hidden shrink-0 items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-semibold transition sm:flex ${
+        {/* From `sm` up there is room for it inline with the row's buttons. */}
+        <PlacementToggle
+          open={placementOpen}
+          onToggle={onTogglePlacement}
+          productName={product.name}
+          className={`hidden shrink-0 items-center gap-1 rounded-md px-2.5 py-1.5 sm:flex ${
             placementOpen
               ? 'bg-accent/15 text-accent'
               : 'text-muted hover:bg-surface-alt'
           }`}
-        >
-          Placement
-          <ChevronDownIcon
-            className={`h-3.5 w-3.5 transition-transform ${placementOpen ? 'rotate-180' : ''}`}
-          />
-        </button>
+        />
         <button
           type="button"
           onClick={() => onEdit('basics')}
@@ -559,6 +566,38 @@ function ProductRow({
         <MerchandisingPanel product={product} onRequest={onMerchandising} />
       )}
     </li>
+  )
+}
+
+/**
+ * Opens the merchandising panel. Rendered twice per row — inline with the
+ * action buttons from `sm` up, and as a chip under the product's meta on
+ * phones, where that line is already full.
+ */
+function PlacementToggle({
+  open,
+  onToggle,
+  productName,
+  className,
+}: {
+  open: boolean
+  onToggle: () => void
+  productName: string
+  className: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      aria-label={`Storefront placement for ${productName}`}
+      className={`text-xs font-semibold transition ${className}`}
+    >
+      Placement
+      <ChevronDownIcon
+        className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`}
+      />
+    </button>
   )
 }
 

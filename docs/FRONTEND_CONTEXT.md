@@ -1242,7 +1242,9 @@ a pickup-address item.
   description") that opens the wizard at that step, so a shop fills up
   gradually. Renames keep the slug/public URL.  A **Placement** toggle on each row opens the
   **Storefront placement** checkboxes (Featured Product · Best Seller · New
-  Arrival · Hide from Search). Each maps to exactly one storefront row, and
+  Arrival · Hide from Search); the toggle sits inline with the row's buttons
+  from `sm` up and becomes a chip under the product's meta on phones, where
+  that line is already full. Each maps to exactly one storefront row, and
   because ticking one changes what customers see immediately, the checkbox
   only *requests* the change — a `ConfirmDialog` names the affected row and
   nothing is written until it is accepted, so the boxes always reflect saved
