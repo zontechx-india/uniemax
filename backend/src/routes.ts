@@ -13,6 +13,10 @@ import {
   adminThemeTemplateRoutes,
 } from "./modules/themeTemplates/themeTemplates.routes.js";
 import { publicDiscoveryRoutes } from "./modules/discovery/discovery.routes.js";
+import {
+  adminBannerRoutes,
+  publicBannerRoutes,
+} from "./modules/banners/banners.routes.js";
 import { addressRoutes } from "./modules/addresses/addresses.routes.js";
 import { cartRoutes } from "./modules/cart/cart.routes.js";
 import {
@@ -74,6 +78,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       await api.register(publicOrderRoutes, { prefix: "/public/stores" });
       // Marketplace discovery — global search + platform stats (homepage).
       await api.register(publicDiscoveryRoutes, { prefix: "/public" });
+      // Marketplace homepage banners — anonymous read of the active set.
+      await api.register(publicBannerRoutes, { prefix: "/public/banners" });
       // Payment gateway callbacks (Cashfree webhook — signature-guarded).
       await api.register(paymentRoutes, { prefix: "/payments" });
 
@@ -107,6 +113,9 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
             // Support ticket queue — the platform team's side of the threads
             // sellers raise from their stores.
             await guarded.register(adminSupportRoutes, { prefix: "/support" });
+            // Marketplace homepage banners — the platform's own carousel,
+            // distinct from the per-store banners sellers manage.
+            await guarded.register(adminBannerRoutes, { prefix: "/banners" });
             // Store appearance templates — the palettes sellers pick from.
             await guarded.register(adminThemeTemplateRoutes, {
               prefix: "/theme-templates",

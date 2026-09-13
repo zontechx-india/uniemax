@@ -14,6 +14,7 @@ import {
   ClipboardIcon,
   FooterIcon,
   HomeIcon,
+  ImageIcon,
   LifebuoyIcon,
   PaletteIcon,
   StoreIcon,
@@ -112,6 +113,9 @@ const SECTION_GROUPS: SectionGroup[] = [
       { label: 'Business Details', to: 'business', icon: ShieldCheckIcon },
       { label: 'Appearance', to: 'appearance', icon: PaletteIcon },
       { label: 'Homepage', to: 'homepage', icon: HomeIcon },
+      // Banners sit under Homepage: the Homepage screen arranges the section,
+      // this one fills it.
+      { label: 'Banners', to: 'banners', icon: ImageIcon },
       { label: 'Footer', to: 'footer', icon: FooterIcon },
     ],
   },

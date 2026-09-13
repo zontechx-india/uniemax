@@ -32,6 +32,7 @@ import type {
   PublicProductQuery,
   PublicStoreListQuery,
 } from "./publicStore.schema.js";
+import { listPublicBanners } from "./storeBanner.service.js";
 
 /**
  * The anonymous storefront surface. Only **published** stores resolve; an
@@ -54,6 +55,8 @@ import type {
 
 /** How many products each homepage section shows. */
 const SECTION_LIMIT = 12;
+/** How many categories the "Shop by Category" product rows cover. */
+const CATEGORY_ROW_COUNT = 3;
 /** How many related products a product page suggests. */
 const RELATED_LIMIT = 8;
 
@@ -440,18 +443,22 @@ export async function listPublicProducts(
 // ---------------------------------------------------------------------------
 
 /**
- * One merchandising section: the products whose flag is set, and *only* those.
+ * One homepage row: the newest visible products matching `scope`. The curated
+ * rows pass their flag, the category rows pass a shelf subtree, and "All
+ * Products" passes nothing at all.
  *
- * There is deliberately **no fallback**. An earlier version substituted recent
- * products when a section had nothing flagged, which meant flagging a product
- * as "New Arrival" also made it surface under "Featured Products" (that
- * section was empty, so it fell back to everything). A flag must mean exactly
- * one thing, so an unflagged section simply comes back empty and the
- * storefront omits it.
+ * For a FLAG scope there is deliberately **no fallback**. An earlier version
+ * substituted recent products when a section had nothing flagged, which meant
+ * flagging a product as "New Arrival" also made it surface under "Featured
+ * Products" (that section was empty, so it fell back to everything). A flag
+ * must mean exactly one thing, so an unflagged section simply comes back empty
+ * and the storefront omits it. The flag-free rows below are the answer to the
+ * empty storefront that rule leaves behind — separate sections the owner can
+ * hide, never a substitution inside a curated one.
  */
-async function section(storeId: string, flag: Prisma.StoreProductWhereInput) {
+async function section(storeId: string, scope: Prisma.StoreProductWhereInput) {
   const rows = await prisma.storeProduct.findMany({
-    where: { ...visibleProductWhere(storeId), ...flag },
+    where: { ...visibleProductWhere(storeId), ...scope },
     select: listProductSelect,
     orderBy: { createdAt: "desc" },
     take: SECTION_LIMIT,
@@ -459,10 +466,59 @@ async function section(storeId: string, flag: Prisma.StoreProductWhereInput) {
   return rows.map(shapeListProduct);
 }
 
+export interface PublicCategoryRow {
+  id: string;
+  name: string;
+  slug: string;
+  /** Newest products in this shelf *and everything beneath it*. */
+  products: Awaited<ReturnType<typeof section>>;
+}
+
 /**
- * Homepage payload: the category row plus the three product sections. Every
- * section is strictly owner-controlled — a product appears in a section if and
- * only if that flag is set. Empty sections are omitted by the storefront.
+ * A product row per category for the first few categories — the flag-free way
+ * a brand-new shop fills its homepage. Each row's "View all" is that
+ * category's own page, so the homepage stays a summary and browsing still
+ * happens where it always did.
+ *
+ * Which categories: the owner's starred ones, else the first few — the same
+ * "starred, else all" rule as the Shop-by-Category strip, so starring a
+ * category curates both rows at once. The tree it picks from is already pruned
+ * to categories that have something shoppable, so a row is never empty.
+ */
+async function categoryRows(
+  storeId: string,
+  categories: PublicCategoryNode[],
+): Promise<PublicCategoryRow[]> {
+  const starred = categories.filter((c) => c.isFeatured);
+  const picked = (starred.length > 0 ? starred : categories).slice(
+    0,
+    CATEGORY_ROW_COUNT,
+  );
+  if (picked.length === 0) return [];
+
+  // One shelf load for all the rows; a category covers its whole subtree.
+  const idx = shelfIndex(await loadShelves(storeId));
+  return Promise.all(
+    picked.map(async ({ id, name, slug }) => ({
+      id,
+      name,
+      slug,
+      products: await section(storeId, {
+        categoryId: { in: idx.descendantIds(id) },
+      }),
+    })),
+  );
+}
+
+/**
+ * Homepage payload: the category strip, the three curated product sections,
+ * and the two flag-free rows that keep an uncurated shop from looking empty.
+ *
+ * The curated three stay strictly owner-controlled — a product appears in one
+ * if and only if that flag is set. `categoryRows` and `catalog` merchandise
+ * the catalog as it stands and need no ticking. All of them are ordinary
+ * sections: the owner reorders or hides any of them, and an empty one is
+ * omitted by the storefront.
  */
 export async function getPublicStoreHome(slug: string, viewerId?: string) {
   const shell = await getPublicStoreShell(slug, viewerId);
@@ -473,11 +529,16 @@ export async function getPublicStoreHome(slug: string, viewerId?: string) {
   const on = (key: HomepageSectionKey) =>
     sections.find((s) => s.key === key)?.enabled ?? false;
 
-  const [featured, newArrivals, bestSellers] = await Promise.all([
-    on("featured") ? section(shell.id, { isFeatured: true }) : [],
-    on("newArrivals") ? section(shell.id, { isNewArrival: true }) : [],
-    on("bestSellers") ? section(shell.id, { isBestSeller: true }) : [],
-  ]);
+  const [banners, featured, newArrivals, bestSellers, shelves, catalog] =
+    await Promise.all([
+      on("banners") ? listPublicBanners(shell.id, shell.slug) : [],
+      on("featured") ? section(shell.id, { isFeatured: true }) : [],
+      on("newArrivals") ? section(shell.id, { isNewArrival: true }) : [],
+      on("bestSellers") ? section(shell.id, { isBestSeller: true }) : [],
+      on("categoryRows") ? categoryRows(shell.id, shell.categories) : [],
+      // No scope at all — every visible product, newest first.
+      on("catalog") ? section(shell.id, {}) : [],
+    ]);
 
   // Categories are navigation, not merchandising: the row is headed "Shop by
   // Category", so showing every top-level category when the owner has starred
@@ -488,6 +549,7 @@ export async function getPublicStoreHome(slug: string, viewerId?: string) {
   return {
     // The ordered section list drives BOTH what renders and in what order.
     sections,
+    banners,
     featuredCategories: on("categories")
       ? starred.length > 0
         ? starred
@@ -496,6 +558,8 @@ export async function getPublicStoreHome(slug: string, viewerId?: string) {
     featured,
     newArrivals,
     bestSellers,
+    categoryRows: shelves,
+    catalog,
   };
 }
 

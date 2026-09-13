@@ -497,6 +497,47 @@ const params = (input: Params) => ({
 
 // ---- Endpoints ------------------------------------------------------------
 
+// ---- Marketplace banners --------------------------------------------------
+
+/**
+ * The platform's own homepage carousel. Not to be confused with the per-store
+ * banners sellers manage in their own console — different table, different
+ * owner, different page.
+ */
+export type BannerLinkType = 'NONE' | 'STORE' | 'URL'
+
+export const BANNER_LINK_TYPES: BannerLinkType[] = ['NONE', 'STORE', 'URL']
+
+/** Where a banner currently points, resolved for display. */
+export interface BannerLinkTarget {
+  /** The destination's name — never the raw id an admin picked. */
+  label: string
+  /** Marketplace path, or null once the target can no longer be linked. */
+  href: string | null
+  /** Unpublished, suspended or deleted — the link would be a dead end. */
+  missing: boolean
+}
+
+export interface BannerRow {
+  id: string
+  /** Doubles as the image's alt text and the row's label in the console. */
+  title: string | null
+  imageUrl: string | null
+  linkType: BannerLinkType
+  /** Store id, or the address for a URL banner. */
+  linkValue: string | null
+  displayOrder: number
+  isActive: boolean
+  target: BannerLinkTarget | null
+}
+
+export interface BannerInput {
+  title?: string | null
+  linkType?: BannerLinkType
+  linkValue?: string | null
+  isActive?: boolean
+}
+
 export const adminApi = {
   dashboard(days: number) {
     return call<Dashboard>(http.get(`${BASE}/dashboard`, params({ days })))
@@ -624,6 +665,58 @@ export const adminApi = {
     return call<{ id: string; deleted: boolean }>(
       http.delete(`${BASE}/theme-templates/${id}`),
     )
+  },
+
+  // Marketplace banners — every mutation answers with the FULL list, so the
+  // page re-renders from one authoritative array rather than merging a row.
+  listBanners() {
+    return call<BannerRow[]>(http.get(`${BASE}/banners`))
+  },
+  createBanner(
+    file: Blob,
+    filename: string,
+    input: BannerInput = {},
+    onProgress?: (fraction: number) => void,
+  ) {
+    const form = new FormData()
+    form.append('file', file, filename)
+    if (input.title != null) form.append('title', input.title)
+    if (input.linkType) form.append('linkType', input.linkType)
+    if (input.linkValue != null) form.append('linkValue', input.linkValue)
+    if (input.isActive !== undefined) form.append('isActive', String(input.isActive))
+    return call<BannerRow[]>(
+      http.post(`${BASE}/banners`, form, {
+        onUploadProgress: (e) => {
+          if (onProgress && e.total) onProgress(e.loaded / e.total)
+        },
+      }),
+    )
+  },
+  updateBanner(id: string, body: BannerInput) {
+    return call<BannerRow[]>(http.patch(`${BASE}/banners/${id}`, body))
+  },
+  replaceBannerImage(
+    id: string,
+    file: Blob,
+    filename: string,
+    onProgress?: (fraction: number) => void,
+  ) {
+    const form = new FormData()
+    form.append('file', file, filename)
+    return call<BannerRow[]>(
+      http.put(`${BASE}/banners/${id}/image`, form, {
+        onUploadProgress: (e) => {
+          if (onProgress && e.total) onProgress(e.loaded / e.total)
+        },
+      }),
+    )
+  },
+  deleteBanner(id: string) {
+    return call<BannerRow[]>(http.delete(`${BASE}/banners/${id}`))
+  },
+  /** The COMPLETE id list in the wanted order — a partial order is ambiguous. */
+  reorderBanners(bannerIds: string[]) {
+    return call<BannerRow[]>(http.patch(`${BASE}/banners/order`, { bannerIds }))
   },
 
   // Broadcast (the feed itself lives in notificationsApi)

@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   publicStoreApi,
+  SECTION_TITLES,
   storeCategoryUrl,
   storeShopUrl,
   type PublicCategory,
+  type PublicCategoryRow,
   type PublicProduct,
-  type PublicSection,
   type PublicStore,
   type PublicStoreHome,
 } from '../../features/stores/storesApi'
@@ -23,6 +24,7 @@ import {
 } from '../../features/publicStore/ListingControls'
 import { ChevronRightIcon } from '../../layout/icons'
 import type { Skin } from '../../features/publicStore/storeTheme'
+import { BannerCarousel } from '../../features/banners/BannerCarousel'
 
 /**
  * Products fetched per homepage row. Only as many as fill the current
@@ -51,6 +53,8 @@ const ROW_GRID =
 /** Covers used by the hero collage (lg+ only). */
 const HERO_COLLAGE_SIZE = 4
 
+type HomeSectionKey = PublicStoreHome['sections'][number]['key']
+
 /**
  * `/store/{storeSlug}` — the storefront homepage.
  *
@@ -65,8 +69,13 @@ const HERO_COLLAGE_SIZE = 4
  * lives inside each section so a hidden one leaves nothing behind. Each
  * product row shows a single row's worth with a "View all" link into the Shop
  * page scoped to that section (`?section=…`), so the homepage stays a summary.
- * Rows are strictly flag-driven — a section with nothing flagged renders
- * nothing (there is deliberately no fallback).
+ *
+ * The three curated rows are strictly flag-driven — one with nothing flagged
+ * renders nothing (there is deliberately no fallback). What keeps an uncurated
+ * shop from being a hero over empty space is the two rows below them, which
+ * need no flags: **Shop by Category** rows (one per category, "View all" into
+ * that category's own page) and **All Products** (newest, "View all" into
+ * Shop). Both are ordinary sections the owner can reorder or hide.
  */
 export function StoreHomePage() {
   const { store, skin } = usePublicStore()
@@ -130,6 +139,7 @@ export function StoreHomePage() {
 
   const showsCategories = visible.some((section) => section.key === 'categories')
   const covers = heroCovers(home)
+  const tones = bandTones(visible, home)
 
   return (
     <>
@@ -140,8 +150,7 @@ export function StoreHomePage() {
           store={store}
           home={home}
           skin={skin}
-          // Alternating bands, starting on the raised surface tone.
-          tone={index % 2 === 0 ? 'alt' : 'base'}
+          tone={tones[index]}
           covers={covers}
           categoriesAnchor={showsCategories}
         />
@@ -151,11 +160,10 @@ export function StoreHomePage() {
 }
 
 /** Does this section have anything to render? Drives band alternation. */
-function hasContent(
-  key: PublicStoreHome['sections'][number]['key'],
-  home: PublicStoreHome,
-): boolean {
+function hasContent(key: HomeSectionKey, home: PublicStoreHome): boolean {
   switch (key) {
+    case 'banners':
+      return home.banners.length > 0
     case 'hero':
       return true
     case 'categories':
@@ -166,12 +174,45 @@ function hasContent(
       return home.newArrivals.length > 0
     case 'bestSellers':
       return home.bestSellers.length > 0
+    case 'categoryRows':
+      return home.categoryRows.length > 0
+    case 'catalog':
+      return home.catalog.length > 0
   }
+}
+
+/**
+ * How many bands a section paints. Every section is one band except the
+ * category rows, which paint one each — the tone ramp has to count them, or
+ * an odd number of rows would hand the next section the tone it just used.
+ */
+function bandCount(key: HomeSectionKey, home: PublicStoreHome): number {
+  return key === 'categoryRows' ? home.categoryRows.length : 1
+}
+
+/** Alternating band tones, starting on the raised surface tone. */
+function bandTones(
+  sections: PublicStoreHome['sections'],
+  home: PublicStoreHome,
+): BandTone[] {
+  let band = 0
+  return sections.map((section) => {
+    const tone: BandTone = band % 2 === 0 ? 'alt' : 'base'
+    band += bandCount(section.key, home)
+    return tone
+  })
 }
 
 /** Real product covers for the hero collage — deduped, newest rows first. */
 function heroCovers(home: PublicStoreHome): string[] {
-  const urls = [...home.newArrivals, ...home.featured, ...home.bestSellers]
+  // `catalog` last: it is the fallback that gives an uncurated shop a collage
+  // at all, but a curated row's covers are the ones the owner chose.
+  const urls = [
+    ...home.newArrivals,
+    ...home.featured,
+    ...home.bestSellers,
+    ...home.catalog,
+  ]
     .map((product) => product.image?.url)
     .filter((url): url is string => Boolean(url))
   return [...new Set(urls)].slice(0, HERO_COLLAGE_SIZE)
@@ -187,7 +228,7 @@ function HomeSection({
   covers,
   categoriesAnchor,
 }: {
-  sectionKey: PublicStoreHome['sections'][number]['key']
+  sectionKey: HomeSectionKey
   store: PublicStore
   home: PublicStoreHome
   skin: Skin
@@ -196,6 +237,15 @@ function HomeSection({
   categoriesAnchor: boolean
 }) {
   switch (sectionKey) {
+    case 'banners':
+      return (
+        <BannerCarousel
+          banners={home.banners}
+          id="shop-banners"
+          className={`border-b ${skin.border} ${tone === 'alt' ? skin.surface : ''}`}
+          wellClassName={skin.well}
+        />
+      )
     case 'hero':
       return (
         <Hero
@@ -216,34 +266,34 @@ function HomeSection({
         />
       )
     case 'featured':
-      return (
-        <ProductRow
-          store={store}
-          title="Featured Products"
-          section="featured"
-          products={home.featured}
-          skin={skin}
-          tone={tone}
-        />
-      )
     case 'newArrivals':
-      return (
-        <ProductRow
-          store={store}
-          title="New Arrivals"
-          section="newArrivals"
-          products={home.newArrivals}
-          skin={skin}
-          tone={tone}
-        />
-      )
     case 'bestSellers':
       return (
         <ProductRow
           store={store}
-          title="Best Sellers"
-          section="bestSellers"
-          products={home.bestSellers}
+          title={SECTION_TITLES[sectionKey]}
+          viewAllTo={storeShopUrl(store.slug, { section: sectionKey })}
+          products={home[sectionKey]}
+          skin={skin}
+          tone={tone}
+        />
+      )
+    case 'categoryRows':
+      return (
+        <CategoryRows
+          store={store}
+          rows={home.categoryRows}
+          skin={skin}
+          tone={tone}
+        />
+      )
+    case 'catalog':
+      return (
+        <ProductRow
+          store={store}
+          title="All Products"
+          viewAllTo={storeShopUrl(store.slug)}
+          products={home.catalog}
           skin={skin}
           tone={tone}
         />
@@ -262,12 +312,15 @@ function Band({
   id,
   tone = 'base',
   skin,
+  dense = false,
   className = '',
   children,
 }: {
   id?: string
   tone?: BandTone
   skin: Skin
+  /** Strip height instead of section height — one row of controls, no heading. */
+  dense?: boolean
   className?: string
   children: React.ReactNode
 }) {
@@ -276,7 +329,9 @@ function Band({
       id={id}
       className={`scroll-mt-20 border-b ${skin.border} ${tone === 'alt' ? skin.surface : ''} ${className}`}
     >
-      <div className="mx-auto w-full max-w-[1920px] px-4 py-8 sm:px-6 sm:py-10 lg:px-10">
+      <div
+        className={`mx-auto w-full max-w-[1920px] px-4 sm:px-6 lg:px-10 ${dense ? 'py-3.5 sm:py-4' : 'py-8 sm:py-10'}`}
+      >
         {children}
       </div>
     </section>
@@ -395,10 +450,20 @@ function HeroCollageImage({ url, skin }: { url: string; skin: Skin }) {
 }
 
 /**
- * Shop by Category — text-only entry points. Deliberately **no icon and no
- * decorative padding**: the category name is the content, so the tiles are
- * compact rows that pack a full-bleed band six across instead of four tall
- * boxes with a badge in the middle.
+ * Shop by Category — the marketplace homepage's single-row strip, per store:
+ * a small inline label followed by one pill per top-level category, wrapping
+ * only when a store has more categories than fit the line.
+ *
+ * It is a **strip, not a section**: no display heading, no tiles, `dense` band
+ * padding. Earlier revisions grew this into a grid of tiles carrying counts
+ * and subcategory links, which turned a wayfinding row into the tallest thing
+ * on the homepage and left a lone tile stranded in six columns whenever a shop
+ * had one category. Drilling into shelves belongs on the category page, which
+ * already lists them.
+ *
+ * The pill fill is picked against the band tone so it never sits on its own
+ * color: the raised tone gets page-canvas pills, the canvas tone gets raised
+ * ones.
  */
 function FeaturedCategories({
   store,
@@ -413,57 +478,45 @@ function FeaturedCategories({
 }) {
   if (categories.length === 0) return null
   return (
-    <Band id="shop-by-category" tone={tone} skin={skin}>
-      <SectionHeading title="Shop by Category" skin={skin} />
-      <ul className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+    <Band id="shop-by-category" tone={tone} skin={skin} dense>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <span
+          className={`text-xs font-semibold uppercase tracking-widest ${skin.muted}`}
+        >
+          Shop by category
+        </span>
         {categories.map((category) => (
-          <li key={category.id}>
-            <Link
-              to={storeCategoryUrl(store.slug, category.slug)}
-              className={`group flex h-full items-center justify-between gap-3 rounded-lg border px-3.5 py-3 metal-lift ${skin.border} ${skin.surface}`}
-            >
-              <span className="min-w-0">
-                <span
-                  className={`block truncate font-heading text-base font-medium leading-tight transition-colors group-hover:text-brand ${skin.text}`}
-                >
-                  {category.name}
-                </span>
-                {category.subcategories.length > 0 && (
-                  <span
-                    className={`mt-0.5 block truncate text-[11px] ${skin.muted}`}
-                  >
-                    {namesBelow(category).join(' · ')}
-                  </span>
-                )}
-              </span>
-              <span className="shrink-0 whitespace-nowrap text-[10px] font-bold text-brand">
-                {category.productCount}{' '}
-                {category.productCount === 1 ? 'product' : 'products'}
-              </span>
-            </Link>
-          </li>
+          <Link
+            key={category.id}
+            to={storeCategoryUrl(store.slug, category.slug)}
+            className={`shrink-0 rounded-pill border px-4 py-1.5 text-sm font-medium transition-colors hover:border-brand hover:text-brand ${skin.border} ${skin.text} ${tone === 'alt' ? 'bg-bg' : skin.surface}`}
+          >
+            {category.name}
+          </Link>
         ))}
-      </ul>
+      </div>
     </Band>
   )
 }
 
 /**
- * One merchandising row — capped at a single row of cards, with "View all"
- * (into the Shop page scoped to THIS section, not the whole catalog) when the
- * section holds more than the row shows. Renders nothing when empty.
+ * One product row headed by `title` — capped at a single row of cards, with
+ * "View all" into `viewAllTo` when the row holds more than it shows. The
+ * target is always the narrowest listing that still holds everything in the
+ * row: the Shop page scoped to a section, or a category's own page. Renders
+ * nothing when empty.
  */
 function ProductRow({
   store,
   title,
-  section,
+  viewAllTo,
   products,
   skin,
   tone,
 }: {
   store: PublicStore
   title: string
-  section: PublicSection
+  viewAllTo: string
   products: PublicProduct[]
   skin: Skin
   tone: BandTone
@@ -478,7 +531,7 @@ function ProductRow({
         // that can be hidden — offer the full section whenever it might be.
         action={
           products.length > 2
-            ? { label: 'View all', to: storeShopUrl(store.slug, { section }) }
+            ? { label: 'View all', to: viewAllTo }
             : undefined
         }
         skin={skin}
@@ -498,7 +551,40 @@ function ProductRow({
   )
 }
 
-/** Every shelf beneath a category, however deep, as a flat list of names. */
-function namesBelow(category: PublicCategory): string[] {
-  return category.subcategories.flatMap((sub) => [sub.name, ...namesBelow(sub)])
+/**
+ * Shop by Category, as products rather than links — one row per category,
+ * each "View all" landing on that category's own page.
+ *
+ * This is what a shop with no merchandising flags ticked has on its homepage,
+ * so it has to look deliberate rather than like a fallback: the rows are
+ * ordinary product rows, and they keep the page's alternating band rhythm by
+ * continuing it from the tone this section was handed.
+ */
+function CategoryRows({
+  store,
+  rows,
+  skin,
+  tone,
+}: {
+  store: PublicStore
+  rows: PublicCategoryRow[]
+  skin: Skin
+  tone: BandTone
+}) {
+  const flip = (t: BandTone): BandTone => (t === 'alt' ? 'base' : 'alt')
+  return (
+    <>
+      {rows.map((row, index) => (
+        <ProductRow
+          key={row.id}
+          store={store}
+          title={row.name}
+          viewAllTo={storeCategoryUrl(store.slug, row.slug)}
+          products={row.products}
+          skin={skin}
+          tone={index % 2 === 0 ? tone : flip(tone)}
+        />
+      ))}
+    </>
+  )
 }

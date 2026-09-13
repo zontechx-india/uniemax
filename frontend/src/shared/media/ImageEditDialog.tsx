@@ -1,20 +1,25 @@
 import { useEffect, useState } from 'react'
 import Cropper from 'react-easy-crop'
 import type { Area } from 'react-easy-crop'
-import { renderToWebp, webpName } from './cropImage'
+import { MAX_EDGE, renderToWebp, webpName } from './cropImage'
 
 /**
- * Optional image editor: crop, rotate and zoom before uploading.
+ * Image editor: crop, rotate and zoom before uploading.
  *
- * Cropping is a CHOICE, not a toll gate. A product photo is uploaded as the
- * seller shot it unless they open this dialog and change something, and even
- * here "Use original" is one click away — forcing every photo into a square
- * is what cuts heads off shoes and bottles. The aspect chips (including
- * **Free** and **Original**) exist so the seller frames the product, rather
- * than the form framing it for them.
+ * For a PRODUCT PHOTO, cropping is a CHOICE, not a toll gate. The photo is
+ * uploaded as the seller shot it unless they open this dialog and change
+ * something, and even here "Use original" is one click away — forcing every
+ * photo into a square is what cuts heads off shoes and bottles. The aspect
+ * chips (including **Free** and **Original**) exist so the seller frames the
+ * product, rather than the form framing it for them.
  *
- * Store logos are the exception and pass `aspects={[1]}`: a logo is displayed
- * in a square everywhere, so its own frame is fixed.
+ * For an image with a FIXED FRAME it is the opposite, and the caller says so
+ * by passing one aspect plus `allowOriginal={false}`: a store logo
+ * (`aspects={[1]}`) is displayed in a square everywhere, and a banner
+ * (`aspects={[16/5]}`, `maxEdge={1920}`) fills a fixed 16:5 strip. There the
+ * image WILL be cropped either way — the dialog exists so the person who
+ * made it decides what is lost, instead of `object-cover` quietly taking it
+ * off the top and bottom.
  */
 
 export interface AspectOption {
@@ -36,6 +41,7 @@ export function ImageEditDialog({
   title = 'Adjust image',
   confirmLabel = 'Apply',
   allowOriginal = true,
+  maxEdge = MAX_EDGE,
   busy = false,
   onCancel,
   onDone,
@@ -48,6 +54,12 @@ export function ImageEditDialog({
   confirmLabel?: string
   /** Shows "Use original" — off for logos, which must be square. */
   allowOriginal?: boolean
+  /**
+   * Longest edge of the rendered blob. Defaults to the product-photo size;
+   * banners pass 1920, because a banner is displayed at full page width and
+   * 1600 would be upscaled on a large monitor.
+   */
+  maxEdge?: number
   /** True while the caller is uploading the previous confirmation. */
   busy?: boolean
   onCancel: () => void
@@ -104,7 +116,7 @@ export function ImageEditDialog({
     setError(null)
     setProcessing(true)
     try {
-      onDone(await renderToWebp(src, options), webpName(file.name))
+      onDone(await renderToWebp(src, { ...options, maxEdge }), webpName(file.name))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not process the image.')
     } finally {

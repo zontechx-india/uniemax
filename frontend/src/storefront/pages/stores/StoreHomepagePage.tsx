@@ -23,13 +23,19 @@ import { ChevronDownIcon, GripIcon } from '../../layout/icons'
  * fixed chrome (logo, search, cart, nav) and always at the top.
  */
 const META: Record<HomepageSectionKey, { label: string; hint: string }> = {
+  banners: {
+    label: 'Banners',
+    hint: 'Your promo images — manage them in Storefront → Banners',
+  },
+  // Named "Hero Banner" until banners were a real feature; two rows both
+  // called a banner told the owner nothing about which was which.
   hero: {
-    label: 'Hero Banner',
-    hint: 'The welcome banner at the top of your storefront',
+    label: 'Welcome Hero',
+    hint: 'Your store name, intro line and Start Shopping button',
   },
   categories: {
     label: 'Shop by Category',
-    hint: 'Category cards linking to each category page',
+    hint: 'A row of links, one per top-level category',
   },
   featured: {
     label: 'Featured Products',
@@ -42,6 +48,16 @@ const META: Record<HomepageSectionKey, { label: string; hint: string }> = {
   bestSellers: {
     label: 'Best Sellers',
     hint: 'Products you ticked as Best Seller',
+  },
+  // The two rows that need no ticking — what a shop shows before its owner has
+  // curated anything, and the reason a new storefront is never just a hero.
+  categoryRows: {
+    label: 'Category Highlights',
+    hint: 'A row of products for each of your first 3 categories — no ticking needed',
+  },
+  catalog: {
+    label: 'All Products',
+    hint: 'Your newest products, whatever you have ticked — no ticking needed',
   },
 }
 

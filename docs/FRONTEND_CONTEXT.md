@@ -170,10 +170,16 @@ for guests and signed-in customers alike and adapts per session state.
   surface tone + a bottom `border-line` divider, compact `py-8/10`) — the
   band lives inside each section component so a hidden section leaves no
   empty band; separation comes from background changes rather than large
-  gaps. Sections, in order: a **left-aligned hero band** (headline + Start
-  Shopping anchor → #new-stores + Open Your Store; on lg+ a two-column
-  offset **collage of real product covers**, adapting from 2 covers up
-  (max 4) — decorative, fed by the same fetch as Fresh Finds); a **Shop
+  gaps. Sections, in order: the **banner carousel**
+  (`GET /public/banners` — the platform's own promo images, uploaded by
+  admins at `/admin/banners`; full-bleed, 16:5, the shared
+  `features/banners/BannerCarousel`). It **replaced a hand-written hero**
+  (a headline, two buttons and a collage of whatever products were newest):
+  the marketplace's opening pitch is now something the platform team
+  controls and can change for a campaign without a deploy. It renders
+  nothing until a banner exists, so an empty platform opens on Shop by
+  Category rather than on an empty frame, and a failed fetch is silent —
+  a decorative strip never earns an error state; a **Shop
   by Category
   chip strip** (`GET /public/categories` — most common category names
   across stores; tapping a chip pre-fills and focuses the global search
@@ -197,8 +203,8 @@ for guests and signed-in customers alike and adapts per session state.
   **Fresh Finds** (`GET /public/products`, newest 12 platform-wide,
   product cards with image / store / name / price on a denser grid than
   the store cards — 2→3→4→5→6 columns, 4-up from `lg`; section hides while
-  the platform has no products — one shared `useNewProducts()` fetch
-  feeds it and the hero collage, the rail owning the error/retry UI);
+  the platform has no products — `useNewProducts()` owns the
+  error/retry UI);
   **Recently Viewed** (local, hidden when empty, logo + name pills);
   **My Stores** (owners only, compact wrapping row — logo, body-face
   name, Published/Draft chip — deliberately slim so consumer sections
@@ -384,7 +390,7 @@ once-ever setting look as important as a daily job:
 | ----- | -------- |
 | **Overview** | Dashboard · Orders *(pending-count badge)* |
 | **Catalog** | Categories · Products |
-| **Storefront** | Store Details · Business Details · Appearance · Homepage · Footer |
+| **Storefront** | Store Details · Business Details · Appearance · Homepage · Banners · Footer |
 | **Payments & Delivery** | Payments · Bank Accounts · Shipping · Checkout |
 | **Help** | Customer Support · UnieMax Support |
 
@@ -582,15 +588,59 @@ column), which lets the homepage render full-bleed section bands instead.
   the same block (avatar, name, the `ACCOUNT_MENU_ITEMS` rows, My Store,
   Logout) sits at the **top of the mobile drawer** instead.
 - **`StoreHomePage`** — hero, Shop by Category, then the
-  merchandising rows (Featured / New Arrivals / Best Sellers) from
+  merchandising rows (Featured / New Arrivals / Best Sellers, then Category
+  Highlights and All Products) from
   `GET …/home`. Sections render in the **owner-arranged order** (the payload's
   ordered `sections` list); each is skipped when disabled or empty. Every
   section is a **full-bleed band** (alternating page-canvas / surface tone plus
-  a bottom `border-line` divider, compact `py-8/10`) exactly like the
+  a bottom `border-line` divider, compact `py-8/10`, or `dense` `py-3.5/4` for
+  a one-row strip like Shop by Category) exactly like the
   marketplace homepage — separation comes from the background change, not from
   large gaps, and the band lives inside the section so a hidden one leaves no
   empty strip. Sections are filtered for *content* before the tones are
-  assigned, so the alternation never breaks on an empty row.
+  assigned, so the alternation never breaks on an empty row, and the tone ramp
+  counts **bands rather than sections** — Category Highlights paints one band
+  per row, so an odd number of them would otherwise hand the next section the
+  tone it just used.
+  - **Category Highlights / All Products** — the two rows that need no
+    merchandising flags, and what a shop shows before its owner has curated
+    anything. Both are ordinary `ProductRow`s: Category Highlights renders one
+    per category (up to three) with "View all" into that category's own page,
+    All Products renders the newest shop-wide with "View all" into Shop. The
+    row component takes a `viewAllTo` URL rather than a section key, so a row
+    can point at whichever listing is the narrowest one still holding
+    everything in it. `catalog` is also the hero collage's last cover source,
+    so an uncurated shop still gets a collage.
+  - **Banners** — the owner's promo carousel, above the hero by default and
+    reorderable like any other section. The carousel itself is
+    `features/banners/BannerCarousel`, **shared with the marketplace
+    homepage** — different owners and different link targets, but the same
+    thing on screen, so two copies would have drifted apart on motion, focus
+    handling and aspect ratio. Everything theme-specific arrives as a class
+    name, so the store passes the owner's palette and the marketplace passes
+    the global one. **Full-bleed, not banded**: a banner is
+    artwork the owner chose, so framing it in a colour they did not pick and
+    shrinking it on the screens it is meant to fill would both be wrong; it
+    keeps only the band's bottom divider. **One image at one ratio, every screen** —
+    `16/5` from `features/stores/bannerSpec.ts`, with **no max-height**, so the
+    rendered height is exactly `width x 5/16` everywhere (1920px → 600px,
+    1440 → 450, 768 → 240, 390 → 122) and the whole artwork stays visible on a
+    phone exactly as on a monitor. A ratio that followed each upload would make
+    the page jump as the carousel advanced and shove the hero down after the
+    first load; a height cap would crop a correctly-sized image on a wide
+    monitor. `bannerSpec` is also what the admin screen quotes to sellers, so
+    the promised size and the rendered size cannot drift.
+
+    An earlier revision also accepted an optional portrait phone image and
+    swapped it in under `sm` via `<picture>`. It was dropped: sellers export
+    one asset, so the *fallback* (a hard centre-crop of the wide image) would
+    have been the common case on phones — the worst of the three outcomes.
+    Auto-advance every 6s, paused on hover/focus and off entirely under
+    `prefers-reduced-motion`, while arrows, dots and swipe keep working. Every
+    slide stays in the DOM (translated track) so a link is never pulled out
+    from under a click; off-screen slides are `inert` so they are not invisible
+    tab stops. A `URL` banner is a plain `<a target="_blank" rel="noopener">`;
+    everything else routes through the SPA.
   - **Hero** — sized like the marketplace hero (`text-3xl sm:text-5xl`,
     `py-8/10`) rather than the old tall rounded card: eyebrow, store name,
     the product/category count line, a Start Shopping CTA and — only when the
@@ -598,10 +648,14 @@ column), which lets the homepage render full-bleed section bands instead.
     button. On `lg+` an offset two-column **collage of the store's real
     product covers** (max 4, deduped from the merchandising rows, decorative
     `alt=""`, skipped below 2 covers). Keeps the radial brand wash.
-  - **Shop by Category** — deliberately **icon-free, text-only** tiles: name,
-    the subcategory line and the product count in a compact row
-    (`px-3.5 py-3`), six across on a wide screen. The old circular
-    `TagIcon` badge and its tall padding are gone.
+  - **Shop by Category** — the marketplace homepage's **single-row strip**,
+    per store: a small uppercase inline label followed by one `rounded-pill`
+    per top-level category, wrapping only when a store has more than fit the
+    line. It is a strip, not a section — no display heading, and the band
+    renders at `dense` height (`py-3.5 sm:py-4`). The pill fill is chosen
+    against the band tone (`bg-bg` on the raised tone, `bg-surface` on the
+    canvas) so it never sits on its own color. Subcategories are not shown
+    here; the category page already lists them.
   - **Product rows** — `ROW_SIZE = 6` fetched, but `ROW_VISIBILITY` hides the
     surplus per breakpoint (`hidden md:list-item` …) so **every** breakpoint
     paints exactly one full row — 2 → 3 → 4 → 5 → 6 cards — and never strands
@@ -1061,11 +1115,43 @@ a pickup-address item.
   changes"),
   `StoreHomepagePage` (**arrange** the storefront homepage — drag-and-drop
   (native HTML5 DnD, no dependency) plus ▲/▼ buttons for keyboard/touch to
-  reorder Hero · Shop by Category · Featured Products · New Arrivals · Best
-  Sellers, each with an `ActiveSwitch` — order + visibility persisted together
-  as the full ordered list via `PATCH /stores/:id/homepage`; a switch only
-  *hides* a section, never forces an empty row; the fixed header is not
-  listed),
+  reorder Banners · Welcome Hero · Shop by Category · Featured Products · New
+  Arrivals · Best Sellers, each with an `ActiveSwitch` — order + visibility
+  persisted together as the full ordered list via `PATCH /stores/:id/homepage`;
+  a switch only *hides* a section, never forces an empty row; the fixed header
+  is not listed. The hero row is labelled **Welcome Hero**, not the old "Hero
+  Banner" — with banners a real feature, two rows both called a banner told the
+  owner nothing about which was which),
+  `StoreBannersPage` (**Banners** — fill the section the page above arranges:
+  a **grid of preview cards** (1 / 2 / 3 across), because a banner is a picture
+  and the picture should be the row. Each card shows the artwork at the
+  storefront's own `16/5` with a position badge, a **drag handle**, the on/off
+  switch and delete over it. Reordering is **drag-and-drop** (native HTML5 DnD,
+  the same pattern as the Homepage screen) plus ←/→ buttons for keyboard and
+  touch; dragging is armed by holding the grip rather than the card body, so
+  the inputs inside a card stay usable, and a drop past the last card appends.
+  Max 10 banners, each with one image. Two switches on purpose: this page's per-banner switch
+  retires one banner while keeping its image for a future campaign, and
+  Homepage → Banners hides the whole strip. The **destination picker** chooses a
+  kind — no link · a category · a product · a web address — and then the
+  matching control: a list of this store's categories or products, or a URL
+  field. The owner never types an id, so a rename cannot break a link; when a
+  chosen target is later deleted or switched off the row says so in red rather
+  than looking healthy while the storefront renders a dead banner. A **size guide** states the one upload size up front —
+  **1920 × 600 (16:5)**, read from `bannerSpec.ts` rather than typed into the
+  copy — and spells out that the same image is used on every screen, shrinking
+  with the width (600px tall on a monitor, ~122px on a phone), so sellers keep
+  text large and central. An upload is **measured in the browser** before it is
+  sent. Already 16:5 (within 1%, `needsBannerCrop`) → uploaded untouched, so a
+  correctly exported banner is never re-encoded. Anything else is **required to
+  be cropped first**: the picked file opens in the shared `ImageEditDialog`
+  locked to 16:5, with no "use original" and `maxEdge={1920}`. A banner fills a
+  fixed frame, so an off-ratio image has to lose something — the only question
+  is who decides what, and left to `object-cover` the browser takes it off the
+  top and bottom (a 3:1 upload silently loses ~3% of each edge, which is enough
+  to clip a logo). Resolution stays advisory: a small file gets a note about
+  softness, never a refusal. Every write returns the server's full list,
+  so the screen never merges a row into local state),
   `StoreFooterPage` (**Footer** manager — everything the storefront footer
   shows, as independently-saving cards over `PATCH /stores/:id/footer`, each
   sending only its own section: **Contact Information** — up to 10 business
@@ -1393,6 +1479,7 @@ Rules they follow (constraints, not taste):
 | `/stores`, `/stores/:id` | Stores + owners. The table carries a **Setup** column (`SetupChip`, naming the first outstanding step) and a **Setup: Not finished / Complete** filter — independent of Published/Draft, because a live store can still be missing its PAN, and "who has not finished?" is the console's usual reason for opening this list. Detail carries suspension, **manual payout-account verification** (account numbers masked to the last 4), a **Products** card — the store's newest listings inline (each opening the same product dialog), with a "View all" into `/products?storeId=…` — and a **Seller setup** card (below). |
 | `/customers`, `/customers/:id` | Buyers and sellers (same account type), with blocking. The dialog states both effects: no future sign-in **and** every session revoked. |
 | `/support`, `/support/:ticketId` | The support queue — **sellers and shoppers in one list** (never a shopper's thread with a shop: those are the seller's to answer), filterable by `scope` (two pages would just mean one of them going unread), each row carrying a Seller/Shopper chip. Defaults to the **Needs reply** tab (open + in progress) sorted **oldest activity first** — a queue's job is to show what is still owed, which is the opposite of every other table here. The detail page carries the thread, the reply box (replying moves OPEN → IN_PROGRESS on its own) and triage: status saves on change and notifies the reporter, priority is internal and silent. |
+| `/banners` | **Homepage banners** — the marketplace homepage carousel, which replaced the old hand-written hero, so the platform's opening pitch is now content rather than code. A grid of preview cards at the homepage's own 16:5, each with the image (click to replace), a **Live** checkbox, a title, and a destination: no link · a store (picked from a list, stored as an **id** so a rename cannot break it) · a web address. Reordering is drag-and-drop with ←/→ for keyboard and touch. Max 10. A banner whose store is unpublished, suspended or deleted is flagged in red here, because the console showing a healthy row while the homepage renders a dead banner is the failure worth preventing. Uploads are measured in the browser: an already-16:5 file goes up untouched, anything else **must be cropped first** in the shared `ImageEditDialog` locked to that ratio (no "use original"), so the admin frames it rather than the browser silently trimming the top and bottom. |
 | `/notifications` | This admin's feed, the per-device push toggle, and the platform broadcast (confirm-with-preview — a broadcast can't be recalled). |
 | `/activity` | The append-only admin audit trail, filterable by action and record type. |
 | `/admins` | SUPER_ADMIN only: create, promote/demote, deactivate, reset password. |
@@ -1685,7 +1772,7 @@ frontend/
     │   └── pages/
     │       ├── LoginPage.tsx     # /login fallback page: split-screen frame around CustomerAuthPanel
     │       ├── LoginRoute.tsx    # /login route: ?next= handling + already-authed redirect
-    │       ├── HomePage.tsx      # Marketplace homepage: hero+collage, New Stores, Fresh Finds, seller CTA
+    │       ├── HomePage.tsx      # Marketplace homepage: banners, New Stores, Fresh Finds, seller CTA
     │       ├── InfoComingSoonPage.tsx # Public placeholder for /about /privacy /terms /contact
     │       ├── ProfilePage.tsx   # /profile — account details + mobile-number linking (SMS OTP)
     │       ├── AddressesPage.tsx # /addresses — saved delivery addresses (one primary)
@@ -1693,7 +1780,7 @@ frontend/
     │       ├── SupportTicketPage.tsx # /support/:ticketId — one ticket thread
     │       ├── OrdersPage.tsx    # /orders — the customer's order history
     │       ├── store/            # Public storefront pages (no sign-in)
-    │       │   ├── StoreHomePage.tsx     # Hero, featured categories, merchandising rows
+    │       │   ├── StoreHomePage.tsx     # Banners, hero, categories, merchandising rows
     │       │   ├── StoreCategoryPage.tsx # Breadcrumb, subcategory chips, listing
     │       │   ├── StoreProductPage.tsx  # Gallery (zoom/swipe) + purchase card +
     │       │   │                         #   highlights/description/specs + sticky bar
@@ -1735,7 +1822,9 @@ frontend/
     │           │   ├── strings.ts       # Every seller-facing word, one file
     │           │   └── icons.tsx        # Camera / video / rotate glyphs
     │           ├── StoreAppearancePage.tsx # Colors + live preview
-    │           ├── StoreHomepagePage.tsx # Show/hide storefront homepage sections
+    │           ├── StoreHomepagePage.tsx # Order + show/hide homepage sections
+    │           ├── StoreBannersPage.tsx # Promo banners: preview grid, drag to
+    │           │                        #   reorder, link target, on/off
     │           ├── StoreFooterPage.tsx  # Footer manager: locations, social, info,
     │           │                        #   support, policy links, links, copyright
     │           ├── LocationMapPicker.tsx # Google Maps search + pin picker (lat/lng;

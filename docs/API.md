@@ -272,8 +272,8 @@ follows primary, surface derives from the background, button text is
 white/black by the primary's luminance).
 `homepage` is the
 storefront section list — an **ordered** array of `{ key, enabled }` over
-`hero`, `categories`, `featured`, `newArrivals`, `bestSellers` (default: that
-order, all enabled). `slug` is auto-generated from the name
+`banners`, `hero`, `categories`, `featured`, `newArrivals`, `bestSellers`,
+`categoryRows`, `catalog` (default: that order, all enabled). `slug` is auto-generated from the name
 (unique, stable across renames) and forms the store's public URL;
 `isPublished` (default `false`) gates the public page. `footer` is the
 storefront footer configuration (see `PATCH …/footer` below), always returned
@@ -492,25 +492,95 @@ by `displayOrder` then oldest first. Colors only; nothing else about a store.
 
 ### `PATCH /api/v1/stores/:id/homepage`
 ```jsonc
-{ "sections": [                       // FULL ordered list, not a subset
-  { "key": "newArrivals", "enabled": true },
-  { "key": "hero",        "enabled": true },
-  { "key": "featured",    "enabled": false },
-  { "key": "categories",  "enabled": true },
-  { "key": "bestSellers", "enabled": true }
+{ "sections": [                        // FULL ordered list, not a subset
+  { "key": "newArrivals",  "enabled": true },
+  { "key": "banners",      "enabled": true },
+  { "key": "hero",         "enabled": true },
+  { "key": "featured",     "enabled": false },
+  { "key": "categories",   "enabled": true },
+  { "key": "bestSellers",  "enabled": true },
+  { "key": "categoryRows", "enabled": true },
+  { "key": "catalog",      "enabled": true }
 ] }
 ```
 Set the storefront homepage section **order** and per-section visibility in one
 write — a reorder and a toggle are the same operation. `sections` must be a
-complete permutation of every known key (`hero`, `categories`, `featured`,
-`newArrivals`, `bestSellers`), each with an `enabled` flag; a missing,
-duplicate or unknown key is a `422`. Returns the full store (with `homepage`
-normalised to the ordered list).
+complete permutation of every known key (`banners`, `hero`, `categories`,
+`featured`, `newArrivals`, `bestSellers`, `categoryRows`, `catalog`), each with
+an `enabled` flag; a missing, duplicate or unknown key is a `422`. Returns the
+full store (with `homepage` normalised to the ordered list).
 
 Enabling a section can only ever *reveal* it — it never forces an empty row to
 appear, since a merchandising row still needs products flagged for it. Disabled
 sections are not queried at all. Adding a new section key later makes it appear
-(enabled, at the end) for existing stores automatically — no migration.
+for existing stores automatically — enabled, and at its **canonical position**
+in the key list rather than appended, so a section the platform defines above
+the hero (like `banners`) arrives above the hero. No migration.
+
+### Storefront banners
+
+The owner-managed promo carousel rendered as the `banners` homepage section
+(above the hero by default). Stored in the **`store_banners` table**, not a
+JSON column — a banner owns uploaded files, and object keys need a lifecycle.
+
+**One image per banner, always 16:5.** The storefront scales it by width at
+every breakpoint, so there is no phone variant and no `variant` parameter.
+
+**Every one of these endpoints answers with the store's FULL banner list**, in
+`displayOrder`, so a client re-renders from one authoritative array:
+
+```jsonc
+{ "success": true, "data": [
+  { "id": "cmu0…",
+    "title": "Festive sale",          // also the image's alt text; may be null
+    "imageUrl": "https://…/x.png",    // the one 16:5 image
+    "linkType": "CATEGORY",           // NONE | CATEGORY | PRODUCT | URL
+    "linkValue": "cmtu…",             // category/product **id**, or the address
+    "displayOrder": 0,
+    "isActive": true,
+    "target": {                       // resolved destination, or null for NONE
+      "label": "Fashion",             // the name — never the raw id
+      "href": "/store/my-shop/category/fashion",   // null once unlinkable
+      "missing": false                // deleted, or switched off
+    } }
+] }
+```
+
+`linkType` `CATEGORY`/`PRODUCT` store the target's **id**, never a path, so a
+link survives a rename and degrades to unlinked (rather than a 404) once the
+target is deleted or deactivated. A `CATEGORY`/`PRODUCT` id that is not in this
+store is a `400`. `URL` must start with `http://` or `https://` — a
+`javascript:` or `data:` href would run in every shopper's browser, and a
+relative path must go through `CATEGORY`/`PRODUCT` instead of a string that
+silently rots.
+
+#### `GET /api/v1/stores/:id/banners`
+The owner's full list, inactive rows included.
+
+#### `POST /api/v1/stores/:id/banners`
+**multipart/form-data** — `file` (the image, required) plus optional text
+fields `title`, `linkType`, `linkValue`, `isActive` (`"true"`/`"false"`;
+multipart has no booleans). Appended last. `201`. Max **10 banners** per store
+(`409` beyond that); the image is validated against the `image` media rule
+served by `/public/media-config`.
+
+#### `PATCH /api/v1/stores/:id/banners/:bannerId`
+`{ title?, linkType?, linkValue?, isActive? }` — any subset. The link is
+validated as it will be **after** the patch, since a body may change only the
+kind or only the value; switching to `NONE` clears `linkValue`.
+
+#### `PUT /api/v1/stores/:id/banners/:bannerId/image`
+**multipart/form-data** — `file`. Swaps the image, keeping the banner's title,
+link and position. The previous object is deleted only after the row points at
+the new one, so a failed delete can never leave a banner with no image.
+
+#### `DELETE /api/v1/stores/:id/banners/:bannerId`
+Deletes the row and its storage object.
+
+#### `PATCH /api/v1/stores/:id/banners/order`
+`{ "bannerIds": ["…", "…"] }` — the **complete** id list in the wanted order;
+anything else is a `400`, for the same reason the homepage PATCH takes the
+whole section list.
 
 ### `PATCH /api/v1/stores/:id/footer`
 
@@ -1327,29 +1397,71 @@ represented by a **count**, never sent in full:
 `popular` / `bestselling` order by the owner's Best Seller flag then recency —
 there is no sales data yet; they become real orderings when orders ship.
 
+### `GET /api/v1/public/banners`
+Active **marketplace** banners in admin order — the carousel at the top of the
+marketplace homepage. Anonymous. Empty until an admin uploads one, and the
+homepage then simply opens on Shop by Category.
+```jsonc
+{ "success": true, "data": [
+  { "id": "cmu0…", "title": "Festive sale",
+    "imageUrl": "https://…/x.png",              // the one 16:5 image
+    "href": "/store/acme",                      // null = render unlinked
+    "external": false }                         // true only for a URL banner
+] }
+```
+Inactive rows never leave the server, and a link whose target is unpublished,
+suspended or deleted arrives as `href: null` so the banner renders as a plain
+image rather than a dead link. Managed through `/admin/banners` (below); the
+per-store equivalent is `/stores/:id/banners`.
+
 ### `GET /api/v1/public/stores/:slug/home`
 Homepage merchandising payload — each product section capped at 12.
 ```jsonc
 { "sections": [ { "key": "hero", "enabled": true }, … ],  // ORDERED
+  "banners": [                  // active only, in the owner's order
+    { "id": "cmu0…", "title": "Festive sale",
+      "imageUrl": "https://…",
+      "href": "/store/my-shop/category/fashion",  // null = render unlinked
+      "external": false } ],    // true only for a URL banner
   "featuredCategories": [ … ],  // owner-flagged roots, else all top-level
-  "featured": [ … ], "newArrivals": [ … ], "bestSellers": [ … ] }
+  "featured": [ … ], "newArrivals": [ … ], "bestSellers": [ … ],
+  "categoryRows": [             // up to 3 — no flags needed
+    { "id": "cmu1…", "name": "Fashion", "slug": "fashion",
+      "products": [ … ] } ],
+  "catalog": [ … ] }            // newest, whole shop — no flags needed
 ```
 `sections` is the owner's ordered list (see `PATCH …/homepage`) and drives
 **both** what the storefront renders and in what order. A section switched
 **off** comes back with its data array empty and is never queried; `hero`
 carries no data, so the client reads its `enabled` flag directly.
-Products use the same listing shape. Each product section is **strictly
-flag-driven**: a product appears in `featured` / `newArrivals` / `bestSellers`
-if and only if the matching flag is set. There is deliberately **no fallback** —
-an unflagged section returns `[]` and the storefront omits it.
+`banners` is the shopper-facing half of the banner endpoints above: **inactive
+rows never leave the server**, and a link whose target has been deleted or
+switched off arrives as `href: null` so the banner renders as a plain image
+rather than a dead link.
+Products use the same listing shape. The three **curated** sections are
+strictly flag-driven: a product appears in `featured` / `newArrivals` /
+`bestSellers` if and only if the matching flag is set. There is deliberately
+**no fallback** — an unflagged one returns `[]` and the storefront omits it.
 
 > Earlier revisions substituted recent products into an empty section, which
 > meant flagging a product as a New Arrival also surfaced it under Featured
 > Products (that section was empty, so it fell back to everything). A flag now
 > means exactly one thing.
 
-`featuredCategories` is the exception, and is navigation rather than
-merchandising: the row is headed "Shop by Category", so it lists every
+`categoryRows` and `catalog` are the **flag-free** sections, and the answer to
+the empty storefront that rule leaves behind: a seller who has ticked nothing
+still gets a stocked homepage. `categoryRows` is one row of products per
+category (up to 3, each the storefront's "View all" link into that category's
+own page); `catalog` is the newest products across the whole shop (its "View
+all" is the unscoped Shop page). Both are ordinary sections — orderable and
+hideable through `PATCH …/homepage` — and both sit below the curated rows by
+default, so flagging always outranks them. They are separate sections, never a
+substitution inside a curated one.
+
+Which categories `categoryRows` covers follows the same rule as
+`featuredCategories`, so starring a category curates both at once: the starred
+roots, else the first few. `featuredCategories` itself is navigation rather
+than merchandising — the row is headed "Shop by Category", so it lists every
 top-level category when the owner has starred none, and narrows to the starred
 set otherwise.
 
@@ -2206,6 +2318,47 @@ Actions: `store.suspend` · `store.restore` · `customer.block` ·
 `customer.unblock` · `product.hide` · `product.show` ·
 `bankAccount.verified|failed|pending` · `admin.create` · `admin.update` ·
 `admin.passwordReset`.
+
+### Marketplace banners 🔒 admin — `/api/v1/admin/banners`
+
+The platform's own homepage carousel, managed by admins. Distinct from the
+per-store banners sellers manage (`/stores/:id/banners`): different table,
+different owner, different page, and a narrower set of link kinds — the
+marketplace homepage has no store context, so "a category" and "a product"
+would be ambiguous across stores.
+
+**One image per banner, always 16:5**, scaled by width at every breakpoint.
+Max **10** banners. Every endpoint answers with the FULL list in
+`displayOrder`:
+
+```jsonc
+{ "success": true, "data": [
+  { "id": "cmu0…", "title": "Festive sale",
+    "imageUrl": "https://…/x.png",
+    "linkType": "STORE",              // NONE | STORE | URL
+    "linkValue": "cmtu…",             // Store **id**, or the address for URL
+    "displayOrder": 0, "isActive": true,
+    "target": { "label": "Acme", "href": "/store/acme", "missing": false } }
+] }
+```
+
+`STORE` stores the shop's **id**, not a path, so a rename cannot break the
+link; `target.missing` is true once that store is unpublished, suspended or
+deleted, and the public payload then drops the href. `URL` must be
+`http(s)` — a `javascript:`/`data:` href would run in every shopper's browser.
+
+- `GET /` — the full list, inactive rows included.
+- `POST /` — **multipart**: `file` plus optional `title`, `linkType`,
+  `linkValue`, `isActive` (`"true"`/`"false"`). Appended last. `201`; `409`
+  past 10.
+- `PATCH /:id` — `{ title?, linkType?, linkValue?, isActive? }`. The link is
+  validated as it will be **after** the patch; switching to `NONE` clears
+  `linkValue`.
+- `PUT /:id/image` — **multipart**: `file`. The previous object is deleted
+  only after the row points at the new one.
+- `DELETE /:id` — removes the row and its storage object.
+- `PATCH /order` — `{ bannerIds }`, the **complete** list in the wanted order.
+
 
 ### Store appearance templates — `/api/v1/admin/theme-templates` 🔒 admin
 

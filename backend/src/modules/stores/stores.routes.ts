@@ -3,6 +3,7 @@ import { requireCustomer } from "../../package/auth/index.js";
 import * as controller from "./stores.controller.js";
 import * as catalogController from "./storeCatalog.controller.js";
 import * as bankController from "./storeBank.controller.js";
+import * as bannerController from "./storeBanner.controller.js";
 import * as publicController from "./publicStore.controller.js";
 import * as ordersController from "../orders/orders.controller.js";
 import { storeOwnerSupportRoutes } from "../support/support.routes.js";
@@ -41,6 +42,17 @@ export const storeRoutes: FastifyPluginAsync = async (app) => {
   // Logo — multipart upload to the dedicated logo bucket. Replace only: a
   // store's logo is mandatory (set at creation), so there is no delete.
   app.put("/:id/logo", controller.updateStoreLogo);
+
+  // Storefront banners — the homepage promo carousel. Create and image
+  // replacement are multipart (the file plus its metadata); everything else
+  // is JSON. Every mutation answers with the store's full banner list.
+  app.get("/:id/banners", bannerController.listBanners);
+  app.post("/:id/banners", bannerController.createBanner);
+  // Before "/:bannerId", so "order" is never read as a banner id.
+  app.patch("/:id/banners/order", bannerController.reorderBanners);
+  app.patch("/:id/banners/:bannerId", bannerController.updateBanner);
+  app.put("/:id/banners/:bannerId/image", bannerController.replaceBannerImage);
+  app.delete("/:id/banners/:bannerId", bannerController.deleteBanner);
 
   // Payout bank accounts — several per store, exactly one primary (the
   // payout target). Verification (third-party + admin) is provisioned in

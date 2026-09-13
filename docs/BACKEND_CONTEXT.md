@@ -604,12 +604,20 @@ White-label design — one codebase, any business:
   text — plus `templateId` and `themeName` recording which appearance template
   the colors were **copied** from and what the seller named their customised
   palette) so customization evolves without migrations, a `homepage` JSON column holding
-  the storefront sections as an **ordered** `{ key, enabled }[]` (`hero`,
-  `categories`, `featured`, `newArrivals`, `bestSellers`; default order, all
-  enabled — the owner drags to reorder and toggles each). `resolveHomepage`
-  normalises it on read, tolerating null, the legacy boolean-map shape, and
-  appending any newly-added section key so old stores get it without a
-  migration. A `footer` JSON column (same evolve-without-migration pattern)
+  the storefront sections as an **ordered** `{ key, enabled }[]` (`banners`,
+  `hero`, `categories`, `featured`, `newArrivals`, `bestSellers`,
+  `categoryRows`, `catalog`; default order, all enabled — the owner drags to
+  reorder and toggles each). The last two are **flag-free**: they merchandise
+  the catalog as it stands (a product row per category, and the newest
+  products shop-wide), so a seller who has ticked no merchandising flags still
+  has a stocked homepage. They sit below the curated rows, so flagging always
+  outranks them.
+  `resolveHomepage` normalises it on read, tolerating null, the legacy
+  boolean-map shape, and back-filling any newly-added section key so old
+  stores get it without a migration — at its **canonical position** in
+  `HOMEPAGE_SECTION_KEYS`, not appended, so a section defined above the hero
+  (`banners`) reaches existing stores above the hero rather than demoted to
+  last. A `footer` JSON column (same evolve-without-migration pattern)
   holds the owner-managed storefront footer: `locations[]` (max 10 —
   label/address/contactPerson/phone/altPhone/email/hours/isPrimary plus an
   optional `lat`/`lng` map pin; ids minted server-side, exactly one primary
@@ -731,10 +739,13 @@ White-label design — one codebase, any business:
   never breaks a shared link. `StoreProduct` also carries owner-controlled
   **merchandising flags** (`isFeatured`, `isBestSeller`, `isNewArrival`,
   `hideFromSearch`). Each section flag maps to **exactly one** storefront
-  homepage row and nothing else — the sections are strictly flag-driven with no
-  fallback, so a flag never leaks a product into another row.
-  `StoreCategory.isFeatured` drives the Shop-by-Category row (when no category is
-  starred, that row falls back to all categories). A StoreCategory also carries
+  homepage row and nothing else — the curated sections are strictly flag-driven
+  with no fallback, so a flag never leaks a product into another row. An
+  unflagged shop is covered by the separate flag-free sections
+  (`categoryRows`, `catalog`) rather than by relaxing that rule.
+  `StoreCategory.isFeatured` drives the Shop-by-Category row **and** which
+  categories get a `categoryRows` product row (when no category is starred,
+  both fall back to all categories). A StoreCategory also carries
   `sortOrder` (lower first, ties by age), an optional `imageUrl` (a pasted URL —
   no upload pipeline) and `categoryId`, the global `Category` this shelf **is**.
 
@@ -856,6 +867,45 @@ White-label design — one codebase, any business:
   the image sequence. Owner endpoints under
   `/stores/:id/products/:productId/media` (upload/replace are multipart);
   the public listing sends only the cover, the product page the full gallery.
+- **Banner** — a platform-wide promo banner on the **marketplace** homepage,
+  managed by admins (`/admin/banners`) and read anonymously at
+  `/public/banners`. Same shape rules as `StoreBanner` — one `imageKey`
+  (object key, never a URL), always 16:5, scaled by width — but a narrower
+  `BannerLinkType` (NONE · STORE · URL): the marketplace homepage has no store
+  context, so "a category" and "a product" would be ambiguous across stores.
+  STORE holds a `Store.id` and resolves to that shop, reporting `missing`
+  once it is unpublished, suspended or deleted. Max 10, module
+  `modules/banners/`.
+  This table **predates the multi-store platform and was dead** — it held a
+  full `imageUrl` and a free `linkUrl` and nothing referenced it but the media
+  audit's legacy scan. It was reshaped in place (both databases were empty)
+  rather than left as clutter beside a near-identical new table.
+- **StoreBanner** — an owner-managed promo banner on the storefront homepage
+  (cascade delete), rendered as the `banners` section: an auto-advancing
+  carousel when more than one is active. Max **10 per store**
+  (service-enforced). Holds one `imageKey` — a storage **object key**, never a
+  URL — always 16:5, which the storefront scales by width at every breakpoint
+  (1920px → 600px tall, 390px → 122px), so there is no phone variant to keep in
+  sync; a `title` that doubles as alt text and the admin row's label;
+  `displayOrder`; and its own `isActive` — independent of the homepage
+  section switch, so one banner can be retired between campaigns without
+  hiding the strip.
+  `linkType` (`StoreBannerLinkType`: NONE · CATEGORY · PRODUCT · URL) with
+  `linkValue` holds the destination. CATEGORY/PRODUCT store the target's
+  **id**, never a path, so the link survives a rename and degrades to unlinked
+  (not a 404) once the target is deleted or deactivated; the service resolves
+  ids to live slugs on read and validates on write that the target is in
+  **this** store. URL is the only kind that leaves the site and must be
+  `http(s)` — a `javascript:`/`data:` href in an owner-supplied field would
+  run in every shopper's browser.
+  **Relational, not a `Store.banners` JSON column** (unlike theme / homepage /
+  footer): a banner owns uploaded files, and object keys need a lifecycle —
+  delete the row, delete the object, and `auditMedia` must see the key column
+  to know the object is still referenced. Module:
+  `storeBanner.{schema,service,controller}.ts`; owner endpoints under
+  `/stores/:id/banners` (create and image replace are multipart, every
+  mutation answers with the full list; the image PUT takes no variant); the storefront reads the active subset
+  through `listPublicBanners`, which the public `/home` payload embeds.
 - **ProductGroup / ProductGroupMember** — a product **family**: separate
   `StoreProduct`s that are the same item on ONE axis ("Colour": Maroon /
   Blue / Tan), each keeping its own photos, price, offer, stock, variants and

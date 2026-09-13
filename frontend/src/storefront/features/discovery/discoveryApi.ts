@@ -88,7 +88,27 @@ export interface PlatformStats {
   orders: number
 }
 
+/** One marketplace banner as a shopper sees it — active only, link resolved. */
+export interface MarketBanner {
+  id: string
+  title: string | null
+  imageUrl: string | null
+  /** Null renders the banner as a plain image rather than a dead link. */
+  href: string | null
+  /** True only for an off-site link. */
+  external: boolean
+}
+
 export const discoveryApi = {
+  /**
+   * Active marketplace banners, in admin order (homepage carousel). Managed
+   * in the admin console; empty until the platform team uploads one, and the
+   * homepage simply renders nothing then.
+   */
+  async listBanners(): Promise<MarketBanner[]> {
+    return call<MarketBanner[]>(http.get(`${PUBLIC}/banners`))
+  },
+
   /** Published stores, newest publish first (homepage "New Stores"). */
   async listStores(
     query: { page?: number; pageSize?: number } = {},

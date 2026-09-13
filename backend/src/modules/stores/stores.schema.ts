@@ -68,20 +68,28 @@ export const storeThemeUpdateSchema = storeThemeSchema.partial();
  * Storefront homepage sections. The owner controls both their **order** and
  * whether each is shown, so the config is an ORDERED LIST of
  * `{ key, enabled }` rather than a flag map. Persisted as the `Store.homepage`
- * JSON column, so adding a future section (offers, banners, reviews…) is a
- * one-line edit to `HOMEPAGE_SECTION_KEYS` here — `resolveHomepage` appends it
- * (enabled) for existing stores, no migration.
+ * JSON column, so adding a future section (offers, reviews…) is a one-line
+ * edit to `HOMEPAGE_SECTION_KEYS` here — `resolveHomepage` back-fills it
+ * (enabled, at its canonical position) for existing stores, no migration.
  *
  * A section renders only when it is enabled AND has content — enabling one
  * never forces an empty row to appear. The header/top bar is deliberately NOT
  * a section: it is fixed chrome (logo, search, cart, nav) and always present.
+ *
+ * The last two are **flag-free**: `categoryRows` and `catalog` merchandise the
+ * catalog as it stands, so a seller who has ticked nothing still gets a
+ * stocked homepage instead of a hero over empty space. They sit below the
+ * curated rows, so ticking flags always outranks them.
  */
 export const HOMEPAGE_SECTION_KEYS = [
+  "banners",
   "hero",
   "categories",
   "featured",
   "newArrivals",
   "bestSellers",
+  "categoryRows",
+  "catalog",
 ] as const;
 
 export type HomepageSectionKey = (typeof HOMEPAGE_SECTION_KEYS)[number];
@@ -162,8 +170,19 @@ export function resolveHomepage(raw: unknown): HomepageSection[] {
           });
         }
       }
+      // A section added since this store last saved lands where the platform
+      // put it in HOMEPAGE_SECTION_KEYS, not at the bottom: "banners" is
+      // defined above the hero, so an existing store gets it above the hero
+      // too. Appending would have quietly demoted every new section to last.
       for (const key of HOMEPAGE_SECTION_KEYS) {
-        if (!seen.has(key)) out.push({ key, enabled: true });
+        if (seen.has(key)) continue;
+        const canonical = HOMEPAGE_SECTION_KEYS.indexOf(key);
+        const at = out.findIndex(
+          (s) => HOMEPAGE_SECTION_KEYS.indexOf(s.key) > canonical,
+        );
+        const entry = { key, enabled: true };
+        if (at === -1) out.push(entry);
+        else out.splice(at, 0, entry);
       }
       return out;
     }

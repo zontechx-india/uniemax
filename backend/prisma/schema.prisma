@@ -413,6 +413,7 @@ model Store {
   supportTickets SupportTicket[]
   cartLines      CartLine[]
   productGroups  ProductGroup[]
+  banners        StoreBanner[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -520,7 +521,7 @@ model StoreProduct {
   //
   // Disabled products are hidden from the public storefront (a product is
   // publicly visible only when it AND its category are active).
-  isActive    Boolean @default(true)
+  isActive    Boolean   @default(true)
   /// When the seller first made it visible. Null = still a draft: created
   /// step by step and never published, which the seller's list shows as such.
   publishedAt DateTime?
@@ -655,30 +656,30 @@ model StoreProductVariant {
   productId String
   product   StoreProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  name          String
+  name           String
   // Required: every variant carries its own price (no inheriting a base).
-  price         Decimal @db.Decimal(10, 2)
-  stockQuantity Int     @default(0)
+  price          Decimal            @db.Decimal(10, 2)
+  stockQuantity  Int                @default(0)
   // Disabled variants are hidden from the public storefront.
-  isActive      Boolean @default(true)
+  isActive       Boolean            @default(true)
   // The implicit single variant of a product that has no options. It is
   // hidden from the storefront's variant picker and is replaced the moment
   // the owner adds a real, named variant.
-  isDefault     Boolean @default(false)
+  isDefault      Boolean            @default(false)
   /// { [optionTypeName]: value } — exactly one entry per product option type.
   /// `name` is DERIVED from this (values joined " / " in type order), which is
   /// what keeps @@unique([productId, name]), OrderItem.variantName and the
   /// cart working unchanged. Null on the implicit Default variant.
-  optionValues  Json?
+  optionValues   Json?
   /// Seller's stock-keeping code — optional; unique within the store when set
   /// (checked in the service: the store is one join away).
   sku            String?
   /// Strike-through price (MRP). Null = no discount shown; above `price` when set.
-  compareAtPrice Decimal? @db.Decimal(10, 2)
+  compareAtPrice Decimal?           @db.Decimal(10, 2)
   /// The product photo that shows this variant (the pink saree's own photo).
   /// Null = the product's cover. Cleared when that photo is deleted.
-  mediaId String?
-  media   StoreProductMedia? @relation(fields: [mediaId], references: [id], onDelete: SetNull)
+  mediaId        String?
+  media          StoreProductMedia? @relation(fields: [mediaId], references: [id], onDelete: SetNull)
 
   orderItems OrderItem[]
   cartLines  CartLine[]
@@ -777,6 +778,58 @@ model StoreProductMedia {
 
   @@index([productId, displayOrder])
   @@map("store_product_media")
+}
+
+/// Where a storefront banner sends the shopper when it is tapped.
+/// CATEGORY/PRODUCT store the target's **id**, not a URL, so the link keeps
+/// working through renames and resolves to null (banner rendered unlinked)
+/// once the target is deleted or hidden. URL is an absolute address for
+/// campaign pages that live outside the store.
+enum StoreBannerLinkType {
+  NONE
+  CATEGORY
+  PRODUCT
+  URL
+}
+
+/// An owner-managed promotional banner on the storefront homepage, shown as
+/// the "banners" homepage section (an auto-advancing carousel when more than
+/// one is active).
+///
+/// Relational rather than a `Store.banners` JSON column — unlike theme /
+/// homepage / footer, a banner OWNS UPLOADED FILES, and object keys need a
+/// lifecycle: delete the row, delete the object; `auditMedia` has to see the
+/// key column to know the object is still referenced.
+model StoreBanner {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  /// Storage OBJECT KEY of the banner image — never a full URL, same rule as
+  /// `Store.logoKey` and `StoreProductMedia.key`. ONE image per banner, always
+  /// 16:5: the storefront scales it by width at every breakpoint, so there is
+  /// no separate phone asset to keep in sync.
+  imageKey String
+  /// Doubles as the image's alt text and the row's label in the admin list.
+  title    String?
+
+  linkType  StoreBannerLinkType @default(NONE)
+  /// CATEGORY → StoreCategory.id · PRODUCT → StoreProduct.id · URL → address.
+  /// Null for NONE.
+  linkValue String?
+
+  displayOrder Int     @default(0)
+  /// Owner's per-banner switch, independent of the homepage section switch:
+  /// turning the section off hides every banner, turning a banner off retires
+  /// just that one while keeping its image for a future campaign.
+  isActive     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// The storefront read: one store's banners in the owner's order.
+  @@index([storeId, displayOrder])
+  @@map("store_banners")
 }
 
 /// A ready-made storefront palette a seller can apply in one click
@@ -1008,17 +1061,48 @@ model Otp {
 // Home banners (carousel)
 // ---------------------------------------------------------------------------
 
-model Banner {
-  id           String   @id @default(cuid())
-  title        String?
-  imageUrl     String
-  linkUrl      String?
-  displayOrder Int      @default(0)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+/// Where tapping a MARKETPLACE banner sends the shopper. Narrower than
+/// `StoreBannerLinkType` on purpose: the marketplace homepage has no store
+/// context, so "a category" and "a product" would be ambiguous across stores.
+/// STORE carries a Store id and resolves to that shop's storefront.
+enum BannerLinkType {
+  NONE
+  STORE
+  URL
+}
 
-  @@index([isActive])
+/// A platform-wide promotional banner on the MARKETPLACE homepage, managed by
+/// admins in the console. The per-store equivalent is `StoreBanner`; the two
+/// are deliberately separate tables because they are owned by different people
+/// (platform team vs seller), shown on different pages, and link to different
+/// kinds of thing.
+///
+/// This table predates the multi-store platform and was dead: it held a full
+/// `imageUrl` and a free `linkUrl` and was referenced by nothing but the
+/// media audit's legacy scan. It is now the marketplace banner — `imageKey`
+/// (an object key, matching every other media column) and a typed link.
+model Banner {
+  id String @id @default(cuid())
+
+  /// Storage OBJECT KEY — never a full URL, same rule as `Store.logoKey`.
+  /// Always 16:5; the marketplace scales it by width at every breakpoint.
+  imageKey String
+  /// Doubles as the image's alt text and the row's label in the console.
+  title    String?
+
+  linkType  BannerLinkType @default(NONE)
+  /// STORE → Store.id · URL → an absolute http(s) address. Null for NONE.
+  /// An id rather than a path, so a store rename cannot break the link.
+  linkValue String?
+
+  displayOrder Int     @default(0)
+  isActive     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// The storefront read: active banners in the admin's order.
+  @@index([isActive, displayOrder])
   @@map("banners")
 }
 

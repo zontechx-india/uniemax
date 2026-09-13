@@ -21,8 +21,10 @@ import {
 } from '../layout/icons'
 import { openAuthDialog } from '../features/auth/authDialogStore'
 import { useCart } from '../features/cart/cart'
+import { BannerCarousel } from '../features/banners/BannerCarousel'
 import { discoveryApi } from '../features/discovery/discoveryApi'
 import type {
+  MarketBanner,
   MarketProduct,
   MarketStore,
   PlatformStats,
@@ -89,8 +91,6 @@ export function HomePage() {
     }
   }, [authed])
 
-  // One fetch feeds both the hero collage and the Fresh Finds rail. The rail
-  // owns the error/retry UI; the hero simply skips its collage on failure.
   const newProducts = useNewProducts()
 
   return (
@@ -99,7 +99,7 @@ export function HomePage() {
       {/* Sections are full-bleed alternating bands (base/alt tone + bottom
           divider) — separation comes from background changes, not gaps. */}
       <main className="flex-1">
-        <MarketHero products={newProducts.products} />
+        <MarketBanners />
         <ShopByCategoryStrip />
         <NewStoresSection />
         <FreshFindsSection {...newProducts} />
@@ -114,10 +114,7 @@ export function HomePage() {
   )
 }
 
-/**
- * Newest discoverable products platform-wide — shared by the hero collage
- * and the Fresh Finds rail so the page costs one request, not two.
- */
+/** Newest discoverable products platform-wide — the Fresh Finds rail. */
 function useNewProducts() {
   const [products, setProducts] = useState<MarketProduct[] | null>(null)
   const [failed, setFailed] = useState(false)
@@ -219,78 +216,39 @@ function MarketHeader() {
 }
 
 // ---------------------------------------------------------------------------
-// Hero — left-aligned pitch band; the right side proves the marketplace is
-// alive with a collage of REAL product covers (skipped while there aren't
-// enough). The global search sits in the sticky toolbar.
+// Banners — the platform's own promo carousel, uploaded by admins in the
+// console. It replaced a hand-written hero (a headline, two buttons and a
+// collage of whatever products happened to be newest): the marketplace's
+// opening pitch is now something the platform team controls and can change
+// for a campaign without a deploy.
+//
+// It renders nothing at all until a banner exists, so the page opens on
+// Shop by Category rather than on an empty frame.
 // ---------------------------------------------------------------------------
 
-const HERO_COLLAGE_SIZE = 4
+function MarketBanners() {
+  const [banners, setBanners] = useState<MarketBanner[]>([])
 
-function MarketHero({ products }: { products: MarketProduct[] | null }) {
-  const covers = (products ?? [])
-    .map((product) => product.image?.url)
-    .filter((url): url is string => Boolean(url))
-    .slice(0, HERO_COLLAGE_SIZE)
-  // Adapts to what the catalog has: 2 covers → one per column, 3 → 2+1,
-  // 4 → 2+2. Below 2 the collage isn't worth drawing.
-  const split = Math.ceil(covers.length / 2)
+  useEffect(() => {
+    let cancelled = false
+    discoveryApi
+      .listBanners()
+      .then((items) => {
+        if (!cancelled) setBanners(items)
+      })
+      // A decorative strip never earns an error state — on failure the page
+      // simply opens one section higher.
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   return (
-    <section className="border-b border-line bg-surface">
-      <div className="mx-auto flex w-full max-w-[1920px] items-center gap-12 px-4 py-8 sm:px-6 sm:py-10 lg:px-10">
-        {/* Display copy is select-none: a stray drag otherwise highlights the
-            headline, which reads as glitchy. */}
-        <div className="max-w-2xl select-none">
-          <h1 className="font-heading text-3xl font-bold text-fg sm:text-5xl sm:leading-none">
-            Discover stores.{' '}
-            <span className="text-brand-gradient">Shop anything.</span>
-          </h1>
-          <p className="mt-3 max-w-xl text-sm text-muted sm:text-base">
-            Independent stores on one marketplace — search across all of them,
-            or open your own in minutes.
-          </p>
-          <div className="mt-5 flex flex-wrap items-center gap-3">
-            <a
-              href="#new-stores"
-              className="rounded-md bg-brand-gradient px-6 py-2.5 text-sm font-semibold text-brand-contrast transition hover:opacity-90"
-            >
-              Start Shopping
-            </a>
-            <CreateStoreLink className="rounded-md border border-line px-6 py-2.5 text-sm font-semibold text-fg transition-colors hover:border-accent">
-              Open Your Store
-            </CreateStoreLink>
-          </div>
-        </div>
-
-        {/* Two offset columns read editorial rather than grid-of-thumbnails.
-            Purely decorative (alt="") — the shoppable cards are below. */}
-        {covers.length >= 2 && (
-          <div className="ml-auto hidden shrink-0 select-none grid-cols-2 items-start gap-4 lg:grid">
-            <div className="space-y-4">
-              {covers.slice(0, split).map((url) => (
-                <HeroCollageImage key={url} url={url} />
-              ))}
-            </div>
-            <div className="mt-8 space-y-4">
-              {covers.slice(split).map((url) => (
-                <HeroCollageImage key={url} url={url} />
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </section>
-  )
-}
-
-function HeroCollageImage({ url }: { url: string }) {
-  return (
-    <img
-      src={url}
-      alt=""
-      loading="lazy"
-      decoding="async"
-      className="h-32 w-32 rounded-lg border border-line object-cover shadow-floating xl:h-40 xl:w-40"
+    <BannerCarousel
+      banners={banners}
+      id="banners"
+      className="border-b border-line"
     />
   )
 }

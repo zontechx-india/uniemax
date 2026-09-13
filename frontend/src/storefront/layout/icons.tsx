@@ -104,6 +104,14 @@ export function ChevronRightIcon({ className }: { className?: string }) {
   )
 }
 
+export function ChevronLeftIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="m15 6-6 6 6 6" />
+    </Svg>
+  )
+}
+
 export function ChevronDownIcon({ className }: { className?: string }) {
   return (
     <Svg className={className}>

@@ -51,6 +51,9 @@ export const NAV_GROUPS: NavGroup[] = [
     title: 'Platform',
     items: [
       { to: '/support', label: 'Support' },
+      // The marketplace homepage carousel — the platform's own storefront
+      // content, so it sits with the other platform-wide settings.
+      { to: '/banners', label: 'Homepage banners' },
       { to: '/theme-templates', label: 'Store themes' },
       { to: '/notifications', label: 'Notifications' },
       { to: '/activity', label: 'Activity log' },

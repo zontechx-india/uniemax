@@ -81,11 +81,17 @@ export function sameColors(a: StoreThemeColors, b: StoreThemeColors): boolean {
  * row to appear. The header/top bar is not a section (fixed chrome).
  */
 export const HOMEPAGE_SECTION_KEYS = [
+  'banners',
   'hero',
   'categories',
   'featured',
   'newArrivals',
   'bestSellers',
+  // Flag-free rows: they merchandise the catalog as it stands, so a shop that
+  // has ticked nothing still has products on its homepage. Below the curated
+  // rows, so ticking flags always outranks them.
+  'categoryRows',
+  'catalog',
 ] as const
 
 export type HomepageSectionKey = (typeof HOMEPAGE_SECTION_KEYS)[number]
@@ -101,8 +107,8 @@ export const DEFAULT_HOMEPAGE_SECTIONS: HomepageSection[] =
 /**
  * Normalise the `homepage` JSON the server stores into an ordered section
  * list. Mirror of the backend `resolveHomepage`: tolerates null, the new
- * `{ sections }` shape (appending any newly-added key), and the legacy boolean
- * map. Keep the two in lockstep.
+ * `{ sections }` shape (back-filling any newly-added key at its canonical
+ * position), and the legacy boolean map. Keep the two in lockstep.
  */
 export function resolveHomepage(raw: unknown): HomepageSection[] {
   const isKey = (k: unknown): k is HomepageSectionKey =>
@@ -124,8 +130,17 @@ export function resolveHomepage(raw: unknown): HomepageSection[] {
           })
         }
       }
+      // A section added since this store last saved lands where the platform
+      // put it in HOMEPAGE_SECTION_KEYS, not at the bottom.
       for (const key of HOMEPAGE_SECTION_KEYS) {
-        if (!seen.has(key)) out.push({ key, enabled: true })
+        if (seen.has(key)) continue
+        const canonical = HOMEPAGE_SECTION_KEYS.indexOf(key)
+        const at = out.findIndex(
+          (s) => HOMEPAGE_SECTION_KEYS.indexOf(s.key) > canonical,
+        )
+        const entry = { key, enabled: true }
+        if (at === -1) out.push(entry)
+        else out.splice(at, 0, entry)
       }
       return out
     }
@@ -603,6 +618,72 @@ export interface PublicCategoryDetail {
   subcategories: { id: string; name: string; slug: string; productCount: number }[]
 }
 
+/**
+ * Storefront banners — the owner's promo carousel above the hero.
+ *
+ * Two shapes, deliberately different: the OWNER list carries everything the
+ * admin screen edits (including inactive rows and a resolved link label), the
+ * PUBLIC list carries only what a shopper's browser needs.
+ *
+ * One image per banner, always 16:5 — the storefront scales it by width, so
+ * there is no phone variant in either shape.
+ */
+export const BANNER_LINK_TYPES = ['NONE', 'CATEGORY', 'PRODUCT', 'URL'] as const
+
+export type BannerLinkType = (typeof BANNER_LINK_TYPES)[number]
+
+/** Where a CATEGORY/PRODUCT/URL banner currently points. */
+export interface BannerLinkTarget {
+  /** The destination's name — never the raw id the owner picked. */
+  label: string
+  /** Storefront path, or null once the target can no longer be linked. */
+  href: string | null
+  /** Deleted, or switched off, so the storefront would not serve it. */
+  missing: boolean
+}
+
+/** One banner as the OWNER sees it. */
+export interface StoreBanner {
+  id: string
+  /** Doubles as the image's alt text and the row's label in the admin list. */
+  title: string | null
+  imageUrl: string | null
+  linkType: BannerLinkType
+  /** Category/product id, or the address for a URL banner. */
+  linkValue: string | null
+  displayOrder: number
+  isActive: boolean
+  target: BannerLinkTarget | null
+}
+
+/** One banner as a SHOPPER sees it — active only, link already resolved. */
+export interface PublicBanner {
+  id: string
+  title: string | null
+  imageUrl: string | null
+  /** Null renders the banner as a plain image rather than a dead link. */
+  href: string | null
+  /** True only for a URL banner — the one kind that leaves the site. */
+  external: boolean
+}
+
+/** Metadata half of a banner write; the image travels separately. */
+export interface StoreBannerInput {
+  title?: string | null
+  linkType?: BannerLinkType
+  linkValue?: string | null
+  isActive?: boolean
+}
+
+/** One homepage product row headed by a category, linking to its own page. */
+export interface PublicCategoryRow {
+  id: string
+  name: string
+  slug: string
+  /** Newest products in this category *including* its subcategories. */
+  products: PublicProduct[]
+}
+
 /** Homepage merchandising payload. */
 export interface PublicStoreHome {
   /**
@@ -610,10 +691,16 @@ export interface PublicStoreHome {
    * order. Disabled sections arrive with their data array empty.
    */
   sections: HomepageSection[]
+  /** Active banners in the owner's order — empty when the section is off. */
+  banners: PublicBanner[]
   featuredCategories: PublicCategory[]
   featured: PublicProduct[]
   newArrivals: PublicProduct[]
   bestSellers: PublicProduct[]
+  /** A row per category — up to three, each linking to that category page. */
+  categoryRows: PublicCategoryRow[]
+  /** Newest products across the whole shop, needing no flags. */
+  catalog: PublicProduct[]
 }
 
 export type PublicSort =
@@ -845,6 +932,89 @@ export const storesApi = {
       await call<RawStore>(
         http.patch(`${STORES}/${storeId}/homepage`, { sections }),
       ),
+    )
+  },
+
+  // --- Storefront banners ------------------------------------------------
+  // Every banner mutation answers with the store's FULL list, so the admin
+  // screen re-renders from one authoritative array rather than merging a row
+  // into local state and hoping order and link labels still agree.
+
+  async listBanners(storeId: string): Promise<StoreBanner[]> {
+    return call<StoreBanner[]>(http.get(`${STORES}/${storeId}/banners`))
+  },
+
+  /**
+   * Create from the image plus its metadata, in one multipart request — a
+   * banner cannot exist without an image, so the two are never written
+   * separately.
+   */
+  async createBanner(
+    storeId: string,
+    file: Blob,
+    filename: string,
+    input: StoreBannerInput = {},
+    onProgress?: (fraction: number) => void,
+  ): Promise<StoreBanner[]> {
+    const form = new FormData()
+    form.append('file', file, filename)
+    if (input.title != null) form.append('title', input.title)
+    if (input.linkType) form.append('linkType', input.linkType)
+    if (input.linkValue != null) form.append('linkValue', input.linkValue)
+    if (input.isActive !== undefined) {
+      form.append('isActive', String(input.isActive))
+    }
+    return call<StoreBanner[]>(
+      http.post(`${STORES}/${storeId}/banners`, form, {
+        onUploadProgress: (e) => {
+          if (onProgress && e.total) onProgress(e.loaded / e.total)
+        },
+      }),
+    )
+  },
+
+  async updateBanner(
+    storeId: string,
+    bannerId: string,
+    patch: StoreBannerInput,
+  ): Promise<StoreBanner[]> {
+    return call<StoreBanner[]>(
+      http.patch(`${STORES}/${storeId}/banners/${bannerId}`, patch),
+    )
+  },
+
+  /** Swap a banner's image, keeping its title, link and position. */
+  async replaceBannerImage(
+    storeId: string,
+    bannerId: string,
+    file: Blob,
+    filename: string,
+    onProgress?: (fraction: number) => void,
+  ): Promise<StoreBanner[]> {
+    const form = new FormData()
+    form.append('file', file, filename)
+    return call<StoreBanner[]>(
+      http.put(`${STORES}/${storeId}/banners/${bannerId}/image`, form, {
+        onUploadProgress: (e) => {
+          if (onProgress && e.total) onProgress(e.loaded / e.total)
+        },
+      }),
+    )
+  },
+
+  async deleteBanner(storeId: string, bannerId: string): Promise<StoreBanner[]> {
+    return call<StoreBanner[]>(
+      http.delete(`${STORES}/${storeId}/banners/${bannerId}`),
+    )
+  },
+
+  /** The COMPLETE id list in the wanted order — a partial order is ambiguous. */
+  async reorderBanners(
+    storeId: string,
+    bannerIds: string[],
+  ): Promise<StoreBanner[]> {
+    return call<StoreBanner[]>(
+      http.patch(`${STORES}/${storeId}/banners/order`, { bannerIds }),
     )
   },
 
