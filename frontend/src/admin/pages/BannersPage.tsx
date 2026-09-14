@@ -41,6 +41,9 @@ import { ImageEditDialog } from '../../shared/media/ImageEditDialog'
 /** Mirrors MAX_BANNERS on the server, so Add stops before a 409 does. */
 const MAX_BANNERS = 10
 
+/** The server caps every admin list page at 100 — asking for more is a 400. */
+const STORE_PICKER_PAGE_SIZE = 100
+
 const LINK_LABEL: Record<BannerLinkType, string> = {
   NONE: 'No link',
   STORE: 'A store',
@@ -66,20 +69,21 @@ export default function BannersPage() {
 
   const load = () => {
     setError(null)
-    Promise.all([
-      adminApi.listBanners(),
-      // Destinations for the link picker. One page is plenty: a banner
-      // promotes a notable shop, and the list is searchable by typing.
-      adminApi.listStores({ pageSize: 200 }),
-    ])
-      .then(([bannerList, storeList]) => {
-        setBanners(bannerList)
-        setStores(storeList.items)
-      })
+    adminApi
+      .listBanners()
+      .then(setBanners)
       .catch((err: Error) => {
         setBanners([])
         setError(err.message)
       })
+    // Destinations for the link picker, loaded SEPARATELY from the banners: it
+    // only fills a dropdown, so a failure here must not blank the page the
+    // admin actually came for. One page is plenty — a banner promotes a
+    // notable shop, and the list is searchable by typing.
+    adminApi
+      .listStores({ pageSize: STORE_PICKER_PAGE_SIZE })
+      .then((storeList) => setStores(storeList.items))
+      .catch(() => setStores([]))
   }
 
   useEffect(load, [])

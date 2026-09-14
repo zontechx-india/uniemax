@@ -35,6 +35,29 @@ const PRODUCT_ASPECTS: AspectOption[] = [
   { label: 'Landscape', value: 16 / 9 },
 ]
 
+/**
+ * The dialog is a WORKBENCH, not a notice, so it takes most of the viewport:
+ * the person is deciding what a crop throws away, and they cannot judge that
+ * in a thumbnail. A fixed 512px panel made this worst for the shape that needs
+ * the room most — a 16:5 banner ended up a ~130px strip floating in letterbox
+ * bars — so the stage is cut to the crop's OWN ratio and the panel is drawn
+ * around it.
+ */
+
+/** Panoramas (16:5 banners) earn the extra width; boxy crops don't need it. */
+const STAGE_CAP_WIDE = 1120
+const STAGE_CAP_BOXY = 760
+/** Height ceiling, so a square crop can't push the buttons off-screen. */
+const STAGE_MAX_VH = 62
+/** The backdrop’s own `p-4`, both sides — the panel’s gutter to the screen. */
+const BACKDROP_PAD_REM = 2
+/** The panel’s `p-5`, both sides — the stage’s gutter inside the panel. */
+const PANEL_PAD_REM = 2.5
+/** Below this the controls row starts to cramp. */
+const PANEL_MIN_PX = 320
+/** Assumed stage shape when the ratio is the user's to change (see below). */
+const FREEFORM_RATIO = 4 / 3
+
 export function ImageEditDialog({
   file,
   aspects = PRODUCT_ASPECTS,
@@ -124,6 +147,25 @@ export function ImageEditDialog({
     }
   }
 
+  /**
+   * ONE fixed aspect means the frame is known before the image even loads, so
+   * the stage is cut to exactly that shape and the artwork fills it edge to
+   * edge. With the chips the ratio is the user's to change, and a dialog that
+   * jumps size under the cursor on every tap is worse than a little letterbox,
+   * so those keep one steady shape instead.
+   */
+  const stageRatio = (aspects.length === 1 ? aspects[0]?.value : null) ?? FREEFORM_RATIO
+  /** Room for the stage once both gutters are paid for. */
+  const stageBudget = `min(calc(100vw - ${BACKDROP_PAD_REM + PANEL_PAD_REM}rem), ${
+    stageRatio >= 1.5 ? STAGE_CAP_WIDE : STAGE_CAP_BOXY
+  }px)`
+  // Height first, so the vh ceiling wins; the width then follows from it and
+  // is therefore always inside the budget above.
+  const stageHeight = `min(${STAGE_MAX_VH}vh, calc(${stageBudget} / ${stageRatio}))`
+  const stageWidth = `calc(${stageHeight} * ${stageRatio})`
+  /** The panel hugs the stage, not the other way round. */
+  const panelWidth = `min(calc(100vw - ${BACKDROP_PAD_REM}rem), max(${PANEL_MIN_PX}px, calc(${stageWidth} + ${PANEL_PAD_REM}rem)))`
+
   const working = processing || busy
 
   return (
@@ -133,7 +175,10 @@ export function ImageEditDialog({
       aria-modal="true"
       aria-label={title}
     >
-      <div className="w-full max-w-lg rounded-lg bg-surface p-5 shadow-floating">
+      <div
+        className="max-h-[94vh] overflow-y-auto rounded-lg bg-surface p-5 shadow-floating"
+        style={{ width: panelWidth }}
+      >
         <h3 className="text-base font-bold text-fg">{title}</h3>
         <p className="mt-1 text-xs text-muted">
           Drag to position, pinch or use the slider to zoom. Nothing outside
@@ -160,7 +205,10 @@ export function ImageEditDialog({
           </div>
         )}
 
-        <div className="relative mt-3 h-72 overflow-hidden rounded-md bg-black/80 sm:h-80">
+        <div
+          className="relative mx-auto mt-3 overflow-hidden rounded-md bg-black/80"
+          style={{ width: stageWidth, height: stageHeight }}
+        >
           {src && (
             <Cropper
               image={src}

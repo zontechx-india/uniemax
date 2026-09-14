@@ -1738,7 +1738,13 @@ frontend/
     │   │   │                     #   retries smaller if still over the size limit
     │   │   └── ImageEditDialog.tsx # react-easy-crop modal — OPTIONAL crop: aspect
     │   │                         #   chips (Original/Square/Portrait/Landscape),
-    │   │                         #   rotate, zoom, Reset, "Use original"
+    │   │                         #   rotate, zoom, Reset, "Use original". The stage
+    │   │                         #   is sized to the CROP’S OWN ratio (capped at
+    │   │                         #   62vh) and the panel is drawn around it, so a
+    │   │                         #   16:5 banner fills a near-full-width dialog
+    │   │                         #   instead of a strip inside letterbox bars; the
+    │   │                         #   multi-chip (product) case keeps one steady 4:3
+    │   │                         #   box so it cannot resize under the cursor
     │   └── auth/
     │       ├── http.ts           # Axios client (cookies + CSRF + ApiError)
     │       ├── authApi.ts        # Typed customer/admin auth endpoints
