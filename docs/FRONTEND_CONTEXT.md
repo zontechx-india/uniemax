@@ -1525,8 +1525,18 @@ Shared plumbing, one bell per app:
   to get notifications blocked for good, and a block can't be undone from the
   page.
 - `public/push-sw.js` — the service worker. Deliberately tiny: renders the
-  notification, routes the click to an existing tab, **caches nothing and
-  intercepts no fetches**, so it can never serve a stale app shell.
+  notification, routes the click to an existing tab, **caches nothing**, so it
+  can never serve a stale app shell. It does carry an **empty `fetch`
+  listener** — Chrome only treats a site as installable when the worker has
+  one — which never calls `respondWith`, so every request still goes straight
+  to the network. Do not add caching there; `shared/staleBuildReload.ts`
+  already handles stale shells.
+- `shared/serviceWorker.ts` — registers that worker on load, from the
+  storefront `main.tsx` only. Registration is silent (no permission, no
+  prompt) and idempotent, so the push hook registering again later costs
+  nothing. Before this, a phone that had never switched notifications on had
+  no worker at all, and Chrome offered a browser shortcut instead of an
+  install — see **Installable app** below.
 - `admin/layout/NotificationBell.tsx` and
   `storefront/layout/NotificationBell.tsx` — unread badge (polled once a
   minute; the list loads only when opened), latest items, per-device push
@@ -1536,6 +1546,42 @@ Shared plumbing, one bell per app:
   know.
 
 Full architecture: [`PUSH_NOTIFICATIONS.md`](./PUSH_NOTIFICATIONS.md).
+
+---
+
+## Installable app (PWA — storefront only)
+
+The storefront installs to a phone's home screen and opens **standalone**: its
+own window, no URL bar, no browser tabs. Four things have to line up, and
+missing any one of them downgrades Chrome's offer from "Install app" to
+"create shortcut" — a bookmark that opens in an ordinary tab, which looks like
+the install worked but isn't one:
+
+1. **HTTPS** — already true on every deployed origin.
+2. **`public/manifest.json`**, linked from `index.html`. `display:
+   "standalone"` is the line that removes the browser chrome; `scope: "/"`
+   keeps in-app navigation inside the app, `start_url: "/?source=pwa"` marks
+   launches that came from the icon, and `id: "/"` pins the app's identity so
+   `start_url` can change later without the phone treating it as a new app.
+   `shortcuts` add Orders and Cart to the icon's long-press menu.
+3. **Square 192 + 512 icons** — the portrait `app_logo.png` does not qualify;
+   see the asset table below for how they are generated.
+4. **A service worker with a fetch handler** — `public/push-sw.js`, registered
+   on load by `shared/serviceWorker.ts`.
+
+The **admin console is deliberately not installable**: `admin.html` links no
+manifest and never calls `initServiceWorker()`. It is a staff tool on the same
+origin, not something to put on a home screen.
+
+`theme-color` (the status bar colour when standalone) is a single meta tag
+rewritten by `shared/theme/mode.ts`, not a `prefers-color-scheme` pair — the
+app's light/dark is a **stored choice**, so a media query would follow the
+phone instead and strand a light app under a dark status bar. iOS ignores the
+manifest's display mode entirely and reads the `apple-mobile-web-app-*` metas.
+
+> Not yet: a **per-store** app. On a white-label platform the ideal is that
+> installing from `/store/acme` yields an "Acme" icon in Acme's colours, which
+> needs a manifest generated per store rather than one static file.
 
 ---
 
@@ -1949,9 +1995,20 @@ downscaled for the web (the originals were 1–1.3 MB):
 
 | File | What | Used by |
 | ---- | ---- | ------- |
-| `app_logo.png` | the bag mark — white U on the brand purple, 453×512 | `AppLogoFull` (splash screens), the tab icon in both HTML entries, `favicon.ts`, `push-sw.js` |
+| `app_logo.png` | the bag mark — purple U-bag on transparency, **portrait** 1024×1536 | `AppLogoFull` (splash screens), the tab icon in both HTML entries, `favicon.ts`, `push-sw.js` |
 | `app_logo_with_name.png` | the lockup — mark + "UnieMax", 888×224 | `AppLogoLockup` (light scheme) |
 | `app_logo_with_name_dark.png` | the same lockup with "Unie" lifted to white | `AppLogoLockup` (dark scheme + `tone="on-dark"`) |
+| `pwa-192.png` · `pwa-512.png` | square install icons | `manifest.json` (`purpose: any`) |
+| `pwa-maskable-512.png` | the same mark inset to 72% | `manifest.json` (`purpose: maskable`) |
+| `apple-touch-icon.png` | 180×180, opaque | iOS home screen |
+
+The four icons are **generated from `app_logo.png`**, which is portrait and
+transparent — neither of which an install icon may be. A square crop cannot
+hold the whole bag (1100px tall in a 1024-wide image) without clipping the
+handle or the base, so each icon *contains* the logo and flattens it onto the
+palette's Black `#111111`: on white the glow disappears, and on the brand
+purple the bag itself would. The maskable one is inset to 72% because Android
+crops it to a circle or squircle.
 
 The lockup sets **Unie** in near-black and **Max** in the purple, so it needs
 the dark twin — the black half would vanish on the dark canvas. The swap is a
@@ -2311,9 +2368,12 @@ Other scripts: `npm run build` (typecheck + build both), `npm run preview`
   and the console 404s on refresh.
 - Lock `/admin` down separately (WAF / IP allow-list / auth at the edge) in
   addition to the backend's `requireAdmin` preHandler.
-- `push-sw.js` is served from the site root (`/push-sw.js`) — it must not be
-  rewritten by either fallback, which `try_files $uri` already guarantees
-  since the file exists. Push also requires **HTTPS** (localhost excepted).
+- `push-sw.js` and `manifest.json` are served from the site root — they must
+  not be rewritten by either fallback, which `try_files $uri` already
+  guarantees since both files exist. `.json` is in nginx's default
+  `mime.types`, so the manifest needs no extra server config (this is why it
+  is not named `.webmanifest`). Push and install both require **HTTPS**
+  (localhost excepted).
 - **Cache policy is part of the deploy contract.** Chunks under `/assets/` are
   content-addressed → `Cache-Control: public, max-age=31536000, immutable`, and
   a missing one must **404** rather than fall through to a shell. The two

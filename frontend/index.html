@@ -3,9 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/app_logo.png" />
-    <link rel="apple-touch-icon" href="/app_logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>UnieMax</title>
+
+    <!--
+      Installable app (PWA). Without the manifest below, Chrome offers only
+      "create shortcut" — a bookmark that opens in a normal tab with the URL
+      bar showing. `display: standalone` in the manifest is what makes the
+      installed icon open its own window with no browser chrome.
+
+      Android needs square 192 + 512 icons (the portrait app_logo.png does not
+      qualify) and a service worker with a fetch handler — see
+      `public/push-sw.js` and `shared/serviceWorker.ts`.
+
+      The single theme-color meta is rewritten at runtime by
+      `shared/theme/mode.ts`: the app's light/dark choice is a stored
+      preference, NOT prefers-color-scheme, so a media-query pair here would
+      follow the phone instead of the app and strand a light app under a dark
+      status bar. The value is the `--surface` of each scheme, since that is
+      what the header paints directly under the status bar.
+    -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <!-- iOS ignores the manifest's display mode and reads these instead. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="UnieMax" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="facebook-domain-verification" content="hzwrc7p4jokp01me9bp8euoddg1j7i" />
 
     <!-- Meta Pixel Code -->

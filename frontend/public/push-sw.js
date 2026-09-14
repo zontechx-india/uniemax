@@ -11,6 +11,18 @@
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))
 
+/* Installability, and nothing else. Chrome only treats a site as installable
+ * — a real standalone app rather than a browser shortcut — when its service
+ * worker has a fetch handler, so this listener has to exist.
+ *
+ * It deliberately does nothing: it never calls `event.respondWith`, so every
+ * request falls through to the network exactly as it would with no worker at
+ * all. That keeps the promise made above — this worker caches nothing and can
+ * never serve a stale app shell. Do not be tempted to add caching here; the
+ * app already recovers from stale builds in `shared/staleBuildReload.ts`.
+ */
+self.addEventListener('fetch', () => {})
+
 self.addEventListener('push', (event) => {
   let payload = {}
   try {

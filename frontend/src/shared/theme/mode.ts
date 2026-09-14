@@ -25,10 +25,27 @@ export function getStoredMode(): ThemeMode {
   return DEFAULT_MODE
 }
 
+/**
+ * What the phone paints the status bar with when the app is installed and
+ * running standalone. Each is the scheme's `--surface`, because that is what
+ * the sticky header paints directly beneath the status bar — matching `--bg`
+ * instead would leave a visible seam wherever the header is on screen.
+ */
+const STATUS_BAR: Record<ThemeMode, string> = {
+  light: '#ffffff',
+  dark: '#1e1e1e',
+}
+
 export function applyThemeMode(mode: ThemeMode): void {
   const root = document.documentElement
   root.dataset.theme = mode
   root.style.colorScheme = mode
+  // The theme is a STORED choice, not `prefers-color-scheme`, so the meta tag
+  // has to be rewritten here — a media-query pair in index.html would follow
+  // the phone and strand a light app under a dark status bar.
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', STATUS_BAR[mode])
 }
 
 export function setStoredMode(mode: ThemeMode): void {
