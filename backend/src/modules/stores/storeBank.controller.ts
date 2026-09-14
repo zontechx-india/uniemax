@@ -1,4 +1,5 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
+import { storeActor } from "./storeActor.js";
 import { ok } from "../../utils/response.js";
 import { idParamSchema } from "../../utils/zodHelpers.js";
 import {
@@ -12,7 +13,7 @@ import * as service from "./storeBank.service.js";
 
 export async function listBankAccounts(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
-  return ok(await service.listBankAccounts(request.customer!.id, id));
+  return ok(await service.listBankAccounts(storeActor(request), id));
 }
 
 export async function createBankAccount(
@@ -22,7 +23,7 @@ export async function createBankAccount(
   const { id } = idParamSchema.parse(request.params);
   const input = bankAccountCreateSchema.parse(request.body);
   const account = await service.createBankAccount(
-    request.customer!.id,
+    storeActor(request),
     id,
     input,
   );
@@ -33,13 +34,13 @@ export async function updateBankAccount(request: FastifyRequest) {
   const { id, accountId } = bankAccountParamSchema.parse(request.params);
   const input = bankAccountUpdateSchema.parse(request.body);
   return ok(
-    await service.updateBankAccount(request.customer!.id, id, accountId, input),
+    await service.updateBankAccount(storeActor(request), id, accountId, input),
   );
 }
 
 export async function deleteBankAccount(request: FastifyRequest) {
   const { id, accountId } = bankAccountParamSchema.parse(request.params);
   return ok(
-    await service.deleteBankAccount(request.customer!.id, id, accountId),
+    await service.deleteBankAccount(storeActor(request), id, accountId),
   );
 }

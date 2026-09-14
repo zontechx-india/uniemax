@@ -133,6 +133,31 @@ export function Chip({
 const BUTTON_BASE =
   'inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50'
 
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
+
+const BUTTON_TONES: Record<ButtonVariant, string> = {
+  primary: 'bg-brand text-brand-contrast hover:bg-brand-hover',
+  secondary: 'border border-line bg-surface text-fg hover:bg-surface-alt',
+  ghost: 'text-muted hover:bg-surface-alt hover:text-fg',
+  danger: 'border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20',
+}
+
+/**
+ * The button's classes without the `<button>` — for the console's CTAs that
+ * are really navigation and so must render as a `<Link>`/`<a>` (keyboard,
+ * middle-click and "open in new tab" all come free from a real anchor).
+ *
+ * Sharing one source with `Button` is the point: a console where a link-shaped
+ * action is 2px shorter than the button beside it looks broken, and sizing is
+ * exactly the kind of thing that drifts when it is retyped at the call site.
+ */
+export function buttonClass({
+  variant = 'secondary',
+  className = '',
+}: { variant?: ButtonVariant; className?: string } = {}): string {
+  return `${BUTTON_BASE} ${BUTTON_TONES[variant]} ${className}`
+}
+
 export function Button({
   children,
   variant = 'secondary',
@@ -140,16 +165,10 @@ export function Button({
   className = '',
   ...rest
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
+  variant?: ButtonVariant
 }) {
-  const tones = {
-    primary: 'bg-brand text-brand-contrast hover:bg-brand-hover',
-    secondary: 'border border-line bg-surface text-fg hover:bg-surface-alt',
-    ghost: 'text-muted hover:bg-surface-alt hover:text-fg',
-    danger: 'border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20',
-  }
   return (
-    <button type={type} className={`${BUTTON_BASE} ${tones[variant]} ${className}`} {...rest}>
+    <button type={type} className={buttonClass({ variant, className })} {...rest}>
       {children}
     </button>
   )

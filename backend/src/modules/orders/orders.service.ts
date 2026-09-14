@@ -1,4 +1,5 @@
 import { randomInt } from "node:crypto";
+import type { StoreActor } from "../stores/storeActor.js";
 import { prisma } from "../../config/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { isProduction } from "../../config/env.js";
@@ -668,8 +669,8 @@ export async function createOrder(
  *                dev-simulated PAID order; the real flow needs the gateway)
  * Revenue sums non-cancelled order totals.
  */
-export async function getStoreDashboard(ownerId: string, storeRef: string) {
-  const store = await getMyStore(ownerId, storeRef); // ownership check
+export async function getStoreDashboard(actor: StoreActor, storeRef: string) {
+  const store = await getMyStore(actor, storeRef); // ownership check
   const storeId = store.id;
 
   const startOfToday = new Date();
@@ -791,11 +792,11 @@ const orderSummarySelect = {
 
 /** The store's orders, newest first — filterable by status + search. */
 export async function listStoreOrders(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   query: SellerOrderListQuery,
 ) {
-  const store = await getMyStore(ownerId, storeRef); // ownership check
+  const store = await getMyStore(actor, storeRef); // ownership check
 
   const where: Prisma.OrderWhereInput = { storeId: store.id };
   if (query.status) where.status = query.status;
@@ -829,11 +830,11 @@ export async function listStoreOrders(
 
 /** One order of the seller's store, full shape. 404 if not this store's. */
 export async function getStoreOrder(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   orderId: string,
 ) {
-  const store = await getMyStore(ownerId, storeRef);
+  const store = await getMyStore(actor, storeRef);
   const row = await prisma.order.findFirst({
     where: { id: orderId, storeId: store.id },
     select: orderSelect,
@@ -848,12 +849,12 @@ export async function getStoreOrder(
  * changed hands at the door — so `paymentStatus` flips to PAID.
  */
 export async function updateOrderStatus(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   orderId: string,
   input: OrderStatusUpdateInput,
 ) {
-  const store = await getMyStore(ownerId, storeRef);
+  const store = await getMyStore(actor, storeRef);
   const current = await prisma.order.findFirst({
     where: { id: orderId, storeId: store.id },
     select: {
@@ -921,12 +922,12 @@ export async function updateOrderStatus(
  * refund lands (see docs/CASHFREE_PAYMENTS.md).
  */
 export async function cancelOrder(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   orderId: string,
   reason: string | null,
 ) {
-  const store = await getMyStore(ownerId, storeRef);
+  const store = await getMyStore(actor, storeRef);
   const current = await prisma.order.findFirst({
     where: { id: orderId, storeId: store.id },
     select: {

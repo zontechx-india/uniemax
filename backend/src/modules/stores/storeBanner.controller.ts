@@ -1,4 +1,5 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
+import { storeActor } from "./storeActor.js";
 import { ok } from "../../utils/response.js";
 import { readUpload } from "../../package/storage/index.js";
 import { idParamSchema } from "../../utils/zodHelpers.js";
@@ -21,7 +22,7 @@ import * as service from "./storeBanner.service.js";
 
 export async function listBanners(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
-  return ok(await service.listBanners(request.customer!.id, id));
+  return ok(await service.listBanners(storeActor(request), id));
 }
 
 /**
@@ -45,7 +46,7 @@ export async function createBanner(
         : file.fields.isActive === "true",
   });
   const banners = await service.createBanner(
-    request.customer!.id,
+    storeActor(request),
     id,
     file,
     input,
@@ -57,7 +58,7 @@ export async function updateBanner(request: FastifyRequest) {
   const { id, bannerId } = storeBannerParamSchema.parse(request.params);
   const input = storeBannerUpdateSchema.parse(request.body);
   return ok(
-    await service.updateBanner(request.customer!.id, id, bannerId, input),
+    await service.updateBanner(storeActor(request), id, bannerId, input),
   );
 }
 
@@ -65,17 +66,17 @@ export async function replaceBannerImage(request: FastifyRequest) {
   const { id, bannerId } = storeBannerParamSchema.parse(request.params);
   const file = await readUpload(request, "image");
   return ok(
-    await service.replaceBannerImage(request.customer!.id, id, bannerId, file),
+    await service.replaceBannerImage(storeActor(request), id, bannerId, file),
   );
 }
 
 export async function deleteBanner(request: FastifyRequest) {
   const { id, bannerId } = storeBannerParamSchema.parse(request.params);
-  return ok(await service.deleteBanner(request.customer!.id, id, bannerId));
+  return ok(await service.deleteBanner(storeActor(request), id, bannerId));
 }
 
 export async function reorderBanners(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   const input = storeBannerOrderSchema.parse(request.body);
-  return ok(await service.reorderBanners(request.customer!.id, id, input));
+  return ok(await service.reorderBanners(storeActor(request), id, input));
 }

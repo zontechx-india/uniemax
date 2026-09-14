@@ -32,6 +32,15 @@ Each login comes in **two client profiles**:
   cookie's value echoed in an `X-CSRF-Token` header (double-submit). CORS is
   credentialed; the browser sends cookies automatically.
 
+  **Every cookie-authenticated mutation under `/api/v1/admin/**` requires it
+  too** — any non-`GET`/`HEAD`/`OPTIONS` request without a matching
+  `um_admin_csrf` cookie and `X-CSRF-Token` header gets `403`. `SameSite=Lax`
+  already stops a cross-site page from making such a request; this is the
+  second layer, so a future cookie-policy change cannot silently become the
+  only one. Requests authenticated with an `Authorization: Bearer` header are
+  exempt: a browser never attaches that automatically, so they are not exposed
+  to CSRF in the first place.
+
   **Cookie names are namespaced per principal**, because the storefront and the
   admin console share one origin and a browser keys cookies by
   `(name, domain, path)` — the port is *not* part of that key, so a shared name
@@ -259,6 +268,15 @@ signed-in customer (someone else's store id → `404`, never `403`). Lists are
 small, so no pagination. The `:id` param accepts the store's **id or slug**
 interchangeably.
 
+> **These endpoints exist twice.** Everything in this section is also served at
+> `/api/v1/admin/manage/stores/**` 🔒 admin, from the same handlers, so platform
+> support can fix a seller's shop on request. Identical request and response
+> shapes; the only difference is that an admin resolves any store rather than
+> only their own. Three groups are **not** served there — `GET`/`POST
+> /api/v1/stores`, the payout bank accounts and the support inboxes — and every
+> write through that mount is audited. See
+> [Store management as an admin](#store-management-as-an-admin-apiv1adminmanagestores--admin).
+
 ### `GET /api/v1/stores`
 The customer's stores, oldest first. Each: `{ id, name, slug, logoUrl, theme,
 homepage, footer, profile, readiness, isPublished, createdAt, updatedAt }`.
@@ -480,6 +498,8 @@ While `themeName` is null the store is simply sitting on the named template.
 ### `GET /api/v1/theme-templates` 🔒 customer
 The appearance templates a seller can apply — **enabled ones only**, ordered
 by `displayOrder` then oldest first. Colors only; nothing else about a store.
+Also served at `/api/v1/admin/manage/theme-templates` 🔒 admin, for the same
+Appearance screen rendered by the console.
 ```jsonc
 { "data": [ {
   "id": "clx…", "name": "Obsidian Amber",
@@ -629,6 +649,11 @@ pattern as `theme` / `homepage`). Every store response returns `footer`
 most one primary location — so clients never normalise it themselves.
 
 ### `PATCH /api/v1/stores/:id/profile`
+
+**Owner only** — one of the four endpoints in this section with no admin
+counterpart (see [Store management as an admin](#store-management-as-an-admin--apiv1adminmanagestores--admin)).
+Support can fix a seller's catalog and storefront, but a business's legal
+identity is the seller's own declaration to make.
 
 The store's **business identity** — the legal entity, the accountable seller,
 the business contact, the structured addresses and the tax IDs. Stored as the
@@ -2188,6 +2213,56 @@ Body `{ "status": "VERIFIED" | "FAILED" | "PENDING", "note"?: "…" }` — the
 validator). `FAILED` **requires** a note: a failure the seller can't act on is
 worse than no answer. Stamps `verifiedBy` with the acting admin. The seller is
 notified. → the full store.
+
+### Store management as an admin — `/api/v1/admin/manage/stores` 🔒 **super admin**
+
+Platform support editing a seller's shop for them — the "can you fix my
+product listing?" path.
+
+**SUPER_ADMIN only**, unlike the rest of the console: a plain `ADMIN` keeps
+read-only oversight, suspension, blocking and payout verification, but gets
+`403` on every route here. Editing a shop in its owner's name is the widest
+capability on the platform, so it is held to the smallest group. The same gate
+covers `/api/v1/admin/manage/theme-templates`. **Not a separate API:** this is the entire
+[Customer Stores](#customer-stores--apiv1stores--customer) surface re-mounted
+under `requireAdmin`, served by the same handlers with the same validation and
+the same response shapes. Anything documented there works here with
+`/api/v1/stores` swapped for `/api/v1/admin/manage/stores`, including the
+catalog, product media, banners, homepage, footer, theme, shipping, checkout,
+payments, publish and the seller order endpoints.
+
+`:id` still accepts the store's id **or** slug. The one behavioural difference
+is scope: an admin resolves **any** store, where a seller resolves only their
+own.
+
+**Not served here** (→ `404`, the route does not exist on this mount):
+
+| Missing | Why |
+| --- | --- |
+| `GET` / `POST /api/v1/stores` | "My stores" and "create me a store" have no admin meaning. Admins browse stores via `GET /api/v1/admin/stores`. |
+| `…/:id/bank-accounts/**` | Where the store's money lands. No support task needs to change it, and it is the platform's highest-value target. Admins **verify** accounts via `PATCH /api/v1/admin/stores/:id/bank-accounts/:accountId/verification` — approve, never edit. The service refuses an admin actor as a second lock. |
+| `PATCH …/:id/profile` | The seller's business identity — legal/trading name, the accountable person, registered address, PAN/GSTIN. Their own declaration, and what the platform holds them to; not support's to restate on their behalf. Admins **read** it on `GET /api/v1/admin/stores/:id`. |
+| `…/:id/support/**` | Both inboxes attribute messages to the seller, so an admin posting there would be writing in the seller's name. The platform side of those threads is `/api/v1/admin/support`. |
+
+The line: an admin may change what a shop **sells** and how it **looks**, but
+not who it legally **is**, where its **money** goes, or what it **says** to
+people in the seller's name.
+
+`GET …/:id` still returns `profile` (support needs to see it); only the write
+is absent.
+
+**Auditing.** Every non-`GET` request that succeeds (`2xx`) writes an
+`AdminAuditLog` row: `action: "store.manage"`, `entityType: "store"`,
+`entityId` the resolved store **id** (never the slug), and `meta` carrying
+`{ method, route, statusCode, storeName }`. Visible in the console's Activity
+Log; filter by `entityId` for one store's history.
+
+### `GET /api/v1/admin/manage/theme-templates` 🔒 admin
+
+The seller's active-only palette list (same payload as
+`GET /api/v1/theme-templates`), served for the Appearance screen inside the
+mount above. Distinct from `/api/v1/admin/theme-templates`, which is the CRUD
+over the same table and returns inactive rows too.
 
 ### `GET /api/v1/admin/customers`
 

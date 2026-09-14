@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma.js";
+import type { StoreActor } from "./storeActor.js";
 import { HttpError } from "../../utils/httpError.js";
 import {
   mediaUrl,
@@ -168,8 +169,8 @@ async function listForStore(storeId: string, storeSlug: string) {
   return rows.map((row) => shapeBanner(row, targets));
 }
 
-export async function listBanners(ownerId: string, storeRef: string) {
-  const store = await getMyStore(ownerId, storeRef);
+export async function listBanners(actor: StoreActor, storeRef: string) {
+  const store = await getMyStore(actor, storeRef);
   return listForStore(store.id, store.slug);
 }
 
@@ -210,12 +211,12 @@ async function assertLinkTarget(
  * fields, parsed by the controller before this is called.
  */
 export async function createBanner(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   file: UploadedFile,
   input: StoreBannerCreateInput,
 ) {
-  const store = await getMyStore(ownerId, storeRef);
+  const store = await getMyStore(actor, storeRef);
 
   const count = await prisma.storeBanner.count({ where: { storeId: store.id } });
   if (count >= MAX_STORE_BANNERS) {
@@ -251,12 +252,12 @@ export async function createBanner(
 }
 
 export async function updateBanner(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   bannerId: string,
   input: StoreBannerUpdateInput,
 ) {
-  const store = await getMyStore(ownerId, storeRef);
+  const store = await getMyStore(actor, storeRef);
   const current = await prisma.storeBanner.findFirst({
     where: { id: bannerId, storeId: store.id },
     select: { id: true, linkType: true, linkValue: true },
@@ -295,12 +296,12 @@ export async function updateBanner(
  * image.
  */
 export async function replaceBannerImage(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   bannerId: string,
   file: UploadedFile,
 ) {
-  const store = await getMyStore(ownerId, storeRef);
+  const store = await getMyStore(actor, storeRef);
   const current = await prisma.storeBanner.findFirst({
     where: { id: bannerId, storeId: store.id },
     select: { id: true, imageKey: true },
@@ -321,11 +322,11 @@ export async function replaceBannerImage(
 }
 
 export async function deleteBanner(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   bannerId: string,
 ) {
-  const store = await getMyStore(ownerId, storeRef);
+  const store = await getMyStore(actor, storeRef);
   const current = await prisma.storeBanner.findFirst({
     where: { id: bannerId, storeId: store.id },
     select: { id: true, imageKey: true },
@@ -345,11 +346,11 @@ export async function deleteBanner(
  * says nothing about where the rest belong.
  */
 export async function reorderBanners(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   input: StoreBannerOrderInput,
 ) {
-  const store = await getMyStore(ownerId, storeRef);
+  const store = await getMyStore(actor, storeRef);
   const rows = await prisma.storeBanner.findMany({
     where: { storeId: store.id },
     select: { id: true },

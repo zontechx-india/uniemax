@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Readiness, StepState } from '../../features/stores/storeProfile'
 import { CheckIcon, ChevronRightIcon } from '../../layout/icons'
+import { useStoreManageScope } from '../../features/stores/storeManageScope'
 
 /**
  * "Finish setting up your store" — the resumable half of onboarding.
@@ -94,6 +95,7 @@ function StepRow({
   open: boolean
   onToggle: () => void
 }) {
+  const { hiddenSections } = useStoreManageScope()
   return (
     <li>
       <div className="flex items-center gap-2 px-4 sm:px-5">
@@ -121,12 +123,19 @@ function StepRow({
           />
         </button>
 
-        <Link
-          to={step.href}
-          className="shrink-0 rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-fg transition hover:bg-surface-alt"
-        >
-          Add
-        </Link>
+        {/* The jump-to-fix button, unless this mode cannot open that section.
+            An admin still SEES the outstanding step — "this shop has no PAN"
+            is exactly what support needs in order to explain the block — but
+            gets no button, because the section it would open is not routed
+            for them and the link would dead-end. */}
+        {hiddenSections.includes(step.href) ? null : (
+          <Link
+            to={step.href}
+            className="shrink-0 rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-fg transition hover:bg-surface-alt"
+          >
+            Add
+          </Link>
+        )}
       </div>
 
       {open && (

@@ -95,6 +95,11 @@ never ships to a shopper.
 - One-request dashboard: totals, today, per-day series, order pipeline, payment
   split, top stores/products, low stock, integration health.
 - Store oversight with **suspension**; seller payout-account verification.
+- **Manage a seller's store for them** (SUPER_ADMIN only) — the support path
+  for "can you fix my listing?". Opens the seller's own dashboard (catalog,
+  media, storefront, delivery, orders), not an admin rebuild of it, so staff
+  see the screen the caller is describing. Payout accounts, the business/tax
+  identity and the support inboxes are excluded, and every change is audited.
 - Customer oversight with **blocking** (revokes every session).
 - Platform-wide order and payment views.
 - Seller-catalog moderation — hide/restore a listing.
@@ -180,7 +185,10 @@ subtrees:
   `/public/**` (storefront pages by slug, discovery, support contact, VAPID key,
   media config), `/payments` (Cashfree webhook, signature-guarded).
 - **Admin** — `/api/v1/admin/**`, a separate subtree where login is public and
-  everything else sits behind a `requireAdmin` `preHandler`.
+  everything else sits behind a `requireAdmin` `preHandler`. It includes
+  `/admin/manage/stores/**`, which is not a second store API but the customer
+  `/stores` plugin mounted again with an admin actor, so support edits a shop
+  through the seller's own validated code paths.
 
 Public queries force active-only visibility. The storefront's
 `PUBLIC_PRODUCT_VISIBILITY` rule is exported and reused by discovery, so search
@@ -261,7 +269,14 @@ The storefront app mounts a **public router** first (no session required):
 
 Store pages are lazy-loaded so the marketplace homepage bundle stays small.
 Signed-in routes (`/orders`, `/profile`, `/addresses`, `/support`, and the whole
-`/stores/...` seller console) sit behind the session gate.
+`/mystores/...` seller console) sit behind the session gate. The old
+`/stores/...` prefix redirects rather than 404s, because notification rows
+already written carry those deep links.
+
+The admin console renders that same seller console at
+`/admin/stores/:storeSlug/manage/**` — the identical components, pointed at the
+admin mount of the store API (see
+[`docs/FRONTEND_CONTEXT.md`](./docs/FRONTEND_CONTEXT.md)).
 
 In dev, Vite proxies `/api` and `/uploads` to the backend on `:4000` so httpOnly
 auth cookies work with no CORS setup — mirroring production, where nginx serves

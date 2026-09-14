@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma.js";
+import type { StoreActor } from "./storeActor.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../../utils/httpError.js";
 import { getMyStore } from "./stores.service.js";
@@ -29,6 +30,28 @@ import type {
  *    account resets it to PENDING for re-verification.
  */
 
+/**
+ * Payout accounts are the ONE store surface a platform admin never touches.
+ *
+ * Everything else in this module is deliberately reachable by an admin actor
+ * so support can fix a seller's catalog or storefront on request. Redirecting
+ * where a shop's money lands is a different kind of act: it is the single
+ * highest-value target on the platform, and no support task needs it. Admins
+ * verify accounts through the console (`admin.routes.ts`) — read and approve,
+ * never create or edit.
+ *
+ * The admin route mount already omits these endpoints; this is the second
+ * lock, so that mounting them by accident later fails closed instead of
+ * silently granting the capability.
+ */
+function assertOwner(actor: StoreActor): void {
+  if (actor.kind !== "owner") {
+    throw HttpError.forbidden(
+      "Payout bank accounts can only be managed by the store owner.",
+    );
+  }
+}
+
 const MAX_ACCOUNTS = 5;
 
 const accountSelect = {
@@ -48,8 +71,9 @@ const accountSelect = {
   updatedAt: true,
 } satisfies Prisma.StoreBankAccountSelect;
 
-export async function listBankAccounts(ownerId: string, storeRef: string) {
-  const store = await getMyStore(ownerId, storeRef); // ownership check
+export async function listBankAccounts(actor: StoreActor, storeRef: string) {
+  assertOwner(actor);
+  const store = await getMyStore(actor, storeRef); // ownership check
   return prisma.storeBankAccount.findMany({
     where: { storeId: store.id },
     select: accountSelect,
@@ -58,11 +82,12 @@ export async function listBankAccounts(ownerId: string, storeRef: string) {
 }
 
 export async function createBankAccount(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   input: BankAccountCreateInput,
 ) {
-  const store = await getMyStore(ownerId, storeRef); // ownership check
+  assertOwner(actor);
+  const store = await getMyStore(actor, storeRef); // ownership check
 
   // `getMyStore` already carries the readiness evaluation, so the gate is
   // read straight off it rather than evaluated a second time.
@@ -99,12 +124,13 @@ export async function createBankAccount(
 }
 
 export async function updateBankAccount(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   accountId: string,
   input: BankAccountUpdateInput,
 ) {
-  const store = await getMyStore(ownerId, storeRef); // ownership check
+  assertOwner(actor);
+  const store = await getMyStore(actor, storeRef); // ownership check
   const existing = await prisma.storeBankAccount.findFirst({
     where: { id: accountId, storeId: store.id },
   });
@@ -154,11 +180,12 @@ export async function updateBankAccount(
 }
 
 export async function deleteBankAccount(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   accountId: string,
 ) {
-  const store = await getMyStore(ownerId, storeRef); // ownership check
+  assertOwner(actor);
+  const store = await getMyStore(actor, storeRef); // ownership check
   const existing = await prisma.storeBankAccount.findFirst({
     where: { id: accountId, storeId: store.id },
     select: { id: true },

@@ -102,7 +102,18 @@ export async function updateAdmin(
   });
 
   // A deactivated admin must lose access now, not when their token expires.
-  if (input.isActive === false) await revokeAllSessions(targetId, "admin");
+  //
+  // A DEMOTED one too, and for a less obvious reason: the role rides in the
+  // access token and is not re-read from this table per request, so a former
+  // SUPER_ADMIN would otherwise keep super-admin powers until that token
+  // expires. That window is up to `JWT_ACCESS_EXPIRES_IN` (15m) and it now
+  // covers editing any seller's shop (`/api/v1/admin/manage/stores`), so the
+  // demotion has to take effect at once. Revoking forces a refresh, which
+  // mints a token carrying the new role.
+  const roleChanged = input.role !== undefined && input.role !== target.role;
+  if (input.isActive === false || roleChanged) {
+    await revokeAllSessions(targetId, "admin");
+  }
   return admin;
 }
 

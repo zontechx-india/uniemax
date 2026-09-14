@@ -33,14 +33,26 @@ import {
 } from "./storeProfile.schema.js";
 import type { StoreProfileUpdateInput } from "./storeProfile.schema.js";
 import { evaluateReadiness, gateBlockedMessage } from "./storeReadiness.js";
+import { storeScope } from "./storeActor.js";
+import type { StoreActor } from "./storeActor.js";
 import type { Gate, ReadinessContext } from "./storeReadiness.js";
 import { randomUUID } from "node:crypto";
 
 /**
- * Every owner-scoped function is scoped to the owning customer — a store id
- * from another account behaves exactly like a missing one (404), never a 403
- * that would leak the id's existence. Store routes accept the store's id
- * **or** slug interchangeably (slugs are the customer-facing identity).
+ * Every store-scoped function takes a `StoreActor` (see `storeActor.ts`) and
+ * resolves the store through `storeScope(actor)`:
+ *
+ *   - an OWNER sees only their own stores — a store id from another account
+ *     behaves exactly like a missing one (404, never a 403 that would leak
+ *     the id's existence);
+ *   - an ADMIN sees every store, for platform support.
+ *
+ * The two callers run this same code, so a catalog rule can never hold on one
+ * path and not the other. `listMyStores` and `createStore` stay owner-only —
+ * "my stores" and "make me a store" have no admin meaning.
+ *
+ * Store routes accept the store's id **or** slug interchangeably (slugs are
+ * the customer-facing identity).
  */
 
 const storeSelect = {
@@ -186,11 +198,11 @@ async function withReadinessMany(rows: StoreRow[]) {
  * computing it twice per request would double the query count for nothing.
  */
 async function assertOwnedStore(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
 ): Promise<ShapedStore> {
   const store = await prisma.store.findFirst({
-    where: { ownerId, OR: [{ id: storeRef }, { slug: storeRef }] },
+    where: { ...storeScope(actor), OR: [{ id: storeRef }, { slug: storeRef }] },
     select: storeSelect,
   });
   if (!store) throw HttpError.notFound("Store not found");
@@ -312,9 +324,9 @@ export async function createStore(
 }
 
 /** `storeRef` is the store's id or slug — both resolve, ownership enforced. */
-export async function getMyStore(ownerId: string, storeRef: string) {
+export async function getMyStore(actor: StoreActor, storeRef: string) {
   const store = await prisma.store.findFirst({
-    where: { ownerId, OR: [{ id: storeRef }, { slug: storeRef }] },
+    where: { ...storeScope(actor), OR: [{ id: storeRef }, { slug: storeRef }] },
     select: storeSelect,
   });
   if (!store) throw HttpError.notFound("Store not found");
@@ -322,11 +334,11 @@ export async function getMyStore(ownerId: string, storeRef: string) {
 }
 
 export async function updateStore(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   input: StoreUpdateInput,
 ) {
-  const store = await assertOwnedStore(ownerId, storeRef); // ownership check
+  const store = await assertOwnedStore(actor, storeRef); // ownership check
 
   const data: Prisma.StoreUncheckedUpdateInput = {};
   if (input.name !== undefined) data.name = input.name;
@@ -352,11 +364,11 @@ export async function updateStore(
  * mandatory from creation onward.
  */
 export async function updateStoreLogo(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   file: UploadedFile,
 ) {
-  const store = await assertOwnedStore(ownerId, storeRef); // ownership check
+  const store = await assertOwnedStore(actor, storeRef); // ownership check
   const previous = await prisma.store.findUniqueOrThrow({
     where: { id: store.id },
     select: { logoKey: true },
@@ -379,11 +391,11 @@ export async function updateStoreLogo(
 }
 
 export async function updateStoreTheme(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   patch: StoreThemeUpdateInput,
 ) {
-  const existing = await assertOwnedStore(ownerId, storeRef);
+  const existing = await assertOwnedStore(actor, storeRef);
   const current =
     existing.theme && typeof existing.theme === "object"
       ? (existing.theme as Record<string, unknown>)
@@ -412,11 +424,11 @@ export async function updateStoreTheme(
  * reorder and a toggle are the same write.
  */
 export async function updateStoreHomepage(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   sections: HomepageSection[],
 ) {
-  const store = await assertOwnedStore(ownerId, storeRef); // ownership check
+  const store = await assertOwnedStore(actor, storeRef); // ownership check
   const row = await prisma.store.update({
     where: { id: store.id },
     // Cast: our typed section objects are valid JSON, but the interface has no
@@ -435,11 +447,11 @@ export async function updateStoreHomepage(
  * primary whenever any exist.
  */
 export async function updateStoreFooter(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   patch: StoreFooterUpdateInput,
 ) {
-  const store = await assertOwnedStore(ownerId, storeRef); // ownership check
+  const store = await assertOwnedStore(actor, storeRef); // ownership check
   const merged = { ...store.footer, ...patch };
 
   if (patch.locations) {
@@ -477,14 +489,24 @@ export async function updateStoreFooter(
  * `assertVerifiedContact`.
  */
 export async function updateStoreProfile(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   patch: StoreProfileUpdateInput,
 ) {
-  const store = await assertOwnedStore(ownerId, storeRef); // ownership check
+  const store = await assertOwnedStore(actor, storeRef); // ownership check
   // Returns the ACCOUNT's copy of any contact field being set, so what lands
   // in the profile is the canonical value rather than the caller's spelling
   // of it ("ME@X.COM", "+91 98765 43210").
+  //
+  // Resolved from the STORE's owner, not from the actor: the rule is that a
+  // store's contact must be an identifier its seller has proven they own, and
+  // that holds however the edit arrives. An admin editing a seller's profile
+  // is bound by it too — support can correct a shop's details, it cannot
+  // point the shop's notifications somewhere the seller never verified.
+  const { ownerId } = await prisma.store.findUniqueOrThrow({
+    where: { id: store.id },
+    select: { ownerId: true },
+  });
   const contact = await assertVerifiedContact(ownerId, patch);
 
   const merged = { ...store.profile, ...patch, ...contact };
@@ -577,11 +599,11 @@ function digitsOf(value: string): string {
 
 /** Update the payment acceptance switches (partial — absent keys are kept). */
 export async function updateStorePayments(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   patch: StorePaymentsUpdateInput,
 ) {
-  const store = await assertOwnedStore(ownerId, storeRef); // ownership check
+  const store = await assertOwnedStore(actor, storeRef); // ownership check
 
   // Turning online payment ON means UnieMax starts collecting money for this
   // seller and paying it out, so the payout identity has to be real first:
@@ -602,11 +624,11 @@ export async function updateStorePayments(
 
 /** Update which checkout fields this store collects (partial merge). */
 export async function updateStoreCheckout(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   patch: StoreCheckoutUpdateInput,
 ) {
-  const store = await assertOwnedStore(ownerId, storeRef); // ownership check
+  const store = await assertOwnedStore(actor, storeRef); // ownership check
   const merged = { ...store.checkout, ...patch };
   const row = await prisma.store.update({
     where: { id: store.id },
@@ -624,11 +646,11 @@ export async function updateStoreCheckout(
  * threshold), likewise the default every product without an override uses.
  */
 export async function updateStoreShipping(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   patch: StoreShippingUpdateInput,
 ) {
-  const store = await assertOwnedStore(ownerId, storeRef); // ownership check
+  const store = await assertOwnedStore(actor, storeRef); // ownership check
 
   // Offering collection with nowhere to collect from would publish a pickup
   // option no customer can act on. Checked before the write.
@@ -671,11 +693,11 @@ export async function updateStoreShipping(
  *     so it means "this store has been live at some point" exactly.
  */
 export async function setStorePublished(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   isPublished: boolean,
 ) {
-  const store = await assertOwnedStore(ownerId, storeRef); // ownership check
+  const store = await assertOwnedStore(actor, storeRef); // ownership check
   const previous = await prisma.store.findUniqueOrThrow({
     where: { id: store.id },
     select: { publishedAt: true },

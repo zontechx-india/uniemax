@@ -22,11 +22,27 @@ export interface StoreThemeTemplate {
   updatedAt: string
 }
 
-const TEMPLATES = '/api/v1/theme-templates'
+/**
+ * Which mount this client talks to — the same two-mount arrangement as
+ * `storesApi`, because the Appearance screen that reads this list is one
+ * component shared by the seller dashboard and the admin console:
+ *
+ *   '/api/v1/theme-templates'               the seller
+ *   '/api/v1/admin/manage/theme-templates'  an admin managing that seller
+ *
+ * NOT the console's own `/api/v1/admin/theme-templates`, which is the CRUD
+ * over this table and returns inactive rows — exactly what a palette picker
+ * must never offer.
+ */
+let templatesBase = '/api/v1/theme-templates'
+
+export function configureThemeTemplatesApi(mountBase: string): void {
+  templatesBase = mountBase
+}
 
 export const themeTemplatesApi = {
   /** Enabled templates, in the order the platform arranged them. */
   async list(): Promise<StoreThemeTemplate[]> {
-    return call<StoreThemeTemplate[]>(http.get(TEMPLATES))
+    return call<StoreThemeTemplate[]>(http.get(templatesBase))
   },
 }

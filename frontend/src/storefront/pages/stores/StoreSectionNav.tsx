@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import { NavLink, useLocation, useResolvedPath } from 'react-router-dom'
 import type { StepState } from '../../features/stores/storeProfile'
+import { useStoreManageScope } from '../../features/stores/storeManageScope'
 import { StatusMark, StatusTag, sectionStatus } from './SetupStatus'
 import {
   BankIcon,
@@ -139,6 +140,25 @@ const SECTION_GROUPS: SectionGroup[] = [
   },
 ]
 
+/**
+ * The sections THIS mode may open.
+ *
+ * Admins render the same nav as sellers minus the rows their mount does not
+ * serve (payout accounts, the two support inboxes); a group left with no
+ * rows disappears rather than showing an empty caption. Sellers hide nothing,
+ * so they keep the exact array above — same object identity, no re-render.
+ */
+function useSectionGroups(): SectionGroup[] {
+  const { hiddenSections } = useStoreManageScope()
+  return useMemo(() => {
+    if (hiddenSections.length === 0) return SECTION_GROUPS
+    return SECTION_GROUPS.map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !hiddenSections.includes(item.to)),
+    })).filter((group) => group.items.length > 0)
+  }, [hiddenSections])
+}
+
 // ---------------------------------------------------------------------------
 // Remembered preferences
 // ---------------------------------------------------------------------------
@@ -208,6 +228,7 @@ export function useNavRail(): [boolean, () => void] {
 function useActiveSection(): { group: SectionGroup; item: SectionItem } {
   const base = useResolvedPath('.').pathname
   const { pathname } = useLocation()
+  const groups = useSectionGroups()
 
   return useMemo(() => {
     const root = base.endsWith('/') ? base.slice(0, -1) : base
@@ -220,7 +241,7 @@ function useActiveSection(): { group: SectionGroup; item: SectionItem } {
 
     let best: { group: SectionGroup; item: SectionItem } | null = null
     if (rest !== null) {
-      for (const group of SECTION_GROUPS) {
+      for (const group of groups) {
         for (const item of group.items) {
           const seg = item.to === '.' ? '' : item.to
           const hit =
@@ -233,8 +254,8 @@ function useActiveSection(): { group: SectionGroup; item: SectionItem } {
 
     // A URL under the layout that matches no row (a future child route) still
     // has to render something — fall back to the landing section.
-    return best ?? { group: SECTION_GROUPS[0], item: SECTION_GROUPS[0].items[0] }
-  }, [base, pathname])
+    return best ?? { group: groups[0], item: groups[0].items[0] }
+  }, [base, pathname, groups])
 }
 
 // ---------------------------------------------------------------------------
@@ -403,9 +424,10 @@ function SectionList({
   activeKey: string
   onNavigate?: () => void
 }) {
+  const groups = useSectionGroups()
   return (
     <div className="p-2">
-      {SECTION_GROUPS.map((group) => (
+      {groups.map((group) => (
         <SectionDisclosure
           key={group.key}
           group={group}
@@ -426,6 +448,7 @@ function SectionList({
 
 export function StoreSectionNav({ rail, ...data }: NavData & { rail: boolean }) {
   const active = useActiveSection()
+  const groups = useSectionGroups()
   const [collapsed, setCollapsed] = useState<string[]>(readCollapsed)
   const [mobileOpen, setMobileOpen] = useState(false)
   const mobileRef = useRef<HTMLDivElement | null>(null)
@@ -526,7 +549,7 @@ export function StoreSectionNav({ rail, ...data }: NavData & { rail: boolean }) 
       <nav className="hidden lg:block" aria-label="Store sections">
         {rail ? (
           <div className="flex flex-col items-center gap-1 p-2">
-            {SECTION_GROUPS.map((group, index) => (
+            {groups.map((group, index) => (
               <div
                 key={group.key}
                 className={`flex w-full flex-col items-center gap-1 ${

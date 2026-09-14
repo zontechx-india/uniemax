@@ -8,7 +8,13 @@ import type { StepState } from '../../features/stores/storeProfile'
 import type { ManagedStoreContext } from '../../features/stores/useManagedStore'
 import { StorePublishCard } from './StorePublishCard'
 import { StoreSectionNav, useNavRail } from './StoreSectionNav'
-import { ArrowLeftIcon, PanelLeftIcon, StoreIcon } from '../../layout/icons'
+import {
+  ArrowLeftIcon,
+  PanelLeftIcon,
+  ShieldCheckIcon,
+  StoreIcon,
+} from '../../layout/icons'
+import { useStoreManageScope } from '../../features/stores/storeManageScope'
 
 /**
  * Store management — Flipkart-account style split inside the app's main
@@ -29,6 +35,8 @@ export function StoreManageLayout() {
   const { storeSlug } = useParams()
   const { store, setStore } = useStore(storeSlug)
   const storeId = store?.id ?? null
+  // Owner by default; the admin console wraps these routes to say otherwise.
+  const scope = useStoreManageScope()
 
   // Minimised-nav preference. Owned here because the grid track width is this
   // file's; the nav renders the icons.
@@ -83,8 +91,9 @@ export function StoreManageLayout() {
     )
   }
 
-  // Unknown/foreign store id → back to the list.
-  if (store === null) return <Navigate to="/mystores" replace />
+  // Unknown/foreign store id → back to the list this store was opened from
+  // (the seller's own stores, or the admin console's store list).
+  if (store === null) return <Navigate to={scope.indexPath} replace />
 
   const pendingOrders = dashboard?.stats.pending ?? 0
 
@@ -113,12 +122,35 @@ export function StoreManageLayout() {
     // and catalog rows stay a readable length on wide screens.
     <div className="mx-auto max-w-7xl space-y-3">
       <Link
-        to="/mystores"
+        to={scope.indexPath}
         className="inline-flex items-center gap-1.5 text-sm font-medium text-muted transition hover:text-fg"
       >
         <ArrowLeftIcon className="h-4 w-4" />
         All stores
       </Link>
+
+      {/* Acting on someone else's shop.
+          Every screen below this point is the seller's own dashboard, pixel
+          for pixel — which is the point (support sees what the caller is
+          describing) and also the risk: an admin four clicks in could forget
+          whose catalog they are editing. So the warning is not a one-time
+          toast but a permanent band, naming the shop, that stays on screen
+          for as long as the admin view is open. */}
+      {scope.mode === 'admin' && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-pending/40 bg-pending-soft px-3 py-2 text-sm"
+        >
+          <ShieldCheckIcon className="h-4 w-4 shrink-0 text-pending" />
+          <span className="font-semibold text-fg">Admin view</span>
+          <span className="text-muted">
+            You are editing{' '}
+            <span className="font-medium text-fg">{store.name}</span> on behalf
+            of its owner. Changes save as the seller&rsquo;s own and are
+            recorded in the activity log.
+          </span>
+        </div>
+      )}
 
       <div
         className={`items-start gap-3 space-y-3 lg:grid lg:space-y-0 ${

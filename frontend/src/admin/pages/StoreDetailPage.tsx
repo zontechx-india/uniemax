@@ -10,6 +10,7 @@ import { formatPriceRange } from '../ui/format'
 import { ProductDetailDialog } from './products/ProductDetailDialog'
 import {
   Button,
+  buttonClass,
   Card,
   CardHeader,
   Chip,
@@ -34,6 +35,7 @@ import {
   formatMoneyExact,
 } from '../ui/format'
 import { StoreAvatar } from './StoresPage'
+import { useAdminSession } from '../app/adminSession'
 import { BackIcon, ExternalIcon } from '../layout/icons'
 
 /**
@@ -60,6 +62,7 @@ const PRODUCT_PREVIEW = 6
 export default function StoreDetailPage() {
   const { storeId = '' } = useParams()
   const navigate = useNavigate()
+  const { isSuperAdmin } = useAdminSession()
   const { data: store, loading, error, refresh } = useAdminQuery(
     () => adminApi.getStore(storeId),
     [storeId],
@@ -153,16 +156,35 @@ export default function StoreDetailPage() {
           </span>
         }
         actions={
-          <Button
-            variant={suspended ? 'secondary' : 'danger'}
-            onClick={() => {
-              setSuspendOpen(true)
-              setReason('')
-              setActionError(null)
-            }}
-          >
-            {suspended ? 'Lift suspension' : 'Suspend store'}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Opens the seller's own dashboard for this shop — the support
+                path for "can you fix my product for me?". Keyed by slug
+                because that is what the manage routes take.
+
+                SUPER_ADMIN only, matching the mount that serves it: a plain
+                ADMIN keeps oversight, suspension and blocking, but editing a
+                shop in its owner's name is held to the smallest group. The
+                API enforces that regardless — hiding the button only avoids
+                offering an action that would 403. */}
+            {isSuperAdmin ? (
+              <Link
+                to={`/stores/${store.slug}/manage`}
+                className={buttonClass({ variant: 'secondary' })}
+              >
+                Manage store
+              </Link>
+            ) : null}
+            <Button
+              variant={suspended ? 'secondary' : 'danger'}
+              onClick={() => {
+                setSuspendOpen(true)
+                setReason('')
+                setActionError(null)
+              }}
+            >
+              {suspended ? 'Lift suspension' : 'Suspend store'}
+            </Button>
+          </div>
         }
       />
 

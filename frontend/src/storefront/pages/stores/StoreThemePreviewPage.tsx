@@ -11,6 +11,7 @@ import { ThemePreview } from './ThemePreview'
 import { findActiveTemplate, ThemeTemplateStrip } from './ThemeTemplateStrip'
 import type { ThemeNavState } from './ThemeTemplateStrip'
 import { ArrowLeftIcon } from '../../layout/icons'
+import { useStoreManageScope } from '../../features/stores/storeManageScope'
 
 /**
  * `/mystores/{slug}/appearance/preview` — the theme preview at full width.
@@ -36,6 +37,7 @@ import { ArrowLeftIcon } from '../../layout/icons'
 
 export function StoreThemePreviewPage() {
   const { storeSlug } = useParams()
+  const scope = useStoreManageScope()
   const { store } = useStore(storeSlug)
   const navigate = useNavigate()
   const location = useLocation()
@@ -74,9 +76,9 @@ export function StoreThemePreviewPage() {
       </div>
     )
   }
-  if (store === null) return <Navigate to="/mystores" replace />
+  if (store === null) return <Navigate to={scope.indexPath} replace />
 
-  const appearanceUrl = `/mystores/${storeSlug}/appearance`
+  const appearanceUrl = `${scope.storePath(storeSlug ?? '')}/appearance`
   const dirty = JSON.stringify(theme) !== JSON.stringify(store.theme)
   const activeTemplate = findActiveTemplate(templates, theme)
 

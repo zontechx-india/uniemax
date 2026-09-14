@@ -1,4 +1,5 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
+import { storeActor } from "./storeActor.js";
 import { ok } from "../../utils/response.js";
 import { readUpload } from "../../package/storage/index.js";
 import { idParamSchema, slugParamSchema } from "../../utils/zodHelpers.js";
@@ -40,58 +41,58 @@ export async function createStore(request: FastifyRequest, reply: FastifyReply) 
 
 export async function getStore(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
-  return ok(await service.getMyStore(request.customer!.id, id));
+  return ok(await service.getMyStore(storeActor(request), id));
 }
 
 export async function updateStore(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   const input = storeUpdateSchema.parse(request.body);
-  return ok(await service.updateStore(request.customer!.id, id, input));
+  return ok(await service.updateStore(storeActor(request), id, input));
 }
 
 export async function updateStoreTheme(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   const patch = storeThemeUpdateSchema.parse(request.body);
-  return ok(await service.updateStoreTheme(request.customer!.id, id, patch));
+  return ok(await service.updateStoreTheme(storeActor(request), id, patch));
 }
 
 export async function updateStoreHomepage(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   const { sections } = storeHomepageSchema.parse(request.body);
   return ok(
-    await service.updateStoreHomepage(request.customer!.id, id, sections),
+    await service.updateStoreHomepage(storeActor(request), id, sections),
   );
 }
 
 export async function updateStoreFooter(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   const patch = storeFooterUpdateSchema.parse(request.body);
-  return ok(await service.updateStoreFooter(request.customer!.id, id, patch));
+  return ok(await service.updateStoreFooter(storeActor(request), id, patch));
 }
 
 export async function updateStorePayments(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   const patch = storePaymentsUpdateSchema.parse(request.body);
-  return ok(await service.updateStorePayments(request.customer!.id, id, patch));
+  return ok(await service.updateStorePayments(storeActor(request), id, patch));
 }
 
 export async function updateStoreCheckout(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   const patch = storeCheckoutUpdateSchema.parse(request.body);
-  return ok(await service.updateStoreCheckout(request.customer!.id, id, patch));
+  return ok(await service.updateStoreCheckout(storeActor(request), id, patch));
 }
 
 export async function updateStoreShipping(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   const input = storeShippingUpdateSchema.parse(request.body);
-  return ok(await service.updateStoreShipping(request.customer!.id, id, input));
+  return ok(await service.updateStoreShipping(storeActor(request), id, input));
 }
 
 export async function setStorePublished(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   const { isPublished } = storePublishSchema.parse(request.body);
   return ok(
-    await service.setStorePublished(request.customer!.id, id, isPublished),
+    await service.setStorePublished(storeActor(request), id, isPublished),
   );
 }
 
@@ -103,7 +104,7 @@ export async function setStorePublished(request: FastifyRequest) {
 export async function updateStoreLogo(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   const file = await readUpload(request, "logo");
-  return ok(await service.updateStoreLogo(request.customer!.id, id, file));
+  return ok(await service.updateStoreLogo(storeActor(request), id, file));
 }
 
 /**
@@ -113,5 +114,5 @@ export async function updateStoreLogo(request: FastifyRequest) {
 export async function updateStoreProfile(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   const patch = storeProfileUpdateSchema.parse(request.body);
-  return ok(await service.updateStoreProfile(request.customer!.id, id, patch));
+  return ok(await service.updateStoreProfile(storeActor(request), id, patch));
 }

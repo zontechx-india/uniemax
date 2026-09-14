@@ -231,6 +231,62 @@ collision. Slugs are generated on create and kept stable across renames.
 Routes split into `/api/v1/...` (public/customer) and `/api/v1/admin/...`. Public
 list/detail queries force `status = ACTIVE` / `isActive = true`; admin sees everything.
 
+### One plugin, two mounts — the `StoreActor` pattern
+
+Platform support has to be able to fix a seller's shop on request. The obvious
+build — a parallel set of admin catalog endpoints — was rejected: it would
+duplicate every rule (variant cartesian products, category-before-product
+ordering, media caps) and then drift from the seller's copy, and the admin
+duplicate is the one nobody exercises daily.
+
+Instead the **ownership check** learned about a second caller, and the route
+plugin is registered twice:
+
+```
+owner → /api/v1/stores               guarded by requireCustomer inside the plugin
+admin → /api/v1/admin/manage/stores  already inside the requireAdmin subtree
+```
+
+- `modules/stores/storeActor.ts` defines
+  `StoreActor = { kind: "owner"; customerId } | { kind: "admin"; adminId }`,
+  `storeScope(actor)` (the Prisma `where` fragment — `{ ownerId }` for an
+  owner, `{}` for an admin) and `storeActor(request)`, which reads whichever
+  of `request.customer` / `request.admin` the guard authenticated.
+- Every store service takes a `StoreActor` as its first argument and resolves
+  through the single chokepoint `getMyStore(actor, storeRef)` /
+  `assertOwnedStore`. `listMyStores` and `createStore` stay owner-only.
+- The admin mount is **SUPER_ADMIN only** (`requireSuperAdmin`, layered on top
+  of the subtree's `requireAdmin`). Most of the console is open to any staff
+  account; editing a shop in its owner's name is not. `requireSuperAdmin` runs
+  `requireAdmin` itself when the request has not been authenticated yet, so it
+  cannot be defeated by hook ordering. Note the role rides in the access
+  token and is not re-read per request — which is why
+  `adminAccounts.service.ts` revokes sessions on a **role change** as well as
+  on deactivation, so a demotion takes effect at once rather than after the
+  15-minute token TTL.
+- `storeRoutes` takes `{ mode: "owner" | "admin" }`, which decides both the
+  guard and **which routes exist at all**. The admin mount omits store
+  list/create, the payout bank accounts, the business-profile write and the
+  support inboxes; requests to them 404 because the route was never
+  registered. The line drawn: an admin may change what a shop sells and how it
+  looks, never who it legally is, where its money goes, or what it says in the
+  seller's name.
+- Defence in depth on the money: `storeBank.service.ts#assertOwner` throws
+  `403` for an admin actor, so mounting those routes by accident later fails
+  closed instead of silently granting the capability.
+- The admin mount carries an `onResponse` hook that writes an `AdminAuditLog`
+  row (`action: "store.manage"`) for every successful non-`GET` — a hook, not
+  per-handler calls, so a route added later is covered without anyone
+  remembering.
+
+`modules/themeTemplates` uses the same `{ mode }` shape for the seller
+palette list, because the Appearance screen reads it under both mounts.
+
+Adding an endpoint to the seller surface therefore gives admins the same
+capability automatically. That is the intent — if a new route must **not** be
+admin-reachable, guard it with `if (mode !== "admin")` in `stores.routes.ts`
+and say why, as the three exclusions above do.
+
 ### Media storage — the `package/storage` sub-system
 
 All file storage goes through one self-contained package (`src/package/storage`)
@@ -295,7 +351,12 @@ module repeats the guard. Deliberate scope decisions:
 
 - **Read-heavy.** The seller owns fulfilment (they hold the stock and the
   customer relationship), so the console reports on orders rather than driving
-  them. The only writes are moderation levers and admin-account management.
+  them. The module's own writes are moderation levers and admin-account
+  management. The one place an admin edits a seller's data directly is the
+  separate store-management mount (`/api/v1/admin/manage/stores`, see
+  [One plugin, two mounts](#one-plugin-two-mounts--the-storeactor-pattern)) —
+  which is not a set of admin endpoints at all, but the seller's own,
+  re-mounted.
 - **Store suspension** (`Store.suspendedAt`) is a separate axis from the
   owner's `isPublished`. Suspension outranks it in every public query
   (`PUBLIC_STORE_VISIBILITY` in `publicStore.service.ts`, reused by
@@ -311,6 +372,14 @@ module repeats the guard. Deliberate scope decisions:
 - **Payout verification** is the `MANUAL` half of the `BankVerificationMethod`
   the schema already provisioned; `FAILED` requires a note, and `verifiedBy`
   records who decided, because money settles to that account.
+- **CSRF, second layer.** The whole `requireAdmin` subtree also carries
+  `requireAdminCsrf`: a cookie-authenticated non-`GET` needs the
+  `um_admin_csrf` cookie echoed in `X-CSRF-Token`, or `403`. `SameSite=Lax`
+  already blocks cross-site state-changing requests, so this is defence in
+  depth rather than a fix for a live hole — it exists so that a later
+  cookie-policy change (or a `SameSite=None` some integration forces) cannot
+  silently leave nothing in the way. Bearer-authenticated requests are exempt:
+  a browser never attaches that header on its own.
 - **Every write appends an `AdminAuditLog` row** via `recordAudit(request, …)`
   — fire-and-forget, so an audit failure never fails the action it describes,
   and carrying a snapshot of the actor's email so the trail survives the admin

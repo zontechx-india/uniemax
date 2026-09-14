@@ -1,4 +1,5 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
+import { storeActor } from "./storeActor.js";
 import { ok } from "../../utils/response.js";
 import { readUpload } from "../../package/storage/index.js";
 import { idParamSchema } from "../../utils/zodHelpers.js";
@@ -29,7 +30,7 @@ import * as service from "./storeCatalog.service.js";
 
 export async function listCategories(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
-  return ok(await service.listCategories(request.customer!.id, id));
+  return ok(await service.listCategories(storeActor(request), id));
 }
 
 export async function createCategory(
@@ -38,7 +39,7 @@ export async function createCategory(
 ) {
   const { id } = idParamSchema.parse(request.params);
   const input = storeCategoryCreateSchema.parse(request.body);
-  const category = await service.createCategory(request.customer!.id, id, input);
+  const category = await service.createCategory(storeActor(request), id, input);
   return reply.status(201).send(ok(category));
 }
 
@@ -47,18 +48,18 @@ export async function updateCategory(request: FastifyRequest) {
   const { id, categoryId } = storeCategoryParamSchema.parse(request.params);
   const patch = storeCategoryUpdateSchema.parse(request.body);
   return ok(
-    await service.updateCategory(request.customer!.id, id, categoryId, patch),
+    await service.updateCategory(storeActor(request), id, categoryId, patch),
   );
 }
 
 export async function deleteCategory(request: FastifyRequest) {
   const { id, categoryId } = storeCategoryParamSchema.parse(request.params);
-  return ok(await service.deleteCategory(request.customer!.id, id, categoryId));
+  return ok(await service.deleteCategory(storeActor(request), id, categoryId));
 }
 
 export async function listProducts(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
-  return ok(await service.listProducts(request.customer!.id, id));
+  return ok(await service.listProducts(storeActor(request), id));
 }
 
 export async function createProduct(
@@ -67,7 +68,7 @@ export async function createProduct(
 ) {
   const { id } = idParamSchema.parse(request.params);
   const input = storeProductCreateSchema.parse(request.body);
-  const product = await service.createProduct(request.customer!.id, id, input);
+  const product = await service.createProduct(storeActor(request), id, input);
   return reply.status(201).send(ok(product));
 }
 
@@ -75,13 +76,13 @@ export async function updateProduct(request: FastifyRequest) {
   const { id, productId } = storeProductParamSchema.parse(request.params);
   const patch = storeProductUpdateSchema.parse(request.body);
   return ok(
-    await service.updateProduct(request.customer!.id, id, productId, patch),
+    await service.updateProduct(storeActor(request), id, productId, patch),
   );
 }
 
 export async function deleteProduct(request: FastifyRequest) {
   const { id, productId } = storeProductParamSchema.parse(request.params);
-  return ok(await service.deleteProduct(request.customer!.id, id, productId));
+  return ok(await service.deleteProduct(storeActor(request), id, productId));
 }
 
 // Options & variants — every mutation responds with the full parent product
@@ -97,7 +98,7 @@ export async function replaceProductOptions(request: FastifyRequest) {
   const input = storeProductOptionsSchema.parse(request.body);
   return ok(
     await service.replaceProductOptions(
-      request.customer!.id,
+      storeActor(request),
       id,
       productId,
       input,
@@ -113,7 +114,7 @@ export async function replaceProductGroups(request: FastifyRequest) {
   const { id, productId } = storeProductParamSchema.parse(request.params);
   const input = storeProductGroupsSchema.parse(request.body);
   return ok(
-    await service.replaceProductGroups(request.customer!.id, id, productId, input),
+    await service.replaceProductGroups(storeActor(request), id, productId, input),
   );
 }
 
@@ -122,7 +123,7 @@ export async function listGroupCandidates(request: FastifyRequest) {
   const { id, productId } = storeProductParamSchema.parse(request.params);
   const query = groupCandidatesQuerySchema.parse(request.query);
   return ok(
-    await service.listGroupCandidates(request.customer!.id, id, productId, query),
+    await service.listGroupCandidates(storeActor(request), id, productId, query),
   );
 }
 
@@ -130,7 +131,7 @@ export async function listGroupCandidates(request: FastifyRequest) {
 export async function copyProduct(request: FastifyRequest, reply: FastifyReply) {
   const { id, productId } = storeProductParamSchema.parse(request.params);
   const input = storeProductCopySchema.parse(request.body ?? {});
-  const product = await service.copyProduct(request.customer!.id, id, productId, input);
+  const product = await service.copyProduct(storeActor(request), id, productId, input);
   return reply.status(201).send(ok(product));
 }
 
@@ -142,7 +143,7 @@ export async function updateVariant(request: FastifyRequest) {
   const patch = storeVariantUpdateSchema.parse(request.body);
   return ok(
     await service.updateVariant(
-      request.customer!.id,
+      storeActor(request),
       id,
       productId,
       variantId,
@@ -162,7 +163,7 @@ export async function addProductMedia(
   const { id, productId } = storeProductParamSchema.parse(request.params);
   const file = await readUpload(request, "auto");
   const product = await service.addProductMedia(
-    request.customer!.id,
+    storeActor(request),
     id,
     productId,
     file,
@@ -177,7 +178,7 @@ export async function replaceProductMediaFile(request: FastifyRequest) {
   const file = await readUpload(request, "auto");
   return ok(
     await service.replaceProductMediaFile(
-      request.customer!.id,
+      storeActor(request),
       id,
       productId,
       mediaId,
@@ -193,7 +194,7 @@ export async function updateProductMedia(request: FastifyRequest) {
   const patch = storeMediaUpdateSchema.parse(request.body);
   return ok(
     await service.updateProductMedia(
-      request.customer!.id,
+      storeActor(request),
       id,
       productId,
       mediaId,
@@ -207,7 +208,7 @@ export async function reorderProductMedia(request: FastifyRequest) {
   const input = storeMediaOrderSchema.parse(request.body);
   return ok(
     await service.reorderProductMedia(
-      request.customer!.id,
+      storeActor(request),
       id,
       productId,
       input,
@@ -221,7 +222,7 @@ export async function deleteProductMedia(request: FastifyRequest) {
   );
   return ok(
     await service.deleteProductMedia(
-      request.customer!.id,
+      storeActor(request),
       id,
       productId,
       mediaId,

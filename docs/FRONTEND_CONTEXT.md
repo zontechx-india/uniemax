@@ -25,7 +25,13 @@ This mirrors the backend, which already splits its routes into a public
   `/admin`.
 - **Isolation** — a change to the admin console cannot break the storefront and
   vice versa. They share the token layer (`src/index.css`) and `src/shared/`,
-  and nothing else.
+  plus **one deliberate exception**: the admin console imports the seller's
+  store-management pages from `storefront/pages/stores/` so support can fix a
+  shop for its owner without a second, drifting implementation of those forms
+  (see [Managing a seller's store from the console](#managing-a-sellers-store-from-the-console)).
+  That direction is one-way — the storefront imports nothing from `admin/` —
+  and the shared pages default to owner behaviour, so the storefront is
+  unaffected by the admin's use of them.
 - **Deployment** — the `/admin` path can be cached and access-controlled
   independently (WAF / IP allow-list at the edge) on top of the backend's
   `requireAdmin` guard.
@@ -1476,7 +1482,8 @@ Rules they follow (constraints, not taste):
 | `/products` | Seller catalog across stores, with the hide/restore moderation switch (always asks for a reason — the seller is notified immediately). A row is a summary; **clicking it opens the listing in full** in `products/ProductDetailDialog` (gallery, description, option matrix, per-variant price/stock, spec table, delivery area, homepage flags, storefront link, hide/restore) over the table, so filters and page survive closing it. `?storeId=` scopes the table to one store and shows a banner naming it. The hide/restore confirm lives in `products/ProductVisibilityDialog` because the table's row button and the detail dialog must ask the same question the same way. |
 | `/category-mapping` | **Converting** sellers' typed shelves into platform categories. Shelves created today are platform categories by construction (the seller picks one rather than typing a name), so this queue is the free text typed before that rule. An admin picks the category with the same search-or-browse picker the seller uses and clicks Convert; the page asks the server for its **plan** (rename and re-parent, or merge into the shelf already standing for that category and delete the typed one) and shows it in the confirm dialog — what the admin approves is exactly what runs, and a shelf's own subcategories come along. One-way; there is no unmap. Rows are chipped **Typed by seller** / **Tagged … · not converted** (linked by the earlier bulk migration but still wearing its typed name) / the converted path. |
 | `/categories` | The **global category taxonomy** — the one place it can be edited. An indented tree of arbitrary depth (the shape follows `parentId`; "category" and "subcategory" are the same row at different depths), with create/edit/enable/disable/delete, sort order, image URL and a parent select. Searching flattens the view and shows each hit's full path, because a match inside a collapsed branch has to be reachable without guessing which parent to open. Disabling hides a whole branch from sellers and shoppers while leaving every existing tag intact — the safe way to retire a category, since deleting is refused while a node still has children or products. Sellers only ever *select* from this list. Each node also carries the product form's **suggested options** (one per line, `Size: S, M, L`) and **suggested specification labels**; blank means inherited from the parent, shown as a hint. |
-| `/stores`, `/stores/:id` | Stores + owners. The table carries a **Setup** column (`SetupChip`, naming the first outstanding step) and a **Setup: Not finished / Complete** filter — independent of Published/Draft, because a live store can still be missing its PAN, and "who has not finished?" is the console's usual reason for opening this list. Detail carries suspension, **manual payout-account verification** (account numbers masked to the last 4), a **Products** card — the store's newest listings inline (each opening the same product dialog), with a "View all" into `/products?storeId=…` — and a **Seller setup** card (below). |
+| `/stores`, `/stores/:id` | Stores + owners. The table carries a **Setup** column (`SetupChip`, naming the first outstanding step) and a **Setup: Not finished / Complete** filter — independent of Published/Draft, because a live store can still be missing its PAN, and "who has not finished?" is the console's usual reason for opening this list. Detail carries suspension, **manual payout-account verification** (account numbers masked to the last 4), a **Products** card — the store's newest listings inline (each opening the same product dialog), with a "View all" into `/products?storeId=…` — and a **Seller setup** card (below). A **Manage store** action opens the seller's own dashboard for that shop (below). |
+| `/stores/:storeSlug/manage/**` | **The seller's dashboard, rendered for an admin** — see [Managing a seller's store from the console](#managing-a-sellers-store-from-the-console). Not admin rebuilds of those screens: the actual components from `storefront/pages/stores/`. |
 | `/customers`, `/customers/:id` | Buyers and sellers (same account type), with blocking. The dialog states both effects: no future sign-in **and** every session revoked. |
 | `/support`, `/support/:ticketId` | The support queue — **sellers and shoppers in one list** (never a shopper's thread with a shop: those are the seller's to answer), filterable by `scope` (two pages would just mean one of them going unread), each row carrying a Seller/Shopper chip. Defaults to the **Needs reply** tab (open + in progress) sorted **oldest activity first** — a queue's job is to show what is still owed, which is the opposite of every other table here. The detail page carries the thread, the reply box (replying moves OPEN → IN_PROGRESS on its own) and triage: status saves on change and notifies the reporter, priority is internal and silent. |
 | `/banners` | **Homepage banners** — the marketplace homepage carousel, which replaced the old hand-written hero, so the platform's opening pitch is now content rather than code. A grid of preview cards at the homepage's own 16:5, each with the image (click to replace), a **Live** checkbox, a title, and a destination: no link · a store (picked from a list, stored as an **id** so a rename cannot break it) · a web address. Reordering is drag-and-drop with ←/→ for keyboard and touch. Max 10. A banner whose store is unpublished, suspended or deleted is flagged in red here, because the console showing a healthy row while the homepage renders a dead banner is the failure worth preventing. Uploads are measured in the browser: an already-16:5 file goes up untouched, anything else **must be cropped first** in the shared `ImageEditDialog` locked to that ratio (no "use original"), so the admin frames it rather than the browser silently trimming the top and bottom. |
@@ -2274,6 +2281,67 @@ the homepage merchandising rows use the same ramp and hide the surplus per
 breakpoint, so each row is always exactly full.
 
 ---
+
+## Managing a seller's store from the console
+
+Support needs to be able to fix a seller's listing while the seller is on the
+phone. Rather than rebuilding the store screens inside the console — two
+implementations of the same forms, drifting apart — the admin app **renders
+the seller's actual pages**, imported straight from `storefront/pages/stores/`
+and pointed at the admin mount of the same backend plugin. An admin therefore
+sees exactly the screen the caller is describing, and a change to a catalog
+form ships to both at once.
+
+Three small pieces make one component serve both apps:
+
+**1. Which API. `configureStoresApi(base)`** (`features/stores/storesApi.ts`)
+— a module-level base, set once at boot. The storefront leaves the default
+`/api/v1/stores`; `admin/main.tsx` sets `/api/v1/admin/manage/stores`.
+`configureThemeTemplatesApi` does the same for the Appearance palette list.
+A plain module value is enough because the two apps are separate bundles with
+separate entry points and never share a runtime.
+
+Because `http.ts` picks the CSRF cookie from the request URL, moving the base
+under `/api/v1/admin/...` also moves this client onto the admin surface's
+cookie namespace — nothing else to configure.
+
+**2. Which routes. `StoreManageScope`** (`features/stores/storeManageScope.tsx`)
+— a context carrying `mode`, `indexPath` (where "back" goes), `storePath(slug)`
+and `hiddenSections`. It **defaults to the owner scope**, so the storefront
+provides nothing and behaves exactly as before; the admin router wraps its
+store routes in `StoreManageScopeProvider scope={ADMIN_STORE_SCOPE}`. This is
+what turns `/mystores` links into `/stores/:slug/manage` ones and drops the
+nav rows the admin mount does not serve.
+
+**3. Which sections.** `StoreSectionNav` filters `SECTION_GROUPS` through
+`hiddenSections` (a group left with no rows disappears rather than showing an
+empty caption). Hidden for admins: **Bank Accounts**, **Business Details**,
+**Customer Support** and **UnieMax Support** — an admin may change what a shop
+sells and how it looks, but not who it legally is, where its money goes, or
+what it says in the seller's name. That is presentation only; the real
+enforcement is that the backend never registers those routes on the admin
+mount.
+
+`SetupChecklist` reads the same list: a readiness step pointing at a hidden
+section (three of them point at `business`, one at `bank-accounts`) still
+**shows** — "this shop has no PAN" is exactly what support needs in order to
+explain a block — but drops its **Add** button, which would otherwise
+dead-end on an unrouted section.
+
+**Who may open it.** SUPER_ADMIN only, matching the mount. The **Manage store**
+button on `/stores/:id` renders only for a super admin, and `StoreManageGate`
+in the admin router redirects anyone else back to `/stores` — a redirect rather
+than just a hidden link, because a pasted URL would otherwise render the whole
+dashboard shell around an API that 403s every call, which reads as "broken"
+rather than "not yours". The API enforces it regardless.
+
+`StoreManageLayout` shows a **permanent amber band** whenever `mode === 'admin'`,
+naming the shop. Not a one-time toast: the screens are pixel-identical to the
+seller's, which is the point and also the risk, so the reminder has to survive
+four clicks into the catalog.
+
+Every write through this path is audited server-side (`action: "store.manage"`)
+and shows up in `/activity`.
 
 ## How the Two Apps Are Kept Separate
 

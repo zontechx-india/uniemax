@@ -1,4 +1,5 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
+import { storeActor } from "../stores/storeActor.js";
 import { list, ok } from "../../utils/response.js";
 import { idParamSchema, slugParamSchema } from "../../utils/zodHelpers.js";
 import { optionalCustomerId } from "../../package/auth/index.js";
@@ -48,7 +49,7 @@ export async function listMyOrders(request: FastifyRequest) {
 /** Seller dashboard — runs behind `requireCustomer` (stores.routes.ts). */
 export async function getStoreDashboard(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
-  return ok(await service.getStoreDashboard(request.customer!.id, id));
+  return ok(await service.getStoreDashboard(storeActor(request), id));
 }
 
 // ---------------------------------------------------------------------------
@@ -60,7 +61,7 @@ export async function listStoreOrders(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   const query = sellerOrderListQuerySchema.parse(request.query);
   const { rows, meta } = await service.listStoreOrders(
-    request.customer!.id,
+    storeActor(request),
     id,
     query,
   );
@@ -69,14 +70,14 @@ export async function listStoreOrders(request: FastifyRequest) {
 
 export async function getStoreOrder(request: FastifyRequest) {
   const { id, orderId } = sellerOrderParamSchema.parse(request.params);
-  return ok(await service.getStoreOrder(request.customer!.id, id, orderId));
+  return ok(await service.getStoreOrder(storeActor(request), id, orderId));
 }
 
 export async function updateStoreOrderStatus(request: FastifyRequest) {
   const { id, orderId } = sellerOrderParamSchema.parse(request.params);
   const input = orderStatusUpdateSchema.parse(request.body);
   return ok(
-    await service.updateOrderStatus(request.customer!.id, id, orderId, input),
+    await service.updateOrderStatus(storeActor(request), id, orderId, input),
   );
 }
 
@@ -85,6 +86,6 @@ export async function cancelStoreOrder(request: FastifyRequest) {
   // Cancel takes no other input, so a missing/empty body is fine too.
   const { reason } = orderCancelSchema.parse(request.body ?? {});
   return ok(
-    await service.cancelOrder(request.customer!.id, id, orderId, reason),
+    await service.cancelOrder(storeActor(request), id, orderId, reason),
   );
 }

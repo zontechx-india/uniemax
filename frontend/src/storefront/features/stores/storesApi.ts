@@ -762,7 +762,34 @@ export const DEFAULT_THEME: StoreTheme = {
   themeName: null,
 }
 
-const STORES = '/api/v1/stores'
+/**
+ * Which mount this client talks to.
+ *
+ * The seller's own dashboard and the admin console drive the SAME store pages
+ * against the SAME backend plugin, mounted twice (see `stores.routes.ts`):
+ *
+ *   '/api/v1/stores'               the seller managing their own shop
+ *   '/api/v1/admin/manage/stores'  an admin managing a seller's shop
+ *
+ * So the base is the only thing that differs, and each app sets it once at
+ * boot — the storefront leaves the default, the admin console calls
+ * `configureStoresApi`. Nothing below this line knows which app it is in.
+ *
+ * A plain module-level value is enough because the two apps are separate
+ * bundles with separate entry points (`index.html` / `admin.html`); they never
+ * share a runtime, so there is no case where both bases must be live at once.
+ *
+ * The CSRF cookie is picked from the request URL (`http.ts`), so pointing the
+ * base at `/api/v1/admin/...` automatically switches this client to the admin
+ * surface's cookie namespace — nothing else to configure.
+ */
+let storesBase = '/api/v1/stores'
+
+export function configureStoresApi(mountBase: string): void {
+  storesBase = mountBase
+}
+
+const base = () => storesBase
 const PUBLIC_STORES = '/api/v1/public/stores'
 
 /** Wire shape: theme/homepage are free JSON columns server-side. */
@@ -837,7 +864,7 @@ export function publicStoreUrl(slug: string): string {
 
 export const storesApi = {
   async list(): Promise<Store[]> {
-    return (await call<RawStore[]>(http.get(STORES))).map(normalize)
+    return (await call<RawStore[]>(http.get(base()))).map(normalize)
   },
 
   /**
@@ -856,7 +883,7 @@ export const storesApi = {
     form.append('file', logo, logoFilename)
     return normalize(
       await call<RawStore>(
-        http.post(STORES, form, {
+        http.post(base(), form, {
           onUploadProgress: (e) => {
             if (onProgress && e.total) onProgress(e.loaded / e.total)
           },
@@ -866,11 +893,11 @@ export const storesApi = {
   },
 
   async get(storeId: string): Promise<Store> {
-    return normalize(await call<RawStore>(http.get(`${STORES}/${storeId}`)))
+    return normalize(await call<RawStore>(http.get(`${base()}/${storeId}`)))
   },
 
   async update(storeId: string, patch: { name?: string }): Promise<Store> {
-    return normalize(await call<RawStore>(http.patch(`${STORES}/${storeId}`, patch)))
+    return normalize(await call<RawStore>(http.patch(`${base()}/${storeId}`, patch)))
   },
 
   /**
@@ -883,7 +910,7 @@ export const storesApi = {
     patch: StoreProfilePatch,
   ): Promise<Store> {
     return normalize(
-      await call<RawStore>(http.patch(`${STORES}/${storeId}/profile`, patch)),
+      await call<RawStore>(http.patch(`${base()}/${storeId}/profile`, patch)),
     )
   },
 
@@ -901,7 +928,7 @@ export const storesApi = {
     form.append('file', file, filename)
     return normalize(
       await call<RawStore>(
-        http.put(`${STORES}/${storeId}/logo`, form, {
+        http.put(`${base()}/${storeId}/logo`, form, {
           onUploadProgress: (e) => {
             if (onProgress && e.total) onProgress(e.loaded / e.total)
           },
@@ -915,7 +942,7 @@ export const storesApi = {
     patch: Partial<StoreTheme>,
   ): Promise<Store> {
     return normalize(
-      await call<RawStore>(http.patch(`${STORES}/${storeId}/theme`, patch)),
+      await call<RawStore>(http.patch(`${base()}/${storeId}/theme`, patch)),
     )
   },
 
@@ -930,7 +957,7 @@ export const storesApi = {
   ): Promise<Store> {
     return normalize(
       await call<RawStore>(
-        http.patch(`${STORES}/${storeId}/homepage`, { sections }),
+        http.patch(`${base()}/${storeId}/homepage`, { sections }),
       ),
     )
   },
@@ -941,7 +968,7 @@ export const storesApi = {
   // into local state and hoping order and link labels still agree.
 
   async listBanners(storeId: string): Promise<StoreBanner[]> {
-    return call<StoreBanner[]>(http.get(`${STORES}/${storeId}/banners`))
+    return call<StoreBanner[]>(http.get(`${base()}/${storeId}/banners`))
   },
 
   /**
@@ -965,7 +992,7 @@ export const storesApi = {
       form.append('isActive', String(input.isActive))
     }
     return call<StoreBanner[]>(
-      http.post(`${STORES}/${storeId}/banners`, form, {
+      http.post(`${base()}/${storeId}/banners`, form, {
         onUploadProgress: (e) => {
           if (onProgress && e.total) onProgress(e.loaded / e.total)
         },
@@ -979,7 +1006,7 @@ export const storesApi = {
     patch: StoreBannerInput,
   ): Promise<StoreBanner[]> {
     return call<StoreBanner[]>(
-      http.patch(`${STORES}/${storeId}/banners/${bannerId}`, patch),
+      http.patch(`${base()}/${storeId}/banners/${bannerId}`, patch),
     )
   },
 
@@ -994,7 +1021,7 @@ export const storesApi = {
     const form = new FormData()
     form.append('file', file, filename)
     return call<StoreBanner[]>(
-      http.put(`${STORES}/${storeId}/banners/${bannerId}/image`, form, {
+      http.put(`${base()}/${storeId}/banners/${bannerId}/image`, form, {
         onUploadProgress: (e) => {
           if (onProgress && e.total) onProgress(e.loaded / e.total)
         },
@@ -1004,7 +1031,7 @@ export const storesApi = {
 
   async deleteBanner(storeId: string, bannerId: string): Promise<StoreBanner[]> {
     return call<StoreBanner[]>(
-      http.delete(`${STORES}/${storeId}/banners/${bannerId}`),
+      http.delete(`${base()}/${storeId}/banners/${bannerId}`),
     )
   },
 
@@ -1014,7 +1041,7 @@ export const storesApi = {
     bannerIds: string[],
   ): Promise<StoreBanner[]> {
     return call<StoreBanner[]>(
-      http.patch(`${STORES}/${storeId}/banners/order`, { bannerIds }),
+      http.patch(`${base()}/${storeId}/banners/order`, { bannerIds }),
     )
   },
 
@@ -1025,7 +1052,7 @@ export const storesApi = {
    */
   async updateFooter(storeId: string, patch: StoreFooterPatch): Promise<Store> {
     return normalize(
-      await call<RawStore>(http.patch(`${STORES}/${storeId}/footer`, patch)),
+      await call<RawStore>(http.patch(`${base()}/${storeId}/footer`, patch)),
     )
   },
 
@@ -1035,7 +1062,7 @@ export const storesApi = {
     patch: Partial<StorePayments>,
   ): Promise<Store> {
     return normalize(
-      await call<RawStore>(http.patch(`${STORES}/${storeId}/payments`, patch)),
+      await call<RawStore>(http.patch(`${base()}/${storeId}/payments`, patch)),
     )
   },
 
@@ -1045,14 +1072,14 @@ export const storesApi = {
     patch: Partial<StoreCheckoutFields>,
   ): Promise<Store> {
     return normalize(
-      await call<RawStore>(http.patch(`${STORES}/${storeId}/checkout`, patch)),
+      await call<RawStore>(http.patch(`${base()}/${storeId}/checkout`, patch)),
     )
   },
 
   /** Set the fulfilment mode (Delivery / Pickup / Both). */
   async updateShipping(storeId: string, mode: ShippingMode): Promise<Store> {
     return normalize(
-      await call<RawStore>(http.patch(`${STORES}/${storeId}/shipping`, { mode })),
+      await call<RawStore>(http.patch(`${base()}/${storeId}/shipping`, { mode })),
     )
   },
 
@@ -1066,7 +1093,7 @@ export const storesApi = {
   ): Promise<Store> {
     return normalize(
       await call<RawStore>(
-        http.patch(`${STORES}/${storeId}/shipping`, { deliveryRule }),
+        http.patch(`${base()}/${storeId}/shipping`, { deliveryRule }),
       ),
     )
   },
@@ -1075,21 +1102,21 @@ export const storesApi = {
   async updateShippingRate(storeId: string, rate: ShippingRate): Promise<Store> {
     return normalize(
       await call<RawStore>(
-        http.patch(`${STORES}/${storeId}/shipping`, { rate }),
+        http.patch(`${base()}/${storeId}/shipping`, { rate }),
       ),
     )
   },
 
   /** Seller dashboard — order counters + latest orders for one store. */
   async getDashboard(storeRef: string): Promise<StoreDashboard> {
-    return call<StoreDashboard>(http.get(`${STORES}/${storeRef}/dashboard`))
+    return call<StoreDashboard>(http.get(`${base()}/${storeRef}/dashboard`))
   },
 
   /** Toggle the store's public page live/offline. */
   async setPublished(storeId: string, isPublished: boolean): Promise<Store> {
     return normalize(
       await call<RawStore>(
-        http.patch(`${STORES}/${storeId}/publish`, { isPublished }),
+        http.patch(`${base()}/${storeId}/publish`, { isPublished }),
       ),
     )
   },
@@ -1178,7 +1205,7 @@ export interface BankAccountInput extends BankAccountDetails {
 export const storeBankApi = {
   async list(storeRef: string): Promise<StoreBankAccount[]> {
     return call<StoreBankAccount[]>(
-      http.get(`${STORES}/${storeRef}/bank-accounts`),
+      http.get(`${base()}/${storeRef}/bank-accounts`),
     )
   },
 
@@ -1187,7 +1214,7 @@ export const storeBankApi = {
     input: BankAccountInput,
   ): Promise<StoreBankAccount> {
     return call<StoreBankAccount>(
-      http.post(`${STORES}/${storeRef}/bank-accounts`, input),
+      http.post(`${base()}/${storeRef}/bank-accounts`, input),
     )
   },
 
@@ -1197,7 +1224,7 @@ export const storeBankApi = {
     patch: Partial<BankAccountDetails> & { isPrimary?: true },
   ): Promise<StoreBankAccount> {
     return call<StoreBankAccount>(
-      http.patch(`${STORES}/${storeRef}/bank-accounts/${accountId}`, patch),
+      http.patch(`${base()}/${storeRef}/bank-accounts/${accountId}`, patch),
     )
   },
 
@@ -1210,7 +1237,7 @@ export const storeBankApi = {
   },
 
   async remove(storeRef: string, accountId: string): Promise<void> {
-    await call(http.delete(`${STORES}/${storeRef}/bank-accounts/${accountId}`))
+    await call(http.delete(`${base()}/${storeRef}/bank-accounts/${accountId}`))
   },
 }
 
@@ -1546,7 +1573,7 @@ export interface StoreProductOptionsInput {
  */
 export const storeCatalogApi = {
   async listCategories(storeRef: string): Promise<StoreCategory[]> {
-    return call<StoreCategory[]>(http.get(`${STORES}/${storeRef}/categories`))
+    return call<StoreCategory[]>(http.get(`${base()}/${storeRef}/categories`))
   },
 
   async createCategory(
@@ -1554,7 +1581,7 @@ export const storeCatalogApi = {
     input: StoreCategoryCreateInput,
   ): Promise<StoreCategory> {
     return call<StoreCategory>(
-      http.post(`${STORES}/${storeRef}/categories`, input),
+      http.post(`${base()}/${storeRef}/categories`, input),
     )
   },
 
@@ -1568,7 +1595,7 @@ export const storeCatalogApi = {
     patch: StoreCategoryInput,
   ): Promise<StoreCategory> {
     return call<StoreCategory>(
-      http.patch(`${STORES}/${storeRef}/categories/${categoryId}`, patch),
+      http.patch(`${base()}/${storeRef}/categories/${categoryId}`, patch),
     )
   },
 
@@ -1578,7 +1605,7 @@ export const storeCatalogApi = {
     isActive: boolean,
   ): Promise<StoreCategory> {
     return call<StoreCategory>(
-      http.patch(`${STORES}/${storeRef}/categories/${categoryId}`, { isActive }),
+      http.patch(`${base()}/${storeRef}/categories/${categoryId}`, { isActive }),
     )
   },
 
@@ -1589,7 +1616,7 @@ export const storeCatalogApi = {
     isFeatured: boolean,
   ): Promise<StoreCategory> {
     return call<StoreCategory>(
-      http.patch(`${STORES}/${storeRef}/categories/${categoryId}`, {
+      http.patch(`${base()}/${storeRef}/categories/${categoryId}`, {
         isFeatured,
       }),
     )
@@ -1602,23 +1629,23 @@ export const storeCatalogApi = {
     name: string,
   ): Promise<StoreCategory> {
     return call<StoreCategory>(
-      http.patch(`${STORES}/${storeRef}/categories/${categoryId}`, { name }),
+      http.patch(`${base()}/${storeRef}/categories/${categoryId}`, { name }),
     )
   },
 
   async deleteCategory(storeRef: string, categoryId: string): Promise<void> {
-    await call(http.delete(`${STORES}/${storeRef}/categories/${categoryId}`))
+    await call(http.delete(`${base()}/${storeRef}/categories/${categoryId}`))
   },
 
   async listProducts(storeRef: string): Promise<StoreProduct[]> {
-    return call<StoreProduct[]>(http.get(`${STORES}/${storeRef}/products`))
+    return call<StoreProduct[]>(http.get(`${base()}/${storeRef}/products`))
   },
 
   async createProduct(
     storeRef: string,
     input: StoreProductCreateInput,
   ): Promise<StoreProduct> {
-    return call<StoreProduct>(http.post(`${STORES}/${storeRef}/products`, input))
+    return call<StoreProduct>(http.post(`${base()}/${storeRef}/products`, input))
   },
 
   /**
@@ -1646,12 +1673,12 @@ export const storeCatalogApi = {
     },
   ): Promise<StoreProduct> {
     return call<StoreProduct>(
-      http.patch(`${STORES}/${storeRef}/products/${productId}`, patch),
+      http.patch(`${base()}/${storeRef}/products/${productId}`, patch),
     )
   },
 
   async deleteProduct(storeRef: string, productId: string): Promise<void> {
-    await call(http.delete(`${STORES}/${storeRef}/products/${productId}`))
+    await call(http.delete(`${base()}/${storeRef}/products/${productId}`))
   },
 
   // Options & variants — every mutation returns the full parent product, so
@@ -1666,7 +1693,7 @@ export const storeCatalogApi = {
     input: StoreProductOptionsInput,
   ): Promise<StoreProduct> {
     return call<StoreProduct>(
-      http.put(`${STORES}/${storeRef}/products/${productId}/options`, input),
+      http.put(`${base()}/${storeRef}/products/${productId}/options`, input),
     )
   },
 
@@ -1680,7 +1707,7 @@ export const storeCatalogApi = {
     input: StoreProductGroupsInput,
   ): Promise<StoreProduct> {
     return call<StoreProduct>(
-      http.put(`${STORES}/${storeRef}/products/${productId}/groups`, input),
+      http.put(`${base()}/${storeRef}/products/${productId}/groups`, input),
     )
   },
 
@@ -1694,7 +1721,7 @@ export const storeCatalogApi = {
     if (query.q) params.set('q', query.q)
     return call<GroupCandidate[]>(
       http.get(
-        `${STORES}/${storeRef}/products/${productId}/group-candidates?${params}`,
+        `${base()}/${storeRef}/products/${productId}/group-candidates?${params}`,
       ),
     )
   },
@@ -1710,7 +1737,7 @@ export const storeCatalogApi = {
     input: { name?: string } = {},
   ): Promise<StoreProduct> {
     return call<StoreProduct>(
-      http.post(`${STORES}/${storeRef}/products/${productId}/copy`, input),
+      http.post(`${base()}/${storeRef}/products/${productId}/copy`, input),
     )
   },
 
@@ -1729,7 +1756,7 @@ export const storeCatalogApi = {
   ): Promise<StoreProduct> {
     return call<StoreProduct>(
       http.patch(
-        `${STORES}/${storeRef}/products/${productId}/variants/${variantId}`,
+        `${base()}/${storeRef}/products/${productId}/variants/${variantId}`,
         patch,
       ),
     )
@@ -1749,7 +1776,7 @@ export const storeCatalogApi = {
     const form = new FormData()
     form.append('file', file, filename)
     return call<StoreProduct>(
-      http.post(`${STORES}/${storeRef}/products/${productId}/media`, form, {
+      http.post(`${base()}/${storeRef}/products/${productId}/media`, form, {
         onUploadProgress: (e) => {
           if (onProgress && e.total) onProgress(e.loaded / e.total)
         },
@@ -1770,7 +1797,7 @@ export const storeCatalogApi = {
     form.append('file', file, filename)
     return call<StoreProduct>(
       http.put(
-        `${STORES}/${storeRef}/products/${productId}/media/${mediaId}/file`,
+        `${base()}/${storeRef}/products/${productId}/media/${mediaId}/file`,
         form,
         {
           onUploadProgress: (e) => {
@@ -1790,7 +1817,7 @@ export const storeCatalogApi = {
   ): Promise<StoreProduct> {
     return call<StoreProduct>(
       http.patch(
-        `${STORES}/${storeRef}/products/${productId}/media/${mediaId}`,
+        `${base()}/${storeRef}/products/${productId}/media/${mediaId}`,
         { altText },
       ),
     )
@@ -1803,7 +1830,7 @@ export const storeCatalogApi = {
     mediaIds: string[],
   ): Promise<StoreProduct> {
     return call<StoreProduct>(
-      http.put(`${STORES}/${storeRef}/products/${productId}/media/order`, {
+      http.put(`${base()}/${storeRef}/products/${productId}/media/order`, {
         mediaIds,
       }),
     )
@@ -1816,7 +1843,7 @@ export const storeCatalogApi = {
   ): Promise<StoreProduct> {
     return call<StoreProduct>(
       http.delete(
-        `${STORES}/${storeRef}/products/${productId}/media/${mediaId}`,
+        `${base()}/${storeRef}/products/${productId}/media/${mediaId}`,
       ),
     )
   },
@@ -2167,14 +2194,14 @@ export const sellerOrderApi = {
     query: SellerOrderListQuery = {},
   ): Promise<{ items: SellerOrderSummary[]; meta: ListMeta }> {
     return callList<SellerOrderSummary>(
-      http.get(`${STORES}/${storeRef}/orders`, { params: query }),
+      http.get(`${base()}/${storeRef}/orders`, { params: query }),
     )
   },
 
   /** One order, full shape (items, customer, payment, lifecycle stamps). */
   async get(storeRef: string, orderId: string): Promise<PlacedOrder> {
     return call<PlacedOrder>(
-      http.get(`${STORES}/${storeRef}/orders/${orderId}`),
+      http.get(`${base()}/${storeRef}/orders/${orderId}`),
     )
   },
 
@@ -2188,7 +2215,7 @@ export const sellerOrderApi = {
     status: 'CONFIRMED' | 'PACKED' | 'SHIPPED' | 'DELIVERED',
   ): Promise<PlacedOrder> {
     return call<PlacedOrder>(
-      http.patch(`${STORES}/${storeRef}/orders/${orderId}/status`, { status }),
+      http.patch(`${base()}/${storeRef}/orders/${orderId}/status`, { status }),
     )
   },
 
@@ -2202,7 +2229,7 @@ export const sellerOrderApi = {
     reason: string | null,
   ): Promise<PlacedOrder> {
     return call<PlacedOrder>(
-      http.post(`${STORES}/${storeRef}/orders/${orderId}/cancel`, { reason }),
+      http.post(`${base()}/${storeRef}/orders/${orderId}/cancel`, { reason }),
     )
   },
 }

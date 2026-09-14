@@ -12,6 +12,7 @@ import { ThemePreview } from './ThemePreview'
 import { findActiveTemplate, ThemeTemplateStrip } from './ThemeTemplateStrip'
 import type { ThemeNavState } from './ThemeTemplateStrip'
 import { EyeIcon, PaletteIcon } from '../../layout/icons'
+import { useStoreManageScope } from '../../features/stores/storeManageScope'
 
 /**
  * Appearance — pick a look, then (optionally) make it yours.
@@ -42,6 +43,8 @@ export function StoreAppearancePage() {
   const { store, onStoreChange } = useManagedStore()
   const { storeSlug } = useParams()
   const location = useLocation()
+  // Owner or admin — decides where the full-screen preview route lives.
+  const scope = useStoreManageScope()
   // The full-screen preview hands its draft back here (and asks for the color
   // editor when the seller pressed Customize there). Read once, on mount:
   // arriving from that page is a fresh mount of this one.
@@ -240,7 +243,7 @@ export function StoreAppearancePage() {
             {/* Carries the DRAFT, so opening the big preview mid-edit shows
                 what you were editing rather than the last saved palette. */}
             <Link
-              to={`/mystores/${storeSlug}/appearance/preview`}
+              to={`${scope.storePath(storeSlug ?? '')}/appearance/preview`}
               state={{ theme } satisfies ThemeNavState}
               className="inline-flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-fg transition-colors hover:border-brand"
             >

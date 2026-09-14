@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma.js";
+import type { StoreActor } from "./storeActor.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../../utils/httpError.js";
 import { getCategoryPath } from "../category/categoryTree.js";
@@ -374,8 +375,8 @@ async function taxonomyRef(id: string) {
 // Categories (a tree mirroring the global taxonomy)
 // ---------------------------------------------------------------------------
 
-export async function listCategories(ownerId: string, storeRef: string) {
-  const store = await getMyStore(ownerId, storeRef);
+export async function listCategories(actor: StoreActor, storeRef: string) {
+  const store = await getMyStore(actor, storeRef);
   const rows = await prisma.storeCategory.findMany({
     where: { storeId: store.id },
     // Seller-set order first; ties keep the historical creation order, so a
@@ -461,11 +462,11 @@ async function ensureShelf(
  * construction. Sellers cannot invent categories; that is the whole point.
  */
 export async function createCategory(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   input: StoreCategoryCreateInput,
 ) {
-  const store = await getMyStore(ownerId, storeRef);
+  const store = await getMyStore(actor, storeRef);
 
   // activeOnly — a seller must not be able to file their catalog under a
   // category an admin has retired.
@@ -513,12 +514,12 @@ export async function createCategory(
  * admin action.
  */
 export async function updateCategory(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   categoryId: string,
   patch: StoreCategoryUpdateInput,
 ) {
-  const store = await getMyStore(ownerId, storeRef);
+  const store = await getMyStore(actor, storeRef);
 
   const category = await prisma.storeCategory.findFirst({
     where: { id: categoryId, storeId: store.id },
@@ -543,11 +544,11 @@ export async function updateCategory(
 }
 
 export async function deleteCategory(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   categoryId: string,
 ) {
-  const store = await getMyStore(ownerId, storeRef);
+  const store = await getMyStore(actor, storeRef);
 
   const category = await prisma.storeCategory.findFirst({
     where: { id: categoryId, storeId: store.id },
@@ -573,8 +574,8 @@ export async function deleteCategory(
 // Products
 // ---------------------------------------------------------------------------
 
-export async function listProducts(ownerId: string, storeRef: string) {
-  const store = await getMyStore(ownerId, storeRef);
+export async function listProducts(actor: StoreActor, storeRef: string) {
+  const store = await getMyStore(actor, storeRef);
   const rows = await prisma.storeProduct.findMany({
     where: { storeId: store.id },
     select: productSelect,
@@ -622,11 +623,11 @@ async function assertOwnImages(productId: string, mediaIds: (string | null | und
   }
 }
 
-export async function createProduct(  ownerId: string,
+export async function createProduct(  actor: StoreActor,
   storeRef: string,
   input: StoreProductCreateInput,
 ) {
-  const store = await getMyStore(ownerId, storeRef);
+  const store = await getMyStore(actor, storeRef);
 
   // The category (root or subcategory) must belong to this store — also
   // what makes a category a prerequisite for adding products.
@@ -693,12 +694,12 @@ export async function createProduct(  ownerId: string,
  * together through `replaceProductOptions`.
  */
 export async function updateProduct(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   productId: string,
   patch: StoreProductUpdateInput,
 ) {
-  const store = await getMyStore(ownerId, storeRef);
+  const store = await getMyStore(actor, storeRef);
 
   const product = await prisma.storeProduct.findFirst({
     where: { id: productId, storeId: store.id },
@@ -798,11 +799,11 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   productId: string,
 ) {
-  const store = await getMyStore(ownerId, storeRef);
+  const store = await getMyStore(actor, storeRef);
 
   const product = await prisma.storeProduct.findFirst({
     where: { id: productId, storeId: store.id },
@@ -845,11 +846,11 @@ export async function deleteProduct(
 
 /** Resolves a product inside one of the owner's stores (foreign → 404). */
 async function getMyProductId(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   productId: string,
 ): Promise<string> {
-  const store = await getMyStore(ownerId, storeRef);
+  const store = await getMyStore(actor, storeRef);
   const product = await prisma.storeProduct.findFirst({
     where: { id: productId, storeId: store.id },
     select: { id: true },
@@ -886,12 +887,12 @@ async function getMyProductId(
  * real names.
  */
 export async function replaceProductOptions(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   productId: string,
   input: StoreProductOptionsInput,
 ) {
-  const { productId: id, storeId } = await getMyProductRef(ownerId, storeRef, productId);
+  const { productId: id, storeId } = await getMyProductRef(actor, storeRef, productId);
 
   // An axis is EITHER typed values (here) or other products (a group) — never
   // both under one name — and groups count towards the option cap.
@@ -1093,12 +1094,12 @@ const shapedProduct = async (id: string) => {
  * case-sensitive; the schema refine covers the rest).
  */
 export async function replaceProductGroups(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   productId: string,
   input: StoreProductGroupsInput,
 ) {
-  const { productId: id, storeId } = await getMyProductRef(ownerId, storeRef, productId);
+  const { productId: id, storeId } = await getMyProductRef(actor, storeRef, productId);
 
   for (const group of input.groups) {
     if (!group.members.some((member) => member.productId === id)) {
@@ -1218,12 +1219,12 @@ export async function replaceProductGroups(
  * the other colours usually live.
  */
 export async function listGroupCandidates(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   productId: string,
   query: GroupCandidatesQuery,
 ) {
-  const { productId: id, storeId } = await getMyProductRef(ownerId, storeRef, productId);
+  const { productId: id, storeId } = await getMyProductRef(actor, storeRef, productId);
   const key = optionKeyOf(query.optionName);
 
   const caller = await prisma.storeProduct.findUniqueOrThrow({
@@ -1333,12 +1334,12 @@ export async function listGroupCandidates(
  * either do not propagate.
  */
 export async function copyProduct(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   productId: string,
   input: StoreProductCopyInput,
 ) {
-  const store = await getMyStore(ownerId, storeRef);
+  const store = await getMyStore(actor, storeRef);
   const source = await prisma.storeProduct.findFirst({
     where: { id: productId, storeId: store.id },
     select: {
@@ -1381,13 +1382,13 @@ export async function copyProduct(
 }
 
 export async function updateVariant(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   productId: string,
   variantId: string,
   patch: StoreVariantUpdateInput,
 ) {
-  const { productId: id, storeId } = await getMyProductRef(ownerId, storeRef, productId);
+  const { productId: id, storeId } = await getMyProductRef(actor, storeRef, productId);
 
   const variant = await prisma.storeProductVariant.findFirst({
     where: { id: variantId, productId: id },
@@ -1437,11 +1438,11 @@ export async function updateVariant(
 
 /** Resolves product + store ids inside one of the owner's stores (404 otherwise). */
 async function getMyProductRef(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   productId: string,
 ): Promise<{ productId: string; storeId: string }> {
-  const store = await getMyStore(ownerId, storeRef);
+  const store = await getMyStore(actor, storeRef);
   const product = await prisma.storeProduct.findFirst({
     where: { id: productId, storeId: store.id },
     select: { id: true },
@@ -1466,13 +1467,13 @@ async function productWithMedia(productId: string) {
  * image ordering entirely.
  */
 export async function addProductMedia(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   productRef: string,
   file: UploadedFile,
 ) {
   const { productId, storeId } = await getMyProductRef(
-    ownerId,
+    actor,
     storeRef,
     productRef,
   );
@@ -1523,14 +1524,14 @@ export async function addProductMedia(
  * removed best-effort after the row points at the new one.
  */
 export async function replaceProductMediaFile(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   productRef: string,
   mediaId: string,
   file: UploadedFile,
 ) {
   const { productId, storeId } = await getMyProductRef(
-    ownerId,
+    actor,
     storeRef,
     productRef,
   );
@@ -1566,13 +1567,13 @@ export async function replaceProductMediaFile(
 
 /** Update media metadata — alt text (accessibility). `null` clears it. */
 export async function updateProductMedia(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   productRef: string,
   mediaId: string,
   patch: StoreMediaUpdateInput,
 ) {
-  const { productId } = await getMyProductRef(ownerId, storeRef, productRef);
+  const { productId } = await getMyProductRef(actor, storeRef, productRef);
 
   const media = await prisma.storeProductMedia.findFirst({
     where: { id: mediaId, productId },
@@ -1594,12 +1595,12 @@ export async function updateProductMedia(
  * The video (if any) is untouched.
  */
 export async function reorderProductMedia(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   productRef: string,
   input: StoreMediaOrderInput,
 ) {
-  const { productId } = await getMyProductRef(ownerId, storeRef, productRef);
+  const { productId } = await getMyProductRef(actor, storeRef, productRef);
 
   const images = await prisma.storeProductMedia.findMany({
     where: { productId, type: "IMAGE" },
@@ -1629,12 +1630,12 @@ export async function reorderProductMedia(
 }
 
 export async function deleteProductMedia(
-  ownerId: string,
+  actor: StoreActor,
   storeRef: string,
   productRef: string,
   mediaId: string,
 ) {
-  const { productId } = await getMyProductRef(ownerId, storeRef, productRef);
+  const { productId } = await getMyProductRef(actor, storeRef, productRef);
 
   const media = await prisma.storeProductMedia.findFirst({
     where: { id: mediaId, productId },

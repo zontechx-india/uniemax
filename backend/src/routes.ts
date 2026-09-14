@@ -1,5 +1,10 @@
 import type { FastifyInstance } from "fastify";
-import { authRoutes, adminAuthRoutes, requireAdmin } from "./package/auth/index.js";
+import {
+  authRoutes,
+  adminAuthRoutes,
+  requireAdmin,
+  requireAdminCsrf,
+} from "./package/auth/index.js";
 import { mediaRules } from "./package/storage/index.js";
 import { ok } from "./utils/response.js";
 import { healthRoutes } from "./modules/health/health.routes.js";
@@ -53,10 +58,13 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       await api.register(authRoutes, { prefix: "/auth" });
       await api.register(publicCategoryRoutes, { prefix: "/categories" });
       // Customer-owned stores (guarded inside the plugin — requireCustomer).
-      await api.register(storeRoutes, { prefix: "/stores" });
+      await api.register(storeRoutes, { prefix: "/stores", mode: "owner" });
       // Curated storefront palettes a seller applies from Appearance —
       // active templates only (guarded inside the plugin — requireCustomer).
-      await api.register(sellerThemeTemplateRoutes, { prefix: "/theme-templates" });
+      await api.register(sellerThemeTemplateRoutes, {
+        prefix: "/theme-templates",
+        mode: "owner",
+      });
       // Customer address book (guarded inside the plugin — requireCustomer).
       await api.register(addressRoutes, { prefix: "/addresses" });
       // Durable cart for signed-in customers (guarded — requireCustomer).
@@ -105,6 +113,12 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
           // Everything else under /admin requires a valid admin token.
           await admin.register(async (guarded) => {
             guarded.addHook("preHandler", requireAdmin);
+            // Second layer under SameSite=Lax for cookie-authenticated
+            // mutations. Skips safe methods and bearer clients — see
+            // `requireAdminCsrf`. The console's HTTP client already echoes
+            // the `um_admin_csrf` cookie on every non-GET, so this is
+            // transparent to it.
+            guarded.addHook("preHandler", requireAdminCsrf);
             await guarded.register(adminCategoryRoutes, { prefix: "/categories" });
             // Notification feed + broadcast for the admin principal.
             await guarded.register(adminNotificationRoutes, {
@@ -123,6 +137,25 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
             // The platform console (dashboard, stores, customers, orders,
             // payments, catalog oversight, audit trail, admin accounts).
             await guarded.register(adminConsoleRoutes);
+            // Store management ON BEHALF OF A SELLER — the SAME plugin that
+            // serves /stores, mounted a second time with an admin actor so
+            // support can fix a seller's catalog or storefront without a
+            // parallel implementation that could drift from the seller's.
+            // Payout accounts, the support inboxes and store creation are
+            // not registered on this mount; every write here is audited.
+            // Registered after adminConsoleRoutes so the static "manage"
+            // segment cannot be swallowed by its "/stores/:id".
+            await guarded.register(storeRoutes, {
+              prefix: "/manage/stores",
+              mode: "admin",
+            });
+            // The Appearance screen inside that mount reads the seller's
+            // template list, so it is served here too — active rows only,
+            // unlike the console CRUD above.
+            await guarded.register(sellerThemeTemplateRoutes, {
+              prefix: "/manage/theme-templates",
+              mode: "admin",
+            });
           });
         },
         { prefix: "/admin" },

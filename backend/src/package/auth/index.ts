@@ -21,7 +21,13 @@ export { adminAuthRoutes } from "./admin/admin.routes.js"; // admin: password (w
 // Guards — for protecting non-auth routes elsewhere in the app.
 // `optionalCustomerId` is the no-throw variant for public routes that grant
 // owner-only extras (e.g. the draft storefront preview).
-export { optionalCustomerId, requireAdmin, requireCustomer } from "./guards.js";
+export {
+  optionalCustomerId,
+  requireAdmin,
+  requireAdminCsrf,
+  requireCustomer,
+  requireSuperAdmin,
+} from "./guards.js";
 
 /**
  * Kill every session of a principal. Exported for the platform-admin console,
