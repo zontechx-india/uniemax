@@ -47,7 +47,9 @@ library, VAPID; console fallback without keys — see
 ```
 backend/
 ├── prisma/
-│   ├── schema.prisma          # Data model (28 models, source of truth)
+│   ├── schema/                # Multi-file Prisma schema (one datasource, two Postgres schemas)
+│   │   ├── core.prisma        #   the platform models — `public` schema
+│   │   └── affiliate.prisma   #   affiliate_* models — `affiliate` schema, no FK to core
 │   └── check.sql              # Connectivity probe for `npm run db:check`
 ├── prisma.config.ts           # Prisma 7 config — migration datasource (DIRECT_URL)
 ├── src/
@@ -74,6 +76,16 @@ backend/
 │   │   │   ├── config.ts      #   own env parsing (VAPID_*, PUSH_TTL_SECONDS)
 │   │   │   ├── types.ts       #   PushSender port (send → sent/expired/failed)
 │   │   │   └── drivers/       #   webPush.ts (real) · console.ts (no keys)
+│   │   ├── events/            # Typed in-process event bus (on / emit) — orders +
+│   │   │                      #   payments publish, packages subscribe at boot
+│   │   ├── affiliate/         # Seller-run affiliate marketing — see "Affiliate
+│   │   │   ├── index.ts       #   marketing" below. facade: registerAffiliate()
+│   │   │   ├── types.ts       #   AffiliateHost — everything it needs from the platform
+│   │   │   ├── hosts/         #   inProcess.ts — the ONLY file that imports core modules
+│   │   │   ├── domain.ts      #   pure rules: rate resolution, amounts, tokens
+│   │   │   ├── services/      #   program · invitations · partner · tracking · commissions
+│   │   │   ├── routes/        #   seller · partner · public · admin (/api/v1/affiliate)
+│   │   │   └── events.ts      #   order-event subscribers + hourly approve/prune job
 │   │   └── auth/              # The whole auth system — see "Authentication" below
 │   │       ├── index.ts       #   PUBLIC facade — the ONLY entry the app imports
 │   │       ├── guards.ts      #   requireAdmin / requireCustomer + request types
@@ -552,6 +564,58 @@ Decisions worth keeping:
 - **Sellers set status, never priority.** Priority is the platform's triage
   vocabulary; a shop's inbox is small enough to read without one.
 
+### Affiliate marketing — the `package/affiliate` sub-system
+
+Seller-run affiliate programmes: a seller enables a programme on their store,
+invites partners by email, partners create short links, and every order line
+that comes through a link earns a commission. Full design in
+[`docs/AFFILIATE.md`](./AFFILIATE.md).
+
+It is a `package/`, not a `modules/` feature, because it is built to be lifted
+out into its own service later. The `package/storage` idea — a `types.ts` port
+and swappable `drivers/` — is applied to the **host platform itself**:
+`types.ts` declares `AffiliateHost` (stores, products, order snapshots, mail,
+notifications), `hosts/inProcess.ts` answers it from the core tables today, and
+an HTTP host would answer it after extraction. Nothing above that interface
+changes.
+
+Rules that keep it liftable:
+
+- Nothing in the package imports core modules except `hosts/inProcess.ts`.
+  Allowed shared imports: `utils/*`, `package/auth`, `package/events`, the
+  generated Prisma client. The Prisma client itself is injected once through
+  `registerAffiliate(app, { prisma, host })` (called from `app.ts`), never
+  imported.
+- Its tables live in the **`affiliate` Postgres schema** (`prisma/schema/
+  affiliate.prisma`) with **no foreign key to a core table** — every core id is
+  a plain string plus a snapshot of what the row displays.
+- The core knows exactly one affiliate thing: `Order.affiliateRef`, an opaque
+  token the checkout sends and the core stores without interpreting.
+- Coupling to orders is one-way through `package/events`: `orders` and
+  `payments` `emit("order.placed" | "order.paid" | "order.status" |
+  "order.cancelled")`; the package subscribes in `events.ts`. Handlers are
+  idempotent (`orderItemId` is unique), so a redelivered event adds nothing.
+  Attribution is resolved in the handler, not inside `createOrder`'s
+  transaction, so behaviour is identical before and after extraction.
+
+Flow: `POST /public/click/:token` records the click and mints an attribution
+token the storefront keeps in `localStorage` per store → checkout sends it as
+`affiliateRef` → `order.placed` resolves it, snapshots rate + base and writes
+one `AffiliateCommission` per line (`PENDING`) → `DELIVERED` sets `maturesAt`
+= delivery + the programme's hold days → the hourly job approves matured
+commissions on paid, delivered orders (`APPROVED`); a cancelled order flips
+them to `CANCELLED` / `REVERSED`. One click credits one order — the storefront
+clears the token after checkout. Rate resolution (`domain.ts`): product rule →
+affiliate-specific override → programme default, the most specific wins; a
+product switched off yields no commission. Payouts (`PAID`) wait for the
+platform ledger — see PRODUCTION_READINESS §S1.
+
+Guards: partner routes run `requireCustomer` then the package's own
+`requireAffiliate` (loads the `Affiliate` row, 403 when absent or suspended);
+seller routes verify ownership through `AffiliateHost.getOwnedStore()`;
+`/admin/**` runs `requireAdmin` + `requireAdminCsrf`. Platform guardrails are
+env-driven constants in `config.ts` (`AFFILIATE_MAX_PERCENT` etc.).
+
 ### Authentication — the `package/auth` sub-system
 
 > Full architecture reference:
@@ -629,7 +693,7 @@ without touching auth logic.
 
 ---
 
-## Data Model (see `prisma/schema.prisma`)
+## Data Model (see `prisma/schema/`)
 
 White-label design — one codebase, any business:
 - **StoreSetting** — single-row branding/contact/defaults.
@@ -1170,8 +1234,43 @@ White-label design — one codebase, any business:
 Enums: `OrderStatus`, `PaymentMethod`, `PaymentStatus`, `ShippingType`,
 `OtpChannel`, `OtpPurpose`, `AuthProvider`, `AdminRole`, `StoreMediaType`,
 `BankVerificationStatus`, `BankVerificationMethod`, `PrincipalType`,
-`NotificationKind` (includes `SUPPORT`), `SupportRecipient`,
+`NotificationKind` (includes `SUPPORT`, `AFFILIATE`), `SupportRecipient`,
 `SupportTicketStatus`, `SupportTicketCategory`, `SupportTicketPriority`.
+
+**Affiliate marketing** (`prisma/schema/affiliate.prisma`, Postgres schema
+`affiliate`, tables prefixed `affiliate_` plus `store_affiliates`; no
+`@relation` crosses into `public` — core ids are plain indexed strings with a
+display snapshot beside them):
+- **AffiliateProgram** — one per store (`storeId` unique): `enabled`, default
+  `commissionType` (`PERCENTAGE | FIXED`) + `commissionRate`, `attributionDays`
+  (how long a click keeps earning, default 30), `holdDays` (return window
+  after delivery before approval, default 7).
+- **AffiliateProductRule** — per-product exception under a programme: switch a
+  product off (`enabled`) or give it its own rate. No row = programme default.
+- **Affiliate** — one per customer (`customerId` unique): `displayName`,
+  `status` (`ACTIVE | SUSPENDED`). Never used as the customer id.
+- **AffiliateInvitation** — seller → person: `token` (unique), name, email,
+  optional negotiated rate, `status` (`PENDING | ACCEPTED | EXPIRED |
+  CANCELLED`), `expiresAt`, `affiliateId` once accepted.
+- **StoreAffiliate** — the partnership (`affiliateId + storeId` unique):
+  `status` (`ACTIVE | PAUSED | REMOVED`), optional affiliate-specific rate,
+  store name/slug snapshot.
+- **AffiliateLink** — `token` (unique, the `/a/:token` part), optional product
+  (id + name/slug snapshot), `channel`, `label`, `enabled`, `clickCount`.
+- **AffiliateClick** — append-only click log (ip / UA / referer), pruned after
+  `AFFILIATE_CLICK_RETENTION_DAYS`; the counter on the link survives.
+- **AffiliateAttribution** — one per click: `token` (unique, what the browser
+  carries), `expiresAt`, `orderId` (unique, set once an order used it).
+- **AffiliateCommission** — one per **order line** (`orderItemId` unique) so a
+  partial return reverses exactly one line: order/store/product snapshots,
+  `lineTotal`, `commissionType`, `commissionRate`, `amount`, `status`
+  (`PENDING | APPROVED | PAID | CANCELLED | REVERSED | REJECTED`), `maturesAt`,
+  `approvedAt`, `paidAt`, `note`.
+- **AffiliateFraudEvent** — recorded suspicion (`SELF_PURCHASE` today) for a
+  human to review; nothing is punished automatically.
+
+Core touch points: `Order.affiliateRef` (nullable opaque token from checkout)
+and `NotificationKind.AFFILIATE`.
 
 ---
 
@@ -1191,6 +1290,17 @@ Enums: `OrderStatus`, `PaymentMethod`, `PaymentStatus`, `ShippingType`,
   db:migrate` (dev — creates + applies a migration) → commit the migration
   folder → `npm run db:deploy` on production. `npm run db:status` shows
   pending migrations. `prisma db push` is no longer used.
+- **Multi-file schema, two Postgres schemas.** `prisma.config.ts` points at the
+  `prisma/schema/` folder; every model and enum carries `@@schema("public")`
+  or `@@schema("affiliate")` (Prisma's `multiSchema` — GA in Prisma 7, so the
+  datasource lists `schemas = ["public", "affiliate"]`). One generated client
+  covers both. The generator `output` is relative to the schema folder, hence
+  `../../src/generated/prisma`.
+- When `migrate dev` refuses because the dev database carries a migration the
+  local folder does not (history drift), do **not** reset. Generate the exact
+  delta instead — `prisma migrate diff --from-config-datasource --to-schema
+  prisma/schema --script` — save it as a new migration folder, review it, and
+  apply with `npm run db:deploy`. That is how `affiliate_v1` was created.
 
 ---
 
@@ -1278,6 +1388,13 @@ self-service profile/orders/verification/linking, with **real delivery providers
 Resend (email) and Message Central (SMS), each with a console fallback when
 credentials are absent. Google sign-in is **disabled** (no verifier registered). All
 verified end-to-end.
+
+Also done: **affiliate marketing** — `package/affiliate` (seller programmes,
+email invitations, partner short links, click attribution, per-line
+commissions with delivery + hold-period approval, admin oversight) on its own
+`affiliate` Postgres schema, driven by the new `package/events` bus. Payout
+of `APPROVED` commissions waits for the platform ledger. See
+`docs/AFFILIATE.md`.
 
 Also done: **marketplace discovery** (`modules/discovery` + the public store
 index in `modules/stores`) powering the marketplace homepage —

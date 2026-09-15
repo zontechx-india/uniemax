@@ -1594,6 +1594,9 @@ never sell.
                                      // the store's shipping mode
   "paymentMethod": "COD",            // ONLINE | COD — must be seller-enabled AND
                                      // allowed by every product (codAvailable)
+  "affiliateRef": "…",               // optional — attribution token the storefront
+                                     // kept from an affiliate link (/a/:token);
+                                     // stored as-is, resolved by package/affiliate
   "billingAddress": {                // optional — omit/null = same as delivery
     "name": "Ravi", "phone": null, "address": "12/4 MG Road, Kochi",
     "pincode": "682016", "state": "Kerala", "country": "India" },
@@ -2133,6 +2136,108 @@ transactionally; pushes go out in batches afterwards.
 → `{ "data": { "recipients": 128 } }`
 
 ---
+
+## Affiliate Marketing — `/api/v1/affiliate`
+
+Served by `package/affiliate` (see `docs/BACKEND_CONTEXT.md` and
+`docs/AFFILIATE.md`). Every affiliate route — seller, partner, public and
+admin — sits under this one prefix. Money fields are plain numbers here
+(already rounded to 2 dp server-side), not decimal strings.
+
+Shared shapes:
+
+```jsonc
+// Commission — one per order line
+{ "id": "…", "storeId": "…", "storeName": "ABC Fashion", "orderId": "…",
+  "orderNumber": "UM-…", "productName": "Premium Jacket", "lineTotal": 2499,
+  "commissionType": "PERCENTAGE",     // PERCENTAGE | FIXED (snapshot)
+  "commissionRate": 10, "amount": 249.9,
+  "status": "PENDING",                // PENDING | APPROVED | PAID | CANCELLED | REVERSED | REJECTED
+  "maturesAt": null,                  // set on delivery = deliveredAt + holdDays
+  "approvedAt": null, "paidAt": null, "note": null, "createdAt": "…",
+  "affiliate": { "id": "…", "displayName": "Rahul" } }
+
+// Totals (seller summary / partner profile)
+{ "orders": 12, "sales": 48250, "pending": 850, "approved": 1820, "paid": 4250 }
+```
+
+### Seller — `/api/v1/affiliate/seller/stores/:storeId/**` 🔒 customer (store owner)
+
+`:storeId` is the store id **or slug**; a store the caller does not own is a
+`404`. Percentage rates are capped by `AFFILIATE_MAX_PERCENT` (default 50) —
+above it → `400`.
+
+- `GET …/summary` → Totals + `{ partners, clicks }`.
+- `GET …/program` · `PATCH …/program` — `{ enabled?, commissionType?,
+  commissionRate?, attributionDays? (1–180), holdDays? (0–90) }`. The row is
+  created with defaults (off, 10 %, 30 days, 7 days) the first time it is
+  read.
+- `GET …/products?page&pageSize&q` (list envelope) — the store's active
+  products with `{ enabled, commissionType, commissionRate, hasOverride }`
+  resolved per product.
+- `PATCH …/products/:productId` — `{ enabled?, commissionType?,
+  commissionRate? }`; `null` rate clears the override. A rule equal to the
+  programme default is deleted rather than stored.
+- `GET …/invitations` · `POST …/invitations` → `201` — `{ name, email,
+  commissionType?, commissionRate? }` (programme must be enabled → else
+  `400`). Emails the invitee and returns the invitation with its `url`
+  (`{PUBLIC_WEB_URL}/affiliate/invite/{token}`); expires after
+  `AFFILIATE_INVITE_DAYS` (14). `DELETE …/invitations/:id` withdraws a pending
+  one (`404` otherwise).
+- `GET …/partners` — partnerships with `{ name, status (ACTIVE | PAUSED |
+  REMOVED), accountStatus, commissionType, commissionRate, hasOverride,
+  commissions, earned, joinedAt }`. `PATCH …/partners/:id` — `{ status?,
+  commissionType?, commissionRate? }` (an affiliate-specific rate; `null`
+  clears it).
+- `GET …/commissions?page&pageSize&status` (list envelope).
+
+### Affiliate partner — `/api/v1/affiliate/me/**` 🔒 customer + affiliate profile
+
+`403` when the customer has no `Affiliate` row ("not an affiliate partner
+yet") or is suspended.
+
+- `GET /api/v1/affiliate/me` → `{ id, displayName, status, joinedAt, stores,
+  clicks, …Totals }`.
+- `GET …/me/stores` — partnerships with the effective rate and
+  `programEnabled`.
+- `GET …/me/stores/:storeId/products?page&pageSize&q` (list envelope) — only
+  products open to affiliates, each with `commissionType`, `commissionRate`
+  and `estimatedCommission` for one unit. `404` unless the partnership is
+  active and the programme enabled.
+- `GET …/me/links` · `POST …/me/links` → `201` — `{ storeId, productId?,
+  channel? (YOUTUBE | INSTAGRAM | FACEBOOK | WEBSITE | WHATSAPP | TELEGRAM |
+  OTHER), label? }`; omitting `productId` links to the store home. Returns the
+  link with `url` = `{PUBLIC_WEB_URL}/a/{token}`. `PATCH …/me/links/:id` —
+  `{ enabled?, label? }`.
+- `GET …/me/commissions?page&pageSize&status` (list envelope).
+
+### Public — `/api/v1/affiliate/public/**`
+
+- `GET …/invitations/:token` (no auth) → `{ storeName, name, status (PENDING |
+  ACCEPTED | EXPIRED | CANCELLED | CLOSED), commissionType, commissionRate,
+  expiresAt }`. `CLOSED` = the programme is off.
+- `POST …/invitations/:token/accept` 🔒 customer → `{ storeName, storeSlug }`.
+  Creates the caller's `Affiliate` profile if needed and the store
+  partnership; `409` when no longer pending/expired/closed, `400` for the
+  store's own owner.
+- `POST …/click/:token` (no auth, 60/min per IP) → `{ path, storeSlug, ref,
+  expiresAt }`. Records the click and mints an attribution token; the
+  storefront's `/a/:token` page calls this, stores `ref` in `localStorage`
+  under the store slug, then navigates to `path`. `404` for a disabled link,
+  paused partnership or closed programme.
+
+### Platform admin — `/api/v1/affiliate/admin/**` 🔒 admin
+
+- `GET …/affiliates?page&pageSize` (list envelope) — `{ id, customerId,
+  displayName, status, stores, links, createdAt }`. `PATCH …/affiliates/:id`
+  — `{ status: ACTIVE | SUSPENDED }`.
+- `GET …/commissions?page&pageSize&status` (list envelope, every store).
+  `PATCH …/commissions/:id` — `{ status: APPROVED | REJECTED, note? }`
+  (approve early from `PENDING`; reject from `PENDING` or `APPROVED`; anything
+  else `409`).
+- `GET …/fraud-events` — latest 100 `{ kind, affiliateId, storeId, orderId,
+  detail, createdAt }`.
+- `POST …/jobs/approve` → `{ approved }` — runs the hourly approval pass now.
 
 ## Platform Admin Console — `/api/v1/admin` 🔒 admin
 

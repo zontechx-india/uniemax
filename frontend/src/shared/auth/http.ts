@@ -39,8 +39,13 @@ function readCookie(name: string): string | undefined {
  */
 const ADMIN_API_PREFIX = '/api/v1/admin'
 
+// The affiliate package keeps its admin routes under its own prefix.
+const AFFILIATE_ADMIN_PREFIX = '/api/v1/affiliate/admin'
+
 function csrfCookieName(url: string | undefined): string {
-  return url?.startsWith(ADMIN_API_PREFIX) ? 'um_admin_csrf' : 'csrf_token'
+  const admin =
+    url?.startsWith(ADMIN_API_PREFIX) || url?.startsWith(AFFILIATE_ADMIN_PREFIX)
+  return admin ? 'um_admin_csrf' : 'csrf_token'
 }
 
 http.interceptors.request.use((config) => {

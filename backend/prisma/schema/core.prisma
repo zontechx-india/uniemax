@@ -3,13 +3,14 @@
 
 generator client {
   provider     = "prisma-client"
-  output       = "../src/generated/prisma"
+  output       = "../../src/generated/prisma"
   runtime      = "nodejs"
   moduleFormat = "esm"
 }
 
 datasource db {
   provider = "postgresql"
+  schemas  = ["public", "affiliate"]
 }
 
 // ---------------------------------------------------------------------------
@@ -23,6 +24,8 @@ enum OrderStatus {
   SHIPPED
   DELIVERED
   CANCELLED
+
+  @@schema("public")
 }
 
 enum PaymentMethod {
@@ -33,12 +36,16 @@ enum PaymentMethod {
   RAZORPAY
   CARD
   NETBANKING
+
+  @@schema("public")
 }
 
 /// How the customer receives the order — mirrors the store's shipping mode.
 enum OrderFulfilment {
   DELIVERY
   PICKUP
+
+  @@schema("public")
 }
 
 enum PaymentStatus {
@@ -46,6 +53,8 @@ enum PaymentStatus {
   PAID
   FAILED
   REFUNDED
+
+  @@schema("public")
 }
 
 enum ShippingType {
@@ -53,11 +62,15 @@ enum ShippingType {
   DISTRICT
   STATE
   FREE
+
+  @@schema("public")
 }
 
 enum OtpChannel {
   SMS
   EMAIL
+
+  @@schema("public")
 }
 
 enum OtpPurpose {
@@ -66,6 +79,8 @@ enum OtpPurpose {
   EMAIL_VERIFY // verifying a customer's email address
   PASSWORD_RESET // forgot-password reset code
   ORDER_PLACEMENT // guest checkout verification
+
+  @@schema("public")
 }
 
 /// Social sign-in providers supported by `package/auth`. Adding a provider
@@ -73,11 +88,15 @@ enum OtpPurpose {
 enum AuthProvider {
   GOOGLE
   APPLE
+
+  @@schema("public")
 }
 
 enum AdminRole {
   SUPER_ADMIN
   ADMIN
+
+  @@schema("public")
 }
 
 /// Who a push subscription / notification belongs to. Mirrors
@@ -86,6 +105,8 @@ enum AdminRole {
 enum PrincipalType {
   ADMIN
   CUSTOMER
+
+  @@schema("public")
 }
 
 /// Notification category — drives the icon/label in the client and lets a
@@ -98,6 +119,9 @@ enum NotificationKind {
   ACCOUNT
   ANNOUNCEMENT
   SUPPORT
+  AFFILIATE
+
+  @@schema("public")
 }
 
 // ---------------------------------------------------------------------------
@@ -122,6 +146,8 @@ model StoreSetting {
   updatedAt         DateTime @updatedAt
 
   @@map("store_settings")
+
+  @@schema("public")
 }
 
 // ---------------------------------------------------------------------------
@@ -158,6 +184,8 @@ model Category {
   @@index([parentId])
   @@index([isActive])
   @@map("categories")
+
+  @@schema("public")
 }
 
 // ---------------------------------------------------------------------------
@@ -201,6 +229,8 @@ model Customer {
   updatedAt      DateTime          @updatedAt
 
   @@map("customers")
+
+  @@schema("public")
 }
 
 /// A saved delivery address in the customer's address book (a customer can
@@ -230,6 +260,8 @@ model CustomerAddress {
 
   @@index([customerId])
   @@map("customer_addresses")
+
+  @@schema("public")
 }
 
 /// Which basket a line currently sits in. ACTIVE lines are what checkout
@@ -240,6 +272,8 @@ model CustomerAddress {
 enum CartLineStatus {
   ACTIVE
   SAVED
+
+  @@schema("public")
 }
 
 /// The signed-in customer's SERVER-SIDE cart — one per account, spanning
@@ -275,6 +309,8 @@ model Cart {
   /// Abandoned-cart sweeps ("carts untouched for N days") scan by recency.
   @@index([updatedAt])
   @@map("carts")
+
+  @@schema("public")
 }
 
 /// One unit of sale in a customer's cart.
@@ -332,6 +368,8 @@ model CartLine {
   @@index([storeId])
   @@index([productId])
   @@map("cart_lines")
+
+  @@schema("public")
 }
 
 /// A customer-owned online store (a single account can own several).
@@ -423,6 +461,8 @@ model Store {
   // Marketplace "New Stores" listing: published stores by publish recency.
   @@index([isPublished, publishedAt])
   @@map("stores")
+
+  @@schema("public")
 }
 
 /// A category inside a customer-owned store (separate from the admin's
@@ -485,6 +525,8 @@ model StoreCategory {
   @@index([isActive])
   @@index([categoryId])
   @@map("store_categories")
+
+  @@schema("public")
 }
 
 /// A product inside a customer-owned store. Category is mandatory
@@ -592,6 +634,8 @@ model StoreProduct {
   @@index([isBestSeller])
   @@index([isNewArrival])
   @@map("store_products")
+
+  @@schema("public")
 }
 
 /// A family of products that are the same item differing on ONE named axis
@@ -622,6 +666,8 @@ model ProductGroup {
 
   @@index([storeId])
   @@map("product_groups")
+
+  @@schema("public")
 }
 
 /// One product's place in a ProductGroup. `value` is the product's position
@@ -644,6 +690,8 @@ model ProductGroupMember {
   @@unique([productId, optionKey])
   @@index([productId])
   @@map("product_group_members")
+
+  @@schema("public")
 }
 
 /// A purchasable variation of a store product — one label covers whatever
@@ -692,11 +740,15 @@ model StoreProductVariant {
   @@index([sku])
   @@index([mediaId])
   @@map("store_product_variants")
+
+  @@schema("public")
 }
 
 enum StoreMediaType {
   IMAGE
   VIDEO
+
+  @@schema("public")
 }
 
 /// Verification state of a seller payout account. Accounts start PENDING;
@@ -708,6 +760,8 @@ enum BankVerificationStatus {
   PENDING
   VERIFIED
   FAILED
+
+  @@schema("public")
 }
 
 /// How a payout account was (or will be) verified — provisioned now, wired
@@ -715,6 +769,8 @@ enum BankVerificationStatus {
 enum BankVerificationMethod {
   THIRD_PARTY
   MANUAL
+
+  @@schema("public")
 }
 
 /// A seller's payout bank account (a store can save several). Exactly ONE
@@ -752,6 +808,8 @@ model StoreBankAccount {
   @@unique([storeId, accountNumber, ifsc])
   @@index([storeId])
   @@map("store_bank_accounts")
+
+  @@schema("public")
 }
 
 /// Media attached to a store product — up to 8 images and 1 video
@@ -778,6 +836,8 @@ model StoreProductMedia {
 
   @@index([productId, displayOrder])
   @@map("store_product_media")
+
+  @@schema("public")
 }
 
 /// Where a storefront banner sends the shopper when it is tapped.
@@ -790,6 +850,8 @@ enum StoreBannerLinkType {
   CATEGORY
   PRODUCT
   URL
+
+  @@schema("public")
 }
 
 /// An owner-managed promotional banner on the storefront homepage, shown as
@@ -830,6 +892,8 @@ model StoreBanner {
   /// The storefront read: one store's banners in the owner's order.
   @@index([storeId, displayOrder])
   @@map("store_banners")
+
+  @@schema("public")
 }
 
 /// A ready-made storefront palette a seller can apply in one click
@@ -865,6 +929,8 @@ model StoreThemeTemplate {
 
   @@index([isActive, displayOrder])
   @@map("store_theme_templates")
+
+  @@schema("public")
 }
 
 /// A social-login identity linked to a customer (one row per provider account).
@@ -882,6 +948,8 @@ model OAuthAccount {
   @@unique([provider, providerAccountId])
   @@index([customerId])
   @@map("oauth_accounts")
+
+  @@schema("public")
 }
 
 /// A customer order, placed PER STORE at the storefront checkout. Everything
@@ -966,6 +1034,9 @@ model Order {
   /// Optional seller note captured on cancellation.
   cancelReason String?
 
+  /// Opaque affiliate attribution token sent by the checkout. Stored as-is;
+  /// only the affiliate package knows what it means.
+  affiliateRef        String?
   estimatedDeliveryAt DateTime?
   placedAt            DateTime    @default(now())
   items               OrderItem[]
@@ -977,6 +1048,8 @@ model Order {
   @@index([customerPhone])
   @@index([status])
   @@map("orders")
+
+  @@schema("public")
 }
 
 /// One line of an order. Product/variant links are nullable + snapshotted so
@@ -1006,6 +1079,8 @@ model OrderItem {
   @@index([orderId])
   @@index([productId])
   @@map("order_items")
+
+  @@schema("public")
 }
 
 // ---------------------------------------------------------------------------
@@ -1029,6 +1104,8 @@ model ShippingRule {
   @@index([type])
   @@index([isActive])
   @@map("shipping_rules")
+
+  @@schema("public")
 }
 
 // ---------------------------------------------------------------------------
@@ -1055,6 +1132,8 @@ model Otp {
   @@index([destination, purpose])
   @@index([expiresAt])
   @@map("otps")
+
+  @@schema("public")
 }
 
 // ---------------------------------------------------------------------------
@@ -1069,6 +1148,8 @@ enum BannerLinkType {
   NONE
   STORE
   URL
+
+  @@schema("public")
 }
 
 /// A platform-wide promotional banner on the MARKETPLACE homepage, managed by
@@ -1104,6 +1185,8 @@ model Banner {
   /// The storefront read: active banners in the admin's order.
   @@index([isActive, displayOrder])
   @@map("banners")
+
+  @@schema("public")
 }
 
 // ---------------------------------------------------------------------------
@@ -1122,6 +1205,8 @@ model Admin {
   updatedAt    DateTime  @updatedAt
 
   @@map("admins")
+
+  @@schema("public")
 }
 
 /// Refresh-token session issued by the standalone `package/auth` module.
@@ -1145,6 +1230,8 @@ model AuthSession {
 
   @@index([principalId, principalType])
   @@map("auth_sessions")
+
+  @@schema("public")
 }
 
 // ---------------------------------------------------------------------------
@@ -1184,6 +1271,8 @@ model PushSubscription {
   @@index([principalId, principalType])
   @@index([disabledAt])
   @@map("push_subscriptions")
+
+  @@schema("public")
 }
 
 /// A delivered notification, kept so the recipient has a feed (bell menu)
@@ -1210,6 +1299,8 @@ model Notification {
   @@index([principalType, principalId, createdAt])
   @@index([principalType, principalId, readAt])
   @@map("notifications")
+
+  @@schema("public")
 }
 
 // ---------------------------------------------------------------------------
@@ -1241,6 +1332,8 @@ model AdminAuditLog {
   @@index([entityType, entityId])
   @@index([createdAt])
   @@map("admin_audit_logs")
+
+  @@schema("public")
 }
 
 // ---------------------------------------------------------------------------
@@ -1257,6 +1350,8 @@ enum SupportRecipient {
   /// The store's owner answers — a shopper contacting the shop they bought
   /// from. UnieMax is not a party to these threads.
   STORE
+
+  @@schema("public")
 }
 
 /// Lifecycle of a support ticket. Forward-only in practice, except that a
@@ -1268,6 +1363,8 @@ enum SupportTicketStatus {
   IN_PROGRESS
   RESOLVED
   CLOSED
+
+  @@schema("public")
 }
 
 /// What the ticket is about — chosen by the person raising it, so the queue
@@ -1284,6 +1381,8 @@ enum SupportTicketCategory {
   ACCOUNT
   TECHNICAL
   OTHER
+
+  @@schema("public")
 }
 
 /// Triage level, set by the platform team only. Deliberately NOT customer
@@ -1294,6 +1393,8 @@ enum SupportTicketPriority {
   NORMAL
   HIGH
   URGENT
+
+  @@schema("public")
 }
 
 /// A support request raised from the app. Owned by the Customer who raised it
@@ -1349,6 +1450,8 @@ model SupportTicket {
   // A seller's inbox: one store's incoming threads, newest activity first.
   @@index([storeId, recipient, lastMessageAt])
   @@map("support_tickets")
+
+  @@schema("public")
 }
 
 /// One message in a ticket thread. `authorType` reuses `PrincipalType`
@@ -1371,4 +1474,6 @@ model SupportTicketMessage {
 
   @@index([ticketId, createdAt])
   @@map("support_ticket_messages")
+
+  @@schema("public")
 }

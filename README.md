@@ -48,8 +48,24 @@ never ships to a shopper.
 - Help & Support **with UnieMax** (account menu) or **with the shop itself**
   (store top bar / footer) — call, email, or raise a tracked ticket.
 
+### For affiliate partners
+
+- Invited by a store by email; accepting creates the partnership on the
+  customer account (no separate login). One person can partner with many
+  stores at different rates.
+- A partner portal (`/affiliate`): pick a store, see which products are open
+  and what each earns, get a short link (`/a/{token}`) per product or for the
+  store home, track clicks, orders and commissions.
+
 ### For sellers
 
+- **Affiliate marketing** per store: switch the programme on, set a default
+  commission (percentage or fixed per item), the attribution window and the
+  hold period after delivery; open or close individual products and give them
+  their own rate; invite partners, pause or remove them, negotiate a special
+  rate; see every commission per order line. Commissions are approved
+  automatically once the order is delivered and the hold period passes, and
+  cancelled with the order.
 - Create multiple stores through a **two-step guided wizard** (store → business
   & contact), pre-filled from the account and resumable: the store is created
   at step 1, so leaving midway loses nothing and a dashboard checklist shows
@@ -184,6 +200,9 @@ subtrees:
   `/addresses`, `/orders`, `/notifications`, `/support`, `/theme-templates`,
   `/public/**` (storefront pages by slug, discovery, support contact, VAPID key,
   media config), `/payments` (Cashfree webhook, signature-guarded).
+- **Affiliate** — `/api/v1/affiliate/**`, mounted by the self-contained
+  `package/affiliate` (seller, partner, public and admin routes under one
+  prefix so the package can become its own service later).
 - **Admin** — `/api/v1/admin/**`, a separate subtree where login is public and
   everything else sits behind a `requireAdmin` `preHandler`. It includes
   `/admin/manage/stores/**`, which is not a second store API but the customer
@@ -248,6 +267,11 @@ env config — see [`backend/docs/PACKAGE_AUTH.md`](./backend/docs/PACKAGE_AUTH.
 - **Notification / PushSubscription** — in-app feed and per-device Web Push, fired
   from the same dispatch function.
 - **AdminAuditLog** — append-only record of every admin write.
+- **Affiliate\*** (own `affiliate` Postgres schema, no foreign key into the
+  core) — `AffiliateProgram` per store, `Affiliate` per customer,
+  `StoreAffiliate` partnerships, invitations, links, clicks, attributions and
+  one `AffiliateCommission` per order line. The core carries only
+  `Order.affiliateRef`.
 
 Full model-by-model detail lives in the Data Model section of
 [`docs/BACKEND_CONTEXT.md`](./docs/BACKEND_CONTEXT.md).

@@ -467,6 +467,16 @@ export function ChartIcon({ className }: { className?: string }) {
   )
 }
 
+/** Megaphone — the Affiliate Marketing section. */
+export function MegaphoneIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M4 10v4a1 1 0 0 0 1 1h2l4 4V5L7 9H5a1 1 0 0 0-1 1z" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a9 9 0 0 1 0 12" />
+    </Svg>
+  )
+}
+
 /** Life-buoy — the Help & Support section. */
 export function LifebuoyIcon({ className }: { className?: string }) {
   return (

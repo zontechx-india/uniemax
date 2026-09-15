@@ -195,7 +195,7 @@ for guests and signed-in customers alike and adapts per session state.
   API's `previewImages` (with a gradient foot **only when there is a real
   photo** — over the icon fallback it read as a grey smear), the store logo
   as a round badge straddling the banner edge at the **left**, then a
-  left-aligned Oswald name and **star-rating slot**, and a full-width
+  left-aligned Manrope name and **star-rating slot**, and a full-width
   footer row above a divider: `productCount` anchored left, a **Visit
   Store →** pill right — a centred column left both margins empty. The
   card body must stay `relative`: the banner above it is positioned, so
@@ -906,7 +906,7 @@ deliberately lives in the URL and **not in storage** (a sessionStorage
 part of browser history, so back/forward-cache restores, refreshes and
 multiple tabs all keep the right theme, where ambient tracking broke. All pages use
 the storefront treatment (full-width shell, flat surface+border cards,
-Oswald headings, sticky top bar) with an order-summary panel stuck beside
+Manrope headings, sticky top bar) with an order-summary panel stuck beside
 the list on desktop.
 **Order summary — priced by the server.** `features/cart/useCheckoutQuote.ts`
 calls `POST …/orders/quote` whenever the lines or the current fulfilment
@@ -1518,6 +1518,58 @@ more than the pagination counters (support adds `openCount`); it defaults to
 
 ---
 
+## Affiliate marketing (`src/packages/affiliate/`)
+
+The UI half of the backend's `package/affiliate` (design in
+`docs/AFFILIATE.md`). It is the frontend's first `packages/` folder: one
+self-contained directory that owns every affiliate screen, hook and API call
+and exposes **route arrays** the host routers spread into place. It imports
+from `shared/` and from exactly four host files — `storefront/app/marketSession`
+(is the visitor signed in) and `storefront/features/auth/authDialogStore`
+(open sign-in in place), both on the invite page;
+`storefront/features/stores/useManagedStore` (which store, read once in the
+seller layout); and `storefront/pages/stores/ActiveSwitch` (the catalog
+toggle, reused on the Products tab) — and nothing else in `storefront/` or
+`admin/`. Host apps import
+from it, never the reverse, so lifting it into its own app later is a folder
+move plus repointing `config.ts`.
+
+Where it appears:
+
+- **`/a/:token`** (`pages/ClickPage.tsx`, marketplace router, no layout) — the
+  short link partners share. Calls `POST /affiliate/public/click/:token`,
+  saves the returned attribution token in `localStorage`
+  (`attribution.ts`, keyed by store slug, with its expiry) and then does a
+  **full navigation** to the store page, because `/store/**` lives in the
+  other router. Kept as an API call + SPA route so no nginx rule is needed for
+  the short URL.
+- **`/affiliate/invite/:token`** (`pages/InvitePage.tsx`, public) — the
+  emailed invitation: store name, rate, expiry. Signed-in → "Accept" →
+  `/affiliate`; guest → opens `AuthDialog` in place, then accepts.
+- **`/affiliate/**`** (`pages/partner/`, inside `RequireCustomer` +
+  `AppLayout`) — the partner portal: Overview (tiles), Stores & products
+  (pick a store, browse what it lets you promote, "Get link" per product or
+  for the store home, with channel), My links (copy / disable), Commissions.
+  A customer with no affiliate profile sees an explanatory empty state; the
+  account menu carries an "Affiliate Partner" row.
+- **`/mystores/:storeSlug/affiliate/**`** (`pages/seller/`) — the **Affiliate
+  Marketing** section of store management, under a new "Marketing" nav
+  group: Programme (on/off, default rate, attribution + hold days, summary
+  tiles), Products (open/close per product, per-product rate), Partners
+  (invite by email, pending invitations with copyable link + withdraw,
+  partner status ACTIVE/PAUSED/REMOVED and special rates), Commissions.
+  `AffiliateLayout` is the one file that reads `useManagedStore()`; the tabs
+  only see a store id. Hidden from the admin's manage mount (`hiddenSections`)
+  because the seller affiliate API has no admin actor yet.
+- **`/admin/affiliates`** (`pages/admin/AffiliateAdminPage.tsx`) — every
+  partner account (suspend / reinstate), every commission (approve early /
+  reject with a note) and a "Run approval now" button.
+
+Checkout sends `getAttribution(storeSlug)` as `affiliateRef` with the order
+and calls `clearAttribution(storeSlug)` once the order is placed — one click
+credits one order. `shared/auth/http.ts` treats `/api/v1/affiliate/admin` as
+an admin URL for CSRF-cookie purposes.
+
 ## Notifications & push (both apps)
 
 Shared plumbing, one bell per app:
@@ -1757,6 +1809,14 @@ frontend/
     │       ├── authApi.ts        # Typed customer/admin auth endpoints
     │       ├── VerifyPhoneForm.tsx # Phone → OTP → verified (shared, form-free)
     │       └── useSession.ts     # Cookie-session hook (loading/guest/authed)
+    ├── packages/
+    │   └── affiliate/           # Affiliate marketing UI — see "Affiliate marketing"
+    │       ├── index.ts         #   route arrays the host routers spread in + attribution helpers
+    │       ├── config.ts        #   AFFILIATE_API_BASE — the one constant to repoint on extraction
+    │       ├── api.ts           #   typed client: seller · partner · public · admin
+    │       ├── attribution.ts   #   localStorage token from /a/:token, per store
+    │       ├── ui.tsx           #   useLoad, StatTile, StatusChip, Pager, TabNav, CopyButton
+    │       └── pages/           #   ClickPage · InvitePage · partner/ · seller/ · admin/
     ├── storefront/
     │   ├── main.tsx              # Mounts <StorefrontApp/>
     │   ├── StorefrontApp.tsx     # Session probe + picks marketplace vs public router
@@ -1954,7 +2014,7 @@ apps must share under `src/shared/`. **`storefront/` must never import from
 The authoritative design system lives in the repo-root `skillui/` package
 (the **anydesk** system: dark-themed, cool palette, 4px grid). Its colors,
 spacing, radius and type scale are used as-is; the typefaces are the one
-deliberate deviation (Oswald + Inter instead of Times New Roman + Noto
+deliberate deviation (Manrope + Inter instead of Times New Roman + Noto
 Sans, adopted from the approved UnieMax prototype — see below). **Read `skillui/SKILL.md` before building
 any UI.** Its tokens are materialized into reusable TypeScript constants
 under `src/shared/theme/` — the single source both apps import instead of
@@ -2067,7 +2127,7 @@ whole palette as CSS variables and maps them into Tailwind v4 via
 | `bg-brand-soft` | brand tint (Light Purple) | `logo-lockup` | the brand lockup (see *Brand art*) |
 | `text-danger` / `success` / `warning` | status | `shadow-floating` | elevation |
 | `text-pending` / `bg-pending-soft` | setup not finished (orange) | `bg-pending-gradient` | the animated pending mark |
-| `rounded-md` (4px) · `rounded-lg` (6px) · `rounded-pill` (50px) | radius | `font-heading` / `font-body` | Oswald / Inter |
+| `rounded-md` (4px) · `rounded-lg` (6px) · `rounded-pill` (50px) | radius | `font-heading` / `font-body` | Manrope / Inter |
 
 **Card hover language** (marketplace grids): `shadow-floating` at rest →
 `hover:-translate-y-1` (4px lift) + `hover:shadow-lifted` (the deeper
@@ -2155,30 +2215,32 @@ derived from it, and the secondary text is lifted to `#9a9a9a` because
   `useTheme() → { mode, setMode, toggle }`; `ThemeToggle` (sun/moon) sits in
   the storefront top bar. Both apps are wrapped in `ThemeProvider`.
 - **Fonts** (a deliberate deviation from the skill's Times New Roman / Noto
-  Sans pairing, adopted from the approved UnieMax prototype
-  `prototype/index.html`): headings/display use **Oswald** — a condensed,
-  athletic face carrying a constant **+0.02em tracking** (applied by the base
-  `h1–h3` rule and re-asserted by the `font-heading` utility, which therefore
-  also wins over `tracking-tight`; Oswald must never be tightened further).
-  Body/UI uses **Inter**. Both are SIL OFL and self-hosted as latin variable
-  files: `public/fonts/Oswald-Variable.woff2` (~28 KB, wght 200–700) and
-  `public/fonts/Inter-Variable.woff2` (~73 KB, wght 100–900), with Segoe UI /
-  `system-ui` fallbacks. Only these two families are allowed. Display
-  conventions from the prototype: section headings `text-2xl sm:text-3xl`
-  semibold, hero `text-4xl sm:text-6xl` bold `leading-none`, product-card
-  names `text-lg` medium `leading-tight` — 700 is reserved for the hero/brand,
-  because condensed Oswald reads cramped when bolded at small sizes.
+  Sans pairing): headings/display use **Manrope** — geometric and open, with
+  clean numerals for prices — carrying a constant **−0.01em tracking**
+  (applied by the base `h1–h3` rule and re-asserted by the `font-heading`
+  utility). Body/UI uses **Inter**. Both are SIL OFL and self-hosted as latin
+  variable files: `public/fonts/Manrope-Variable.woff2` (~25 KB, wght
+  200–800) and `public/fonts/Inter-Variable.woff2` (~73 KB, wght 100–900),
+  with Segoe UI / `system-ui` fallbacks. Only these two families are allowed.
+  Manrope replaced the prototype's condensed, uppercase-looking **Oswald** in
+  September 2026 — the store owner found it out of place on user-typed names
+  such as store titles; swapping it was one `@font-face`, the
+  `--font-heading` token and the `typography.ts` stack, which is the point of
+  routing every heading through the token.
+  Display conventions from the prototype: section headings `text-2xl
+  sm:text-3xl` semibold, hero `text-4xl sm:text-6xl` bold `leading-none`,
+  product-card names `text-lg` medium `leading-tight` — 700 is reserved for
+  the hero/brand.
   **User-typed names in the authed app** (store names on the My Stores cards,
-  the "Managing …" header) render in the body face instead — add `font-body
-  tracking-normal` to the heading element — because the condensed display
-  face suits page headings and storefront display, not people's own names.
-  The **store-management section headings** (`/mystores/{slug}` — Store
-  Details, Appearance, Homepage, Footer, Categories, Products and their
-  in-card subheads) also use `font-body font-semibold tracking-normal`:
-  they are workbench UI, and bolded condensed Oswald read cramped at those
-  small sizes.
-  The storefront keeps Oswald for store/product names deliberately (that's
-  the prototype's brand look). The
+  the "Managing …" header) still render in the body face — `font-body
+  tracking-normal` on the heading element — and the **store-management
+  section headings** (`/mystores/{slug}` — Store Details, Appearance,
+  Homepage, Footer, Categories, Products and their in-card subheads) use
+  `font-body font-semibold tracking-normal`: they are workbench UI. Those
+  rules predate the font swap and are kept for consistency, not because
+  Manrope needs them.
+  The storefront uses the heading face for store/product names (the
+  prototype's brand look). The
   storefront brand mark (store name in header/footer) uses `metal-text` —
   gradient display text cut from the owner's primary (prototype's
   `gold-text`).

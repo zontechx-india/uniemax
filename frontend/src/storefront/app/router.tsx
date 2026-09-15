@@ -2,6 +2,11 @@ import { createBrowserRouter, Navigate, useLocation, useParams } from 'react-rou
 import { AppLayout } from '../layout/AppLayout'
 import { RequireCustomer } from './RequireCustomer'
 import { LoginRoute } from '../pages/LoginRoute'
+import {
+  affiliatePartnerRoutes,
+  affiliatePublicRoutes,
+  affiliateSellerRoutes,
+} from '../../packages/affiliate'
 
 /**
  * `/stores/**` → `/mystores/**`, forwarding the rest of the path, the query
@@ -52,6 +57,8 @@ export const router = createBrowserRouter([
       Component: (await import('../pages/InfoComingSoonPage')).InfoComingSoonPage,
     }),
   })),
+  // Affiliate short links and invitations — public, no layout.
+  ...affiliatePublicRoutes,
 
   // ---- Account subtree (signed-in customers only) --------------------------
   {
@@ -93,6 +100,8 @@ export const router = createBrowserRouter([
               Component: (await import('../pages/SupportTicketPage')).SupportTicketPage,
             }),
           },
+          // Affiliate partner portal — by invitation from a store.
+          affiliatePartnerRoutes,
           // Store creation & management (a customer can own multiple stores).
           //
           // `/mystores`, not `/stores`: the public storefront lives at
@@ -264,6 +273,8 @@ export const router = createBrowserRouter([
                     .StoreSupportTicketPage,
                 }),
               },
+              // Affiliate Marketing — programme, products, partners, commissions.
+              affiliateSellerRoutes,
             ],
           },
         ],

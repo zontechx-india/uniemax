@@ -93,6 +93,13 @@ export const orderCreateSchema = z.object({
       country: null,
     })),
   items: orderItemsSchema,
+  /** Affiliate attribution token the storefront picked up from /a/:token. */
+  affiliateRef: z
+    .string()
+    .trim()
+    .max(64)
+    .nullish()
+    .transform((v) => v || null),
 });
 
 export const orderParamSchema = z.object({

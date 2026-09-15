@@ -66,7 +66,8 @@ export const ADMIN_STORE_SCOPE: StoreManageScope = {
   mode: 'admin',
   indexPath: '/stores',
   storePath: (slug) => `/stores/${slug}/manage`,
-  hiddenSections: ['bank-accounts', 'business', 'customer-support', 'support'],
+  // `affiliate` too: the seller-only affiliate API has no admin mount yet.
+  hiddenSections: ['bank-accounts', 'business', 'customer-support', 'support', 'affiliate'],
 }
 
 const StoreManageScopeContext =

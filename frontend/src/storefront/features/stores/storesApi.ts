@@ -1970,6 +1970,8 @@ export interface OrderCreateInput {
     country?: string | null
   }
   items: OrderItemInput[]
+  /** Attribution token from an affiliate link, if the visitor arrived through one. */
+  affiliateRef?: string | null
 }
 
 /**

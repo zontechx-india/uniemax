@@ -17,6 +17,7 @@ import {
   HomeIcon,
   ImageIcon,
   LifebuoyIcon,
+  MegaphoneIcon,
   PaletteIcon,
   StoreIcon,
   TagIcon,
@@ -129,6 +130,11 @@ const SECTION_GROUPS: SectionGroup[] = [
       { label: 'Shipping', to: 'shipping', icon: TruckIcon },
       { label: 'Checkout', to: 'checkout', icon: ClipboardIcon },
     ],
+  },
+  {
+    key: 'marketing',
+    caption: 'Marketing',
+    items: [{ label: 'Affiliate Marketing', to: 'affiliate', icon: MegaphoneIcon }],
   },
   {
     key: 'help',

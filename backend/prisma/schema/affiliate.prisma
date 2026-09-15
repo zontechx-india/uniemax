@@ -1,0 +1,303 @@
+// Affiliate marketing — seller-run programmes, partner links, attribution and
+// commissions. Lives in its own Postgres schema and never relates to a core
+// model: every core id is a plain string plus a snapshot of what we display,
+// so the whole set can move to a standalone service. See docs/AFFILIATE.md.
+
+enum AffiliateCommissionType {
+  PERCENTAGE
+  FIXED
+
+  @@schema("affiliate")
+}
+
+enum AffiliateStatus {
+  ACTIVE
+  SUSPENDED
+
+  @@schema("affiliate")
+}
+
+enum StoreAffiliateStatus {
+  ACTIVE
+  PAUSED
+  REMOVED
+
+  @@schema("affiliate")
+}
+
+enum AffiliateInviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+
+  @@schema("affiliate")
+}
+
+enum AffiliateChannel {
+  YOUTUBE
+  INSTAGRAM
+  FACEBOOK
+  WEBSITE
+  WHATSAPP
+  TELEGRAM
+  OTHER
+
+  @@schema("affiliate")
+}
+
+enum AffiliateCommissionStatus {
+  PENDING
+  APPROVED
+  PAID
+  CANCELLED
+  REVERSED
+  REJECTED
+
+  @@schema("affiliate")
+}
+
+/// One per store. Created the first time the seller opens Affiliate Marketing.
+model AffiliateProgram {
+  id      String @id @default(cuid())
+  storeId String @unique
+
+  enabled        Boolean                 @default(false)
+  commissionType AffiliateCommissionType @default(PERCENTAGE)
+  commissionRate Decimal                 @default(10) @db.Decimal(10, 2)
+  /// How long a click keeps earning, in days.
+  attributionDays Int @default(30)
+  /// Days after delivery before a commission is approved (return window).
+  holdDays Int @default(7)
+
+  productRules AffiliateProductRule[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("affiliate_programs")
+  @@schema("affiliate")
+}
+
+/// Per-product exception: switch a product off, or give it its own rate.
+/// Products without a row follow the programme default.
+model AffiliateProductRule {
+  id        String           @id @default(cuid())
+  programId String
+  program   AffiliateProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  productId String
+
+  enabled        Boolean                  @default(true)
+  commissionType AffiliateCommissionType?
+  commissionRate Decimal?                 @db.Decimal(10, 2)
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([programId, productId])
+  @@map("affiliate_product_rules")
+  @@schema("affiliate")
+}
+
+/// A person who promotes stores. One per customer account, platform-wide.
+model Affiliate {
+  id         String @id @default(cuid())
+  customerId String @unique
+
+  displayName String
+  status      AffiliateStatus @default(ACTIVE)
+
+  stores      StoreAffiliate[]
+  links       AffiliateLink[]
+  commissions AffiliateCommission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("affiliates")
+  @@schema("affiliate")
+}
+
+/// Seller-issued invitation. Accepting it creates the StoreAffiliate row.
+model AffiliateInvitation {
+  id        String @id @default(cuid())
+  storeId   String
+  storeName String
+  token     String @unique
+
+  name  String
+  email String
+  /// Optional negotiated rate; null = programme default at the time.
+  commissionType AffiliateCommissionType?
+  commissionRate Decimal?                 @db.Decimal(10, 2)
+
+  status     AffiliateInviteStatus @default(PENDING)
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  /// Set on acceptance so the seller can see who took the invite.
+  affiliateId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([storeId, status])
+  @@map("affiliate_invitations")
+  @@schema("affiliate")
+}
+
+/// The partnership between one affiliate and one store.
+model StoreAffiliate {
+  id          String    @id @default(cuid())
+  affiliateId String
+  affiliate   Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  storeId     String
+  storeName   String
+  storeSlug   String
+
+  status StoreAffiliateStatus @default(ACTIVE)
+  /// Affiliate-specific override; null = programme default.
+  commissionType AffiliateCommissionType?
+  commissionRate Decimal?                 @db.Decimal(10, 2)
+
+  links       AffiliateLink[]
+  commissions AffiliateCommission[]
+
+  joinedAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([affiliateId, storeId])
+  @@index([storeId, status])
+  @@map("store_affiliates")
+  @@schema("affiliate")
+}
+
+/// A shareable tracking link. `token` is the public part of /a/:token.
+model AffiliateLink {
+  id               String         @id @default(cuid())
+  token            String         @unique
+  affiliateId      String
+  affiliate        Affiliate      @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  storeAffiliateId String
+  storeAffiliate   StoreAffiliate @relation(fields: [storeAffiliateId], references: [id], onDelete: Cascade)
+  storeId          String
+  storeSlug        String
+
+  /// Null = the link lands on the store home page.
+  productId   String?
+  productName String?
+  productSlug String?
+
+  channel AffiliateChannel?
+  label   String?
+  enabled Boolean           @default(true)
+
+  clickCount Int @default(0)
+
+  clicks       AffiliateClick[]
+  attributions AffiliateAttribution[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([affiliateId])
+  @@index([storeId])
+  @@map("affiliate_links")
+  @@schema("affiliate")
+}
+
+/// Append-only click log. Pruned by a job; the counter on the link survives.
+model AffiliateClick {
+  id     String        @id @default(cuid())
+  linkId String
+  link   AffiliateLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  ip        String?
+  userAgent String?
+  referer   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([linkId, createdAt])
+  @@map("affiliate_clicks")
+  @@schema("affiliate")
+}
+
+/// One per click. The visitor carries `token`; checkout hands it back as
+/// Order.affiliateRef and the order.placed handler resolves it here.
+model AffiliateAttribution {
+  id     String        @id @default(cuid())
+  token  String        @unique
+  linkId String
+  link   AffiliateLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  affiliateId      String
+  storeAffiliateId String
+  storeId          String
+
+  expiresAt DateTime
+  /// Set once an order used this attribution — never reused after.
+  orderId String? @unique
+
+  createdAt DateTime @default(now())
+
+  @@index([storeId, expiresAt])
+  @@map("affiliate_attributions")
+  @@schema("affiliate")
+}
+
+/// What an affiliate earned on ONE order line. Per line so a partial return
+/// reverses exactly the right amount. Rate and base are snapshotted.
+model AffiliateCommission {
+  id               String         @id @default(cuid())
+  affiliateId      String
+  affiliate        Affiliate      @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  storeAffiliateId String
+  storeAffiliate   StoreAffiliate @relation(fields: [storeAffiliateId], references: [id], onDelete: Cascade)
+  linkId           String?
+
+  storeId     String
+  storeName   String
+  orderId     String
+  orderNumber String
+  orderItemId String  @unique
+  productId   String?
+  productName String
+  customerId  String?
+
+  lineTotal      Decimal                 @db.Decimal(10, 2)
+  commissionType AffiliateCommissionType
+  commissionRate Decimal                 @db.Decimal(10, 2)
+  amount         Decimal                 @db.Decimal(10, 2)
+
+  status AffiliateCommissionStatus @default(PENDING)
+  /// When the return window closes and the commission can be approved.
+  maturesAt  DateTime?
+  approvedAt DateTime?
+  paidAt     DateTime?
+  note       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([affiliateId, status])
+  @@index([storeId, status])
+  @@index([status, maturesAt])
+  @@map("affiliate_commissions")
+  @@schema("affiliate")
+}
+
+/// Something that looked wrong (self-purchase, dead link…). Recorded for a
+/// human to look at; nothing is punished automatically.
+model AffiliateFraudEvent {
+  id          String  @id @default(cuid())
+  kind        String
+  affiliateId String?
+  storeId     String?
+  orderId     String?
+  detail      Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("affiliate_fraud_events")
+  @@schema("affiliate")
+}

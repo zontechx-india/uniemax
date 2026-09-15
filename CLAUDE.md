@@ -19,6 +19,7 @@ one file (no duplication).
 | High-level project overview or features list     | [`README.md`](./README.md)          |
 | Prisma schema models/enums                       | [`docs/BACKEND_CONTEXT.md`](./docs/BACKEND_CONTEXT.md) (Data Model section) |
 | Frontend structure, shared UI, theme tokens, per-store theming | [`docs/FRONTEND_CONTEXT.md`](./docs/FRONTEND_CONTEXT.md) |
+| Affiliate system (programmes, invitations, links, attribution, commission, payouts) | [`docs/AFFILIATE.md`](./docs/AFFILIATE.md) |
 
 Rules:
 - If a change spans several concerns, update **each** relevant doc.

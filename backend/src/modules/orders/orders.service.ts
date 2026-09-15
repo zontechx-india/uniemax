@@ -6,6 +6,7 @@ import { isProduction } from "../../config/env.js";
 import { HttpError } from "../../utils/httpError.js";
 import { buildListMeta } from "../../utils/response.js";
 import { mediaUrl } from "../../package/storage/index.js";
+import { emit } from "../../package/events/index.js";
 import { clearStoreLines } from "../cart/cart.service.js";
 import { recomputeProductAggregates } from "../stores/catalogSlug.js";
 import { getMyStore } from "../stores/stores.service.js";
@@ -589,6 +590,7 @@ export async function createOrder(
         paymentMethod: input.paymentMethod,
         paymentStatus: simulated ? "PAID" : "PENDING",
         paymentRef: simulated ? "DEV-SIMULATED" : null,
+        affiliateRef: input.affiliateRef,
         items: {
           create: lines.map((line) => ({
             productId: line.productId,
@@ -653,6 +655,7 @@ export async function createOrder(
   // Gateway orders wait for the money — the payments module sends these
   // same notifications when the payment settles.
   if (!viaGateway) notifyOrderPlaced(shaped, customerId, store.owner);
+  emit("order.placed", { orderId: row.id });
   return { ...shaped, payment: payment ?? null };
 }
 
@@ -904,6 +907,8 @@ export async function updateOrderStatus(
   const shaped = shapeOrder(row!);
   // Fire-and-forget customer update (Confirmed/Shipped/Delivered have copy).
   notifyOrderStatusChange(shaped, current.customerId);
+  emit("order.status", { orderId, status: input.status });
+  if (data.paymentStatus === "PAID") emit("order.paid", { orderId });
   return shaped;
 }
 
@@ -1005,6 +1010,7 @@ export async function cancelOrder(
   const shaped = shapeOrder(row!);
   // Fire-and-forget cancellation email to the customer.
   notifyOrderStatusChange(shaped, current.customerId);
+  emit("order.cancelled", { orderId });
   return shaped;
 }
 

@@ -3,6 +3,7 @@ import { prisma } from "../../config/prisma.js";
 import { env } from "../../config/env.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../../utils/httpError.js";
+import { emit } from "../../package/events/index.js";
 import { publicWebUrl } from "../../package/mail/index.js";
 import {
   notifyOrderPlaced,
@@ -204,6 +205,7 @@ async function markOrderPaid(
     data: { paymentStatus: "PAID", paymentRef: cfPaymentId },
   });
   if (updated.count === 0) return; // already settled
+  emit("order.paid", { orderId });
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },

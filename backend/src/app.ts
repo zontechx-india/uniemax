@@ -6,6 +6,7 @@ import rateLimit from "@fastify/rate-limit";
 import { env, resolveTrustProxy } from "./config/env.js";
 import { registerAuthPlugins } from "./package/auth/index.js";
 import { registerStoragePlugins } from "./package/storage/index.js";
+import { createInProcessHost, registerAffiliate } from "./package/affiliate/index.js";
 import { loggerConfig } from "./utils/logger.js";
 import { registerPrisma } from "./plugins/prisma.js";
 import { registerRoutes } from "./routes.js";
@@ -75,6 +76,12 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Routes
   // ---------------------------------------------------------------------------
   await registerRoutes(app);
+
+  // Affiliate marketing — self-contained package, mounted under /api/v1/affiliate.
+  await registerAffiliate(app, {
+    prisma: app.prisma,
+    host: createInProcessHost(app.prisma),
+  });
 
   return app;
 }

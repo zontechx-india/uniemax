@@ -1067,6 +1067,23 @@ Phase 2
 
 ---
 
+# Affiliate Marketing (seller-run)
+
+Each store can run its own affiliate programme: the seller switches it on,
+sets a default commission (percentage of the line or a fixed amount per
+item), an attribution window and a hold period, decides which products are
+open to affiliates (with optional per-product rates), and invites partners by
+email. A partner accepts on their customer account, gets short links per
+product or for the store home, and earns a commission on every order line
+that comes through a link — created when the order is placed, approved once
+it is delivered and the hold period passes, cancelled with the order. Sellers
+see partners, invitations and commissions inside store management; partners
+have their own portal; platform admins can suspend partners and override
+commissions. Payout of approved commissions waits for the platform ledger.
+Full rules and design: [AFFILIATE.md](./AFFILIATE.md).
+
+---
+
 # Future Enhancements
 
 - Coupons

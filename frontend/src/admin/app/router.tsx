@@ -36,6 +36,9 @@ const SupportPage = lazy(() => import('../pages/SupportPage'))
 const SupportTicketPage = lazy(() => import('../pages/SupportTicketPage'))
 const ThemeTemplatesPage = lazy(() => import('../pages/ThemeTemplatesPage'))
 const BannersPage = lazy(() => import('../pages/BannersPage'))
+const AffiliateAdminPage = lazy(
+  () => import('../../packages/affiliate/pages/admin/AffiliateAdminPage'),
+)
 const NotificationsPage = lazy(() => import('../pages/NotificationsPage'))
 const ActivityPage = lazy(() => import('../pages/ActivityPage'))
 const AdminsPage = lazy(() => import('../pages/AdminsPage'))
@@ -198,6 +201,7 @@ export function AdminRouter() {
                 <Route path="support/:ticketId" element={<SupportTicketPage />} />
                 <Route path="theme-templates" element={<ThemeTemplatesPage />} />
                 <Route path="banners" element={<BannersPage />} />
+                <Route path="affiliates" element={<AffiliateAdminPage />} />
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="activity" element={<ActivityPage />} />
                 <Route path="admins" element={<AdminsPage />} />

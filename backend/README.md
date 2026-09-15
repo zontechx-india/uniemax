@@ -80,6 +80,9 @@ Verify: `curl http://localhost:4000/health`
 | `CASHFREE_API_VERSION` | `x-api-version` header (default `2023-08-01`, PG API v4) |
 | `PUBLIC_API_URL` | Optional public origin of this API — builds the per-order webhook `notify_url`; otherwise configure the webhook URL in the Cashfree dashboard (see [docs/CASHFREE_PAYMENTS.md](../docs/CASHFREE_PAYMENTS.md)) |
 | `SUPPORT_EMAIL` / `SUPPORT_PHONE` / `SUPPORT_HOURS` | Platform support contact served at `GET /api/v1/public/support-contact` and printed on the seller's Help & Support page. All default to the live UnieMax details, so no environment has to set them |
+| `AFFILIATE_MAX_PERCENT` | Highest percentage commission a seller may offer (default `50`) — the platform ceiling for `package/affiliate` |
+| `AFFILIATE_INVITE_DAYS` | Days an affiliate invitation stays valid (default `14`) |
+| `AFFILIATE_CLICK_RETENTION_DAYS` | Days of raw click rows kept before the hourly job prunes them (default `90`); link click counters are never pruned |
 | `DATABASE_URL` | Pooled connection (runtime) — Supabase PgBouncer `:6543`  |
 | `DIRECT_URL`   | Direct connection (migrations) — Supabase `:5432`         |
 | `JWT_SECRET`   | **Required.** Signs access tokens (admin + customer)      |

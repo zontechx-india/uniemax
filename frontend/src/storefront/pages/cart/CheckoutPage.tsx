@@ -16,6 +16,7 @@ import { useCheckoutQuote } from '../../features/cart/useCheckoutQuote'
 import { useDeliveryCheck } from '../../features/cart/useDeliveryCheck'
 import { storeVars } from '../../features/publicStore/storeTheme'
 import { useStoreShell } from '../../features/publicStore/useStoreShells'
+import { clearAttribution, getAttribution } from '../../../packages/affiliate'
 import {
   cartUrl,
   formatPrice,
@@ -169,6 +170,7 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
           variantId: item.variantId,
           quantity: item.qty,
         })),
+        affiliateRef: getAttribution(storeSlug),
       })
     try {
       let order: Awaited<ReturnType<typeof submit>>
@@ -185,6 +187,8 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
       // The order owns these items now — clear them before leaving so a
       // back-navigation doesn't offer to buy them twice.
       cart.clearStore(storeSlug)
+      // One affiliate click credits one order — the next purchase needs a fresh click.
+      clearAttribution(storeSlug)
       if (order.payment?.paymentSessionId) {
         // Cashfree gateway order — hand over to the hosted checkout; it
         // redirects back to the order page (return_url) after payment.
