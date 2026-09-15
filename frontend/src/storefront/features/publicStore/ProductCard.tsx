@@ -70,8 +70,8 @@ export function ProductCard({
             {product.category.name}
           </span>
 
-          {/* Prototype card title: condensed display face, medium weight —
-              bold Oswald at this size reads cramped. */}
+          {/* Prototype card title: heading face at medium weight — bold
+              reads heavy at this size. */}
           <h3
             className={`line-clamp-2 font-heading text-sm font-medium leading-tight transition-colors group-hover:text-brand sm:text-base ${skin.text}`}
           >

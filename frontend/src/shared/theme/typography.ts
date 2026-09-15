@@ -6,9 +6,10 @@
  * deviate from the skill by design decision, adopted from the approved
  * UnieMax prototype (`prototype/index.html`):
  *
- * - Oswald — condensed display face for headings, product names and prices
- *   (athletic/retail character; always tracked +0.02em — see `index.css`).
- *   SIL OFL, self-hosted (`public/fonts/Oswald-Variable.woff2`, wght 200–700).
+ * - Manrope — headings, product names and prices (geometric, open, clean
+ *   numerals; tracked −0.01em — see `index.css`). SIL OFL, self-hosted
+ *   (`public/fonts/Manrope-Variable.woff2`, wght 200–800). Replaced the
+ *   prototype's condensed Oswald in September 2026.
  * - Inter — body/UI text. SIL OFL, self-hosted
  *   (`public/fonts/Inter-Variable.woff2`, wght 100–900).
  *
@@ -19,7 +20,7 @@
 
 export const fontFamily = {
   /** Headings / display. */
-  heading: '"Oswald", "Segoe UI", system-ui, sans-serif',
+  heading: '"Manrope", "Segoe UI", system-ui, sans-serif',
   /** Body / UI text. */
   body: '"Inter", "Segoe UI", system-ui, -apple-system, sans-serif',
 } as const

@@ -26,14 +26,14 @@
  * ------------------------------------------------------------------ */
 
 /* Type pairing (both SIL OFL, self-hosted as latin variable files):
- *   Oswald — condensed display face for headings, product names, prices;
- *            reads athletic/retail, always with +0.02em tracking (see below).
- *   Inter  — body/UI text.
- * Adopted from the approved UnieMax prototype (prototype/index.html). */
+ *   Manrope — headings, product names, prices. Geometric and open, with
+ *             tabular-friendly numerals; sits slightly tight (see below).
+ *   Inter   — body/UI text.
+ * Manrope replaced the prototype's condensed Oswald in September 2026. */
 @font-face {
-  font-family: 'Oswald';
-  src: url('/fonts/Oswald-Variable.woff2') format('woff2');
-  font-weight: 200 700;
+  font-family: 'Manrope';
+  src: url('/fonts/Manrope-Variable.woff2') format('woff2');
+  font-weight: 200 800;
   font-style: normal;
   font-display: swap;
 }
@@ -47,7 +47,7 @@
 
 /* Static (never-flipping) tokens → generate font/radius/shadow utilities. */
 @theme {
-  --font-heading: 'Oswald', 'Segoe UI', system-ui, sans-serif;
+  --font-heading: 'Manrope', 'Segoe UI', system-ui, sans-serif;
   --font-body: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
 
   --radius-xs: 2px;
@@ -382,12 +382,11 @@
     box-shadow: var(--metal-glow);
   }
 
-  /* Oswald is condensed — wherever the heading face is used as a utility it
-   * carries the same +0.02em tracking as the base h1–h3 rule. Declared after
-   * Tailwind's generated utilities, so it also wins over `tracking-tight`
-   * (Oswald should never be tightened further). */
+  /* The heading face sits a touch tight wherever it is used as a utility —
+   * the same as the base h1–h3 rule. Declared after Tailwind's generated
+   * utilities so the two stay in step. */
   .font-heading {
-    letter-spacing: 0.02em;
+    letter-spacing: -0.01em;
   }
 
   /* Brand-gradient display text (the prototype's `gold-text` slot), cut from
@@ -532,14 +531,13 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Type pairing: display headings in Oswald, body/UI in Inter. Oswald is
-   * condensed, so it always carries a touch of tracking (prototype's
-   * `.font-display` rule) — applied here and by the `font-heading` utility. */
+  /* Type pairing: headings in Manrope, body/UI in Inter. Headings sit a
+   * touch tight — applied here and by the `font-heading` utility. */
   h1,
   h2,
   h3 {
     font-family: var(--font-heading);
-    letter-spacing: 0.02em;
+    letter-spacing: -0.01em;
   }
 
   /* Accent focus ring for keyboard users (skill: blue #1863dc outline). */

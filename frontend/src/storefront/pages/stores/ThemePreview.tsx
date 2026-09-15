@@ -397,7 +397,7 @@ function Products() {
   )
 }
 
-/** Brand tick + Oswald title — the storefront's own heading rule. */
+/** Brand tick + heading-face title — the storefront's own heading rule. */
 function SectionHeading({ title, action }: { title: string; action?: string }) {
   return (
     <div className="flex items-end justify-between gap-3">

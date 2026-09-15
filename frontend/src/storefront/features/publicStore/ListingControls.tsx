@@ -107,7 +107,7 @@ export function SectionHeading({
     <div className="flex items-end justify-between gap-4">
       <div>
         <span className="block h-0.5 w-8 rounded-full bg-brand" />
-        {/* Oswald display scale from the prototype: 2xl → 3xl, medium weight
+        {/* Heading scale from the prototype: 2xl → 3xl, semibold
             (700 is reserved for the hero). */}
         <h2
           className={`mt-2 font-heading text-2xl font-semibold sm:text-3xl ${skin.text}`}

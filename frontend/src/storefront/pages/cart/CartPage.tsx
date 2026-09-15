@@ -24,7 +24,7 @@ const PREVIEW_LINES = 3
  * page (/cart/{storeSlug}) for the full list.
  *
  * Styling matches the storefront treatment (full-width shell, flat surfaces
- * + borders, Oswald headings) and **continues the theme of the store the
+ * + borders, Manrope headings) and **continues the theme of the store the
  * visitor opened the cart from** — carried explicitly as `?from={slug}` by
  * every cart link inside a store (see `cartUrl`), regardless of which
  * stores' items are inside. Opened from the marketplace (homepage — plain

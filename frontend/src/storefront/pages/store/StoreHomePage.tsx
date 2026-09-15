@@ -384,7 +384,7 @@ function Hero({
           <span className="text-[11px] font-semibold uppercase tracking-[0.3em] text-brand">
             Welcome to
           </span>
-          {/* Prototype hero scale: Oswald 700, near-flush leading. */}
+          {/* Prototype hero scale: heading face at 700, near-flush leading. */}
           <h1
             className={`mt-2 font-heading text-3xl font-bold leading-none sm:text-5xl ${skin.text}`}
           >
