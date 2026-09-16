@@ -4,7 +4,8 @@ import { resolveSession } from './authApi'
 /**
  * Cookie-session state for an app shell (storefront or admin).
  *
- *   loading → probing /me (with one refresh retry) on mount
+ *   loading → probing /me on mount (the http client refreshes + retries an
+ *             expired access cookie by itself)
  *   guest   → no valid session; show the login page
  *   authed  → `user` is the signed-in principal
  */
@@ -15,7 +16,6 @@ export type SessionState<TUser> =
 
 export function useSession<TUser>(api: {
   me(): Promise<TUser>
-  refresh(): Promise<unknown>
   logout(): Promise<unknown>
 }) {
   const [state, setState] = useState<SessionState<TUser>>({ status: 'loading' })

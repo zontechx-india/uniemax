@@ -61,8 +61,13 @@ Each login comes in **two client profiles**:
 
 Guards accept the access token from **either** the Bearer header or the cookie. A
 customer token on an admin route (or vice-versa) returns `403`; missing/invalid/expired
-→ `401`. When a **rotated** (already-used) refresh token is presented, every session for
-that principal is revoked (theft defence). Public browse endpoints need no token and
+→ `401`. The access **cookie** outlives its JWT (it carries the refresh cookie's
+`maxAge`), so an expired token still reaches the server and fails as `401 Invalid or
+expired token` — the web client answers any 401 with one silent `/web/refresh` and a
+replay. When a **rotated** (already-used) refresh token is presented, every session for
+that principal is revoked (theft defence) — except within **30 s** of that rotation,
+when the presenter is taken for a sibling tab of the same browser and is rotated
+forward from the successor session instead. Public browse endpoints need no token and
 only ever return active data; **placing an order requires a customer token** (guests
 browse and fill a cart, but must sign in to order).
 

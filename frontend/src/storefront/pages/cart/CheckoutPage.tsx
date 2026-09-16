@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useGoBack } from '../../../shared/useGoBack'
 import { usePageTitle } from '../../../shared/usePageTitle'
 import { trackInitiateCheckout } from '../../../shared/analytics/metaPixel'
-import { customerAuth } from '../../../shared/auth/authApi'
 import { toApiError } from '../../../shared/auth/http'
 import { ErrorNote } from '../../../shared/ui/form'
 import { buttonClass } from '../../../shared/ui/Button'
@@ -59,9 +58,9 @@ import { StoreLogo } from './StoreLogo'
  * from the shell's one probe (`useMarketSession`); guests get a sign-in
  * prompt instead of the checkout steps, whose CTA opens the auth dialog in
  * the store's palette over this very page — the steps appear the moment the
- * session flips, nothing reloads. A 401 on Place Order (cookie expired while
- * filling the form) refreshes once and retries; only if that fails does the
- * dialog open, with the cart and the steps still intact.
+ * session flips, nothing reloads. A cookie that expired while filling the
+ * form is refreshed and the request replayed by the http client; a 401 that
+ * still comes back opens the dialog, with the cart and the steps intact.
  */
 export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
   const { state: session } = useMarketSession()
@@ -173,17 +172,10 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
         affiliateRef: getAttribution(storeSlug),
       })
     try {
-      let order: Awaited<ReturnType<typeof submit>>
-      try {
-        order = await submit()
-      } catch (err) {
-        // The access cookie may simply have expired while the customer filled
-        // in the steps. Rotate it once and retry before asking them to sign
-        // in — the old full-page bounce through /login did this implicitly.
-        if (toApiError(err).statusCode !== 401) throw err
-        await customerAuth.refresh()
-        order = await submit()
-      }
+      // An access cookie that expired while the customer filled in the steps
+      // is handled by the http client (one silent refresh + replay); a 401
+      // that reaches us means the session is really gone.
+      const order = await submit()
       // The order owns these items now — clear them before leaving so a
       // back-navigation doesn't offer to buy them twice.
       cart.clearStore(storeSlug)

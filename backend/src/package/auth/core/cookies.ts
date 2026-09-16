@@ -49,9 +49,15 @@ export function setAuthCookies(reply: FastifyReply, tokens: IssuedTokens): void 
   const names = authConfig.cookieSurface(type);
   const refreshMaxAge = Math.floor(authConfig.refreshTtlMs(type) / 1000);
 
+  // The access cookie outlives its JWT on purpose. Expiry is enforced by the
+  // token's own `exp`, so once it lapses the server still *sees* it and
+  // answers "Invalid or expired token" — a 401 the SPA recovers from with a
+  // refresh. With `maxAge` = the JWT lifetime the browser silently dropped
+  // the cookie at minute 15 and requests arrived with no credential at all,
+  // indistinguishable from a signed-out visitor.
   reply.setCookie(names.access, tokens.accessToken, {
     ...tokenOptions(type),
-    maxAge: Math.floor(authConfig.accessTtlMs / 1000),
+    maxAge: refreshMaxAge,
   });
   reply.setCookie(names.refresh, tokens.refreshToken, {
     ...tokenOptions(type),

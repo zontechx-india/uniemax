@@ -66,9 +66,9 @@ Auth talks to the live backend (`package/auth`) via `src/shared/auth/`:
 
 | File | Purpose |
 | ---- | ------- |
-| `http.ts`    | Axios client: `withCredentials`, echoes the surface's CSRF cookie in `X-CSRF-Token` on mutations (`um_admin_csrf` for `/api/v1/admin/**`, `csrf_token` otherwise — chosen from the request URL, so no boot-time initialisation has to be respected), normalizes the error envelope into `ApiError` |
-| `authApi.ts` | Typed endpoints: `customerAuth` (register, login, google, requestOtp/verifyOtp, forgot/resetPassword, linkRequest/linkVerify, me, refresh, logout) + `adminAuth` (login, me, refresh, logout) + `resolveSession`. `refresh()` is **single-flight** on both surfaces: refresh tokens rotate and the backend treats a re-presented rotated token as theft (revokes every session), so overlapping callers share one in-flight request |
-| `useSession.ts` | Session hook: on mount probes `/me` (one refresh retry on 401) → `loading / guest / authed`; exposes `signedIn(user)` / `signOut()` |
+| `http.ts`    | Axios client: `withCredentials`, echoes the surface's CSRF cookie in `X-CSRF-Token` on mutations (`um_admin_csrf` for `/api/v1/admin/**`, `csrf_token` otherwise — chosen from the request URL, so no boot-time initialisation has to be respected), normalizes the error envelope into `ApiError`. **Global 401 recovery:** a response interceptor answers any 401 (except the `/auth/web/*` cookie-exchange endpoints, and only when the surface's CSRF cookie exists — i.e. this browser holds a session) with one `refreshSession(surface)` and a replay of the request; a 401 that survives that reaches the caller. `refreshSession` is **single-flight** per surface: refresh tokens rotate, the backend treats a re-presented rotated token as theft (revokes every session, beyond a 30 s sibling-tab grace window), and an expired access cookie makes a whole page's worth of requests fail in the same instant — they must all share one refresh |
+| `authApi.ts` | Typed endpoints: `customerAuth` (register, login, google, requestOtp/verifyOtp, forgot/resetPassword, linkRequest/linkVerify, me, refresh, logout) + `adminAuth` (login, me, refresh, logout) + `resolveSession`. `refresh()` delegates to `http.ts`'s `refreshSession`; call it only where a *non-401* response means "expired cookie" (the draft-preview 404) or on a keep-alive timer — 401s refresh themselves |
+| `useSession.ts` | Session hook: on mount probes `/me` (the http client refreshes + replays an expired cookie) → `loading / guest / authed`; exposes `signedIn(user)` / `signOut()` |
 | `VerifyPhoneForm.tsx` | The one way a phone number enters the platform: number → SMS code → `linkRequest`/`linkVerify`, resolving with the updated `Customer`. Renders no `<form>` so it embeds inside host forms |
 
 Both frontends are **web** clients: tokens live in httpOnly cookies (never JS),
@@ -863,8 +863,9 @@ account's basket on every device. The server copy is deliberately kept, so
 signing back in restores it; the local clear exists only so the next person to
 use the browser doesn't inherit the previous customer's basket. Only an
 *explicit* logout clears it — an expired session (the 401 path out of
-checkout) refreshes once and retries, else opens the auth dialog over the
-checkout, leaving the cart intact so the shopper can sign back in and pay.
+checkout) is refreshed and replayed by the http client, else opens the auth
+dialog over the checkout, leaving the cart intact so the shopper can sign back
+in and pay.
 **Placing an order also clears that store's lines server-side**, so the
 basket empties on every signed-in device rather than only the tab that
 checked out.
@@ -926,8 +927,8 @@ needs an account, matching the API's `requireCustomer` on order
 placement). Guests get a "Sign in to place your order" panel whose CTA
 opens the auth dialog in the store's palette over the checkout — the steps
 and the quote appear the moment the session flips, nothing reloads. A
-mid-checkout 401 on Place Order (cookie expired while filling the form)
-calls `customerAuth.refresh()` once and retries; only if that fails does the
+mid-checkout 401 on Place Order (cookie expired while filling the form) is
+refreshed and replayed by the http client; only if that fails does the
 dialog open, with the cart and the filled-in steps intact. For signed-in customers it
 renders an Inter-titled top bar with a secure-checkout
 cue, compact store identity row, the read-only item list (edit links back
@@ -1398,8 +1399,9 @@ via the `adminRouter` plugin, so deep links work in both.
 
 ### Shell & session hardening
 
-`AdminApp` probes the cookie session (`GET /admin/auth/me`, one refresh retry)
-and swaps between the login page and the console. Because this is the
+`AdminApp` probes the cookie session (`GET /admin/auth/me`; the http client
+refreshes + replays an expired cookie) and swaps between the login page and
+the console. Because this is the
 highest-privilege surface on the platform, `app/adminSession.tsx` adds three
 rules the storefront does not have:
 
@@ -1410,11 +1412,13 @@ rules the storefront does not have:
    the real risk. Activity is `pointerdown`/`keydown`/`scroll`/`focus`;
    `visibilitychange` deliberately does **not** count, because a background
    tab is not someone at the desk.
-3. **Global 401 handling** — an axios interceptor drops the whole app to the
-   login screen the moment any admin call comes back unauthorised (session
-   revoked elsewhere, admin deactivated), instead of leaving half-loaded
-   pages showing stale data. The login POST is exempt: a 401 there is a form
-   error, not an expired session.
+3. **Global 401 handling** — the shared http client first answers any 401
+   with one silent refresh + replay (so a laptop waking from sleep past the
+   token's 15 minutes just carries on); a 401 that survives that is one the
+   refresh could not fix (session revoked elsewhere, admin deactivated), and
+   this provider's axios interceptor drops the whole app to the login screen
+   at once instead of leaving half-loaded pages showing stale data. The
+   login POST is exempt: a 401 there is a form error, not an expired session.
 
 `layout/AdminLayout.tsx` is the shell — **one nav, two presentations**: the
 same `NAV_GROUPS` render as a fixed 16rem rail from `lg` up and as a slide-in

@@ -21,7 +21,7 @@
 | **Phone/email linking** (`/me/link`) | Code-verified; identifier unique to one account (409 on conflict). Linking a phone is what enables OTP login. |
 | **Google Sign-In flow logic** | Find-by-`(provider,sub)` → link-by-verified-email → create. *(Token verification itself is still mocked — see below.)* |
 | **Admin login** (email + password) | Bootstrap/reset via `npm run create-admin` — no signup endpoint by design. |
-| **Sessions** | Access JWT (15m) + opaque rotating refresh token (DB-backed). Reuse of a rotated token ⇒ theft ⇒ all sessions revoked. Web = httpOnly cookies + double-submit CSRF; mobile = bearer tokens. Refresh / logout / logout-all per surface. |
+| **Sessions** | Access JWT (15m) + opaque rotating refresh token (DB-backed). Reuse of a rotated token ⇒ theft ⇒ all sessions revoked — except within a 30 s grace window after the rotation (`REUSE_GRACE_MS`), when the late presenter is a sibling browser tab and is rotated forward from the successor session. Web = httpOnly cookies + double-submit CSRF (the access cookie carries the refresh cookie's `maxAge`, so an expired JWT still reaches the guard as a recoverable `401` rather than vanishing); mobile = bearer tokens. Refresh / logout / logout-all per surface. |
 | **Email delivery** | **LIVE via Resend** — domain verified, sender `EMAIL_FROM`. Codes are never echoed in API responses; no dev bypass for email. Provider failure → clean `502`. |
 | **Profile self-service** | `GET/PATCH /me`, `GET /me/orders`. |
 

@@ -19,8 +19,24 @@ import type {
  * Each login creates a session row holding the SHA-256 of an opaque refresh
  * token. On refresh the token is rotated: the old row is revoked and points to
  * the new one (`replacedById`). Presenting an already-rotated (revoked) token
- * signals theft → every session for that principal is revoked.
+ * signals theft → every session for that principal is revoked — except inside
+ * a short **grace window** after the rotation (see `REUSE_GRACE_MS`).
  */
+
+/**
+ * How long after a rotation the *previous* token is still honoured.
+ *
+ * A browser shares one cookie jar across tabs, and session restore opens
+ * every tab at once: each probes `/me`, each gets 401 on the expired access
+ * cookie, and each posts the SAME refresh cookie. The first wins; without a
+ * grace window the second is "reuse" and burns every session the customer
+ * has — they wake up signed out for no reason. Inside the window the late
+ * presenter is treated as the successor session's owner (which, in one
+ * browser, it is) and rotates *that* instead. A real thief who replays a
+ * token within seconds of the victim's own refresh gets one hop; the
+ * moment either side rotates past the window the other is caught as before.
+ */
+const REUSE_GRACE_MS = 30_000;
 
 function expiryFor(type: PrincipalType): Date {
   return new Date(Date.now() + authConfig.refreshTtlMs(type));
@@ -37,6 +53,26 @@ function principalFromRow(row: {
   };
   if (row.role) principal.role = row.role;
   return principal;
+}
+
+type SessionRow = NonNullable<
+  Awaited<ReturnType<typeof prisma.authSession.findUnique>>
+>;
+
+/**
+ * For a token revoked by *rotation* within `REUSE_GRACE_MS`, the live
+ * session that replaced it; `null` when the revocation was older, was a
+ * logout (no successor), or the successor is itself gone — all of which are
+ * the theft case.
+ */
+async function graceSuccessor(revoked: SessionRow): Promise<SessionRow | null> {
+  if (!revoked.revokedAt || !revoked.replacedById) return null;
+  if (Date.now() - revoked.revokedAt.getTime() > REUSE_GRACE_MS) return null;
+  const successor = await prisma.authSession.findUnique({
+    where: { id: revoked.replacedById },
+  });
+  if (!successor || successor.revokedAt) return null;
+  return successor;
 }
 
 async function mint(
@@ -91,17 +127,24 @@ export async function rotateSession(
   meta: SessionMeta = {},
   expectType?: PrincipalType,
 ): Promise<IssuedTokens> {
-  const row = await prisma.authSession.findUnique({
+  const presented = await prisma.authSession.findUnique({
     where: { refreshHash: hashRefreshToken(presentedRefresh) },
   });
-  if (!row) throw HttpError.unauthorized("Invalid refresh token");
+  if (!presented) throw HttpError.unauthorized("Invalid refresh token");
 
-  // Reuse of an already-rotated token → likely theft. Burn everything.
+  let row = presented;
   if (row.revokedAt) {
-    await revokeAllSessions(row.principalId, row.principalType as PrincipalType);
-    throw HttpError.unauthorized(
-      "Refresh token reuse detected — all sessions revoked. Please sign in again.",
-    );
+    // Rotated moments ago by a sibling tab → continue from its successor.
+    const successor = await graceSuccessor(row);
+    if (!successor) {
+      // Reuse of an already-rotated token (or a logged-out one) → likely
+      // theft. Burn everything.
+      await revokeAllSessions(row.principalId, row.principalType as PrincipalType);
+      throw HttpError.unauthorized(
+        "Refresh token reuse detected — all sessions revoked. Please sign in again.",
+      );
+    }
+    row = successor;
   }
   if (row.expiresAt.getTime() <= Date.now()) {
     throw HttpError.unauthorized("Refresh token expired. Please sign in again.");

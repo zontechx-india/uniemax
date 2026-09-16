@@ -17,10 +17,13 @@ import { http } from '../../shared/auth/http'
  *    risk, so 30 minutes without a keystroke, click or scroll ends the
  *    session server-side. `visibilitychange` is deliberately NOT treated as
  *    activity: a background tab is not someone at the desk.
- * 3. **Global 401 handling.** If a request comes back unauthorised anyway
- *    (the session was revoked from another device, or an admin was
- *    deactivated), the whole app drops to the login screen at once instead
- *    of leaving half-loaded pages showing stale data.
+ * 3. **Global 401 handling.** The shared http client answers every 401 with
+ *    one silent refresh + replay first (so a laptop waking from sleep past
+ *    the token's 15 minutes just carries on). A 401 that reaches this
+ *    provider is therefore one the refresh could not fix — the session was
+ *    revoked from another device, or the admin was deactivated — and the
+ *    whole app drops to the login screen at once instead of leaving
+ *    half-loaded pages showing stale data.
  */
 
 export interface AdminSession {
@@ -90,8 +93,9 @@ export function AdminSessionProvider({
     }
   }, [])
 
-  // A 401 from any admin call means the session is gone — drop out now
-  // rather than letting each page render its own "Unauthorized" error.
+  // A 401 from any admin call that the shared client's refresh-and-replay
+  // could not clear means the session is gone — drop out now rather than
+  // letting each page render its own "Unauthorized" error.
   useEffect(() => {
     const interceptor = http.interceptors.response.use(
       (response) => response,
@@ -99,8 +103,14 @@ export function AdminSessionProvider({
         const status = error?.response?.status
         const url: string = error?.config?.url ?? ''
         // The login POST answers 401 for bad credentials — that is a form
-        // error, not an expired session.
-        if (status === 401 && url.startsWith('/api/v1/admin') && !url.includes('/auth/')) {
+        // error, not an expired session. And once we have signed out, the
+        // failed replay's own rejection must not sign out a second time.
+        if (
+          status === 401 &&
+          !signedOut.current &&
+          url.startsWith('/api/v1/admin') &&
+          !url.includes('/auth/')
+        ) {
           signedOut.current = true
           onSignedOut()
         }

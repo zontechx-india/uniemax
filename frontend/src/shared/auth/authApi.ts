@@ -1,4 +1,4 @@
-import { http, call, toApiError } from './http'
+import { http, call, refreshSession, toApiError } from './http'
 
 /**
  * Typed client for the backend auth API (web profile — httpOnly cookies).
@@ -49,38 +49,6 @@ export interface CustomerLogin {
 
 const AUTH = '/api/v1/auth'
 const ADMIN_AUTH = '/api/v1/admin/auth'
-
-/**
- * Collapses overlapping calls into ONE request — everyone who arrives while a
- * call is in flight awaits the same promise.
- *
- * Used for `refresh()`, where it is a correctness guard rather than an
- * optimisation: refresh tokens **rotate**, and the backend treats a second
- * presentation of an already-rotated token as theft and revokes every session
- * (`rotateSession` in `session.service.ts`). Two components probing the
- * session at the same moment — the app shell and, on a store page, the draft
- * preview retry — would otherwise sign the customer out of everything.
- *
- * A failed call clears the slot, so the next caller genuinely retries.
- */
-function singleFlight<T>(run: () => Promise<T>): () => Promise<T> {
-  let inFlight: Promise<T> | null = null
-  return () => {
-    if (!inFlight) {
-      inFlight = run().finally(() => {
-        inFlight = null
-      })
-    }
-    return inFlight
-  }
-}
-
-const refreshCustomerSession = singleFlight(() =>
-  call<Record<string, never>>(http.post(`${AUTH}/web/refresh`)),
-)
-const refreshAdminSession = singleFlight(() =>
-  call<Record<string, never>>(http.post(`${ADMIN_AUTH}/web/refresh`)),
-)
 
 // ---- Customer ---------------------------------------------------------------
 
@@ -133,12 +101,15 @@ export const customerAuth = {
     return call<Customer>(http.post(`${AUTH}/me/link/verify`, input))
   },
 
-  // Session
+  // Session — `refresh()` is single-flight (see `refreshSession` in http.ts);
+  // a 401 anywhere already refreshes + replays automatically, so call this
+  // only where a *non-401* response means "the access cookie expired" (the
+  // draft-preview 404 in PublicStoreLayout) or on a keep-alive timer.
   me() {
     return call<Customer>(http.get(`${AUTH}/me`))
   },
   refresh() {
-    return refreshCustomerSession()
+    return refreshSession('customer')
   },
   logout() {
     return call<{ signedOut: boolean }>(http.post(`${AUTH}/web/logout`))
@@ -155,7 +126,7 @@ export const adminAuth = {
     return call<Admin>(http.get(`${ADMIN_AUTH}/me`))
   },
   refresh() {
-    return refreshAdminSession()
+    return refreshSession('admin')
   },
   logout() {
     return call<{ signedOut: boolean }>(http.post(`${ADMIN_AUTH}/web/logout`))
@@ -165,22 +136,18 @@ export const adminAuth = {
 // ---- Session bootstrap (shared by both apps) -----------------------------------
 
 /**
- * Resolves the current user from the cookie session: try `/me`; on 401 rotate
- * the refresh cookie once and retry. Returns `null` when signed out.
+ * Resolves the current user from the cookie session: `/me`, which the http
+ * client already retries once behind a silent refresh when the access cookie
+ * has expired. A 401 that survives that means signed out → `null`. Other
+ * failures (server down) propagate so the shell can decide.
  */
 export async function resolveSession<TUser>(api: {
   me(): Promise<TUser>
-  refresh(): Promise<unknown>
 }): Promise<TUser | null> {
   try {
     return await api.me()
   } catch (err) {
-    if (toApiError(err).statusCode !== 401) throw err
-  }
-  try {
-    await api.refresh()
-    return await api.me()
-  } catch {
-    return null
+    if (toApiError(err).statusCode === 401) return null
+    throw err
   }
 }

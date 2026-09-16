@@ -628,8 +628,13 @@ extracted into a standalone service later with minimal churn. The rest of the ap
 — and never reaches into the internals. Inside:
 
 - **`core/`** — the generic, domain-free **engine**: access JWT + opaque rotating refresh
-  tokens (`AuthSession`-backed, reuse ⇒ all sessions revoked), web-cookie + CSRF and
-  mobile-bearer delivery, `requirePrincipal` guard, generic refresh/logout routes.
+  tokens (`AuthSession`-backed; reuse ⇒ all sessions revoked, except a 30 s grace
+  window after a rotation in which the late presenter — a sibling browser tab — is
+  rotated forward from the successor session), web-cookie + CSRF and mobile-bearer
+  delivery, `requirePrincipal` guard, generic refresh/logout routes. The access cookie
+  carries the refresh cookie's `maxAge` so an expired JWT still reaches the guard and
+  fails as `401 Invalid or expired token` (recoverable by refresh) instead of vanishing
+  from the browser and arriving as "no credential".
   Web cookies are namespaced into a **cookie surface per principal**
   (`authConfig.cookieSurface`): customer keeps `access_token`/`refresh_token`/
   `csrf_token` at `/`, admin uses `um_admin_*` with its tokens path-scoped to
