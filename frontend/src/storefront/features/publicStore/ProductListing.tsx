@@ -87,16 +87,16 @@ export function ProductListing({
 
       {children}
 
-      <div className="mt-4">
-        <SortFilterBar
-          total={total}
-          sort={sort}
-          onSort={setSort}
-          activeFilterCount={filterCount}
-          onOpenFilters={() => setFiltersOpen(true)}
-          skin={skin}
-        />
-      </div>
+      {/* No wrapper: a sticky element can only travel inside its parent's
+          box, and a div sized to the bar itself let it scroll straight away. */}
+      <SortFilterBar
+        total={total}
+        sort={sort}
+        onSort={setSort}
+        activeFilterCount={filterCount}
+        onOpenFilters={() => setFiltersOpen(true)}
+        skin={skin}
+      />
 
       {error ? (
         <p className="rounded-lg border border-line p-6 text-center text-sm text-danger">

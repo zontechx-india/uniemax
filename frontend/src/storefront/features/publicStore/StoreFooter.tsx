@@ -4,12 +4,17 @@ import { SOCIAL_META } from '../../../shared/ui/socialIcons'
 import {
   FOOTER_POLICY_KEYS,
   FOOTER_SOCIAL_KEYS,
+  storeCategoryUrl,
+  storeHomeUrl,
+  storeShopUrl,
   storeSupportUrl,
   type FooterLocation,
   type FooterPolicyKey,
   type PublicStore,
   type StoreFooter as StoreFooterData,
 } from '../stores/storesApi'
+import { STORE_CONTAINER } from './storeLayout'
+import { builderSectionProps } from './builderBridge'
 import {
   ClockIcon,
   ExternalLinkIcon,
@@ -23,10 +28,15 @@ import type { Skin } from './storeTheme'
 
 /**
  * Storefront footer — renders the owner's Footer settings (locations, social
- * profiles, store info, support, policy + custom links, copyright). Every
- * block is conditional: a store that configured nothing gets the original
- * minimal footer (brand mark + powered-by), never a wall of empty headings.
- * Fully responsive: one column on phones, two on tablets, four on desktop.
+ * profiles, store info, support, policy + custom links, copyright) around two
+ * blocks that need no configuring: **Shop** (the store's own navigation and
+ * top categories) and **Customer Support**. The owner-configured blocks stay
+ * conditional, so a store that filled nothing in gets brand + Shop + Support
+ * rather than a wall of empty headings.
+ *
+ * Responsive: one column on phones, two on tablets, and on desktop exactly as
+ * many as this store's blocks fill (`BLOCK_COLUMNS`) — a fixed four left a
+ * fully-configured store stranding its last block alone on a second row.
  *
  * The Customer Support block is the one exception to "conditional": it always
  * renders, because **Help & Support is always available** whether or not the
@@ -47,26 +57,50 @@ const POLICY_LABELS: Record<FooterPolicyKey, string> = {
 const waLink = (number: string) => `https://wa.me/${number.replace(/\D/g, '')}`
 const telLink = (number: string) => `tel:${number.replace(/[^\d+]/g, '')}`
 
+/**
+ * How many columns the block row takes on `lg`, so the brand block plus
+ * however many blocks this store configured always land on ONE line. A fixed
+ * four left a store with every block filled stranding its last one alone on a
+ * second row, and a store with none of them leaving three empty columns.
+ */
+const BLOCK_COLUMNS = [
+  'lg:grid-cols-2',
+  'lg:grid-cols-2',
+  'lg:grid-cols-3',
+  'lg:grid-cols-4',
+  'lg:grid-cols-5',
+]
+
 export function StoreFooter({ store, skin }: { store: PublicStore; skin: Skin }) {
   const footer = store.footer
   const socials = FOOTER_SOCIAL_KEYS.filter((key) => footer.social[key])
   const policies = FOOTER_POLICY_KEYS.filter((key) => footer.policies[key])
   const hasLinks = footer.links.length > 0 || policies.length > 0
 
-  // The block grid always renders now: Customer Support is unconditional
-  // (it carries the in-app Help & Support link, which every store has), so
-  // the old "configured nothing → minimal footer" branch can no longer be
-  // reached and the flags that decided it are gone.
+  // The block grid always renders now: Shop and Customer Support are
+  // unconditional (every store has categories and the in-app Help & Support
+  // link), so the old "configured nothing → minimal footer" branch can no
+  // longer be reached and the flags that decided it are gone.
+  const blocks = 2 + (hasLinks ? 1 : 0) + (footer.locations.length > 0 ? 1 : 0)
 
   const copyright =
     footer.copyrightText ??
     `© ${new Date().getFullYear()} ${store.name}. All Rights Reserved.`
 
   return (
-    <footer className={`mt-10 border-t ${skin.border}`}>
-      <div className="mx-auto max-w-[1920px] px-4 sm:px-6 lg:px-10">
-        <div className="grid gap-10 py-10 sm:grid-cols-2 lg:grid-cols-4">
+    // The footer is a place a seller can EDIT, so inside the Store Builder's
+    // preview it is a hit-target like any homepage band. Nothing is added on a
+    // real storefront.
+    <footer
+      className={`mt-10 border-t ${skin.border}`}
+      {...builderSectionProps('footer')}
+    >
+      <div className={STORE_CONTAINER}>
+        <div
+          className={`grid gap-10 py-10 sm:grid-cols-2 sm:gap-x-8 ${BLOCK_COLUMNS[blocks] ?? 'lg:grid-cols-4'}`}
+        >
           <BrandBlock store={store} socials={socials} />
+          <ShopBlock store={store} />
           {hasLinks && (
             <FooterBlock title="Quick Links">
               <ul className="space-y-2">
@@ -230,6 +264,47 @@ function BrandBlock({
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * Shop — the store's own navigation, repeated at the bottom of the page for
+ * anyone who read that far instead of scanning the toolbar. Nothing here is
+ * configured: it is the same three destinations the header carries plus the
+ * store's top-level categories, capped so a shop with forty shelves does not
+ * turn its footer into a sitemap.
+ */
+const FOOTER_CATEGORY_LIMIT = 6
+
+function ShopBlock({ store }: { store: PublicStore }) {
+  const categories = store.categories.slice(0, FOOTER_CATEGORY_LIMIT)
+  return (
+    <FooterBlock title="Shop">
+      <ul className="space-y-2">
+        <li>
+          <FooterAnchor href={storeHomeUrl(store.slug)}>Home</FooterAnchor>
+        </li>
+        <li>
+          <FooterAnchor href={storeShopUrl(store.slug)}>
+            All Products
+          </FooterAnchor>
+        </li>
+        {categories.map((category) => (
+          <li key={category.id}>
+            <FooterAnchor href={storeCategoryUrl(store.slug, category.slug)}>
+              {category.name}
+            </FooterAnchor>
+          </li>
+        ))}
+        {store.categories.length > FOOTER_CATEGORY_LIMIT && (
+          <li>
+            <FooterAnchor href={storeShopUrl(store.slug)}>
+              All categories →
+            </FooterAnchor>
+          </li>
+        )}
+      </ul>
+    </FooterBlock>
   )
 }
 

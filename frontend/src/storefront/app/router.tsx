@@ -25,6 +25,16 @@ function LegacyStoresRedirect() {
 }
 
 /**
+ * Appearance, Homepage, and the old full-screen theme preview → the Store
+ * Builder, which is now the one place a storefront is designed. `replace`
+ * keeps the retired path out of the seller's back button.
+ */
+function BuilderRedirect() {
+  const { storeSlug = '' } = useParams()
+  return <Navigate to={`/mystores/${storeSlug}/builder`} replace />
+}
+
+/**
  * Marketplace router — everything that is not the per-store shopping surface
  * (`/store`, `/cart`, `/checkout` live in `publicRouter.tsx`).
  *
@@ -129,17 +139,25 @@ export const router = createBrowserRouter([
               Component: (await import('../pages/stores/CreateStorePage')).CreateStorePage,
             }),
           },
-          // Full-width theme preview. A SIBLING of the manage layout, not a
-          // child: inside that layout the preview shares its row with the
-          // 260px section nav, which on a 1024px laptop leaves it narrower
-          // than a 768px tablet gets. React Router ranks by specificity, so
-          // this four-segment path wins over the layout's 'appearance' child.
+          // Store Builder. A SIBLING of the manage layout, not a child: it is
+          // a workspace, not a settings page, and inside that layout its live
+          // preview would share its row with the 264px section nav — which on
+          // a 1024px laptop leaves the "desktop" preview narrower than a
+          // tablet. React Router ranks by specificity, so this three-segment
+          // path wins over anything the layout mounts.
+          {
+            path: 'mystores/:storeSlug/builder',
+            lazy: async () => ({
+              Component: (await import('../pages/stores/builder/StoreBuilderPage'))
+                .StoreBuilderPage,
+            }),
+          },
+          // The four screens the builder replaced. Kept as redirects, not
+          // removed: notification rows, bookmarks and support threads already
+          // carry these links, and they have to keep resolving.
           {
             path: 'mystores/:storeSlug/appearance/preview',
-            lazy: async () => ({
-              Component: (await import('../pages/stores/StoreThemePreviewPage'))
-                .StoreThemePreviewPage,
-            }),
+            Component: BuilderRedirect,
           },
           {
             path: 'mystores/:storeSlug',
@@ -183,15 +201,11 @@ export const router = createBrowserRouter([
               },
               {
                 path: 'appearance',
-                lazy: async () => ({
-                  Component: (await import('../pages/stores/StoreAppearancePage')).StoreAppearancePage,
-                }),
+                Component: BuilderRedirect,
               },
               {
                 path: 'homepage',
-                lazy: async () => ({
-                  Component: (await import('../pages/stores/StoreHomepagePage')).StoreHomepagePage,
-                }),
+                Component: BuilderRedirect,
               },
               {
                 path: 'banners',

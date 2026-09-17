@@ -8,6 +8,7 @@ import {
   storeUpdateSchema,
   storeThemeUpdateSchema,
   storeHomepageSchema,
+  resolveSectionSettings,
   storeFooterUpdateSchema,
   storePaymentsUpdateSchema,
   storeShippingUpdateSchema,
@@ -15,6 +16,7 @@ import {
   storePublishSchema,
   storeProfileUpdateSchema,
 } from "./stores.schema.js";
+import type { HomepageSection } from "./stores.schema.js";
 import * as service from "./stores.service.js";
 
 /**
@@ -59,8 +61,18 @@ export async function updateStoreTheme(request: FastifyRequest) {
 export async function updateStoreHomepage(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   const { sections } = storeHomepageSchema.parse(request.body);
+  // Zod validated the SHAPE; `resolveSectionSettings` decides the stored
+  // FORM — blank strings, nulls and an empty settings object all collapse back
+  // to "no settings", so a seller who clears a renamed heading leaves the
+  // column exactly as it was before they ever opened the Store Builder.
+  const normalised: HomepageSection[] = sections.map(
+    ({ key, enabled, settings }) => {
+      const resolved = resolveSectionSettings(key, settings);
+      return resolved ? { key, enabled, settings: resolved } : { key, enabled };
+    },
+  );
   return ok(
-    await service.updateStoreHomepage(storeActor(request), id, sections),
+    await service.updateStoreHomepage(storeActor(request), id, normalised),
   );
 }
 

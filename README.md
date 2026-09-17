@@ -80,11 +80,14 @@ never ships to a shopper.
   product carries one hidden default variant.
 - Merchandising flags (`isFeatured`, `isBestSeller`, `isNewArrival`,
   `hideFromSearch`) each map to exactly one storefront homepage row.
-- Appearance: pick a curated theme template, recolor it, name the palette,
-  preview it before publishing.
-- Homepage builder: drag to reorder and toggle the storefront sections
-  (hero, categories, featured, new arrivals, best sellers).
-- Footer builder: up to 10 locations with map pins, social links, business info,
+- **Store Builder**: one workspace for the whole storefront, with the seller's
+  real shop live beside the controls (desktop / tablet / phone). Drag to
+  reorder sections, switch any on or off, rename a heading, pick how a section
+  is laid out, upload banners, fill in the footer — or publish without touching
+  any of it, because a new store already has a complete homepage.
+- Color themes: pick a curated palette, recolor it, name it, see it on your own
+  shop before saving.
+- Footer: up to 10 locations with map pins, social links, business info,
   support contacts, policy links, custom links, copyright.
 - Configure payments (COD / online, with per-product COD opt-out), fulfilment
   (delivery / pickup / both), shipping charges (free, or a flat rate per order
@@ -121,7 +124,7 @@ never ships to a shopper.
 - Seller-catalog moderation — hide/restore a listing.
 - Support queue for shopper→UnieMax and seller→UnieMax threads (store-level
   tickets stay private to that store).
-- Appearance templates the sellers choose from.
+- Color themes the sellers choose from.
 - Platform announcements (broadcast notification + push).
 - Append-only **audit trail** of every admin write.
 - SUPER_ADMIN-only admin account management.

@@ -36,18 +36,39 @@ import { LocationMapPicker } from './LocationMapPicker'
  * copyright line. Each card saves independently via
  * `PATCH /stores/:id/footer` (the payload carries only that card's section).
  */
-export function StoreFooterPage() {
+export function StoreFooterPage({
+  embedded = false,
+}: {
+  /**
+   * Rendered inside the Store Builder's editor panel rather than as its own
+   * management page: the page heading goes (the panel already names it) and
+   * the cards stop self-capping, because the panel is already narrow.
+   */
+  embedded?: boolean
+} = {}) {
   const { store } = useManagedStore()
 
   return (
     <div>
-      <h2 className="font-body text-xl font-semibold tracking-normal text-fg">Footer</h2>
-      <p className="mt-1 text-sm text-muted">
-        Everything shown in your storefront's footer — contact details,
-        locations, social media and more. Each card saves on its own.
-      </p>
+      {!embedded && (
+        <>
+          <h2 className="font-body text-xl font-semibold tracking-normal text-fg">
+            Footer
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            Everything shown in your storefront's footer — contact details,
+            locations, social media and more. Each card saves on its own.
+          </p>
+        </>
+      )}
+      {embedded && (
+        <p className="text-sm text-muted">
+          Everything shown at the bottom of every page of your shop. Each card
+          saves on its own.
+        </p>
+      )}
 
-      <div className="mt-5 max-w-2xl space-y-4">
+      <div className={`mt-5 space-y-4 ${embedded ? '' : 'max-w-2xl'}`}>
         <LocationsCard key={`loc-${store.id}`} />
         <SocialCard key={`soc-${store.id}`} />
         <InfoCard key={`info-${store.id}`} />

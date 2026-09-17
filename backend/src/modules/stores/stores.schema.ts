@@ -94,14 +94,102 @@ export const HOMEPAGE_SECTION_KEYS = [
 
 export type HomepageSectionKey = (typeof HOMEPAGE_SECTION_KEYS)[number];
 
+/**
+ * The presentation variants each section can actually be rendered in.
+ *
+ * **This list is the contract with the storefront**, not a wish list: every
+ * value here maps to a composition `StoreHomePage` already knows how to draw,
+ * which is why the Store Builder can offer them as a two-or-three-button
+ * choice with nothing to explain. A section with an empty array has exactly
+ * one shape — its composition is driven by the data (a banner is a carousel, a
+ * category shelf is a shelf) — and the builder shows no layout control at all.
+ *
+ * A layout is only ever a *preference*: the storefront still falls back to the
+ * capped grid row when a section holds too few products for the shape asked
+ * for, so picking "Spotlight" for a three-product row cannot produce a hole.
+ */
+export const HOMEPAGE_SECTION_LAYOUTS = {
+  banners: [],
+  hero: ["split", "minimal"],
+  categories: ["chips", "tiles"],
+  featured: ["spotlight", "rail", "grid"],
+  newArrivals: ["rail", "grid"],
+  bestSellers: ["rail", "grid"],
+  categoryRows: [],
+  catalog: ["grid", "rail"],
+} as const satisfies Record<HomepageSectionKey, readonly string[]>;
+
+/**
+ * Per-section presentation, all of it optional.
+ *
+ * Absent or `null` means **"use the platform default"** — which is the whole
+ * point: a store that has never opened the Store Builder stores no settings at
+ * all and renders exactly as it always has, and a seller who only renamed one
+ * row stores only that one string. Nothing here is required, and nothing here
+ * can make a section render something it has no data for.
+ */
+export interface HomepageSectionSettings {
+  /** Heading override. Absent/null = the platform's own name for the row. */
+  title?: string | null;
+  /** The small line that sits with the heading. */
+  subtitle?: string | null;
+  /** One of `HOMEPAGE_SECTION_LAYOUTS[key]`. */
+  layout?: string | null;
+  /** **Hero only** — the label on its primary button ("Start Shopping"). */
+  ctaLabel?: string | null;
+}
+
 export interface HomepageSection {
   key: HomepageSectionKey;
   enabled: boolean;
+  /** Omitted entirely when the seller has customised nothing. */
+  settings?: HomepageSectionSettings;
 }
 
 /** Canonical order, all enabled — used for new stores and as the fallback. */
 export const DEFAULT_HOMEPAGE_SECTIONS: HomepageSection[] =
   HOMEPAGE_SECTION_KEYS.map((key) => ({ key, enabled: true }));
+
+/** Trim a stored string field to a usable value, or drop it. */
+function cleanText(raw: unknown, max: number): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const text = raw.trim().slice(0, max);
+  return text.length > 0 ? text : undefined;
+}
+
+/**
+ * Normalise one stored settings object: keep the fields this section can
+ * actually use, drop everything else. A layout the storefront no longer draws
+ * (a variant retired since the row was saved) is dropped rather than kept, so
+ * the section falls back to its default composition instead of rendering
+ * nothing.
+ *
+ * Returns `undefined` when nothing survives, so an untouched section stays a
+ * bare `{ key, enabled }`.
+ */
+export function resolveSectionSettings(
+  key: HomepageSectionKey,
+  raw: unknown,
+): HomepageSectionSettings | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const obj = raw as Record<string, unknown>;
+  const allowed = HOMEPAGE_SECTION_LAYOUTS[key] as readonly string[];
+
+  const out: HomepageSectionSettings = {};
+  const title = cleanText(obj.title, 60);
+  if (title) out.title = title;
+  const subtitle = cleanText(obj.subtitle, 120);
+  if (subtitle) out.subtitle = subtitle;
+  const layout = cleanText(obj.layout, 20);
+  if (layout && allowed.includes(layout)) out.layout = layout;
+  // Only the hero has a button, so a stray label on any other row is noise.
+  if (key === "hero") {
+    const ctaLabel = cleanText(obj.ctaLabel, 30);
+    if (ctaLabel) out.ctaLabel = ctaLabel;
+  }
+
+  return Object.keys(out).length > 0 ? out : undefined;
+}
 
 /**
  * PATCH body: the FULL ordered section list (a permutation of every known key,
@@ -109,14 +197,40 @@ export const DEFAULT_HOMEPAGE_SECTIONS: HomepageSection[] =
  * replace the list — and the client always holds the complete list, so
  * requiring the whole thing keeps the stored order unambiguous.
  */
+const homepageSectionSettingsSchema = z.object({
+  title: z.string().trim().min(1).max(60).nullish(),
+  subtitle: z.string().trim().min(1).max(120).nullish(),
+  layout: z.string().trim().min(1).max(20).nullish(),
+  ctaLabel: z.string().trim().min(1).max(30).nullish(),
+});
+
 export const storeHomepageSchema = z
   .object({
     sections: z
       .array(
-        z.object({
-          key: z.enum(HOMEPAGE_SECTION_KEYS),
-          enabled: z.boolean(),
-        }),
+        z
+          .object({
+            key: z.enum(HOMEPAGE_SECTION_KEYS),
+            enabled: z.boolean(),
+            settings: homepageSectionSettingsSchema.optional(),
+          })
+          // A layout is only valid for the section it belongs to, so the check
+          // needs the sibling `key` — which is why it lives on the element
+          // rather than on the settings object.
+          .superRefine((section, ctx) => {
+            const layout = section.settings?.layout;
+            if (!layout) return;
+            const allowed = HOMEPAGE_SECTION_LAYOUTS[
+              section.key
+            ] as readonly string[];
+            if (!allowed.includes(layout)) {
+              ctx.addIssue({
+                code: "custom",
+                path: ["settings", "layout"],
+                message: `"${section.key}" has no "${layout}" layout`,
+              });
+            }
+          }),
       )
       .length(HOMEPAGE_SECTION_KEYS.length),
   })
@@ -146,7 +260,9 @@ export const storeHomepageSchema = z
  *   - null / garbage       → default order, all enabled
  *   - `{ sections: [...] }` → known keys in stored order; any key missing (a
  *                             section added since it was saved) is appended
- *                             enabled, unknown keys dropped
+ *                             enabled, unknown keys dropped, and each
+ *                             section's optional `settings` sanitised by
+ *                             `resolveSectionSettings`
  *   - legacy boolean map    → canonical order with the stored enabled flags,
  *     `{ hero: true, … }`     so the format change loses nothing
  */
@@ -164,9 +280,16 @@ export function resolveHomepage(raw: unknown): HomepageSection[] {
           !seen.has(key as HomepageSectionKey)
         ) {
           seen.add(key as HomepageSectionKey);
+          const settings = resolveSectionSettings(
+            key as HomepageSectionKey,
+            (item as { settings?: unknown }).settings,
+          );
           out.push({
             key: key as HomepageSectionKey,
             enabled: (item as { enabled?: unknown }).enabled !== false,
+            // Spread so an uncustomised section stays a bare {key, enabled}
+            // rather than carrying `settings: undefined` into the response.
+            ...(settings ? { settings } : {}),
           });
         }
       }

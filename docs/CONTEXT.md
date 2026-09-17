@@ -135,7 +135,7 @@ A single account can own multiple stores and switch between them.
   rules existed keep publishing freely.
 - **Store management** — a two-panel page (left: section list —
   Dashboard, Orders, Categories, Products, Store Details, Business Details,
-  Appearance, Homepage, Footer, Payments, Bank Accounts, Shipping, Checkout,
+  Store Builder, Payments, Bank Accounts, Shipping, Checkout,
   plus Customer Support and UnieMax Support; right: the selected section),
   addressed by the store's slug (`/stores/{storeSlug}`).
 - **Business Details** — the permanent home of what the wizard collects and
@@ -164,13 +164,39 @@ A single account can own multiple stores and switch between them.
   return to stock automatically, and a paid order is marked refunded
   (status only for gateway payments — the money is refunded from the
   Cashfree dashboard until the automatic refund call ships).
-- **Homepage sections** — **arrange** the storefront homepage: drag (or ▲/▼)
-  to reorder the sections — Hero Banner, Shop by Category, Featured Products,
-  New Arrivals, Best Sellers — and switch each on or off. Order and visibility
-  are one setting. A switch can only *hide* a section — turning one on does not
-  force an empty row to appear, because merchandising rows still need products
-  ticked for them. The header/top bar is fixed chrome and not reorderable. New
-  sections (offers, banners, reviews…) slot in without a migration.
+- **Store Builder** — the one place a seller designs their shop, replacing the
+  four separate screens (Appearance, Homepage, Banners, Footer) that between
+  them described a single thing. Controls on the left, the **seller's actual
+  storefront** on the right, in a frame that can be switched between desktop,
+  tablet and phone. The seller drags to reorder sections, switches any on or
+  off, opens one to change how it looks, uploads banners and fills in the
+  footer — without leaving the screen, and seeing the result as they go.
+  Clicking a section **inside the preview** opens that section's settings,
+  which is the shortest path between "I don't like that bit" and changing it.
+
+  **Nothing has to be built.** A new store already has a complete, professional
+  homepage — Welcome Hero, Banners, Shop by Category, Featured Products, New
+  Arrivals, Best Sellers, Category Highlights, All Products, in that order, all
+  switched on. A seller can publish without ever opening the builder.
+
+  Per section the seller can change **what it is called**, its **small line**,
+  and **how it is laid out** where there is a genuine choice: the hero with or
+  without product pictures; categories as a compact row or a block of cards;
+  Featured Products as a spotlight, a sliding row or a simple row; New Arrivals
+  and Best Sellers as a sliding or simple row. Those are the shapes the
+  storefront can actually draw — no setting here promises something it cannot
+  deliver, and a row with too few products quietly falls back to the shape that
+  suits it rather than leaving a hole. Everything else (spacing, type scale,
+  card proportions, how each layout behaves on a phone) is the platform's
+  decision, not the seller's.
+
+  Order, visibility and these settings are one setting and **save themselves**
+  as they are changed. A switch can only ever *hide* a section — turning one on
+  does not force an empty row to appear, because merchandising rows still need
+  products ticked for them. The header and the footer are fixed at the top and
+  bottom, and openable but not movable. New sections slot in without a
+  migration, and a store that has never been customised is stored, and renders,
+  exactly as it always was.
 - **Footer management** — the owner configures everything the storefront
   footer shows, one card per topic (each saves independently):
   - **Contact information** — one or more business locations (up to 10),
@@ -254,8 +280,8 @@ A single account can own multiple stores and switch between them.
   phone/email) are asked even for store-pickup orders; the address fields
   only for delivery. The page warns a delivering store that switches all
   address fields off.
-- **Customization (Appearance)** — the section leads with **templates**, not
-  color pickers: a horizontal strip of the platform's ready-made palettes,
+- **Color theme** (Store Builder → Design) — it leads with **ready-made
+  themes**, not color pickers: a horizontal strip of the platform's palettes,
   each drawn in its own colors, applied to the whole storefront in one click.
   A new seller who has no opinion about hex codes gets a professional look
   immediately; anyone who does can press **Customize** on the selected
@@ -266,37 +292,23 @@ A single account can own multiple stores and switch between them.
   text** (labels on Add to Cart / Place Order — Auto picks white or black from
   the button color's luminance, so text never disappears on a dark button).
   A customised palette is **the seller's own, named theme**, saved on their
-  store; the template it started from is never modified, and the store keeps
-  its colors even if that template is later changed or withdrawn. The seller's
-  existing palette stays in the strip as its own card, so trying templates on
+  store; the theme it started from is never modified, and the store keeps its
+  colors even if that theme is later changed or withdrawn. The seller's
+  existing palette stays in the strip as its own card, so trying themes on
   never loses what they already had.
 
-  Below it sits a **preview of a sample shop** — top bar, banner, category
-  tiles, product cards, a promo strip and a footer — painted in the chosen
-  colors and repainting the moment a template or a single color changes. It is
-  **one layout, identical for every seller**, and deliberately not a rendering
-  of their own store page: the palette is then the only thing that differs
-  between two templates, which is what makes them comparable at a glance.
-  The sample content is chosen so every color role appears at least once —
-  the button at two sizes, prices and a sale badge in the secondary color,
-  cards on the surface color, muted text on both the canvas and a card — so
-  what the seller is really checking (does the button label stay readable, do
-  card edges survive against the background) is on screen before they save.
-  It reflows against **its own width rather than the window's** — the panel it
-  sits in loses 260px to the section nav above `lg`, so a laptop can leave it
-  narrower than a tablet does — stepping two-up → three-up → six-up products
-  and dropping the search box and nav links as the room for them runs out,
-  with no horizontal scroll or shrunken text at any size.
+  It is called a **color theme**, not a template, because colour is genuinely
+  all it changes — the layouts, the type and the card proportions are the
+  platform's, the same in every shop. The *shape* of a storefront is chosen in
+  the builder's Sections tab, one row at a time.
 
-  **Open full preview** takes the same sample shop to its own page
-  (`/mystores/{slug}/appearance/preview`), outside the management workbench, so
-  it gets the entire window — roughly 300–400px more than the panel can give
-  it on a laptop. The template strip travels with it and stays pinned while
-  the preview scrolls, so a seller can click through every template at close
-  to real size and save from there. Colours stay on the Appearance form;
-  **Customize** hands the draft back to it. Unsaved work survives the trip in
-  both directions, so opening the full preview mid-edit shows what was being
-  edited rather than the last saved palette.
+  Colour is previewed on the seller's **own shop**, live: the frame beside the
+  pickers repaints as a theme is clicked or a single colour is dragged, so what
+  is being judged is the real page with the real products — does the button
+  label stay readable, do card edges survive against the background. It is also
+  the one part of the builder that does **not** save itself: colour is the
+  change that can make a shop unreadable, so it is committed on purpose, with
+  Discard beside it.
 - **Store catalog** — hierarchy: **Store → Categories (a tree mirroring the
   platform taxonomy, up to 5 levels) → Product → Variants**. The Categories
   section lets the owner add (chosen from the platform list by search or
@@ -398,15 +410,27 @@ A single account can own multiple stores and switch between them.
   grid: hero banner, **Shop by Category**, then the owner's
   merchandising rows — **Featured Products**, **New Arrivals**, **Best
   Sellers**. Every section is an edge-to-edge **band** on alternating
-  backgrounds, so the page reads as one continuous shop rather than a stack of
-  floating boxes. The **hero** is a compact introduction (store name, what the
-  catalog holds, a Start Shopping button and a jump to the categories) with a
-  collage of the store's real product photos beside it on wide screens.
-  **Shop by Category** is a dense strip of text-only category tiles — name,
-  its subcategories and the product count, no decorative icons.
+  backgrounds with its content held to a centred column, so the page reads as
+  one continuous shop rather than a stack of floating boxes, and does not
+  stretch into a wall of tiny cards on a very wide monitor.
+
+  **Each section is shaped for what it is for**, so the page has a rhythm
+  instead of repeating one grid: the **hero** introduces the store (logo, name,
+  the owner's own About text or a summary of the catalog, a Start Shopping
+  button and a jump to the categories) with a mosaic of the store's real
+  product photos beside it — and when there are no photos yet it centres
+  itself rather than leaving half the band empty; **Shop by Category** is a
+  single sideways-scrolling row of category chips with counts, so one category
+  and thirty both look right; **Featured Products** leads with one large card
+  beside a block of smaller ones; **New Arrivals** and **Best Sellers** are
+  horizontal rails you can swipe or arrow through, showing more than a row
+  holds; **Category Highlights** pairs a collection panel with that shelf's
+  newest stock. A section with too few products for its shape falls back to a
+  plain row, so a shop with three products looks tidy rather than half-built.
+
   Each merchandising row shows **only** the products the owner ticked for it,
-  and a row with nothing ticked is simply not shown. Rows are capped at one
-  full row of cards (as many as the screen fits) with a "View all" link. The
+  and a row with nothing ticked is simply not shown. Plain rows are capped at
+  one full row of cards (as many as the screen fits) with a "View all" link. The
   owner controls both the **order** of these homepage sections (including the
   hero) and whether each shows, by drag-and-drop in the store's Homepage
   section — see Store Management.
@@ -454,12 +478,14 @@ A single account can own multiple stores and switch between them.
   catalog in the same grid, or search it by name and description. This is the
   target of the header's **Shop** link and every "View all".
 
-  Listing cards are **compact** — image, category, name, a "from" price (the
-  MRP struck through and a **"Sale"** tag when that price is a genuine
-  discount — "Sale" never appears without one), a stock badge only when it
-  matters (Low / Out of stock) and a **variant count** for products with options
-  (never the full option list) — so a wide screen shows up to six per row
-  instead of a few oversized tiles. The **whole card is a link** to the
+  Listing cards are **compact** — image, category, name, a "from" price with
+  the MRP struck through, a **"N% off" flag over the cover** when that price is
+  a genuine discount (it never appears without one), a **"Sold out" veil**
+  across the image when stock is gone, a Low-stock badge only when it matters,
+  and a **variant count** for products with options (never the full option
+  list) — so a wide screen shows up to five per row instead of a few oversized
+  tiles. A product with no photo yet gets a quiet "No image" placeholder rather
+  than anything that looks broken. The **whole card is a link** to the
   product page — there
   is no Add to Cart on a card, so every card looks the same whether or not the
   product has options; buying happens on the product page. Hovering lifts the

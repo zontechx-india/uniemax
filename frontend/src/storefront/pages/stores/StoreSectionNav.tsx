@@ -13,9 +13,6 @@ import {
   ChatIcon,
   ChevronDownIcon,
   ClipboardIcon,
-  FooterIcon,
-  HomeIcon,
-  ImageIcon,
   LifebuoyIcon,
   MegaphoneIcon,
   PaletteIcon,
@@ -113,12 +110,12 @@ const SECTION_GROUPS: SectionGroup[] = [
       // Payments: it is who the seller IS, which orders and invoices need
       // long before any payout does.
       { label: 'Business Details', to: 'business', icon: ShieldCheckIcon },
-      { label: 'Appearance', to: 'appearance', icon: PaletteIcon },
-      { label: 'Homepage', to: 'homepage', icon: HomeIcon },
-      // Banners sit under Homepage: the Homepage screen arranges the section,
-      // this one fills it.
-      { label: 'Banners', to: 'banners', icon: ImageIcon },
-      { label: 'Footer', to: 'footer', icon: FooterIcon },
+      // ONE row where there were four. Appearance, Homepage, Banners and
+      // Footer all described the same object — the shop — and splitting them
+      // made a seller learn the platform's filing system before they could
+      // move a heading. The builder is also the only one of the five that can
+      // show them the result.
+      { label: 'Store Builder', to: 'builder', icon: PaletteIcon },
     ],
   },
   {
@@ -173,11 +170,12 @@ const RAIL_KEY = 'uniemax.storeNav.rail'
 const GROUPS_KEY = 'uniemax.storeNav.collapsed'
 
 /**
- * Storefront and the two config groups start closed: they hold the
- * set-it-once work, so a returning seller opens on four rows of daily work
- * plus three headers instead of sixteen rows of everything.
+ * The two config groups start closed: they hold the set-it-once work, so a
+ * returning seller opens on the daily rows plus a couple of headers instead of
+ * every row at once. Storefront stays OPEN — it is three rows now, and one of
+ * them is where a seller designs their shop.
  */
-const DEFAULT_COLLAPSED = ['storefront', 'settings', 'help']
+const DEFAULT_COLLAPSED = ['settings', 'help']
 
 function readCollapsed(): string[] {
   try {

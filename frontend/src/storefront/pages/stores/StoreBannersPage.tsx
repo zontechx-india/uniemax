@@ -55,7 +55,20 @@ const LINK_LABEL: Record<BannerLinkType, string> = {
   URL: 'A web address',
 }
 
-export function StoreBannersPage() {
+export function StoreBannersPage({
+  embedded = false,
+  onSaved,
+}: {
+  /**
+   * Rendered inside the Store Builder's editor panel rather than as its own
+   * management page: the page heading and the cross-link to Homepage are
+   * dropped (the panel already names the section and holds its switch), and
+   * the cards run in one column, because the panel is a column.
+   */
+  embedded?: boolean
+  /** Fired after every successful write, so a live preview can repaint. */
+  onSaved?: () => void
+} = {}) {
   const { store } = useManagedStore()
   const [banners, setBanners] = useState<StoreBanner[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -111,6 +124,7 @@ export function StoreBannersPage() {
     setBusy(true)
     try {
       setBanners(await action())
+      onSaved?.()
     } catch (err) {
       setError(toApiError(err).message)
     } finally {
@@ -177,28 +191,34 @@ export function StoreBannersPage() {
   }
 
   const full = (banners?.length ?? 0) >= MAX_BANNERS
+  // One column inside the builder panel; the management page still spreads.
+  const cardGrid = embedded ? '' : 'sm:grid-cols-2 xl:grid-cols-3'
 
   return (
     <div>
-      <h2 className="font-body text-xl font-semibold tracking-normal text-fg">
-        Banners
-      </h2>
-      <p className="mt-1 max-w-2xl text-sm text-muted">
-        Promo images at the top of your storefront. With more than one they
-        rotate automatically, in the order below — drag a card by its handle to
-        change it. Tapping a banner can take shoppers to a category, a product,
-        or any web address.
-      </p>
-      <p className="mt-1 text-sm text-muted">
-        The whole strip is switched on and off under{' '}
-        <Link
-          to="../homepage"
-          className="font-semibold text-brand hover:underline"
-        >
-          Homepage
-        </Link>
-        .
-      </p>
+      {!embedded && (
+        <>
+          <h2 className="font-body text-xl font-semibold tracking-normal text-fg">
+            Banners
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm text-muted">
+            Promo images at the top of your storefront. With more than one they
+            rotate automatically, in the order below — drag a card by its
+            handle to change it. Tapping a banner can take shoppers to a
+            category, a product, or any web address.
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            The whole strip is switched on and off in the{' '}
+            <Link
+              to="../builder"
+              className="font-semibold text-brand hover:underline"
+            >
+              Store Builder
+            </Link>
+            .
+          </p>
+        </>
+      )}
 
       <SizeGuide />
 
@@ -245,7 +265,7 @@ export function StoreBannersPage() {
       </div>
 
       {banners === null ? (
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className={`mt-4 grid gap-4 ${cardGrid}`}>
           {[0, 1, 2].map((i) => (
             <div key={i} className="h-72 animate-pulse rounded-lg bg-surface-alt" />
           ))}
@@ -254,7 +274,7 @@ export function StoreBannersPage() {
         <EmptyBanners onAdd={() => addInput.current?.click()} />
       ) : (
         <ul
-          className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+          className={`mt-4 grid gap-4 ${cardGrid}`}
           // A drop past the last card appends, so the cards themselves are not
           // the only valid target.
           onDragOver={(e) => e.preventDefault()}

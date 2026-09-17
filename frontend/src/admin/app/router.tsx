@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import type { ReactNode } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { AdminLayout } from '../layout/AdminLayout'
 import { Skeleton } from '../ui/primitives'
 import { useAdminSession } from './adminSession'
@@ -78,17 +78,10 @@ const StoreDetailsPage = lazy(async () => ({
   default: (await import('../../storefront/pages/stores/StoreDetailsPage'))
     .StoreDetailsPage,
 }))
-const StoreAppearancePage = lazy(async () => ({
-  default: (await import('../../storefront/pages/stores/StoreAppearancePage'))
-    .StoreAppearancePage,
-}))
-const StoreThemePreviewPage = lazy(async () => ({
-  default: (await import('../../storefront/pages/stores/StoreThemePreviewPage'))
-    .StoreThemePreviewPage,
-}))
-const StoreHomepagePage = lazy(async () => ({
-  default: (await import('../../storefront/pages/stores/StoreHomepagePage'))
-    .StoreHomepagePage,
+const StoreBuilderPage = lazy(async () => ({
+  default: (
+    await import('../../storefront/pages/stores/builder/StoreBuilderPage')
+  ).StoreBuilderPage,
 }))
 const StoreBannersPage = lazy(async () => ({
   default: (await import('../../storefront/pages/stores/StoreBannersPage'))
@@ -141,6 +134,12 @@ function StoreManageGate({ children }: { children: ReactNode }) {
   )
 }
 
+/** Appearance / Homepage / theme preview → the Store Builder. */
+function AdminBuilderRedirect() {
+  const { storeSlug = '' } = useParams()
+  return <Navigate to={`/stores/${storeSlug}/manage/builder`} replace />
+}
+
 export function AdminRouter() {
   return (
     <Routes>
@@ -154,17 +153,22 @@ export function AdminRouter() {
                 <Route path="stores" element={<StoresPage />} />
                 {/* The seller's own management screens, rendered for an admin.
                     Declared BEFORE "stores/:storeId" so the literal "manage"
-                    segment is never read as a store id. The full-width theme
-                    preview is a sibling of the layout, not a child, for the
-                    same reason it is in the storefront router: inside the
-                    layout it would share its row with the 260px section nav. */}
+                    segment is never read as a store id. The Store Builder is a
+                    sibling of the layout, not a child, for the same reason it
+                    is in the storefront router: inside the layout its preview
+                    would share its row with the 264px section nav. */}
                 <Route
-                  path="stores/:storeSlug/manage/appearance/preview"
+                  path="stores/:storeSlug/manage/builder"
                   element={
                     <StoreManageGate>
-                      <StoreThemePreviewPage />
+                      <StoreBuilderPage />
                     </StoreManageGate>
                   }
+                />
+                {/* Retired screens the builder replaced — kept resolving. */}
+                <Route
+                  path="stores/:storeSlug/manage/appearance/preview"
+                  element={<AdminBuilderRedirect />}
                 />
                 <Route
                   path="stores/:storeSlug/manage"
@@ -178,8 +182,8 @@ export function AdminRouter() {
                   <Route path="orders" element={<StoreOrdersPage />} />
                   <Route path="orders/:orderId" element={<StoreOrderDetailPage />} />
                   <Route path="details" element={<StoreDetailsPage />} />
-                  <Route path="appearance" element={<StoreAppearancePage />} />
-                  <Route path="homepage" element={<StoreHomepagePage />} />
+                  <Route path="appearance" element={<AdminBuilderRedirect />} />
+                  <Route path="homepage" element={<AdminBuilderRedirect />} />
                   <Route path="banners" element={<StoreBannersPage />} />
                   <Route path="footer" element={<StoreFooterPage />} />
                   <Route path="payments" element={<StorePaymentsPage />} />

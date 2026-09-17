@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { storeHomeUrl, type PublicSort } from '../stores/storesApi'
 import { PRODUCT_GRID } from './ProductCard'
+import { STICK_UNDER_HEADER } from './storeLayout'
 import {
   BoxIcon,
   ChevronDownIcon,
@@ -22,8 +23,15 @@ export const SORT_OPTIONS: { key: PublicSort; label: string }[] = [
 ]
 
 /**
- * Result count · sort · filter. Sticky on mobile so the controls stay reachable
- * while scrolling a long grid.
+ * Result count · sort · filter. Sticky below `lg` so the controls stay
+ * reachable while scrolling a long grid — it parks flush under the store
+ * header, whose height `STICK_UNDER_HEADER` reads from the CSS variable the
+ * store root publishes (the header is two rows on a phone and one from `md`,
+ * so a hardcoded offset only ever held at one size).
+ *
+ * It must be a **direct child of the page column**: a sticky element can only
+ * travel inside its parent's box, so the wrapper div it used to sit in —
+ * exactly as tall as the bar — let it scroll away immediately.
  */
 export function SortFilterBar({
   total,
@@ -42,7 +50,7 @@ export function SortFilterBar({
 }) {
   return (
     <div
-      className={`sticky top-[4.25rem] z-20 -mx-4 mb-4 flex items-center justify-between gap-3 border-y bg-bg px-4 py-2.5 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:rounded-xl lg:border lg:bg-surface ${skin.border}`}
+      className={`sticky ${STICK_UNDER_HEADER} z-20 -mx-4 mb-4 mt-4 flex items-center justify-between gap-3 border-y bg-bg px-4 py-2.5 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:rounded-lg lg:border lg:bg-surface lg:px-4 ${skin.border}`}
     >
       <span className={`text-xs font-semibold ${skin.muted}`}>
         {total} {total === 1 ? 'product' : 'products'}
@@ -91,37 +99,59 @@ export function SortFilterBar({
 }
 
 /**
- * Section heading — brand dash, title, and an optional right-aligned action
- * ("View all →"). Shared by the homepage rows and the product page.
+ * Section heading — brand dash, title, an optional muted strapline and an
+ * optional right-aligned action ("View all →") or caller-supplied controls
+ * (the rails put their arrows here). Shared by every homepage section and the
+ * product page, so the storefront has exactly one heading shape.
  */
 export function SectionHeading({
   title,
+  eyebrow,
   action,
+  aside,
+  size = 'md',
   skin,
 }: {
   title: string
+  /** Small muted line under the title — what the section is, in a few words. */
+  eyebrow?: string
   action?: { label: string; to: string }
+  /** Controls that sit beside the action (rail arrows). */
+  aside?: React.ReactNode
+  /** `sm` for a strip that heads one row of chips rather than a section. */
+  size?: 'sm' | 'md'
   skin: Skin
 }) {
   return (
     <div className="flex items-end justify-between gap-4">
-      <div>
+      <div className="min-w-0">
         <span className="block h-0.5 w-8 rounded-full bg-brand" />
-        {/* Heading scale from the prototype: 2xl → 3xl, semibold
-            (700 is reserved for the hero). */}
+        {/* Heading scale from the prototype: semibold, 700 reserved for the
+            hero. `sm` steps it down for a chip strip, which is a signpost
+            rather than a section of its own. */}
         <h2
-          className={`mt-2 font-heading text-2xl font-semibold sm:text-3xl ${skin.text}`}
+          className={`mt-2 font-heading font-semibold ${
+            size === 'sm' ? 'text-lg sm:text-xl' : 'text-2xl sm:text-3xl'
+          } ${skin.text}`}
         >
           {title}
         </h2>
+        {eyebrow && (
+          <p className={`mt-1 text-sm ${skin.muted}`}>{eyebrow}</p>
+        )}
       </div>
-      {action && (
-        <Link
-          to={action.to}
-          className="shrink-0 whitespace-nowrap text-sm font-semibold text-brand hover:underline"
-        >
-          {action.label} →
-        </Link>
+      {(action || aside) && (
+        <div className="flex shrink-0 items-center gap-2">
+          {action && (
+            <Link
+              to={action.to}
+              className="whitespace-nowrap text-sm font-semibold text-brand hover:underline"
+            >
+              {action.label} →
+            </Link>
+          )}
+          {aside}
+        </div>
       )}
     </div>
   )

@@ -750,12 +750,26 @@ White-label design — one codebase, any business:
   products shop-wide), so a seller who has ticked no merchandising flags still
   has a stocked homepage. They sit below the curated rows, so flagging always
   outranks them.
+  Each entry may also carry an optional `settings` object — `title`,
+  `subtitle`, `layout` and (hero only) `ctaLabel` — which is what the Store
+  Builder writes when a seller renames a heading or picks another
+  composition. All of it is optional and **absent means "platform default"**,
+  so a store that has never been customised stores the same bare
+  `{ key, enabled }` rows it always did. `layout` is validated against
+  `HOMEPAGE_SECTION_LAYOUTS`, which lists per key the compositions the
+  storefront can actually draw (`hero`: split·minimal; `categories`:
+  chips·tiles; `featured`: spotlight·rail·grid; `newArrivals`/`bestSellers`:
+  rail·grid; `catalog`: grid·rail; `banners`/`categoryRows`: none) — a value
+  that section has no shape for is a `422`, so the column can never name a
+  layout nobody renders.
   `resolveHomepage` normalises it on read, tolerating null, the legacy
   boolean-map shape, and back-filling any newly-added section key so old
   stores get it without a migration — at its **canonical position** in
   `HOMEPAGE_SECTION_KEYS`, not appended, so a section defined above the hero
   (`banners`) reaches existing stores above the hero rather than demoted to
-  last. A `footer` JSON column (same evolve-without-migration pattern)
+  last. `resolveSectionSettings` does the same job one level down: blank
+  strings, nulls, unknown fields and retired layouts are dropped, and a
+  section left with nothing stores no `settings` key at all. A `footer` JSON column (same evolve-without-migration pattern)
   holds the owner-managed storefront footer: `locations[]` (max 10 —
   label/address/contactPerson/phone/altPhone/email/hours/isPrimary plus an
   optional `lat`/`lng` map pin; ids minted server-side, exactly one primary

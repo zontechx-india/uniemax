@@ -22,6 +22,8 @@ import { Avatar } from '../../layout/Avatar'
 import { useSignOutConfirm } from '../../layout/useSignOutConfirm'
 import { openAuthDialog, storeAuthRequest } from '../auth/authDialogStore'
 import { ShareButton } from './ShareButton'
+import { STORE_CONTAINER } from './storeLayout'
+import { builderSectionProps } from './builderBridge'
 import {
   CartIcon,
   ChevronDownIcon,
@@ -45,6 +47,15 @@ import type { Skin } from './storeTheme'
  * Desktop opens the menu on hover (and on click/keyboard for accessibility);
  * below `lg` the hamburger opens a drawer where categories expand as an
  * accordion.
+ *
+ * **Two rows on a phone, one from `md`.** The bar is
+ * `[menu] [logo · store name] [share] [cart]`, and search drops to a full-width
+ * second row underneath rather than being squeezed in beside five controls —
+ * at 360px that field was barely wide enough for one word, and search is the
+ * main way anyone finds anything in a large catalog. The store name grows into
+ * whatever the buttons leave and truncates there, so a long one never pushes
+ * the cart off the screen. `STORE_HEADER_OFFSET` publishes the resulting
+ * height so the listing filter bar can stick flush under either shape.
  *
  * **Help** goes to this shop's own Help & Support — the seller answers it,
  * not UnieMax. It sits in the nav rather than behind an icon because a
@@ -100,8 +111,15 @@ function StoreHeaderBar({
   }, [location.pathname, location.search])
 
   return (
-    <header className={`sticky top-0 z-30 border-b ${skin.border} bg-bg`}>
-      <div className="mx-auto flex max-w-[1920px] items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:px-10">
+    <header
+      className={`sticky top-0 z-30 border-b ${skin.border} bg-bg`}
+      // Clickable inside the Store Builder's preview, where it opens the panel
+      // that explains what the header is and where its logo comes from.
+      {...builderSectionProps('header')}
+    >
+      <div
+        className={`${STORE_CONTAINER} flex items-center gap-2 py-2.5 sm:gap-3 md:py-3`}
+      >
         {/* Mobile menu toggle */}
         <button
           type="button"
@@ -112,10 +130,13 @@ function StoreHeaderBar({
           <MenuIcon className="h-5 w-5" />
         </button>
 
-        {/* Logo + name */}
+        {/* Logo + name. It GROWS below `lg` so the name takes whatever the
+            icon buttons leave and truncates there rather than shoving the
+            cart off a 320px screen; from `lg` the nav follows it, so it
+            shrink-wraps again. */}
         <Link
           to={storeHomeUrl(store.slug)}
-          className="flex min-w-0 shrink-0 items-center gap-2.5"
+          className="flex min-w-0 flex-1 items-center gap-2.5 lg:flex-none"
         >
           {store.logoUrl ? (
             <img
@@ -132,7 +153,7 @@ function StoreHeaderBar({
             </span>
           )}
           {/* Brand mark in gradient display text (prototype's gold-text). */}
-          <span className="metal-text hidden max-w-40 truncate font-heading text-lg font-semibold sm:block">
+          <span className="metal-text truncate font-heading text-base font-semibold sm:text-lg lg:max-w-56">
             {store.name}
           </span>
         </Link>
@@ -151,25 +172,38 @@ function StoreHeaderBar({
           </NavLink>
         </nav>
 
-        {/* Search */}
-        <SearchBox store={store} skin={skin} />
-
-        {/* Share this store (native sheet / copy link) */}
-        <ShareButton
-          title={store.name}
-          url={publicStoreUrl(store.slug)}
-          skin={skin}
-          ariaLabel="Share this store"
-        />
-
-        {/* Cart */}
-        <CartButton skin={skin} storeSlug={store.slug} />
-
-        {/* Account — from `sm` up; below that it lives in the drawer, where
-            there is room for it beside the search field. */}
-        <div className="hidden shrink-0 sm:block">
-          <AccountSlot store={store} session={session} skin={skin} />
+        {/* Search takes the slack between the nav and the actions — but only
+            from `md`, where there is slack to take. Below that it gets its
+            own row rather than a field too narrow to read a query in. */}
+        <div className="hidden min-w-0 flex-1 justify-end md:flex lg:pl-4">
+          <SearchBox store={store} skin={skin} className="max-w-xl" />
         </div>
+
+        <div className="ml-auto flex shrink-0 items-center gap-2 md:ml-0 md:pl-1">
+          {/* Share this store (native sheet / copy link) */}
+          <ShareButton
+            title={store.name}
+            url={publicStoreUrl(store.slug)}
+            skin={skin}
+            ariaLabel="Share this store"
+          />
+
+          {/* Cart */}
+          <CartButton skin={skin} storeSlug={store.slug} />
+
+          {/* Account — from `sm` up; below that it lives in the drawer, where
+              there is room for it beside the search field. */}
+          <div className="hidden sm:block">
+            <AccountSlot store={store} session={session} skin={skin} />
+          </div>
+        </div>
+      </div>
+
+      {/* Second row, phones and small tablets only: search on its own line.
+          Squeezing it into the bar beside five controls left a field barely
+          wide enough for one word. */}
+      <div className={`${STORE_CONTAINER} pb-2.5 md:hidden`}>
+        <SearchBox store={store} skin={skin} />
       </div>
 
       {drawerOpen && (
@@ -469,13 +503,21 @@ function MobileDrawer({
 // Search + cart
 // ---------------------------------------------------------------------------
 
-function SearchBox({ store, skin }: { store: PublicStore; skin: Skin }) {
+function SearchBox({
+  store,
+  skin,
+  className = '',
+}: {
+  store: PublicStore
+  skin: Skin
+  className?: string
+}) {
   const navigate = useNavigate()
   const [value, setValue] = useState('')
 
   return (
     <form
-      className="relative min-w-0 flex-1"
+      className={`relative w-full min-w-0 ${className}`}
       onSubmit={(e) => {
         e.preventDefault()
         const q = value.trim()

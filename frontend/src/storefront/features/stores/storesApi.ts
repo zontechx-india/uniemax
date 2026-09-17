@@ -96,13 +96,96 @@ export const HOMEPAGE_SECTION_KEYS = [
 
 export type HomepageSectionKey = (typeof HOMEPAGE_SECTION_KEYS)[number]
 
+/**
+ * The presentation variants each section can be rendered in — mirror of
+ * `HOMEPAGE_SECTION_LAYOUTS` on the server, which validates writes against it.
+ *
+ * Every value maps to a composition `StoreHomePage` already draws, which is
+ * what lets the Store Builder offer it as a two-or-three-button choice with
+ * nothing to explain. An empty array means the section has exactly one shape
+ * (its composition follows the data) and the builder shows no layout control.
+ *
+ * A layout is a *preference*, never a promise: the storefront still falls back
+ * to the capped grid row when a section holds too few products for the shape
+ * asked for, so picking Spotlight for a three-product row cannot leave a hole.
+ */
+export const HOMEPAGE_SECTION_LAYOUTS = {
+  banners: [],
+  hero: ['split', 'minimal'],
+  categories: ['chips', 'tiles'],
+  featured: ['spotlight', 'rail', 'grid'],
+  newArrivals: ['rail', 'grid'],
+  bestSellers: ['rail', 'grid'],
+  categoryRows: [],
+  catalog: ['grid', 'rail'],
+} as const satisfies Record<HomepageSectionKey, readonly string[]>
+
+/**
+ * Per-section presentation, all of it optional. Absent means **"use the
+ * platform default"**, so a store that has never been customised stores
+ * nothing and renders exactly as it always has.
+ */
+export interface HomepageSectionSettings {
+  /** Heading override. Absent = the platform's own name for the row. */
+  title?: string | null
+  /** The small line that sits with the heading. */
+  subtitle?: string | null
+  /** One of `HOMEPAGE_SECTION_LAYOUTS[key]`. */
+  layout?: string | null
+  /** **Hero only** — the label on its primary button. */
+  ctaLabel?: string | null
+}
+
 export interface HomepageSection {
   key: HomepageSectionKey
   enabled: boolean
+  /** Omitted entirely when the seller has customised nothing. */
+  settings?: HomepageSectionSettings
+}
+
+/** The layouts this section offers, or `[]` when it has only one shape. */
+export function sectionLayouts(key: HomepageSectionKey): readonly string[] {
+  return HOMEPAGE_SECTION_LAYOUTS[key]
 }
 
 export const DEFAULT_HOMEPAGE_SECTIONS: HomepageSection[] =
   HOMEPAGE_SECTION_KEYS.map((key) => ({ key, enabled: true }))
+
+/** Trim a stored string field to a usable value, or drop it. */
+function cleanSectionText(raw: unknown, max: number): string | undefined {
+  if (typeof raw !== 'string') return undefined
+  const text = raw.trim().slice(0, max)
+  return text.length > 0 ? text : undefined
+}
+
+/**
+ * Normalise one stored settings object — mirror of `resolveSectionSettings`
+ * on the server. A layout the storefront no longer draws is DROPPED rather
+ * than kept, so the section falls back to its default composition instead of
+ * rendering nothing. Returns `undefined` when nothing survives.
+ */
+export function resolveSectionSettings(
+  key: HomepageSectionKey,
+  raw: unknown,
+): HomepageSectionSettings | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const obj = raw as Record<string, unknown>
+  const allowed = HOMEPAGE_SECTION_LAYOUTS[key] as readonly string[]
+
+  const out: HomepageSectionSettings = {}
+  const title = cleanSectionText(obj.title, 60)
+  if (title) out.title = title
+  const subtitle = cleanSectionText(obj.subtitle, 120)
+  if (subtitle) out.subtitle = subtitle
+  const layout = cleanSectionText(obj.layout, 20)
+  if (layout && allowed.includes(layout)) out.layout = layout
+  if (key === 'hero') {
+    const ctaLabel = cleanSectionText(obj.ctaLabel, 30)
+    if (ctaLabel) out.ctaLabel = ctaLabel
+  }
+
+  return Object.keys(out).length > 0 ? out : undefined
+}
 
 /**
  * Normalise the `homepage` JSON the server stores into an ordered section
@@ -124,9 +207,14 @@ export function resolveHomepage(raw: unknown): HomepageSection[] {
         const key = (item as { key?: unknown } | null)?.key
         if (isKey(key) && !seen.has(key)) {
           seen.add(key)
+          const settings = resolveSectionSettings(
+            key,
+            (item as { settings?: unknown }).settings,
+          )
           out.push({
             key,
             enabled: (item as { enabled?: unknown }).enabled !== false,
+            ...(settings ? { settings } : {}),
           })
         }
       }

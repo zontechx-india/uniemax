@@ -555,3 +555,46 @@
     }
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Store Builder preview
+ *
+ * Only ever active inside the builder's iframe, where `PublicStoreLayout` sets
+ * `data-builder-preview` on the store root — a real shopper's storefront never
+ * matches any of this.
+ *
+ * The point is to make the preview *pointable*: every section band lights up
+ * under the cursor and says so, so "click the bit you want to change" works
+ * without the seller first learning what the left-hand list is called. The ring
+ * is drawn with `outline`, not a border or box-shadow, so it costs the layout
+ * nothing and cannot shift the page it is describing.
+ * ------------------------------------------------------------------------- */
+@layer utilities {
+  [data-builder-preview] [data-builder-section] {
+    cursor: pointer;
+    position: relative;
+    transition: outline-color 0.12s ease-out;
+    outline: 2px dashed transparent;
+    outline-offset: -2px;
+  }
+
+  [data-builder-preview] [data-builder-section]:hover {
+    outline-color: color-mix(in srgb, var(--brand) 55%, transparent);
+  }
+
+  /* The section the editor panel is currently open on. Solid, not dashed, so
+     it reads as "this one" rather than "one of these". */
+  [data-builder-preview] [data-builder-section].builder-focus {
+    outline-style: solid;
+    outline-color: var(--brand);
+  }
+
+  /* A preview is for looking, not for shopping: the frame is inert to normal
+     interaction so a stray click cannot navigate the seller out of their own
+     builder. The click itself is still delivered (capture phase), which is
+     what selects the section. */
+  [data-builder-preview] a,
+  [data-builder-preview] button:not([data-builder-allow]) {
+    pointer-events: none;
+  }
+}

@@ -8,9 +8,7 @@ import { storeVars, SKIN } from '../../features/publicStore/storeTheme'
 import { CheckIcon } from '../../layout/icons'
 
 /**
- * The horizontal template picker, shared by the Appearance section and the
- * full-screen preview page so the two can never drift apart — the same cards,
- * the same selection rule, the same "your colors" behaviour in both places.
+ * The horizontal template picker, used by the Store Builder's Design panel.
  *
  * Each card is a miniature storefront drawn with `storeVars` + the `SKIN`
  * fragments, exactly like the big preview, so a swatch never promises a look
@@ -36,16 +34,6 @@ export function findActiveTemplate(
     list.find((t) => sameColors(theme, t.theme)) ??
     null
   )
-}
-
-/**
- * Router state the Appearance section and the full-screen preview hand each
- * other, so an unsaved draft survives the trip in either direction.
- */
-export interface ThemeNavState {
-  theme?: StoreTheme
-  /** Set when the preview sends the seller back to edit colors. */
-  customize?: boolean
 }
 
 /** Applying a template is a COPY — the template itself is never touched. */

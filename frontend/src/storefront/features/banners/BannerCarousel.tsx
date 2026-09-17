@@ -38,18 +38,20 @@ export interface CarouselBanner {
 }
 
 /**
- * **Full-bleed, not banded.** A banner is artwork somebody chose; wrapping it
- * in the standard padded band would frame it in a colour they did not pick and
- * shrink it on exactly the screens it is meant to fill. It keeps the band's
- * bottom divider so the page rhythm survives, and nothing else.
+ * **How wide the artwork runs is the caller's call.** The marketplace runs it
+ * full-bleed; the storefront passes its own content column through
+ * `containerClassName`, because at a 1440px cap an edge-to-edge 16:5 banner is
+ * 800px tall on a 2560px monitor — taller than everything it sits above, and
+ * wider than the page it belongs to. Either way the section keeps the band's
+ * bottom divider so the page rhythm survives.
  *
  * **One ratio at every screen size** — 16:5, from `bannerSpec.ts`, the same
  * contract quoted verbatim to uploaders. The banner is scaled by WIDTH, so its
- * height simply falls out of the viewport (1920 → 600, 1440 → 450, 390 → 122)
- * and the whole artwork stays visible on a phone exactly as on a monitor.
- * Pinning the ratio also keeps the page still: one that followed each upload
- * would make it jump as the carousel advances, and shift whatever is below it
- * down after the first image loads.
+ * height simply falls out of the space it is given (1920 → 600, 1440 → 450,
+ * 390 → 122) and the whole artwork stays visible on a phone exactly as on a
+ * monitor. Pinning the ratio also keeps the page still: one that followed each
+ * upload would make it jump as the carousel advances, and shift whatever is
+ * below it down after the first image loads.
  *
  * Motion is opt-out: auto-advance stops for `prefers-reduced-motion`, while
  * the arrows, dots and swipe keep working, so the same markup serves both.
@@ -58,14 +60,23 @@ export function BannerCarousel({
   banners,
   id,
   className = '',
+  containerClassName = '',
+  frameClassName = '',
   wellClassName = 'bg-surface-alt',
+  ...rest
 }: {
   banners: CarouselBanner[]
   id?: string
   /** Section chrome — divider and band tone, from the caller's palette. */
   className?: string
+  /** Wraps the carousel: a content column + padding, or nothing (full-bleed). */
+  containerClassName?: string
+  /** The artwork frame itself — a border and radius when it is not full-bleed. */
+  frameClassName?: string
   /** The empty slot behind an image while it loads. */
   wellClassName?: string
+  /** Passthrough for the Store Builder's `data-builder-section` hit-target. */
+  [key: `data-${string}`]: string | undefined
 }) {
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
@@ -113,49 +124,52 @@ export function BannerCarousel({
       onFocusCapture={() => setPaused(true)}
       onBlurCapture={() => setPaused(false)}
       {...swipe}
+      {...rest}
     >
-      <div className="relative isolate overflow-hidden">
-        {/* One track, translated — every slide stays in the DOM so a link is
-            never removed from under a click that has already started. */}
-        <div
-          className="flex transition-transform duration-500 ease-out motion-reduce:transition-none"
-          style={{ transform: `translateX(-${safeIndex * 100}%)` }}
-        >
-          {banners.map((banner, i) => (
-            <BannerSlide
-              key={banner.id}
-              banner={banner}
-              wellClassName={wellClassName}
-              // Only the visible slide is reachable; the rest would otherwise
-              // be invisible tab stops.
-              hidden={i !== safeIndex}
-              eager={i === 0}
-            />
-          ))}
-        </div>
+      <div className={containerClassName}>
+        <div className={`relative isolate overflow-hidden ${frameClassName}`}>
+          {/* One track, translated — every slide stays in the DOM so a link is
+              never removed from under a click that has already started. */}
+          <div
+            className="flex transition-transform duration-500 ease-out motion-reduce:transition-none"
+            style={{ transform: `translateX(-${safeIndex * 100}%)` }}
+          >
+            {banners.map((banner, i) => (
+              <BannerSlide
+                key={banner.id}
+                banner={banner}
+                wellClassName={wellClassName}
+                // Only the visible slide is reachable; the rest would otherwise
+                // be invisible tab stops.
+                hidden={i !== safeIndex}
+                eager={i === 0}
+              />
+            ))}
+          </div>
 
-        {count > 1 && (
-          <>
-            <BannerArrow side="left" onClick={() => go(safeIndex - 1)} />
-            <BannerArrow side="right" onClick={() => go(safeIndex + 1)} />
-            <div className="absolute inset-x-0 bottom-3 flex justify-center gap-2">
-              {banners.map((banner, i) => (
-                <button
-                  key={banner.id}
-                  type="button"
-                  onClick={() => go(i)}
-                  aria-label={`Show banner ${i + 1} of ${count}`}
-                  aria-current={i === safeIndex}
-                  className={`h-2 rounded-pill border border-black/10 transition-all ${
-                    i === safeIndex
-                      ? 'w-6 bg-white'
-                      : 'w-2 bg-white/60 hover:bg-white'
-                  }`}
-                />
-              ))}
-            </div>
-          </>
-        )}
+          {count > 1 && (
+            <>
+              <BannerArrow side="left" onClick={() => go(safeIndex - 1)} />
+              <BannerArrow side="right" onClick={() => go(safeIndex + 1)} />
+              <div className="absolute inset-x-0 bottom-3 flex justify-center gap-2">
+                {banners.map((banner, i) => (
+                  <button
+                    key={banner.id}
+                    type="button"
+                    onClick={() => go(i)}
+                    aria-label={`Show banner ${i + 1} of ${count}`}
+                    aria-current={i === safeIndex}
+                    className={`h-2 rounded-pill border border-black/10 transition-all ${
+                      i === safeIndex
+                        ? 'w-6 bg-white'
+                        : 'w-2 bg-white/60 hover:bg-white'
+                    }`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </section>
   )

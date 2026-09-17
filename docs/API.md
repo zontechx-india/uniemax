@@ -518,9 +518,11 @@ Appearance screen rendered by the console.
 ### `PATCH /api/v1/stores/:id/homepage`
 ```jsonc
 { "sections": [                        // FULL ordered list, not a subset
-  { "key": "newArrivals",  "enabled": true },
+  { "key": "newArrivals",  "enabled": true,
+    "settings": { "title": "Just landed", "layout": "grid" } },
   { "key": "banners",      "enabled": true },
-  { "key": "hero",         "enabled": true },
+  { "key": "hero",         "enabled": true,
+    "settings": { "layout": "minimal", "ctaLabel": "Browse the range" } },
   { "key": "featured",     "enabled": false },
   { "key": "categories",   "enabled": true },
   { "key": "bestSellers",  "enabled": true },
@@ -528,12 +530,47 @@ Appearance screen rendered by the console.
   { "key": "catalog",      "enabled": true }
 ] }
 ```
-Set the storefront homepage section **order** and per-section visibility in one
-write — a reorder and a toggle are the same operation. `sections` must be a
-complete permutation of every known key (`banners`, `hero`, `categories`,
-`featured`, `newArrivals`, `bestSellers`, `categoryRows`, `catalog`), each with
-an `enabled` flag; a missing, duplicate or unknown key is a `422`. Returns the
-full store (with `homepage` normalised to the ordered list).
+Set the storefront homepage section **order**, per-section visibility and
+per-section presentation in one write — a reorder, a toggle and a renamed
+heading are the same operation. `sections` must be a complete permutation of
+every known key (`banners`, `hero`, `categories`, `featured`, `newArrivals`,
+`bestSellers`, `categoryRows`, `catalog`), each with an `enabled` flag; a
+missing, duplicate or unknown key is a `422`. Returns the full store (with
+`homepage` normalised to the ordered list).
+
+**`settings` is optional and every field in it is optional.** Absent means
+"use the platform default", so a store that has never been customised stores
+nothing and renders exactly as it always has.
+
+| Field      | Max | Applies to               | Absent means                        |
+| ---------- | --- | ------------------------ | ----------------------------------- |
+| `title`    | 60  | every section with a heading | the platform's own name for the row |
+| `subtitle` | 120 | the same                 | the platform's own strapline, or none |
+| `layout`   | 20  | sections with more than one shape | the section's default composition |
+| `ctaLabel` | 30  | `hero` only              | "Start Shopping"                    |
+
+`layout` is validated **against the section it is on** — a value that section
+has no composition for is a `422`:
+
+| Section        | Layouts                             |
+| -------------- | ----------------------------------- |
+| `hero`         | `split` (default) · `minimal`        |
+| `categories`   | `chips` (default) · `tiles`          |
+| `featured`     | `spotlight` (default) · `rail` · `grid` |
+| `newArrivals`  | `rail` (default) · `grid`            |
+| `bestSellers`  | `rail` (default) · `grid`            |
+| `catalog`      | `grid` (default) · `rail`            |
+| `banners`, `categoryRows` | none — their shape follows their data |
+
+A layout stays a *preference*: the storefront still falls back to its capped
+grid row when a section holds too few products for the shape asked for, so
+choosing `spotlight` for a three-product row cannot leave a hole.
+
+Blank strings, `null`s and an empty `settings` object all **collapse back to no
+settings** on write, so clearing a renamed heading leaves the column as it was
+before the seller ever customised it. On read, a stored layout the storefront
+no longer draws is dropped (the section falls back to its default composition)
+rather than kept.
 
 Enabling a section can only ever *reveal* it — it never forces an empty row to
 appear, since a merchandising row still needs products flagged for it. Disabled
@@ -1461,9 +1498,11 @@ Homepage merchandising payload — each product section capped at 12.
   "catalog": [ … ] }            // newest, whole shop — no flags needed
 ```
 `sections` is the owner's ordered list (see `PATCH …/homepage`) and drives
-**both** what the storefront renders and in what order. A section switched
-**off** comes back with its data array empty and is never queried; `hero`
-carries no data, so the client reads its `enabled` flag directly.
+**both** what the storefront renders and in what order — each entry carrying
+its optional `settings` (heading, strapline, layout) exactly as stored. A
+section switched **off** comes back with its data array empty and is never
+queried; `hero` carries no data, so the client reads its `enabled` flag
+directly.
 `banners` is the shopper-facing half of the banner endpoints above: **inactive
 rows never leave the server**, and a link whose target has been deleted or
 switched off arrives as `href: null` so the banner renders as a plain image

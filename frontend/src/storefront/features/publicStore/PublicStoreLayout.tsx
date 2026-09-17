@@ -8,6 +8,12 @@ import { StoreIcon } from '../../layout/icons'
 import { StoreFooter } from './StoreFooter'
 import { StoreHeader } from './StoreHeader'
 import { SKIN, storeVars, type Skin } from './storeTheme'
+import {
+  isBuilderPreview,
+  useBuilderPreviewBridge,
+  useBuilderRefresh,
+} from './builderBridge'
+import { STORE_CONTAINER, STORE_HEADER_OFFSET } from './storeLayout'
 import { rememberStoreVisit } from '../discovery/recentActivity'
 
 /**
@@ -41,10 +47,20 @@ export function usePublicStore(): StoreContext {
 export function PublicStoreLayout() {
   const { storeSlug = '' } = useParams()
   const [store, setStore] = useState<PublicStore | null | undefined>(undefined)
+  // Non-null only inside the Store Builder's preview frame, and only while the
+  // seller has colors they have not saved yet — see `builderBridge`.
+  const draftTheme = useBuilderPreviewBridge()
+  // A save in the builder repaints the chrome (theme, footer, store details)
+  // without reloading the frame. `reload` counts saves; the fetch effect
+  // already keys on it, so bumping it is the whole implementation.
+  const [reload, setReload] = useState(0)
+  useBuilderRefresh(() => setReload((n) => n + 1))
 
   useEffect(() => {
     let cancelled = false
-    setStore(undefined)
+    // A refetch inside the builder must NOT blank the preview back to
+    // "Loading store…" — the seller is looking at the thing being saved.
+    if (reload === 0) setStore(undefined)
     const load = async (): Promise<PublicStore | null> => {
       try {
         return await publicStoreApi.getBySlug(storeSlug)
@@ -87,7 +103,7 @@ export function PublicStoreLayout() {
       cancelled = true
       resetFavicon()
     }
-  }, [storeSlug])
+  }, [storeSlug, reload])
 
   if (store === undefined) {
     return (
@@ -102,10 +118,16 @@ export function PublicStoreLayout() {
   return (
     <Ctx.Provider value={{ store, skin: SKIN }}>
       <div
-        className="flex min-h-screen flex-col bg-bg text-fg"
-        style={storeVars(store.theme)}
+        className={`flex min-h-screen flex-col bg-bg text-fg ${STORE_HEADER_OFFSET}`}
+        style={storeVars(draftTheme ?? store.theme)}
+        {...(isBuilderPreview() ? { 'data-builder-preview': '' } : {})}
       >
-        {!store.isPublished && <DraftPreviewBanner storeSlug={store.slug} />}
+        {/* The draft banner is management chrome, and inside the builder the
+            seller is already looking at the publish control — so the preview
+            frame leaves it out rather than stealing a strip of the page. */}
+        {!store.isPublished && !isBuilderPreview() && (
+          <DraftPreviewBanner storeSlug={store.slug} />
+        )}
         <StoreHeader store={store} skin={SKIN} />
         {/* Truly full-bleed: each page brings its own container, so the
             homepage can render edge-to-edge section bands while the inner
@@ -121,9 +143,9 @@ export function PublicStoreLayout() {
 
 /**
  * Standard padded column for the inner storefront pages (category, product,
- * shop). Full-bleed with a soft 1920px cap for ultrawides, exactly what
- * `<main>` used to provide. The homepage deliberately opts out — it renders
- * its own edge-to-edge section bands instead.
+ * shop) — `STORE_CONTAINER` plus vertical rhythm. The homepage deliberately
+ * opts out: it renders its own edge-to-edge section bands, each of which puts
+ * the same container back inside.
  */
 export function StorePageShell({
   children,
@@ -133,9 +155,7 @@ export function StorePageShell({
   className?: string
 }) {
   return (
-    <div
-      className={`mx-auto w-full max-w-[1920px] px-4 py-6 sm:px-6 sm:py-8 lg:px-10 ${className}`}
-    >
+    <div className={`${STORE_CONTAINER} py-6 sm:py-8 ${className}`}>
       {children}
     </div>
   )

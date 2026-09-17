@@ -170,8 +170,9 @@ for guests and signed-in customers alike and adapts per session state.
   the utilities (theme toggle · cart link with count · Sign in — a button
   that opens the auth dialog — / `AccountMenu`, all `h-10`, `gap-3` →
   `lg:gap-6`; the old hairline separator
-  was removed — the gap does that job). **Full-bleed** like the storefront
-  (`max-w-[1920px]` soft cap, `lg:px-10`; card grids run 2→3→4→5 columns).
+  was removed — the gap does that job). **Full-bleed** with a `max-w-[1920px]`
+  soft cap and `lg:px-10` (the storefront caps tighter, at 1440 — see
+  **Layout width**; card grids here run 2→3→4→5 columns).
   Sections render as **full-bleed alternating bands** (base canvas / `alt`
   surface tone + a bottom `border-line` divider, compact `py-8/10`) — the
   band lives inside each section component so a hidden section leaves no
@@ -396,7 +397,7 @@ once-ever setting look as important as a daily job:
 | ----- | -------- |
 | **Overview** | Dashboard · Orders *(pending-count badge)* |
 | **Catalog** | Categories · Products |
-| **Storefront** | Store Details · Business Details · Appearance · Homepage · Banners · Footer |
+| **Storefront** | Store Details · Business Details · **Store Builder** |
 | **Payments & Delivery** | Payments · Bank Accounts · Shipping · Checkout |
 | **Help** | Customer Support · UnieMax Support |
 
@@ -540,8 +541,9 @@ scales from a few products to thousands:
 so moving between pages never refetches the chrome. It applies `storeVars()`
 and renders `StoreHeader` + `<Outlet/>` + `StoreFooter`. `<main>` is
 **edge-to-edge** and carries no padding of its own: inner pages wrap
-themselves in the exported **`StorePageShell`** (the 1920px-capped padded
-column), which lets the homepage render full-bleed section bands instead.
+themselves in the exported **`StorePageShell`** (`STORE_CONTAINER` plus
+vertical rhythm — see **Layout width**), which lets the homepage render
+full-bleed section bands instead.
 
 - **Help & Support entry points** — a shopper reaches the shop from the
   **top bar** (a `Help` nav item beside Categories, and a row in the mobile
@@ -564,16 +566,31 @@ column), which lets the homepage render full-bleed section bands instead.
   policy links), business locations (address, contact person, `tel:` phones,
   `mailto:` email, hours, and a **View on Google Maps** link built from the
   pinned lat/lng — falling back to an address search, no API key needed) and
-  a Customer Support block (phone / WhatsApp `wa.me` / email / hours). Every
-  block is conditional; a store with nothing configured gets just the
-  copyright bar. Bottom bar: owner's `copyrightText` (default
+  a Customer Support block (phone / WhatsApp `wa.me` / email / hours). Around
+  those sit two blocks that need **no configuring**: **Shop** (Home, All
+  Products and up to six top-level categories, then an "All categories →" row
+  when there are more — the store's own navigation, repeated for anyone who
+  read to the bottom instead of scanning the toolbar) and Customer Support. So
+  a store that filled nothing in gets brand + Shop + Support, never a wall of
+  empty headings. Bottom bar: owner's `copyrightText` (default
   "© {year} {store name}. All Rights Reserved."), GST/registration small
-  print, "Powered by UnieMax". Responsive: 1 → 2 → 4 columns.
+  print, "Powered by UnieMax". Responsive: 1 → 2 columns, then on desktop
+  **exactly as many as this store's blocks fill** (`BLOCK_COLUMNS`, 2–5) — a
+  fixed four left a fully-configured store stranding its last block alone on a
+  second row.
 
-- **`StoreHeader`** — logo · Home · Shop · **Categories ▾** · search ·
-  **share** · cart · **account**. Hover
+- **`StoreHeader`** — logo · store name · Home · Shop · **Categories ▾** ·
+  Help · search · **share** · cart · **account**. Hover
   dropdown on desktop, hamburger drawer with an accordion below `lg`. The menu
-  lists **categories and subcategories only, never products**. The share
+  lists **categories and subcategories only, never products**.
+  **Two rows on a phone, one from `md`**: the bar is
+  `[menu] [logo · store name] [share] [cart]` and search drops to a full-width
+  row underneath, because squeezed in beside five controls at 360px it was
+  barely wide enough for one word — and search is how anyone finds anything in
+  a large catalog. The store name now shows at every size: it *grows* into
+  whatever the buttons leave and truncates there, so a long one never pushes
+  the cart off a 320px screen. The resulting height is published as
+  `--store-header` (see **Layout width**) rather than hardcoded anywhere. The share
   button (`ShareButton.tsx`, backed by `shared/share.ts`) opens the native
   share sheet where available, else copies the store's permanent public URL
   with a "Link copied" check — the same helper the owner's Share Store panel
@@ -608,15 +625,54 @@ column), which lets the homepage render full-bleed section bands instead.
   counts **bands rather than sections** — Category Highlights paints one band
   per row, so an odd number of them would otherwise hand the next section the
   tone it just used.
-  - **Category Highlights / All Products** — the two rows that need no
+  - **Every section looks different on purpose, and degrades to a plain row
+    when it is too small for its shape.** A homepage that repeats one grid six
+    times reads as a dashboard listing inventory, so each section gets the
+    composition that matches what it is for:
+
+    | Section                     | Composition                                       | Falls back below |
+    | --------------------------- | ------------------------------------------------- | ---------------- |
+    | Shop by Category            | one scrolling row of chips (`CategoryStrip`)      | —                |
+    | Featured Products           | spotlight — one `size="lg"` lead + exactly 6       | 7 products       |
+    | New Arrivals / Best Sellers | horizontal rail (`ProductRail`)                   | 6 products       |
+    | Category Highlights         | shelf panel + that shelf's newest                 | 2 products       |
+    | All Products                | the capped grid row                               | —                |
+
+    The fallback is always the capped grid row, and it is the whole reason the
+    three live in one `ProductSection`: the choice is made **once, from the
+    product count**, instead of each call site guessing what a store will have
+    in stock. A rail that cannot scroll and a spotlight with a hole in its grid
+    both look broken, so a shop with three products gets tidy short rows rather
+    than empty scaffolding.
+  - **`ProductRail`** — shows **everything the section returned** (the API
+    sends up to a dozen) rather than the five a capped row fits, so New
+    Arrivals and Best Sellers are browsable without leaving the homepage. Card
+    widths are percentages of the scroller, so the last card is always
+    part-cut at the right edge — which is what tells a thumb there is more.
+    Arrows appear from `lg` (where there is no swipe) inside the section
+    heading; they scroll by most of a screenful and **grey out** at each end
+    rather than disappearing, so the control row does not reflow as you scroll.
+  - **Shop by Category** (`CategoryStrip`) is **one scrolling row of chips,
+    never a wrapping block**: it is wayfinding, not merchandising. A store with
+    twenty categories must not turn its tallest homepage section into a list of
+    links, and a store with one must not strand a lone tile in a grid — a
+    single sideways-scrolling row is the only shape that holds for both, and on
+    a phone it is the natural gesture. Chips are `h-10` and carry the category's
+    product count.
+  - **Category Highlights / All Products** — the two sections that need no
     merchandising flags, and what a shop shows before its owner has curated
-    anything. Both are ordinary `ProductRow`s: Category Highlights renders one
-    per category (up to three) with "View all" into that category's own page,
-    All Products renders the newest shop-wide with "View all" into Shop. The
-    row component takes a `viewAllTo` URL rather than a section key, so a row
-    can point at whichever listing is the narrowest one still holding
-    everything in it. `catalog` is also the hero collage's last cover source,
-    so an uncurated shop still gets a collage.
+    anything. All Products is the plain capped row (newest shop-wide, "View
+    all" into Shop). Category Highlights paints one band per category, each a
+    **shelf panel beside that shelf's newest stock** — the panel names the
+    collection, counts it (from the shell's category tree; the row payload
+    carries no total) and links into it, which reads as a collection rather
+    than another grid. The panel is a compact bar on a phone and a full-height
+    card from `lg`, where **it absorbs whatever the shelf does not need**
+    (`SHELF_SPLIT`): a two-product shelf fills its band instead of leaving a
+    card-shaped hole, and the cards stay the width they are everywhere else.
+    A one-product shelf drops the panel entirely — a "collection" of one is
+    theatre. `catalog` is also the hero art's last cover source, so an
+    uncurated shop still gets art.
   - **Banners** — the owner's promo carousel, above the hero by default and
     reorderable like any other section. The carousel itself is
     `features/banners/BannerCarousel`, **shared with the marketplace
@@ -624,14 +680,17 @@ column), which lets the homepage render full-bleed section bands instead.
     thing on screen, so two copies would have drifted apart on motion, focus
     handling and aspect ratio. Everything theme-specific arrives as a class
     name, so the store passes the owner's palette and the marketplace passes
-    the global one. **Full-bleed, not banded**: a banner is
-    artwork the owner chose, so framing it in a colour they did not pick and
-    shrinking it on the screens it is meant to fill would both be wrong; it
-    keeps only the band's bottom divider. **One image at one ratio, every screen** —
+    the global one. **How wide the artwork runs is the caller's call**
+    (`containerClassName` / `frameClassName`): the marketplace runs it
+    full-bleed, the storefront passes its own `STORE_CONTAINER` and a bordered
+    rounded frame, because at a 1440px cap an edge-to-edge 16:5 banner is 800px
+    tall on a 2560px monitor — taller than everything above it and wider than
+    the page it belongs to. Either way the section keeps the band's bottom
+    divider. **One image at one ratio, every screen** —
     `16/5` from `features/stores/bannerSpec.ts`, with **no max-height**, so the
-    rendered height is exactly `width x 5/16` everywhere (1920px → 600px,
-    1440 → 450, 768 → 240, 390 → 122) and the whole artwork stays visible on a
-    phone exactly as on a monitor. A ratio that followed each upload would make
+    rendered height is exactly `width x 5/16` of the space it is given (1920px
+    → 600px, 1440 → 450, 768 → 240, 390 → 122) and the whole artwork stays
+    visible on a phone exactly as on a monitor. A ratio that followed each upload would make
     the page jump as the carousel advanced and shove the hero down after the
     first load; a height cap would crop a correctly-sized image on a wide
     monitor. `bannerSpec` is also what the admin screen quotes to sellers, so
@@ -647,25 +706,30 @@ column), which lets the homepage render full-bleed section bands instead.
     from under a click; off-screen slides are `inert` so they are not invisible
     tab stops. A `URL` banner is a plain `<a target="_blank" rel="noopener">`;
     everything else routes through the SPA.
-  - **Hero** — sized like the marketplace hero (`text-3xl sm:text-5xl`,
-    `py-8/10`) rather than the old tall rounded card: eyebrow, store name,
-    the product/category count line, a Start Shopping CTA and — only when the
-    categories band is actually on the page — a `#shop-by-category` anchor
-    button. On `lg+` an offset two-column **collage of the store's real
-    product covers** (max 4, deduped from the merchandising rows, decorative
-    `alt=""`, skipped below 2 covers). Keeps the radial brand wash.
-  - **Shop by Category** — the marketplace homepage's **single-row strip**,
-    per store: a small uppercase inline label followed by one `rounded-pill`
-    per top-level category, wrapping only when a store has more than fit the
-    line. It is a strip, not a section — no display heading, and the band
-    renders at `dense` height (`py-3.5 sm:py-4`). The pill fill is chosen
-    against the band tone (`bg-bg` on the raised tone, `bg-surface` on the
-    canvas) so it never sits on its own color. Subcategories are not shown
-    here; the category page already lists them.
-  - **Product rows** — `ROW_SIZE = 6` fetched, but `ROW_VISIBILITY` hides the
-    surplus per breakpoint (`hidden md:list-item` …) so **every** breakpoint
-    paints exactly one full row — 2 → 3 → 4 → 5 → 6 cards — and never strands
-    an orphan. Each carries a "View all →" link **scoped to that section**
+  - **Hero** — the store's logo mark and a wide-tracked eyebrow, the store
+    name (`text-3xl sm:text-4xl lg:text-5xl`, `break-words` so a long
+    single-word name wraps instead of widening the band), a description, a
+    Start Shopping CTA and — only when the categories band is actually on the
+    page — a `#shop-by-category` anchor button. It sits at `hero` band padding
+    (`py-10 sm:py-14 lg:py-16`) and keeps the radial brand wash.
+    - **Two shapes, and the empty one is deliberate.** With at least two real
+      product covers it is a two-column composition: the pitch on the left,
+      `HeroArt` on the right — one grid in two shapes, a triptych of squares
+      below `lg` (a strip of life under the copy, costing almost no height)
+      and a lead-plus-stack mosaic beside it from `lg`, where the lead takes
+      its height from the two squares rather than an aspect ratio so the
+      columns always end level. Covers are deduped from the merchandising rows
+      (max 3) and decorative (`alt=""`). **With fewer than two there is no
+      second column at all** — the copy centres instead of leaving half the
+      band empty, which is what a brand-new shop used to look like.
+    - The description is the owner's own **About** text from their Footer
+      settings when they wrote one (with the catalog summary as a second,
+      muted line), and the generated summary alone when they did not.
+  - **Shop by Category** — see the composition table above.
+  - **Capped product rows** — `ROW_SIZE = 5` shown, with `ROW_VISIBILITY`
+    hiding the surplus per breakpoint (`hidden md:list-item` …) so **every**
+    breakpoint paints exactly one full row — 2 → 3 → 4 → 5 cards — and never
+    strands an orphan. Each carries a "View all →" link **scoped to that section**
     (`/shop?section=featured|newArrivals|bestSellers`). Rows are
     **strictly flag-driven** (a product shows only in the sections its owner
     ticked) and a row with nothing ticked is not rendered at all.
@@ -778,20 +842,35 @@ column), which lets the homepage render full-bleed section bands instead.
 - **`ProductCard`** — the **whole card is one link** to the product page; there
   is no Add to Cart on a card. Buying happens on the product page, which keeps
   every card the same shape whether or not the product has options, so a grid
-  of thousands stays uniform. Shows the **cover image** (lazy-loaded
-  `loading="lazy"`/`decoding="async"`, icon fallback while no photo exists),
-  category label, name, a **"From ₹X"** price (with the MRP struck through
-  and a **"Sale"** tag when that variant's MRP is above its price — the tag
-  is never shown without a real discount), a **stock badge** only when it
-  matters (Low / Out of Stock — plenty in stock says nothing) and **"N
-  Variants Available"** (never the options themselves). Hover applies `metal-lift`:
-  a small rise plus an **evenly-spread halo** (zero-offset shadow, so it
-  radiates equally on all four sides rather than pooling underneath) and the
-  name shifts to the brand color. The card is deliberately **compact**
-  (`p-2`/`p-3`, `rounded-lg`, `text-sm sm:text-base` name) so the full-bleed
-  layout carries dense rows instead of four oversized cards: the shared
-  `PRODUCT_GRID` ramp (exported here, also used by `GridSkeleton` and the
-  homepage rows) runs 2 → 3 → 4 → 5 → **6 columns (2xl)**.
+  of thousands stays uniform. Shows the **cover image**, category label, name
+  (2 lines, then ellipsis), a **"From ₹X"** price in the brand color with the
+  MRP struck through, a **stock badge** only when it matters (Low — plenty in
+  stock says nothing) and **"N Variants Available"** (never the options
+  themselves). The badge line is `mt-auto`, so it sits level across a row
+  however the names wrapped.
+  - **The cover slot is always a fixed ratio** (square; `4/3` for a
+    spotlight's lead) with the image `object-contain` inside it, so a mix of
+    portrait, landscape and missing photos never makes a row ragged. It is
+    lazy-loaded (`loading="lazy"`/`decoding="async"`) and inset (`p-2`) so it
+    reads as a framed product rather than a slab bleeding into the card.
+  - Over that slot: a **"N% off" flag** top-left, computed from the MRP and
+    only when the discount is real (it replaced a wordless "Sale" tag — the
+    number is what a shopper actually scans for), and a **"Sold out" veil**
+    across the foot when stock is zero, which is also why the stock chip below
+    only ever says Low.
+  - **`NoProductImage`** is the no-photo state: the same recessed well, one
+    muted glyph and a quiet "No image" label, so a catalog mid-upload reads as
+    "photo coming" rather than broken content.
+  - **`size="lg"`** is the spotlight lead only: bigger type, the product's
+    description, a `4/3` cover. Because that card is stretched to the height of
+    the grid beside it, from `lg` its cover **absorbs the extra height**
+    (`flex-1`, aspect dropped) instead of leaving the text floating above a void.
+  - Hover applies `metal-lift`: a small rise plus an **evenly-spread halo**
+    (zero-offset shadow, so it radiates equally on all four sides rather than
+    pooling underneath), the cover scales *inside* its slot so the frame never
+    moves, and the name shifts to the brand color. The shared `PRODUCT_GRID`
+    ramp (exported here, also used by `GridSkeleton` and the homepage rows)
+    runs 2 → 3 → 4 → **5 columns (xl)**.
 - **`FilterPanel`** — right slide-over on desktop, bottom sheet on mobile:
   Availability + Price Range live; Brand/Rating/Discount shown "Soon".
 
@@ -1120,26 +1199,76 @@ a pickup-address item.
   `business` / `address` / `tax`; unsaved edits are lifted to the page so a
   tile can never claim "1 of 4" while the card below it says "Unsaved
   changes"),
-  `StoreHomepagePage` (**arrange** the storefront homepage — drag-and-drop
-  (native HTML5 DnD, no dependency) plus ▲/▼ buttons for keyboard/touch to
-  reorder Banners · Welcome Hero · Shop by Category · Featured Products · New
-  Arrivals · Best Sellers, each with an `ActiveSwitch` — order + visibility
-  persisted together as the full ordered list via `PATCH /stores/:id/homepage`;
-  a switch only *hides* a section, never forces an empty row; the fixed header
-  is not listed. The hero row is labelled **Welcome Hero**, not the old "Hero
-  Banner" — with banners a real feature, two rows both called a banner told the
-  owner nothing about which was which),
-  `StoreBannersPage` (**Banners** — fill the section the page above arranges:
+  `StoreBuilderPage` (**Store Builder**, `pages/stores/builder/` — the one
+  workspace where a storefront is designed, replacing the four screens
+  (Appearance · Homepage · Banners · Footer) that between them described a
+  single thing. It is a **sibling route** of `StoreManageLayout`, not a child:
+  it takes the window, because inside the layout its live preview would share
+  its row with the 264px section nav and the "desktop" frame would come out
+  narrower than a tablet. `/appearance`, `/homepage` and the old
+  `/appearance/preview` now **redirect** here — links already in the wild keep
+  resolving.
+
+  **Left: controls.** Two tabs. *Sections* is the storefront's structure —
+  every homepage section as a row with a drag handle, an `ActiveSwitch` and a
+  click target, bracketed by pinned **Store header** and **Footer** rows (real
+  parts of the shop, but never moved or switched off). Reordering is offered
+  twice on purpose: native HTML5 drag for a mouse, ▲/▼ buttons for keyboard,
+  screen readers and phones. Opening a row swaps the panel for that section's
+  editor. *Design* (`BuilderDesignPanel`) is colour and nothing else — it is
+  called **Color theme**, not "Template", because colour is genuinely all it
+  changes; a seller picks one of the platform's palettes in a click, and the
+  five pickers (shared with the storefront via `ThemeColorFields.tsx`) stay
+  folded behind *Customize colors*.
+
+  **Right: the real storefront** (`BuilderPreview`) — `/store/{slug}?builder=1`
+  in an iframe, not a mock-up, so the preview cannot disagree with the shop. It
+  is laid out at the full logical width of the device (1440 / 834 / 390) and
+  **scaled** with a transform to fit the panel, which is the difference between
+  "your shop at desktop width, smaller" and "your shop in a narrow window".
+
+  **They talk** over `features/publicStore/builderBridge.ts`, a same-origin
+  `postMessage` channel that is inert for every real shopper: the builder posts
+  an unsaved palette (painted live), a *refresh* after each save (the frame
+  refetches in place rather than reloading, keeping scroll) and a *focus* key
+  (the section is ringed and scrolled to); the frame posts a handshake and,
+  when a seller clicks a band inside it, the key of the section they pointed
+  at — which opens its editor. Inside the frame links and buttons are
+  `pointer-events: none` so a stray click cannot navigate the seller out of
+  their own builder, while the capture-phase listener still receives it.
+
+  **Saving.** Structure — order, on/off and per-section settings — saves
+  itself: every change replaces the whole ordered list via
+  `PATCH /stores/:id/homepage`, clicks go out immediately and typing is
+  debounced 600ms (a pending write is **flushed on unmount**, so the last
+  keystroke before leaving is never lost), with the header reporting
+  Saving…/Saved and a failed write rolling the panel back to the server's
+  answer. Colour is the deliberate exception and has its own Save, because it
+  is the one change that can make a shop unreadable.
+
+  **Section editors** (`BuilderSectionEditor`) are generated from one table,
+  `builderSections.ts`, which is most of the product: label, plain-English
+  hint, the fields the section offers and its layout choices with a line of
+  copy each. Its layout ids are checked against `HOMEPAGE_SECTION_LAYOUTS` at
+  module load in dev, so a section can never be offered a shape the storefront
+  cannot draw. Layout and title are on screen; the strapline, the hero's button
+  label and *reset to defaults* sit under **More options**. Banners and Footer
+  keep their own full editors, embedded — `StoreBannersPage embedded` and
+  `StoreFooterPage embedded` rendered inside a `ManagedStoreProvider`, which is
+  why `useManagedStore` now reads a context *or* the outlet: one implementation
+  of each, used in both places),
+  `StoreBannersPage` (**Banners** — the images the builder's Banners section
+  shows:
   a **grid of preview cards** (1 / 2 / 3 across), because a banner is a picture
   and the picture should be the row. Each card shows the artwork at the
   storefront's own `16/5` with a position badge, a **drag handle**, the on/off
   switch and delete over it. Reordering is **drag-and-drop** (native HTML5 DnD,
-  the same pattern as the Homepage screen) plus ←/→ buttons for keyboard and
+  the same pattern as the builder's section list) plus ←/→ buttons for keyboard and
   touch; dragging is armed by holding the grip rather than the card body, so
   the inputs inside a card stay usable, and a drop past the last card appends.
-  Max 10 banners, each with one image. Two switches on purpose: this page's per-banner switch
-  retires one banner while keeping its image for a future campaign, and
-  Homepage → Banners hides the whole strip. The **destination picker** chooses a
+  Max 10 banners, each with one image. Two switches on purpose: the per-banner
+  switch retires one banner while keeping its image for a future campaign, and
+  the builder's Banners switch hides the whole strip. The **destination picker** chooses a
   kind — no link · a category · a product · a web address — and then the
   matching control: a list of this store's categories or products, or a URL
   field. The owner never types an id, so a rename cannot break a link; when a
@@ -1158,7 +1287,10 @@ a pickup-address item.
   top and bottom (a 3:1 upload silently loses ~3% of each edge, which is enough
   to clip a logo). Resolution stays advisory: a small file gets a note about
   softness, never a refusal. Every write returns the server's full list,
-  so the screen never merges a row into local state),
+  so the screen never merges a row into local state. Takes `embedded` to drop
+  its page heading and run one column wide inside the Store Builder's editor
+  panel, and `onSaved` so the live preview repaints after every write — the
+  same component in both places, never a second copy),
   `StoreFooterPage` (**Footer** manager — everything the storefront footer
   shows, as independently-saving cards over `PATCH /stores/:id/footer`, each
   sending only its own section: **Contact Information** — up to 10 business
@@ -1255,19 +1387,7 @@ a pickup-address item.
   simpler than the console's equivalent — **no priority**, which is the
   platform's triage vocabulary — and replying picks the request up on its own
   so the Needs-reply tab can't quietly lie),
-  `StoreAppearancePage` (background + primary color — picker swatch plus a
-  typed/pasted hex field (`#rrggbb`, `#rgb` shorthand auto-expanded) —
-  plus optional **secondary** (links/prices/highlights), **surface**
-  (cards/panels) and **button text** (CTA labels) colors, each an
-  Auto/Customize toggle where Auto keeps the derived behaviour (secondary
-  follows primary; surface follows the background; button text is
-  white/black from the primary's luminance) — and a live mini-storefront
-  preview — top bar, category chip bar, product card grid **and a real
-  labeled CTA button** (same `SKIN.cta` fill as the
-  live storefront, so button-text contrast is checked before saving),
-  rendered with the real page's own `storeVars()` semantics (flat
-  surfaces, chrome CTAs) so it previews truthfully →
-  `PATCH /stores/:id/theme`), `StoreCategoriesPage`
+  `StoreCategoriesPage`
   (add form of **one `CategoryPicker` and nothing else** — search or browse
   the platform taxonomy to any depth. There is no name field: a seller
   chooses a category and cannot type one, so no shop invents its own
@@ -1874,10 +1994,15 @@ frontend/
     │   │   │   ├── ListingControls.tsx # Sort/filter bar, breadcrumb, LoadMore, empty states
     │   │   │   ├── OptionPicker.tsx  # One radiogroup per option type; greys unreachable values
     │   │   │   ├── GroupSwatchRow.tsx # Product-family swatches — each a Link to that member's page
-    │   │   │   ├── ProductCard.tsx   # Listing card + responsive ProductGrid
+    │   │   │   ├── ProductCard.tsx   # Listing card (+ lead size, NoProductImage) + ProductGrid
     │   │   │   ├── useProductQuery.ts# Server-paginated listing (debounce + race guard)
     │   │   │   ├── catalog.ts        # Filter state + stock-level presentation only
     │   │   │   ├── storeTheme.ts     # Per-store CSS-var theming + metal tokens (storeVars) + SKIN
+    │   │   │   ├── storeLayout.ts    # STORE_CONTAINER (1440 cap) + sticky-header offset vars
+    │   │   │   ├── sectionCopy.ts    # Platform default heading/strapline per homepage
+    │   │   │   │                     #   section + the owner's overrides (sectionCopy)
+    │   │   │   ├── builderBridge.ts  # Store Builder ↔ preview postMessage channel
+    │   │   │   │                     #   (draft theme, refresh, focus, click-to-edit)
     │   │   │   ├── CartControls.tsx  # PurchaseActions (qty + Add to Cart + Buy Now),
     │   │   │   │                     #   QuantityStepper, AddedToast, StockBadge
     │   │   │   ├── productDescription.ts # Description → highlights / specs / prose
@@ -1903,7 +2028,7 @@ frontend/
     │       ├── SupportTicketPage.tsx # /support/:ticketId — one ticket thread
     │       ├── OrdersPage.tsx    # /orders — the customer's order history
     │       ├── store/            # Public storefront pages (no sign-in)
-    │       │   ├── StoreHomePage.tsx     # Banners, hero, categories, merchandising rows
+    │       │   ├── StoreHomePage.tsx     # Banners, hero, category strip, rails/spotlight/shelves
     │       │   ├── StoreCategoryPage.tsx # Breadcrumb, subcategory chips, listing
     │       │   ├── StoreProductPage.tsx  # Gallery (zoom/swipe) + purchase card +
     │       │   │                         #   highlights/description/specs + sticky bar
@@ -1944,8 +2069,16 @@ frontend/
     │           │   ├── types.ts         # MediaDriver contract
     │           │   ├── strings.ts       # Every seller-facing word, one file
     │           │   └── icons.tsx        # Camera / video / rotate glyphs
-    │           ├── StoreAppearancePage.tsx # Colors + live preview
-    │           ├── StoreHomepagePage.tsx # Order + show/hide homepage sections
+    │           ├── builder/             # Store Builder — the one storefront workspace
+    │           │   ├── StoreBuilderPage.tsx  # Shell: header + controls + live preview,
+    │           │   │                        #   owns section state and autosave
+    │           │   ├── BuilderHeader.tsx     # Device switch, save state, Publish
+    │           │   ├── BuilderSectionList.tsx# Reorder / show / open, + pinned header & footer
+    │           │   ├── BuilderSectionEditor.tsx # Layout + title, rest under More options
+    │           │   ├── BuilderDesignPanel.tsx# Color theme + the five pickers
+    │           │   ├── BuilderPreview.tsx    # The real /store/{slug} in a scaled iframe
+    │           │   └── builderSections.ts    # One table: every control the builder offers
+    │           ├── ThemeColorFields.tsx # The five color controls + the Auto rules
     │           ├── StoreBannersPage.tsx # Promo banners: preview grid, drag to
     │           │                        #   reorder, link target, on/off
     │           ├── StoreFooterPage.tsx  # Footer manager: locations, social, info,
@@ -2238,8 +2371,8 @@ derived from it, and the secondary text is lifted to `#9a9a9a` because
   **User-typed names in the authed app** (store names on the My Stores cards,
   the "Managing …" header) still render in the body face — `font-body
   tracking-normal` on the heading element — and the **store-management
-  section headings** (`/mystores/{slug}` — Store Details, Appearance,
-  Homepage, Footer, Categories, Products and their in-card subheads) use
+  section headings** (`/mystores/{slug}` — Store Details, Business Details,
+  Categories, Products and their in-card subheads) use
   `font-body font-semibold tracking-normal`: they are workbench UI. Those
   rules predate the font swap and are kept for consistency, not because
   Manrope needs them.
@@ -2253,7 +2386,7 @@ derived from it, and the secondary text is lifted to `#9a9a9a` because
 
 The public store page is themed by the **store owner**, not by the app's
 dark/light mode. `PublicStoreLayout` calls `storeVars(theme)` (the store's
-Appearance settings, in `features/publicStore/storeTheme.ts`) to set the
+Color theme, in `features/publicStore/storeTheme.ts`) to set the
 same CSS variables (`--bg`, `--surface`, `--fg`, `--brand`, …) **on the page
 root** — neutrals derived from the background's luminance — so every
 semantic utility resolves to the store's palette while spacing / fonts /
@@ -2334,17 +2467,41 @@ and two radii.
 
 The `SKIN` object in `storeTheme.ts` maps semantic slots (`surface`, `well`,
 `chip` — all flat — plus `cta` → `btn-rise`, `ctaSheen` → `btn-sheen` and
-`ctaRing` → `btn-ring`), so storefront components stay declarative. `StoreAppearancePage` edits the two colors with a live
-mini-preview built from the same semantics, so the preview is a true
-miniature.
+`ctaRing` → `btn-ring`), so storefront components stay declarative. The Store
+Builder's Design panel edits the colors and paints the draft straight into the
+live preview frame, so what is being judged is the shop itself rather than a
+miniature of it.
 
-**Layout width.** Storefront pages are **full-bleed** like a real shop — the
-header, footer and each page's `StorePageShell` share `max-w-[1920px]` (a soft
-cap for ultrawides only) with `lg:px-10` padding, instead of a centered column.
-`<main>` itself is unpadded so the homepage's section bands can run truly
-edge-to-edge. Open-ended product grids run 2 → 3 → 4 → 5 → **6 columns (2xl)**;
-the homepage merchandising rows use the same ramp and hide the surplus per
-breakpoint, so each row is always exactly full.
+**Layout width — `features/publicStore/storeLayout.ts`.** The storefront's
+layout constants live in their own module (the header needs them and the layout
+already imports the header, so a constant shared both ways sits above both):
+
+| Constant              | What it is                                                      |
+| --------------------- | --------------------------------------------------------------- |
+| `STORE_CONTAINER`     | `max-w-[1440px]` + `px-4 sm:px-6 lg:px-10` — the ONE content column |
+| `STORE_HEADER_OFFSET` | publishes `--store-header` on the store root (`7rem`, `4.15rem` from `md`) |
+| `STICK_UNDER_HEADER`  | `top-[var(--store-header)]` — parks flush under the sticky header |
+| `SCROLL_UNDER_HEADER` | the matching `scroll-mt` for in-page anchor targets              |
+| `EDGE_SCROLLER`       | a horizontal scroller that bleeds to the screen edge on phones   |
+
+The principle is **full-width backgrounds, centered max-width content**: the
+header bar, every homepage band and the footer still paint edge to edge, and
+each puts `STORE_CONTAINER` back inside. `<main>` is unpadded so the bands can
+run truly edge-to-edge; inner pages wrap themselves in `StorePageShell`, which
+is that container plus vertical rhythm.
+
+The cap is **1440px**, which is where a 5-across row lands on ~270px cards. It
+was 1920px with the grid running to six columns, which on a 2560px monitor
+produced a wall of cards too small to read a product name in. Open-ended
+product grids now run 2 → 3 → 4 → **5 columns (xl)**; the homepage's capped
+rows use the same ramp and hide the surplus per breakpoint, so each row is
+always exactly full.
+
+Because the header is **two rows on a phone and one from `md`**, nothing
+hardcodes its height: it publishes `--store-header` and the listing sort/filter
+bar reads it. That bar must also be a *direct child* of the page column — a
+sticky element can only travel inside its parent's box, and the wrapper div it
+used to sit in was exactly as tall as the bar, so it scrolled away instantly.
 
 ---
 
@@ -2363,7 +2520,7 @@ Three small pieces make one component serve both apps:
 **1. Which API. `configureStoresApi(base)`** (`features/stores/storesApi.ts`)
 — a module-level base, set once at boot. The storefront leaves the default
 `/api/v1/stores`; `admin/main.tsx` sets `/api/v1/admin/manage/stores`.
-`configureThemeTemplatesApi` does the same for the Appearance palette list.
+`configureThemeTemplatesApi` does the same for the Color theme palette list.
 A plain module value is enough because the two apps are separate bundles with
 separate entry points and never share a runtime.
 
