@@ -57,6 +57,16 @@ export const router = createBrowserRouter([
     }),
   },
   { path: '/login', element: <LoginRoute /> },
+  // Global category landing pages — the platform's only pages about a KIND of
+  // product rather than about a shop, and so the only ones that can rank for
+  // a category term. Public, no layout wrapper (the page brings its own
+  // marketplace chrome).
+  {
+    path: '/c/:slug',
+    lazy: async () => ({
+      Component: (await import('../pages/BrowseCategoryPage')).BrowseCategoryPage,
+    }),
+  },
   // Footer links — real routes with a lightweight public placeholder, so a
   // shared link lands on "coming soon" rather than a 404/redirect.
   // `support` is NOT among them: it is a real page in the account subtree

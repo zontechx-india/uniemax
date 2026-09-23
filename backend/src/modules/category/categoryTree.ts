@@ -284,3 +284,60 @@ export async function getCategoryHeight(id: string): Promise<number> {
   };
   return height(id);
 }
+
+/**
+ * One node resolved for a **public browse page**: the node itself, its
+ * ancestors, its direct children, and every id at or beneath it.
+ *
+ * `descendantIds` is the point of this helper. A product is tagged on a leaf
+ * ("Fashion > Men > Jackets"), but the page a shopper searches for is usually
+ * higher up ("Fashion > Men"), so a browse page must match the whole branch
+ * or it shows an empty shelf under every node that is not a leaf. The
+ * taxonomy is cached in memory here, so the branch costs no query at all —
+ * the alternative, a recursive CTE per page view, would be the one expensive
+ * thing on an otherwise cheap page.
+ */
+export async function getCategoryBranch(
+  slug: string,
+  activeOnly = true,
+): Promise<{
+  node: CategoryNode;
+  children: CategoryNode[];
+  descendantIds: string[];
+} | null> {
+  const idx = await index(activeOnly);
+  const row = idx.bySlug.get(slug);
+  if (!row) return null;
+
+  const descendantIds: string[] = [];
+  const guard = new Set<string>();
+  const walk = (id: string) => {
+    if (guard.has(id)) return;
+    guard.add(id);
+    descendantIds.push(id);
+    for (const kid of idx.childrenOf.get(id) ?? []) walk(kid.id);
+  };
+  walk(row.id);
+
+  return {
+    node: toNode(row, idx, false),
+    children: (idx.childrenOf.get(row.id) ?? []).map((kid) => toNode(kid, idx, false)),
+    descendantIds,
+  };
+}
+
+/**
+ * Every node at or beneath each of several slugs, as one id set. Used by the
+ * sitemap, which asks "which taxonomy nodes are worth a URL" in one pass.
+ */
+export async function getActiveCategoryNodes(): Promise<
+  { id: string; name: string; slug: string; parentId: string | null }[]
+> {
+  const idx = await index(true);
+  return idx.rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    parentId: row.parentId,
+  }));
+}

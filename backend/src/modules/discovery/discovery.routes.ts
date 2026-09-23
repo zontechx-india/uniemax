@@ -10,4 +10,9 @@ export const publicDiscoveryRoutes: FastifyPluginAsync = async (app) => {
   app.get("/products", controller.newProducts);
   app.get("/categories", controller.popularCategories);
   app.get("/stats", controller.stats);
+  // Global category landing pages (`/c/{slug}`) — the taxonomy-wide browse
+  // surface. `/browse` (the browsable set) is static and so cannot be
+  // swallowed by `/browse/:slug`.
+  app.get("/browse", controller.browsableCategories);
+  app.get("/browse/:slug", controller.browseCategory);
 };

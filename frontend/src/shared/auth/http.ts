@@ -239,3 +239,24 @@ export async function callList<T>(
     throw toApiError(err)
   }
 }
+
+/**
+ * The **whole** success envelope, for the few endpoints that return a list
+ * plus page-level context beside it (`data` + `meta` + more). The global
+ * category pages are the case: one request has to answer the heading, the
+ * breadcrumb, the child links and the product page, and splitting that into
+ * two round trips to fit `callList` would be the tail wagging the dog.
+ *
+ * Prefer `call` / `callList`; reach for this only when the extra keys are
+ * genuinely part of the same read.
+ */
+export async function callEnvelope<T>(
+  request: Promise<{ data: T }>,
+): Promise<T> {
+  try {
+    const response = await request
+    return response.data
+  } catch (err) {
+    throw toApiError(err)
+  }
+}

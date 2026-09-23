@@ -27,3 +27,18 @@ export type SearchQuery = z.infer<typeof searchQuerySchema>;
 export const newProductsQuerySchema = paginationQuery;
 
 export type NewProductsQuery = z.infer<typeof newProductsQuerySchema>;
+
+/**
+ * Global category browsing (`GET /public/browse/:slug`) — the `/c/{slug}`
+ * landing pages.
+ *
+ * Sorting is limited to what the denormalised columns can answer without a
+ * join (`createdAt`, `priceMin`). There is deliberately no "relevance" or
+ * "popularity": neither exists as data yet, and an option that silently falls
+ * back to newest is worse than no option.
+ */
+export const browseQuerySchema = paginationQuery.extend({
+  sort: z.enum(["newest", "priceAsc", "priceDesc"]).default("newest"),
+});
+
+export type BrowseQuery = z.infer<typeof browseQuerySchema>;
