@@ -103,3 +103,41 @@ function toParagraphs(lines: string[]): string[] {
   if (current.length) paragraphs.push(current.join('\n'))
   return paragraphs
 }
+
+/**
+ * The `<meta name="description">` / `og:description` line for a product page.
+ *
+ * Google shows this verbatim as the result snippet, so it is written for a
+ * shopper scanning a results list, not as a dump of the first 160 characters
+ * of whatever the seller typed. Preference order:
+ *
+ *  1. the seller's own prose — it is the only text written about THIS product;
+ *  2. their highlight bullets, joined — prose is absent but selling points
+ *     were still written;
+ *  3. a composed line from the facts the catalog always has (name, category,
+ *     store, price), because an absent description is far worse for a snippet
+ *     than a plain factual one, and most drafts ship with no description.
+ *
+ * The price is deliberately included in the fallback: a snippet carrying a
+ * number earns clicks against ones that do not.
+ */
+export function productMetaDescription(
+  product: {
+    name: string
+    description: string | null
+    price: string | null
+    category: { name: string }
+  },
+  storeName: string,
+  formatPrice: (price: string | number) => string,
+): string {
+  const parsed = parseDescription(product.description)
+  const prose = parsed.paragraphs.join(' ').trim()
+  if (prose) return prose
+
+  const highlights = parsed.highlights.join('. ').trim()
+  if (highlights) return highlights
+
+  const price = product.price ? ` from ${formatPrice(product.price)}` : ''
+  return `Buy ${product.name}${price} — ${product.category.name} from ${storeName} on UnieMax. Order online with delivery or store pickup.`
+}

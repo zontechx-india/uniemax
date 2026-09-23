@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { usePageTitle } from '../../shared/usePageTitle'
+import { usePrivatePageTitle } from '../../shared/seo'
 import { TicketThread } from '../features/support/TicketThread'
 import { ArrowLeftIcon } from '../layout/icons'
 
@@ -9,7 +9,7 @@ import { ArrowLeftIcon } from '../layout/icons'
  * (`features/support/TicketThread`); all this page owns is where "back" goes.
  */
 export function SupportTicketPage() {
-  usePageTitle('Support ticket')
+  usePrivatePageTitle('Support ticket')
 
   return (
     <div className="mx-auto max-w-3xl">

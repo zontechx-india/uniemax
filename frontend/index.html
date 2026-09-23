@@ -4,7 +4,44 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/app_logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>UnieMax</title>
+    <title>UnieMax — Online Shops You Can Buy From Directly</title>
+
+    <!--
+      STATIC SEO/social defaults. This is a client-rendered SPA, so these
+      tags are the only ones a crawler that does not run JavaScript ever
+      sees — which is every social-link scraper (WhatsApp, Instagram,
+      Facebook, X, Slack) and most non-Google search crawlers.
+
+      `shared/seo.ts` rewrites all of them per route once React mounts, so
+      Googlebot's rendering pass gets the real per-store/per-product values.
+      What is written HERE is the fallback the first byte carries: it must
+      therefore describe the PLATFORM, never a page.
+
+      Serving per-page tags in the first byte needs the HTML shell to be
+      built per request — see docs/BACKEND_CONTEXT.md (SEO). Until that
+      lands, a shared store link previews as UnieMax rather than as blank.
+    -->
+    <meta
+      name="description"
+      content="Discover independent online shops on UnieMax and order directly from the seller — clothing, sports gear, electronics, groceries and more, with cash on delivery or secure online payment."
+    />
+    <meta name="robots" content="index, follow" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="UnieMax" />
+    <meta property="og:title" content="UnieMax — Online Shops You Can Buy From Directly" />
+    <meta
+      property="og:description"
+      content="Discover independent online shops on UnieMax and order directly from the seller."
+    />
+    <meta property="og:image" content="/app_logo_with_name.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="UnieMax — Online Shops You Can Buy From Directly" />
+    <meta
+      name="twitter:description"
+      content="Discover independent online shops on UnieMax and order directly from the seller."
+    />
+    <meta name="twitter:image" content="/app_logo_with_name.png" />
 
     <!--
       Installable app (PWA). Without the manifest below, Chrome offers only

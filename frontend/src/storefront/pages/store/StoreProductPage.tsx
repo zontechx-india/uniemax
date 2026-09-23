@@ -14,7 +14,12 @@ import {
   StorePageShell,
   usePublicStore,
 } from '../../features/publicStore/PublicStoreLayout'
-import { usePageTitle } from '../../../shared/usePageTitle'
+import { useSeo } from '../../../shared/seo'
+import {
+  breadcrumbJsonLd,
+  categoryTrail,
+  productJsonLd,
+} from '../../features/publicStore/structuredData'
 import { trackViewContent } from '../../../shared/analytics/metaPixel'
 import { ProductGrid } from '../../features/publicStore/ProductCard'
 import { ShareButton } from '../../features/publicStore/ShareButton'
@@ -31,6 +36,7 @@ import {
 } from '../../features/publicStore/ListingControls'
 import {
   parseDescription,
+  productMetaDescription,
   type ProductSpec,
 } from '../../features/publicStore/productDescription'
 import { OptionPicker } from '../../features/publicStore/OptionPicker'
@@ -77,13 +83,60 @@ import type { Skin } from '../../features/publicStore/storeTheme'
 /** Highlights shown inside the purchase card before the section takes over. */
 const CARD_HIGHLIGHTS = 4
 
+/**
+ * The page's head: title, snippet, canonical, social card and the `Product` +
+ * `BreadcrumbList` structured data.
+ *
+ * It lives on `StoreProductPage` rather than on `ProductDetail` below because
+ * React flushes child effects before parent ones — written on the child, the
+ * parent's own head write would run afterwards and overwrite it.
+ *
+ * Two things are deliberately `noindex`:
+ *  - the **owner draft preview** (`store.isPublished === false`), which is a
+ *    page only its owner can see and must never reach a results list;
+ *  - a **missing product**, because the SPA fallback answers 200 for a dead
+ *    slug. Until the shell is rendered per request there is no way to send a
+ *    real 404, and an indexed "Product not found" page is worse than none.
+ */
+function useProductSeo(
+  store: PublicStore,
+  product: PublicProductDetail | null | undefined,
+) {
+  const description = product
+    ? productMetaDescription(product, store.name, formatPrice)
+    : null
+  const draft = !store.isPublished
+
+  useSeo({
+    title: product ? [product.name, store.name] : [store.name],
+    description,
+    canonical: product ? storeProductUrl(store.slug, product.slug) : null,
+    image: product?.media.find((item) => item.type === 'IMAGE')?.url ?? store.logoUrl,
+    type: 'product',
+    robots: draft || product === null ? 'noindex, follow' : null,
+    jsonLd:
+      product && !draft
+        ? [
+            productJsonLd(store, product, description),
+            breadcrumbJsonLd(store, [
+              ...categoryTrail(store.slug, product.category),
+              {
+                name: product.name,
+                path: storeProductUrl(store.slug, product.slug),
+              },
+            ]),
+          ]
+        : null,
+  })
+}
+
 export function StoreProductPage() {
   const { store, skin } = usePublicStore()
   const { productSlug = '' } = useParams()
   const [product, setProduct] = useState<
     PublicProductDetail | null | undefined
   >(undefined)
-  usePageTitle(product?.name, store.name)
+  useProductSeo(store, product)
 
   useEffect(() => {
     let cancelled = false

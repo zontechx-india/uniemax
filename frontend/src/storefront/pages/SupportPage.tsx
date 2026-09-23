@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { usePageTitle } from '../../shared/usePageTitle'
+import { usePrivatePageTitle } from '../../shared/seo'
 import { toApiError } from '../../shared/auth/http'
 import { useCustomerSession } from '../app/sessionContext'
 import { NewTicketForm } from '../features/support/NewTicketForm'
@@ -28,7 +28,7 @@ import { PlusIcon } from '../layout/icons'
  * a customer↔seller channel is a separate feature.
  */
 export function SupportPage() {
-  usePageTitle('Help & Support')
+  usePrivatePageTitle('Help & Support')
 
   const { customer } = useCustomerSession()
   const [tickets, setTickets] = useState<SupportTicket[] | null>(null)

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { usePageTitle } from '../../../shared/usePageTitle'
+import { usePrivatePageTitle } from '../../../shared/seo'
 import { Button, buttonClass } from '../../../shared/ui/Button'
 import { trackPurchase } from '../../../shared/analytics/metaPixel'
 import { toApiError } from '../../../shared/auth/http'
@@ -39,7 +39,7 @@ export function OrderSuccessPage({
   const [pollTick, setPollTick] = useState(0)
   const [retrying, setRetrying] = useState(false)
   const [retryError, setRetryError] = useState<string | null>(null)
-  usePageTitle('Order Placed', order?.storeName ?? shell?.name)
+  usePrivatePageTitle('Order Placed', order?.storeName ?? shell?.name)
 
   useEffect(() => {
     setOrder(undefined)

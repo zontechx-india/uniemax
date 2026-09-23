@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { usePageTitle } from '../../shared/usePageTitle'
+import { usePrivatePageTitle } from '../../shared/seo'
 import { call, http, toApiError } from '../../shared/auth/http'
 import { formatPrice, storeHomeUrl } from '../features/stores/storesApi'
 import type { PlacedOrder } from '../features/stores/storesApi'
@@ -31,7 +31,7 @@ function formatDate(iso: string): string {
 }
 
 export function OrdersPage() {
-  usePageTitle('My Orders')
+  usePrivatePageTitle('My Orders')
 
   const [orders, setOrders] = useState<PlacedOrder[] | null>(null)
   const [error, setError] = useState<string | null>(null)

@@ -4,14 +4,50 @@ import {
   publicStoreApi,
   storeCategoryUrl,
   type PublicCategoryDetail,
+  type PublicStore,
 } from '../../features/stores/storesApi'
 import {
   StorePageShell,
   usePublicStore,
 } from '../../features/publicStore/PublicStoreLayout'
-import { usePageTitle } from '../../../shared/usePageTitle'
+import { useSeo } from '../../../shared/seo'
+import {
+  breadcrumbJsonLd,
+  categoryTrail,
+} from '../../features/publicStore/structuredData'
 import { ProductListing } from '../../features/publicStore/ProductListing'
 import type { Crumb } from '../../features/publicStore/ListingControls'
+
+/**
+ * A category page is the shop's best shot at a "<thing> in <shop>" query, so
+ * its snippet names what is actually on the shelf — the subcategories when it
+ * has them, the product count when it does not. Both come free from the
+ * payload the page already fetches.
+ */
+function useCategorySeo(
+  store: PublicStore,
+  categorySlug: string,
+  category: PublicCategoryDetail | null | undefined,
+) {
+  const children = category?.subcategories.map((sub) => sub.name).join(', ') ?? ''
+  const draft = !store.isPublished
+
+  useSeo({
+    title: category ? [category.name, store.name] : [store.name],
+    description: category
+      ? children
+        ? `${category.name} at ${store.name} — ${children}. Order online with delivery or store pickup on UnieMax.`
+        : `Shop ${category.name} at ${store.name} on UnieMax. Order online with delivery or store pickup.`
+      : null,
+    canonical: storeCategoryUrl(store.slug, categorySlug),
+    image: store.logoUrl,
+    robots: draft || category === null ? 'noindex, follow' : null,
+    jsonLd:
+      category && !draft
+        ? breadcrumbJsonLd(store, categoryTrail(store.slug, category))
+        : null,
+  })
+}
 
 /**
  * `/store/{storeSlug}/category/{categorySlug}` — a dedicated page per
@@ -26,7 +62,7 @@ export function StoreCategoryPage() {
   const [category, setCategory] = useState<
     PublicCategoryDetail | null | undefined
   >(undefined)
-  usePageTitle(category?.name, store.name)
+  useCategorySeo(store, categorySlug, category)
 
   useEffect(() => {
     let cancelled = false

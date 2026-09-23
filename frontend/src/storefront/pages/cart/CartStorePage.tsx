@@ -5,7 +5,7 @@ import { storeVars } from '../../features/publicStore/storeTheme'
 import { useStoreShell } from '../../features/publicStore/useStoreShells'
 import { cartUrl, formatPrice, storeHomeUrl } from '../../features/stores/storesApi'
 import { useGoBack } from '../../../shared/useGoBack'
-import { usePageTitle } from '../../../shared/usePageTitle'
+import { usePrivatePageTitle } from '../../../shared/seo'
 import { buttonClass } from '../../../shared/ui/Button'
 import {
   ArrowLeftIcon,
@@ -34,7 +34,7 @@ export function CartStorePage({ storeSlug }: { storeSlug: string }) {
   const revalidation = useCartRevalidation(storeSlug)
   const shell = useStoreShell(storeSlug)
   const group = groupByStore(items).find((g) => g.storeSlug === storeSlug)
-  usePageTitle('Cart', group?.storeName)
+  usePrivatePageTitle('Cart', group?.storeName)
   const goBack = useGoBack(cartUrl(storeSlug))
 
   return (

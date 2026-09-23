@@ -1,7 +1,11 @@
 import { useSearchParams } from 'react-router-dom'
-import { SECTION_TITLES, type PublicSection } from '../../features/stores/storesApi'
+import {
+  SECTION_TITLES,
+  storeShopUrl,
+  type PublicSection,
+} from '../../features/stores/storesApi'
 import { usePublicStore } from '../../features/publicStore/PublicStoreLayout'
-import { usePageTitle } from '../../../shared/usePageTitle'
+import { useSeo } from '../../../shared/seo'
 import { ProductListing } from '../../features/publicStore/ProductListing'
 
 /**
@@ -30,10 +34,28 @@ export function StoreShopPage() {
     : section
       ? SECTION_TITLES[section]
       : 'All Products'
-  usePageTitle(
-    q ? `Search “${q}”` : section ? SECTION_TITLES[section] : 'Shop',
-    store.name,
-  )
+  // One route, three scopes — and only the unscoped one is a destination.
+  //
+  // `?q=` results and `?section=` rows re-list products their category pages
+  // already list, so indexing them would put near-identical pages in
+  // competition with each other for the same terms. They therefore canonical
+  // to bare `/shop` and carry `noindex, follow`: Google drops the duplicate
+  // but still walks through to every product linked from it, which is exactly
+  // what a listing page is worth to a crawler.
+  const scoped = Boolean(q || section)
+
+  useSeo({
+    title: [
+      q ? `Search “${q}”` : section ? SECTION_TITLES[section] : 'Shop',
+      store.name,
+    ],
+    description: scoped
+      ? null
+      : `Browse every product from ${store.name} on UnieMax — order online with delivery or store pickup.`,
+    canonical: storeShopUrl(store.slug),
+    image: store.logoUrl,
+    robots: scoped || !store.isPublished ? 'noindex, follow' : null,
+  })
 
   return (
     <ProductListing

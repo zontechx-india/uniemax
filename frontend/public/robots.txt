@@ -1,0 +1,38 @@
+# UnieMax — https://uniemax.com
+#
+# The indexable surface is the marketplace homepage and the public
+# storefronts (/store/**). Everything disallowed below is either
+# per-customer, a console, or a duplicate of a page that is already
+# indexable — crawling it only spends budget the store pages need.
+
+User-agent: *
+Allow: /
+
+# Per-session / per-customer. Never a useful search result.
+Disallow: /cart
+Disallow: /checkout/
+Disallow: /order/
+Disallow: /login
+Disallow: /orders
+Disallow: /profile
+Disallow: /addresses
+Disallow: /notifications
+Disallow: /support
+
+# Seller store management + the platform console (a second SPA at /admin).
+Disallow: /mystores
+Disallow: /stores
+Disallow: /admin
+
+# Affiliate short links are tracked redirects, not content.
+Disallow: /a/
+Disallow: /affiliate
+
+# In-store search results list products the category pages already link,
+# so they add duplicates without adding a single new destination.
+Disallow: /*?q=
+
+# Served by the API (same origin through the nginx /api proxy), so it needs
+# no extra nginx location. A sitemap declared here is read for the whole
+# host regardless of the path it sits at.
+Sitemap: https://uniemax.com/api/v1/public/sitemap.xml

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { usePageTitle } from '../../shared/usePageTitle'
+import { usePrivatePageTitle } from '../../shared/seo'
 import { toApiError } from '../../shared/auth/http'
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
 import { ErrorNote, SuccessNote } from '../../shared/ui/form'
@@ -25,7 +25,7 @@ import {
 const MAX_ADDRESSES = 10
 
 export function AddressesPage() {
-  usePageTitle('Saved Addresses')
+  usePrivatePageTitle('Saved Addresses')
 
   const [addresses, setAddresses] = useState<CustomerAddress[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)

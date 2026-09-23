@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { usePageTitle } from '../../shared/usePageTitle'
+import { usePrivatePageTitle } from '../../shared/seo'
 import type { Customer } from '../../shared/auth/authApi'
 import { VerifyPhoneForm } from '../../shared/auth/VerifyPhoneForm'
 import { SuccessNote, PhoneIcon } from '../../shared/ui/form'
@@ -18,7 +18,7 @@ import { CheckIcon, MailIcon, PhoneCallIcon } from '../layout/icons'
  * verified linking flow, never a plain edit).
  */
 export function ProfilePage() {
-  usePageTitle('My Profile')
+  usePrivatePageTitle('My Profile')
 
   const { customer } = useCustomerSession()
   // Linking changes the customer record; push the fresh copy into the

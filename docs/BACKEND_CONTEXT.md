@@ -125,6 +125,12 @@ backend/
 │   │   │                      #   (GET /orders) + seller dashboard
 │   │   │                      #   (GET /stores/:id/dashboard)
 │   │   ├── discovery/         # marketplace: global search + platform stats
+│   │   │                      #   + browse.service.ts — the GLOBAL category
+│   │   │                      #   landing pages (/c/{slug}), aggregated
+│   │   │                      #   across stores via globalCategoryId
+│   │   ├── seo/               # XML sitemaps (index · marketplace · per store)
+│   │   │                      #   — the one public surface answering XML, not
+│   │   │                      #   the JSON envelope. 1 h in-process cache.
 │   │   ├── notifications/     # feed + push subscriptions (one handler set,
 │   │   │                      #   guard picks the principal) + notify()/
 │   │   │                      #   notifyAdmins() dispatch + admin broadcast
@@ -1423,6 +1429,41 @@ capped per group; category/product hits carry their owning store) and
 `GET /public/stats` (60 s in-process cache). All three reuse the storefront's
 exported `PUBLIC_PRODUCT_VISIBILITY` rule (`publicStore.service.ts`), so
 discovery can never surface what a store page would hide.
+
+Also done: **global category pages** — `modules/discovery/browse.service.ts`
+serves `GET /public/browse` (every taxonomy node with something in it) and
+`GET /public/browse/:slug` (one `/c/{slug}` landing page), aggregating
+products across every published store through `StoreProduct.globalCategoryId`.
+This is the platform's only surface addressed by a *kind of product* rather
+than by a shop, and so the only one that can rank for a category term:
+everything else lives at `/store/{slug}/…`, which is right for shopping and
+useless for search, since nobody googles a shop they have never heard of.
+Branch matching (the node **and** its descendants) comes from
+`getCategoryBranch` in `category/categoryTree.ts`, resolved out of that
+module's in-memory taxonomy cache — a recursive CTE per page view would be
+the one expensive thing on an otherwise cheap page.
+
+Also done: **sitemaps** — `modules/seo` serves an XML sitemap index, a
+marketplace file, a category file and one file per published store under
+`/api/v1/public`
+(see `API.md` → Sitemaps). A marketplace cannot rely on link-crawling to
+expose its catalog: a product sits three clicks down behind a Load-More
+listing, so a crawler reaches the newest handful in a store and stops. The
+sitemap is how the rest is discovered, and `lastmod` is what gets a price
+change re-crawled. Reuses the same visibility predicates as discovery, and
+additionally drops `hideFromSearch` products. Cached 1 h in process; the
+`<loc>` origin comes from `PUBLIC_WEB_URL` or the request's own host.
+
+**Not yet: per-request HTML.** The frontend is a client-rendered SPA, so
+`index.html` is byte-identical for every URL — meaning per-page `<title>`,
+description, canonical, Open Graph and JSON-LD reach Googlebot (it renders
+JS) but **not** social-link scrapers or most non-Google crawlers, which never
+execute JS. Closing that needs the shell built per request: a handler that
+reads `dist/index.html`, calls the existing public store/product services and
+injects the head tags (plus a real `404` for a dead slug, which the nginx SPA
+fallback currently answers `200` to), with nginx routing HTML navigations
+under `/store` to it. The client-side resolution already lives in
+`frontend/src/shared/seo.ts` in the shape such a renderer would emit.
 
 Also done: **orders** — `modules/orders` places per-store orders from the
 storefront checkout (**signed-in customers only** — placement runs behind

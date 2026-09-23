@@ -1,19 +1,10 @@
-import { useEffect } from 'react'
-
-const APP_NAME = 'UnieMax'
-
 /**
- * Per-page `document.title` (IMPROVEMENTS item: every page shared one SPA
- * title). Pass the most specific part first — undefined/empty parts are
- * skipped, so loading states can pass `undefined` and refine once data
- * arrives: `usePageTitle(product?.name, store.name)`.
+ * Kept as its own module because ~20 screens import `usePageTitle` from here.
+ * The implementation moved to `seo.ts`, which manages the whole head (title,
+ * description, canonical, robots, social cards, JSON-LD) rather than the
+ * title alone.
  *
- * SPA-only: crawlers that don't run JS still see the static title; real
- * OG/meta tags wait for SSR/prerender.
+ * New code should import `useSeo` from `./seo` directly; `usePageTitle` is
+ * the title-only shorthand for pages that have nothing else to say.
  */
-export function usePageTitle(...parts: (string | undefined | null)[]) {
-  const title = parts.filter(Boolean).join(' · ')
-  useEffect(() => {
-    document.title = title ? `${title} · ${APP_NAME}` : APP_NAME
-  }, [title])
-}
+export { usePageTitle, useSeo, applySeo, type SeoOptions } from './seo'

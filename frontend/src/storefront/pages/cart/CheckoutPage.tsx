@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useGoBack } from '../../../shared/useGoBack'
-import { usePageTitle } from '../../../shared/usePageTitle'
+import { usePrivatePageTitle } from '../../../shared/seo'
 import { trackInitiateCheckout } from '../../../shared/analytics/metaPixel'
 import { toApiError } from '../../../shared/auth/http'
 import { ErrorNote } from '../../../shared/ui/form'
@@ -69,7 +69,7 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
   const revalidation = useCartRevalidation(storeSlug)
   const shell = useStoreShell(storeSlug)
   const group = groupByStore(items).find((g) => g.storeSlug === storeSlug)
-  usePageTitle('Place Order', group?.storeName ?? shell?.name)
+  usePrivatePageTitle('Place Order', group?.storeName ?? shell?.name)
   const navigate = useNavigate()
   const goBack = useGoBack(cartUrl(storeSlug))
 

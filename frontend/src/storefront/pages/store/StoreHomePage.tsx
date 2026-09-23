@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   publicStoreApi,
   storeCategoryUrl,
+  storeHomeUrl,
   storeShopUrl,
   type PublicCategory,
   type PublicCategoryRow,
@@ -19,7 +20,8 @@ import {
   SCROLL_UNDER_HEADER,
   STORE_CONTAINER,
 } from '../../features/publicStore/storeLayout'
-import { usePageTitle } from '../../../shared/usePageTitle'
+import { useSeo } from '../../../shared/seo'
+import { storeJsonLd } from '../../features/publicStore/structuredData'
 import { PRODUCT_GRID, ProductCard } from '../../features/publicStore/ProductCard'
 import {
   EmptyCatalog,
@@ -151,9 +153,46 @@ type HomeSectionEntry = PublicStoreHome['sections'][number]
  * into that category's own page) and **All Products** (newest, "View all" into
  * Shop). Both are ordinary sections the owner can reorder or hide.
  */
+/**
+ * The storefront's front door, and the URL a seller actually shares — so it
+ * is the one page that has to win a search for the shop's own name.
+ *
+ * Its snippet is the seller's own About text when they wrote one; otherwise a
+ * line composed from what every store has (its name and its shelves), because
+ * "UnieMax" repeated under every result teaches Google nothing about which
+ * shop is which.
+ *
+ * The `Store` / `Organization` block is what carries the address, phone, map
+ * pin and social profiles the owner already filled into Footer management
+ * into Google's hands — the only part of this that can earn local results.
+ */
+function useStoreHomeSeo(store: PublicStore) {
+  const shelves = store.categories
+    .slice(0, 6)
+    .map((category) => category.name)
+    .join(', ')
+
+  useSeo({
+    title: [store.name],
+    description:
+      store.footer.info.about ||
+      (shelves
+        ? `Shop ${shelves} at ${store.name} on UnieMax. Order online with delivery or store pickup.`
+        : `Shop ${store.name} on UnieMax — order online with delivery or store pickup.`),
+    canonical: storeHomeUrl(store.slug),
+    image: store.logoUrl,
+    // An unpublished store is a private draft its owner is previewing. It
+    // resolves for them and 404s for everyone else, so it must never be a
+    // result — and it is the one storefront page a signed-in owner reaches
+    // most often, so the guard belongs here as much as on the product page.
+    robots: store.isPublished ? null : 'noindex, follow',
+    jsonLd: store.isPublished ? storeJsonLd(store) : null,
+  })
+}
+
 export function StoreHomePage() {
   const { store, skin } = usePublicStore()
-  usePageTitle(store.name)
+  useStoreHomeSeo(store)
   const [home, setHome] = useState<PublicStoreHome | null | undefined>(undefined)
   // A save in the Store Builder repaints the preview in place — see
   // `builderBridge`. Outside the builder this never fires.

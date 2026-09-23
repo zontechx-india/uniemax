@@ -18,6 +18,7 @@ import {
   adminThemeTemplateRoutes,
 } from "./modules/themeTemplates/themeTemplates.routes.js";
 import { publicDiscoveryRoutes } from "./modules/discovery/discovery.routes.js";
+import { publicSeoRoutes } from "./modules/seo/seo.routes.js";
 import {
   adminBannerRoutes,
   publicBannerRoutes,
@@ -86,6 +87,10 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       await api.register(publicOrderRoutes, { prefix: "/public/stores" });
       // Marketplace discovery — global search + platform stats (homepage).
       await api.register(publicDiscoveryRoutes, { prefix: "/public" });
+      // XML sitemaps for the storefronts. Under /public so the existing nginx
+      // /api proxy serves them without a new location block on every vhost —
+      // frontend/public/robots.txt points a crawler at the index.
+      await api.register(publicSeoRoutes, { prefix: "/public" });
       // Marketplace homepage banners — anonymous read of the active set.
       await api.register(publicBannerRoutes, { prefix: "/public/banners" });
       // Payment gateway callbacks (Cashfree webhook — signature-guarded).

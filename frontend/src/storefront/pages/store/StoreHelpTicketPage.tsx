@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { usePageTitle } from '../../../shared/usePageTitle'
+import { usePrivatePageTitle } from '../../../shared/seo'
 import {
   usePublicStore,
   StorePageShell,
@@ -18,7 +18,7 @@ import { ArrowLeftIcon } from '../../layout/icons'
  */
 export function StoreHelpTicketPage() {
   const { store } = usePublicStore()
-  usePageTitle('Support request', store.name)
+  usePrivatePageTitle('Support request', store.name)
 
   return (
     <StorePageShell className="max-w-3xl">

@@ -7,7 +7,7 @@ import { storeVars } from '../../features/publicStore/storeTheme'
 import { useStoreShells } from '../../features/publicStore/useStoreShells'
 import { formatPrice, storeHomeUrl } from '../../features/stores/storesApi'
 import type { PublicStore } from '../../features/stores/storesApi'
-import { usePageTitle } from '../../../shared/usePageTitle'
+import { usePrivatePageTitle } from '../../../shared/seo'
 import { buttonClass } from '../../../shared/ui/Button'
 import { ArrowLeftIcon, CartIcon, ChevronRightIcon } from '../../layout/icons'
 import { CartLine } from './CartLine'
@@ -89,7 +89,7 @@ export function CartPage() {
     ? otherGroups.reduce((sum, g) => sum + g.itemCount, 0)
     : 0
 
-  usePageTitle('Your Cart', scoped ? focusGroup.storeName : undefined)
+  usePrivatePageTitle('Your Cart', scoped ? focusGroup.storeName : undefined)
 
   return (
     <div
