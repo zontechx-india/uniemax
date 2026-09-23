@@ -1,4 +1,4 @@
-import { call, callList, http } from '../../../shared/auth/http'
+import { call, callEnvelope, callList, http } from '../../../shared/auth/http'
 import type { ListMeta } from '../../../shared/auth/http'
 
 /**
@@ -19,6 +19,11 @@ export interface MarketStore {
   publishedAt: string | null
   /** Publicly visible products in the store. */
   productCount: number
+  /**
+   * Names of the store's first couple of **top-level** shelves — what the card
+   * says the shop sells. Empty for a store with no active categories.
+   */
+  categories: string[]
   /** Cover images of the newest visible products (max 4) — the card strip. */
   previewImages: string[]
 }
@@ -99,6 +104,37 @@ export interface MarketBanner {
   external: boolean
 }
 
+
+/**
+ * A node on the GLOBAL taxonomy that has something to sell — a `/c/{slug}`
+ * landing page. Unlike `PopularCategory` (which aggregates category *names*
+ * typed per store), this is a real taxonomy node with a stable slug, so it
+ * can be linked, crawled and ranked.
+ */
+export interface BrowsableCategory {
+  name: string
+  slug: string
+  /** Products at or beneath this node, across every published store. */
+  productCount: number
+}
+
+/** One `/c/{slug}` landing page. */
+export interface BrowseCategoryPage {
+  category: {
+    id: string
+    name: string
+    slug: string
+    /** Root first, this node LAST — the breadcrumb. */
+    path: { name: string; slug: string }[]
+  }
+  /** Direct children that have something in them, each with its own count. */
+  children: { name: string; slug: string; productCount: number }[]
+  products: MarketProduct[]
+  meta: ListMeta
+}
+
+export type BrowseSort = 'newest' | 'priceAsc' | 'priceDesc'
+
 export const discoveryApi = {
   /**
    * Active marketplace banners, in admin order (homepage carousel). Managed
@@ -144,5 +180,46 @@ export const discoveryApi = {
   /** Marketplace trust counters. */
   async stats(): Promise<PlatformStats> {
     return call<PlatformStats>(http.get(`${PUBLIC}/stats`))
+  },
+
+  /**
+   * Every global-taxonomy node with something in it, biggest first — the
+   * homepage category links and the set of `/c/{slug}` pages that exist.
+   */
+  async browsableCategories(): Promise<BrowsableCategory[]> {
+    return call<BrowsableCategory[]>(http.get(`${PUBLIC}/browse`))
+  },
+
+  /**
+   * One `/c/{slug}` landing page. Throws (404) for an unknown or empty-branch
+   * slug, which the page turns into a "category not found" view.
+   *
+   * The envelope carries `category` and `children` alongside the usual
+   * `data` / `meta`, so one request renders the whole page — heading,
+   * breadcrumb, child links and the product grid.
+   */
+  async browseCategory(
+    slug: string,
+    query: { page?: number; pageSize?: number; sort?: BrowseSort } = {},
+  ): Promise<BrowseCategoryPage> {
+    const params = new URLSearchParams()
+    if (query.page) params.set('page', String(query.page))
+    if (query.pageSize) params.set('pageSize', String(query.pageSize))
+    if (query.sort) params.set('sort', query.sort)
+    const qs = params.toString()
+    const envelope = await callEnvelope<{
+      data: MarketProduct[]
+      meta: ListMeta
+      category: BrowseCategoryPage['category']
+      children: BrowseCategoryPage['children']
+    }>(
+      http.get(`${PUBLIC}/browse/${encodeURIComponent(slug)}${qs ? `?${qs}` : ''}`),
+    )
+    return {
+      category: envelope.category,
+      children: envelope.children,
+      products: envelope.data,
+      meta: envelope.meta,
+    }
   },
 }

@@ -215,12 +215,24 @@ function shapeListProduct(row: ListProductRow) {
 const STORE_PREVIEW_IMAGES = 4;
 
 /**
+ * How many top-level shelves a marketplace store card names.
+ *
+ * Two, because the card has one line for them and the point is to say what
+ * KIND of shop this is, not to list its catalog: "Poorvika", "MotoCore" and
+ * "ZUNO HUB" are names a shopper cannot decode, and "Mobiles · Accessories"
+ * under one of them is the whole difference between a card worth clicking and
+ * a logo.
+ */
+const STORE_CARD_CATEGORIES = 2;
+
+/**
  * Published stores, newest publish first. Card-sized payload: branding plus
- * a taste of the catalog — the visible-product count and up to
- * `STORE_PREVIEW_IMAGES` cover thumbnails — so a marketplace card can show
- * real merchandise without shipping catalog data. Both use
- * `PUBLIC_PRODUCT_VISIBILITY`, so the card never previews (or counts)
- * anything the store page would hide.
+ * a taste of the catalog — the visible-product count, up to
+ * `STORE_PREVIEW_IMAGES` cover thumbnails and the names of its first couple of
+ * shelves — so a marketplace card can show real merchandise, and say what kind
+ * of shop it is, without shipping catalog data. Products use
+ * `PUBLIC_PRODUCT_VISIBILITY`, so the card never previews (or counts) anything
+ * the store page would hide, and only **active** shelves are named.
  */
 export async function listPublicStores(query: PublicStoreListQuery) {
   const where: Prisma.StoreWhereInput = { ...PUBLIC_STORE_VISIBILITY };
@@ -236,6 +248,15 @@ export async function listPublicStores(query: PublicStoreListQuery) {
         logoKey: true,
         publishedAt: true,
         _count: { select: { products: { where: PUBLIC_PRODUCT_VISIBILITY } } },
+        // Top-level shelves only: a card says "Fashion", not "Fashion ›
+        // Women › Sarees". Ordered the way the owner ordered them, so the
+        // shelf they lead with is the one the card names.
+        categories: {
+          where: { parentId: null, isActive: true },
+          orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+          take: STORE_CARD_CATEGORIES,
+          select: { name: true },
+        },
         // Newest visible products that HAVE a photo — each contributes its
         // cover image to the card's preview strip.
         products: {
@@ -267,10 +288,11 @@ export async function listPublicStores(query: PublicStoreListQuery) {
 
   return {
     total,
-    stores: rows.map(({ logoKey, _count, products, ...store }) => ({
+    stores: rows.map(({ logoKey, _count, products, categories, ...store }) => ({
       ...store,
       logoUrl: mediaUrl("logo", logoKey),
       productCount: _count.products,
+      categories: categories.map((category) => category.name),
       previewImages: products
         .map((p) => mediaUrl("media", p.media[0]?.key ?? null))
         .filter((url): url is string => url !== null),

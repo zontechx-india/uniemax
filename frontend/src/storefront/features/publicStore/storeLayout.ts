@@ -16,9 +16,12 @@
  * revision capped at 1920px and let the grid run to six columns — on a 2560px
  * monitor that produced a wall of tiny cards and headline measures nobody
  * reads across.
+ *
+ * Re-exported rather than declared: the marketplace homepage reads the same
+ * constant from `layout/contentWidth`, so the shop and the marketplace around
+ * it can never again be capped at two different widths.
  */
-export const STORE_CONTAINER =
-  'mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-10'
+export { CONTENT_COLUMN as STORE_CONTAINER } from '../../layout/contentWidth'
 
 /**
  * Height of the sticky header, published as a CSS variable on the store root

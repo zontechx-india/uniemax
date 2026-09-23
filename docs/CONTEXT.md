@@ -609,7 +609,17 @@ Future releases add: automatic Cashfree refunds on cancellation (today a
 paid order's refund is executed from the Cashfree dashboard),
 shipping-charge rules, customer-side order tracking/cancellation,
 dedicated store policy pages (policy links are already supported in
-the footer), SEO settings, and additional configuration. (Footer/business
+the footer), and additional configuration.
+
+**SEO still to come**, on top of what has landed (see Non-Functional
+Requirements): per-request HTML so link previews and non-Google crawlers see
+real tags; **seller-editable SEO fields** — a meta title, description and
+share image per store and per product, with a live result preview, sensible
+auto-generated defaults and a home in the Store Builder; a crawlable
+`/search?q=` results page (global search is still a dropdown with no URL);
+a **product feed** for Google Merchant Center and the Meta catalog; and a
+**seller-facing taxonomy prompt**, since a product left untagged on the
+global taxonomy cannot appear on any `/c/{slug}` page. (Footer/business
 info, bank accounts, payment + shipping + checkout settings, customer
 addresses, order placement, and seller order management — confirm → pack
 → ship → deliver + pre-shipment cancellation — have all landed.)
@@ -625,28 +635,56 @@ The platform's public entry point (full spec: `HomePage_mpv.md`) — a
 `/store/{storeSlug}`. Public for guests and signed-in customers alike;
 sign-in moved to its own `/login` page.
 
+It is written for the marketplace as it **is**, not as it will be. Two rules
+follow from that, and they decide most of what is on the page:
+
+- **Nothing counts itself out loud.** A visitor's reason to trust the platform
+  is what it guarantees — you buy straight from the seller, you can pay cash on
+  delivery, online payment goes through the gateway — and each of those is as
+  true on the third store as on the three-thousandth. A counter reading "3"
+  argues against the page it sits on.
+- **Nothing is laid out for a fullness it does not have.** Rows cap their
+  columns at the number of things actually in them, so three stores read as a
+  deliberate three-up rather than a four-up with a hole; anything whose length
+  nobody controls scrolls sideways instead of wrapping into a ragged grid.
+
+- **The opening** — the platform's own campaign banner, then one slim bar
+  carrying what the site is, a three-point trust row (straight from the seller ·
+  cash on delivery · secure online payment) and the popular categories to start
+  from. The banner is the hero; the bar explains it in a line rather than
+  competing with it.
 - **Global search** — one box searching stores, products and categories
   platform-wide (results always grouped, never mixed; category/product hits
   open inside their owning store, since categories are per-store — there is
   no global category page).
 - **Recent searches** — local to the browser, shown as chips, hidden when
   empty.
-- **New Stores** — newest **published** stores (by first-publish time),
-  shown as storefront-preview cards: a large banner from the store's own
-  products, its logo, the store name, a **star rating**, the product count
-  and a **Visit Store** button. The rating is a **placeholder** until the
-  review system exists — a store with no reviews says so rather than
-  showing invented stars. Empty state invites the visitor to be the first
-  seller.
+- **New Stores** — newest **published** stores (by first-publish time), shown
+  as **portrait** storefront-preview cards: a **mosaic of the shop's own
+  product covers**
+  (up to four — a shop is a collection, and one cropped product photo says
+  nothing about it), its logo, the store name, a **New** badge for a shop opened
+  in the last month, **what the shop sells** (its first couple of shelves —
+  "Mobiles · Accessories", because a name like "Poorvika" decodes to nothing on
+  its own) and a **Visit store** button. It deliberately does not print how many
+  products a shop has: that is the shop's number, not a reason to open it. A shop with no photos yet gets a brand-tinted panel rather than a
+  grey placeholder. Empty state invites
+  the visitor to be the first seller. There is deliberately **no star
+  rating**: with no review system, every card said "No reviews yet", which
+  reads as a verdict on the platform rather than as a space reserved for a
+  future one.
 - **Recently Viewed** — stores the visitor opened before (local snapshots,
   published stores only), hidden when empty.
 - **My Stores** — shown only to owners: status chip + Manage shortcut +
   create-another card.
-- **Become a Seller** — prominent CTA panel; the button reads "Create
-  Another Store" for existing owners, and guests pass through sign-in
-  straight to store creation.
-- **Platform stats** — published-store and visible-product counters (orders
-  join later); hidden while the platform has no published stores.
+- **Become a Seller** — prominent CTA panel: the offer and its proof points
+  on one side, **how it actually works** (create your store → add your
+  products → publish) on the other. The button reads "Create another store"
+  for existing owners, and guests pass through sign-in straight to store
+  creation.
+- **Platform stats** — published-store, product and order counters exist in
+  the API but are **not shown on the homepage**. They will be worth showing
+  when they are worth reading.
 - **Footer** — About / Privacy / Terms / Support / Contact open "coming
   soon" pages rather than dead links.
 
@@ -1130,7 +1168,18 @@ Full rules and design: [AFFILIATE.md](./AFFILIATE.md).
 
 - Responsive Website
 - Fast Loading
-- SEO Friendly
+- SEO Friendly — **partly met.** Every public page now carries its own title,
+  meta description, canonical, social card and schema.org structured data
+  (`Product`, `Store`, `BreadcrumbList`), there is a `robots.txt`, and XML
+  sitemaps expose every published store's categories and products. Two gaps
+  remain, both deliberate and both listed under Future releases below:
+  **global category pages** (`/c/{slug}`) give a search like "men's jackets"
+  a URL on this platform to rank — a page about the *category*, drawing
+  products from every published store, that hands the visitor on to whichever
+  seller stocks one. One gap remains, listed under Future releases below:
+  those head tags are written by JavaScript, so social-link scrapers
+  (WhatsApp, Instagram, Facebook) and non-Google crawlers still see only the
+  platform defaults.
 - Secure APIs
 - Image Optimization
 - Cloud Storage

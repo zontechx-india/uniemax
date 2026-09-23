@@ -1396,9 +1396,13 @@ Marketplace store **index** — published stores only, newest publish first
 (feeds the homepage "New Stores" rail). Ordered by `publishedAt` (stamped on
 a store's **first** publish — re-publishing an old store doesn't bump it),
 nulls last, then `createdAt`. Each card carries a taste of the catalog:
-`productCount` (publicly visible products) and `previewImages` (cover-image
-URLs of the newest visible products that have a photo, max 4) — both follow
-the same visibility rule the store page enforces.
+`productCount` (publicly visible products), `previewImages` (cover-image URLs
+of the newest visible products that have a photo, max 4) — both follow the same
+visibility rule the store page enforces — and `categories`, the names of the
+store's first two **top-level active** shelves in the owner's own order, which
+is what lets a card say what kind of shop it is ("Poorvika" means nothing;
+"Poorvika · Mobiles · Accessories" does). Empty array for a store with no
+active categories.
 
 | Query      | Type | Default | Notes            |
 | ---------- | ---- | ------- | ---------------- |
@@ -1408,7 +1412,8 @@ the same visibility rule the store page enforces.
 ```jsonc
 { "success": true,
   "data": [ { "id", "name", "slug", "logoUrl", "publishedAt",
-              "productCount": 12, "previewImages": ["https://…", …] } ],
+              "productCount": 12, "previewImages": ["https://…", …],
+              "categories": ["Mobiles", "Accessories"] } ],
   "meta": { "total", "page", "pageSize", "totalPages" } }
 ```
 
@@ -1836,6 +1841,112 @@ so homepage traffic costs one count-scan per minute.
 ```jsonc
 { "success": true, "data": { "stores": 18, "products": 642, "orders": 97 } }
 ```
+
+### `GET /api/v1/public/browse`
+
+Every **global taxonomy** node with at least one discoverable product at or
+beneath it, biggest first. Two callers: the marketplace homepage's category
+links and the category sitemap — both of which must never point at an empty
+page. Direct counts are rolled UP the tree in memory (a product tagged on a
+leaf counts towards every ancestor, because every ancestor's page shows it),
+so this is one grouped query regardless of taxonomy size. 5 min cache.
+
+```jsonc
+{ "success": true,
+  "data": [ { "name": "Sports & Fitness", "slug": "sports-fitness",
+              "productCount": 10 }, … ] }
+```
+
+### `GET /api/v1/public/browse/:slug`
+
+One **global category landing page** (`/c/{slug}`) — the only surface on the
+platform addressed by a *kind of product* rather than by a shop, and so the
+only one that can rank for a category term rather than a store name.
+
+Built on `StoreProduct.globalCategoryId`: the optional tag placing a product
+on the platform taxonomy independently of the shelf its seller filed it
+under. A shelf is the seller's merchandising ("KTM > Duke 200"); the tag is
+what the thing *is*. Only the second aggregates across stores.
+
+Matches the node **and every descendant**, resolved from the in-memory
+taxonomy cache (`getCategoryBranch`) — otherwise `/c/fashion` would be empty
+while `/c/fashion-men-jackets` held everything. Same `discoverable` rule as
+global search (published store, active chain, sellable, not `hideFromSearch`).
+An unknown or disabled slug is `404`, never an empty page.
+
+| Query      | Type   | Default  | Notes                                  |
+| ---------- | ------ | -------- | -------------------------------------- |
+| `page`     | int    | 1        |                                        |
+| `pageSize` | int    | 20       | max 100                                |
+| `sort`     | enum   | `newest` | `newest` · `priceAsc` · `priceDesc`    |
+
+Sorting is limited to what the denormalised columns answer without a join.
+There is deliberately no relevance/popularity option — neither exists as
+data, and an option that silently falls back to newest is worse than none.
+
+The response carries `category` and `children` **beside** the usual
+`data`/`meta`, so one request renders the whole page:
+
+```jsonc
+{ "success": true,
+  "data": [ /* …marketplace product-hit shape… */ ],
+  "meta": { "total", "page", "pageSize", "totalPages" },
+  "category": { "id", "name", "slug",
+                "path": [ { "name", "slug" } ] },   // root first, SELF LAST
+  "children": [ { "name", "slug", "productCount" } ] }  // non-empty only
+```
+
+`children` omits any child whose branch is empty, so a crawler following
+these links never lands on a dead end.
+
+---
+
+## Sitemaps — `/api/v1/public` (no auth)
+
+XML sitemaps for the public storefronts. The **only** public endpoints that
+do not answer the `ok()` / `list()` JSON envelope — the sitemap protocol is
+XML. Errors still answer JSON through the central handler.
+
+They live under the API prefix rather than at the site root so the nginx
+`/api` proxy every vhost already has serves them with **no new `location`
+block**. `frontend/public/robots.txt` declares the index, and a sitemap
+declared in `robots.txt` is read for the whole host whatever path it sits at.
+
+Every query reuses `PUBLIC_STORE_VISIBILITY` / `PUBLIC_PRODUCT_VISIBILITY`,
+so a sitemap can never advertise a URL a store page would 404 or hide.
+Products flagged `hideFromSearch` are additionally excluded — handing one to
+Google in a sitemap is the literal opposite of what the flag asks for.
+
+Each file is built from an in-process cache with a **1 hour** TTL and served
+with `cache-control: public, max-age=3600`. `<loc>` values are built from
+`PUBLIC_WEB_URL` when set, otherwise from the request's own scheme + host
+(the SPA and the API share one origin behind nginx, so that is always right).
+
+### `GET /api/v1/public/sitemap.xml`
+The sitemap **index**: `sitemap-stores.xml` plus one file per published
+store. One file per store on purpose — Search Console reports indexing
+coverage per sitemap, so this shape answers "how much of this seller's
+catalog is indexed" without any extra reporting.
+
+### `GET /api/v1/public/sitemap-stores.xml`
+The marketplace homepage (`/`) and every published store's front page
+(`/store/{slug}`), `lastmod` from the store's `updatedAt`.
+
+### `GET /api/v1/public/sitemap-categories.xml`
+The global category landing pages (`/c/{slug}`) — only nodes that
+`GET /public/browse` reports as non-empty, so an empty branch of the taxonomy
+is never submitted as a thin page. No `lastmod`: the content changes whenever
+any product in the branch changes in any store, and a wrong date is worse
+than none.
+
+### `GET /api/v1/public/sitemap-store-{slug}.xml`
+One store's own pages: `/store/{slug}`, `/store/{slug}/shop`, each category
+that has something to show (itself **or beneath it** — a parent shelf whose
+stock lives in its children is a real page), and each publicly visible
+product with its `updatedAt` as `lastmod`. Unknown *and* unpublished slugs
+both `404`, matching every other public endpoint.
+
+Capped at 50,000 URLs per file (the protocol limit).
 
 ---
 

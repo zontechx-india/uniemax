@@ -162,74 +162,152 @@ for guests and signed-in customers alike and adapts per session state.
   don't exist in the marketplace router, so a client-side navigate would
   hit its catch-all.
 - **`pages/HomePage.tsx`** (marketplace, replaces the old dashboard landing):
-  own chrome — a deliberately **airy** sticky header (`h-16`, `md:h-20`) laid
-  out as four zones separated by large gaps (`gap-5` → `lg:gap-12`) rather
-  than a dense cluster: brand (logo `h-10`/`md:h-12` + `text-xl`/`sm:text-2xl`
-  wordmark) · **global search centered in the toolbar** on md+, dropping to
-  its own row under the bar below md · "Sell on UnieMax" link (lg+) · then
-  the utilities (theme toggle · cart link with count · Sign in — a button
-  that opens the auth dialog — / `AccountMenu`, all `h-10`, `gap-3` →
-  `lg:gap-6`; the old hairline separator
-  was removed — the gap does that job). **Full-bleed** with a `max-w-[1920px]`
-  soft cap and `lg:px-10` (the storefront caps tighter, at 1440 — see
-  **Layout width**; card grids here run 2→3→4→5 columns).
+  own chrome — a sticky header (`h-16`, `md:h-20`) laid out as four zones:
+  brand · **global search centred in the toolbar** on md+, dropping to its own
+  row under the bar below md · "Sell on UnieMax" link (lg+) · then the
+  utilities (theme toggle · cart link with count · Sign in — a button that
+  opens the auth dialog — / `AccountMenu`). Its gaps and its brand step **down**
+  at the smallest widths as well as up at the largest (`gap-3` → `lg:gap-10`,
+  logo `h-8` → `md:h-11`, the 40px controls to 36px below `sm`): fixed at their
+  comfortable desktop values those four zones needed 339px of a 320px screen and
+  overflowed the bar rather than anything giving way.
+
+  **Everything on the page sits in `CONTENT_COLUMN`** — the same 1440px column
+  the storefront uses, from `layout/contentWidth.ts`. It was `max-w-[1920px]`,
+  which is not a cap at all on a 1920 monitor: the page was genuinely
+  full-width, the logo sat a thousand pixels from its own search box, the
+  grids ran to six columns and an unframed 16:5 banner reached 800px tall on a
+  2560 screen. See **Layout width**.
+
   Sections render as **full-bleed alternating bands** (base canvas / `alt`
-  surface tone + a bottom `border-line` divider, compact `py-8/10`) — the
-  band lives inside each section component so a hidden section leaves no
-  empty band; separation comes from background changes rather than large
-  gaps. Sections, in order: the **banner carousel**
-  (`GET /public/banners` — the platform's own promo images, uploaded by
-  admins at `/admin/banners`; full-bleed, 16:5, the shared
-  `features/banners/BannerCarousel`). It **replaced a hand-written hero**
-  (a headline, two buttons and a collage of whatever products were newest):
-  the marketplace's opening pitch is now something the platform team
-  controls and can change for a campaign without a deploy. It renders
-  nothing until a banner exists, so an empty platform opens on Shop by
-  Category rather than on an empty frame, and a failed fetch is silent —
-  a decorative strip never earns an error state; a **Shop
-  by Category
-  chip strip** (`GET /public/categories` — most common category names
-  across stores; tapping a chip pre-fills and focuses the global search
-  via a tiny module-level search-intent bus; the strip renders nothing
-  while loading/failed/empty); **New Stores**
-  (**storefront-preview cards**: a 16:9 banner cut from the first of the
-  API's `previewImages` (with a gradient foot **only when there is a real
-  photo** — over the icon fallback it read as a grey smear), the store logo
-  as a round badge straddling the banner edge at the **left**, then a
-  left-aligned Manrope name and **star-rating slot**, and a full-width
-  footer row above a divider: `productCount` anchored left, a **Visit
-  Store →** pill right — a centred column left both margins empty. The
-  card body must stay `relative`: the banner above it is positioned, so
-  otherwise the overlapping logo paints underneath the image. The
-  whole card is still one link — the CTA is a styled `<span>`, never a
-  nested `<a>`, so there is no second tab stop. **The rating is a
-  placeholder**: there is no review system yet, so `StoreRating` renders
-  muted outline stars + "No reviews yet" rather than fabricating stars for
-  shoppers, and lights up unchanged the moment the API returns
-  `rating`/`reviewCount`);
-  **Fresh Finds** (`GET /public/products`, newest 12 platform-wide,
-  product cards with image / store / name / price on a denser grid than
-  the store cards — 2→3→4→5→6 columns, 4-up from `lg`; section hides while
-  the platform has no products — `useNewProducts()` owns the
-  error/retry UI);
-  **Recently Viewed** (local, hidden when empty, logo + name pills);
-  **My Stores** (owners only, compact wrapping row — logo, body-face
-  name, Published/Draft chip — deliberately slim so consumer sections
-  keep the prime real estate; these pill rows and the category strip
-  all **wrap** rather than scroll horizontally — no scrollbars on the
-  homepage); and a **Become a Seller** gradient panel
-  (split layout: pitch + 3 check-mark proof points + CTA on the left —
-  label flips to "Create Another Store" for owners; for guests the CTA opens
-  the auth dialog and navigates to `/mystores/new` via `onSignedIn` — and the
-  live **platform counters**
-  (Stores / Products / Orders from `GET /public/stats`) on the right as
-  social proof; counters fail silently and any zero value hides). The
+  surface tone + a bottom `border-line` divider, `SECTION_PADDING`
+  `py-9`→`lg:py-14`) — the band lives inside each section component so a hidden
+  section leaves no empty band; separation comes from background changes rather
+  than large gaps.
+
+  Two rules shape the sections, because the marketplace is young and **a page
+  that only looks right when it is full looks broken today**:
+
+  1. **Nothing counts itself out loud.** Trust comes from what the platform
+     guarantees, not from how big it is.
+  2. **No grid ends in holes.** `gridFor(count)` caps the column ramp at the
+     number of items actually present (so three stores are a deliberate
+     three-up, not a four-up with a gap), and anything whose length nobody
+     controls is a **rail** rather than a grid.
+
+  Sections, in order: the **banner carousel** (`GET /public/banners`, the
+  platform's own promo images from `/admin/banners`, the shared
+  `features/banners/BannerCarousel`) — **the banner is the hero**, and it is now
+  **framed inside the content column** exactly as the storefront frames its own,
+  because edge-to-edge a 16:5 banner is a function of the screen rather than of
+  the page. It renders nothing until a banner exists and fails silently — a
+  decorative strip never earns an error state. Under it, the **identity bar**
+  (`MarketIdentityBar`) — one slim band carrying three things that each need one
+  line: the page's real `<h1>`, the trust row (straight from the seller · cash
+  on delivery · secure online payment, each a checkable property of the product,
+  **labels only** — a sentence under each read as fine print) and the
+  popular-category chips.
+
+  > An intermediate revision put a full text hero *above* the banner —
+  > headline, sub-line, chips and a three-column trust grid. It gave the page
+  > two openings competing for the same job and left a wide, plainly empty band
+  > above the one piece of designed artwork on the site. The bar says the same
+  > things in about a fifth of the height, and says them after the visitor has
+  > seen what the platform looks like. The `<h1>` stays **real rather than
+  > visually hidden**: a heading does not have to be the largest thing on screen
+  > to be the heading, it has to be the true one.
+
+  The chips are **one scrolling line at every width** (`CHIP_SCROLLER`) — eleven
+  of them wrapped to four rows on a phone. Then **New Stores** — **storefront-preview cards**, each a
+  `StorePreview` mosaic over one footer row (logo · name · Visit store).
+
+  **The card is portrait — `aspect-[9/14]` artwork on a ~220px tile**, so a
+  1440px row holds six shops rather than four (see `CARD_RAMP`). Landscape
+  cards at four-up were 325px wide and read as a catalogue of four; narrow
+  portrait tiles show a shop's stock the way the stock is usually photographed.
+  9:14 rather than a full 9:16 because the footer earns the difference — see
+  below.
+
+  The mosaic is **the shop's own product covers**, and it degrades by how many
+  of them there are rather than by breakpoint: four or three put a lead cover
+  across the top two thirds with two beneath it, two split the frame
+  horizontally, one fills it, none gives a soft brand-tinted panel. Both splits
+  cut across the **short** axis — in a portrait frame two side-by-side cells
+  would be slivers, while two stacked ones are each a normal landscape crop.
+
+  The API has always sent up to four in `previewImages` and the card used
+  exactly **one**, cover-cropped and treated as store branding — which it is
+  not. It is a photograph of one product, and on the live marketplace two
+  neighbouring cards showed near-identical crops of the same brownie and read
+  as a duplicate render. A shop is a *collection*, so its artwork is one.
+  Hairline gaps (`gap-px` over `bg-line`); the hover zoom sits on an inner
+  layer so the frame and the hairlines stay put while the photographs move.
+
+  A **New** badge (published within 30 days) sits on the artwork, top-left —
+  it is a fact about the shop rather than about its name, and overlaid it costs
+  no height, which is what freed the footer's second line.
+
+  The footer is three things over two rows: an `h-9` logo beside the name
+  (`line-clamp-2`) with **what the shop sells** under it, and a full-width
+  **Visit store** button pinned to the bottom. One logo size at every width —
+  the tile is ~220px at its widest, so the footer never has the room that
+  justified a 44px badge.
+
+  The category line comes from `MarketStore.categories` (the store's first two
+  top-level shelves — see `GET /public/stores`). It is the line that makes the
+  card legible: "Poorvika", "MotoCore" and "ZUNO HUB" are names a shopper
+  cannot decode, and "Mobiles · Accessories" underneath one is the difference
+  between a card worth opening and a logo. It is absent, not placeheld, when a
+  store has no active categories — and it is deliberately **not** a product
+  count, which is the shop's number rather than a reason to visit it.
+
+  `flex-1` on the footer with `mt-auto` on the button is load-bearing: a card
+  whose name runs to two lines is taller than its neighbour and the grid
+  stretches both to match, so without it the buttons in a row would sit at two
+  different heights — the tell that a grid was laid out by accident. The button
+  is a styled `<span>`, never a nested `<a>`: the whole card is already the
+  link, and a real one would be a second tab stop to the same place. That second line used to be the **product
+  count**, which is inventory reporting: "8 products" is the shop's number
+  rather than a reason to open it, and on a young marketplace most of those
+  numbers are small enough to argue against the shop they label. The invitation
+  costs the same height and asks for the click.
+
+  Three other things were fixed here: the name used to `truncate`, which in a
+  2-up phone grid left about 70px and rendered every shop as "Retail S…",
+  "Abhi's O…"; a right-hand chevron was 28px of chrome on a device with no hover
+  to trigger it (the arrow now travels with the Visit store text); and the logo
+  was an overlapping **round** badge at `object-cover`, which kept the middle of
+  a wordmark and threw the rest away (see `StoreLogoTile`). An earlier revision
+  also carried a full-width *Visit Store* pill — a whole row of height for what
+  is now one line. Between them the card went from ~355px tall to ~250px.
+
+  **There is no rating row.** A `StoreRating` placeholder used to sit here
+  drawing five muted stars and "No reviews yet" on *every* card, which does not
+  hold space for a future feature so much as tell a visitor that nothing on the
+  platform has ever been rated. Then
+  **Fresh Finds** (`GET /public/products`, newest 12 platform-wide) and
+  **Recently Viewed** (local, hidden when empty), both **rails** —
+  percentage-width cards in a snapping scroller with arrows from `lg` that grey
+  out at each end, since eleven products in a five-column grid end in four
+  holes; **My Stores** (owners only, compact auto-fill row — logo, body-face
+  name, Published/Draft chip — deliberately slim so consumer sections keep the
+  prime real estate); and a **Become a Seller** gradient panel (two equal
+  columns from `lg`: pitch + 3 check-mark proof points + CTA on the left —
+  label flips to "Create another store" for owners; for guests the CTA opens the
+  auth dialog and navigates to `/mystores/new` via `onSignedIn` — and **how it
+  works**, three numbered steps, on the right. That column used to hold the live
+  platform counters from `GET /public/stats`; on a marketplace this size they
+  argued against the pitch they decorated, and three steps are as true on day
+  one as at ten thousand stores. The endpoint is untouched). The
   **footer** is a structured 4-column block: brand + tagline, Marketplace
   (About / Support / Contact) and Legal (Privacy / Terms) columns
   (→ `pages/InfoComingSoonPage.tsx`, public placeholders), and a Sell on
   UnieMax column with a Become a Seller button. Every section still
   fetches independently with its own skeleton and retry — one failed API
-  never blanks the page.
+  never blanks the page, and a skeleton's `count` is **the minimum the section
+  will occupy, not the maximum it might**: twelve placeholders resolving to
+  three stores collapses the page upward, moving whatever the visitor was about
+  to click.
 - **Global search** (`features/discovery/discoveryApi.ts` →
   `GET /api/v1/public/search`) — starts at 2 characters, 300 ms debounce,
   stale-response guard; results are **always grouped** (Stores / Categories
@@ -254,9 +332,13 @@ for guests and signed-in customers alike and adapts per session state.
   state invites the visitor to be the first seller. **Fresh Finds** —
   `GET /api/v1/public/products`. **Category chips** —
   `GET /api/v1/public/categories`. **Platform counters** —
-  `GET /api/v1/public/stats` (rendered inside the Become a Seller panel).
-  The footer's bottom bar carries a trust row (COD available · Secure
-  checkout).
+  `GET /api/v1/public/stats` — **not rendered on the homepage any more**; the
+  Become a Seller panel shows three how-it-works steps where the counters were,
+  because "3 Stores · 11 Products · 0 Orders" argued against the pitch it was
+  decorating. The endpoint is unchanged and the numbers are a one-component
+  change away if a surface wants them. Trust on the homepage is carried by
+  `MarketIdentityBar`'s trust row instead, and the footer's bottom bar
+  (COD available · Secure checkout).
 
 ### Storefront account shell (routed dashboard)
 
@@ -267,7 +349,8 @@ Signed-in account pages mount inside `RequireCustomer` → `AppLayout`
   (brand → `/`, theme toggle, account menu); the old sidebar/drawer was
   removed — it duplicated the account menu. Pages render into `<Outlet/>`
   inside a **full-width** container (`max-w-[1920px]`, a soft cap for
-  ultrawides — matching the storefront); form-heavy pages constrain
+  ultrawides — the authed shell and the cart/checkout pages still use this and
+  have NOT been brought onto `CONTENT_COLUMN`); form-heavy pages constrain
   themselves (`CreateStorePage` `max-w-lg`, `StoreManageLayout` `max-w-7xl`,
   section forms `max-w-xl`).
 - **Account menu** (`layout/AccountMenu.tsx`) — the ONE place account
@@ -1074,10 +1157,71 @@ arrow deliberately keeps `window.history.back()`: the store header reaches
 it with a full page load (`<a href>`), which resets `idx` to 0 even though
 the store is one browser step back.
 
-Every public page sets a **per-route `document.title`** via
-`shared/usePageTitle.ts` — "Product · Store · UnieMax", "Search "q" ·
-Store · UnieMax", "Your Cart · UnieMax", etc. (SPA-only: real OG/meta tags
-for crawlers wait for SSR/prerender).
+**SEO / head tags — `shared/seo.ts`.** `useSeo({ title, description,
+canonical, image, type, robots, jsonLd })` owns the whole `<head>` per route;
+`usePageTitle(...parts)` is the title-only shorthand and `usePrivatePageTitle`
+the same plus `noindex, follow`. Titles read "Product · Store · UnieMax".
+
+Every call writes **every** managed tag, falling back to the platform
+defaults captured from `index.html` at import time — so a product page's
+`og:image` or `Product` JSON-LD can never survive onto the next page (a stale
+JSON-LD block is a structured-data error against the whole domain, not just
+the page). A route that calls neither hook inherits the previous route's tags,
+which is cosmetic only: a crawler loads every URL fresh. A layout-level reset
+would be wrong — a parent's effect runs *after* its children's, so it would
+clobber the page that did the right thing.
+
+What each public page contributes:
+
+| Page | Adds |
+| ---- | ---- |
+| Store home | About text (or a line naming its shelves) · logo card · `Store` JSON-LD — address, map pin, phone, socials from Footer management, degrading to `Organization` with no address |
+| Product | Seller's prose → highlights → a composed line with the price (`productMetaDescription`) · cover image · `Product` + `Offer`/`AggregateOffer` + `BreadcrumbList` |
+| Category | Subcategory names or the product count · `BreadcrumbList` |
+| Shop | Canonicals to bare `/shop`; `?q=`/`?section=` are `noindex, follow` — they re-list what category pages already list |
+| Marketplace home | Platform description · `WebSite` · the `<h1>` in `MarketIdentityBar` |
+| `/c/{slug}` | Category name + product/shop counts · `BreadcrumbList` + `ItemList` · `?page=`/`?sort=` canonical to the bare slug and go `noindex, follow` · an empty branch is `noindex` |
+
+**Global category pages — `pages/BrowseCategoryPage.tsx` (`/c/{slug}`).** The
+only page type whose subject is a *kind of product* rather than a shop.
+Everything else is addressed inside a store, which is right for shopping and
+useless for search: nobody googles a shop they have never heard of, they
+google "men's jackets". This page is what such a search can land on, and each
+card hands the visitor to the seller's own storefront (a product's only
+address) rather than checking out anonymously on the marketplace.
+
+Backed by `GET /public/browse/:slug` (one request answers heading, breadcrumb,
+child links and grid — read via `callEnvelope`, the `data`+`meta`+extras
+variant of `call`). Three details are load-bearing for SEO: child categories
+are **links**, not filter buttons, so the branch below is crawlable;
+pagination is prev/next `<a href>`, not a Load-More button, because a crawler
+cannot press a button; and the marketplace homepage's category row now links
+here (`MarketIdentityBar`) instead of firing an `onClick` that pre-filled the
+search box — that row sits in the most prominent place on the site and used
+to pass nothing to anything. The search-intent bus it used went with it.
+`layout/MarketChrome.tsx` wraps the page in the homepage's header/footer,
+which still live in `HomePage.tsx` (exported, not moved — a third consumer is
+the moment to lift them).
+
+`noindex, follow` also covers the **owner draft preview** (an unpublished
+store resolves only for its owner), a missing product/category (the SPA
+fallback answers `200`, so there is no other way to keep a "not found" page
+out of the index), and every per-customer page — cart, checkout, order
+confirmation, addresses, support threads. `robots.txt` disallows those paths
+too; the two do different jobs, and the failure mode worth double-covering is
+a shared order-confirmation link getting indexed.
+
+Structured data lives in `features/publicStore/structuredData.ts` and follows
+two rules: **never invent a fact** (there is no review system, so no
+`aggregateRating` — claiming one is a manual action against the domain) and
+**omit rather than guess** (`prune()` drops empty fields, since an absent
+optional is valid where an empty string is an error).
+
+**The limit**: this is a client-rendered SPA, so these tags land after React
+mounts. Googlebot renders JS and reads them; social-link scrapers (WhatsApp,
+Instagram, Facebook, X, Slack) and most non-Google crawlers do not, and see
+only the platform defaults now in `index.html`. Fixing that needs the HTML
+shell built per request — see `docs/BACKEND_CONTEXT.md`.
 
 - `storesApi.ts` — typed HTTP client (list/create/get/update/updateTheme/
   setPublished + `storeCatalogApi` for per-store categories/subcategories/
@@ -1953,6 +2097,8 @@ frontend/
     │   │   ├── sessionContext.ts # CustomerSession context + useCustomerSession()
     │   │   └── SessionProvider.tsx # Provides { customer, signOut } to the tree
     │   ├── layout/
+    │   │   ├── contentWidth.ts   # THE content column (1440 cap + gutters) + band padding;
+    │   │   │                     #   storeLayout.ts re-exports it as STORE_CONTAINER
     │   │   ├── AppLayout.tsx     # Authed shell: sticky top bar + Outlet (no sidebar)
     │   │   ├── AccountMenu.tsx   # Top-bar avatar dropdown (account links + logout)
     │   │   ├── useSignOutConfirm.ts # Shared confirm-then-sign-out flow
@@ -2020,7 +2166,10 @@ frontend/
     │   └── pages/
     │       ├── LoginPage.tsx     # /login fallback page: split-screen frame around CustomerAuthPanel
     │       ├── LoginRoute.tsx    # /login route: ?next= handling + already-authed redirect
-    │       ├── HomePage.tsx      # Marketplace homepage: banners, New Stores, Fresh Finds, seller CTA
+    │       ├── HomePage.tsx      # Marketplace homepage: banner, identity bar
+    │       │                     #   (h1 + trust + chips), New Stores (count-capped
+    │       │                     #   grid), Fresh Finds and Recently Viewed (rails),
+    │       │                     #   My Stores, seller CTA
     │       ├── InfoComingSoonPage.tsx # Public placeholder for /about /privacy /terms /contact
     │       ├── ProfilePage.tsx   # /profile — account details + mobile-number linking (SMS OTP)
     │       ├── AddressesPage.tsx # /addresses — saved delivery addresses (one primary)
@@ -2472,30 +2621,51 @@ Builder's Design panel edits the colors and paints the draft straight into the
 live preview frame, so what is being judged is the shop itself rather than a
 miniature of it.
 
-**Layout width — `features/publicStore/storeLayout.ts`.** The storefront's
-layout constants live in their own module (the header needs them and the layout
-already imports the header, so a constant shared both ways sits above both):
+**Layout width — `layout/contentWidth.ts` + `features/publicStore/storeLayout.ts`.**
+
+The **cap and gutters live once**, in `layout/contentWidth.ts`, and both
+surfaces read them:
+
+| Constant          | What it is                                                     |
+| ----------------- | -------------------------------------------------------------- |
+| `CONTENT_MAX`     | `max-w-[1440px]` — the cap on its own                           |
+| `CONTENT_GUTTER`  | `px-4 sm:px-6 lg:px-10` — 16 / 24 / 40px side gutters           |
+| `CONTENT_COLUMN`  | the two together, centred — what the marketplace homepage uses  |
+| `SECTION_PADDING` | `py-9 sm:py-11 lg:py-14` — vertical rhythm for a full-bleed band |
+
+`STORE_CONTAINER` is a **re-export** of `CONTENT_COLUMN`, not a second
+declaration. The storefront was capped at 1440 and the marketplace around it at
+1920, and one page handing over to the other visibly jumped; a shared constant
+is the only version of that fix that stays fixed. `SECTION_PADDING` keeps
+growing to `lg` on purpose — padding that is right at 1280 leaves a 2560
+monitor looking like a stack of tight strips, because the bands got wider while
+the air inside them did not.
+
+The storefront's remaining layout constants stay in their own module (the
+header needs them and the layout already imports the header, so a constant
+shared both ways sits above both):
 
 | Constant              | What it is                                                      |
 | --------------------- | --------------------------------------------------------------- |
-| `STORE_CONTAINER`     | `max-w-[1440px]` + `px-4 sm:px-6 lg:px-10` — the ONE content column |
+| `STORE_CONTAINER`     | `CONTENT_COLUMN`, re-exported under the storefront's name        |
 | `STORE_HEADER_OFFSET` | publishes `--store-header` on the store root (`7rem`, `4.15rem` from `md`) |
 | `STICK_UNDER_HEADER`  | `top-[var(--store-header)]` — parks flush under the sticky header |
 | `SCROLL_UNDER_HEADER` | the matching `scroll-mt` for in-page anchor targets              |
 | `EDGE_SCROLLER`       | a horizontal scroller that bleeds to the screen edge on phones   |
 
-The principle is **full-width backgrounds, centered max-width content**: the
-header bar, every homepage band and the footer still paint edge to edge, and
-each puts `STORE_CONTAINER` back inside. `<main>` is unpadded so the bands can
+The principle is **full-width backgrounds, centered max-width content**, and it
+holds on `/` as well as `/store/{slug}`: the header bar, every band and the
+footer still paint edge to edge, and each puts the content column back inside. `<main>` is unpadded so the bands can
 run truly edge-to-edge; inner pages wrap themselves in `StorePageShell`, which
 is that container plus vertical rhythm.
 
 The cap is **1440px**, which is where a 5-across row lands on ~270px cards. It
 was 1920px with the grid running to six columns, which on a 2560px monitor
 produced a wall of cards too small to read a product name in. Open-ended
-product grids now run 2 → 3 → 4 → **5 columns (xl)**; the homepage's capped
-rows use the same ramp and hide the surplus per breakpoint, so each row is
-always exactly full.
+product grids now run 2 → 3 → 4 → **5 columns (xl)**; the storefront homepage's
+capped rows use the same ramp and hide the surplus per breakpoint, so each row
+is always exactly full, and the marketplace homepage caps its ramp at the item
+count instead (`gridFor`).
 
 Because the header is **two rows on a phone and one from `md`**, nothing
 hardcodes its height: it publishes `--store-header` and the listing sort/filter
