@@ -94,7 +94,13 @@ export function PurchaseActions({
   }
 
   const buyNow = () => {
-    addToCart()
+    // "Buy Now" means THIS quantity: a line already in the cart is set to
+    // it, not added to — tapping Buy Now twice must not order two.
+    if (inCart > 0) {
+      cart.setQty(target.storeSlug, target.productId, target.variantId, qty)
+    } else {
+      addToCart()
+    }
     navigate(`/checkout/${target.storeSlug}`)
   }
 

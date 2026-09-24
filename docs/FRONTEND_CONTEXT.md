@@ -874,7 +874,9 @@ full-bleed section bands instead.
     unmatched combination shows "This combination isn't available" and
     disables purchase through stock 0) →
     **quantity selector + Add to Cart + Buy Now** (`PurchaseActions`; Buy Now
-    adds the line then goes straight to `/checkout/{storeSlug}`) → the
+    adds the line — or, if it is already in the cart, SETS it to the chosen
+    quantity, so a second Buy Now never orders two — then goes straight to
+    `/checkout/{storeSlug}`) → the
     delivery block → trust badges. The **share button** sits in the card
     header beside the name.
   - **Delivery check** (`features/publicStore/DeliveryCheck.tsx`, right
