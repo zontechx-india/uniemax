@@ -18,7 +18,7 @@
     "seed-categories": "tsx src/scripts/seedCategories.ts",
     "audit-media": "tsx src/scripts/auditMedia.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "test:api": "node --test --test-concurrency=1 test/"
+    "test:api": "node --test --test-concurrency=1 \"test/**/*.test.mjs\""
   },
   "keywords": [],
   "author": "",

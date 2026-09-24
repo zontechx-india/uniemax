@@ -7,8 +7,9 @@ import * as paymentsController from "../payments/payments.controller.js";
  * Storefront order placement + confirmation lookup. Mounted alongside the
  * public store surface at /api/v1/public/stores. Placing an order requires a
  * signed-in customer (guests browse and fill a cart, but must sign in to
- * order); the confirmation lookup stays anonymous so the success link keeps
- * working in a fresh session. Published stores only, all pricing/stock
+ * order); the confirmation lookup authenticates optionally so the success
+ * link keeps working in a fresh session, and shows contact + delivery details
+ * only to the buyer (see `getPublicOrder`). Published stores only, all pricing/stock
  * re-validated server-side.
  */
 export const publicOrderRoutes: FastifyPluginAsync = async (app) => {

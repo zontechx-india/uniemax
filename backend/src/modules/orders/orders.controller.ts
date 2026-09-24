@@ -38,7 +38,9 @@ export async function quoteOrder(request: FastifyRequest) {
 
 export async function getOrder(request: FastifyRequest) {
   const { slug, orderId } = orderParamSchema.parse(request.params);
-  return ok(await service.getPublicOrder(slug, orderId));
+  return ok(
+    await service.getPublicOrder(slug, orderId, optionalCustomerId(request)),
+  );
 }
 
 /** Runs behind `requireCustomer` (customer order-history routes). */

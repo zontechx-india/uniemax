@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { usePrivatePageTitle } from '../../../shared/seo'
 import { Button, buttonClass } from '../../../shared/ui/Button'
 import { trackPurchase } from '../../../shared/analytics/metaPixel'
-import { toApiError } from '../../../shared/auth/http'
+import { refreshSession, toApiError } from '../../../shared/auth/http'
 import { storeVars } from '../../features/publicStore/storeTheme'
 import { useStoreShell } from '../../features/publicStore/useStoreShells'
 import {
@@ -23,9 +23,11 @@ import {
 
 /**
  * Order confirmation (/order/{storeSlug}/{orderId}) — where a successful
- * Place Order lands. Fetches the order by its unguessable id (guest-friendly,
- * no account needed) and keeps the store's theme, so the celebration still
- * feels like the shop the customer just bought from.
+ * Place Order lands. Fetches the order by its id and keeps the store's theme,
+ * so the celebration still feels like the shop the customer just bought from.
+ * The backend returns the contact + delivery details only to the customer who
+ * placed the order (`redacted: false`); anyone else opening the link sees the
+ * order with those fields hidden.
  */
 export function OrderSuccessPage({
   storeSlug,
@@ -39,18 +41,32 @@ export function OrderSuccessPage({
   const [pollTick, setPollTick] = useState(0)
   const [retrying, setRetrying] = useState(false)
   const [retryError, setRetryError] = useState<string | null>(null)
+  // One silent session refresh when the details come back redacted: the
+  // lookup authenticates optionally, so an owner whose 15-minute access token
+  // lapsed gets no 401 to trigger the HTTP client's usual refresh-and-retry.
+  const triedRefresh = useRef(false)
   usePrivatePageTitle('Order Placed', order?.storeName ?? shell?.name)
 
   useEffect(() => {
     setOrder(undefined)
     setPollTick(0)
+    triedRefresh.current = false
   }, [storeSlug, orderId])
 
   useEffect(() => {
     let cancelled = false
     publicOrderApi
       .get(storeSlug, orderId)
-      .then((found) => {
+      .then(async (found) => {
+        if (found.redacted && !triedRefresh.current) {
+          triedRefresh.current = true
+          try {
+            await refreshSession('customer')
+            found = await publicOrderApi.get(storeSlug, orderId)
+          } catch {
+            // Not signed in (or not the buyer) — the redacted view is right.
+          }
+        }
         if (!cancelled) setOrder(found)
       })
       .catch(() => {
@@ -324,6 +340,12 @@ export function OrderSuccessPage({
                     ]
                       .filter(Boolean)
                       .join('\n')}
+                  </p>
+                )}
+                {order.redacted && (
+                  <p className="mt-2 text-xs">
+                    Sign in with the account that placed this order to see
+                    the delivery details.
                   </p>
                 )}
                 {order.customerPhone && (

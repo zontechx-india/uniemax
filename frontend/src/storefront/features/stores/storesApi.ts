@@ -2175,6 +2175,9 @@ export interface PlacedOrder {
   /** Optional seller note captured on cancellation. */
   cancelReason: string | null
   items: PlacedOrderItem[]
+  /** Order lookup only: true when the viewer is not the customer who placed
+   *  the order — contact + delivery fields then come back null. */
+  redacted?: boolean
   /** Cashfree session for an ONLINE order awaiting payment — feed it to the
    *  web SDK's checkout(). Null/absent on COD, simulated and read paths. */
   payment?: PaymentSession | null

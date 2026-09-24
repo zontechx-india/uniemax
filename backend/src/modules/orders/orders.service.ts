@@ -1015,21 +1015,47 @@ export async function cancelOrder(
 }
 
 /**
- * Order confirmation lookup — no auth, keyed by the order's unguessable cuid
- * scoped to its store slug (the success page's data source; guests have no
- * account to look orders up under).
+ * Order confirmation lookup — keyed by the order's cuid scoped to its store
+ * slug (the success page's data source). Auth is optional so the link still
+ * opens in a fresh browser, but only the **customer who placed the order**
+ * gets the contact + delivery snapshot: everyone else (anonymous, another
+ * account) gets the order with those fields nulled and `redacted: true`.
+ * A cuid is not a secret — it is time-ordered and leaks through shared
+ * links, history and logs — so it must not unlock a buyer's phone, email
+ * and home address on its own.
  *
  * Doubles as the webhook fallback: an ONLINE order still awaiting payment is
  * reconciled against Cashfree before answering, so the success page the
  * gateway redirects to shows PAID even when the webhook hasn't arrived
  * (or can't — e.g. local dev).
  */
-export async function getPublicOrder(storeSlug: string, orderId: string) {
+export async function getPublicOrder(
+  storeSlug: string,
+  orderId: string,
+  viewerCustomerId?: string,
+) {
   await reconcilePendingPayment(orderId); // best-effort, no-op unless needed
   const row = await prisma.order.findFirst({
     where: { id: orderId, storeSlug },
-    select: orderSelect,
+    select: { ...orderSelect, customerId: true },
   });
   if (!row) throw HttpError.notFound("Order not found");
-  return shapeOrder(row);
+  const { customerId, ...order } = row;
+  const shaped = shapeOrder(order);
+  const isOwner = !!viewerCustomerId && viewerCustomerId === customerId;
+  if (isOwner) return { ...shaped, redacted: false };
+  return {
+    ...shaped,
+    // First name only — enough for "Thanks, Asha" on the success page.
+    customerName: shaped.customerName?.trim().split(/\s+/)[0] ?? null,
+    customerPhone: null,
+    customerEmail: null,
+    addressLine: null,
+    pincode: null,
+    billingAddress: null,
+    // The success page only needs to know a payment was simulated; a real
+    // gateway reference is the buyer's business.
+    paymentRef: shaped.paymentRef === "DEV-SIMULATED" ? shaped.paymentRef : null,
+    redacted: true,
+  };
 }

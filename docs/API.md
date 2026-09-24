@@ -1724,12 +1724,18 @@ Response: the full order —
 }
 ```
 
-### `GET /api/v1/public/stores/:slug/orders/:orderId` (no auth)
+### `GET /api/v1/public/stores/:slug/orders/:orderId` (optional auth)
 
-Confirmation lookup for the order-success page, keyed by the order's
-unguessable cuid scoped to its store slug — anonymous so the confirmation
-link keeps working in a fresh session. Same shape as above (never includes
-`payment`); `404` if unknown. An ONLINE order still awaiting payment is
+Confirmation lookup for the order-success page, keyed by the order's cuid
+scoped to its store slug — auth is optional so the confirmation link still
+opens in a fresh session. Same shape as above (never includes `payment`) plus
+`redacted`: **only the customer who placed the order** gets `redacted: false`
+and the full contact + delivery snapshot. Anyone else (anonymous, another
+account) gets `redacted: true` with `customerPhone`, `customerEmail`,
+`addressLine`, `pincode`, `billingAddress` and a real `paymentRef` nulled and
+`customerName` cut to the first name — a cuid is time-ordered and leaks
+through shared links, so it must not unlock a buyer's address on its own.
+`404` if unknown. An ONLINE order still awaiting payment is
 **reconciled against Cashfree** before answering (webhook fallback), so the
 success page converges on `PAID` by polling this endpoint.
 
