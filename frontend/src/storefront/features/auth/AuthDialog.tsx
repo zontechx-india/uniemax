@@ -173,12 +173,15 @@ function OpenAuthDialog({ req }: { req: AuthDialogRequest }) {
             )}
 
             <h2 id="auth-dialog-title" className="font-heading text-2xl font-bold text-fg">
-              {brand.kind === 'store' ? 'Sign in' : 'Welcome back'}
+              {/* The same dialog serves first-timers (checkout sends them
+                  here) and returning buyers — "Welcome back" greeted
+                  people who had never been here. */}
+              Sign in or create an account
             </h2>
             <p className="mb-6 mt-1 text-sm text-muted">
               {brand.kind === 'store'
-                ? `Sign in to shop at ${brand.name}`
-                : 'Sign in to continue shopping'}
+                ? `To order from ${brand.name}. New here? It takes a minute.`
+                : 'To place orders and track them. New here? It takes a minute.'}
             </p>
 
             {state.status === 'loading' ? (

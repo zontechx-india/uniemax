@@ -164,6 +164,9 @@ function EmailSignIn({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
+    // Say what is missing instead of greying the button out with no reason.
+    if (!email.trim()) return setError('Enter your email address.')
+    if (!password) return setError('Enter your password.')
     setError('')
     setBusy(true)
     try {
@@ -209,7 +212,7 @@ function EmailSignIn({
           </div>
         </div>
         {error && <ErrorNote>{error}</ErrorNote>}
-        <PrimaryButton type="submit" disabled={busy || !email.trim() || !password}>
+        <PrimaryButton type="submit" disabled={busy}>
           {busy ? 'Signing in…' : 'Sign in'}
         </PrimaryButton>
       </form>
@@ -267,6 +270,12 @@ function Register({
 
   async function requestCode(e?: React.FormEvent) {
     e?.preventDefault()
+    if (!email.trim()) return setError('Enter your email address.')
+    if (password.length < 8) {
+      return setError(
+        `Choose a password of at least 8 letters or numbers${password ? ` (you have ${password.length})` : ''}.`,
+      )
+    }
     setError('')
     setBusy(true)
     try {
@@ -329,7 +338,7 @@ function Register({
           trailing={<PasswordToggle show={showPassword} onToggle={() => setShowPassword((s) => !s)} />}
         />
         {error && <ErrorNote>{error}</ErrorNote>}
-        <PrimaryButton type="submit" disabled={busy || !email.trim() || password.length < 8}>
+        <PrimaryButton type="submit" disabled={busy}>
           {busy ? 'Sending code…' : 'Continue'}
         </PrimaryButton>
         <p className="text-center text-xs text-muted">
