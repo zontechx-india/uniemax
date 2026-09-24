@@ -552,7 +552,12 @@ responses for a store the seller has since left; the Dashboard page calls it
 only on **re-entry** (a mount-time snapshot of whether data is already in
 hand — otherwise it would duplicate the layout's initial load), and
 `StoreOrderDetailPage` calls it after a status change or cancellation so the
-badge and tiles never lag the order they describe. It renders: Today's
+badge and tiles never lag the order they describe. Likewise
+`refreshStore()` re-fetches the store after a catalog change (category
+created/deleted, product enabled/disabled/deleted, product wizard closed) —
+`store.readiness`, which drives the sidebar setup badges and the publish
+card's "Before publishing, add…", is computed server-side from the catalog.
+It renders: Today's
 Orders / Total Orders / Revenue
 tiles, the order pipeline (Pending / Processing / Shipped / Completed /
 Cancelled / Refunded — each tile deep-links into the Orders section

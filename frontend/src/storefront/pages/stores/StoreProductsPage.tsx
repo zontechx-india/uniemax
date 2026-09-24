@@ -36,7 +36,7 @@ import type { StepKey } from './products/wizard/shared'
  * one — the backend enforces the same rule).
  */
 export function StoreProductsPage() {
-  const { store } = useManagedStore()
+  const { store, refreshStore } = useManagedStore()
 
   const [categories, setCategories] = useState<StoreCategory[] | null>(null)
   const [products, setProducts] = useState<StoreProduct[] | null>(null)
@@ -122,6 +122,7 @@ export function StoreProductsPage() {
           isActive: next,
         }),
       )
+      refreshStore?.()
     } catch (err) {
       setError(toApiError(err).message)
     } finally {
@@ -167,6 +168,7 @@ export function StoreProductsPage() {
         ),
       )
       if (toDelete.groups.length > 0) reload()
+      refreshStore?.()
     } catch (err) {
       setError(toApiError(err).message)
     } finally {
@@ -258,7 +260,10 @@ export function StoreProductsPage() {
           startAt={wizard.startAt}
           onProductChange={absorb}
           onCatalogChanged={reload}
-          onClose={() => setWizard(null)}
+          onClose={() => {
+            setWizard(null)
+            refreshStore?.()
+          }}
         />
       ) : (
         <div className="mt-4">

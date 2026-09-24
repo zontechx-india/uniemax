@@ -53,6 +53,16 @@ export function StoreManageLayout() {
   const inFlight = useRef(false)
   const request = useRef(0)
 
+  // Readiness is derived from the catalog server-side; catalog pages call
+  // this after they change it so the nav badges and publish card follow.
+  const refreshStore = useCallback(() => {
+    if (!storeId) return
+    storesApi
+      .get(storeId)
+      .then((fresh) => setStore(fresh))
+      .catch(() => {})
+  }, [storeId, setStore])
+
   const refreshDashboard = useCallback(() => {
     if (!storeId || inFlight.current) return
     inFlight.current = true
@@ -252,6 +262,7 @@ export function StoreManageLayout() {
                 dashboard,
                 dashboardError,
                 refreshDashboard,
+                refreshStore,
               } satisfies ManagedStoreContext
             }
           />

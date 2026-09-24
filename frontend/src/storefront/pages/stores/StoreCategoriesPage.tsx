@@ -37,7 +37,7 @@ import { ActiveSwitch } from './ActiveSwitch'
  * here can rewrite a shop's existing navigation.
  */
 export function StoreCategoriesPage() {
-  const { store } = useManagedStore()
+  const { store, refreshStore } = useManagedStore()
 
   const [categories, setCategories] = useState<StoreCategory[] | null>(null)
   const [choice, setChoice] = useState<string | null>(null)
@@ -137,6 +137,7 @@ export function StoreCategoriesPage() {
       // Refetch rather than append: picking a deep category creates its
       // ancestors too, and only the server knows which ones it did.
       const list = await reload()
+      refreshStore?.()
       setChoice(null)
       // Reveal the new shelf instead of hiding it in collapsed ancestors.
       const next = new Set(expanded)
@@ -213,6 +214,7 @@ export function StoreCategoriesPage() {
     try {
       await storeCatalogApi.deleteCategory(store.id, toDelete.id)
       setCategories((list) => (list ?? []).filter((c) => c.id !== toDelete.id))
+      refreshStore?.()
       setToDelete(null)
     } catch (err) {
       setError(toApiError(err).message)

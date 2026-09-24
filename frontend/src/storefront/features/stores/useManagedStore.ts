@@ -25,6 +25,14 @@ export interface ManagedStoreContext {
    * nav badge and the dashboard tiles stay truthful.
    */
   refreshDashboard: () => void
+  /**
+   * Re-fetch the store itself. Call it after a catalog change (category or
+   * product created, deleted, enabled/disabled, published) — the store's
+   * `readiness` (sidebar setup badges, "Before publishing, add…") is
+   * computed server-side from the catalog, so it goes stale otherwise.
+   * Optional: contexts outside the manage layout may not provide it.
+   */
+  refreshStore?: () => void
 }
 
 const Ctx = createContext<ManagedStoreContext | null>(null)
