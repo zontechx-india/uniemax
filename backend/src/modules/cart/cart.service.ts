@@ -183,6 +183,8 @@ interface ResolvedLine {
   productId: string;
   storeId: string;
   price: Prisma.Decimal;
+  /** Live stock of the variant at resolve time — only used to cap quantity. */
+  stock: number;
   quantity: number;
   status: CartLineStatus;
   metadata: Prisma.InputJsonValue | typeof Prisma.DbNull;
@@ -202,6 +204,12 @@ interface ResolvedLine {
  * Duplicates collapse to the LARGEST quantity rather than the sum, so pushing
  * the same cart twice is a no-op. (Two inputs can land on one variant: a
  * simple product sent both as `variantId: null` and by its default id.)
+ *
+ * **Quantities are capped at the variant's live stock** when it has any, the
+ * same clamp the storefront applies — otherwise a stale tab or a direct call
+ * stores "999 of 10" and every device that hydrates the cart shows a total
+ * checkout will refuse. A sold-out variant keeps the requested quantity (the
+ * line reads as out of stock, and the intent survives a restock).
  */
 async function resolveLines(inputs: CartLineInput[]): Promise<ResolvedLine[]> {
   if (inputs.length === 0) return [];
@@ -226,6 +234,7 @@ async function resolveLines(inputs: CartLineInput[]): Promise<ResolvedLine[]> {
       productId: true,
       price: true,
       isDefault: true,
+      stockQuantity: true,
       product: { select: { storeId: true } },
     },
   });
@@ -255,6 +264,7 @@ async function resolveLines(inputs: CartLineInput[]): Promise<ResolvedLine[]> {
       productId: variant.productId,
       storeId: variant.product.storeId,
       price: variant.price,
+      stock: variant.stockQuantity,
       quantity: line.quantity,
       status: line.status,
       metadata: (line.metadata ?? Prisma.DbNull) as
@@ -262,7 +272,15 @@ async function resolveLines(inputs: CartLineInput[]): Promise<ResolvedLine[]> {
         | typeof Prisma.DbNull,
     });
   }
+  for (const line of resolved.values()) {
+    line.quantity = capToStock(line.quantity, line.stock);
+  }
   return [...resolved.values()];
+}
+
+/** Requested quantity capped at live stock; sold-out keeps the request. */
+function capToStock(quantity: number, stock: number): number {
+  return stock > 0 ? Math.min(quantity, stock) : quantity;
 }
 
 /** The cart row for this customer, created on first write. */
@@ -348,11 +366,13 @@ export async function mergeCart(customerId: string, input: CartMergeInput) {
         if (room <= 0) continue;
         room -= 1;
       }
+      // The account's own quantity may predate a stock drop — cap the
+      // larger of the two sides, same rule as resolveLines.
       await upsertLine(
         tx,
         cart.id,
         line,
-        Math.max(line.quantity, current ?? 0),
+        capToStock(Math.max(line.quantity, current ?? 0), line.stock),
       );
     }
   });

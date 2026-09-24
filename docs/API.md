@@ -1353,7 +1353,10 @@ naturally as an addition, with no tombstones and no per-line race.
 ```
 Lines kept from the previous state retain their `priceAtAdd` and `addedAt`.
 Duplicates that resolve to one variant collapse to the **largest** quantity
-(never the sum), so pushing the same cart twice is a no-op.
+(never the sum), so pushing the same cart twice is a no-op. Every stored
+quantity (here and in `merge`) is **capped at the variant's live stock** when
+it has any; a sold-out variant keeps the requested quantity and reads as
+`unavailableReason: "OUT_OF_STOCK"`.
 
 **`POST /api/v1/cart/merge`** — same body; **unions** these lines into the
 stored cart instead of replacing it. The sign-in reconciliation: quantities
