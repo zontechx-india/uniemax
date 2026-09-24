@@ -397,7 +397,10 @@ module repeats the guard. Deliberate scope decisions:
   depth rather than a fix for a live hole — it exists so that a later
   cookie-policy change (or a `SameSite=None` some integration forces) cannot
   silently leave nothing in the way. Bearer-authenticated requests are exempt:
-  a browser never attaches that header on its own.
+  a browser never attaches that header on its own. The customer surface gets
+  the same check from `requireCustomer` itself (`csrf_token` cookie echoed in
+  `X-CSRF-Token` on cookie-authenticated non-`GET`s), so every customer/seller
+  route is covered without a per-plugin hook.
 - **Every write appends an `AdminAuditLog` row** via `recordAudit(request, …)`
   — fire-and-forget, so an audit failure never fails the action it describes,
   and carrying a snapshot of the actor's email so the trail survives the admin

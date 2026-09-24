@@ -32,9 +32,11 @@ Each login comes in **two client profiles**:
   cookie's value echoed in an `X-CSRF-Token` header (double-submit). CORS is
   credentialed; the browser sends cookies automatically.
 
-  **Every cookie-authenticated mutation under `/api/v1/admin/**` requires it
-  too** — any non-`GET`/`HEAD`/`OPTIONS` request without a matching
-  `um_admin_csrf` cookie and `X-CSRF-Token` header gets `403`. `SameSite=Lax`
+  **Every cookie-authenticated mutation requires it too** — any
+  non-`GET`/`HEAD`/`OPTIONS` request under `/api/v1/admin/**` without a
+  matching `um_admin_csrf` cookie and `X-CSRF-Token` header, and any
+  customer-guarded (🔒 customer) one without a matching `csrf_token` cookie and
+  header, gets `403 "Invalid or missing CSRF token"`. `SameSite=Lax`
   already stops a cross-site page from making such a request; this is the
   second layer, so a future cookie-policy change cannot silently become the
   only one. Requests authenticated with an `Authorization: Bearer` header are

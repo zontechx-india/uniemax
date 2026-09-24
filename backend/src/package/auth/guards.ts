@@ -9,6 +9,10 @@ import { HttpError } from "../../utils/httpError.js";
  * customer and declares the request fields they set.
  */
 
+/** Methods that change nothing — never CSRF-checked. */
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const customerCsrf = requireCsrf("customer");
+
 // Authenticated principals attached to the request by the guards below.
 declare module "fastify" {
   interface FastifyRequest {
@@ -20,8 +24,26 @@ declare module "fastify" {
 /** Requires a valid **admin** access token (bearer or cookie). Sets `request.admin`. */
 export const requireAdmin = requirePrincipal("admin");
 
-/** Requires a valid **customer** access token (bearer or cookie). Sets `request.customer`. */
-export const requireCustomer = requirePrincipal("customer");
+const customerPrincipal = requirePrincipal("customer");
+
+/**
+ * Requires a valid **customer** access token (bearer or cookie). Sets
+ * `request.customer`.
+ *
+ * Cookie-authenticated mutations also pass the customer surface's
+ * double-submit CSRF check (`csrf_token` cookie echoed in `X-CSRF-Token`) —
+ * the same second layer the admin subtree has (`requireAdminCsrf`), with the
+ * same two skips: safe methods and bearer clients. Living in the guard means
+ * every customer/seller route (stores, cart, addresses, orders, affiliate,
+ * support, /auth/me) gets it without each plugin having to remember a hook.
+ * The storefront's HTTP client already echoes the cookie on every non-GET.
+ */
+export async function requireCustomer(request: FastifyRequest): Promise<void> {
+  await customerPrincipal(request);
+  if (SAFE_METHODS.has(request.method)) return;
+  if (request.headers.authorization?.startsWith("Bearer ")) return;
+  await customerCsrf(request);
+}
 
 /**
  * Requires an admin whose role is **SUPER_ADMIN**.
@@ -59,7 +81,6 @@ export async function requireSuperAdmin(request: FastifyRequest): Promise<void> 
  *     not be forced to carry a token it has no way to obtain.
  */
 const adminCsrf = requireCsrf("admin");
-const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 export async function requireAdminCsrf(request: FastifyRequest): Promise<void> {
   if (SAFE_METHODS.has(request.method)) return;
