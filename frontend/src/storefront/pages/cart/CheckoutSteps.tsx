@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { toApiError } from '../../../shared/auth/http'
+import { customerAuth } from '../../../shared/auth/authApi'
 import {
   PHONE_HINT,
   PIN_HINT,
@@ -602,6 +603,22 @@ function SavedAddressPicker({
   const [problem, setProblem] = useState<string | null>(null)
   const [extraEmail, setExtraEmail] = useState('')
 
+  // The signed-in account already has an email — offer it instead of making
+  // the buyer type it again when the store asks for one.
+  useEffect(() => {
+    if (!fields.email) return
+    let cancelled = false
+    customerAuth
+      .me()
+      .then((me) => {
+        if (!cancelled && me.email) setExtraEmail((prev) => prev || me.email || '')
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [fields.email])
+
   const selected = addresses.find((a) => a.id === selectedId) ?? null
   const needsEmail = fields.email && selected !== null && !selected.email
 
@@ -613,6 +630,9 @@ function SavedAddressPicker({
       onAddressesChange([...addresses, created])
       setSelectedId(created.id)
       setAdding(false)
+      // "Save & Use This Address" means use it: finish the step unless the
+      // store still needs something from the buyer (an email).
+      if (!fields.email || created.email || extraEmail.trim()) confirm(created)
     } catch (err) {
       setProblem(toApiError(err).message)
     } finally {
@@ -620,8 +640,9 @@ function SavedAddressPicker({
     }
   }
 
-  const confirm = () => {
-    if (!selected) return setProblem('Select a delivery address.')
+  const confirm = (chosen: CustomerAddress | null = selected) => {
+    if (!chosen) return setProblem('Select a delivery address.')
+    const selected = chosen
     const email = selected.email ?? extraEmail.trim()
     if (fields.email && !email) {
       return setProblem('Enter an email address for this order.')
@@ -717,11 +738,12 @@ function SavedAddressPicker({
 
       {needsEmail && !adding && (
         <TextField
-          label="Email for this order (this store asks for it)"
+          label="Email for order updates"
           value={extraEmail}
           onChange={(e) => setExtraEmail(e.target.value)}
-          placeholder="you@example.com"
+          placeholder="e.g. you@example.com"
           type="email"
+          autoComplete="email"
           maxLength={160}
         />
       )}
@@ -743,7 +765,7 @@ function SavedAddressPicker({
           {addresses.length > 0 && (
             <button
               type="button"
-              onClick={confirm}
+              onClick={() => confirm()}
               className={buttonClass({ size: 'lg' })}
             >
               Deliver to This Address
@@ -885,6 +907,22 @@ function PaymentStep({
   useEffect(() => {
     if (value === 'COD' && codDisabled) onChange(null)
   }, [value, codDisabled, onChange])
+
+  // One way to pay → it is already chosen; don't make the buyer tap the only
+  // option before Place Order wakes up.
+  const onlyMethod =
+    (shell.payments.acceptOnlinePayment ? 1 : 0) +
+      (shell.payments.acceptCod ? 1 : 0) ===
+    1
+      ? shell.payments.acceptCod
+        ? codDisabled
+          ? null
+          : ('COD' as const)
+        : ('ONLINE' as const)
+      : null
+  useEffect(() => {
+    if (value === null && onlyMethod) onChange(onlyMethod)
+  }, [value, onlyMethod, onChange])
 
   const methods = [
     shell.payments.acceptOnlinePayment

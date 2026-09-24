@@ -1043,8 +1043,9 @@ Three public routes, matched before the session gate like `/store/{slug}`:
 store card shows the store's **logo** (fetched via
 `features/publicStore/useStoreShells.ts`, a session-cached shell lookup;
 `StoreLogo.tsx` falls back to the store glyph), item count, subtotal, a
-**Continue shopping** link, a **Place Order** button (→
-`/checkout/{storeSlug}`; disabled when nothing is orderable), and the
+**Continue shopping** link, a **Checkout** button (→
+`/checkout/{storeSlug}`; disabled when nothing is orderable — it only opens
+checkout, so it is not labelled "Place Order"), and the
 first 3 lines, with a "View N more items" link to
 **`/cart/{storeSlug}`** (`pages/cart/CartStorePage.tsx`), the dedicated
 all-items page for that store (plus Clear all and its own Place Order).
@@ -1127,8 +1128,10 @@ still future). **Step 1 — Delivery Details**: for `BOTH`-mode stores a
 Delivery/Pickup picker (pickup shows the store's primary footer location
 and skips address fields); customers get their **saved addresses
 as selectable rows** (primary preselected) with an inline "Add New
-Address" that saves to the address book, plus an email top-up field when
-the store collects email but the chosen address has none (the plain-form
+Address" that saves to the address book **and completes the step** ("Save &
+Use This Address" — unless the store still needs an email), plus an "Email
+for order updates" field, pre-filled with the account's email, when the
+store collects email but the chosen address has none (the plain-form
 fallback only renders if the addresses probe fails — the page itself
 already required sign-in). The form renders **only the fields
 the store collects** (`shell.checkout`, seller-toggled) and validates
@@ -1140,7 +1143,14 @@ cards for Online Payment / Cash on Delivery per the store's `payments`
 switches, narrowed by the server quote's `paymentMethods` — a cart with a
 `codAvailable: false` product greys COD out, names the item, and clears a
 COD choice that has become invalid (dimmed until step
-1 is done; a store with nothing enabled gets a can't-order note). With both
+1 is done; a store with nothing enabled gets a can't-order note). When the
+store accepts exactly one usable method it is **pre-selected**, so Place
+Order wakes up as soon as step 1 is done. When one store is on screen the
+cart's Order Summary also carries a full-width **Continue to checkout**
+button and says delivery is priced at checkout. A request that gets no
+response surfaces as "You're offline / Couldn't connect. Check your internet
+connection and try again." (`toApiError` in `shared/auth/http.ts`; 5xx reads
+"Something went wrong on our side"). With both
 steps complete the summary's **Place Order** button goes live
 (`publicOrderApi.place` → `POST /public/stores/:slug/orders`): the payload
 carries item references + quantities only (the server re-prices and

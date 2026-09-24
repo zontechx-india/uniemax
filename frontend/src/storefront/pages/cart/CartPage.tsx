@@ -32,7 +32,7 @@ const PREVIEW_LINES = 3
  * visitor's light/dark toggle. The context lives in the URL, never in
  * storage: back/forward, refresh and multiple tabs restore it correctly.
  * Each store group carries its own logo, "Continue shopping" path and
- * per-store "Place Order" button.
+ * per-store "Checkout" button.
  *
  * **`?from=` scopes the contents too, not just the palette.** Arriving from
  * a store, the visitor is mid-shop in THAT store: showing three other
@@ -81,6 +81,13 @@ export function CartPage() {
   const visibleGroups = focusGroup
     ? [focusGroup, ...(showAll ? otherGroups : [])]
     : groups
+
+  // Exactly one shop on screen → the summary carries its checkout button.
+  const soloGroup = scoped
+    ? focusGroup
+    : visibleGroups.length === 1
+      ? visibleGroups[0]!
+      : null
 
   // Totals follow what is ON SCREEN, never the hidden remainder.
   const total = visibleGroups.reduce((sum, g) => sum + g.subtotal, 0)
@@ -164,9 +171,18 @@ export function CartPage() {
                   whole cart. */}
               <p className="mt-2 text-xs text-muted">
                 {scoped
-                  ? `From ${focusGroup.storeName} only. Use Place Order above to check out.`
-                  : 'Orders are placed per store — use Place Order in a store’s section.'}
+                  ? `From ${focusGroup.storeName}. Delivery charges are shown at checkout.`
+                  : 'Each shop ships its own order — tap Checkout in a shop’s section.'}
               </p>
+              {/* One shop in view → one obvious next step, full width. */}
+              {soloGroup && soloGroup.itemCount > 0 && (
+                <Link
+                  to={`/checkout/${soloGroup.storeSlug}`}
+                  className={buttonClass({ size: 'lg', full: true, className: 'mt-4' })}
+                >
+                  Continue to checkout
+                </Link>
+              )}
               {hiddenCount > 0 && (
                 <button
                   type="button"
@@ -278,14 +294,14 @@ function StoreGroupCard({
             to={`/checkout/${group.storeSlug}`}
             className={buttonClass({ size: 'sm' })}
           >
-            Place Order
+            Checkout
           </Link>
         ) : (
           <span
             title="No available items from this store"
             className="shrink-0 cursor-not-allowed rounded-md bg-surface-alt px-3.5 py-2 text-xs font-bold text-muted"
           >
-            Place Order
+            Checkout
           </span>
         )}
       </div>

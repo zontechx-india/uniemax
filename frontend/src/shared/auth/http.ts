@@ -200,9 +200,22 @@ export function toApiError(err: unknown): ApiError {
       return new ApiError(message, body.statusCode ?? axiosErr.response?.status ?? 0, body.issues)
     }
     if (axiosErr.response) {
-      return new ApiError(`Request failed (${axiosErr.response.status})`, axiosErr.response.status)
+      const status = axiosErr.response.status
+      return new ApiError(
+        status >= 500
+          ? `Something went wrong on our side (error ${status}). Please try again in a moment.`
+          : `Request failed (${status})`,
+        status,
+      )
     }
-    return new ApiError('Cannot reach the server. Is the backend running?', 0)
+    // No response at all: almost always the phone's connection, not our
+    // server — say so in words a shopper can act on.
+    return new ApiError(
+      typeof navigator !== 'undefined' && navigator.onLine === false
+        ? "You're offline. Check your internet connection and try again."
+        : "Couldn't connect. Check your internet connection and try again.",
+      0,
+    )
   }
   return new ApiError(err instanceof Error ? err.message : 'Something went wrong', 0)
 }
