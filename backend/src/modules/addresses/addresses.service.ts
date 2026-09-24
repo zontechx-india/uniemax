@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../../utils/httpError.js";
+import { PINCODE_MESSAGE, isValidPincode } from "../../utils/zodHelpers.js";
 import type {
   AddressCreateInput,
   AddressUpdateInput,
@@ -76,9 +77,18 @@ export async function updateAddress(
 ) {
   const existing = await prisma.customerAddress.findFirst({
     where: { id: addressId, customerId },
-    select: { id: true, isPrimary: true },
+    select: { id: true, isPrimary: true, pincode: true, country: true },
   });
   if (!existing) throw HttpError.notFound("Address not found");
+  // Country-specific PIN rule against the address as it will be saved —
+  // a pincode-only or country-only change is checked against the other half.
+  if (input.pincode !== undefined || input.country !== undefined) {
+    const pincode = input.pincode ?? existing.pincode;
+    const country = input.country ?? existing.country;
+    if (!isValidPincode(pincode, country)) {
+      throw HttpError.badRequest(PINCODE_MESSAGE);
+    }
+  }
 
   const { isPrimary, ...details } = input;
   // Field-by-field: undefined = "not sent" must be omitted

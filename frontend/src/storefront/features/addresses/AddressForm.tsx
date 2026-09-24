@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { ErrorNote, TextField } from '../../../shared/ui/form'
 import type { AddressInput, CustomerAddress } from './addressesApi'
+import { isValidPincode } from './pincode'
 
 /**
  * Add/edit form for one address-book entry — used by the Saved Addresses
@@ -48,8 +49,8 @@ export function AddressForm({
       return setProblem('The email address looks invalid.')
     }
     if (!draft.addressLine.trim()) return setProblem('The address is required.')
-    if (!/^[A-Za-z0-9 -]{3,10}$/.test(draft.pincode.trim())) {
-      return setProblem('A valid pincode is required.')
+    if (!isValidPincode(draft.pincode, draft.country)) {
+      return setProblem('Enter a valid 6-digit PIN code.')
     }
     if (!draft.state.trim()) return setProblem('State is required.')
     if (!draft.country.trim()) return setProblem('Country is required.')

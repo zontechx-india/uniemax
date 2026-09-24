@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { paginationQuery } from "../../utils/zodHelpers.js";
+import { PINCODE_MESSAGE, isValidPincode, paginationQuery } from "../../utils/zodHelpers.js";
 
 /**
  * Storefront order placement (per store, guests welcome). The payload
@@ -33,6 +33,10 @@ export const billingAddressSchema = z.object({
     .regex(/^[A-Za-z0-9 -]{3,10}$/, "The billing pincode looks invalid"),
   state: optionalText(100),
   country: optionalText(100),
+}).superRefine((val, ctx) => {
+  if (!isValidPincode(val.pincode, val.country)) {
+    ctx.addIssue({ code: "custom", path: ["pincode"], message: PINCODE_MESSAGE });
+  }
 });
 
 export type BillingAddressInput = z.infer<typeof billingAddressSchema>;

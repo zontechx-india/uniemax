@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { toApiError } from '../../../shared/auth/http'
+import { isValidPincode } from '../../features/addresses/pincode'
 import { ErrorNote, InfoNote, TextField } from '../../../shared/ui/form'
 import { buttonClass } from '../../../shared/ui/Button'
 import {
@@ -87,8 +88,8 @@ function validate(
     if (key === 'email' && !/^\S+@\S+\.\S+$/.test(value)) {
       return 'The email address looks invalid.'
     }
-    if (key === 'pincode' && !/^[A-Za-z0-9 -]{3,10}$/.test(value)) {
-      return 'The pincode looks invalid.'
+    if (key === 'pincode' && !isValidPincode(value, values.country)) {
+      return 'Enter a valid 6-digit PIN code.'
     }
   }
   return null
@@ -144,8 +145,8 @@ const EMPTY_BILLING: BillingForm = {
 function validateBilling(values: BillingForm): string | null {
   if (!values.name.trim()) return 'Enter the billing name.'
   if (!values.address.trim()) return 'Enter the billing address.'
-  if (!/^[A-Za-z0-9 -]{3,10}$/.test(values.pincode.trim())) {
-    return 'The billing pincode looks invalid.'
+  if (!isValidPincode(values.pincode, values.country)) {
+    return 'Enter a valid 6-digit billing PIN code.'
   }
   return null
 }

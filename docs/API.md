@@ -1261,7 +1261,9 @@ form instead.
   "phone": "+91 98765 43210",               // required
   "email": "ravi@example.com",              // optional
   "addressLine": "12/4 MG Road, Kochi",     // required (1–300)
-  "pincode": "682016",                      // required (3–10 alphanumeric)
+  "pincode": "682016",                      // required — India: 6-digit PIN, not
+                                            //   starting with 0; other countries:
+                                            //   3–10 alphanumeric (422 / 400 on PATCH)
   "state": "Kerala",                        // required
   "country": "India",                       // defaults to "India"
   "isPrimary": true                          // optional — first address is
@@ -1692,6 +1694,11 @@ Vase" — choose another payment method"` when any line's product has
 `codAvailable: false` (the quote's `paymentMethods.cod` said so already).
 `billingAddress` is stored only on DELIVERY orders (null = same as the
 delivery details).
+
+**PIN codes:** `customer.pincode` and `billingAddress.pincode` must be a
+6-digit PIN not starting with 0 when the country is India (or not given) —
+`400 "Enter a valid 6-digit PIN code"` / `422` for billing; other countries
+accept 3–10 alphanumerics.
 
 **Delivery areas** (`DELIVERY` orders): every line's effective pincode rule
 (the product's own `deliveryRule`, else the store's `shipping.deliveryRule`)

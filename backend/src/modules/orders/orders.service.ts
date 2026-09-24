@@ -4,6 +4,7 @@ import { prisma } from "../../config/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { isProduction } from "../../config/env.js";
 import { HttpError } from "../../utils/httpError.js";
+import { PINCODE_MESSAGE, isValidPincode } from "../../utils/zodHelpers.js";
 import { buildListMeta } from "../../utils/response.js";
 import { mediaUrl } from "../../package/storage/index.js";
 import { emit } from "../../package/events/index.js";
@@ -180,8 +181,8 @@ function validateCustomerFields(
     if (key === "email" && !/^\S+@\S+\.\S+$/.test(value)) {
       throw HttpError.badRequest("The email address looks invalid");
     }
-    if (key === "pincode" && !/^[A-Za-z0-9 -]{3,10}$/.test(value)) {
-      throw HttpError.badRequest("The pincode looks invalid");
+    if (key === "pincode" && !isValidPincode(value, customer.country)) {
+      throw HttpError.badRequest(PINCODE_MESSAGE);
     }
   }
 }
