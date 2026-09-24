@@ -65,6 +65,8 @@ Verify: `curl http://localhost:4000/health`
 | `npm run seed-categories` | Seed the global category taxonomy (29 top-level + 125 sub) from `src/scripts/data/globalCategories.ts`. Upserts by slug — idempotent, never duplicates, never deletes. Realigns `name`/`parentId`/`displayOrder`; leaves `isActive`/`description`/`imageUrl` as the admin set them; fills `optionTemplates`/`specTemplates` from `data/categoryPresets.ts` only where never set. `-- --dry-run` reports without writing. |
 | `npm run audit-media` | Compare every S3 object against the media keys the current environment's DB references (`Store.logoKey`, `StoreProductMedia.key`, `OrderItem.imageKey`, plus bucket-hosted legacy URL columns). Writes `media-audit-<mode>.{json,md}` + CSVs to `backend/migration-backups/`. Both envs share one bucket, so run once per env and pass `-- --merge migration-backups/media-audit-<other>.json` on the second run to get true orphans (referenced by neither DB). Read-only unless `--delete-orphans --yes` is added to a merged run. |
 
+| `npm run test:api` | API regression suite (`test/*.test.mjs`, Node's built-in `node:test`, no extra deps) against a **running** backend. Env: `API_BASE`, `QA_EMAIL_A`/`QA_PASSWORD_A` (seller + buyer), `QA_EMAIL_B`/`QA_PASSWORD_B` (second customer), optional `QA_PHONE_A` (+ `QA_OTP_CODE`, default `123456`) so the test store can publish via the SMS OTP bypass. Creates a store, products and orders — local or dev only; refuses `*.uniemax.com`. |
+
 ## Environment (`.env`)
 
 | Var            | Notes                                                     |
