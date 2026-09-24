@@ -11,15 +11,28 @@ import {
   launchCashfreeCheckout,
   publicOrderApi,
   storeHomeUrl,
+  storeSupportUrl,
 } from '../../features/stores/storesApi'
 import type { PlacedOrder } from '../../features/stores/storesApi'
 import {
+  formatStepTime,
+  orderProgress,
+  orderStatusCopy,
+  phoneDigits,
+} from '../../features/stores/orderStatus'
+import {
   BoxIcon,
+  ChatIcon,
   CheckIcon,
   ChevronRightIcon,
+  CloseIcon,
+  LifebuoyIcon,
   MapPinIcon,
   PhoneCallIcon,
 } from '../../layout/icons'
+
+/** How long after placing the page still greets the buyer with "Order placed!". */
+const FRESH_MS = 30 * 60 * 1000
 
 /**
  * Order confirmation (/order/{storeSlug}/{orderId}) — where a successful
@@ -28,6 +41,12 @@ import {
  * The backend returns the contact + delivery details only to the customer who
  * placed the order (`redacted: false`); anyone else opening the link sees the
  * order with those fields hidden.
+ *
+ * It is also where a buyer comes BACK to check on an order (the "View details"
+ * link on /orders), so after the first half hour — or as soon as the seller
+ * moves it on — the headline follows the order's real status in plain words
+ * ("Your order is on the way"), with a step-by-step progress list, the
+ * cancellation reason if any, and ways to reach the seller.
  */
 export function OrderSuccessPage({
   storeSlug,
@@ -45,7 +64,14 @@ export function OrderSuccessPage({
   // lookup authenticates optionally, so an owner whose 15-minute access token
   // lapsed gets no 401 to trigger the HTTP client's usual refresh-and-retry.
   const triedRefresh = useRef(false)
-  usePrivatePageTitle('Order Placed', order?.storeName ?? shell?.name)
+  const fresh =
+    !!order &&
+    order.status === 'PENDING' &&
+    Date.now() - new Date(order.placedAt).getTime() < FRESH_MS
+  usePrivatePageTitle(
+    order && !fresh ? 'Your Order' : 'Order Placed',
+    order?.storeName ?? shell?.name,
+  )
 
   useEffect(() => {
     setOrder(undefined)
@@ -108,6 +134,14 @@ export function OrderSuccessPage({
       setRetrying(false)
     }
   }
+
+  const status = order ? orderStatusCopy(order) : orderStatusCopy({ status: 'PENDING', fulfilment: 'DELIVERY', storeName: '' })
+  const cancelled = order?.status === 'CANCELLED'
+  const sellerPhone = phoneDigits(shell?.footer?.support.phone)
+  const sellerWhatsApp = phoneDigits(
+    shell?.footer?.support.whatsapp ?? shell?.footer?.social.whatsapp,
+    true,
+  )
 
   const paymentState: 'paid' | 'pending' | 'failed' | 'cod' = !order
     ? 'cod'
@@ -186,28 +220,40 @@ export function OrderSuccessPage({
             <div className="flex flex-col items-center text-center">
               <span
                 className={`flex h-16 w-16 items-center justify-center rounded-full ${
-                  paymentState === 'failed'
+                  paymentState === 'failed' || cancelled
                     ? 'bg-danger/10 text-danger'
-                    : paymentState === 'pending'
+                    : paymentState === 'pending' || status.tone === 'wait'
                       ? 'bg-surface-alt text-muted'
                       : 'bg-success/10 text-success'
                 }`}
               >
-                <CheckIcon className="h-8 w-8" />
+                {cancelled ? (
+                  <CloseIcon className="h-8 w-8" />
+                ) : (
+                  <CheckIcon className="h-8 w-8" />
+                )}
               </span>
               <h1 className="mt-4 font-body text-2xl font-semibold tracking-normal">
-                {paymentState === 'pending'
-                  ? 'Completing your payment…'
-                  : paymentState === 'failed'
-                    ? 'Payment not completed'
-                    : 'Order placed!'}
+                {cancelled
+                  ? status.headline
+                  : paymentState === 'pending'
+                    ? 'Completing your payment…'
+                    : paymentState === 'failed'
+                      ? 'Payment not completed'
+                      : fresh
+                        ? 'Order placed!'
+                        : status.headline}
               </h1>
-              <p className="mt-1 text-sm text-muted">
-                {paymentState === 'pending'
-                  ? 'We are confirming your payment — this page refreshes automatically.'
-                  : paymentState === 'failed'
-                    ? 'Your payment did not go through. Your order is saved — you can try again below.'
-                    : `Thanks${order.customerName ? `, ${order.customerName}` : ''} — ${order.storeName} has received your order.`}
+              <p className="mt-1 max-w-full text-sm text-muted [overflow-wrap:anywhere]">
+                {cancelled
+                  ? status.next
+                  : paymentState === 'pending'
+                    ? 'We are confirming your payment — this page refreshes automatically.'
+                    : paymentState === 'failed'
+                      ? 'Your payment did not go through. Your order is saved — you can try again below.'
+                      : fresh
+                        ? `Thanks${order.customerName ? `, ${order.customerName}` : ''} — ${order.storeName} has received your order. We'll show every update here.`
+                        : status.next}
               </p>
               <p className="mt-3 rounded-pill border border-line bg-surface px-4 py-1.5 text-sm font-bold tracking-wide">
                 {order.orderNumber}
@@ -219,9 +265,13 @@ export function OrderSuccessPage({
                     : order.paymentStatus === 'FAILED'
                       ? 'Online payment failed'
                       : 'Online payment pending'
-                  : 'Pay on delivery'}
+                  : order.status === 'DELIVERED'
+                    ? 'Paid on delivery'
+                    : cancelled
+                      ? 'Cash on delivery — nothing to pay'
+                      : 'Pay on delivery'}
               </p>
-              {(paymentState === 'pending' || paymentState === 'failed') && (
+              {!cancelled && (paymentState === 'pending' || paymentState === 'failed') && (
                 <div className="mt-4 flex flex-col items-center gap-2">
                   <Button loading={retrying} onClick={() => void retryPayment()}>
                     {retrying
@@ -239,8 +289,72 @@ export function OrderSuccessPage({
               )}
             </div>
 
+            {/* Where the order is now — plain-words steps with times */}
+            <section
+              aria-label="Order progress"
+              className="mt-8 rounded-xl border border-line bg-surface p-5"
+            >
+              <h2 className="font-body text-base font-semibold tracking-normal">
+                Order progress
+              </h2>
+              {cancelled ? (
+                <div className="mt-3 rounded-lg bg-danger/10 px-4 py-3 text-sm">
+                  <p className="font-semibold text-danger">
+                    Cancelled
+                    {order.cancelledAt && ` · ${formatStepTime(order.cancelledAt)}`}
+                  </p>
+                  {order.cancelReason && (
+                    <p className="mt-1 text-fg">
+                      Reason from the seller: {order.cancelReason}
+                    </p>
+                  )}
+                  {order.paymentMethod === 'ONLINE' && order.paymentStatus === 'PAID' && (
+                    <p className="mt-1 text-muted">
+                      You paid online — contact the seller below about your refund.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <ol className="mt-3 space-y-3">
+                  {orderProgress(order).map((step) => (
+                    <li key={step.key} className="flex items-start gap-3">
+                      <span
+                        aria-hidden="true"
+                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                          step.done
+                            ? 'border-success bg-success text-white'
+                            : 'border-line bg-surface'
+                        }`}
+                      >
+                        {step.done && <CheckIcon className="h-3 w-3" />}
+                      </span>
+                      <div className="min-w-0 text-sm">
+                        <p
+                          className={
+                            step.current
+                              ? 'font-semibold text-fg'
+                              : step.done
+                                ? 'text-fg'
+                                : 'text-muted'
+                          }
+                        >
+                          {step.label}
+                          <span className="sr-only">
+                            {step.done ? ' — done' : ' — not yet'}
+                          </span>
+                        </p>
+                        {step.at && (
+                          <p className="text-xs text-muted">{formatStepTime(step.at)}</p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+
             {/* What was ordered */}
-            <section className="mt-8 rounded-xl border border-line bg-surface">
+            <section className="mt-4 rounded-xl border border-line bg-surface">
               <h2 className="border-b border-line px-5 py-3.5 font-body text-base font-semibold tracking-normal">
                 Your Items
               </h2>
@@ -331,7 +445,7 @@ export function OrderSuccessPage({
                     will confirm when it's ready.
                   </p>
                 ) : (
-                  <p className="whitespace-pre-line">
+                  <p className="whitespace-pre-line [overflow-wrap:anywhere]">
                     {[
                       order.customerName,
                       order.addressLine,
@@ -354,6 +468,48 @@ export function OrderSuccessPage({
                     {order.customerPhone}
                   </p>
                 )}
+              </div>
+            </section>
+
+            {/* Reaching the seller — a first-time buyer's first question */}
+            <section className="mt-4 rounded-xl border border-line bg-surface p-5">
+              <h2 className="font-body text-base font-semibold tracking-normal">
+                Questions about this order?
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                Contact {order.storeName} directly. Mention order{' '}
+                <span className="font-semibold text-fg">{order.orderNumber}</span>.
+              </p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                {sellerPhone && (
+                  <a
+                    href={`tel:+${sellerPhone.length === 10 ? `91${sellerPhone}` : sellerPhone}`}
+                    className={buttonClass({ variant: 'ring', className: 'sm:flex-1' })}
+                  >
+                    <PhoneCallIcon className="h-4 w-4" />
+                    Call seller
+                  </a>
+                )}
+                {sellerWhatsApp && (
+                  <a
+                    href={`https://wa.me/${sellerWhatsApp}?text=${encodeURIComponent(
+                      `Hi ${order.storeName}, I have a question about my order ${order.orderNumber}.`,
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={buttonClass({ variant: 'ring', className: 'sm:flex-1' })}
+                  >
+                    <ChatIcon className="h-4 w-4" />
+                    WhatsApp seller
+                  </a>
+                )}
+                <Link
+                  to={storeSupportUrl(order.storeSlug)}
+                  className={buttonClass({ variant: 'ring', className: 'sm:flex-1' })}
+                >
+                  <LifebuoyIcon className="h-4 w-4" />
+                  Send a message
+                </Link>
               </div>
             </section>
 

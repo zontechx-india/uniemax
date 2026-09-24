@@ -395,11 +395,13 @@ Signed-in account pages mount inside `RequireCustomer` → `AppLayout`
   with a Verified chip (identifiers change only via verified linking, never
   a plain edit); an `altPhone` row shows when set (contact-only).
   `/orders` is the real **My Orders** page (`OrdersPage.tsx` over
-  `GET /api/v1/orders`): one card per order — order number, date, store
-  link, status chip (Placed/Confirmed/…/Delivered/Cancelled), payment chip
-  (Paid online / pending / Pay on delivery), total, item rows with
-  thumbnails, and a "View details" link to the shareable confirmation page
-  (plain `<a>` — `/order/…` lives in the anonymous public router).
+  `GET /api/v1/orders`): one card per order — store link as the heading,
+  date + order number under it, a plain-words status chip from
+  `features/stores/orderStatus.ts` (Waiting for seller / Confirmed / Packed /
+  On the way / Delivered / Cancelled), payment chip (Paid online / pending /
+  Pay on delivery / Paid on delivery), total, item rows with thumbnails, and a
+  "Track order" link to the order page (plain `<a>` — `/order/…` lives in the
+  anonymous public router).
   `/addresses` is the real **Saved Addresses** page (`AddressesPage.tsx`
   over `features/addresses/`): up to 10 addresses, one **primary** (the
   default checkout suggestion — deleting it promotes the oldest remaining),
@@ -1147,7 +1149,17 @@ route with **`/order/{storeSlug}/{orderId}`** —
 `pages/cart/OrderSuccessPage.tsx`, a store-themed confirmation (green
 check, order number pill, paid/pay-on-delivery line — flagging simulated
 dev payments —, item list with thumbnails, delivery/pickup summary,
-Continue shopping). ONLINE payment is simulated in development; production
+Continue shopping). The same page is where a buyer comes back to **track**
+the order: "Order placed!" only while the order is `PENDING` and under 30
+minutes old; otherwise the headline and sub-line follow the real status in
+plain words (`orderStatusCopy` in `features/stores/orderStatus.ts` — "Your
+order is on the way", "This order was cancelled"). An **Order progress** card
+lists the steps (placed → confirmed → packed → on the way → delivered;
+shipping skipped for pickup) with the lifecycle stamps' times, or the
+cancellation time + seller's reason; a **Questions about this order?** card
+offers Call seller / WhatsApp seller (from the store's footer support phone /
+WhatsApp, when set, with the order number pre-filled) and Send a message
+(the store's `/support` page). ONLINE payment is simulated in development; production
 answers 503 until the gateway lands, surfaced as the Place Order error.
 The `/order/...` prefix is part of `StorefrontApp`'s anonymous
 `PUBLIC_PATH`, so a guest can reopen their confirmation link.

@@ -3,6 +3,7 @@ import { usePrivatePageTitle } from '../../shared/seo'
 import { call, http, toApiError } from '../../shared/auth/http'
 import { formatPrice, storeHomeUrl } from '../features/stores/storesApi'
 import type { PlacedOrder } from '../features/stores/storesApi'
+import { orderStatusCopy } from '../features/stores/orderStatus'
 import { BoxIcon, CartIcon, ChevronRightIcon } from '../layout/icons'
 
 /**
@@ -13,13 +14,12 @@ import { BoxIcon, CartIcon, ChevronRightIcon } from '../layout/icons'
  * plain <a> links — crossing routers takes a full page load.)
  */
 
-const STATUS_META: Record<string, { label: string; className: string }> = {
-  PENDING: { label: 'Placed', className: 'bg-warning/10 text-warning' },
-  CONFIRMED: { label: 'Confirmed', className: 'bg-accent/10 text-accent' },
-  PACKED: { label: 'Packed', className: 'bg-accent/10 text-accent' },
-  SHIPPED: { label: 'Shipped', className: 'bg-accent/10 text-accent' },
-  DELIVERED: { label: 'Delivered', className: 'bg-success/10 text-success' },
-  CANCELLED: { label: 'Cancelled', className: 'bg-danger/10 text-danger' },
+/** Chip colour per status tone; the words come from `orderStatusCopy`. */
+const TONE_CLASS: Record<string, string> = {
+  wait: 'bg-warning/10 text-warning',
+  progress: 'bg-accent/10 text-accent',
+  done: 'bg-success/10 text-success',
+  stopped: 'bg-danger/10 text-danger',
 }
 
 function formatDate(iso: string): string {
@@ -92,7 +92,7 @@ export function OrdersPage() {
         )}
 
         {(orders ?? []).map((order) => {
-          const status = STATUS_META[order.status] ?? STATUS_META.PENDING!
+          const status = orderStatusCopy(order)
           return (
             <section
               key={order.id}
@@ -100,22 +100,23 @@ export function OrdersPage() {
             >
               {/* Order header */}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-line px-5 py-3.5">
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 basis-full [overflow-wrap:anywhere] sm:flex-1 sm:basis-auto">
+                  {/* The shop and the date are what a buyer recognises; the
+                      order number is for quoting to the seller. */}
                   <p className="text-sm font-bold text-fg">
-                    {order.orderNumber}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted">
-                    {formatDate(order.placedAt)} ·{' '}
                     <a
                       href={storeHomeUrl(order.storeSlug)}
-                      className="font-semibold hover:text-brand hover:underline"
+                      className="hover:text-brand hover:underline"
                     >
                       {order.storeName}
                     </a>
                   </p>
+                  <p className="mt-0.5 text-xs text-muted">
+                    {formatDate(order.placedAt)} · Order {order.orderNumber}
+                  </p>
                 </div>
                 <span
-                  className={`rounded-pill px-2.5 py-1 text-[11px] font-semibold ${status.className}`}
+                  className={`rounded-pill px-2.5 py-1 text-[11px] font-semibold ${TONE_CLASS[status.tone]}`}
                 >
                   {status.label}
                 </span>
@@ -124,7 +125,11 @@ export function OrdersPage() {
                     ? order.paymentStatus === 'PAID'
                       ? 'Paid online'
                       : 'Online payment pending'
-                    : 'Pay on delivery'}
+                    : order.status === 'DELIVERED'
+                      ? 'Paid on delivery'
+                      : order.status === 'CANCELLED'
+                        ? 'Nothing to pay'
+                        : 'Pay on delivery'}
                 </span>
                 <span className="text-sm font-bold text-fg">
                   {formatPrice(order.total)}
@@ -179,9 +184,9 @@ export function OrdersPage() {
                 </span>
                 <a
                   href={`/order/${order.storeSlug}/${order.id}`}
-                  className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand hover:underline"
+                  className="inline-flex min-h-11 shrink-0 items-center gap-1 text-sm font-semibold text-brand hover:underline"
                 >
-                  View details
+                  Track order
                   <ChevronRightIcon className="h-3.5 w-3.5" />
                 </a>
               </div>
