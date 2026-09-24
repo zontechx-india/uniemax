@@ -199,7 +199,7 @@ export function MarketHeader() {
           giving way. */}
       <div className={`flex h-16 items-center gap-3 sm:gap-6 md:h-20 md:gap-8 lg:gap-10 ${CONTENT_COLUMN}`}>
         {/* Brand never wraps or shrinks — it's the anchor of the bar. */}
-        <Link to="/" className="flex shrink-0 items-center">
+        <Link to="/" aria-label="UnieMax home" className="flex shrink-0 items-center">
           <AppLogoLockup className="h-8 sm:h-9 md:h-11" />
         </Link>
 
@@ -1629,7 +1629,7 @@ export function MarketFooter() {
       <div className={`${CONTENT_COLUMN} py-12 lg:py-14`}>
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <div className="max-w-xs">
-            <Link to="/" className="flex items-center">
+            <Link to="/" aria-label="UnieMax home" className="flex items-center">
               <AppLogoLockup className="h-8" />
             </Link>
             <p className="mt-3 text-sm text-muted">

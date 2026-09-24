@@ -170,8 +170,8 @@ export function CartPage() {
                   stores it covers — otherwise a scoped total reads as the
                   whole cart. */}
               <p className="mt-2 text-xs text-muted">
-                {scoped
-                  ? `From ${focusGroup.storeName}. Delivery charges are shown at checkout.`
+                {soloGroup
+                  ? `From ${soloGroup.storeName}. Delivery charges are shown at checkout.`
                   : 'Each shop ships its own order — tap Checkout in a shop’s section.'}
               </p>
               {/* One shop in view → one obvious next step, full width. */}

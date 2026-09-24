@@ -64,14 +64,17 @@ export function CartLine({ item }: { item: CartItem }) {
 
       {/* Quantity stepper (clamped to the revalidated stock) */}
       {!out && (
-        <span className="inline-flex h-9 shrink-0 items-center overflow-hidden rounded-md border border-line">
+        <span className="inline-flex h-11 shrink-0 items-center overflow-hidden rounded-md border border-line">
           <button
             type="button"
             aria-label="Decrease quantity"
+            // At 1 the minus would silently delete the line — removing is
+            // the bin button's job, so a slip of the thumb never does it.
+            disabled={item.qty <= 1}
             onClick={() =>
               cart.setQty(item.storeSlug, item.productId, item.variantId, item.qty - 1)
             }
-            className="flex h-full w-8 items-center justify-center text-muted transition hover:bg-surface-alt"
+            className="flex h-full w-10 items-center justify-center text-muted transition hover:bg-surface-alt disabled:opacity-40"
           >
             <MinusIcon className="h-3.5 w-3.5" />
           </button>
@@ -85,7 +88,7 @@ export function CartLine({ item }: { item: CartItem }) {
             onClick={() =>
               cart.setQty(item.storeSlug, item.productId, item.variantId, item.qty + 1)
             }
-            className="flex h-full w-8 items-center justify-center text-muted transition hover:bg-surface-alt disabled:bg-line disabled:text-muted"
+            className="flex h-full w-10 items-center justify-center text-muted transition hover:bg-surface-alt disabled:bg-line disabled:text-muted"
           >
             <PlusIcon className="h-3.5 w-3.5" />
           </button>
@@ -104,7 +107,7 @@ export function CartLine({ item }: { item: CartItem }) {
         type="button"
         aria-label={`Remove ${item.name} from cart`}
         onClick={() => cart.remove(item.storeSlug, item.productId, item.variantId)}
-        className="shrink-0 rounded-md p-2 text-muted transition hover:bg-danger/10 hover:text-danger"
+        className="shrink-0 rounded-md p-3 text-muted transition hover:bg-danger/10 hover:text-danger"
       >
         <TrashIcon className="h-4 w-4" />
       </button>

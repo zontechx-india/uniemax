@@ -190,7 +190,7 @@ export function QuantityStepper({
           const parsed = Number(e.target.value.replace(/\D/g, ''))
           if (parsed > 0) onChange(clamp(parsed))
         }}
-        className={`h-full w-10 border-0 bg-transparent text-center text-sm font-bold outline-none ${skin.text}`}
+        className={`h-full w-10 border-0 bg-transparent text-center text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent ${skin.text}`}
       />
       <button
         type="button"

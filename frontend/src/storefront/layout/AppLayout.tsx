@@ -18,7 +18,7 @@ export function AppLayout() {
   return (
     <div className="min-h-screen bg-bg">
       <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-line bg-surface px-4 sm:px-6 lg:px-8">
-        <Link to="/" className="flex shrink-0 items-center">
+        <Link to="/" aria-label="UnieMax home" className="flex shrink-0 items-center">
           <AppLogoLockup className="h-8" />
         </Link>
 

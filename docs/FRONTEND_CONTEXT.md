@@ -1135,7 +1135,8 @@ product that gained options) is marked **unavailable** — kept visible with
 a warning but excluded from counts and subtotals; only a definite 404
 does this, network errors leave snapshots untouched. The shared line row
 (qty stepper, remove, line total, unavailable state) lives in
-`pages/cart/CartLine.tsx`.
+`pages/cart/CartLine.tsx` — 44px stepper whose minus stops at 1 (removing a
+line is the bin button's job, so a slipped thumb never deletes it).
 
 **Checkout steps** (`pages/cart/CheckoutSteps.tsx`, rendered by
 `CheckoutPage` once the shell loads) — Delivery Details → Choose Payment
