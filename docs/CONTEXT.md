@@ -63,7 +63,8 @@ A single account can own multiple stores and switch between them.
   always knows how much is left:
   1. **Your store** — name + logo (pick an image → crop it square, the one
      place a square is required → staged locally and uploaded with the
-     create request).
+     create request). A seller without a logo can skip the photo: the app
+     makes a letter logo from the shop name (replaceable later).
   2. **Business & contact** — business name and seller name, plus the contact
      phone and email shown read-only as the seller's verified account
      identifiers. A seller who has no mobile number yet (the ordinary case —

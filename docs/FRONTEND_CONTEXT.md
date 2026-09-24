@@ -1295,7 +1295,10 @@ shell built per request — see `docs/BACKEND_CONTEXT.md`.
 **Create Store (`CreateStorePage`)** — a two-step wizard over the shared
 `Wizard` shell: **Your store** (name + logo, the same
 validate → crop 1:1 → upload pipeline as before, posted as one multipart
-create) and **Business & contact**. Its steps map 1:1 onto the
+create; the photo is **optional** — without one, `shared/media/letterLogo.ts`
+draws a 512px PNG of the name's first letters on a colour picked from the
+name, previewed live beside the field, so a seller with no logo is never
+stopped; they replace it later in Store Details) and **Business & contact**. Its steps map 1:1 onto the
 `wizard: true` steps of the backend requirement registry, so the flow and
 the publish gate cannot drift.
 

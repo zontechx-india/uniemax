@@ -1,4 +1,5 @@
 import { usePrivatePageTitle } from '../../../shared/seo'
+import { colourFor, initialsOf, makeLetterLogo } from '../../../shared/media/letterLogo'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { FormEvent } from 'react'
@@ -6,7 +7,6 @@ import { toApiError } from '../../../shared/auth/http'
 import { ImageEditDialog } from '../../../shared/media/ImageEditDialog'
 import {
   acceptAttr,
-  ruleHint,
   useMediaConfig,
   validateImageSource,
 } from '../../../shared/media/mediaConfig'
@@ -339,13 +339,18 @@ function StoreStep({
     if (store) return onDone(store)
 
     if (!name.trim()) return setError('Please enter a store name.')
-    if (!logo) return setError('Please add a store logo.')
 
     setError(null)
     setBusy(true)
     try {
+      // No logo chosen → make a letter logo from the name rather than stop a
+      // seller who has none; it can be replaced any time in Store Details.
+      const mark = logo ?? {
+        blob: await makeLetterLogo(name.trim()),
+        filename: 'logo.png',
+      }
       onDone(
-        await storesApi.create({ name: name.trim() }, logo.blob, logo.filename),
+        await storesApi.create({ name: name.trim() }, mark.blob, mark.filename),
       )
     } catch (err) {
       setError(toApiError(err).message)
@@ -370,7 +375,7 @@ function StoreStep({
 
       <div>
         <span className="mb-2 block text-sm font-medium text-muted">
-          Store logo *
+          Store logo (optional)
         </span>
         <div className="flex items-center gap-4">
           {preview ? (
@@ -379,6 +384,15 @@ function StoreStep({
               alt="Store logo preview"
               className="h-20 w-20 shrink-0 rounded-md border border-line object-cover"
             />
+          ) : name.trim() ? (
+            // What they get if they don't pick a photo — seen before saving.
+            <div
+              aria-hidden="true"
+              className="flex h-20 w-20 shrink-0 items-center justify-center rounded-md text-2xl font-bold text-white"
+              style={{ backgroundColor: colourFor(name.trim()) }}
+            >
+              {initialsOf(name)}
+            </div>
           ) : (
             <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-md border-2 border-dashed border-line bg-surface-alt text-muted">
               <ImageIcon className="h-7 w-7" />
@@ -389,12 +403,14 @@ function StoreStep({
               type="button"
               onClick={() => inputRef.current?.click()}
               disabled={busy || !config || store !== null}
-              className="h-9 rounded-md border border-line bg-surface px-3.5 text-sm font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
+              className="h-11 rounded-md border border-line bg-surface px-4 text-sm font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
             >
-              {preview ? 'Replace' : 'Choose Logo'}
+              {preview ? 'Change photo' : 'Choose a photo'}
             </button>
             <p className="mt-1.5 text-xs text-muted">
-              {config ? `Square logo · ${ruleHint(config.logo)}` : 'Loading…'}
+              {preview
+                ? 'A square photo works best.'
+                : "No logo? No problem — we'll use your shop's first letters. You can change it later."}
             </p>
           </div>
         </div>
