@@ -30,7 +30,7 @@ export function LoginPage({ onSignedIn }: { onSignedIn: (customer: Customer) => 
       <CustomerAuthPanel variant="page" onSignedIn={onSignedIn} />
 
       <p className="mt-4 text-center text-sm text-muted">
-        Browsing and checkout work without an account — sign in to see your orders.
+        Browse and fill your cart without an account — sign in to place an order and see your orders.
       </p>
     </AuthLayout>
   )

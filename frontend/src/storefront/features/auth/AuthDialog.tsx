@@ -196,8 +196,8 @@ function OpenAuthDialog({ req }: { req: AuthDialogRequest }) {
             )}
 
             <p className="mt-6 text-center text-xs text-muted">
-              Browsing and checkout work without an account — sign in to see
-              your orders.
+              Browse and fill your cart without an account — sign in to place
+              an order and see your orders.
             </p>
           </div>
         </div>
