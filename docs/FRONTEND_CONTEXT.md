@@ -1602,8 +1602,10 @@ a pickup-address item.
   swaps the name for an input with save/cancel, Enter saves, Escape
   cancels → `PATCH /stores/:id/categories/:categoryId` with `{ name }`),
   and `StoreProductsPage`
-  (**gated**: with zero categories it shows an "Add a category first"
+  (**gated**: with zero categories it shows a "First, choose what you sell"
   state linking to the Categories section — the category-first sequence;
+  the Categories page then leads with "Category added. Next: add your first
+  product" + **Add a product** while the store still has no product;
   otherwise the **`ProductWizard`**
   (`pages/stores/products/wizard/`) for adding *and* editing — one question
   per step, written for sellers who are not technical: **1 What is it?**

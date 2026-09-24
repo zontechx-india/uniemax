@@ -202,18 +202,18 @@ export function StoreProductsPage() {
             <TagIcon className="h-6 w-6" />
           </div>
           <p className="mt-4 text-sm font-medium text-fg">
-            Add a category first
+            First, choose what you sell
           </p>
           <p className="mt-1 max-w-sm text-sm text-muted">
-            Every product lives inside a category. Create your first
-            category, then come back here to add products.
+            Pick a category for your products — type what you sell, like
+            "saree" or "atta". Then you can add products.
           </p>
           <Link
             to="../categories"
             className="mt-5 inline-flex h-10 items-center gap-2 rounded-md bg-brand-gradient px-4 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90"
           >
             <PlusIcon className="h-4 w-4" />
-            Add a Category
+            Choose a category
           </Link>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { toApiError } from '../../../shared/auth/http'
 import { CategoryPicker } from '../../../shared/categories/CategoryPicker'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { ErrorNote } from '../../../shared/ui/form'
+import { buttonClass } from '../../../shared/ui/Button'
 import { storeCatalogApi } from '../../features/stores/storesApi'
 import type {
   StoreCategory,
@@ -279,6 +280,21 @@ export function StoreCategoriesPage() {
         the categories above it too. Add at least one, then you can start
         adding products.
       </p>
+
+      {/* The next step, right where the seller finishes this one — before,
+          they had to find "Products" in the section menu themselves. */}
+      {(categories?.length ?? 0) > 0 &&
+        store.readiness.gates.PUBLISH.blockers.includes('At least one product') && (
+          <div className="mt-4 flex flex-col gap-3 rounded-lg border border-success/40 bg-success/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-fg">
+              <span className="font-semibold">Category added.</span> Next: add
+              your first product.
+            </p>
+            <Link to="../products" className={buttonClass({ size: 'md' })}>
+              Add a product
+            </Link>
+          </div>
+        )}
 
       {/* Add form — a picker, no free text: a shop cannot invent a category,
           so every shelf is findable across the whole platform. */}
