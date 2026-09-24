@@ -95,6 +95,12 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
     fulfilment: 'DELIVERY',
   })
   const [placing, setPlacing] = useState(false)
+  // `placing` only disables the button after React re-renders; a second
+  // click/tap in the same frame still reaches placeOrder. The ref closes that
+  // gap, and the idempotency key (one per visit to this page) makes the
+  // backend return the same order to any retry that gets through anyway.
+  const placingRef = useRef(false)
+  const idempotencyKey = useRef(newIdempotencyKey())
   const [placeError, setPlaceError] = useState<string | null>(null)
   const onStepsChange = useCallback((state: CheckoutState) => {
     setCheckout(state)
@@ -146,6 +152,8 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
 
   const placeOrder = async () => {
     if (!ready || !checkout.delivery || !checkout.payment || sellable.length === 0) return
+    if (placingRef.current) return
+    placingRef.current = true
     setPlacing(true)
     setPlaceError(null)
     const delivery = checkout.delivery
@@ -170,7 +178,7 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
           quantity: item.qty,
         })),
         affiliateRef: getAttribution(storeSlug),
-      })
+      }, idempotencyKey.current)
     try {
       // An access cookie that expired while the customer filled in the steps
       // is handled by the http client (one silent refresh + replay); a 401
@@ -189,6 +197,7 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
       navigate(`/order/${storeSlug}/${order.id}`, { replace: true })
     } catch (err) {
       const apiError = toApiError(err)
+      placingRef.current = false
       setPlacing(false)
       if (apiError.statusCode === 401) {
         // The refresh failed too — the session is really gone. Sign in right
@@ -629,4 +638,10 @@ function NothingToOrder({
       </div>
     </div>
   )
+}
+
+/** Opaque per-attempt key for the order placement's Idempotency-Key header. */
+function newIdempotencyKey(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
+  return `ck-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
 }

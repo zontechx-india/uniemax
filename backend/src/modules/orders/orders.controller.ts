@@ -5,6 +5,7 @@ import { idParamSchema, slugParamSchema } from "../../utils/zodHelpers.js";
 import { optionalCustomerId } from "../../package/auth/index.js";
 import {
   orderCancelSchema,
+  idempotencyHeaderSchema,
   orderCreateSchema,
   orderParamSchema,
   orderQuoteSchema,
@@ -22,7 +23,15 @@ import * as service from "./orders.service.js";
 export async function createOrder(request: FastifyRequest, reply: FastifyReply) {
   const { slug } = slugParamSchema.parse(request.params);
   const input = orderCreateSchema.parse(request.body);
-  const order = await service.createOrder(slug, input, request.customer!.id);
+  const { "idempotency-key": idempotencyKey } = idempotencyHeaderSchema.parse(
+    request.headers,
+  );
+  const order = await service.createOrder(
+    slug,
+    input,
+    request.customer!.id,
+    idempotencyKey,
+  );
   return reply.status(201).send(ok(order));
 }
 

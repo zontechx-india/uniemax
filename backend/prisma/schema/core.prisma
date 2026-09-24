@@ -1037,12 +1037,17 @@ model Order {
   /// Opaque affiliate attribution token sent by the checkout. Stored as-is;
   /// only the affiliate package knows what it means.
   affiliateRef        String?
+  /// Client-generated `Idempotency-Key` of the placement request (one per
+  /// checkout attempt). Unique per customer, so a retried or double-fired
+  /// Place Order returns the order it already created instead of a second one.
+  idempotencyKey      String?
   estimatedDeliveryAt DateTime?
   placedAt            DateTime    @default(now())
   items               OrderItem[]
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
 
+  @@unique([customerId, idempotencyKey])
   @@index([storeId])
   @@index([customerId])
   @@index([customerPhone])

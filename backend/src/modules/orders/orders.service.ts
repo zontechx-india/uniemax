@@ -410,11 +410,39 @@ export async function quoteOrder(
   };
 }
 
+/**
+ * The order an earlier request with the same `Idempotency-Key` created, in
+ * the placement response shape — or null. A replay never re-opens a payment
+ * session: the order page owns "Pay now" for an unpaid ONLINE order.
+ */
+async function findIdempotentOrder(customerId: string, idempotencyKey: string) {
+  const existing = await prisma.order.findUnique({
+    where: { customerId_idempotencyKey: { customerId, idempotencyKey } },
+    select: orderSelect,
+  });
+  return existing ? { ...shapeOrder(existing), payment: null } : null;
+}
+
+function isIdempotencyConflict(err: unknown): boolean {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") {
+    return false;
+  }
+  return JSON.stringify(err.meta ?? {}).includes("idempotencyKey");
+}
+
 export async function createOrder(
   storeSlug: string,
   input: OrderCreateInput,
   customerId: string,
+  idempotencyKey?: string,
 ) {
+  // Replay of a placement that already succeeded (double-fired button,
+  // network retry after the response was lost): hand back that order.
+  if (idempotencyKey) {
+    const replay = await findIdempotentOrder(customerId, idempotencyKey);
+    if (replay) return replay;
+  }
+
   // Only LIVE stores take orders — an owner's draft preview can browse but
   // never sell, so drafts deliberately 404 here like they do for anyone else.
   const store = await prisma.store.findFirst({
@@ -543,72 +571,85 @@ export async function createOrder(
   const simulated =
     input.paymentMethod === "ONLINE" && !isProduction && !cashfreeConfigured;
 
-  const row = await prisma.$transaction(async (tx) => {
-    // Guarded decrement: the WHERE re-checks stock inside the transaction,
-    // so two simultaneous orders can never oversell a variant.
-    for (const line of lines) {
-      const updated = await tx.storeProductVariant.updateMany({
-        where: {
-          id: line.stockVariantId,
-          stockQuantity: { gte: line.quantity },
-        },
-        data: { stockQuantity: { decrement: line.quantity } },
-      });
-      if (updated.count === 0) {
-        throw HttpError.conflict(
-          `"${line.productName}" just sold out — refresh your cart`,
-        );
+  let row: OrderRow;
+  try {
+    row = await prisma.$transaction(async (tx) => {
+      // Guarded decrement: the WHERE re-checks stock inside the transaction,
+      // so two simultaneous orders can never oversell a variant.
+      for (const line of lines) {
+        const updated = await tx.storeProductVariant.updateMany({
+          where: {
+            id: line.stockVariantId,
+            stockQuantity: { gte: line.quantity },
+          },
+          data: { stockQuantity: { decrement: line.quantity } },
+        });
+        if (updated.count === 0) {
+          throw HttpError.conflict(
+            `"${line.productName}" just sold out — refresh your cart`,
+          );
+        }
       }
-    }
-    for (const productId of new Set(lines.map((l) => l.productId))) {
-      await recomputeProductAggregates(productId, tx);
-    }
+      for (const productId of new Set(lines.map((l) => l.productId))) {
+        await recomputeProductAggregates(productId, tx);
+      }
 
-    return tx.order.create({
-      data: {
-        orderNumber: newOrderNumber(),
-        storeId: store.id,
-        storeName: store.name,
-        storeSlug: store.slug,
-        customerId,
-        fulfilment: input.fulfilment,
-        customerName: input.customer.name,
-        customerPhone: input.customer.phone,
-        customerEmail: input.customer.email,
-        addressLine: withAddress ? input.customer.address : null,
-        pincode: withAddress ? input.customer.pincode : null,
-        state: withAddress ? input.customer.state : null,
-        country: withAddress ? input.customer.country : null,
-        billingAddress: billingAddress ?? Prisma.DbNull,
-        subtotal: money.subtotal,
-        shippingCharge: money.shippingCharge,
-        shippingMethod: money.shippingMethod,
-        shippingBasis: money.shippingBasis as unknown as Prisma.InputJsonValue,
-        tax: money.tax,
-        discount: money.discount,
-        total: money.total,
-        paymentMethod: input.paymentMethod,
-        paymentStatus: simulated ? "PAID" : "PENDING",
-        paymentRef: simulated ? "DEV-SIMULATED" : null,
-        affiliateRef: input.affiliateRef,
-        items: {
-          create: lines.map((line) => ({
-            productId: line.productId,
-            variantId: line.variantId,
-            productName: line.productName,
-            variantName: line.variantName,
-            sku: line.sku,
-            productSlug: line.productSlug,
-            imageKey: line.imageKey,
-            unitPrice: line.unitPrice,
-            quantity: line.quantity,
-            lineTotal: line.lineTotal,
-          })),
+      return tx.order.create({
+        data: {
+          orderNumber: newOrderNumber(),
+          storeId: store.id,
+          storeName: store.name,
+          storeSlug: store.slug,
+          customerId,
+          fulfilment: input.fulfilment,
+          customerName: input.customer.name,
+          customerPhone: input.customer.phone,
+          customerEmail: input.customer.email,
+          addressLine: withAddress ? input.customer.address : null,
+          pincode: withAddress ? input.customer.pincode : null,
+          state: withAddress ? input.customer.state : null,
+          country: withAddress ? input.customer.country : null,
+          billingAddress: billingAddress ?? Prisma.DbNull,
+          subtotal: money.subtotal,
+          shippingCharge: money.shippingCharge,
+          shippingMethod: money.shippingMethod,
+          shippingBasis: money.shippingBasis as unknown as Prisma.InputJsonValue,
+          tax: money.tax,
+          discount: money.discount,
+          total: money.total,
+          paymentMethod: input.paymentMethod,
+          paymentStatus: simulated ? "PAID" : "PENDING",
+          paymentRef: simulated ? "DEV-SIMULATED" : null,
+          affiliateRef: input.affiliateRef,
+          idempotencyKey: idempotencyKey ?? null,
+          items: {
+            create: lines.map((line) => ({
+              productId: line.productId,
+              variantId: line.variantId,
+              productName: line.productName,
+              variantName: line.variantName,
+              sku: line.sku,
+              productSlug: line.productSlug,
+              imageKey: line.imageKey,
+              unitPrice: line.unitPrice,
+              quantity: line.quantity,
+              lineTotal: line.lineTotal,
+            })),
+          },
         },
-      },
-      select: orderSelect,
+        select: orderSelect,
+      });
     });
-  });
+  } catch (err) {
+    // Two requests with the same key raced past the replay check: the
+    // unique (customerId, idempotencyKey) index let exactly one commit and
+    // rolled this one back — stock decrement included. Answer with the winner.
+    if (idempotencyKey && isIdempotencyConflict(err)) {
+      const replay = await findIdempotentOrder(customerId, idempotencyKey);
+      if (replay) return replay;
+    }
+    throw err;
+  }
 
   // Gateway orders: register the Cashfree order and hand the session id to
   // the client. If Cashfree refuses, the order must not linger holding stock

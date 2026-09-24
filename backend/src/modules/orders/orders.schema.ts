@@ -66,6 +66,18 @@ export const orderQuoteSchema = z.object({
 
 export type OrderQuoteInput = z.infer<typeof orderQuoteSchema>;
 
+/**
+ * Optional `Idempotency-Key` header on order placement — one opaque key per
+ * checkout attempt (the storefront sends a UUID). Same key from the same
+ * customer ⇒ the same order back, never a second one.
+ */
+export const idempotencyHeaderSchema = z.object({
+  "idempotency-key": z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{8,100}$/, "Idempotency-Key must be 8–100 characters of A–Z, a–z, 0–9, _ or -")
+    .optional(),
+});
+
 export const orderCreateSchema = z.object({
   fulfilment: z.enum(["DELIVERY", "PICKUP"]),
   paymentMethod: z.enum(["ONLINE", "COD"]),

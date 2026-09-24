@@ -2217,9 +2217,19 @@ export const publicOrderApi = {
    * ONLINE orders return `payment.paymentSessionId` for the Cashfree SDK;
    * without it dev simulates the payment and production answers 503.
    */
-  async place(slug: string, input: OrderCreateInput): Promise<PlacedOrder> {
+  /**
+   * `idempotencyKey` — one per checkout attempt: a retried or double-fired
+   * placement with the same key gets the order the first one created.
+   */
+  async place(
+    slug: string,
+    input: OrderCreateInput,
+    idempotencyKey?: string,
+  ): Promise<PlacedOrder> {
     return call<PlacedOrder>(
-      http.post(`${PUBLIC_STORES}/${slug}/orders`, input),
+      http.post(`${PUBLIC_STORES}/${slug}/orders`, input, {
+        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {},
+      }),
     )
   },
 

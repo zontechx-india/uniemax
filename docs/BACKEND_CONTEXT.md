@@ -1143,7 +1143,8 @@ White-label design — one codebase, any business:
   storefront checkout (`modules/orders`; placement runs behind
   `requireCustomer` — only signed-in customers can order, and every order
   is attached to its account; browsing stays anonymous, and the
-  confirmation lookup is public. A guest's cart is anonymous too — it
+  confirmation lookup authenticates optionally — contact + delivery fields
+  only for the buyer, redacted for anyone else. A guest's cart is anonymous too — it
   lives in their browser until they sign in; see **Cart / CartLine**).
   Order snapshots the store
   (`storeId` SetNull + `storeName`/`storeSlug`), fulfilment
@@ -1161,7 +1162,11 @@ White-label design — one codebase, any business:
   gateway attempt fields `cfOrderId` (unique — the order id registered
   with Cashfree, `orderNumber` or `orderNumber~R<n>` on retries) and
   `paymentSessionId` (latest Cashfree session for the web SDK; see
-  `docs/CASHFREE_PAYMENTS.md`). Items reference
+  `docs/CASHFREE_PAYMENTS.md`), and `idempotencyKey` — the placement
+  request's `Idempotency-Key` header, unique per `(customerId,
+  idempotencyKey)`, so a retried/double-fired Place Order returns the order
+  already created (a concurrent duplicate loses on the index and its whole
+  transaction, stock decrement included, rolls back). Items reference
   `StoreProduct`/`StoreProductVariant` (SetNull)
   and snapshot name/variant label/slug/cover `imageKey`/price, so history
   survives catalog edits and deletions. The variant label is the derived

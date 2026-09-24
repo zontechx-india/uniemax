@@ -459,7 +459,7 @@ the order page own the payment launch. The order page already has the full
 retry flow. This makes the success page the single owner of payment state, which
 is the right shape anyway.
 
-### F7. No idempotency on order placement 🟡
+### F7. No idempotency on order placement ✅ fixed (Sep 2026)
 
 `POST /public/stores/:slug/orders` has no idempotency key. A double-submit that
 the disabled button doesn't catch (network retry, flaky mobile connection,
@@ -468,6 +468,10 @@ The 10/min rate limit is an abuse control, not a correctness control.
 
 **Required:** accept an `Idempotency-Key` header, store it on the order with a
 unique index, return the existing order on replay.
+
+**Done:** `Order.idempotencyKey` + unique `(customerId, idempotencyKey)`;
+the checkout sends one UUID per visit and guards re-entrant clicks with a ref.
+Covered by `backend/test/order-idempotency.test.mjs`.
 
 ### F8. `POST /pay` reconciles but the caller may never come back 🟡
 
@@ -718,7 +722,7 @@ being stranded*, then *what makes the marketplace credible*.
 10. **Customer self-cancel** before dispatch (C1) — S
 11. **Customer-visible order timeline** (C2, presentation of existing data) — S
 12. **Return request → ticket** (C3 minimum viable) — S
-13. **Order-placement idempotency key** (F7) — S
+13. ~~**Order-placement idempotency key** (F7) — S~~ ✅ done
 14. **Order history pagination** (C8) — XS
 15. **Error monitoring + sweep-job alerting** (X4) — S
 

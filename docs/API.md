@@ -1639,6 +1639,14 @@ without a valid customer token — the checkout page sends guests through
 it. **Published stores only** — an owner's draft preview can browse but
 never sell.
 
+**`Idempotency-Key` header** (optional, 8–100 chars of `A–Z a–z 0–9 _ -`,
+`422` otherwise): one key per checkout attempt — the storefront sends a UUID
+generated when the checkout page opens. A repeat with the same key from the
+same customer (double-fired button, retry after a lost response, concurrent
+duplicate) returns the order the first request created — `201`, same `id`,
+stock decremented once — with `payment: null` (the order page's *Pay now*
+owns re-opening a gateway session).
+
 ```jsonc
 {
   "fulfilment": "DELIVERY",          // DELIVERY | PICKUP — must be allowed by
