@@ -900,9 +900,11 @@ full-bleed section bands instead.
     price, sizes and stock all change; `ProductDetail` remounts on the new
     id); the picker beneath changes only this product's variant.
   - **Sticky purchase bar** — an IntersectionObserver watches the purchase
-    card; once it scrolls out of view a fixed bottom bar (thumbnail, name,
-    live price, Add + Buy Now) takes over on every breakpoint, and the page
-    carries `pb-24` so it never covers content.
+    **buttons** (the `PurchaseActions` wrapper, not the whole card); whenever
+    they are off screen a fixed bottom bar (thumbnail, name, live price, Add
+    + Buy Now) takes over on every breakpoint — including on first load on a
+    phone, where the title and option picker push the buttons below the
+    fold — and the page carries `pb-24` so it never covers content.
   - **No rating and no reviews.** There is no review system in the schema or
     API, and the platform's rule is to say so rather than invent stars (same
     as `StoreRating` on the marketplace homepage) — the section arrives with

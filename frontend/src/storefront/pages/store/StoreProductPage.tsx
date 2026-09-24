@@ -197,7 +197,9 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
   )
   const variant = findVariant(product.variants, product.optionTypes, selection)
   const hasOptions = product.optionTypes.length > 0
-  // The sticky bar appears only once the real purchase card is out of view.
+  // The sticky bar shows whenever the real Add to Cart / Buy Now buttons are
+  // off screen — including on first load on a phone, where they start below
+  // the fold.
   const buyCardRef = useRef<HTMLDivElement>(null)
   const buyCardVisible = useIsVisible(buyCardRef)
 
@@ -276,7 +278,6 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
 
         {/* Everything about buying lives inside one card. */}
         <div
-          ref={buyCardRef}
           className={`min-w-0 rounded-xl border p-5 sm:p-6 ${skin.border} ${skin.surface}`}
         >
           <div className="flex items-start justify-between gap-3">
@@ -361,7 +362,10 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
             </p>
           )}
 
-          <div className="mt-6">
+          {/* Watched by the sticky bar: on a phone the title + options fill
+              the first screen, so the buttons start below the fold — the
+              bar must show until THEY are on screen, not just the card. */}
+          <div ref={buyCardRef} className="mt-6">
             <PurchaseActions target={target} skin={skin} />
           </div>
 
