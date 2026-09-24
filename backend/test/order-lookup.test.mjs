@@ -38,7 +38,8 @@ test("order lookup: buyer sees details; anonymous and other accounts get a redac
   const own = await buyer.req("GET", path);
   assert.equal(own.status, 200);
   assert.equal(own.body.data.redacted, false);
-  assert.equal(own.body.data.customerPhone, CUSTOMER.phone);
+  // Stored in canonical form (see phone.test.mjs).
+  assert.equal(own.body.data.customerPhone, `+91${CUSTOMER.phone}`);
   assert.equal(own.body.data.addressLine, CUSTOMER.address);
 
   const anon = await new Client().req("GET", path, { anonymous: true });

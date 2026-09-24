@@ -1,7 +1,13 @@
 import { prisma } from "../../config/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../../utils/httpError.js";
-import { PINCODE_MESSAGE, isValidPincode } from "../../utils/zodHelpers.js";
+import {
+  PHONE_MESSAGE,
+  PINCODE_MESSAGE,
+  isValidPincode,
+  normalizePhone,
+  normalizePincode,
+} from "../../utils/zodHelpers.js";
 import type {
   AddressCreateInput,
   AddressUpdateInput,
@@ -82,12 +88,20 @@ export async function updateAddress(
   if (!existing) throw HttpError.notFound("Address not found");
   // Country-specific PIN rule against the address as it will be saved —
   // a pincode-only or country-only change is checked against the other half.
+  const country = input.country ?? existing.country;
   if (input.pincode !== undefined || input.country !== undefined) {
     const pincode = input.pincode ?? existing.pincode;
-    const country = input.country ?? existing.country;
     if (!isValidPincode(pincode, country)) {
       throw HttpError.badRequest(PINCODE_MESSAGE);
     }
+  }
+  // A phone that is sent is checked + stored in its canonical form for the
+  // address's country (same rule as create).
+  let phone: string | undefined;
+  if (input.phone !== undefined) {
+    const normalized = normalizePhone(input.phone, country);
+    if (!normalized) throw HttpError.badRequest(PHONE_MESSAGE);
+    phone = normalized;
   }
 
   const { isPrimary, ...details } = input;
@@ -96,10 +110,12 @@ export async function updateAddress(
   const data: Prisma.CustomerAddressUncheckedUpdateInput = {};
   if (details.label !== undefined) data.label = details.label;
   if (details.name !== undefined) data.name = details.name;
-  if (details.phone !== undefined) data.phone = details.phone;
+  if (phone !== undefined) data.phone = phone;
   if (details.email !== undefined) data.email = details.email;
   if (details.addressLine !== undefined) data.addressLine = details.addressLine;
-  if (details.pincode !== undefined) data.pincode = details.pincode;
+  if (details.pincode !== undefined) {
+    data.pincode = normalizePincode(details.pincode, country);
+  }
   if (details.state !== undefined) data.state = details.state;
   if (details.country !== undefined) data.country = details.country;
   if (isPrimary) data.isPrimary = true;

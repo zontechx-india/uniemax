@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { PINCODE_MESSAGE, isValidPincode, paginationQuery } from "../../utils/zodHelpers.js";
+import {
+  PHONE_MESSAGE,
+  PINCODE_MESSAGE,
+  isValidPincode,
+  normalizePhone,
+  normalizePincode,
+  paginationQuery,
+} from "../../utils/zodHelpers.js";
 
 /**
  * Storefront order placement (per store, guests welcome). The payload
@@ -37,7 +44,14 @@ export const billingAddressSchema = z.object({
   if (!isValidPincode(val.pincode, val.country)) {
     ctx.addIssue({ code: "custom", path: ["pincode"], message: PINCODE_MESSAGE });
   }
-});
+  if (val.phone && !normalizePhone(val.phone, val.country)) {
+    ctx.addIssue({ code: "custom", path: ["phone"], message: PHONE_MESSAGE });
+  }
+}).transform((val) => ({
+  ...val,
+  pincode: normalizePincode(val.pincode, val.country),
+  phone: val.phone ? (normalizePhone(val.phone, val.country) ?? val.phone) : null,
+}));
 
 export type BillingAddressInput = z.infer<typeof billingAddressSchema>;
 
@@ -107,6 +121,14 @@ export const orderCreateSchema = z.object({
       pincode: null,
       state: null,
       country: null,
+    }))
+    // Canonical forms where the value is usable ("682 001" → "682001",
+    // "098765 43210" → "+919876543210"); anything else is left as typed so
+    // the service's per-store field check rejects it with a clear message.
+    .transform((c) => ({
+      ...c,
+      phone: c.phone ? (normalizePhone(c.phone, c.country) ?? c.phone) : null,
+      pincode: c.pincode ? normalizePincode(c.pincode, c.country) : null,
     })),
   items: orderItemsSchema,
   /** Affiliate attribution token the storefront picked up from /a/:token. */

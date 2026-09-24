@@ -1258,7 +1258,11 @@ form instead.
 {
   "label": "Home",                          // optional (≤ 40)
   "name": "Ravi Kumar",                     // required (1–100)
-  "phone": "+91 98765 43210",               // required
+  "phone": "+91 98765 43210",               // required — India: any spacing/dashes,
+                                            //   +91 / 0091 / leading 0 accepted, must
+                                            //   leave 10 digits (not starting 0/1);
+                                            //   stored as "+919876543210". Other
+                                            //   countries: loose shape, stored as typed
   "email": "ravi@example.com",              // optional
   "addressLine": "12/4 MG Road, Kochi",     // required (1–300)
   "pincode": "682016",                      // required — India: 6-digit PIN, not
@@ -1698,7 +1702,17 @@ delivery details).
 **PIN codes:** `customer.pincode` and `billingAddress.pincode` must be a
 6-digit PIN not starting with 0 when the country is India (or not given) —
 `400 "Enter a valid 6-digit PIN code"` / `422` for billing; other countries
-accept 3–10 alphanumerics.
+accept 3–10 alphanumerics. Spaces/dashes inside an Indian PIN are dropped
+before the check and in what is stored ("682 001" → "682001") — here and in
+the address book.
+
+**Phones:** `customer.phone` (and an optional `billingAddress.phone`) for an
+Indian address must reduce to a 10-digit number not starting with 0 or 1
+after removing spaces, dashes, brackets and a `+91` / `0091` / `0` prefix —
+`400 "Enter a 10-digit mobile number, e.g. 98765 43210"` otherwise (`422` for
+billing) — and is stored as `+91XXXXXXXXXX`, so the seller can dial it and
+order search matches any run of its digits. Same rule in the address book
+(`422` on create, `400` on PATCH).
 
 **Delivery areas** (`DELIVERY` orders): every line's effective pincode rule
 (the product's own `deliveryRule`, else the store's `shipping.deliveryRule`)

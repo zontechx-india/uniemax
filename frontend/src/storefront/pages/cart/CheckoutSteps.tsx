@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { toApiError } from '../../../shared/auth/http'
-import { isValidPincode } from '../../features/addresses/pincode'
+import {
+  PHONE_HINT,
+  PIN_HINT,
+  isValidPhone,
+  isValidPincode,
+} from '../../features/addresses/pincode'
 import { ErrorNote, InfoNote, TextField } from '../../../shared/ui/form'
 import { buttonClass } from '../../../shared/ui/Button'
 import {
@@ -67,6 +72,25 @@ const FIELD_LABELS: Record<CheckoutFieldKey, string> = {
   country: 'Country',
 }
 
+/** Browser autofill hints — a returning buyer's phone fills in the details. */
+const AUTOCOMPLETE: Record<CheckoutFieldKey, string> = {
+  name: 'name',
+  phone: 'tel',
+  email: 'email',
+  address: 'street-address',
+  pincode: 'postal-code',
+  state: 'address-level1',
+  country: 'country-name',
+}
+
+/** "e.g." so an example never reads as an already-filled answer. */
+const PLACEHOLDERS: Partial<Record<CheckoutFieldKey, string>> = {
+  phone: 'e.g. 98765 43210',
+  email: 'e.g. you@example.com',
+  pincode: 'e.g. 682016',
+  state: 'e.g. Kerala',
+}
+
 export type CheckoutForm = Partial<Record<CheckoutFieldKey, string>>
 
 /** Validate ONLY the fields this store collects for this fulfilment. */
@@ -82,14 +106,14 @@ function validate(
     if (!fields[key]) continue
     const value = (values[key] ?? '').trim()
     if (!value) return `${FIELD_LABELS[key]} is required.`
-    if (key === 'phone' && !/^\+?[\d\s\-()]{5,20}$/.test(value)) {
-      return 'The mobile number looks invalid.'
+    if (key === 'phone' && !isValidPhone(value, values.country)) {
+      return PHONE_HINT
     }
     if (key === 'email' && !/^\S+@\S+\.\S+$/.test(value)) {
       return 'The email address looks invalid.'
     }
     if (key === 'pincode' && !isValidPincode(value, values.country)) {
-      return 'Enter a valid 6-digit PIN code.'
+      return PIN_HINT
     }
   }
   return null
@@ -146,7 +170,10 @@ function validateBilling(values: BillingForm): string | null {
   if (!values.name.trim()) return 'Enter the billing name.'
   if (!values.address.trim()) return 'Enter the billing address.'
   if (!isValidPincode(values.pincode, values.country)) {
-    return 'Enter a valid 6-digit billing PIN code.'
+    return 'Enter the 6-digit billing PIN code, e.g. 682016.'
+  }
+  if (values.phone.trim() && !isValidPhone(values.phone, values.country)) {
+    return PHONE_HINT
   }
   return null
 }
@@ -604,6 +631,11 @@ function SavedAddressPicker({
     }
     // Saved before PIN codes were validated — catch it here rather than as a
     // 400 on Place Order.
+    if (fields.phone && !isValidPhone(selected.phone, selected.country)) {
+      return setProblem(
+        'This address has an incomplete mobile number — the seller needs it to reach you. Add a new address or edit it in your account.',
+      )
+    }
     if (fields.pincode && !isValidPincode(selected.pincode, selected.country)) {
       return setProblem(
         'This address has an invalid PIN code — add a new address or edit it in your account.',
@@ -771,7 +803,8 @@ function ManualDetailsForm({
           <textarea
             value={values[key] ?? ''}
             onChange={(e) => set(key, e.target.value)}
-            placeholder="House / street / area / city"
+            placeholder="House no., street, area, city"
+            autoComplete="street-address"
             rows={3}
             maxLength={300}
             className="w-full rounded-md border border-line bg-input px-4 py-3 text-sm text-fg outline-none transition-colors placeholder:text-muted hover:border-fg/30 focus:border-accent"
@@ -788,7 +821,9 @@ function ManualDetailsForm({
         inputMode={
           key === 'phone' ? 'tel' : key === 'pincode' ? 'numeric' : undefined
         }
-        type={key === 'email' ? 'email' : undefined}
+        type={key === 'email' ? 'email' : key === 'phone' ? 'tel' : undefined}
+        autoComplete={AUTOCOMPLETE[key]}
+        placeholder={PLACEHOLDERS[key]}
         maxLength={key === 'phone' ? 20 : key === 'pincode' ? 10 : 160}
       />
     )

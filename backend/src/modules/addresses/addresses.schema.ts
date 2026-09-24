@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { PINCODE_MESSAGE, isValidPincode } from "../../utils/zodHelpers.js";
+import {
+  PHONE_MESSAGE,
+  PINCODE_MESSAGE,
+  isValidPincode,
+  normalizePhone,
+  normalizePincode,
+} from "../../utils/zodHelpers.js";
 
 /**
  * Customer address book. An address carries everything a store's checkout
@@ -57,7 +63,15 @@ export const addressCreateSchema = z.object({
   if (!isValidPincode(val.pincode, val.country)) {
     ctx.addIssue({ code: "custom", path: ["pincode"], message: PINCODE_MESSAGE });
   }
-});
+  if (!normalizePhone(val.phone, val.country)) {
+    ctx.addIssue({ code: "custom", path: ["phone"], message: PHONE_MESSAGE });
+  }
+}).transform((val) => ({
+  ...val,
+  // Canonical forms: "682 001" → "682001", "098765 43210" → "+919876543210".
+  pincode: normalizePincode(val.pincode, val.country),
+  phone: normalizePhone(val.phone, val.country) ?? val.phone,
+}));
 
 /**
  * Partial update. `isPrimary` accepts only `true` — the way to demote the

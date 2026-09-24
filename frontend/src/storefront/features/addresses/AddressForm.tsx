@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { ErrorNote, TextField } from '../../../shared/ui/form'
 import type { AddressInput, CustomerAddress } from './addressesApi'
-import { isValidPincode } from './pincode'
+import { PHONE_HINT, PIN_HINT, isValidPhone, isValidPincode } from './pincode'
 
 /**
  * Add/edit form for one address-book entry — used by the Saved Addresses
@@ -41,8 +41,8 @@ export function AddressForm({
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!draft.name.trim()) return setProblem('Name is required.')
-    if (!/^\+?[\d\s\-()]{5,20}$/.test(draft.phone.trim())) {
-      return setProblem('A valid phone number is required.')
+    if (!isValidPhone(draft.phone, draft.country)) {
+      return setProblem(PHONE_HINT)
     }
     const email = draft.email.trim()
     if (email && !/^\S+@\S+\.\S+$/.test(email)) {
@@ -50,7 +50,7 @@ export function AddressForm({
     }
     if (!draft.addressLine.trim()) return setProblem('The address is required.')
     if (!isValidPincode(draft.pincode, draft.country)) {
-      return setProblem('Enter a valid 6-digit PIN code.')
+      return setProblem(PIN_HINT)
     }
     if (!draft.state.trim()) return setProblem('State is required.')
     if (!draft.country.trim()) return setProblem('Country is required.')
@@ -93,16 +93,19 @@ export function AddressForm({
           label="Mobile number"
           value={draft.phone}
           onChange={(e) => set('phone', e.target.value)}
-          placeholder="+91 98765 43210"
+          placeholder="e.g. 98765 43210"
           inputMode="tel"
+          type="tel"
+          autoComplete="tel"
           maxLength={20}
         />
         <TextField
           label="Email (optional)"
           value={draft.email}
           onChange={(e) => set('email', e.target.value)}
-          placeholder="you@example.com"
+          placeholder="e.g. you@example.com"
           type="email"
+          autoComplete="email"
           maxLength={160}
         />
       </div>
@@ -113,7 +116,8 @@ export function AddressForm({
         <textarea
           value={draft.addressLine}
           onChange={(e) => set('addressLine', e.target.value)}
-          placeholder="House / street / area / city"
+          placeholder="House no., street, area, city"
+          autoComplete="street-address"
           rows={3}
           maxLength={300}
           className="w-full rounded-md border border-line bg-input px-4 py-3 text-sm text-fg outline-none transition-colors placeholder:text-muted hover:border-fg/30 focus:border-accent"
@@ -124,15 +128,17 @@ export function AddressForm({
           label="Pincode"
           value={draft.pincode}
           onChange={(e) => set('pincode', e.target.value)}
-          placeholder="682016"
+          placeholder="e.g. 682016"
           inputMode="numeric"
+          autoComplete="postal-code"
           maxLength={10}
         />
         <TextField
           label="State"
           value={draft.state}
           onChange={(e) => set('state', e.target.value)}
-          placeholder="Kerala"
+          placeholder="e.g. Kerala"
+          autoComplete="address-level1"
           maxLength={100}
         />
         <TextField

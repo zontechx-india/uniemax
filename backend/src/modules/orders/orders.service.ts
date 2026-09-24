@@ -4,7 +4,12 @@ import { prisma } from "../../config/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { isProduction } from "../../config/env.js";
 import { HttpError } from "../../utils/httpError.js";
-import { PINCODE_MESSAGE, isValidPincode } from "../../utils/zodHelpers.js";
+import {
+  PHONE_MESSAGE,
+  PINCODE_MESSAGE,
+  isValidPincode,
+  normalizePhone,
+} from "../../utils/zodHelpers.js";
 import { buildListMeta } from "../../utils/response.js";
 import { mediaUrl } from "../../package/storage/index.js";
 import { emit } from "../../package/events/index.js";
@@ -175,8 +180,8 @@ function validateCustomerFields(
     if (!value) {
       throw HttpError.badRequest(`${FIELD_LABELS[key]} is required`);
     }
-    if (key === "phone" && !/^\+?[\d\s\-()]{5,20}$/.test(value)) {
-      throw HttpError.badRequest("The phone number looks invalid");
+    if (key === "phone" && !normalizePhone(value, customer.country)) {
+      throw HttpError.badRequest(PHONE_MESSAGE);
     }
     if (key === "email" && !/^\S+@\S+\.\S+$/.test(value)) {
       throw HttpError.badRequest("The email address looks invalid");

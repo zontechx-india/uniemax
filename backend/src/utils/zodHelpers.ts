@@ -40,10 +40,57 @@ export function isValidPincode(
   pincode: string,
   country: string | null | undefined,
 ): boolean {
-  const value = pincode.trim();
+  const value = normalizePincode(pincode, country);
   return isIndia(country)
     ? /^[1-9]\d{5}$/.test(value)
     : /^[A-Za-z0-9 -]{3,10}$/.test(value);
 }
 
+/**
+ * Forgiving PIN input: an Indian PIN typed as "682 001" or "682-001" is the
+ * same six digits, so separators are dropped before it is checked or
+ * stored. Other countries' postcodes keep their spacing ("SW1A 1AA").
+ */
+export function normalizePincode(
+  pincode: string,
+  country: string | null | undefined,
+): string {
+  const value = pincode.trim();
+  return isIndia(country) ? value.replace(/[\s-]/g, "") : value;
+}
+
 export const PINCODE_MESSAGE = "Enter a valid 6-digit PIN code";
+
+/**
+ * Forgiving Indian phone input. People type the same number many ways —
+ * "98765 43210", "+91 98765-43210", "098765 43210", "0091 9876543210" — so
+ * the separators and the country/trunk prefix are removed and what is left
+ * must be 10 digits not starting with 0 or 1 (mobiles start 6–9; a landline
+ * with its STD code is also 10 digits). Returns the canonical "+91XXXXXXXXXX"
+ * (so seller search by any run of digits matches), or null when the input is
+ * not a usable Indian number ("12345"). Non-Indian addresses keep the loose
+ * shape check and are stored as typed.
+ */
+export function normalizeIndianPhone(raw: string): string | null {
+  let digits = raw.trim();
+  if (!/^[+\d\s\-().]+$/.test(digits)) return null;
+  digits = digits.replace(/\D/g, "");
+  if (digits.length === 14 && digits.startsWith("0091")) digits = digits.slice(4);
+  else if (digits.length === 12 && digits.startsWith("91")) digits = digits.slice(2);
+  else if (digits.length === 11 && digits.startsWith("0")) digits = digits.slice(1);
+  return /^[2-9]\d{9}$/.test(digits) ? `+91${digits}` : null;
+}
+
+const LOOSE_PHONE = /^\+?[\d\s\-()]{5,20}$/;
+
+/** Canonical phone for the address's country, or null if it is not valid. */
+export function normalizePhone(
+  raw: string,
+  country: string | null | undefined,
+): string | null {
+  if (isIndia(country)) return normalizeIndianPhone(raw);
+  const value = raw.trim();
+  return LOOSE_PHONE.test(value) ? value : null;
+}
+
+export const PHONE_MESSAGE = "Enter a 10-digit mobile number, e.g. 98765 43210";
