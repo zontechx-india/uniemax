@@ -83,9 +83,6 @@
       fbq('init', '931826082697608');
       fbq('track', 'PageView');
     </script>
-    <noscript><img height="1" width="1" style="display:none"
-    src="https://www.facebook.com/tr?id=931826082697608&ev=PageView&noscript=1"
-    /></noscript>
     <!-- End Meta Pixel Code -->
     <!--
       The base snippet only reports the FIRST url of a visit: this is a
@@ -95,7 +92,16 @@
     -->
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Meta Pixel no-JS fallback. Lives in <body>: an <img> inside a
+         <noscript> in <head> is invalid HTML (parse5 warned on every build). -->
+    <noscript><img height="1" width="1" style="display:none"
+    src="https://www.facebook.com/tr?id=931826082697608&ev=PageView&noscript=1"
+    /></noscript>
+    <!-- Shown until the app's JavaScript runs (React replaces it). On a slow
+         phone connection this is the difference between a blank white page —
+         which people close — and one that says it is on its way. Inline
+         styles only: nothing else has loaded yet. -->
+    <div id="root"><div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#6b7280;font-size:14px"><div style="width:32px;height:32px;border-radius:50%;border:3px solid rgba(124,58,237,.2);border-top-color:#7c3aed;animation:um-spin .8s linear infinite"></div><p style="margin:0">Opening the shop…</p><style>@keyframes um-spin{to{transform:rotate(360deg)}}</style></div></div>
     <script type="module" src="/src/storefront/main.tsx"></script>
   </body>
 </html>

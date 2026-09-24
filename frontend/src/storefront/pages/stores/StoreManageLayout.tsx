@@ -1,3 +1,4 @@
+import { usePrivatePageTitle } from '../../../shared/seo'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, Outlet, useParams } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
@@ -35,6 +36,8 @@ export function StoreManageLayout() {
   const { storeSlug } = useParams()
   const { store, setStore } = useStore(storeSlug)
   const storeId = store?.id ?? null
+  // A tab title a seller can find among open tabs ("Manage · Lakshmi Sarees").
+  usePrivatePageTitle('Manage', store?.name)
   // Owner by default; the admin console wraps these routes to say otherwise.
   const scope = useStoreManageScope()
 

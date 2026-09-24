@@ -1,3 +1,4 @@
+import { usePrivatePageTitle } from '../../../shared/seo'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { FormEvent } from 'react'
@@ -66,6 +67,7 @@ const STEPS: (WizardStep & { key: StepKey })[] = [
 ]
 
 export function CreateStorePage() {
+  usePrivatePageTitle('Create your shop')
   const navigate = useNavigate()
   const [index, setIndex] = useState(0)
 

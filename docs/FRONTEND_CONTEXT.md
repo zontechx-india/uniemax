@@ -1358,7 +1358,10 @@ a pickup-address item.
   as WebP with a progress bar; Replace / Remove with confirmation — saves
   immediately, independent of the name form),
   `StoreBusinessPage` (**Business Details** — three independently-saving
-  cards over `PATCH /stores/:id/profile`, each sending only its own keys:
+  cards over `PATCH /stores/:id/profile`, each sending only its own keys, with
+  section-named buttons — "Save business & contact" / "Save address" / "Save
+  tax details" — and a `beforeunload` warning while any card has unsaved
+  edits, since saving one card never saves another:
   **Business & contact** (business name and seller name as fields; phone and
   email read-only as the verified account identifiers, with an inline
   `VerifyPhoneForm` when no number is linked yet and a link to Profile),
@@ -1957,7 +1960,10 @@ manifest's display mode entirely and reads the `apple-mobile-web-app-*` metas.
 
 Meta's base snippet (pixel `931826082697608`) sits verbatim in the head of
 `index.html`, so it loads before the app bundle and fires the first
-`PageView`. The **admin console (`admin.html`) has no pixel** — nothing about
+`PageView` (its `<noscript>` image fallback sits at the top of `<body>` —
+an `<img>` is not valid in a head `<noscript>`). `#root` ships with an
+inline-styled spinner + "Opening the shop…" that React replaces on first
+render, so a slow connection never shows a blank white page. The **admin console (`admin.html`) has no pixel** — nothing about
 operator activity belongs in an ad platform.
 
 `shared/analytics/metaPixel.ts` is only what the snippet cannot do itself.

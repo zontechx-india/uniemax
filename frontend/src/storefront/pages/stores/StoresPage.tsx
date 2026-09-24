@@ -1,3 +1,4 @@
+import { usePrivatePageTitle } from '../../../shared/seo'
 import { Link } from 'react-router-dom'
 import { useStores } from '../../features/stores/useStores'
 import type { Store } from '../../features/stores/storesApi'
@@ -12,6 +13,7 @@ import { ChevronRightIcon, GlobeIcon, PlusIcon, StoreIcon } from '../../layout/i
  * URL path, so the list doubles as an at-a-glance health check.
  */
 export function StoresPage() {
+  usePrivatePageTitle('My Stores')
   const { stores } = useStores()
 
   if (stores === null) {
@@ -86,7 +88,7 @@ function StoreCard({ store }: { store: Store }) {
 
       <div className="mt-4 flex items-center justify-between border-t border-line pt-3">
         <span className="text-xs text-muted">
-          Created {new Date(store.createdAt).toLocaleDateString()}
+          Created {new Date(store.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
         </span>
         <span className="flex items-center gap-1 text-xs font-semibold text-brand">
           Manage

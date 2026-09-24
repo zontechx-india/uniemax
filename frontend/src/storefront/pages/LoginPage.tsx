@@ -1,3 +1,4 @@
+import { usePrivatePageTitle } from '../../shared/seo'
 import type { Customer } from '../../shared/auth/authApi'
 import { AppLogoLockup } from '../../shared/ui/AppLogo'
 import { AuthLayout, Brand } from '../../shared/ui/form'
@@ -15,6 +16,7 @@ import { StorefrontHero } from '../features/auth/StorefrontHero'
  * is only the split-screen frame around them.
  */
 export function LoginPage({ onSignedIn }: { onSignedIn: (customer: Customer) => void }) {
+  usePrivatePageTitle('Sign in')
   return (
     <AuthLayout
       hero={<StorefrontHero />}

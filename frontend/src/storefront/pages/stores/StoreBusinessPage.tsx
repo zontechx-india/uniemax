@@ -103,6 +103,19 @@ export function StoreBusinessPage() {
     )
   }, [])
 
+  // Each card saves on its own, so a seller who fills two cards and taps
+  // only the last Save would lose the other on reload/close. Warn first.
+  const anyDirty = Object.values(dirty).some(Boolean)
+  useEffect(() => {
+    if (!anyDirty) return
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [anyDirty])
+
   // A new object per jump so tapping the same chip twice re-triggers the
   // highlight; a bare id would compare equal and the second tap would look
   // like nothing happened.
@@ -274,14 +287,24 @@ function Card({
   )
 }
 
-function SaveButton({ busy, disabled }: { busy: boolean; disabled: boolean }) {
+function SaveButton({
+  busy,
+  disabled,
+  label = 'Save Changes',
+}: {
+  busy: boolean
+  disabled: boolean
+  /** Names the section — three buttons all reading "Save Changes" made
+   *  sellers think the last one saved the whole page. */
+  label?: string
+}) {
   return (
     <button
       type="submit"
       disabled={busy || disabled}
       className="h-11 w-full rounded-md bg-brand-gradient px-6 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted sm:w-auto"
     >
-      {busy ? 'Saving…' : 'Save Changes'}
+      {busy ? 'Saving…' : label}
     </button>
   )
 }
@@ -451,7 +474,7 @@ function ContactCard({
 
         {error && <ErrorNote>{error}</ErrorNote>}
         {saved && <SuccessNote>Business details saved.</SuccessNote>}
-        <SaveButton busy={busy} disabled={!phone} />
+        <SaveButton busy={busy} disabled={!phone} label="Save business & contact" />
       </form>
     </Card>
   )
@@ -531,7 +554,7 @@ function AddressCard({
 
         {error && <ErrorNote>{error}</ErrorNote>}
         {saved && <SuccessNote>Address saved.</SuccessNote>}
-        <SaveButton busy={busy} disabled={false} />
+        <SaveButton busy={busy} disabled={false} label="Save address" />
       </form>
     </Card>
   )
@@ -689,7 +712,7 @@ function TaxCard({
 
         {error && <ErrorNote>{error}</ErrorNote>}
         {saved && <SuccessNote>Tax details saved.</SuccessNote>}
-        <SaveButton busy={busy} disabled={false} />
+        <SaveButton busy={busy} disabled={false} label="Save tax details" />
       </form>
     </Card>
   )
