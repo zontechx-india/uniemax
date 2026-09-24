@@ -602,6 +602,13 @@ function SavedAddressPicker({
     if (fields.email && !/^\S+@\S+\.\S+$/.test(email)) {
       return setProblem('The email address looks invalid.')
     }
+    // Saved before PIN codes were validated — catch it here rather than as a
+    // 400 on Place Order.
+    if (fields.pincode && !isValidPincode(selected.pincode, selected.country)) {
+      return setProblem(
+        'This address has an invalid PIN code — add a new address or edit it in your account.',
+      )
+    }
     setProblem(null)
     onDone({
       name: selected.name,
