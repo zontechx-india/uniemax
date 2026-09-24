@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma.js";
+import { expandEverydayTerms } from "./everydayWords.js";
 import { resolveOptionTemplates, resolveSpecTemplates } from "./categoryTemplates.js";
 import type { OptionTemplate } from "./categoryTemplates.js";
 
@@ -236,9 +237,24 @@ export async function searchCategories(
   activeOnly: boolean,
 ): Promise<CategoryNode[]> {
   const idx = await index(activeOnly);
-  const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
-  if (terms.length === 0) return [];
+  const typed = q.toLowerCase().split(/\s+/).filter(Boolean);
+  if (typed.length === 0) return [];
+  // Taxonomy words first; only when nothing matches, try everyday words
+  // ("saree" → Fashion > Women) so a real category name always wins.
+  const direct = rankMatches(idx, typed, limit);
+  if (direct.length > 0) return direct;
+  const expanded = expandEverydayTerms(typed);
+  return expanded.some((term, i) => term !== typed[i])
+    ? rankMatches(idx, expanded, limit)
+    : [];
+}
 
+/** Ranked matches for `terms` — every term must appear in the path. */
+function rankMatches(
+  idx: Awaited<ReturnType<typeof index>>,
+  terms: string[],
+  limit: number,
+): CategoryNode[] {
   const scored: { node: CategoryNode; score: number }[] = [];
   for (const row of idx.rows) {
     const node = toNode(row, idx, false);

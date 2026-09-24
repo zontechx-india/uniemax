@@ -2049,6 +2049,12 @@ Free-text across the taxonomy; each hit carries its full `path`, so "brake"
 renders as `Automotive > Motorcycle Parts > Brake Parts`. A node also matches
 on its ancestors' names, so `automotive brake` narrows rather than widens.
 Ranked name-prefix → name-substring → path-only, shallower first.
+Only when nothing matches, **everyday words** are tried
+(`modules/category/everydayWords.ts`): "saree", "sari", "साड़ी", "சேலை",
+"സാരി", "kurti" → `Fashion > Women`, "kurta"/"dhoti"/"mundu" → `Fashion >
+Men`, "atta"/"dal" → `Grocery & Food > Staples`, … (a term that starts a key,
+3+ characters, counts) — so a seller's own word finds the right shelf without
+changing the taxonomy.
 
 | Query        | Type    | Default | Notes                    |
 | ------------ | ------- | ------- | ------------------------ |
