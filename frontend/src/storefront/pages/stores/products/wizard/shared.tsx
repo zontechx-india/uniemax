@@ -77,6 +77,7 @@ export function StepButtons({
   busy = false,
   canNext = true,
   skip,
+  skipLabel,
 }: {
   onBack?: () => void
   onNext: () => void
@@ -85,6 +86,8 @@ export function StepButtons({
   canNext?: boolean
   /** "Skip for now" — for optional steps. */
   skip?: () => void
+  /** Wording for `skip` where "skip" would be unclear (e.g. "Save as draft"). */
+  skipLabel?: string
 }) {
   return (
     <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
@@ -113,7 +116,7 @@ export function StepButtons({
           disabled={busy}
           className="text-sm font-semibold text-muted transition hover:text-fg"
         >
-          Skip for now
+          {skipLabel ?? 'Skip for now'}
         </button>
       )}
     </div>

@@ -255,7 +255,7 @@ export function CheckoutSteps({
                   ? 'Store pickup'
                   : 'Deliver to'}
               </p>
-              <p className="mt-0.5 text-muted">
+              <p className="mt-0.5 text-muted [overflow-wrap:anywhere]">
                 {summarize(delivery.values, delivery.fulfilment === 'DELIVERY') ||
                   'Details recorded.'}
               </p>
@@ -709,7 +709,7 @@ function SavedAddressPicker({
                   >
                     {isSelected && <CheckIcon className="h-3 w-3" />}
                   </span>
-                  <span className="min-w-0">
+                  <span className="min-w-0 [overflow-wrap:anywhere]">
                     <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-fg">
                       {address.name}
                       {address.label && (

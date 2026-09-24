@@ -55,8 +55,8 @@ export function StoreDetailsPage() {
         Store Details
       </h2>
       <p className="mt-1 text-sm text-muted">
-        The essentials shown to your customers. More settings (business
-        info, contact, address, policies) are coming in future updates.
+        Your shop's name and logo, as customers see them. Contact, address
+        and tax details are under Business Details.
       </p>
 
       <form onSubmit={submit} className="mt-4 max-w-md space-y-5" noValidate>

@@ -362,6 +362,7 @@ function ReviewStep({
           busy={busy}
           canNext={canPublish}
           skip={onDone}
+          skipLabel="Save as draft"
         />
       )}
     </StepShell>
