@@ -322,7 +322,8 @@ default credential chain) and **local** (dev default — writes under
 Vite in dev). Uploads arrive as multipart (`readUpload`, which also returns
 the plain text fields sent alongside the file so an endpoint can take a file
 and its metadata in one request — `POST /stores` takes name + logo that way),
-validated against env-configured size/type rules (`mediaRules`) that are also served to clients
+validated against env-configured size/type rules (`mediaRules`) — the type by the file's
+magic bytes (`sniffContentType`), not the client's mimetype — that are also served to clients
 via `GET /api/v1/public/media-config`, so UI hints can't drift from what the
 server enforces. Keys are never reused (a replace mints a new key), which
 makes objects immutable and infinitely cacheable. The package parses its own

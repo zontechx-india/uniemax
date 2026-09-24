@@ -1229,7 +1229,10 @@ the next image.
 
 The upload rules the server enforces, for client-side hints + pre-upload
 validation: `{ image | video | logo: { maxMB, contentTypes[] } }` — driven by
-the `MEDIA_MAX_*_MB` / `MEDIA_*_TYPES` env vars.
+the `MEDIA_MAX_*_MB` / `MEDIA_*_TYPES` env vars. Every upload is also checked
+**by its bytes**: a file whose magic bytes are not one of the allowed types is
+`400` whatever mimetype it declares (e.g. HTML/SVG renamed to `.png`), and a
+mislabelled but valid file is stored under the type it really is.
 
 ---
 

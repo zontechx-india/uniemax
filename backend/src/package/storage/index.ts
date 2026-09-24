@@ -111,13 +111,60 @@ export async function readUpload(
     throw tooLarge();
   }
 
+  // The declared mimetype is the client's word; check the bytes. Anything
+  // that is not a real image/video of an allowed type is refused (an HTML or
+  // SVG file renamed to .png would otherwise be stored and served from our
+  // bucket), and a mislabelled one is stored under the type it really is.
+  const sniffed = sniffContentType(buffer);
+  if (!sniffed || !rule.contentTypes.includes(sniffed)) {
+    throw HttpError.badRequest(
+      `The file is not a valid ${rule.contentTypes
+        .map((t) => t.split("/")[1]?.toUpperCase())
+        .join(", ")} — it may be corrupted or renamed`,
+    );
+  }
+
   return {
     buffer,
-    contentType,
+    contentType: sniffed,
     filename: file.filename,
     kind: resolvedKind,
     fields: textFields(file.fields),
   };
+}
+
+/**
+ * The media type a buffer really is, from its leading magic bytes — only the
+ * formats the upload rules can allow (JPEG, PNG, WebP, AVIF, MP4, QuickTime,
+ * WebM). `null` for anything else. Dependency-free on purpose: these
+ * signatures are fixed by the formats themselves.
+ */
+export function sniffContentType(buf: Buffer): string | null {
+  const ascii = (start: number, end: number) =>
+    buf.length >= end ? buf.toString("latin1", start, end) : "";
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (
+    buf.length >= 8 &&
+    buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  ) {
+    return "image/png";
+  }
+  if (ascii(0, 4) === "RIFF" && ascii(8, 12) === "WEBP") return "image/webp";
+  if (buf.length >= 4 && buf.readUInt32BE(0) === 0x1a45dfa3) return "video/webm";
+  if (ascii(4, 8) === "ftyp") {
+    // ISO-BMFF: major brand at 8..12, compatible brands after the version.
+    const boxSize = Math.min(buf.readUInt32BE(0), buf.length, 256);
+    const brands = [ascii(8, 12)];
+    for (let i = 16; i + 4 <= boxSize; i += 4) brands.push(ascii(i, i + 4));
+    if (brands.some((b) => b === "avif" || b === "avis")) return "image/avif";
+    if (brands[0] === "qt  ") return "video/quicktime";
+    if (brands.some((b) => /^(isom|iso[2-9]|mp41|mp42|avc1|dash|M4V |M4A |mmp4|msnv)$/.test(b))) {
+      return "video/mp4";
+    }
+  }
+  return null;
 }
 
 /** Picks the plain text fields out of a multipart part's `fields` bag. */
