@@ -159,6 +159,7 @@ export default function DashboardPage() {
           subtitle="Revenue by method, all time"
           footer={
             <p className="text-xs text-muted">
+              {formatMoneyShort(data.payments.collected)} collected ·{' '}
               {formatCount(data.payments.pending)} awaiting payment ·{' '}
               {formatCount(data.payments.refunded)} refunded
             </p>
@@ -177,8 +178,13 @@ export default function DashboardPage() {
                 color: 'var(--chart-2)',
               },
             ]}
-            centerLabel="collected"
-            centerValue={formatMoneyShort(data.payments.collected)}
+            // The slices are billed revenue (paid + awaiting payment), so the
+            // centre must total the same thing — "collected" (paid only) lives
+            // in the footer; showing it here made ₹3.1L sit over a ₹3.9L ring.
+            centerLabel="billed"
+            centerValue={formatMoneyShort(
+              Number(data.payments.onlineRevenue) + Number(data.payments.codRevenue),
+            )}
             formatValue={formatMoney}
           />
         </ChartFrame>

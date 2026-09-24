@@ -2452,7 +2452,11 @@ Query `days` (1–365, default 30). One request feeds the whole landing page.
 } }
 ```
 `series` carries **one point per day including empty days**, so a chart can't
-misread the trend.
+misread the trend. `lowStock` (≤ 5 left, lowest first, max 8) lists **live
+listings only** — the storefront's product visibility rules in a published,
+unsuspended store — so a draft store's catalog never shows up there.
+`payments.codRevenue` + `onlineRevenue` are billed revenue (paid + awaiting,
+cancelled excluded); `collected` is the paid part.
 
 ### `GET /api/v1/admin/stores`
 

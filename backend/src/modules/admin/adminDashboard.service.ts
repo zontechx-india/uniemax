@@ -4,6 +4,10 @@ import { mediaUrl } from "../../package/storage/index.js";
 import { cashfreeConfigured } from "../payments/payments.service.js";
 import { pushConfigured } from "../../package/push/index.js";
 import type { RangeQuery } from "./admin.schema.js";
+import {
+  PUBLIC_PRODUCT_VISIBILITY,
+  PUBLIC_STORE_VISIBILITY,
+} from "../stores/publicStore.service.js";
 
 /**
  * The platform dashboard — one request, everything the landing page draws.
@@ -211,7 +215,13 @@ export async function getDashboard(query: RangeQuery) {
       },
     }),
     prisma.storeProduct.findMany({
-      where: { isActive: true, stockTotal: { lte: LOW_STOCK_THRESHOLD } },
+      // "Live listings" means what shoppers can actually see: the same
+      // visibility rules as the storefront, in a store that is published.
+      where: {
+        ...PUBLIC_PRODUCT_VISIBILITY,
+        store: PUBLIC_STORE_VISIBILITY,
+        stockTotal: { lte: LOW_STOCK_THRESHOLD },
+      },
       orderBy: { stockTotal: "asc" },
       take: 8,
       select: {
