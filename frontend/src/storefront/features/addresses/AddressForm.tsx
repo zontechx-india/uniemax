@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ErrorNote, TextField } from '../../../shared/ui/form'
 import type { AddressInput, CustomerAddress } from './addressesApi'
@@ -9,21 +9,59 @@ import { PHONE_HINT, PIN_HINT, isValidPhone, isValidPincode } from './pincode'
  * page and inline at checkout ("Add new address"). Always collects the FULL
  * field set: the book is store-agnostic, so an address must satisfy any
  * store's checkout configuration (only `email` and `label` are optional).
+ *
+ * `draftKey` (checkout): the half-typed address is kept in sessionStorage
+ * under that key, so a refresh, a dropped connection or Back/Forward on a
+ * phone doesn't wipe what the buyer typed. Cleared once it validates.
  */
+
+type Draft = {
+  label: string
+  name: string
+  phone: string
+  email: string
+  addressLine: string
+  pincode: string
+  state: string
+  country: string
+}
+
+const DRAFT_PREFIX = 'um:address-draft:'
+
+/** A saved in-progress draft for `key`, if any (storage may be blocked). */
+export function readAddressDraft(key: string): Draft | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_PREFIX + key)
+    return raw ? (JSON.parse(raw) as Draft) : null
+  } catch {
+    return null
+  }
+}
+
+function writeAddressDraft(key: string, draft: Draft | null) {
+  try {
+    if (draft) sessionStorage.setItem(DRAFT_PREFIX + key, JSON.stringify(draft))
+    else sessionStorage.removeItem(DRAFT_PREFIX + key)
+  } catch {
+    // Private mode / storage full — the form still works, just unsaved.
+  }
+}
 export function AddressForm({
   initial,
   busy,
   submitLabel = 'Save Address',
   onSubmit,
   onCancel,
+  draftKey,
 }: {
   initial?: CustomerAddress
+  draftKey?: string
   busy: boolean
   submitLabel?: string
   onSubmit: (input: AddressInput) => void
   onCancel: () => void
 }) {
-  const [draft, setDraft] = useState({
+  const [draft, setDraft] = useState<Draft>(() => (draftKey && !initial && readAddressDraft(draftKey)) || {
     label: initial?.label ?? '',
     name: initial?.name ?? '',
     phone: initial?.phone ?? '',
@@ -34,6 +72,12 @@ export function AddressForm({
     country: initial?.country ?? 'India',
   })
   const [problem, setProblem] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!draftKey || initial) return
+    const typed = draft.name || draft.phone || draft.addressLine || draft.pincode || draft.state
+    writeAddressDraft(draftKey, typed ? draft : null)
+  }, [draftKey, initial, draft])
 
   const set = <K extends keyof typeof draft>(key: K, value: string) =>
     setDraft((d) => ({ ...d, [key]: value }))
@@ -55,6 +99,7 @@ export function AddressForm({
     if (!draft.state.trim()) return setProblem('State is required.')
     if (!draft.country.trim()) return setProblem('Country is required.')
     setProblem(null)
+    if (draftKey) writeAddressDraft(draftKey, null)
     onSubmit({
       label: draft.label.trim() || null,
       name: draft.name.trim(),
@@ -161,7 +206,10 @@ export function AddressForm({
         </button>
         <button
           type="button"
-          onClick={onCancel}
+          onClick={() => {
+            if (draftKey) writeAddressDraft(draftKey, null)
+            onCancel()
+          }}
           disabled={busy}
           className="h-10 rounded-md border border-line bg-surface px-4 text-sm font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
         >

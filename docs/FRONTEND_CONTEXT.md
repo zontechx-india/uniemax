@@ -1145,7 +1145,9 @@ Delivery/Pickup picker (pickup shows the store's primary footer location
 and skips address fields); customers get their **saved addresses
 as selectable rows** (primary preselected) with an inline "Add New
 Address" that saves to the address book **and completes the step** ("Save &
-Use This Address" — unless the store still needs an email), plus an "Email
+Use This Address" — unless the store still needs an email; the half-typed
+form is kept in sessionStorage via `AddressForm`'s `draftKey`, so a refresh
+or Back/Forward re-opens it with what was typed), plus an "Email
 for order updates" field, pre-filled with the account's email, when the
 store collects email but the chosen address has none (the plain-form
 fallback only renders if the addresses probe fails — the page itself

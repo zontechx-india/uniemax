@@ -18,7 +18,7 @@ import type {
   AddressInput,
   CustomerAddress,
 } from '../../features/addresses/addressesApi'
-import { AddressForm } from '../../features/addresses/AddressForm'
+import { AddressForm, readAddressDraft } from '../../features/addresses/AddressForm'
 import type {
   BillingAddressInput,
   CheckoutFieldKey,
@@ -91,6 +91,9 @@ const PLACEHOLDERS: Partial<Record<CheckoutFieldKey, string>> = {
   pincode: 'e.g. 682016',
   state: 'e.g. Kerala',
 }
+
+/** sessionStorage key for the checkout's half-typed new address. */
+const CHECKOUT_DRAFT = 'checkout'
 
 export type CheckoutForm = Partial<Record<CheckoutFieldKey, string>>
 
@@ -598,7 +601,11 @@ function SavedAddressPicker({
   const [selectedId, setSelectedId] = useState<string | null>(
     addresses.find((a) => a.isPrimary)?.id ?? addresses[0]?.id ?? null,
   )
-  const [adding, setAdding] = useState(addresses.length === 0)
+  // Re-open the add form after a refresh if the buyer was half-way through
+  // typing a new address (the draft survives in sessionStorage).
+  const [adding, setAdding] = useState(
+    () => addresses.length === 0 || readAddressDraft(CHECKOUT_DRAFT) !== null,
+  )
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
   const [extraEmail, setExtraEmail] = useState('')
@@ -731,6 +738,7 @@ function SavedAddressPicker({
         <AddressForm
           busy={busy}
           submitLabel="Save & Use This Address"
+          draftKey={CHECKOUT_DRAFT}
           onCancel={() => setAdding(false)}
           onSubmit={(input) => void addNew(input)}
         />
