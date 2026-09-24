@@ -586,8 +586,10 @@ page (plus a "View all orders" link).
   next-step button (Confirm Order → Mark as Packed → Mark as Shipped →
   Mark as Delivered; pickup goes Packed → Delivered) plus Cancel Order
   while the order hasn't shipped. Every action confirms via
-  `ConfirmDialog` first (changes are customer-visible immediately); the
-  cancel dialog carries an optional reason field and explains that stock
+  `ConfirmDialog` first (changes are customer-visible immediately; the
+  dismiss button reads "Go back", never "Cancel", beside Confirm Order); the
+  cancel dialog carries an optional reason field (shown to the buyer on
+  their order page) and explains that stock
   is restored (and a paid order marked refunded). Conflicts (409 — e.g.
   a race with another tab) surface as inline errors.
 
@@ -599,7 +601,17 @@ built by `publicStoreUrl()` in `storesApi.ts`; uses the native share sheet
 where available). Before publishing, the same URL works as a **private
 draft preview** for the signed-in owner (an amber hint says only they can
 open it), and a **Preview** button beside Share opens it in a new tab
-(labelled "View Store" once published).
+(labelled "View Store" once published). Once live, a full-width green
+**Share on WhatsApp** (`wa.me/?text=` with a ready "…is now online. See our
+products and order here: {url}" message, `whatsAppShareUrl()`) leads the
+card. While the shop is unpublished and has at least one live product, the
+Products section opens with `ShopNotLiveNudge` ("Customers can't see your
+shop yet" + **Publish my shop**, or the remaining publish blockers) — a
+seller who publishes a product otherwise assumes customers can see it.
+Price/MRP fields in the product wizard and variant matrix drop "₹", "Rs",
+commas and spaces as they are typed (`cleanAmount`/`cleanCount` in
+`features/stores/productOptions.ts`), and their errors say what to type
+("Enter the price in numbers only, e.g. 1299.").
 
 **Public storefront (multi-page)** — everything under `/store/…`, `/cart…`
 and `/checkout/…` is served **without sign-in**: `StorefrontApp` picks the

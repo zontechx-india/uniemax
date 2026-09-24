@@ -424,3 +424,17 @@ export function draftToInput(
 
   return { input: { optionTypes, variants } }
 }
+
+/**
+ * Forgiving money input: sellers type prices the way they write them —
+ * "₹1,299", "Rs. 1299", "1 299". The rupee sign, "Rs", commas and spaces
+ * are dropped as they type, so the field only ever holds the number.
+ */
+export function cleanAmount(raw: string): string {
+  return raw.replace(/₹|rs\.?|inr|,|\s/gi, '')
+}
+
+/** Stock typed as "1,000" or "1 000" is 1000. */
+export function cleanCount(raw: string): string {
+  return raw.replace(/[,\s]/g, '')
+}

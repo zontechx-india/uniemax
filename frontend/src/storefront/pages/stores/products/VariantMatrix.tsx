@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   OPTION_LIMITS,
+  cleanAmount,
+  cleanCount,
   draftLabel,
   rowsNeedingPrice,
 } from '../../../features/stores/productOptions'
@@ -97,7 +99,7 @@ export function VariantMatrix({
           <BulkField
             label="Set every price"
             value={bulkPrice}
-            onChange={setBulkPrice}
+            onChange={(v) => setBulkPrice(cleanAmount(v))}
             placeholder="₹"
             inputMode="decimal"
             disabled={disabled}
@@ -109,7 +111,7 @@ export function VariantMatrix({
           <BulkField
             label="Set every MRP"
             value={bulkMrp}
-            onChange={setBulkMrp}
+            onChange={(v) => setBulkMrp(cleanAmount(v))}
             placeholder="₹"
             inputMode="decimal"
             disabled={disabled}
@@ -121,7 +123,7 @@ export function VariantMatrix({
           <BulkField
             label="Set every stock"
             value={bulkStock}
-            onChange={setBulkStock}
+            onChange={(v) => setBulkStock(cleanCount(v))}
             placeholder="Qty"
             inputMode="numeric"
             disabled={disabled}
@@ -259,7 +261,7 @@ export function VariantMatrix({
                   <td className="px-3 py-2">
                     <input
                       value={row.price}
-                      onChange={(e) => patchRow(index, { price: e.target.value })}
+                      onChange={(e) => patchRow(index, { price: cleanAmount(e.target.value) })}
                       inputMode="decimal"
                       placeholder="Required"
                       disabled={disabled}
@@ -272,7 +274,7 @@ export function VariantMatrix({
                   <td className="px-3 py-2">
                     <input
                       value={row.compareAt}
-                      onChange={(e) => patchRow(index, { compareAt: e.target.value })}
+                      onChange={(e) => patchRow(index, { compareAt: cleanAmount(e.target.value) })}
                       inputMode="decimal"
                       placeholder="Optional"
                       disabled={disabled}
@@ -283,7 +285,7 @@ export function VariantMatrix({
                   <td className="px-3 py-2">
                     <input
                       value={row.stock}
-                      onChange={(e) => patchRow(index, { stock: e.target.value })}
+                      onChange={(e) => patchRow(index, { stock: cleanCount(e.target.value) })}
                       inputMode="numeric"
                       placeholder="0"
                       disabled={disabled}
@@ -362,7 +364,7 @@ export function VariantMatrix({
                   </span>
                   <input
                     value={row.price}
-                    onChange={(e) => patchRow(index, { price: e.target.value })}
+                    onChange={(e) => patchRow(index, { price: cleanAmount(e.target.value) })}
                     inputMode="decimal"
                     placeholder="Required"
                     disabled={disabled}
@@ -377,7 +379,7 @@ export function VariantMatrix({
                   </span>
                   <input
                     value={row.compareAt}
-                    onChange={(e) => patchRow(index, { compareAt: e.target.value })}
+                    onChange={(e) => patchRow(index, { compareAt: cleanAmount(e.target.value) })}
                     inputMode="decimal"
                     placeholder="Optional"
                     disabled={disabled}
@@ -390,7 +392,7 @@ export function VariantMatrix({
                   </span>
                   <input
                     value={row.stock}
-                    onChange={(e) => patchRow(index, { stock: e.target.value })}
+                    onChange={(e) => patchRow(index, { stock: cleanCount(e.target.value) })}
                     inputMode="numeric"
                     placeholder="0"
                     disabled={disabled}

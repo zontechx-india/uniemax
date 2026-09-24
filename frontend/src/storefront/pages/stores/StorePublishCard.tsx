@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { toApiError } from '../../../shared/auth/http'
+import { Button } from '../../../shared/ui/Button'
 import { shareOrCopy } from '../../../shared/share'
 import { publicStoreUrl, storesApi } from '../../features/stores/storesApi'
 import type { Store } from '../../features/stores/storesApi'
-import { CheckIcon, EyeIcon, GlobeIcon, ShareIcon } from '../../layout/icons'
+import { ChatIcon, CheckIcon, EyeIcon, GlobeIcon, ShareIcon } from '../../layout/icons'
 
 /**
  * Publish & share panel shown on every store-management section (left card).
@@ -15,7 +16,15 @@ import { CheckIcon, EyeIcon, GlobeIcon, ShareIcon } from '../../layout/icons'
  *   published, since it is then simply the live page).
  * - Share Store copies the store's public URL (/store/{slug}) so the owner
  *   can hand it straight to customers.
+ * - Once live, **Share on WhatsApp** opens WhatsApp with a ready-made
+ *   message + link — how most small Indian sellers reach their customers.
  */
+
+/** wa.me link with a ready-to-send message announcing the shop. */
+export function whatsAppShareUrl(storeName: string, url: string): string {
+  const text = `Hi! ${storeName} is now online. See our products and order here: ${url}`
+  return `https://wa.me/?text=${encodeURIComponent(text)}`
+}
 export function StorePublishCard({
   store,
   onStoreChange,
@@ -83,7 +92,7 @@ export function StorePublishCard({
               ? `Still needed: ${publishGate.blockers.join(', ')}`
               : undefined
           }
-          className={`h-8 rounded-md px-3 text-xs font-semibold transition disabled:cursor-not-allowed ${
+          className={`h-10 rounded-md px-4 text-sm font-semibold transition disabled:cursor-not-allowed ${
             store.isPublished
               ? 'bg-surface-alt text-fg hover:bg-line'
               : blocked
@@ -112,12 +121,23 @@ export function StorePublishCard({
       ) : (
         <p className="mt-2 text-xs text-muted">
           {store.isPublished
-            ? 'Your store is live — customers can browse it at the link below.'
-            : 'Open the link below to preview your store, and publish it when it looks right.'}
+            ? 'Your shop is live! Send the link to your customers so they can order.'
+            : 'Preview your shop with the link below, then tap Publish so customers can see it.'}
         </p>
       )}
 
       <div className="mt-3 space-y-2">
+        {store.isPublished && (
+          <a
+            href={whatsAppShareUrl(store.name, shareUrl)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#25D366] text-sm font-semibold text-white transition hover:opacity-90"
+          >
+            <ChatIcon className="h-4 w-4" />
+            Share on WhatsApp
+          </a>
+        )}
         <a
           href={shareUrl}
           target="_blank"
@@ -133,7 +153,7 @@ export function StorePublishCard({
             href={shareUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-line text-xs font-semibold text-fg transition hover:bg-surface-alt"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-line text-xs font-semibold text-fg transition hover:bg-surface-alt"
           >
             <EyeIcon className="h-3.5 w-3.5" />
             {store.isPublished ? 'View Store' : 'Preview'}
@@ -141,7 +161,7 @@ export function StorePublishCard({
           <button
             type="button"
             onClick={share}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-line text-xs font-semibold text-fg transition hover:bg-surface-alt"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-line text-xs font-semibold text-fg transition hover:bg-surface-alt"
           >
             {copied ? (
               <>
@@ -165,6 +185,63 @@ export function StorePublishCard({
         )}
         {error && <p className="text-[11px] leading-4 text-danger">{error}</p>}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Shown above the product list while the shop is NOT published: a seller
+ * who just "published" a product otherwise believes customers can see it.
+ * One tap publishes when nothing blocks it; otherwise it says what is left.
+ */
+export function ShopNotLiveNudge({
+  store,
+  onStoreChange,
+}: {
+  store: Store
+  onStoreChange: (store: Store) => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  if (store.isPublished) return null
+  const gate = store.readiness.gates.PUBLISH
+  const publish = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      onStoreChange(await storesApi.setPublished(store.id, true))
+    } catch (err) {
+      setError(toApiError(err).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div
+      role="status"
+      className="mb-4 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm"
+    >
+      <p className="font-semibold text-fg">Customers can't see your shop yet</p>
+      {gate.allowed ? (
+        <>
+          <p className="mt-0.5 text-muted">
+            Your shop is not published. Publish it to start taking orders.
+          </p>
+          <Button
+            size="md"
+            className="mt-2"
+            loading={busy}
+            onClick={() => void publish()}
+          >
+            Publish my shop
+          </Button>
+        </>
+      ) : (
+        <p className="mt-0.5 text-muted">
+          Before you can publish, add: {gate.blockers.join(' · ')}
+        </p>
+      )}
+      {error && <p className="mt-1 text-xs text-danger">{error}</p>}
     </div>
   )
 }

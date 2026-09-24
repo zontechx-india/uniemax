@@ -21,6 +21,7 @@ import {
   TrashIcon,
 } from '../../layout/icons'
 import { ActiveSwitch } from './ActiveSwitch'
+import { ShopNotLiveNudge } from './StorePublishCard'
 import { ProductWizard } from './products/wizard/ProductWizard'
 import type { StepKey } from './products/wizard/shared'
 
@@ -36,7 +37,7 @@ import type { StepKey } from './products/wizard/shared'
  * one — the backend enforces the same rule).
  */
 export function StoreProductsPage() {
-  const { store, refreshStore } = useManagedStore()
+  const { store, onStoreChange, refreshStore } = useManagedStore()
 
   const [categories, setCategories] = useState<StoreCategory[] | null>(null)
   const [products, setProducts] = useState<StoreProduct[] | null>(null)
@@ -223,6 +224,11 @@ export function StoreProductsPage() {
 
   return (
     <div>
+      {/* Only once there is something live to see — a new seller with no
+          products isn't nagged about publishing. */}
+      {!wizard && products.some((p) => !p.isDraft && p.isActive) && (
+        <ShopNotLiveNudge store={store} onStoreChange={onStoreChange} />
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-body text-xl font-semibold tracking-normal text-fg">

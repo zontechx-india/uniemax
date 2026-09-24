@@ -9,6 +9,8 @@ import {
 } from '../../../../features/stores/productGroups'
 import type { GroupDraft } from '../../../../features/stores/productGroups'
 import {
+  cleanAmount,
+  cleanCount,
   draftLabel,
   draftToInput,
   newKey,
@@ -155,7 +157,11 @@ export function PricingStep({
     | { error: string } => {
     const priceValue = Number(price)
     if (!price.trim() || Number.isNaN(priceValue) || priceValue < 0) {
-      return { error: 'Enter the selling price.' }
+      return {
+        error: price.trim()
+          ? 'Enter the price in numbers only, e.g. 1299.'
+          : 'Enter the selling price.',
+      }
     }
     const compareAtValue = compareAt.trim() === '' ? null : Number(compareAt)
     if (
@@ -166,7 +172,7 @@ export function PricingStep({
     }
     const stockValue = stock.trim() === '' ? 0 : Number(stock)
     if (!Number.isInteger(stockValue) || stockValue < 0) {
-      return { error: 'Stock must be a whole number.' }
+      return { error: 'Enter how many you have as a whole number, e.g. 10 (0 if sold out).' }
     }
     return {
       price: priceValue,
@@ -347,7 +353,7 @@ export function PricingStep({
       <Field label="Selling price (₹)" hint="What the customer pays.">
         <input
           value={price}
-          onChange={(e) => setPrice(e.target.value)}
+          onChange={(e) => setPrice(cleanAmount(e.target.value))}
           inputMode="decimal"
           placeholder="e.g. 1499"
           className={inputClass}
@@ -360,7 +366,7 @@ export function PricingStep({
       >
         <input
           value={compareAt}
-          onChange={(e) => setCompareAt(e.target.value)}
+          onChange={(e) => setCompareAt(cleanAmount(e.target.value))}
           inputMode="decimal"
           placeholder="e.g. 1999"
           className={inputClass}
@@ -369,7 +375,7 @@ export function PricingStep({
       <Field label="Stock" hint="How many you have. Customers see “only 2 left” when it runs low.">
         <input
           value={stock}
-          onChange={(e) => setStock(e.target.value)}
+          onChange={(e) => setStock(cleanCount(e.target.value))}
           inputMode="numeric"
           placeholder="e.g. 10"
           className={inputClass}

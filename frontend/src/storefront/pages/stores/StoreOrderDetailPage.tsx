@@ -464,6 +464,8 @@ export function StoreOrderDetailPage() {
           </>
         }
         confirmLabel={action?.label}
+        // "Cancel" next to "Confirm Order" reads as "cancel the order".
+        cancelLabel="Go back"
         tone="neutral"
         busy={busy}
         onConfirm={() => void advance()}
@@ -487,7 +489,7 @@ export function StoreOrderDetailPage() {
               onChange={(e) => setCancelReason(e.target.value)}
               maxLength={300}
               rows={2}
-              placeholder="Reason (optional — e.g. out of stock)"
+              placeholder="Reason — the customer will see this (optional, e.g. out of stock)"
               className="mt-3 w-full rounded-md border border-line bg-input px-3 py-2 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
             />
           </>
