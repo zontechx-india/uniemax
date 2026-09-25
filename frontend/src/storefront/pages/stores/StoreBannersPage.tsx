@@ -378,16 +378,9 @@ function SizeGuide() {
         {bannerSizeLabel()} — one image, used on every screen
       </p>
       <p className="mt-1 text-xs text-muted">
-        The banner keeps its {BANNER_FORMAT.ratio} shape everywhere and is
-        scaled to the screen's width, so its height shrinks on smaller screens
-        and the whole image always stays visible — nothing is cropped or
-        letterboxed. On a 1920px monitor it is 600px tall, on a laptop about
-        450px, and on a phone about 122px.
-      </p>
-      <p className="mt-2 text-[11px] text-muted">
-        Because a phone shows the same artwork at roughly a third the height,
-        keep text large and near the centre — small print will be unreadable
-        there.
+        Nothing is cropped — the whole picture shows on every screen, just
+        smaller on a phone. Keep any text large and near the centre so it
+        stays readable there.
       </p>
     </div>
   )
