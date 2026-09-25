@@ -1389,7 +1389,8 @@ the seller is trying to do rather than one "n of 12" list:
 - **Unpublished → "Get your store live"**: only the launch steps (store,
   business & contact, first product) — done ones ticked, open ones naming
   exactly what is missing ("Still needed: Contact phone number") with a
-  button saying what it opens ("Add details", "Add a product") — then an
+  button saying what it opens ("Add details", "Add a product" — or "Choose a
+  category", straight to Categories, while no category exists) — then an
   optional **Make it look yours** row (→ Store Builder; every store already
   has a default look, so it never blocks), then **Preview and publish** with
   Preview and the Publish button right there, or the linked blockers.

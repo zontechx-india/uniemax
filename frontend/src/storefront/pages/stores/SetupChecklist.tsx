@@ -213,6 +213,14 @@ function OnlinePaymentsCard({ steps }: { steps: StepState[] }) {
 function StepRow({ step, number }: { step: StepState; number?: number }) {
   const { hiddenSections } = useStoreManageScope()
   const missing = step.requirements.filter((req) => !req.met).map((req) => req.label)
+  // Products can't be added until a category exists — send the seller
+  // straight to the step that unblocks them instead of a gate page.
+  const needsCategory =
+    step.key === 'catalog' &&
+    step.requirements.some((req) => req.key === 'catalog.category' && !req.met)
+  const action = needsCategory
+    ? { to: 'categories', label: 'Choose a category' }
+    : { to: step.href, label: STEP_ACTION[step.key] ?? 'Open' }
   return (
     <Row
       number={number}
@@ -224,8 +232,8 @@ function StepRow({ step, number }: { step: StepState; number?: number }) {
         // what support needs to explain the block — but gets no button when
         // the section is not routed for them.
         step.complete || hiddenSections.includes(step.href) ? null : (
-          <Link to={step.href} className={buttonClass({ variant: 'ring', size: 'sm' })}>
-            {STEP_ACTION[step.key] ?? 'Open'}
+          <Link to={action.to} className={buttonClass({ variant: 'ring', size: 'sm' })}>
+            {action.label}
           </Link>
         )
       }
