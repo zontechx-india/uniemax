@@ -147,6 +147,8 @@ backend/
 │   │   │                      #   REST wrapper) + session create/retry +
 │   │   │                      #   HMAC-verified webhook + reconcile fallback
 │   │   │                      #   + session termination on seller cancel
+│   │   │                      #   + payments.jobs.ts (10-min stranded-payment
+│   │   │                      #   sweep, settle-only)
 │   │   │                      #   (see docs/CASHFREE_PAYMENTS.md)
 │   │   └── (shipping, inventory, settings, dashboard — planned)
 │   ├── scripts/
@@ -1505,7 +1507,9 @@ decrementing stock transactionally. `POST …/orders/quote` serves the
 checkout's price summary from the very same pricing functions, so the
 client never computes money. COD is live end-to-end; ONLINE payment
 runs through **Cashfree** (`modules/payments` — session on placement,
-HMAC-verified webhook, reconcile fallback, pay/retry endpoint; see
+HMAC-verified webhook, reconcile fallback — on page visit and every 10
+minutes for ONLINE orders 5 min – 48 h old still unpaid (`payments.jobs.ts`,
+settle-only: it never cancels or releases stock) —, pay/retry endpoint; see
 `docs/CASHFREE_PAYMENTS.md`) when the gateway keys are configured, and
 falls back to the dev **simulation** (`paymentRef: "DEV-SIMULATED"`) /
 production 503 without them. The module also serves

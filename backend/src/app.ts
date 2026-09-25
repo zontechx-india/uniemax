@@ -10,6 +10,7 @@ import { createInProcessHost, registerAffiliate } from "./package/affiliate/inde
 import { loggerConfig } from "./utils/logger.js";
 import { registerPrisma } from "./plugins/prisma.js";
 import { registerRoutes } from "./routes.js";
+import { startPaymentJobs } from "./modules/payments/payments.jobs.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 
 /**
@@ -86,6 +87,11 @@ export async function buildApp(): Promise<FastifyInstance> {
     prisma: app.prisma,
     host: createInProcessHost(app.prisma),
   });
+
+  // Webhook safety net: settle ONLINE orders whose payment landed but whose
+  // webhook never did. No-op without Cashfree credentials.
+  const stopPaymentJobs = startPaymentJobs(app.log);
+  app.addHook("onClose", async () => stopPaymentJobs());
 
   return app;
 }

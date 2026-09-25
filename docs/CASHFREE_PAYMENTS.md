@@ -122,6 +122,12 @@ Node.js Backend (payments module)
     200 { received: true }
 ```
 
+**If the webhook never arrives:** the order page reconciles on every visit,
+and `modules/payments/payments.jobs.ts` sweeps every 10 minutes — ONLINE
+orders 5 min to 48 h old whose payment is still PENDING/FAILED are asked about
+at Cashfree and settled if paid (up to 50 per run, sequentially). It never
+cancels or releases stock; it only runs when the gateway keys are set.
+
 **Dashboard setup:** in the Cashfree merchant dashboard add the webhook URL
 `https://<api-host>/api/v1/payments/webhooks/cashfree` with the
 **2023-08-01 webhook version**. When `PUBLIC_API_URL` is set the backend

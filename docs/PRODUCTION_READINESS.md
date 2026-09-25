@@ -29,7 +29,7 @@ to raise a problem.
 | Online payments (Cashfree) | Live: session, webhook, reconcile, retry | ⚠️ Ready to **charge**, not to **resolve** |
 | **Refunds** | Status flip only — no API call, no record | 🔴 **Blocker** |
 | **Seller payouts / settlement** | Bank accounts collected; **no money movement at all** | 🔴 **Blocker** |
-| **Stranded-payment recovery** | Only on page-visit; no background job | 🔴 **Blocker** |
+| Stranded-payment recovery | Page-visit reconcile + a 10-minute background sweep of unpaid ONLINE orders (settle-only) (updated 25 Sep 2026); unpaid orders' stock is still not released automatically | 🟠 High |
 | **Review & rating system** | Does not exist (deliberately, no fake stars) | 🟠 Required for launch credibility |
 | Support / dispute handling | Built: tickets (customer ↔ store, seller/customer ↔ UnieMax, admin inbox); `/contact` shows the support email/phone/hours (updated 25 Sep 2026) | ✅ Ready (no refund-dispute workflow yet) |
 | Customer post-order self-service | Order tracking timeline + **cancel before the seller confirms (unpaid orders)**; no return, no invoice (updated 25 Sep 2026) | 🟠 High |
