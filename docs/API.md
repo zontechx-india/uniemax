@@ -348,7 +348,7 @@ on, so the two can never disagree.
   ],
   "gates": {
     "PUBLISH":        { "gate": "PUBLISH", "allowed": false,
-                        "blockers": ["Contact phone number", "At least one product"],
+                        "blockers": ["Contact phone number", "At least one live product"],
                         "blockerKeys": ["business.phone", "catalog.product"] },
     "PAYOUT_SETUP":   { "gate": "PAYOUT_SETUP", "allowed": false,
                         "blockers": ["Business address", "PAN"],
@@ -366,7 +366,7 @@ on, so the two can never disagree.
 
 | Gate | Blocks | Requirements |
 | --- | --- | --- |
-| `PUBLISH` | `PATCH …/publish` with `isPublished: true` | store name + logo · business name · seller name · contact phone · contact email · ≥ 1 category · ≥ 1 product |
+| `PUBLISH` | `PATCH …/publish` with `isPublished: true` | store name + logo · business name · seller name · contact phone · contact email · ≥ 1 category · ≥ 1 live product (drafts and disabled products don't count) |
 | `PAYOUT_SETUP` | `POST …/bank-accounts` (adding any payout account) | business address · PAN · GST registration status (a GSTIN or the not-registered declaration) |
 | `ONLINE_PAYMENT` | `PATCH …/payments` turning `acceptOnlinePayment` **on** | PAN · a primary payout bank account |
 | `PICKUP` | `PATCH …/shipping` with mode `PICKUP` / `BOTH` | the business address |
@@ -376,7 +376,7 @@ shop can open without them. They become mandatory at `PAYOUT_SETUP`, the first
 point at which the platform has to know who it is paying and where.
 
 A blocked request returns `400` naming every missing requirement at once, e.g.
-`"Before you can publish your store, please add: Business address, At least one product."`
+`"Before you can publish your store, please add: Business address, At least one live product."`
 
 Requirements that do not apply are omitted rather than reported unmet — a
 delivery-only store has no pickup-address requirement at all. Turning a

@@ -6,7 +6,7 @@ import { useMarketSession } from '../../app/marketSession'
 import { CloseIcon, StoreIcon } from '../../layout/icons'
 import { storeVars } from '../publicStore/storeTheme'
 import { closeAuthDialog, useAuthDialog } from './authDialogStore'
-import type { AuthDialogBrand, AuthDialogRequest } from './authDialogStore'
+import type { AuthDialogBrand, AuthDialogRequest, AuthIntent } from './authDialogStore'
 import { CustomerAuthPanel } from './CustomerAuthPanel'
 import { StorefrontHero } from './StorefrontHero'
 
@@ -52,6 +52,7 @@ function OpenAuthDialog({ req }: { req: AuthDialogRequest }) {
   const { state, signedIn } = useMarketSession()
   const panelRef = useRef<HTMLDivElement>(null)
   const brand: AuthDialogBrand = req.brand ?? { kind: 'market' }
+  const selling = req.intent === 'sell'
 
   const handleSignedIn = (customer: Customer) => {
     signedIn(customer) // every consumer flips to authed…
@@ -154,7 +155,7 @@ function OpenAuthDialog({ req }: { req: AuthDialogRequest }) {
           <CloseIcon className="h-4 w-4" />
         </button>
 
-        <BrandPanel brand={brand} />
+        <BrandPanel brand={brand} intent={req.intent} />
 
         {/* Form column. `m-auto` on the inner block centres a short form and
             lets a tall one (register, the Google dev panel) scroll within
@@ -176,12 +177,14 @@ function OpenAuthDialog({ req }: { req: AuthDialogRequest }) {
               {/* The same dialog serves first-timers (checkout sends them
                   here) and returning buyers — "Welcome back" greeted
                   people who had never been here. */}
-              Sign in or create an account
+              {selling ? 'Start selling on UnieMax' : 'Sign in or create an account'}
             </h2>
             <p className="mb-6 mt-1 text-sm text-muted">
-              {brand.kind === 'store'
-                ? `To order from ${brand.name}. New here? It takes a minute.`
-                : 'To place orders and track them. New here? It takes a minute.'}
+              {selling
+                ? 'Create a free account (or sign in), then set up your store in a few minutes.'
+                : brand.kind === 'store'
+                  ? `To order from ${brand.name}. New here? It takes a minute.`
+                  : 'To place orders and track them. New here? It takes a minute.'}
             </p>
 
             {state.status === 'loading' ? (
@@ -198,10 +201,12 @@ function OpenAuthDialog({ req }: { req: AuthDialogRequest }) {
               />
             )}
 
-            <p className="mt-6 text-center text-xs text-muted">
-              Browse and fill your cart without an account — sign in to place
-              an order and see your orders.
-            </p>
+            {!selling && (
+              <p className="mt-6 text-center text-xs text-muted">
+                Browse and fill your cart without an account — sign in to place
+                an order and see your orders.
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -215,11 +220,17 @@ function OpenAuthDialog({ req }: { req: AuthDialogRequest }) {
  * store, the store's own identity in its palette — the dialog should feel
  * like the shop asking, with UnieMax as the quiet "powered by" line.
  */
-function BrandPanel({ brand }: { brand: AuthDialogBrand }) {
+function BrandPanel({
+  brand,
+  intent,
+}: {
+  brand: AuthDialogBrand
+  intent?: AuthIntent
+}) {
   if (brand.kind === 'market') {
     return (
       <div className="hidden md:flex md:min-h-0 md:flex-col">
-        <StorefrontHero className="rounded-none p-8" />
+        <StorefrontHero className="rounded-none p-8" intent={intent} />
       </div>
     )
   }

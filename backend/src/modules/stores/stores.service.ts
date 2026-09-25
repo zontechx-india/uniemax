@@ -128,9 +128,11 @@ export async function loadReadinessCounts(
       where: { storeId: { in: storeIds } },
       _count: { _all: true },
     }),
+    // Only products customers can see count: a half-finished draft (no
+    // price, no photo) must not unlock publishing an empty storefront.
     prisma.storeProduct.groupBy({
       by: ["storeId"],
-      where: { storeId: { in: storeIds } },
+      where: { storeId: { in: storeIds }, isActive: true },
       _count: { _all: true },
     }),
     prisma.storeBankAccount.findMany({

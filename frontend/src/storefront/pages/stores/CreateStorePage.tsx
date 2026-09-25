@@ -21,6 +21,7 @@ import { VerifyPhoneForm } from '../../../shared/auth/VerifyPhoneForm'
 import { useCustomerSession } from '../../app/sessionContext'
 import { useMarketSession } from '../../app/marketSession'
 import { ArrowLeftIcon, CheckIcon, ImageIcon } from '../../layout/icons'
+import { Button } from '../../../shared/ui/Button'
 
 /**
  * Create Store — a two-step guided flow.
@@ -266,13 +267,9 @@ function ResumePanel({
                   /store/{draft.slug} · Next: {nextStep.title}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => onResume(draft)}
-                className="h-9 shrink-0 rounded-md bg-brand-gradient px-3.5 text-sm font-semibold text-brand-contrast transition hover:opacity-90"
-              >
+              <Button type="button" size="md" onClick={() => onResume(draft)}>
                 Continue
-              </button>
+              </Button>
             </li>
           )
         })}
@@ -504,7 +501,6 @@ function BusinessStep({
     e.preventDefault()
     if (!businessName.trim()) return setError('Please enter your business name.')
     if (!sellerName.trim()) return setError('Please enter the seller name.')
-    if (!phone) return setError('Please verify a mobile number to continue.')
 
     setError(null)
     setBusy(true)
@@ -513,7 +509,10 @@ function BusinessStep({
         await storesApi.updateProfile(store.id, {
           businessName: businessName.trim(),
           sellerName: sellerName.trim(),
-          phone,
+          // A number is needed to PUBLISH, not to finish here — the checklist
+          // carries it. Blocking this step on it used to throw away the names
+          // above when a seller chose "Finish later".
+          ...(phone ? { phone } : {}),
           ...(email ? { email } : {}),
         }),
       )
@@ -559,9 +558,9 @@ function BusinessStep({
             <ContactRow label="Mobile number" value={phone} />
           ) : (
             <div>
-              <p className="text-xs font-medium text-muted">Mobile number</p>
-              <p className="mt-0.5 mb-3 text-sm text-muted">
-                Add a number so we can reach you about orders.
+              <p className="mb-3 text-sm text-muted">
+                Add a mobile number so we can reach you about orders. You can
+                also do this later — it&apos;s needed before you publish.
               </p>
               <VerifyPhoneForm
                 autoFocus={false}
@@ -578,7 +577,6 @@ function BusinessStep({
         onBack={onBack}
         submitLabel="Finish setup"
         busy={busy}
-        disabled={!phone}
       />
     </form>
   )

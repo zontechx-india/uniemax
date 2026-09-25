@@ -22,6 +22,7 @@ import { useManagedStore } from '../../features/stores/useManagedStore'
 import { CheckIcon, MapPinIcon, TruckIcon } from '../../layout/icons'
 import { DeliveryRuleEditor } from './DeliveryRuleEditor'
 import { ShippingRateEditor } from './ShippingRateEditor'
+import { Button } from '../../../shared/ui/Button'
 
 /**
  * Shipping section of Store Management — how customers RECEIVE orders:
@@ -304,14 +305,15 @@ function ShippingCharges({
       )}
 
       <div className="mt-4 flex items-center gap-3">
-        <button
+        <Button
           type="button"
+          size="md"
           onClick={() => void save()}
-          disabled={busy || !dirty}
-          className="inline-flex h-10 items-center rounded-md bg-brand-gradient px-4 text-sm font-semibold text-brand-contrast transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
+          loading={busy}
+          disabled={!dirty}
         >
           {busy ? 'Saving…' : 'Save Shipping Charges'}
-        </button>
+        </Button>
         {dirty && !busy && (
           <button
             type="button"
@@ -412,14 +414,15 @@ function DeliveryAreas({
       )}
 
       <div className="mt-4 flex items-center gap-3">
-        <button
+        <Button
           type="button"
+          size="md"
           onClick={() => void save()}
-          disabled={busy || !dirty}
-          className="inline-flex h-10 items-center rounded-md bg-brand-gradient px-4 text-sm font-semibold text-brand-contrast transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
+          loading={busy}
+          disabled={!dirty}
         >
           {busy ? 'Saving…' : 'Save Delivery Areas'}
-        </button>
+        </Button>
         {dirty && !busy && (
           <button
             type="button"

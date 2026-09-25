@@ -12,6 +12,7 @@ import { ErrorNote, SuccessNote, TextField } from '../../../shared/ui/form'
 import { storesApi } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import { ImageIcon } from '../../layout/icons'
+import { Button } from '../../../shared/ui/Button'
 
 /**
  * Store Details section — name plus the store logo. The logo flow is
@@ -72,13 +73,9 @@ export function StoreDetailsPage() {
         {error && <ErrorNote>{error}</ErrorNote>}
         {saved && !dirty && <SuccessNote>Store details saved.</SuccessNote>}
 
-        <button
-          type="submit"
-          disabled={busy || !dirty}
-          className="h-11 rounded-md bg-brand-gradient px-6 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
-        >
+        <Button type="submit" size="md" loading={busy} disabled={!dirty}>
           {busy ? 'Saving…' : 'Save Changes'}
-        </button>
+        </Button>
       </form>
     </div>
   )

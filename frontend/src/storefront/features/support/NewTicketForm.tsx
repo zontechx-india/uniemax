@@ -8,6 +8,7 @@ import type {
   TicketCategory,
   TicketCreateInput,
 } from './supportApi'
+import { Button } from '../../../shared/ui/Button'
 
 /**
  * The raise-a-ticket form, shared by both entry points.
@@ -145,13 +146,9 @@ export function NewTicketForm({
       {error && <ErrorNote>{error}</ErrorNote>}
 
       <div className="flex flex-wrap gap-2">
-        <button
-          type="submit"
-          disabled={busy}
-          className="h-11 rounded-md bg-brand-gradient px-5 text-sm font-semibold text-brand-contrast transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
-        >
+        <Button type="submit" size="md" loading={busy}>
           {busy ? 'Sending…' : 'Submit ticket'}
-        </button>
+        </Button>
         <button
           type="button"
           onClick={onCancel}

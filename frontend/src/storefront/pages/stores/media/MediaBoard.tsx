@@ -28,6 +28,7 @@ import type { ReviewItem } from './ReviewQueue'
 import { CameraIcon, VideoIcon } from './icons'
 import { media as t } from './strings'
 import type { BoardPhoto, MediaDriver } from './types'
+import { Button } from '../../../../shared/ui/Button'
 
 /**
  * **Photos & video**, the one screen every seller has to get through.
@@ -234,9 +235,11 @@ export function MediaBoard({
 
       <p
         className={`mb-3 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold ${
+          // Not having a photo YET is the next step, not an error — red on
+          // arrival read as "you did something wrong" before any action.
           ready.length > 0
             ? 'bg-success/10 text-success'
-            : 'bg-danger/10 text-danger'
+            : 'bg-surface-alt text-fg'
         }`}
       >
         <span className="h-2 w-2 shrink-0 rounded-full bg-current" />
@@ -249,15 +252,16 @@ export function MediaBoard({
       {photos.length + preparing + queue.length === 0 ? (
         <div className="grid gap-2">
           {touch && (
-            <button
+            <Button
               type="button"
+              size="lg"
+              full
               onClick={openCamera}
               disabled={!config || disabled}
-              className="flex h-12 items-center justify-center gap-2 rounded-md bg-brand-gradient text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
             >
               <CameraIcon className="h-4.5 w-4.5" />
               {t.add.camera}
-            </button>
+            </Button>
           )}
           <button
             type="button"

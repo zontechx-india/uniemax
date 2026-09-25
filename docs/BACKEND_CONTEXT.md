@@ -172,7 +172,9 @@ backend/
 1. `server.ts` calls `buildApp()`.
 2. `buildApp()` (in `app.ts`):
    - creates Fastify (`trustProxy: true`, Pino logger),
-   - registers `@fastify/cors`,
+   - registers `@fastify/cors` with an explicit `methods` list (v10+ defaults to
+     GET/HEAD/POST only, which silently blocked every PATCH/PUT/DELETE from a
+     cross-origin frontend such as local dev on :5173 → :4000),
    - `registerPrisma(app)` → `prisma.$connect()` + `app.decorate("prisma", …)` + `onClose` disconnect,
    - sets the global error handler + not-found handler,
    - registers routes.
@@ -466,9 +468,12 @@ no endpoint, no UI and no migration change.
   matters once the seller switches a capability on. Inapplicable requirements
   are dropped from the evaluation, never reported unmet.
 - `evaluateReadiness(ctx)` is pure. The context's three counts (categories,
-  products, primary bank account) are loaded by `loadReadinessCounts`, which
-  batches: listing a seller's whole portfolio costs three queries, not three
-  per store.
+  **active** products, primary bank account) are loaded by
+  `loadReadinessCounts` — only `isActive` products count toward
+  `catalog.product` ("At least one live product"), so a half-finished draft
+  (created inactive by the product wizard) can no longer unlock publishing an
+  empty storefront. It batches: listing a seller's whole portfolio costs
+  three queries, not three per store.
 - Turning a capability **off** is never gated, and the `PUBLISH` gate applies
   only to a store's **first** publish (`publishedAt === null`), so stores that
   went live before the requirements existed are grandfathered.

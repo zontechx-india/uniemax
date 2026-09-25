@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { StoreCategory } from '../../../../features/stores/storesApi'
+import { Button } from '../../../../../shared/ui/Button'
 
 /**
  * The product wizard's steps, in order. Every step saves as it goes (the
@@ -101,14 +102,9 @@ export function StepButtons({
           Back
         </button>
       )}
-      <button
-        type="button"
-        onClick={onNext}
-        disabled={busy || !canNext}
-        className="inline-flex h-11 items-center rounded-md bg-brand-gradient px-5 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
-      >
+      <Button type="button" size="md" onClick={onNext} loading={busy} disabled={!canNext}>
         {busy ? 'Saving…' : nextLabel}
-      </button>
+      </Button>
       {skip && (
         <button
           type="button"

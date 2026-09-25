@@ -5,7 +5,7 @@ import { toApiError } from '../../../shared/auth/http'
 import { CategoryPicker } from '../../../shared/categories/CategoryPicker'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { ErrorNote } from '../../../shared/ui/form'
-import { buttonClass } from '../../../shared/ui/Button'
+import { Button, buttonClass } from '../../../shared/ui/Button'
 import { storeCatalogApi } from '../../features/stores/storesApi'
 import type {
   StoreCategory,
@@ -284,7 +284,7 @@ export function StoreCategoriesPage() {
       {/* The next step, right where the seller finishes this one — before,
           they had to find "Products" in the section menu themselves. */}
       {(categories?.length ?? 0) > 0 &&
-        store.readiness.gates.PUBLISH.blockers.includes('At least one product') && (
+        store.readiness.gates.PUBLISH.blockerKeys.includes('catalog.product') && (
           <div className="mt-4 flex flex-col gap-3 rounded-lg border border-success/40 bg-success/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-fg">
               <span className="font-semibold">Category added.</span> Next: add
@@ -310,14 +310,15 @@ export function StoreCategoriesPage() {
             placeholder="Search or browse categories…"
             className="w-full"
           />
-          <button
+          <Button
             type="submit"
-            disabled={busy || !choice || alreadyAdded !== null}
-            className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-md bg-brand-gradient px-4 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
+            size="md"
+            loading={busy}
+            disabled={!choice || alreadyAdded !== null}
           >
             <PlusIcon className="h-4 w-4" />
             {busy ? 'Adding…' : 'Add'}
-          </button>
+          </Button>
         </div>
         {alreadyAdded && (
           <p className="mt-2 text-xs text-muted">
@@ -500,14 +501,9 @@ function CategoryEditPanel({
       </div>
 
       <div className="mt-4 flex gap-2">
-        <button
-          type="button"
-          onClick={() => void save()}
-          disabled={saving}
-          className="inline-flex h-10 items-center rounded-md bg-brand-gradient px-4 text-sm font-semibold text-brand-contrast transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
-        >
+        <Button type="button" size="md" onClick={() => void save()} loading={saving}>
           {saving ? 'Saving…' : 'Save'}
-        </button>
+        </Button>
         <button
           type="button"
           onClick={onCancel}

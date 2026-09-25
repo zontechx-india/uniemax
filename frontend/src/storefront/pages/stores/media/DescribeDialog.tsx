@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { media } from './strings'
 import type { BoardPhoto } from './types'
+import { Button } from '../../../../shared/ui/Button'
 
 /**
  * "Describe this photo" — what used to be an `Alt` button nobody pressed.
@@ -67,14 +68,9 @@ export function DescribeDialog({
           >
             {media.describe.cancel}
           </button>
-          <button
-            type="button"
-            onClick={() => void save()}
-            disabled={busy}
-            className="h-10 rounded-md bg-brand-gradient px-5 text-sm font-semibold text-brand-contrast transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
-          >
+          <Button type="button" size="md" onClick={() => void save()} loading={busy}>
             {busy ? media.describe.saving : media.describe.save}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

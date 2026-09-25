@@ -42,6 +42,7 @@ import {
   CONTENT_COLUMN,
   SECTION_PADDING,
 } from '../layout/contentWidth'
+import { buttonClass } from '../../shared/ui/Button'
 
 /**
  * Marketplace homepage (`/`) — the platform's public entry point. Not a
@@ -960,7 +961,7 @@ function NewStoresSection() {
             No stores have been published yet.
           </p>
           <p className="mt-1 text-sm text-muted">Be the first seller!</p>
-          <CreateStoreLink className="mt-4 rounded-md bg-brand-gradient px-5 py-2 text-sm font-semibold text-brand-contrast transition hover:opacity-90">
+          <CreateStoreLink className={buttonClass({ size: 'md', className: 'mt-4' })}>
             Create Store →
           </CreateStoreLink>
         </div>
@@ -1593,7 +1594,13 @@ function CreateStoreLink({
   return (
     <button
       type="button"
-      onClick={() => openAuthDialog({ onSignedIn: () => navigate('/mystores/new') })}
+      onClick={() =>
+        openAuthDialog({
+          intent: 'sell',
+          initialView: 'register',
+          onSignedIn: () => navigate('/mystores/new'),
+        })
+      }
       className={className}
     >
       {children}

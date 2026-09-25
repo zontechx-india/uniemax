@@ -1,12 +1,22 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { shareOrCopy } from '../../../shared/share'
+import { buttonClass } from '../../../shared/ui/Button'
 import { ErrorNote } from '../../../shared/ui/form'
-import { formatPrice } from '../../features/stores/storesApi'
-import type { StoreDashboard } from '../../features/stores/storesApi'
+import { formatPrice, publicStoreUrl } from '../../features/stores/storesApi'
+import type { Store, StoreDashboard } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
-import { CartIcon, ChevronRightIcon } from '../../layout/icons'
+import {
+  ChatIcon,
+  CheckIcon,
+  ChevronRightIcon,
+  EyeIcon,
+  GlobeIcon,
+  ShareIcon,
+} from '../../layout/icons'
 import { OrderStatusChip, formatOrderDate, paymentLabel } from './orderMeta'
 import { SetupChecklist } from './SetupChecklist'
+import { whatsAppShareUrl } from './StorePublishCard'
 
 /**
  * Dashboard section of Store Management — the landing view: today's orders,
@@ -36,13 +46,22 @@ export function StoreDashboardPage() {
   // The layout owns this data — it also feeds the Orders badge in the nav, and
   // keeping it there means re-entering this section is instant instead of
   // re-fetching (see ManagedStoreContext).
-  const { store, dashboard, dashboardError: error, refreshDashboard } =
-    useManagedStore()
+  const {
+    store,
+    onStoreChange,
+    dashboard,
+    dashboardError: error,
+    refreshDashboard,
+  } = useManagedStore()
 
   // Snapshot at mount: with data already in hand we are RE-entering the
   // section, so pull a fresh copy. Empty means the layout's own initial load
   // is already in flight — asking again would just duplicate it.
   const reEntered = useRef(dashboard !== null)
+  // Once a LIVE store has orders, they are the daily job: the optional
+  // online-payments setup moves below them. (Unpublished, "get live" leads.)
+  const setupBelow =
+    store.isPublished && (dashboard?.stats.totalOrders ?? 0) > 0
   useEffect(() => {
     if (reEntered.current) refreshDashboard()
   }, [refreshDashboard])
@@ -57,11 +76,15 @@ export function StoreDashboardPage() {
         place them.
       </p>
 
-      {/* Above the numbers on purpose: until the store can publish there are
-          no numbers to read, and this is the only thing worth doing. It
-          removes itself once every requirement is met. */}
-      <div className="mt-5">
-        <SetupChecklist readiness={store.readiness} />
+      {/* Above the numbers on purpose: until the store is live there are no
+          numbers to read, and this is the only thing worth doing. */}
+      <div className="mt-5 space-y-5">
+        {store.isPublished && dashboard?.stats.totalOrders === 0 && (
+          <FirstOrderCard store={store} />
+        )}
+        {!setupBelow && (
+          <SetupChecklist store={store} onStoreChange={onStoreChange} />
+        )}
       </div>
 
       {error && (
@@ -75,7 +98,9 @@ export function StoreDashboardPage() {
         </p>
       )}
 
-      {dashboard && (
+      {/* Nine tiles reading 0 teach a new seller nothing — the numbers
+          appear with the first order. */}
+      {dashboard && dashboard.stats.totalOrders > 0 && (
         <div className="mt-5 space-y-5">
           {/* Headline tiles */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -153,20 +178,7 @@ export function StoreDashboardPage() {
                 View all orders →
               </Link>
             </div>
-            {dashboard.recentOrders.length === 0 ? (
-              <div className="mt-2 flex flex-col items-center rounded-lg border border-line px-6 py-10 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-md bg-surface-alt text-muted">
-                  <CartIcon className="h-6 w-6" />
-                </div>
-                <p className="mt-3 text-sm font-semibold text-fg">
-                  No orders yet
-                </p>
-                <p className="mt-1 max-w-sm text-sm text-muted">
-                  Share your store link — orders will show up here the moment
-                  they're placed.
-                </p>
-              </div>
-            ) : (
+            {dashboard.recentOrders.length > 0 && (
               <ul className="mt-2 divide-y divide-line rounded-lg border border-line">
                 {dashboard.recentOrders.map((order) => (
                   <li key={order.id}>
@@ -199,8 +211,80 @@ export function StoreDashboardPage() {
               </ul>
             )}
           </div>
+
+          {setupBelow && (
+            <SetupChecklist store={store} onStoreChange={onStoreChange} />
+          )}
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * The moment after publishing, until the first order: the store is live, so
+ * the one useful thing left is getting the link in front of customers. This
+ * replaces an empty stats grid, and leads with WhatsApp — how most small
+ * sellers here reach their buyers.
+ */
+function FirstOrderCard({ store }: { store: Store }) {
+  const url = publicStoreUrl(store.slug)
+  const [copied, setCopied] = useState(false)
+
+  const share = async () => {
+    if ((await shareOrCopy({ title: store.name, url })) === 'copied') {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  return (
+    <section className="rounded-lg border border-success/40 bg-success/5 p-4 sm:p-5">
+      <p className="flex items-center gap-2 text-base font-semibold text-fg">
+        <span className="h-2 w-2 rounded-full bg-success" aria-hidden />
+        Your store is live
+      </p>
+      <p className="mt-1 text-sm text-muted">
+        Share your link to get your first order — it will show up here the
+        moment it&apos;s placed.
+      </p>
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-3 flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-sm text-fg transition hover:bg-surface-alt"
+      >
+        <GlobeIcon className="h-4 w-4 shrink-0 text-muted" />
+        <span className="truncate">{url.replace(/^https?:\/\//, '')}</span>
+      </a>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <a
+          href={whatsAppShareUrl(store.name, url)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={buttonClass({ size: 'sm' })}
+        >
+          <ChatIcon className="h-3.5 w-3.5" />
+          Share on WhatsApp
+        </a>
+        <button
+          type="button"
+          onClick={() => void share()}
+          className={buttonClass({ variant: 'ring', size: 'sm' })}
+        >
+          {copied ? <CheckIcon className="h-3.5 w-3.5" /> : <ShareIcon className="h-3.5 w-3.5" />}
+          {copied ? 'Link copied' : 'Copy link'}
+        </button>
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className={buttonClass({ variant: 'ring', size: 'sm' })}
+        >
+          <EyeIcon className="h-3.5 w-3.5" />
+          View store
+        </a>
+      </div>
+    </section>
   )
 }

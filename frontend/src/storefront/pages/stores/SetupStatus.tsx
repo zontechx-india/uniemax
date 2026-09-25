@@ -40,6 +40,8 @@ export interface SectionStatus {
   total: number
   /** Labels of what is still missing, in registry order. Empty when done. */
   missing: string[]
+  /** Something missing here stops the store being PUBLISHED. */
+  blocksLaunch: boolean
 }
 
 export function stepsByKey(
@@ -61,6 +63,9 @@ export function sectionStatus(steps: StepState[]): SectionStatus {
     total: steps.reduce((sum, step) => sum + step.totalCount, 0),
     missing: steps.flatMap((step) =>
       step.requirements.filter((req) => !req.met).map((req) => req.label),
+    ),
+    blocksLaunch: steps.some((step) =>
+      step.requirements.some((req) => !req.met && req.gates.includes('PUBLISH')),
     ),
   }
 }
@@ -130,6 +135,7 @@ export function StatusMark({
 function statusText(status: SectionStatus, dirty: boolean): string {
   if (dirty) return 'Unsaved changes'
   if (status.complete) return 'Complete'
+  if (!status.blocksLaunch) return 'Optional'
   return `${status.met} of ${status.total} done`
 }
 
@@ -208,6 +214,16 @@ export function StatusBadge({
     )
   }
 
+  // Orange is reserved for "blocks publishing"; an optional section that is
+  // simply not filled in yet says so in neutral.
+  if (!status.blocksLaunch) {
+    return (
+      <span className="inline-flex shrink-0 items-center rounded-pill bg-surface-alt px-2.5 py-1 text-[11px] font-semibold text-muted">
+        Optional
+      </span>
+    )
+  }
+
   return (
     <span className="inline-flex shrink-0 items-center gap-1.5 rounded-pill bg-pending-soft px-2.5 py-1 text-[11px] font-semibold text-pending">
       <StatusMark complete={false} size="sm" label={null} />
@@ -257,7 +273,10 @@ export function SectionJumpBar({
   targets: JumpTarget[]
   onJump: (id: string) => void
 }) {
-  const pending = targets.filter((t) => !t.status.complete).length
+  // Only what blocks publishing is "pending" here; optional sections that
+  // are simply empty neither pin the bar nor turn orange.
+  const needsWork = (t: JumpTarget) => !t.status.complete && t.status.blocksLaunch
+  const pending = targets.filter(needsWork).length
 
   return (
     <div
@@ -279,15 +298,17 @@ export function SectionJumpBar({
             className={`flex min-w-0 flex-1 basis-0 items-start gap-2 rounded-md border px-2 py-2 text-left transition sm:px-2.5 ${
               target.dirty
                 ? 'border-brand/30 bg-brand-soft text-brand hover:border-brand/60'
-                : target.status.complete
-                  ? 'border-line bg-surface text-muted hover:bg-surface-alt hover:text-fg'
-                  : 'border-pending/30 bg-pending-soft text-pending hover:border-pending/60'
+                : needsWork(target)
+                  ? 'border-pending/30 bg-pending-soft text-pending hover:border-pending/60'
+                  : 'border-line bg-surface text-muted hover:bg-surface-alt hover:text-fg'
             }`}
           >
-            {target.dirty ? (
+            {target.dirty || !(target.status.complete || needsWork(target)) ? (
               <span
                 aria-hidden
-                className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-brand"
+                className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${
+                  target.dirty ? 'bg-brand' : 'bg-line'
+                }`}
               />
             ) : (
               <StatusMark

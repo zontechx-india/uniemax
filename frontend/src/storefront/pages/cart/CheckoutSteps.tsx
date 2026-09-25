@@ -18,6 +18,7 @@ import type {
   AddressInput,
   CustomerAddress,
 } from '../../features/addresses/addressesApi'
+import { useMarketSession } from '../../app/marketSession'
 import { AddressForm, readAddressDraft } from '../../features/addresses/AddressForm'
 import type {
   BillingAddressInput,
@@ -598,6 +599,7 @@ function SavedAddressPicker({
   onAddressesChange: (next: CustomerAddress[]) => void
   onDone: (values: CheckoutForm) => void
 }) {
+  const { state: session } = useMarketSession()
   const [selectedId, setSelectedId] = useState<string | null>(
     addresses.find((a) => a.isPrimary)?.id ?? addresses[0]?.id ?? null,
   )
@@ -737,6 +739,15 @@ function SavedAddressPicker({
       {adding && (
         <AddressForm
           busy={busy}
+          defaults={
+            session.status === 'authed'
+              ? {
+                  name: session.user.name,
+                  phone: session.user.phoneVerifiedAt ? session.user.phone : null,
+                  email: session.user.emailVerifiedAt ? session.user.email : null,
+                }
+              : undefined
+          }
           submitLabel="Save & Use This Address"
           draftKey={CHECKOUT_DRAFT}
           onCancel={() => setAdding(false)}

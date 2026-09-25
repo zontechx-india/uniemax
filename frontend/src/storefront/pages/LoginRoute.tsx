@@ -58,5 +58,10 @@ export function LoginRoute() {
     signedIn(user) // the effect above navigates once the state lands
   }
 
-  return <LoginPage onSignedIn={onSignedIn} />
+  return (
+    <LoginPage
+      onSignedIn={onSignedIn}
+      intent={next.startsWith('/mystores') ? 'sell' : 'shop'}
+    />
+  )
 }

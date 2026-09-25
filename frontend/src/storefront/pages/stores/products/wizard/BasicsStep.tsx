@@ -35,7 +35,7 @@ export function BasicsStep({
 }) {
   const [name, setName] = useState(product?.name ?? '')
   const [categoryId, setCategoryId] = useState(
-    product?.category.id ?? categories[0]?.id ?? '',
+    product?.category.id ?? defaultCategoryId(categories),
   )
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -138,4 +138,15 @@ export function BasicsStep({
       />
     </StepShell>
   )
+}
+
+/**
+ * The first MOST SPECIFIC category, in the order the picker lists them.
+ * Picking "Women" adds "Fashion › Women", and defaulting a new product to the
+ * parent the seller never chose filed it one level too high.
+ */
+function defaultCategoryId(categories: StoreCategory[]): string {
+  const parents = new Set(categories.map((c) => c.parentId))
+  const ordered = categoryOptions(categories)
+  return (ordered.find((option) => !parents.has(option.id)) ?? ordered[0])?.id ?? ''
 }

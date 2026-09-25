@@ -7,6 +7,7 @@ import { ErrorNote, InfoNote } from '../../../shared/ui/form'
 import { CATEGORY_LABELS, supportApi } from './supportApi'
 import type { SupportTicketDetail } from './supportApi'
 import { TicketStatusChip, formatTicketDateTime } from './ticketMeta'
+import { Button } from '../../../shared/ui/Button'
 
 /**
  * One ticket thread as the reporter sees it — fetch, conversation, reply box
@@ -192,13 +193,9 @@ export function TicketThread({ back }: { back: ReactNode }) {
           )}
           {actionError && <ErrorNote>{actionError}</ErrorNote>}
 
-          <button
-            type="submit"
-            disabled={busy}
-            className="h-11 rounded-md bg-brand-gradient px-5 text-sm font-semibold text-brand-contrast transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
-          >
+          <Button type="submit" size="md" loading={busy}>
             {busy ? 'Sending…' : 'Send reply'}
-          </button>
+          </Button>
         </form>
       )}
 

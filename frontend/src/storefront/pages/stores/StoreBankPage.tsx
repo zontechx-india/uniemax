@@ -17,6 +17,7 @@ import {
   PlusIcon,
   TrashIcon,
 } from '../../layout/icons'
+import { Button } from '../../../shared/ui/Button'
 
 /**
  * Bank Accounts section of Store Management — the seller's payout accounts.
@@ -507,13 +508,9 @@ function AccountForm({
       {problem && <ErrorNote>{problem}</ErrorNote>}
 
       <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={busy}
-          className="h-10 rounded-md bg-brand-gradient px-5 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
-        >
+        <Button type="submit" size="md" loading={busy}>
           {busy ? 'Saving…' : initial ? 'Save Changes' : 'Add Account'}
-        </button>
+        </Button>
         <button
           type="button"
           onClick={onCancel}

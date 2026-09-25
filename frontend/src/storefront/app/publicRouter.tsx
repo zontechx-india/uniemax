@@ -10,6 +10,7 @@ import { CartPage } from '../pages/cart/CartPage'
 import { CartStorePage } from '../pages/cart/CartStorePage'
 import { CheckoutPage } from '../pages/cart/CheckoutPage'
 import { OrderSuccessPage } from '../pages/cart/OrderSuccessPage'
+import { buttonClass } from '../../shared/ui/Button'
 
 /**
  * Router for the **public** (no sign-in) shopping surface. Mounted by
@@ -102,7 +103,7 @@ function PublicError() {
       <div className="mt-6 flex gap-3">
         <a
           href="/"
-          className="rounded-md bg-brand-gradient px-5 py-2.5 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90"
+          className={buttonClass({ size: 'md' })}
         >
           Back to UnieMax
         </a>

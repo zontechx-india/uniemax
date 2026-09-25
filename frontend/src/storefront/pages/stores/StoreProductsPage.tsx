@@ -24,6 +24,7 @@ import { ActiveSwitch } from './ActiveSwitch'
 import { ShopNotLiveNudge } from './StorePublishCard'
 import { ProductWizard } from './products/wizard/ProductWizard'
 import type { StepKey } from './products/wizard/shared'
+import { Button, buttonClass } from '../../../shared/ui/Button'
 
 /**
  * Products section of the store manage page.
@@ -210,7 +211,7 @@ export function StoreProductsPage() {
           </p>
           <Link
             to="../categories"
-            className="mt-5 inline-flex h-10 items-center gap-2 rounded-md bg-brand-gradient px-4 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90"
+            className={buttonClass({ size: 'md', className: 'mt-5' })}
           >
             <PlusIcon className="h-4 w-4" />
             Choose a category
@@ -240,14 +241,14 @@ export function StoreProductsPage() {
           </p>
         </div>
         {!wizard && (
-          <button
+          <Button
             type="button"
+            size="md"
             onClick={() => setWizard({ product: null, startAt: 'basics' })}
-            className="inline-flex h-10 items-center gap-1.5 rounded-md bg-brand-gradient px-4 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90"
           >
             <PlusIcon className="h-4 w-4" />
             Add Product
-          </button>
+          </Button>
         )}
       </div>
 

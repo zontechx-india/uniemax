@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { ErrorNote, TextField } from '../../../shared/ui/form'
 import type { AddressInput, CustomerAddress } from './addressesApi'
 import { PHONE_HINT, PIN_HINT, isValidPhone, isValidPincode } from './pincode'
+import { Button } from '../../../shared/ui/Button'
 
 /**
  * Add/edit form for one address-book entry — used by the Saved Addresses
@@ -48,6 +49,7 @@ function writeAddressDraft(key: string, draft: Draft | null) {
 }
 export function AddressForm({
   initial,
+  defaults,
   busy,
   submitLabel = 'Save Address',
   onSubmit,
@@ -55,6 +57,12 @@ export function AddressForm({
   draftKey,
 }: {
   initial?: CustomerAddress
+  /**
+   * Starting values for a NEW address (ignored when editing or restoring a
+   * draft) — the signed-in customer's own name and verified phone, so a
+   * first-time buyer isn't asked to retype what the account already knows.
+   */
+  defaults?: { name?: string | null; phone?: string | null; email?: string | null }
   draftKey?: string
   busy: boolean
   submitLabel?: string
@@ -63,9 +71,9 @@ export function AddressForm({
 }) {
   const [draft, setDraft] = useState<Draft>(() => (draftKey && !initial && readAddressDraft(draftKey)) || {
     label: initial?.label ?? '',
-    name: initial?.name ?? '',
-    phone: initial?.phone ?? '',
-    email: initial?.email ?? '',
+    name: initial?.name ?? defaults?.name ?? '',
+    phone: initial?.phone ?? defaults?.phone ?? '',
+    email: initial?.email ?? defaults?.email ?? '',
     addressLine: initial?.addressLine ?? '',
     pincode: initial?.pincode ?? '',
     state: initial?.state ?? '',
@@ -197,13 +205,9 @@ export function AddressForm({
       {problem && <ErrorNote>{problem}</ErrorNote>}
 
       <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={busy}
-          className="h-10 rounded-md bg-brand-gradient px-5 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
-        >
+        <Button type="submit" size="md" loading={busy}>
           {busy ? 'Saving…' : submitLabel}
-        </button>
+        </Button>
         <button
           type="button"
           onClick={() => {

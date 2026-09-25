@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { usePageTitle } from '../../shared/usePageTitle'
 import { AppLogoLockup } from '../../shared/ui/AppLogo'
+import { buttonClass } from '../../shared/ui/Button'
 
 /**
  * Public placeholder for the marketplace footer pages (About, Privacy,
@@ -41,7 +42,7 @@ export function InfoComingSoonPage() {
       </p>
       <Link
         to="/"
-        className="mt-8 rounded-md bg-brand-gradient px-6 py-2.5 text-sm font-semibold text-brand-contrast transition hover:opacity-90"
+        className={buttonClass({ size: 'md', className: 'mt-8' })}
       >
         Back to Home
       </Link>

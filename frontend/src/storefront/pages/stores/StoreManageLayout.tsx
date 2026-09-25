@@ -1,10 +1,11 @@
 import { usePrivatePageTitle } from '../../../shared/seo'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, Navigate, Outlet, useParams } from 'react-router-dom'
+import { Link, Navigate, Outlet, useLocation, useParams } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
 import { storesApi } from '../../features/stores/storesApi'
 import type { StoreDashboard } from '../../features/stores/storesApi'
 import { useStore } from '../../features/stores/useStores'
+import { isLaunchStep } from '../../features/stores/storeProfile'
 import type { StepState } from '../../features/stores/storeProfile'
 import type { ManagedStoreContext } from '../../features/stores/useManagedStore'
 import { StorePublishCard } from './StorePublishCard'
@@ -40,6 +41,13 @@ export function StoreManageLayout() {
   usePrivatePageTitle('Manage', store?.name)
   // Owner by default; the admin console wraps these routes to say otherwise.
   const scope = useStoreManageScope()
+  // The Dashboard carries the launch / "your store is live" cards itself, so
+  // on a phone — where this panel stacks ABOVE the page — the publish card
+  // would say everything twice before the seller reached the content.
+  const { pathname } = useLocation()
+  const onDashboard =
+    storeSlug !== undefined &&
+    pathname.replace(/\/+$/, '') === scope.storePath(storeSlug)
 
   // Minimised-nav preference. Owned here because the grid track width is this
   // file's; the nav renders the icons.
@@ -118,14 +126,16 @@ export function StoreManageLayout() {
    * second hardcoded list here — add a requirement to `storeReadiness.ts` and
    * its mark appears against the right row with no change to this file.
    *
-   * Empty once the store is fully set up: a column of green ticks that can
-   * never change again is decoration, and the same reasoning already hides
-   * `SetupChecklist` at 100%.
+   * Only steps that block PUBLISHING, and only until the store is live.
+   * Address, tax and payout are optional for a cash-on-delivery shop; marking
+   * them "Pending" kept Business Details looking unfinished forever for
+   * sellers who never want online payment. They are surfaced on the
+   * Dashboard's "Accept online payments" card and enforced where they apply.
    */
   const setupSteps = new Map<string, StepState[]>()
-  if (!store.readiness.complete) {
+  if (!store.isPublished) {
     for (const step of store.readiness.steps) {
-      if (step.totalCount === 0) continue
+      if (step.totalCount === 0 || !isLaunchStep(step)) continue
       setupSteps.set(step.href, [...(setupSteps.get(step.href) ?? []), step])
     }
   }
@@ -244,7 +254,9 @@ export function StoreManageLayout() {
               />
             </div>
           )}
-          <div className={rail ? 'lg:hidden' : ''}>
+          <div
+            className={`${rail ? 'lg:hidden' : ''} ${onDashboard ? 'max-lg:hidden' : ''}`}
+          >
             <StorePublishCard store={store} onStoreChange={setStore} />
           </div>
         </aside>

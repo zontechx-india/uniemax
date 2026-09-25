@@ -11,6 +11,7 @@ import { formatPrice } from '../features/stores/storesApi'
 import { CONTENT_COLUMN } from '../layout/contentWidth'
 import { MarketChrome } from '../layout/MarketChrome'
 import { BoxIcon } from '../layout/icons'
+import { buttonClass } from '../../shared/ui/Button'
 
 /**
  * `/c/{slug}` — a **global category landing page**.
@@ -410,7 +411,7 @@ function NotFound() {
       </p>
       <Link
         to="/"
-        className="mt-6 inline-flex h-10 items-center rounded-md bg-brand-gradient px-5 text-sm font-semibold text-brand-contrast"
+        className={buttonClass({ size: 'md', className: 'mt-6' })}
       >
         Back to UnieMax
       </Link>

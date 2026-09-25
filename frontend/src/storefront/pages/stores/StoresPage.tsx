@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useStores } from '../../features/stores/useStores'
 import type { Store } from '../../features/stores/storesApi'
 import { ChevronRightIcon, GlobeIcon, PlusIcon, StoreIcon } from '../../layout/icons'
+import { buttonClass } from '../../../shared/ui/Button'
 
 /**
  * Store selection ("My Store" in the account menu): pick one of the
@@ -39,7 +40,7 @@ export function StoresPage() {
         </div>
         <Link
           to="/mystores/new"
-          className="inline-flex h-10 items-center gap-2 rounded-md bg-brand-gradient px-4 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90"
+          className={buttonClass({ size: 'md' })}
         >
           <PlusIcon className="h-4 w-4" />
           Create New Store
@@ -129,7 +130,7 @@ function EmptyState() {
       </p>
       <Link
         to="/mystores/new"
-        className="mt-6 inline-flex h-11 items-center gap-2 rounded-md bg-brand-gradient px-5 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90"
+        className={buttonClass({ size: 'md', className: 'mt-6' })}
       >
         <PlusIcon className="h-4 w-4" />
         Create Store

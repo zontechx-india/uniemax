@@ -5,6 +5,7 @@ import { shareOrCopy } from '../../../shared/share'
 import { publicStoreUrl, storesApi } from '../../features/stores/storesApi'
 import type { Store } from '../../features/stores/storesApi'
 import { ChatIcon, CheckIcon, EyeIcon, GlobeIcon, ShareIcon } from '../../layout/icons'
+import { BlockerLinks, useGateBlockers } from './GateBlockers'
 
 /**
  * Publish & share panel shown on every store-management section (left card).
@@ -47,8 +48,8 @@ export function StorePublishCard({
    * for exactly the reasons a request would have been rejected. Unpublishing
    * is never blocked: a seller must always be able to take their shop down.
    */
-  const publishGate = store.readiness.gates.PUBLISH
-  const blocked = !store.isPublished && !publishGate.allowed
+  const blockers = useGateBlockers(store, 'PUBLISH')
+  const blocked = !store.isPublished && !store.readiness.gates.PUBLISH.allowed
 
   const togglePublished = async () => {
     setError(null)
@@ -83,40 +84,33 @@ export function StorePublishCard({
           />
           {store.isPublished ? 'Published' : 'Not published'}
         </span>
-        <button
-          type="button"
-          onClick={togglePublished}
-          disabled={busy || blocked}
-          title={
-            blocked
-              ? `Still needed: ${publishGate.blockers.join(', ')}`
-              : undefined
-          }
-          className={`h-10 rounded-md px-4 text-sm font-semibold transition disabled:cursor-not-allowed ${
-            store.isPublished
-              ? 'bg-surface-alt text-fg hover:bg-line'
-              : blocked
-                ? 'bg-line text-muted'
-                : 'bg-success text-white shadow-floating hover:bg-success/90'
-          }`}
-        >
-          {busy ? 'Saving…' : store.isPublished ? 'Unpublish' : 'Publish'}
-        </button>
+        {store.isPublished ? (
+          <button
+            type="button"
+            onClick={togglePublished}
+            disabled={busy}
+            className="h-9 rounded-md px-3 text-xs font-semibold text-muted transition hover:bg-surface-alt hover:text-fg disabled:cursor-not-allowed"
+          >
+            {busy ? 'Saving…' : 'Unpublish'}
+          </button>
+        ) : (
+          <Button
+            size="sm"
+            onClick={togglePublished}
+            loading={busy}
+            disabled={blocked}
+          >
+            Publish store
+          </Button>
+        )}
       </div>
 
       {/* Naming the blockers beats a disabled button with no explanation —
           the seller can act without hunting for what is missing. */}
       {blocked ? (
         <div className="mt-2 rounded-md border border-line bg-surface-alt px-2.5 py-2">
-          <p className="text-xs font-medium text-fg">Before publishing, add:</p>
-          <ul className="mt-1 space-y-0.5">
-            {publishGate.blockers.map((blocker) => (
-              <li key={blocker} className="flex gap-1.5 text-xs text-muted">
-                <span aria-hidden>·</span>
-                <span>{blocker}</span>
-              </li>
-            ))}
-          </ul>
+          <p className="mb-1.5 text-xs font-medium text-fg">Before publishing, add:</p>
+          <BlockerLinks blockers={blockers} />
         </div>
       ) : (
         <p className="mt-2 text-xs text-muted">
@@ -203,8 +197,8 @@ export function ShopNotLiveNudge({
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const blockers = useGateBlockers(store, 'PUBLISH')
   if (store.isPublished) return null
-  const gate = store.readiness.gates.PUBLISH
   const publish = async () => {
     setBusy(true)
     setError(null)
@@ -222,7 +216,7 @@ export function ShopNotLiveNudge({
       className="mb-4 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm"
     >
       <p className="font-semibold text-fg">Customers can't see your shop yet</p>
-      {gate.allowed ? (
+      {store.readiness.gates.PUBLISH.allowed ? (
         <>
           <p className="mt-0.5 text-muted">
             Your shop is not published. Publish it to start taking orders.
@@ -237,9 +231,10 @@ export function ShopNotLiveNudge({
           </Button>
         </>
       ) : (
-        <p className="mt-0.5 text-muted">
-          Before you can publish, add: {gate.blockers.join(' · ')}
-        </p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-muted">Before you can publish, add:</span>
+          <BlockerLinks blockers={blockers} />
+        </div>
       )}
       {error && <p className="mt-1 text-xs text-danger">{error}</p>}
     </div>

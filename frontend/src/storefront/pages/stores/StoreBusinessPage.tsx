@@ -3,6 +3,8 @@ import type { FormEvent, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
 import { VerifyPhoneForm } from '../../../shared/auth/VerifyPhoneForm'
+import type { Customer } from '../../../shared/auth/authApi'
+import { Button } from '../../../shared/ui/Button'
 import { ErrorNote, SuccessNote, TextField } from '../../../shared/ui/form'
 import { useCustomerSession } from '../../app/sessionContext'
 import { useMarketSession } from '../../app/marketSession'
@@ -77,14 +79,14 @@ const SECTIONS: {
     id: 'business-address',
     title: 'Address',
     description:
-      'Where your business operates from. Needed before you add a bank account or offer pickup.',
+      'Where your business operates from. Optional for Cash on Delivery — needed before you add a bank account or offer store pickup.',
     step: 'address',
   },
   {
     id: 'business-tax',
     title: 'Tax & compliance',
     description:
-      'PAN and GST status. Needed before you add a bank account and get paid.',
+      'PAN and GST status. Optional for Cash on Delivery — needed before you add a bank account and accept online payments.',
     step: 'tax',
   },
 ]
@@ -152,7 +154,9 @@ export function StoreBusinessPage() {
 
   const met = statuses.reduce((sum, s) => sum + s.status.met, 0)
   const total = statuses.reduce((sum, s) => sum + s.status.total, 0)
-  const allComplete = statuses.every((s) => s.status.complete)
+  // Green once nothing here blocks publishing — the optional payout fields
+  // shouldn't keep a working COD shop looking unfinished.
+  const allComplete = statuses.every((s) => !s.status.blocksLaunch)
   const percent = total ? Math.round((met / total) * 100) : 100
 
   const cardProps = (id: string): CardStatusProps => {
@@ -179,8 +183,8 @@ export function StoreBusinessPage() {
         </span>
       </div>
       <p className="mt-1 text-sm text-muted">
-        Who's behind {store.name}, where you trade from, and the tax details we
-        need before paying you out.
+        Who's behind {store.name}. Address and tax details are only needed
+        once you want to be paid online.
       </p>
 
       {/* The one number that survives a phone screen. The bar carries the
@@ -276,8 +280,16 @@ function Card({
           are unsaved edits, because it would then be describing the state the
           seller is in the middle of leaving. */}
       {!dirty && !status.complete && status.missing.length > 0 && (
-        <p className="mt-3 rounded-md bg-pending-soft px-3 py-2 text-xs text-pending">
-          <span className="font-semibold">Still needed: </span>
+        // Orange means "blocks your store going live"; an optional card's
+        // gaps are listed in neutral so they don't read as a to-do.
+        <p
+          className={`mt-3 rounded-md px-3 py-2 text-xs ${
+            status.blocksLaunch ? 'bg-pending-soft text-pending' : 'bg-surface-alt text-muted'
+          }`}
+        >
+          <span className="font-semibold">
+            {status.blocksLaunch ? 'Still needed: ' : 'For online payments, add: '}
+          </span>
           {status.missing.join(' · ')}
         </p>
       )}
@@ -289,23 +301,19 @@ function Card({
 
 function SaveButton({
   busy,
-  disabled,
+  disabled = false,
   label = 'Save Changes',
 }: {
   busy: boolean
-  disabled: boolean
+  disabled?: boolean
   /** Names the section — three buttons all reading "Save Changes" made
    *  sellers think the last one saved the whole page. */
   label?: string
 }) {
   return (
-    <button
-      type="submit"
-      disabled={busy || disabled}
-      className="h-11 w-full rounded-md bg-brand-gradient px-6 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted sm:w-auto"
-    >
+    <Button type="submit" loading={busy} disabled={disabled} className="w-full sm:w-auto">
       {busy ? 'Saving…' : label}
-    </button>
+    </Button>
   )
 }
 
@@ -389,7 +397,12 @@ function ContactCard({
   )
   const { customer } = useCustomerSession()
   const { signedIn } = useMarketSession()
-  const [businessName, setBusinessName] = useState(profile.businessName ?? '')
+  // Same default as the Create Store wizard: most sole proprietors trade
+  // under the shop's name, so an empty field here is just one more thing to
+  // type.
+  const [businessName, setBusinessName] = useState(
+    profile.businessName ?? store.name,
+  )
   const [sellerName, setSellerName] = useState(profile.sellerName ?? '')
 
   // Contact details are the seller's own verified account identifiers, never
@@ -407,14 +420,22 @@ function ContactCard({
     e.preventDefault()
     if (!businessName.trim()) return setError('Business name is required.')
     if (!sellerName.trim()) return setError('Seller name is required.')
-    if (!phone) return setError('Verify a mobile number to save contact details.')
 
     await save({
       businessName: businessName.trim(),
       sellerName: sellerName.trim(),
-      phone,
+      ...(phone ? { phone } : {}),
       ...(email ? { email } : {}),
     })
+  }
+
+  // Verifying a number IS the seller's intent to use it — apply it to the
+  // store right away instead of leaving it unsaved behind a second button.
+  const phoneVerified = async (verified: Customer) => {
+    signedIn(verified)
+    if (verified.phone && verified.phoneVerifiedAt) {
+      await save({ phone: verified.phone })
+    }
   }
 
   return (
@@ -458,14 +479,14 @@ function ContactCard({
               <VerifiedContact label="Mobile number" value={phone} />
             ) : (
               <div>
-                <p className="text-xs font-medium text-muted">Mobile number</p>
-                <p className="mt-0.5 mb-3 text-sm text-muted">
-                  Add a number so we can reach you about orders.
+                <p className="mb-3 text-sm text-muted">
+                  Add a mobile number so we can reach you about orders —
+                  it&apos;s needed before you publish.
                 </p>
                 <VerifyPhoneForm
                   autoFocus={false}
                   submitLabel="Verify number"
-                  onVerified={signedIn}
+                  onVerified={(verified) => void phoneVerified(verified)}
                 />
               </div>
             )}
@@ -474,7 +495,7 @@ function ContactCard({
 
         {error && <ErrorNote>{error}</ErrorNote>}
         {saved && <SuccessNote>Business details saved.</SuccessNote>}
-        <SaveButton busy={busy} disabled={!phone} label="Save business & contact" />
+        <SaveButton busy={busy} label="Save business & contact" />
       </form>
     </Card>
   )

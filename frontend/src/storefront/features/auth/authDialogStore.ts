@@ -34,7 +34,15 @@ export interface AuthDialogOptions {
    */
   onSignedIn?: (customer: Customer) => void
   initialView?: AuthView
+  /**
+   * Why the visitor is signing in. `sell` (the "Create your store" CTAs)
+   * swaps the shopper copy — "to place orders" — for the seller's, so
+   * someone opening a shop is not greeted as a buyer. Default `shop`.
+   */
+  intent?: AuthIntent
 }
+
+export type AuthIntent = 'shop' | 'sell'
 
 export interface AuthDialogRequest extends AuthDialogOptions {
   /** Increments per open — keys the panel so two opens never share state. */

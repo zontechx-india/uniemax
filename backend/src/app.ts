@@ -43,6 +43,10 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(cors, {
     origin: env.CORS_ORIGIN === "*" ? true : env.CORS_ORIGIN.split(","),
     credentials: true,
+    // @fastify/cors v10+ defaults to GET/HEAD/POST only, which silently
+    // blocks every PATCH/PUT/DELETE from a cross-origin frontend (local dev:
+    // :5173 → :4000). List what the API actually uses.
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"],
   });
 
   // Abuse protection — a generous per-IP ceiling for the whole API (keyed by

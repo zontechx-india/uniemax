@@ -9,6 +9,7 @@ import { TicketList } from '../features/support/TicketList'
 import { CUSTOMER_CATEGORIES, supportApi } from '../features/support/supportApi'
 import type { SupportTicket } from '../features/support/supportApi'
 import { PlusIcon } from '../layout/icons'
+import { Button } from '../../shared/ui/Button'
 
 /**
  * Help & Support (`/support`) — how a **shopper** reaches the UnieMax team,
@@ -69,14 +70,10 @@ export function SupportPage() {
           Your tickets
         </h2>
         {!composing && (
-          <button
-            type="button"
-            onClick={() => setComposing(true)}
-            className="inline-flex h-10 items-center gap-1.5 rounded-md bg-brand-gradient px-4 text-sm font-semibold text-brand-contrast transition hover:opacity-90"
-          >
+          <Button type="button" size="md" onClick={() => setComposing(true)}>
             <PlusIcon className="h-4 w-4" />
             New ticket
-          </button>
+          </Button>
         )}
       </div>
 

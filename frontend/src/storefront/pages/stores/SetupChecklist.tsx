@@ -1,78 +1,204 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import type { Readiness, StepState } from '../../features/stores/storeProfile'
-import { CheckIcon, ChevronRightIcon } from '../../layout/icons'
+import { toApiError } from '../../../shared/auth/http'
+import { Button, buttonClass } from '../../../shared/ui/Button'
+import { isLaunchStep } from '../../features/stores/storeProfile'
+import type { StepState } from '../../features/stores/storeProfile'
+import { publicStoreUrl, storesApi } from '../../features/stores/storesApi'
+import type { Store } from '../../features/stores/storesApi'
 import { useStoreManageScope } from '../../features/stores/storeManageScope'
+import { CheckIcon, EyeIcon, PaletteIcon } from '../../layout/icons'
+import { BlockerLinks, useGateBlockers } from './GateBlockers'
 
 /**
- * "Finish setting up your store" — the resumable half of onboarding.
+ * The seller's path to a live store, on the Dashboard — the resumable half of
+ * onboarding (the Create Store wizard asks only what fits at signup).
  *
- * The wizard covers what can be asked at signup; this covers everything else
- * (a first product, a payout account) plus whatever the seller skipped. Both
- * render from the SAME server-computed `readiness`, which is also what the
- * publish and payment endpoints enforce, so the list can never promise a
- * seller they are done while the server disagrees.
+ * Two cards, because they answer two different questions:
  *
- * It disappears once every applicable requirement is met — a checklist that
- * lingers at 100% is noise, and the gates it guarded are already open.
+ *  - **Get your store live** (until published): only the steps that block
+ *    publishing, then an optional "make it yours" pointer to the Store
+ *    Builder, then Preview + Publish right here. It used to be one "4 of 12"
+ *    list mixing these with payout KYC, which read as twelve chores before a
+ *    shop could open — when a cash-on-delivery shop needs none of the
+ *    payout ones.
+ *  - **Accept online payments** (once live, while unfinished): address, tax
+ *    and bank account — clearly optional, since COD already works.
+ *
+ * Both render from the SAME server-computed `readiness` that the publish and
+ * payment endpoints enforce, so this can never promise a seller they are done
+ * while the server disagrees.
  */
-export function SetupChecklist({ readiness }: { readiness: Readiness }) {
-  const [expanded, setExpanded] = useState<string | null>(null)
+export function SetupChecklist({
+  store,
+  onStoreChange,
+}: {
+  store: Store
+  onStoreChange: (store: Store) => void
+}) {
+  const applicable = store.readiness.steps.filter((step) => step.totalCount > 0)
+  const launch = applicable.filter(isLaunchStep)
+  const payout = applicable.filter((step) => !isLaunchStep(step))
 
-  // Steps with nothing applicable (pickup address for a delivery-only store)
-  // are not "incomplete" — they do not apply, and showing them would be a bug.
-  const pending = readiness.steps.filter(
-    (step) => !step.complete && step.totalCount > 0,
-  )
-  if (readiness.complete || pending.length === 0) return null
+  if (!store.isPublished) {
+    return <LaunchCard store={store} steps={launch} onStoreChange={onStoreChange} />
+  }
+  const payoutPending = payout.filter((step) => !step.complete)
+  return payoutPending.length > 0 ? <OnlinePaymentsCard steps={payoutPending} /> : null
+}
 
-  const percent = readiness.totalCount
-    ? Math.round((readiness.metCount / readiness.totalCount) * 100)
-    : 0
+/** What the jump-to-fix button says, per step — "Add" alone said nothing. */
+const STEP_ACTION: Partial<Record<StepState['key'], string>> = {
+  store: 'Edit details',
+  business: 'Add details',
+  catalog: 'Add a product',
+  address: 'Add address',
+  tax: 'Add tax details',
+  payout: 'Add bank account',
+}
+
+function LaunchCard({
+  store,
+  steps,
+  onStoreChange,
+}: {
+  store: Store
+  steps: StepState[]
+  onStoreChange: (store: Store) => void
+}) {
+  const { storePath } = useStoreManageScope()
+  const blockers = useGateBlockers(store, 'PUBLISH')
+  const canPublish = store.readiness.gates.PUBLISH.allowed
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const done = steps.filter((step) => step.complete).length
+  // +1: publishing is the last step, and it is never "done" on this card.
+  const total = steps.length + 1
+  const percent = Math.round((done / total) * 100)
+
+  const publish = async () => {
+    setError(null)
+    setBusy(true)
+    try {
+      onStoreChange(await storesApi.setPublished(store.id, true))
+    } catch (err) {
+      setError(toApiError(err).message)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
-    <section className="mb-6 overflow-hidden rounded-lg border border-line bg-surface shadow-floating">
+    <section className="overflow-hidden rounded-lg border border-line bg-surface shadow-floating">
       <header className="border-b border-line p-4 sm:p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <h3 className="font-body text-base font-semibold text-fg">
-            Finish setting up your store
+            Get your store live
           </h3>
           <span className="text-xs font-medium text-muted">
-            {readiness.metCount} of {readiness.totalCount} done
+            Step {Math.min(done + 1, total)} of {total}
           </span>
         </div>
-
         <div
           className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-alt"
           role="progressbar"
           aria-valuenow={percent}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label="Store setup progress"
+          aria-label="Store launch progress"
         >
           <div
             className="h-full rounded-full bg-brand-gradient transition-all duration-500"
             style={{ width: `${percent}%` }}
           />
         </div>
-
-        <p className="mt-2.5 text-xs text-muted">
-          {readiness.gates.PUBLISH.allowed
-            ? 'Your store is ready to publish.'
-            : `${readiness.gates.PUBLISH.blockers.length} of these are needed before you can publish.`}
-        </p>
       </header>
 
+      <ol className="divide-y divide-line">
+        {steps.map((step, i) => (
+          <StepRow key={step.key} number={i + 1} step={step} />
+        ))}
+
+        {/* Advisory: every store already has a working default look, so
+            this never blocks and is never "incomplete". */}
+        <Row
+          number={steps.length + 1}
+          icon={<PaletteIcon className="h-3.5 w-3.5" />}
+          title="Make it look yours"
+          detail="Optional — pick a theme, colours and homepage sections. Your store already has a clean default look."
+          action={
+            <Link
+              to={`${storePath(store.slug)}/builder`}
+              className={buttonClass({ variant: 'ring', size: 'sm' })}
+            >
+              Open Store Builder
+            </Link>
+          }
+        />
+
+        <Row
+          number={total}
+          title="Preview and publish"
+          detail={
+            canPublish ? (
+              'Check your store as customers will see it, then publish to start taking orders.'
+            ) : (
+              <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                Still needed: <BlockerLinks blockers={blockers} />
+              </span>
+            )
+          }
+          action={
+            <span className="flex gap-2">
+              <a
+                href={publicStoreUrl(store.slug)}
+                target="_blank"
+                rel="noreferrer"
+                className={buttonClass({ variant: 'ring', size: 'sm' })}
+              >
+                <EyeIcon className="h-3.5 w-3.5" />
+                Preview
+              </a>
+              <Button
+                size="sm"
+                variant="sheen"
+                loading={busy}
+                disabled={!canPublish}
+                onClick={() => void publish()}
+              >
+                Publish store
+              </Button>
+            </span>
+          }
+        />
+      </ol>
+      {error && (
+        <p className="border-t border-line bg-danger-soft px-4 py-2 text-xs font-medium text-danger sm:px-5">
+          {error}
+        </p>
+      )}
+    </section>
+  )
+}
+
+function OnlinePaymentsCard({ steps }: { steps: StepState[] }) {
+  return (
+    <section className="overflow-hidden rounded-lg border border-line bg-surface">
+      <header className="border-b border-line p-4 sm:p-5">
+        <h3 className="font-body text-base font-semibold text-fg">
+          Accept online payments{' '}
+          <span className="text-xs font-medium text-muted">— optional</span>
+        </h3>
+        <p className="mt-1 text-xs text-muted">
+          Cash on Delivery already works. To take UPI and card payments, add
+          these so we know who to pay out.
+        </p>
+      </header>
       <ul className="divide-y divide-line">
-        {pending.map((step) => (
-          <StepRow
-            key={step.key}
-            step={step}
-            open={expanded === step.key}
-            onToggle={() =>
-              setExpanded((current) => (current === step.key ? null : step.key))
-            }
-          />
+        {steps.map((step) => (
+          <StepRow key={step.key} step={step} />
         ))}
       </ul>
     </section>
@@ -80,97 +206,70 @@ export function SetupChecklist({ readiness }: { readiness: Readiness }) {
 }
 
 /**
- * One step. Collapsed it is a title plus an n/m counter; expanded it lists the
- * individual requirements with their state, so "Business & contact 2/4" can
- * be resolved into "you still need a phone and an email" without leaving the
- * page. The link out is separate from the expander — tapping the row should
- * explain, not navigate away mid-thought.
+ * One readiness step. Unfinished, its detail line names exactly what is
+ * missing (rather than a generic blurb and an n/m counter to expand), and
+ * its button says what it opens.
  */
-function StepRow({
-  step,
-  open,
-  onToggle,
-}: {
-  step: StepState
-  open: boolean
-  onToggle: () => void
-}) {
+function StepRow({ step, number }: { step: StepState; number?: number }) {
   const { hiddenSections } = useStoreManageScope()
+  const missing = step.requirements.filter((req) => !req.met).map((req) => req.label)
   return (
-    <li>
-      <div className="flex items-center gap-2 px-4 sm:px-5">
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={open}
-          className="flex min-w-0 flex-1 items-center gap-3 py-3.5 text-left"
-        >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-line bg-surface-alt text-[11px] font-semibold text-muted">
-            {step.metCount}/{step.totalCount}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium text-fg">
-              {step.title}
-            </span>
-            <span className="mt-0.5 block truncate text-xs text-muted">
-              {step.blurb}
-            </span>
-          </span>
-          <ChevronRightIcon
-            className={`h-4 w-4 shrink-0 text-muted transition-transform ${
-              open ? 'rotate-90' : ''
-            }`}
-          />
-        </button>
-
-        {/* The jump-to-fix button, unless this mode cannot open that section.
-            An admin still SEES the outstanding step — "this shop has no PAN"
-            is exactly what support needs in order to explain the block — but
-            gets no button, because the section it would open is not routed
-            for them and the link would dead-end. */}
-        {hiddenSections.includes(step.href) ? null : (
-          <Link
-            to={step.href}
-            className="shrink-0 rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-fg transition hover:bg-surface-alt"
-          >
-            Add
+    <Row
+      number={number}
+      complete={step.complete}
+      title={step.title}
+      detail={step.complete ? step.blurb : `Still needed: ${missing.join(' · ')}`}
+      action={
+        // An admin still SEES the outstanding step — "this shop has no PAN" is
+        // what support needs to explain the block — but gets no button when
+        // the section is not routed for them.
+        step.complete || hiddenSections.includes(step.href) ? null : (
+          <Link to={step.href} className={buttonClass({ variant: 'ring', size: 'sm' })}>
+            {STEP_ACTION[step.key] ?? 'Open'}
           </Link>
-        )}
-      </div>
+        )
+      }
+    />
+  )
+}
 
-      {open && (
-        <ul className="space-y-1.5 px-4 pb-4 pl-[3.4rem] sm:px-5 sm:pl-[4.1rem]">
-          {step.requirements.map((req) => (
-            <li
-              key={req.key}
-              className={`flex items-center gap-2 text-xs ${
-                req.met ? 'text-muted' : 'text-fg'
-              }`}
-            >
-              {req.met ? (
-                <CheckIcon className="h-3.5 w-3.5 shrink-0 text-success" />
-              ) : (
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-line" />
-              )}
-              <span className={req.met ? 'line-through' : ''}>{req.label}</span>
-              {/* What the missing piece is FOR. Publishing wins when both
-                  apply; "to get paid" covers the payout prerequisites
-                  (address, tax IDs, the bank account itself). */}
-              {!req.met && req.gates.includes('PUBLISH') ? (
-                <span className="rounded-sm bg-surface-alt px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
-                  to publish
-                </span>
-              ) : !req.met &&
-                (req.gates.includes('PAYOUT_SETUP') ||
-                  req.gates.includes('ONLINE_PAYMENT')) ? (
-                <span className="rounded-sm bg-surface-alt px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
-                  to get paid
-                </span>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
+function Row({
+  number,
+  icon,
+  complete = false,
+  title,
+  detail,
+  action,
+}: {
+  number?: number
+  icon?: ReactNode
+  complete?: boolean
+  title: string
+  detail: ReactNode
+  action: ReactNode
+}) {
+  return (
+    <li className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:px-5">
+      <div className="flex min-w-0 flex-1 items-start gap-3">
+        <span
+          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
+            complete
+              ? 'bg-success/15 text-success'
+              : 'border border-line bg-surface-alt text-muted'
+          }`}
+          aria-hidden
+        >
+          {complete ? <CheckIcon className="h-3.5 w-3.5" /> : (icon ?? number)}
+        </span>
+        <div className="min-w-0">
+          <p className={`text-sm font-medium ${complete ? 'text-muted' : 'text-fg'}`}>
+            {title}
+            {complete && <span className="sr-only"> — done</span>}
+          </p>
+          <div className="mt-0.5 text-xs text-muted">{detail}</div>
+        </div>
+      </div>
+      {action && <div className="shrink-0 pl-10 sm:pl-0">{action}</div>}
     </li>
   )
 }

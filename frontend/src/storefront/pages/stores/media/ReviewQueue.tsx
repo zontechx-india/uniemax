@@ -1,5 +1,6 @@
 import { CheckIcon, CloseIcon, PencilIcon } from '../../../layout/icons'
 import { media } from './strings'
+import { Button } from '../../../../shared/ui/Button'
 
 /** One picked photo, already optimized, waiting for the seller's verdict. */
 export interface ReviewItem {
@@ -78,14 +79,10 @@ export function ReviewQueue({
         </p>
 
         <div className="mt-4 grid gap-2">
-          <button
-            type="button"
-            onClick={() => onUse(item)}
-            className="flex h-12 items-center justify-center gap-2 rounded-md bg-brand-gradient text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90"
-          >
+          <Button type="button" size="lg" full onClick={() => onUse(item)}>
             <CheckIcon className="h-4 w-4" />
             {media.review.use}
-          </button>
+          </Button>
           <button
             type="button"
             onClick={() => onEdit(item)}

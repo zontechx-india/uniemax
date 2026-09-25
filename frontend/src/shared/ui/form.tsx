@@ -4,6 +4,7 @@ import type {
   ReactNode,
   SelectHTMLAttributes,
 } from 'react'
+import { buttonClass } from './Button'
 
 /**
  * Shared, brand-neutral auth primitives.
@@ -281,8 +282,10 @@ export function PrimaryButton({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
+    // The full-width form submit — a `Button` (lg, full) under another name,
+    // so auth and form screens share the one CTA shape.
     <button
-      className={`h-12 w-full rounded-md bg-brand-gradient px-4 text-sm font-semibold text-brand-contrast transition-colors hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted ${className}`}
+      className={buttonClass({ size: 'lg', full: true, className })}
       {...props}
     >
       {children}

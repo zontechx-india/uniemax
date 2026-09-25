@@ -89,7 +89,11 @@ the API same-origin — matching production, so no CORS/SameSite issues.
   calls `signedIn(customer)` and closes, and every consumer re-renders as
   signed in — no reload, no `?next=`. Because it sits OUTSIDE the router it
   cannot navigate; callers that need a follow-up pass `onSignedIn` (the
-  seller CTA navigates to `/mystores/new`). Size: from `sm` an 80vw × 80vh
+  seller CTA navigates to `/mystores/new`). An `intent: 'sell'` option
+  (every "Create your store" / "Sell on UnieMax" CTA passes it, opening on
+  the register view) swaps the shopper copy for the seller's — "Start selling
+  on UnieMax", no "fill your cart" footnote — and the hero's seller line;
+  `/login` does the same when `?next=` points into `/mystores`. Size: from `sm` an 80vw × 80vh
   panel capped at `max-w-5xl` (brand column on the left from `md`, form on
   the right); below `sm` a full-screen sheet. It is portalled to `<body>`
   (see ConfirmDialog for why), which is OUTSIDE the div where
@@ -101,7 +105,9 @@ the API same-origin — matching production, so no CORS/SameSite issues.
   the store's identity (logo, name, "Sign in to shop at {name}", a small
   "Powered by UnieMax") inside a store, and the UnieMax photo hero
   (`features/auth/StorefrontHero.tsx`, shared with `/login`) on the
-  marketplace. Escape / backdrop `mousedown` / ✕ close it; body scroll is
+  marketplace. Its copy is platform-level, never one vertical's (it used to
+  advertise cricket bats to every seller): "Shop straight from the seller"
+  for shoppers, "Your store, online in minutes" for `intent: 'sell'`. Escape / backdrop `mousedown` / ✕ close it; body scroll is
   locked; Tab cycles inside the panel; focus goes to the first field on open
   and back to the opener on close; opened during the session probe it shows
   a skeleton and closes itself if the probe resolves authed. Each open is
@@ -529,8 +535,9 @@ shop's own inbox (buyers writing to the seller, so it leads: daily work) and
 *who is on the other end* is the only labelling that stays unambiguous once
 both exist.
 
-Rows that a readiness step points at (`step.href` → Store Details, Business
-Details, Products, Bank Accounts) also carry a **setup mark** (`StatusTag`,
+Rows that a **launch** step points at (a step holding a requirement that
+gates `PUBLISH` — `isLaunchStep()` in `storeProfile.ts`: Store Details,
+Business Details, Products) carry a **setup mark** (`StatusTag`,
 `SetupStatus.tsx`), and it is asymmetric on purpose: an unfinished row says
 the **word** "Pending" beside the orange animated ring, a finished one keeps
 the bare green tick. A mark alone is ambiguous in a list — nobody should have
@@ -538,9 +545,12 @@ to learn that orange-ring means unfinished — while "Complete" repeated down a
 column of sixteen rows is noise.
 The grouping is read off `store.readiness.steps` rather than a second
 hardcoded list, so a requirement added to `storeReadiness.ts` appears against
-the right row with no change to the layout. Marks vanish entirely once
-`readiness.complete` — a column of ticks that can never change again is
-decoration, the same reason `SetupChecklist` hides itself at 100%.
+the right row with no change to the layout. Marks vanish entirely once the
+store is **published** — a column of ticks that can never change again is
+decoration. Payout prerequisites (address, tax, bank account) never mark a
+row: a cash-on-delivery shop may never need them, and "Pending" on Business
+Details forever read as an unfinished store. They live on the Dashboard's
+"Accept online payments" card instead.
 
 **Dashboard** (`StoreDashboardPage`, the manage landing at
 `/mystores/{slug}`; Store Details moved to `/mystores/{slug}/details`) — over
@@ -594,8 +604,14 @@ page (plus a "View all orders" link).
   a race with another tab) surface as inline errors.
 
 **Publish & share** — the left card ends in `StorePublishCard` (visible on
-every manage section): a Published/Not-published status row with a
-Publish/Unpublish toggle (`PATCH /stores/:id/publish`) and a **Share Store**
+every manage section, except the Dashboard below `lg`, where the page's own
+launch / "your store is live" cards would repeat it above the content): a
+Published/Not-published status row with a **Publish store** `Button` (a quiet
+Unpublish once live; `PATCH /stores/:id/publish`), the publish blockers as
+**links to the section that fixes each** (`GateBlockers.tsx` —
+`useGateBlockers(store, gate)` maps `blockerKeys` → owning step → `href`,
+honouring the manage scope's hidden sections; the Store Builder header and
+`ShopNotLiveNudge` use the same helper), and a **Share Store**
 button that copies the store's public URL (`{origin}/store/{slug}`,
 built by `publicStoreUrl()` in `storesApi.ts`; uses the native share sheet
 where available). Before publishing, the same URL works as a **private
@@ -1340,9 +1356,13 @@ verified account identifiers, and offers no way to type them: they are what
 order alerts reach and what shoppers see, so a free-text field would invite an
 address nobody controls. A seller with no linked number — the ordinary case,
 since registration is by email — verifies one through the shared
-`VerifyPhoneForm` embedded in the step, and Continue stays disabled until they
-do. `assertVerifiedContact` enforces the same rule server-side, so this is the
-presentation of a constraint rather than the constraint itself.
+`VerifyPhoneForm` embedded in the step — or skips it: **Finish setup** saves
+the business and seller names without a phone (the patch simply omits it),
+and the phone stays a publish requirement on the dashboard. It used to block
+the step, so "Finish later" silently discarded the names the seller had just
+confirmed. `assertVerifiedContact` enforces the verified-only rule
+server-side, so this is the presentation of a constraint rather than the
+constraint itself.
 
 **`VerifyPhoneForm`** (`shared/auth/`) owns the one way a phone number enters
 the platform: number → SMS code → `POST /auth/me/link/{request,verify}`,
@@ -1353,14 +1373,27 @@ anywhere would quietly reintroduce unverified contact details. It renders no
 step) where a nested form would be invalid HTML that browsers silently drop;
 Enter is handled on the inputs instead.
 
-**`SetupChecklist`** renders from `store.readiness` (never from local
-inspection of the profile): a progress bar, the incomplete steps in registry
-order (open the shop, then get paid), and each expandable to its individual
-requirements with a "to publish" marker on the publish blockers and a "to get
-paid" marker on the payout prerequisites (`PAYOUT_SETUP` / `ONLINE_PAYMENT`
-gates). It returns `null` once `readiness.complete`. Steps with no
-applicable requirements are skipped, so a delivery-only store is never shown
-a pickup-address item.
+**`SetupChecklist`** (the Dashboard's top card) renders from
+`store.readiness` (never from local inspection of the profile), split by what
+the seller is trying to do rather than one "n of 12" list:
+
+- **Unpublished → "Get your store live"**: only the launch steps (store,
+  business & contact, first product) — done ones ticked, open ones naming
+  exactly what is missing ("Still needed: Contact phone number") with a
+  button saying what it opens ("Add details", "Add a product") — then an
+  optional **Make it look yours** row (→ Store Builder; every store already
+  has a default look, so it never blocks), then **Preview and publish** with
+  Preview and the Publish button right there, or the linked blockers.
+- **Published → "Accept online payments — optional"**: the address, tax and
+  payout steps still open, under "Cash on Delivery already works". Hidden
+  once they are done.
+
+Steps with no applicable requirements are skipped, so a delivery-only store
+is never shown a pickup-address item. The Dashboard also shows **"Your store
+is live"** (the link, Share on WhatsApp, Copy link, View store) from publish
+until the first order, and hides the stat tiles / pipeline / latest orders
+until there is an order to count; once a live store has orders, the optional
+payments card moves below the numbers.
 - Sections: `StoreDetailsPage` (name update + **logo upload**: pick →
   validate the format → crop 1:1 (`ImageEditDialog`, square-locked) → upload
   as WebP with a progress bar; Replace / Remove with confirmation — saves
@@ -1370,17 +1403,25 @@ a pickup-address item.
   section-named buttons — "Save business & contact" / "Save address" / "Save
   tax details" — and a `beforeunload` warning while any card has unsaved
   edits, since saving one card never saves another:
-  **Business & contact** (business name and seller name as fields; phone and
-  email read-only as the verified account identifiers, with an inline
-  `VerifyPhoneForm` when no number is linked yet and a link to Profile),
+  **Business & contact** (business name — defaulting to the store name, as in
+  the wizard — and seller name as fields; phone and email read-only as the
+  verified account identifiers, with an inline `VerifyPhoneForm` when no
+  number is linked yet, which **saves the verified number to the store
+  immediately** rather than leaving it behind a second Save, and a link to
+  Profile),
   **Address** (the business address via `AddressFields` — the one address the
   platform holds) and **Tax & compliance** (PAN,
   GSTIN, a not-registered declaration, registration number, with live format
   hints, the GSTIN's state code decoded, and a PAN-inside-GSTIN cross-check).
   Because the three save independently, each carries its **own status** in
-  its header (`StatusBadge`: Complete / *n* of *m* done / Unsaved changes)
-  plus, when incomplete, the missing requirements named in a line — "2 of 4"
-  alone still leaves the seller hunting the form. Above them a
+  its header (`StatusBadge`: Complete / *n* of *m* done / Unsaved changes /
+  **Optional**) plus, when incomplete, the missing requirements named in a
+  line — "2 of 4" alone still leaves the seller hunting the form. Orange is
+  reserved for what blocks publishing (`SectionStatus.blocksLaunch`): the
+  Address and Tax cards, needed only for payouts, read "Optional" with a
+  neutral "For online payments, add: …" line, neither pin the jump bar nor
+  turn its tiles orange, and the header bar turns green once nothing on the
+  page blocks publishing. Above them a
   `SectionJumpBar` repeats all three as **equal-width tiles**
   (`flex-1 basis-0`, so the columns come from the count and not from label
   length) that scroll to their card (`scroll-mt-28` clears both sticky bars,
@@ -2255,7 +2296,8 @@ frontend/
     │           │                        #   bank accounts instead)
     │           ├── StoreManageLayout.tsx# Left sections card + right <Outlet/>
     │           ├── StoreSectionNav.tsx  # Collapsible groups / icon rail / mobile dropdown
-    │           ├── SetupChecklist.tsx   # Dashboard checklist from store.readiness
+    │           ├── SetupChecklist.tsx   # Dashboard "Get your store live" / "Accept online payments" cards
+    │           ├── GateBlockers.tsx     # useGateBlockers + BlockerLinks: each gate blocker → link to its fix
     │           ├── SetupStatus.tsx      # Shared setup marks: StatusMark / StatusBadge /
     │           │                        #   SectionJumpBar, all from store.readiness
     │           ├── StoreBusinessPage.tsx# Business & contact / address / tax cards

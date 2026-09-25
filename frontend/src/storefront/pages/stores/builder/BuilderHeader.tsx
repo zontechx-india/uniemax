@@ -11,6 +11,7 @@ import {
   StoreIcon,
 } from '../../../layout/icons'
 import type { PreviewDevice } from './BuilderPreview'
+import { BlockerLinks, useGateBlockers } from '../GateBlockers'
 
 /**
  * The builder's top bar: where you are, what it looks like on, whether your
@@ -61,24 +62,8 @@ export function BuilderHeader({
   const gate = store.readiness.gates.PUBLISH
   const blocked = !store.isPublished && !gate.allowed
 
-  /**
-   * Each blocker as something to click. A readiness requirement declares the
-   * step it belongs to and every step declares where it is edited, so the
-   * route is derived rather than hardcoded — add a publish requirement to
-   * `storeReadiness.ts` and its chip links to the right screen with no change
-   * here.
-   */
-  const blockers = gate.blockerKeys.map((key) => {
-    const step = store.readiness.steps.find((s) =>
-      s.requirements.some((r) => r.key === key),
-    )
-    const requirement = step?.requirements.find((r) => r.key === key)
-    return {
-      key,
-      label: requirement?.label ?? key,
-      to: step ? `${backTo}/${step.href}` : null,
-    }
-  })
+  /** Each blocker as a link to the screen that fixes it. */
+  const blockers = useGateBlockers(store, 'PUBLISH')
 
   const togglePublished = async () => {
     setPublishError(null)
@@ -205,24 +190,7 @@ export function BuilderHeader({
             Almost ready to publish.
           </span>
           <span className="text-muted">Still needed:</span>
-          {blockers.map((blocker) =>
-            blocker.to ? (
-              <Link
-                key={blocker.key}
-                to={blocker.to}
-                className="rounded-pill bg-surface px-2 py-0.5 font-semibold text-brand transition hover:underline"
-              >
-                {blocker.label}
-              </Link>
-            ) : (
-              <span
-                key={blocker.key}
-                className="rounded-pill bg-surface px-2 py-0.5 font-medium text-fg"
-              >
-                {blocker.label}
-              </span>
-            ),
-          )}
+          <BlockerLinks blockers={blockers} />
         </div>
       )}
 

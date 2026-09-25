@@ -15,6 +15,7 @@ import {
 } from '../../features/support/ticketMeta'
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import { ArrowLeftIcon, MailIcon, PhoneCallIcon } from '../../layout/icons'
+import { Button } from '../../../shared/ui/Button'
 
 /**
  * One customer request, as the **seller** answers it.
@@ -207,13 +208,9 @@ export function StoreCustomerSupportTicketPage() {
           {actionError && <ErrorNote>{actionError}</ErrorNote>}
 
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="submit"
-              disabled={busy}
-              className="h-11 rounded-md bg-brand-gradient px-5 text-sm font-semibold text-brand-contrast transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
-            >
+            <Button type="submit" size="md" loading={busy}>
               {busy ? 'Sending…' : 'Send reply'}
-            </button>
+            </Button>
 
             <label className="flex items-center gap-2 text-sm text-muted">
               Status

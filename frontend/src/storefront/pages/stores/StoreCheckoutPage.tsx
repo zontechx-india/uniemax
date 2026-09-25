@@ -6,6 +6,7 @@ import { CHECKOUT_FIELD_KEYS, storesApi } from '../../features/stores/storesApi'
 import type { CheckoutFieldKey } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import { ActiveSwitch } from './ActiveSwitch'
+import { Button } from '../../../shared/ui/Button'
 
 /**
  * Checkout section of Store Management — which customer details the
@@ -142,13 +143,9 @@ export function StoreCheckoutPage() {
         {error && <ErrorNote>{error}</ErrorNote>}
         {saved && !dirty && <SuccessNote>Checkout settings saved.</SuccessNote>}
 
-        <button
-          type="submit"
-          disabled={busy || !dirty}
-          className="h-11 rounded-md bg-brand-gradient px-6 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
-        >
+        <Button type="submit" size="md" loading={busy} disabled={!dirty}>
           {busy ? 'Saving…' : 'Save Changes'}
-        </button>
+        </Button>
       </form>
     </div>
   )

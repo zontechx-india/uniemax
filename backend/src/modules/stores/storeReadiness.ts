@@ -245,7 +245,7 @@ export const REQUIREMENTS: Requirement[] = [
   },
   {
     key: "catalog.product",
-    label: "At least one product",
+    label: "At least one live product",
     step: "catalog",
     gates: ["PUBLISH"],
     isMet: (ctx) => ctx.productCount > 0,

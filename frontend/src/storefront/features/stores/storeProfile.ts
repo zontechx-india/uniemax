@@ -290,3 +290,12 @@ export const PERMISSIVE_READINESS: Readiness = {
 export function pendingSteps(readiness: Readiness): StepState[] {
   return readiness.steps.filter((step) => !step.complete && step.totalCount > 0)
 }
+
+/**
+ * A step that stands between the seller and a live store — it holds at least
+ * one requirement gating `PUBLISH`. Everything else (address, tax, payout) is
+ * about getting paid online, which a cash-on-delivery shop can open without.
+ */
+export function isLaunchStep(step: StepState): boolean {
+  return step.requirements.some((req) => req.gates.includes('PUBLISH'))
+}

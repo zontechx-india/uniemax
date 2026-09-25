@@ -15,6 +15,7 @@ import {
   formatOrderDateTime,
   paymentLabel,
 } from './orderMeta'
+import { Button } from '../../../shared/ui/Button'
 
 /**
  * One order of the store — the seller's working view. Shows the items,
@@ -184,14 +185,14 @@ export function StoreOrderDetailPage() {
           {(action || CANCELLABLE.has(order.status)) && (
             <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line p-4">
               {action && (
-                <button
+                <Button
                   type="button"
+                  size="md"
                   disabled={busy}
                   onClick={() => setConfirming('advance')}
-                  className="rounded-md bg-brand-gradient px-5 py-2.5 text-sm font-bold text-brand-contrast transition hover:opacity-90 disabled:bg-none disabled:bg-line disabled:text-muted"
                 >
                   {action.label}
-                </button>
+                </Button>
               )}
               {CANCELLABLE.has(order.status) && (
                 <button

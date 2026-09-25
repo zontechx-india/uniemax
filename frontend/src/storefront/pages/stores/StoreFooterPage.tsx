@@ -28,6 +28,7 @@ import {
   TrashIcon,
 } from '../../layout/icons'
 import { LocationMapPicker } from './LocationMapPicker'
+import { Button } from '../../../shared/ui/Button'
 
 /**
  * Footer section of Store Management — everything the storefront footer
@@ -148,13 +149,9 @@ function TextArea({
 
 function SaveButton({ busy, dirty }: { busy: boolean; dirty: boolean }) {
   return (
-    <button
-      type="submit"
-      disabled={busy || !dirty}
-      className="h-10 rounded-md bg-brand-gradient px-5 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
-    >
+    <Button type="submit" size="md" loading={busy} disabled={!dirty}>
       {busy ? 'Saving…' : 'Save'}
-    </button>
+    </Button>
   )
 }
 
@@ -536,13 +533,9 @@ function LocationForm({
       {problem && <ErrorNote>{problem}</ErrorNote>}
 
       <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={busy}
-          className="h-10 rounded-md bg-brand-gradient px-5 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
-        >
+        <Button type="submit" size="md" loading={busy}>
           {busy ? 'Saving…' : 'Save Location'}
-        </button>
+        </Button>
         <button
           type="button"
           onClick={onCancel}

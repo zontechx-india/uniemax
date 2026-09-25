@@ -5,6 +5,7 @@ import { formatPrice, storeHomeUrl } from '../features/stores/storesApi'
 import type { PlacedOrder } from '../features/stores/storesApi'
 import { orderStatusCopy } from '../features/stores/orderStatus'
 import { BoxIcon, CartIcon, ChevronRightIcon } from '../layout/icons'
+import { buttonClass } from '../../shared/ui/Button'
 
 /**
  * Orders (/orders) — the signed-in customer's order history, newest first.
@@ -84,7 +85,7 @@ export function OrdersPage() {
             </p>
             <a
               href="/"
-              className="mt-5 rounded-md bg-brand-gradient px-5 py-2.5 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90"
+              className={buttonClass({ size: 'md', className: 'mt-5' })}
             >
               Explore stores
             </a>

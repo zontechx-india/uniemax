@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Button } from './Button'
 
 /**
  * A generic, presentational multi-step form shell.
@@ -188,13 +189,14 @@ export function WizardActions({
         )}
       </div>
 
-      <button
+      <Button
         type="submit"
-        disabled={busy || disabled}
-        className="h-11 w-full rounded-md bg-brand-gradient px-8 text-sm font-semibold text-brand-contrast shadow-floating transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted sm:w-auto"
+        loading={busy}
+        disabled={disabled}
+        className="w-full px-8 sm:w-auto"
       >
         {busy ? 'Saving…' : submitLabel}
-      </button>
+      </Button>
     </div>
   )
 }
