@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useId, useRef } from 'react'
+import { useModalFocus } from './useModalFocus'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 
@@ -38,6 +39,10 @@ export function Dialog({
   children: ReactNode
 }) {
   const closeRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  // Unique per instance — a hard-coded id collided when two were mounted.
+  const titleId = useId()
+  useModalFocus(panelRef, open)
 
   useEffect(() => {
     if (!open) return
@@ -73,16 +78,17 @@ export function Dialog({
       onMouseDown={onClose}
     >
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="content-dialog-title"
+        aria-labelledby={titleId}
         className={`flex max-h-[92vh] w-full flex-col rounded-t-lg border border-line bg-surface shadow-floating sm:max-h-[88vh] sm:rounded-lg ${width}`}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
           <div className="min-w-0">
             <h2
-              id="content-dialog-title"
+              id={titleId}
               className="truncate font-heading text-base font-semibold text-fg sm:text-lg"
             >
               {title}

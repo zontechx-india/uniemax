@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useModalFocus } from './useModalFocus'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 
@@ -42,6 +43,9 @@ export function ConfirmDialog({
 }) {
   const cancelRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  // Before the focus effect below, so the opener it records is the element
+  // that opened the dialog — not the dialog's own Cancel button.
+  useModalFocus(panelRef, open)
 
   /**
    * Move focus ONCE, when the dialog opens.

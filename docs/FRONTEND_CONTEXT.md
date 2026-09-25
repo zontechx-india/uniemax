@@ -2157,6 +2157,8 @@ frontend/
     │   │   │                     #   rise (default primary) · sheen (the one committing
     │   │   │                     #   action per view) · ring (secondary beside a
     │   │   │                     #   primary). `buttonClass()` for <Link> CTAs.
+    │   │   ├── useModalFocus.ts # Tab stays inside a modal; focus returns to the
+    │   │   │                     #   opener on close (Dialog, ConfirmDialog)
     │   │   ├── RouteError.tsx   # Error screen for every router: `RouteError`
     │   │   │                     #   (errorElement — marketplace root + public
     │   │   │                     #   router) and `ErrorBoundary` (admin). A stale
