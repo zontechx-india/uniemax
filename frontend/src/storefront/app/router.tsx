@@ -1,4 +1,11 @@
-import { createBrowserRouter, Navigate, useLocation, useParams } from 'react-router-dom'
+import {
+  createBrowserRouter,
+  Navigate,
+  Outlet,
+  ScrollRestoration,
+  useLocation,
+  useParams,
+} from 'react-router-dom'
 import { AppLayout } from '../layout/AppLayout'
 import { RequireCustomer } from './RequireCustomer'
 import { LoginRoute } from '../pages/LoginRoute'
@@ -55,6 +62,14 @@ export const router = createBrowserRouter([
     // deploy reloads itself; anything else gets a friendly page, not
     // react-router's developer error.
     errorElement: <RouteError />,
+    // Back/forward land where the visitor was, not at the top of the page
+    // (the public router does the same).
+    element: (
+      <>
+        <ScrollRestoration />
+        <Outlet />
+      </>
+    ),
     children: [
       // ---- Public marketplace pages -------------------------------------------
       {
