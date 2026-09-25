@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { usePrivatePageTitle } from '../../../shared/seo'
 import { Button, buttonClass } from '../../../shared/ui/Button'
+import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { trackPurchase } from '../../../shared/analytics/metaPixel'
 import { refreshSession, toApiError } from '../../../shared/auth/http'
 import { storeVars } from '../../features/publicStore/storeTheme'
@@ -303,10 +304,14 @@ export function OrderSuccessPage({
                     Cancelled
                     {order.cancelledAt && ` · ${formatStepTime(order.cancelledAt)}`}
                   </p>
-                  {order.cancelReason && (
-                    <p className="mt-1 text-fg">
-                      Reason from the seller: {order.cancelReason}
-                    </p>
+                  {order.cancelledByCustomer ? (
+                    <p className="mt-1 text-fg">You cancelled this order.</p>
+                  ) : (
+                    order.cancelReason && (
+                      <p className="mt-1 text-fg">
+                        Reason from the seller: {order.cancelReason}
+                      </p>
+                    )
                   )}
                   {order.paymentMethod === 'ONLINE' && order.paymentStatus === 'PAID' && (
                     <p className="mt-1 text-muted">
@@ -513,6 +518,13 @@ export function OrderSuccessPage({
               </div>
             </section>
 
+            {!order.redacted &&
+              order.status === 'PENDING' &&
+              order.paymentStatus !== 'PAID' &&
+              order.paymentStatus !== 'REFUNDED' && (
+                <CancelOrderRow order={order} onCancelled={setOrder} />
+              )}
+
             <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:justify-center">
               <Link
                 to={storeHomeUrl(order.storeSlug)}
@@ -534,5 +546,65 @@ export function OrderSuccessPage({
         )}
       </main>
     </div>
+  )
+}
+
+/**
+ * "Changed your mind?" — the buyer may cancel until the seller confirms, and
+ * only while nothing is paid (a paid order needs a real refund, which goes
+ * through the store). Quiet on purpose: it is an escape hatch, not a CTA.
+ */
+function CancelOrderRow({
+  order,
+  onCancelled,
+}: {
+  order: PlacedOrder
+  onCancelled: (order: PlacedOrder) => void
+}) {
+  const [asking, setAsking] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const cancel = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      onCancelled(await publicOrderApi.cancel(order.storeSlug, order.id))
+      setAsking(false)
+    } catch (err) {
+      setError(toApiError(err).message)
+      setAsking(false)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="mt-4 rounded-xl border border-line bg-surface px-5 py-4 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-muted">
+          Changed your mind? You can cancel until {order.storeName} confirms
+          your order.
+        </p>
+        <button
+          type="button"
+          onClick={() => setAsking(true)}
+          className="font-semibold text-danger hover:underline"
+        >
+          Cancel order
+        </button>
+      </div>
+      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+      <ConfirmDialog
+        open={asking}
+        title="Cancel this order?"
+        description={`${order.orderNumber} from ${order.storeName} will be cancelled and the seller told not to send it.`}
+        confirmLabel="Yes, cancel order"
+        cancelLabel="Keep my order"
+        busy={busy}
+        onConfirm={() => void cancel()}
+        onCancel={() => setAsking(false)}
+      />
+    </section>
   )
 }

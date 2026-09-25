@@ -1205,7 +1205,11 @@ White-label design — one codebase, any business:
   stock** and recomputes aggregates transactionally, **terminates the
   Cashfree order** of an unpaid ONLINE order so the returned stock can't
   still be paid for, flips a PAID payment to REFUNDED — status only; the
-  Cashfree refund API call is a planned follow-up). Both mutations use a guarded
+  Cashfree refund API call is a planned follow-up). The **buyer** can cancel
+  too (`POST /public/stores/:slug/orders/:orderId/cancel`, `cancelMyOrder`) —
+  only while `PENDING` and unpaid; it shares `restockItems`, sets
+  `cancelledByCustomer` (so both sides are told who cancelled) and notifies
+  the seller (`notifyCustomerCancelled`). Both mutations use a guarded
   `updateMany` re-checking the read status, so concurrent updates conflict
   (409) instead of double-applying.
 - **ShippingRule** — `FIXED` / `DISTRICT` / `STATE` / `FREE` with `priority`.

@@ -44,6 +44,7 @@ import type {
   SellerOrderListQuery,
 } from "./orders.schema.js";
 import {
+  notifyCustomerCancelled,
   notifyOrderPlaced,
   notifyOrderStatusChange,
 } from "./orders.notifications.js";
@@ -137,6 +138,7 @@ const orderSelect = {
   deliveredAt: true,
   cancelledAt: true,
   cancelReason: true,
+  cancelledByCustomer: true,
   items: {
     select: {
       id: true,
@@ -1025,33 +1027,7 @@ export async function cancelOrder(
       throw HttpError.conflict("The order just changed — reload and try again");
     }
 
-    // Put the stock back. Items snapshot their references with SetNull, so a
-    // line whose product/variant was deleted since simply has nothing to
-    // restore into. Simple products reference no variant on the line — the
-    // stock lives on the product's implicit Default variant (if the product
-    // gained options since, that variant is gone and the line is skipped).
-    const restoredProducts = new Set<string>();
-    for (const item of current.items) {
-      let variantId = item.variantId;
-      if (!variantId && item.productId) {
-        const dv = await tx.storeProductVariant.findFirst({
-          where: { productId: item.productId, isDefault: true },
-          select: { id: true },
-        });
-        variantId = dv?.id ?? null;
-      }
-      if (!variantId) continue;
-      const restored = await tx.storeProductVariant.updateMany({
-        where: { id: variantId },
-        data: { stockQuantity: { increment: item.quantity } },
-      });
-      if (restored.count > 0 && item.productId) {
-        restoredProducts.add(item.productId);
-      }
-    }
-    for (const productId of restoredProducts) {
-      await recomputeProductAggregates(productId, tx);
-    }
+    await restockItems(current.items, tx);
   });
 
   // Close the payment window before answering: the stock is back on sale, so
@@ -1068,6 +1044,113 @@ export async function cancelOrder(
   notifyOrderStatusChange(shaped, current.customerId);
   emit("order.cancelled", { orderId });
   return shaped;
+}
+
+/**
+ * Put a cancelled order's stock back. Items snapshot their references with
+ * SetNull, so a line whose product/variant was deleted since simply has
+ * nothing to restore into. Simple products reference no variant on the line —
+ * the stock lives on the product's implicit Default variant (if the product
+ * gained options since, that variant is gone and the line is skipped).
+ */
+async function restockItems(
+  items: { productId: string | null; variantId: string | null; quantity: number }[],
+  tx: Prisma.TransactionClient,
+): Promise<void> {
+  const restoredProducts = new Set<string>();
+  for (const item of items) {
+    let variantId = item.variantId;
+    if (!variantId && item.productId) {
+      const dv = await tx.storeProductVariant.findFirst({
+        where: { productId: item.productId, isDefault: true },
+        select: { id: true },
+      });
+      variantId = dv?.id ?? null;
+    }
+    if (!variantId) continue;
+    const restored = await tx.storeProductVariant.updateMany({
+      where: { id: variantId },
+      data: { stockQuantity: { increment: item.quantity } },
+    });
+    if (restored.count > 0 && item.productId) {
+      restoredProducts.add(item.productId);
+    }
+  }
+  for (const productId of restoredProducts) {
+    await recomputeProductAggregates(productId, tx);
+  }
+}
+
+/**
+ * The BUYER cancels their own order — only while the seller has not
+ * confirmed it yet and nothing has been paid. Anything later (packed,
+ * shipped) or paid (which would need a real refund) goes through the seller,
+ * so this path can never promise money back. Same guarded write, restock,
+ * payment-window close and `order.cancelled` event as the seller's cancel.
+ */
+export async function cancelMyOrder(
+  customerId: string,
+  storeSlug: string,
+  orderId: string,
+  reason: string | null,
+) {
+  const current = await prisma.order.findFirst({
+    where: { id: orderId, storeSlug, customerId },
+    select: {
+      status: true,
+      paymentStatus: true,
+      storeId: true,
+      items: { select: { productId: true, variantId: true, quantity: true } },
+      store: { select: { owner: { select: { id: true } } } },
+    },
+  });
+  if (!current) throw HttpError.notFound("Order not found");
+  if (current.status === "CANCELLED") {
+    throw HttpError.conflict("This order is already cancelled");
+  }
+  if (current.status !== "PENDING") {
+    throw HttpError.conflict(
+      "The seller has already confirmed this order — contact the store to cancel it.",
+    );
+  }
+  if (current.paymentStatus === "PAID" || current.paymentStatus === "REFUNDED") {
+    throw HttpError.conflict(
+      "This order is already paid — contact the store to cancel it and arrange the refund.",
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const updated = await tx.order.updateMany({
+      where: {
+        id: orderId,
+        customerId,
+        status: "PENDING",
+        paymentStatus: current.paymentStatus,
+      },
+      data: {
+        status: "CANCELLED",
+        cancelledAt: new Date(),
+        cancelReason: reason,
+        cancelledByCustomer: true,
+      },
+    });
+    if (updated.count === 0) {
+      throw HttpError.conflict("The order just changed — reload and try again");
+    }
+    await restockItems(current.items, tx);
+  });
+
+  await voidPaymentSession(orderId);
+
+  const row = await prisma.order.findFirst({
+    where: { id: orderId },
+    select: orderSelect,
+  });
+  const shaped = shapeOrder(row!);
+  notifyOrderStatusChange(shaped, customerId);
+  notifyCustomerCancelled(shaped, current.store?.owner.id ?? null);
+  emit("order.cancelled", { orderId });
+  return { ...shaped, redacted: false };
 }
 
 /**

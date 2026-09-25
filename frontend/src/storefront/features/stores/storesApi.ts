@@ -2174,6 +2174,8 @@ export interface PlacedOrder {
   cancelledAt: string | null
   /** Optional seller note captured on cancellation. */
   cancelReason: string | null
+  /** The buyer cancelled it themselves (before the seller confirmed). */
+  cancelledByCustomer: boolean
   items: PlacedOrderItem[]
   /** Order lookup only: true when the viewer is not the customer who placed
    *  the order — contact + delivery fields then come back null. */
@@ -2247,6 +2249,13 @@ export const publicOrderApi = {
   async paySession(slug: string, orderId: string): Promise<PaySessionResult> {
     return call<PaySessionResult>(
       http.post(`${PUBLIC_STORES}/${slug}/orders/${orderId}/pay`),
+    )
+  },
+
+  /** The buyer cancels an order the seller hasn't confirmed yet (unpaid only). */
+  async cancel(slug: string, orderId: string): Promise<PlacedOrder> {
+    return call<PlacedOrder>(
+      http.post(`${PUBLIC_STORES}/${slug}/orders/${orderId}/cancel`, {}),
     )
   },
 }

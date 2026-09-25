@@ -74,6 +74,8 @@ export interface OrderDetail extends OrderRow {
   deliveredAt: string | null
   cancelledAt: string | null
   cancelReason: string | null
+  /** The buyer cancelled it themselves (before the seller confirmed). */
+  cancelledByCustomer: boolean
   customer: { id: string; name: string | null; email: string | null; phone: string | null } | null
   store: { id: string; name: string; slug: string } | null
   items: {

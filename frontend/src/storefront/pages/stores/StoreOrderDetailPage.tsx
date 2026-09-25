@@ -214,6 +214,7 @@ export function StoreOrderDetailPage() {
           {order.status === 'CANCELLED' && (
             <InfoNote>
               This order was cancelled
+              {order.cancelledByCustomer && <> by the customer</>}
               {order.cancelledAt && (
                 <> on {formatOrderDateTime(order.cancelledAt)}</>
               )}

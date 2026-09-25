@@ -323,3 +323,24 @@ export function notifyOrderStatusChange(
     });
   })().catch(logFailure(`customer ${order.status.toLowerCase()}`));
 }
+
+/**
+ * The buyer cancelled an order the seller had not confirmed yet — the seller
+ * must not pack it. A bell/push notification is enough: the order detail
+ * already shows the cancellation and its reason.
+ */
+export function notifyCustomerCancelled(
+  order: OrderMailData,
+  sellerId: string | null,
+): void {
+  if (!sellerId) return;
+  notify({
+    principalType: "CUSTOMER",
+    principalId: sellerId,
+    kind: "ORDER_STATUS",
+    title: `Order cancelled by the customer · ${order.storeName}`,
+    body: `${order.orderNumber} was cancelled before you confirmed it — no need to pack it. Its stock is back on sale.`,
+    url: `/mystores/${order.storeSlug}/orders/${order.id}`,
+    data: { orderId: order.id, status: "CANCELLED" },
+  });
+}

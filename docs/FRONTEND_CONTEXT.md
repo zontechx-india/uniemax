@@ -1207,7 +1207,10 @@ plain words (`orderStatusCopy` in `features/stores/orderStatus.ts` — "Your
 order is on the way", "This order was cancelled"). An **Order progress** card
 lists the steps (placed → confirmed → packed → on the way → delivered;
 shipping skipped for pickup) with the lifecycle stamps' times, or the
-cancellation time + seller's reason; a **Questions about this order?** card
+cancellation time + seller's reason (or "You cancelled this order" when
+`cancelledByCustomer`); while the order is `PENDING` and unpaid, the buyer
+also gets a quiet **"Changed your mind? … Cancel order"** row (confirmed via
+`ConfirmDialog`, `publicOrderApi.cancel`); a **Questions about this order?** card
 offers Call seller / WhatsApp seller (from the store's footer support phone /
 WhatsApp, when set, with the order number pre-filled) and Send a message
 (the store's `/support` page). ONLINE payment is simulated in development; production

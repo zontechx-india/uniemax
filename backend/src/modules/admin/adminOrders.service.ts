@@ -119,6 +119,7 @@ export async function getOrder(orderId: string) {
       deliveredAt: true,
       cancelledAt: true,
       cancelReason: true,
+      cancelledByCustomer: true,
       customer: { select: { id: true, name: true, email: true, phone: true } },
       store: { select: { id: true, name: true, slug: true, ownerId: true } },
       items: {

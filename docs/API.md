@@ -1791,6 +1791,17 @@ session when it is still valid, and registers a fresh Cashfree order
 mode } }`. `409` on COD/cancelled/paid-and-refunded orders; `503` when the
 gateway is not configured.
 
+### `POST /api/v1/public/stores/:slug/orders/:orderId/cancel` 🔒 customer
+
+The **buyer** cancels their own order — only while it is still `PENDING`
+(the seller has not confirmed it) and not `PAID`/`REFUNDED` (a paid order
+needs a real refund, so it goes through the store). Body `{ reason? }`
+(optional, ≤ 300 chars). Same effect as the seller's cancel: `CANCELLED`,
+`cancelledAt`, `cancelledByCustomer: true`, stock restored, the Cashfree
+payment window closed, the buyer emailed and the seller notified. Returns the
+order (unredacted). `409` once confirmed, paid, or already cancelled; `404`
+for an order that is not the caller's. 10/min.
+
 ### `POST /api/v1/payments/webhooks/cashfree` (no auth — HMAC-guarded)
 
 Cashfree's server-to-server payment notification. Authenticity is verified

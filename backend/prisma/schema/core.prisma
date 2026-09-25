@@ -1035,6 +1035,10 @@ model Order {
   cancelledAt  DateTime?
   /// Optional seller note captured on cancellation.
   cancelReason String?
+  /// The BUYER cancelled (allowed only before the seller confirms, unpaid).
+  /// False for a seller/admin cancellation — who cancelled decides the copy
+  /// both sides see.
+  cancelledByCustomer Boolean @default(false)
 
   /// Opaque affiliate attribution token sent by the checkout. Stored as-is;
   /// only the affiliate package knows what it means.

@@ -32,6 +32,16 @@ export const publicOrderRoutes: FastifyPluginAsync = async (app) => {
     controller.createOrder,
   );
   app.get("/:slug/orders/:orderId", controller.getOrder);
+  // The buyer cancels an order the seller hasn't confirmed yet (unpaid only —
+  // a paid one needs a real refund, so it goes through the store).
+  app.post(
+    "/:slug/orders/:orderId/cancel",
+    {
+      preHandler: requireCustomer,
+      config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+    },
+    controller.cancelMyOrder,
+  );
   // "Pay now / Retry payment" for an unpaid ONLINE order — returns a usable
   // Cashfree payment session (reusing the active one when possible).
   app.post(

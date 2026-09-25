@@ -90,7 +90,12 @@ export default function OrderDetailPage() {
         }
       />
 
-      {order.cancelReason ? (
+      {order.cancelledByCustomer ? (
+        <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm">
+          <span className="font-medium text-fg">Cancelled by the customer</span>{' '}
+          <span className="text-muted">before the seller confirmed it.</span>
+        </div>
+      ) : order.cancelReason ? (
         <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm">
           <span className="font-medium text-fg">Cancelled by the seller:</span>{' '}
           <span className="text-muted">{order.cancelReason}</span>

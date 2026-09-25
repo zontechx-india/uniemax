@@ -52,6 +52,15 @@ export async function getOrder(request: FastifyRequest) {
   );
 }
 
+/** The buyer cancels their own not-yet-confirmed, unpaid order. */
+export async function cancelMyOrder(request: FastifyRequest) {
+  const { slug, orderId } = orderParamSchema.parse(request.params);
+  const { reason } = orderCancelSchema.parse(request.body ?? {});
+  return ok(
+    await service.cancelMyOrder(request.customer!.id, slug, orderId, reason),
+  );
+}
+
 /** Runs behind `requireCustomer` (customer order-history routes). */
 export async function listMyOrders(request: FastifyRequest) {
   return ok(await service.listMyOrders(request.customer!.id));
