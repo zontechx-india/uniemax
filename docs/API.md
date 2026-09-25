@@ -1777,8 +1777,9 @@ account) gets `redacted: true` with `customerPhone`, `customerEmail`,
 `customerName` cut to the first name — a cuid is time-ordered and leaks
 through shared links, so it must not unlock a buyer's address on its own.
 `404` if unknown. An ONLINE order still awaiting payment is
-**reconciled against Cashfree** before answering (webhook fallback), so the
-success page converges on `PAID` by polling this endpoint.
+**reconciled against Cashfree** before answering (webhook fallback, at most
+once per order every 5 s — the endpoint is public), so the success page
+converges on `PAID` by polling this endpoint.
 
 ### `POST /api/v1/public/stores/:slug/orders/:orderId/pay` 🔒 customer
 

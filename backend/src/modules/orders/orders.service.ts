@@ -1153,6 +1153,24 @@ export async function cancelMyOrder(
   return { ...shaped, redacted: false };
 }
 
+const RECONCILE_WINDOW_MS = 5_000;
+const lastReconciled = new Map<string, number>();
+
+/** Throttle for the public lookup's gateway check (per order, in-process). */
+function shouldReconcile(orderId: string): boolean {
+  const now = Date.now();
+  const last = lastReconciled.get(orderId);
+  if (last !== undefined && now - last < RECONCILE_WINDOW_MS) return false;
+  lastReconciled.set(orderId, now);
+  // Keep the map from growing without bound on a long-lived process.
+  if (lastReconciled.size > 5_000) {
+    for (const [id, at] of lastReconciled) {
+      if (now - at >= RECONCILE_WINDOW_MS) lastReconciled.delete(id);
+    }
+  }
+  return true;
+}
+
 /**
  * Order confirmation lookup — keyed by the order's cuid scoped to its store
  * slug (the success page's data source). Auth is optional so the link still
@@ -1173,7 +1191,10 @@ export async function getPublicOrder(
   orderId: string,
   viewerCustomerId?: string,
 ) {
-  await reconcilePendingPayment(orderId); // best-effort, no-op unless needed
+  // Best-effort, no-op unless needed — and at most once per order per window:
+  // this endpoint is public, and without a cap every reload (or a scripted
+  // loop) was a Cashfree API call. The success page polls well inside it.
+  if (shouldReconcile(orderId)) await reconcilePendingPayment(orderId);
   const row = await prisma.order.findFirst({
     where: { id: orderId, storeSlug },
     select: { ...orderSelect, customerId: true },
