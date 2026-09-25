@@ -229,6 +229,8 @@ export function useNavRail(): [boolean, () => void] {
  * Matching is segment-wise and longest-wins, so `support` never claims
  * `customer-support` and `orders/123` still resolves to Orders.
  */
+const BUILDER_PARTS = new Set(['banners', 'footer'])
+
 function useActiveSection(): { group: SectionGroup; item: SectionItem } {
   const base = useResolvedPath('.').pathname
   const { pathname } = useLocation()
@@ -236,12 +238,15 @@ function useActiveSection(): { group: SectionGroup; item: SectionItem } {
 
   return useMemo(() => {
     const root = base.endsWith('/') ? base.slice(0, -1) : base
-    const rest =
+    const raw =
       pathname === root || pathname === `${root}/`
         ? ''
         : pathname.startsWith(`${root}/`)
           ? pathname.slice(root.length + 1)
           : null
+    // Banners and Footer are Store Builder editors with standalone pages of
+    // their own; name the Builder rather than falling back to "Dashboard".
+    const rest = raw !== null && BUILDER_PARTS.has(raw.split('/')[0]!) ? 'builder' : raw
 
     let best: { group: SectionGroup; item: SectionItem } | null = null
     if (rest !== null) {
