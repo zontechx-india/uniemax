@@ -119,6 +119,12 @@ JSON body).
 > Without credentials a console fallback issues a local code (echoed as `devCode`
 > in non-production responses); `OTP_BYPASS=true` would instead accept the fixed
 > `OTP_DEV_CODE` (**`123456`**).
+>
+> Every code-sending endpoint (`register/request`, `otp/request`, `password/forgot`,
+> `me/link/request`) answers **`429`** — `"Please wait N seconds before requesting
+> another code."` — when a code went to the same destination for the same purpose
+> less than 30 seconds ago. A code allows `OTP_MAX_ATTEMPTS` wrong guesses in total,
+> concurrent requests included, and can be redeemed once.
 
 ### `POST /api/v1/auth/register/request` → `201`
 ```jsonc

@@ -678,7 +678,12 @@ extracted into a standalone service later with minimal churn. The rest of the ap
   (`providers/index.ts`) is the one file edited when Google/Apple verification lands.
 - **`verification/`** — a generic **code engine** behind every prove-ownership flow
   (phone-OTP login, registration email verification, password reset, linking), with
-  TTL + attempt limits in `Otp`. **Email codes are locally generated + hashed** and
+  TTL + attempt limits in `Otp`. The attempt is **reserved atomically before** the
+  code is checked (a conditional `updateMany … attempts < OTP_MAX_ATTEMPTS`), so
+  parallel guesses cannot exceed the limit; a provider outage gives the attempt
+  back; consuming is single-use (`consumedAt: null` guard). Issuing enforces a
+  **30 s per-destination resend cooldown** (`429 "Please wait N seconds…"`) on top
+  of the per-IP route limits, so rotating IPs cannot flood one phone or inbox. **Email codes are locally generated + hashed** and
   delivered via Resend (never echoed in responses). **SMS codes are provider-managed**
   — Message Central generates/delivers/validates them; we store only its
   `verificationId` (`Otp.providerRef`). Console fallbacks cover missing credentials;
@@ -1172,7 +1177,13 @@ White-label design — one codebase, any business:
   request's `Idempotency-Key` header, unique per `(customerId,
   idempotencyKey)`, so a retried/double-fired Place Order returns the order
   already created (a concurrent duplicate loses on the index and its whole
-  transaction, stock decrement included, rolls back). Items reference
+  transaction, stock decrement included, rolls back). Indexed as
+  `(storeId, placedAt)` and `(customerId, placedAt)` — every order list is one
+  store's or one buyer's orders newest-first — plus `status`, `paymentStatus`
+  and `customerPhone`. `cancelOrder`'s guarded update matches the
+  `paymentStatus` it read as well as the status, so a payment webhook landing
+  mid-cancel turns into a 409 (the retry sees PAID and flags REFUNDED) rather
+  than a cancelled-but-paid order. Items reference
   `StoreProduct`/`StoreProductVariant` (SetNull)
   and snapshot name/variant label/slug/cover `imageKey`/price, so history
   survives catalog edits and deletions. The variant label is the derived

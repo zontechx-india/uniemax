@@ -626,6 +626,8 @@ model StoreProduct {
 
   @@unique([storeId, slug])
   @@index([storeId])
+  // Storefront listings: one store's active products, newest first.
+  @@index([storeId, isActive, createdAt])
   @@index([categoryId])
   @@index([globalCategoryId])
   @@index([isActive])
@@ -1048,10 +1050,14 @@ model Order {
   updatedAt           DateTime    @updatedAt
 
   @@unique([customerId, idempotencyKey])
-  @@index([storeId])
-  @@index([customerId])
+  // Every order list is "this store's / this customer's orders, newest
+  // first" — the composites serve both the filter and the sort (and any
+  // storeId-only / customerId-only lookup through their prefix).
+  @@index([storeId, placedAt])
+  @@index([customerId, placedAt])
   @@index([customerPhone])
   @@index([status])
+  @@index([paymentStatus])
   @@map("orders")
 
   @@schema("public")

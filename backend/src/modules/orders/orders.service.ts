@@ -1002,7 +1002,16 @@ export async function cancelOrder(
 
   await prisma.$transaction(async (tx) => {
     const updated = await tx.order.updateMany({
-      where: { id: orderId, storeId: store.id, status: current.status },
+      // paymentStatus too: a payment webhook landing between the read above
+      // and this write would otherwise leave the order CANCELLED + PAID —
+      // never flagged REFUNDED, and the buyer told "order placed" instead of
+      // "refund on the way". Now it's a conflict; the retry sees PAID.
+      where: {
+        id: orderId,
+        storeId: store.id,
+        status: current.status,
+        paymentStatus: current.paymentStatus,
+      },
       data: {
         status: "CANCELLED",
         cancelledAt: new Date(),

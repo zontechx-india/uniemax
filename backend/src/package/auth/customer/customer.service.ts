@@ -78,6 +78,9 @@ export async function listOwnOrders(customerId: string) {
   return prisma.order.findMany({
     where: { customerId },
     orderBy: { placedAt: "desc" },
+    // Same cap as the orders module's own list — unbounded, a long-time
+    // buyer's history was one ever-growing query.
+    take: 100,
     select: {
       id: true,
       orderNumber: true,

@@ -81,12 +81,35 @@ async function storeCode(
   });
 }
 
+/**
+ * Minimum gap between two codes to the same destination for the same purpose.
+ * The route rate limits are per IP; this is the per-TARGET limit, so rotating
+ * IPs cannot flood one person's phone or inbox (or run up the SMS bill).
+ */
+const RESEND_COOLDOWN_MS = 30_000;
+
+async function assertResendCooldown(target: CodeTarget): Promise<void> {
+  const last = await prisma.otp.findFirst({
+    where: { destination: target.destination, purpose: target.purpose },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
+  if (!last) return;
+  const waitMs = last.createdAt.getTime() + RESEND_COOLDOWN_MS - Date.now();
+  if (waitMs > 0) {
+    throw HttpError.tooManyRequests(
+      `Please wait ${Math.ceil(waitMs / 1000)} seconds before requesting another code.`,
+    );
+  }
+}
+
 /** Issues (and sends) a fresh code, invalidating any earlier live one. */
 export async function issueCode(target: CodeTarget): Promise<IssuedCode> {
   // SMS dev bypass: nothing stored or sent — the fixed dev code will verify.
   if (bypassed(target.channel)) {
     return { expiresInMinutes: authEnv.OTP_TTL_MINUTES, devCode: authEnv.OTP_DEV_CODE };
   }
+  await assertResendCooldown(target);
 
   // SMS: the provider owns the code; we keep its verification reference.
   if (target.channel === "SMS") {
@@ -147,7 +170,19 @@ export async function consumeCode(
   if (!otp) {
     throw HttpError.unauthorized("No valid code found. Please request a new one.");
   }
-  if (otp.attempts >= authEnv.OTP_MAX_ATTEMPTS) {
+
+  // Reserve the attempt BEFORE checking the code, as one conditional write:
+  // a read-then-increment let concurrent guesses all pass the limit check
+  // before any of them was counted.
+  const reserved = await prisma.otp.updateMany({
+    where: {
+      id: otp.id,
+      consumedAt: null,
+      attempts: { lt: authEnv.OTP_MAX_ATTEMPTS },
+    },
+    data: { attempts: { increment: 1 } },
+  });
+  if (reserved.count === 0) {
     throw HttpError.unauthorized(
       "Too many incorrect attempts. Please request a new code.",
     );
@@ -169,19 +204,25 @@ export async function consumeCode(
       throw HttpError.unauthorized("No valid code found. Please request a new one.");
     }
   } catch (err) {
-    if (err instanceof HttpError && err.statusCode === 401) {
+    // Only a WRONG code spends an attempt; a provider outage gives it back.
+    if (!(err instanceof HttpError && err.statusCode === 401)) {
       await prisma.otp.update({
         where: { id: otp.id },
-        data: { attempts: { increment: 1 } },
+        data: { attempts: { decrement: 1 } },
       });
     }
     throw err;
   }
 
-  await prisma.otp.update({
-    where: { id: otp.id },
+  // Single use: only the request that flips consumedAt wins, so the same
+  // code cannot be redeemed twice by two concurrent requests.
+  const consumed = await prisma.otp.updateMany({
+    where: { id: otp.id, consumedAt: null },
     data: { consumedAt: new Date() },
   });
+  if (consumed.count === 0) {
+    throw HttpError.unauthorized("This code was already used. Please request a new one.");
+  }
 }
 
 /**
