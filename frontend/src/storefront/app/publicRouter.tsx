@@ -6,10 +6,6 @@ import {
 } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import { PublicStoreLayout } from '../features/publicStore/PublicStoreLayout'
-import { CartPage } from '../pages/cart/CartPage'
-import { CartStorePage } from '../pages/cart/CartStorePage'
-import { CheckoutPage } from '../pages/cart/CheckoutPage'
-import { OrderSuccessPage } from '../pages/cart/OrderSuccessPage'
 import { buttonClass } from '../../shared/ui/Button'
 
 /**
@@ -59,6 +55,23 @@ const StoreHelpPage = lazy(() =>
 const StoreHelpTicketPage = lazy(() =>
   import('../pages/store/StoreHelpTicketPage').then((m) => ({
     default: m.StoreHelpTicketPage,
+  })),
+)
+
+// Cart → checkout → confirmation are lazy too: most visitors browse and never
+// reach them, and CheckoutPage + CheckoutSteps alone are ~1,700 lines.
+const CartPage = lazy(() =>
+  import('../pages/cart/CartPage').then((m) => ({ default: m.CartPage })),
+)
+const CartStorePage = lazy(() =>
+  import('../pages/cart/CartStorePage').then((m) => ({ default: m.CartStorePage })),
+)
+const CheckoutPage = lazy(() =>
+  import('../pages/cart/CheckoutPage').then((m) => ({ default: m.CheckoutPage })),
+)
+const OrderSuccessPage = lazy(() =>
+  import('../pages/cart/OrderSuccessPage').then((m) => ({
+    default: m.OrderSuccessPage,
   })),
 )
 
@@ -146,7 +159,7 @@ export const publicRouter = createBrowserRouter([
           },
         ],
       },
-      { path: '/cart', element: <CartPage /> },
+      { path: '/cart', element: lazyRoute(<CartPage />) },
       { path: '/cart/:storeSlug', element: <CartStoreRoute /> },
       // Per-store order review — orders are placed per store, so the target
       // of every "Place Order" button carries exactly one store's items.
@@ -160,15 +173,15 @@ export const publicRouter = createBrowserRouter([
 /** Adapts the route param to `CartStorePage`'s prop-based API. */
 function CartStoreRoute() {
   const { storeSlug = '' } = useParams()
-  return <CartStorePage storeSlug={storeSlug} />
+  return lazyRoute(<CartStorePage storeSlug={storeSlug} />)
 }
 
 function CheckoutRoute() {
   const { storeSlug = '' } = useParams()
-  return <CheckoutPage storeSlug={storeSlug} />
+  return lazyRoute(<CheckoutPage storeSlug={storeSlug} />)
 }
 
 function OrderSuccessRoute() {
   const { storeSlug = '', orderId = '' } = useParams()
-  return <OrderSuccessPage storeSlug={storeSlug} orderId={orderId} />
+  return lazyRoute(<OrderSuccessPage storeSlug={storeSlug} orderId={orderId} />)
 }

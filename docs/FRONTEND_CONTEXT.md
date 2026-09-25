@@ -2199,7 +2199,7 @@ frontend/
     │   ├── StorefrontApp.tsx     # Session probe + picks marketplace vs public router
     │   ├── app/
     │   │   ├── router.tsx        # Marketplace router: public / + /login + guarded account subtree
-    │   │   ├── publicRouter.tsx  # Public storefront + cart routes (no sign-in)
+    │   │   ├── publicRouter.tsx  # Public storefront + cart routes (no sign-in; every page, cart/checkout included, is a lazy chunk)
     │   │   ├── navigation.ts     # Account-menu nav config (single source of truth)
     │   │   ├── marketSession.tsx # Whole-session context (loading/guest/authed) + provider
     │   │   ├── RequireCustomer.tsx # Route guard: guest → /login?next=…, authed → SessionProvider
