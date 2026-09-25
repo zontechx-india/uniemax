@@ -31,10 +31,10 @@ to raise a problem.
 | **Seller payouts / settlement** | Bank accounts collected; **no money movement at all** | 🔴 **Blocker** |
 | **Stranded-payment recovery** | Only on page-visit; no background job | 🔴 **Blocker** |
 | **Review & rating system** | Does not exist (deliberately, no fake stars) | 🟠 Required for launch credibility |
-| **Support / dispute handling** | `/support` + `/contact` are "coming soon" pages | 🔴 **Blocker** (gateway + consumer-law requirement) |
+| Support / dispute handling | Built: tickets (customer ↔ store, seller/customer ↔ UnieMax, admin inbox); `/contact` shows the support email/phone/hours (updated 25 Sep 2026) | ✅ Ready (no refund-dispute workflow yet) |
 | Customer post-order self-service | History only — no cancel, no track, no return, no invoice | 🟠 High |
-| Shipping charges | Hardcoded ₹0 (`orders.service.ts:294`) | 🟠 High |
-| Legal/policy pages | Optional external URLs in the footer only | 🔴 **Blocker** |
+| Shipping charges | Built: free / flat per order / per-product overrides (`stores/shippingRates.ts`) (updated 25 Sep 2026) | ✅ Ready |
+| Legal/policy pages | `/about` and `/contact` live; `/privacy` and `/terms` are holding pages awaiting the business's legal text (updated 25 Sep 2026) | 🔴 **Blocker** |
 | Guest order tracking (phone+OTP) | Spec'd in CONTEXT.md, never built | 🟡 Medium |
 
 **Three things make this un-launchable today, in order:**

@@ -307,7 +307,9 @@ for guests and signed-in customers alike and adapts per session state.
   one as at ten thousand stores. The endpoint is untouched). The
   **footer** is a structured 4-column block: brand + tagline, Marketplace
   (About / Support / Contact) and Legal (Privacy / Terms) columns
-  (→ `pages/InfoComingSoonPage.tsx`, public placeholders), and a Sell on
+  (→ `pages/InfoComingSoonPage.tsx`: About and Contact with real content — Contact
+  shows the live `SupportContactCard` — Privacy and Terms a holding page with the
+  support contact until the legal text is supplied), and a Sell on
   UnieMax column with a Become a Seller button. Every section still
   fetches independently with its own skeleton and retry — one failed API
   never blanks the page, and a skeleton's `count` is **the minimum the section
@@ -2273,7 +2275,7 @@ frontend/
     │       │                     #   (h1 + trust + chips), New Stores (count-capped
     │       │                     #   grid), Fresh Finds and Recently Viewed (rails),
     │       │                     #   My Stores, seller CTA
-    │       ├── InfoComingSoonPage.tsx # Public placeholder for /about /privacy /terms /contact
+    │       ├── InfoComingSoonPage.tsx # /about /contact (real) · /privacy /terms (holding page + support contact)
     │       ├── ProfilePage.tsx   # /profile — account details + mobile-number linking (SMS OTP)
     │       ├── AddressesPage.tsx # /addresses — saved delivery addresses (one primary)
     │       ├── SupportPage.tsx   # /support — shopper → UnieMax (contact + tickets)

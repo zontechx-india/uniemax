@@ -67,8 +67,9 @@ export const router = createBrowserRouter([
       Component: (await import('../pages/BrowseCategoryPage')).BrowseCategoryPage,
     }),
   },
-  // Footer links — real routes with a lightweight public placeholder, so a
-  // shared link lands on "coming soon" rather than a 404/redirect.
+  // Footer info pages — public routes: About and Contact have real content,
+  // Privacy and Terms a holding page with the support contact until the
+  // business supplies the legal text.
   // `support` is NOT among them: it is a real page in the account subtree
   // below, since a ticket needs to know who is writing.
   ...['about', 'privacy', 'terms', 'contact'].map((page) => ({
