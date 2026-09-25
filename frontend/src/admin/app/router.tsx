@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react'
+import { ErrorBoundary } from '../../shared/ui/RouteError'
 import type { ReactNode } from 'react'
 import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { AdminLayout } from '../layout/AdminLayout'
@@ -147,6 +148,7 @@ export function AdminRouter() {
         <Route
           path="/*"
           element={
+            <ErrorBoundary homeHref="/admin">
             <Suspense fallback={<PageFallback />}>
               <Routes>
                 <Route index element={<DashboardPage />} />
@@ -214,6 +216,7 @@ export function AdminRouter() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Suspense>
+            </ErrorBoundary>
           }
         />
       </Route>

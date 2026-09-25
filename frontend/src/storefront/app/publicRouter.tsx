@@ -6,7 +6,7 @@ import {
 } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import { PublicStoreLayout } from '../features/publicStore/PublicStoreLayout'
-import { buttonClass } from '../../shared/ui/Button'
+import { RouteError } from '../../shared/ui/RouteError'
 
 /**
  * Router for the **public** (no sign-in) shopping surface. Mounted by
@@ -98,43 +98,10 @@ function PublicRoot() {
   )
 }
 
-/**
- * Friendly fallback for unmatched paths / render errors inside this router
- * (instead of React Router's raw developer error screen). Plain <a> links —
- * after an error, a clean full-page load is the safest way out.
- */
-function PublicError() {
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-6 text-center text-fg">
-      <h1 className="font-body text-2xl font-semibold tracking-normal">
-        Page not found
-      </h1>
-      <p className="mt-2 max-w-sm text-sm text-muted">
-        The page you're looking for doesn't exist or something went wrong
-        loading it.
-      </p>
-      <div className="mt-6 flex gap-3">
-        <a
-          href="/"
-          className={buttonClass({ size: 'md' })}
-        >
-          Back to UnieMax
-        </a>
-        <a
-          href="/cart"
-          className="rounded-md border border-line px-5 py-2.5 text-sm font-semibold text-muted transition hover:bg-surface-alt hover:text-fg"
-        >
-          Your cart
-        </a>
-      </div>
-    </div>
-  )
-}
-
 export const publicRouter = createBrowserRouter([
   {
     element: <PublicRoot />,
-    errorElement: <PublicError />,
+    errorElement: <RouteError />,
     children: [
       {
         path: '/store/:storeSlug',

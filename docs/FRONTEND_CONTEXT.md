@@ -2157,6 +2157,12 @@ frontend/
     │   │   │                     #   rise (default primary) · sheen (the one committing
     │   │   │                     #   action per view) · ring (secondary beside a
     │   │   │                     #   primary). `buttonClass()` for <Link> CTAs.
+    │   │   ├── RouteError.tsx   # Error screen for every router: `RouteError`
+    │   │   │                     #   (errorElement — marketplace root + public
+    │   │   │                     #   router) and `ErrorBoundary` (admin). A stale
+    │   │   │                     #   lazy chunk after a deploy reloads ONCE (guarded
+    │   │   │                     #   per minute); 404 → "Page not found"; else a
+    │   │   │                     #   friendly "Something went wrong" + Reload
     │   │   └── socialIcons.tsx   # Social brand glyphs + SOCIAL_META (label + icon per platform)
     │   ├── analytics/
     │   │   └── metaPixel.ts     # Meta Pixel: SPA PageView, CompleteRegistration,
