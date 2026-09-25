@@ -690,8 +690,11 @@ Admin controls the platform rules; admin does **not** own a seller's programme.
 
 ## 15. API surface
 
-**Every affiliate route lives under `/api/v1/affiliate/**`** — including the
-seller ones, which deliberately do _not_ sit under `/api/v1/stores/**`. One
+**Every affiliate route lives under `/api/v1/affiliate/**`** except platform
+admin — including the seller ones, which deliberately do _not_ sit under
+`/api/v1/stores/**`. The admin routes are the one exception: they mount at
+`/api/v1/admin/affiliate/**`, because the admin session cookies are path-scoped
+to `/api/v1/admin` and a browser never sent them anywhere else. One
 prefix means extraction day is a single nginx `location` block, and until then it
 marks exactly which routes belong to the package. Registered by
 `registerAffiliate(app, …)` from `app.ts`, not by hand in `src/routes.ts`.
@@ -700,7 +703,8 @@ The endpoints are documented in [API.md — Affiliate Marketing](./API.md):
 `/seller/stores/:storeId/**` (programme, products, invitations, partners,
 commissions, summary), `/me/**` (profile, stores, products, links,
 commissions), `/public/**` (invitation preview + accept, the click endpoint)
-and `/admin/**` (accounts, commissions, fraud events, run approval).
+and, under `/api/v1/admin/affiliate`, `/**` for admins (accounts, commissions,
+fraud events, run approval).
 
 Not built yet: withdrawal / payout endpoints (Phase 3) and admin-on-behalf
 seller routes (support fixing a programme in the seller's name — the section is

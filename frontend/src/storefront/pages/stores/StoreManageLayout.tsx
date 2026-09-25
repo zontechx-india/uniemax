@@ -1,6 +1,6 @@
 import { usePrivatePageTitle } from '../../../shared/seo'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, Navigate, Outlet, useLocation, useParams } from 'react-router-dom'
+import { Link, Navigate, Outlet, useParams } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
 import { storesApi } from '../../features/stores/storesApi'
 import type { StoreDashboard } from '../../features/stores/storesApi'
@@ -41,13 +41,6 @@ export function StoreManageLayout() {
   usePrivatePageTitle('Manage', store?.name)
   // Owner by default; the admin console wraps these routes to say otherwise.
   const scope = useStoreManageScope()
-  // The Dashboard carries the launch / "your store is live" cards itself, so
-  // on a phone — where this panel stacks ABOVE the page — the publish card
-  // would say everything twice before the seller reached the content.
-  const { pathname } = useLocation()
-  const onDashboard =
-    storeSlug !== undefined &&
-    pathname.replace(/\/+$/, '') === scope.storePath(storeSlug)
 
   // Minimised-nav preference. Owned here because the grid track width is this
   // file's; the nav renders the icons.
@@ -254,9 +247,7 @@ export function StoreManageLayout() {
               />
             </div>
           )}
-          <div
-            className={`${rail ? 'lg:hidden' : ''} ${onDashboard ? 'max-lg:hidden' : ''}`}
-          >
+          <div className={rail ? 'lg:hidden' : ''}>
             <StorePublishCard store={store} onStoreChange={setStore} />
           </div>
         </aside>

@@ -276,14 +276,17 @@ export const publicAffiliateApi = {
 
 // ---- platform admin -------------------------------------------------------
 
+/** Inside the admin API subtree — the admin session cookies are scoped to it. */
+const ADMIN_BASE = '/api/v1/admin/affiliate'
+
 export const adminAffiliateApi = {
   affiliates: (page: number) =>
-    callList<AdminAffiliate>(http.get(`${BASE}/admin/affiliates`, { params: { page } })),
+    callList<AdminAffiliate>(http.get(`${ADMIN_BASE}/affiliates`, { params: { page } })),
   setStatus: (id: string, status: AdminAffiliate['status']) =>
-    call<AdminAffiliate>(http.patch(`${BASE}/admin/affiliates/${id}`, { status })),
+    call<AdminAffiliate>(http.patch(`${ADMIN_BASE}/affiliates/${id}`, { status })),
   commissions: (query: PageQuery) =>
-    callList<Commission>(http.get(`${BASE}/admin/commissions`, { params: query })),
+    callList<Commission>(http.get(`${ADMIN_BASE}/commissions`, { params: query })),
   updateCommission: (id: string, patch: { status: 'APPROVED' | 'REJECTED'; note?: string }) =>
-    call<Commission>(http.patch(`${BASE}/admin/commissions/${id}`, patch)),
-  approveNow: () => call<{ approved: number }>(http.post(`${BASE}/admin/jobs/approve`)),
+    call<Commission>(http.patch(`${ADMIN_BASE}/commissions/${id}`, patch)),
+  approveNow: () => call<{ approved: number }>(http.post(`${ADMIN_BASE}/jobs/approve`)),
 }

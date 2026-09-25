@@ -441,7 +441,10 @@ function ProductRow({
 
   return (
     <li>
-      <div className="flex items-center gap-3 px-4 py-3">
+      {/* Wraps on phones: the product gets the full width of its line and the
+          controls drop under it, instead of squeezing the name and the
+          completeness nudge into a column a few words wide. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 sm:flex-nowrap">
         {cover ? (
           <img
             src={cover}
@@ -539,6 +542,7 @@ function ProductRow({
             }`}
           />
         </div>
+        <div className="flex w-full items-center justify-end gap-1 sm:w-auto sm:gap-3">
         {/* From `sm` up there is room for it inline with the row's buttons. */}
         <PlacementToggle
           open={placementOpen}
@@ -572,6 +576,7 @@ function ProductRow({
         >
           <TrashIcon className="h-4 w-4" />
         </button>
+        </div>
       </div>
 
       {placementOpen && (

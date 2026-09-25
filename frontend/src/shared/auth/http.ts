@@ -46,16 +46,11 @@ function readCookie(name: string): string | undefined {
  */
 const ADMIN_API_PREFIX = '/api/v1/admin'
 
-// The affiliate package keeps its admin routes under its own prefix.
-const AFFILIATE_ADMIN_PREFIX = '/api/v1/affiliate/admin'
-
 /** The auth surface a request belongs to, from its URL alone. */
 export type AuthSurface = 'customer' | 'admin'
 
 function surfaceOf(url: string | undefined): AuthSurface {
-  const admin =
-    url?.startsWith(ADMIN_API_PREFIX) || url?.startsWith(AFFILIATE_ADMIN_PREFIX)
-  return admin ? 'admin' : 'customer'
+  return url?.startsWith(ADMIN_API_PREFIX) ? 'admin' : 'customer'
 }
 
 const SURFACE: Record<AuthSurface, { csrfCookie: string; refreshUrl: string }> = {

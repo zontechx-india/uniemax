@@ -585,7 +585,9 @@ page (plus a "View all orders" link).
 - **List** — status tabs (All + the six statuses, deep-linkable via
   `?status=` so dashboard tiles land pre-filtered), a debounced search
   (order number / customer name / phone), newest first, server-paginated
-  with Load More; every row opens the detail page.
+  with Load More; every row opens the detail page. Rows are the shared
+  `SellerOrderRow` (`orderMeta.tsx`, also the Dashboard's latest orders): one
+  line from `sm`, on a phone number + total, then details, then the chips.
 - **Detail** — items with thumbnails + money summary, customer/delivery
   snapshot (tel: link, pickup note for PICKUP orders), payment card
   (flags dev-simulated payments), a **lifecycle timeline** (Placed →
@@ -604,8 +606,10 @@ page (plus a "View all orders" link).
   a race with another tab) surface as inline errors.
 
 **Publish & share** — the left card ends in `StorePublishCard` (visible on
-every manage section, except the Dashboard below `lg`, where the page's own
-launch / "your store is live" cards would repeat it above the content): a
+every manage section; below `lg`, where the panel stacks ABOVE the section,
+it collapses to one row — status · View/Preview · share · Publish/Unpublish,
+plus a "What's still needed?" link to the Dashboard when blocked — because the
+full card pushed every section's content below the fold on a phone): a
 Published/Not-published status row with a **Publish store** `Button` (a quiet
 Unpublish once live; `PATCH /stores/:id/publish`), the publish blockers as
 **links to the section that fixes each** (`GateBlockers.tsx` —
@@ -1930,8 +1934,9 @@ Where it appears:
 
 Checkout sends `getAttribution(storeSlug)` as `affiliateRef` with the order
 and calls `clearAttribution(storeSlug)` once the order is placed — one click
-credits one order. `shared/auth/http.ts` treats `/api/v1/affiliate/admin` as
-an admin URL for CSRF-cookie purposes.
+credits one order. The platform-admin calls go to `/api/v1/admin/affiliate/**`
+— inside the admin API subtree, so the path-scoped admin session cookies are
+sent and `shared/auth/http.ts` picks the admin CSRF cookie from the prefix alone.
 
 ## Notifications & push (both apps)
 

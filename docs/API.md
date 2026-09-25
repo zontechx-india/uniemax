@@ -2436,7 +2436,12 @@ yet") or is suspended.
   under the store slug, then navigates to `path`. `404` for a disabled link,
   paused partnership or closed programme.
 
-### Platform admin — `/api/v1/affiliate/admin/**` 🔒 admin
+### Platform admin — `/api/v1/admin/affiliate/**` 🔒 admin
+
+Mounted inside the admin API subtree (not under `/api/v1/affiliate`) because the
+admin session cookies are path-scoped to `/api/v1/admin` — outside it a browser
+never sends them.
+
 
 - `GET …/affiliates?page&pageSize` (list envelope) — `{ id, customerId,
   displayName, status, stores, links, createdAt }`. `PATCH …/affiliates/:id`

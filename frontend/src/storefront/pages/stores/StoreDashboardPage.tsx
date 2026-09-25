@@ -9,12 +9,11 @@ import { useManagedStore } from '../../features/stores/useManagedStore'
 import {
   ChatIcon,
   CheckIcon,
-  ChevronRightIcon,
   EyeIcon,
   GlobeIcon,
   ShareIcon,
 } from '../../layout/icons'
-import { OrderStatusChip, formatOrderDate, paymentLabel } from './orderMeta'
+import { SellerOrderRow } from './orderMeta'
 import { SetupChecklist } from './SetupChecklist'
 import { whatsAppShareUrl } from './StorePublishCard'
 
@@ -182,30 +181,7 @@ export function StoreDashboardPage() {
               <ul className="mt-2 divide-y divide-line rounded-lg border border-line">
                 {dashboard.recentOrders.map((order) => (
                   <li key={order.id}>
-                    <Link
-                      to={`orders/${order.id}`}
-                      className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 transition hover:bg-surface-alt"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-fg">
-                          {order.orderNumber}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted">
-                          {formatOrderDate(order.placedAt)}
-                          {order.customerName && <> · {order.customerName}</>} ·{' '}
-                          {order.itemCount} item{order.itemCount === 1 ? '' : 's'}
-                          {order.fulfilment === 'PICKUP' && <> · Pickup</>}
-                        </p>
-                      </div>
-                      <span className="rounded-pill bg-surface-alt px-2.5 py-0.5 text-[11px] font-semibold text-muted">
-                        {paymentLabel(order.paymentMethod, order.paymentStatus)}
-                      </span>
-                      <OrderStatusChip status={order.status} />
-                      <span className="text-sm font-bold text-fg">
-                        {formatPrice(order.total)}
-                      </span>
-                      <ChevronRightIcon className="h-4 w-4 shrink-0 text-muted" />
-                    </Link>
+                    <SellerOrderRow order={order} to={`orders/${order.id}`} />
                   </li>
                 ))}
               </ul>

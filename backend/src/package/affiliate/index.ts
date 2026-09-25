@@ -29,10 +29,14 @@ export async function registerAffiliate(
       await affiliate.register(partnerRoutes, { prefix: "/me" });
       await affiliate.register(sellerRoutes, { prefix: "/seller/stores/:storeId" });
       await affiliate.register(publicRoutes, { prefix: "/public" });
-      await affiliate.register(adminRoutes, { prefix: "/admin" });
     },
     { prefix: "/api/v1/affiliate" },
   );
+  // Platform oversight lives INSIDE the admin API subtree, not under
+  // /api/v1/affiliate: the admin session cookies are path-scoped to
+  // /api/v1/admin, so a browser never sent them to /api/v1/affiliate/admin
+  // and the admin Affiliates page could only ever answer 401.
+  await app.register(adminRoutes, { prefix: "/api/v1/admin/affiliate" });
 }
 
 export { createInProcessHost } from "./hosts/inProcess.js";
