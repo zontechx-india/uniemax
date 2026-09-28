@@ -348,6 +348,23 @@ for guests and signed-in customers alike and adapts per session state.
   `MarketIdentityBar`'s trust row instead, and the footer's bottom bar
   (COD available · Secure checkout).
 
+### Seller landing page (`/sell`)
+
+`pages/SellPage.tsx` — the page seller-acquisition ads point at
+(`https://uniemax.com/sell?utm_…`). The homepage speaks to shoppers and keeps
+its seller pitch in the last section, which mobile ad visitors never reached;
+this page is only that pitch. Its first phone screen holds the headline
+("Create your online store — free"), the **Create your free store** button
+(`CreateStoreLink`: guests get the auth dialog on Register with `intent:
+'sell'` and continue to `/mystores/new`; signed-in visitors go straight there),
+and the three proof points; below are the three how-it-works steps and the same
+button again. Its own minimal chrome: logo + "Already selling? Sign in" (→
+`/mystores` after sign-in), no search, cart or product rails, and **no API calls
+of its own**, so it renders as soon as the bundle does. The copy
+(`SELLER_PROOF_POINTS`, `SELLER_STEPS`) and the CTA live in
+`features/selling/sellerPitch.tsx`, shared with the homepage's Become a Seller
+panel, so the two cannot drift.
+
 ### Storefront account shell (routed dashboard)
 
 Signed-in account pages mount inside `RequireCustomer` → `AppLayout`
@@ -2206,7 +2223,7 @@ frontend/
     │   ├── main.tsx              # Mounts <StorefrontApp/>
     │   ├── StorefrontApp.tsx     # Session probe + picks marketplace vs public router
     │   ├── app/
-    │   │   ├── router.tsx        # Marketplace router: public / + /login + guarded account subtree
+    │   │   ├── router.tsx        # Marketplace router: public / + /sell + /login + guarded account subtree
     │   │   ├── publicRouter.tsx  # Public storefront + cart routes (no sign-in; every page, cart/checkout included, is a lazy chunk)
     │   │   ├── navigation.ts     # Account-menu nav config (single source of truth)
     │   │   ├── marketSession.tsx # Whole-session context (loading/guest/authed) + provider
@@ -2272,6 +2289,9 @@ frontend/
     │   │   │   ├── DeliveryCheck.tsx # Product page: "Delivers to / Not deliverable to <pincode>"
     │   │   │   ├── deliveryPincode.ts # useDeliveryPincode: typed pincode (localStorage) → primary address
     │   │   │   └── FilterPanel.tsx   # Availability + Price filters (slide-over/bottom sheet)
+    │   │   ├── selling/
+    │   │   │   └── sellerPitch.tsx # SELLER_PROOF_POINTS · SELLER_STEPS · CreateStoreLink
+    │   │   │                     #   (shared by the homepage panel and /sell)
     │   │   └── stores/           # Customer-owned stores (see Stores feature above)
     │   │       ├── storesApi.ts  # Typed HTTP client for /api/v1/stores
     │   │       ├── deliveryRules.ts # Pincode parsing/validation + rule summaries (seller editors)
@@ -2287,6 +2307,7 @@ frontend/
     │       │                     #   (h1 + trust + chips), New Stores (count-capped
     │       │                     #   grid), Fresh Finds and Recently Viewed (rails),
     │       │                     #   My Stores, seller CTA
+    │       ├── SellPage.tsx      # /sell — seller landing page (where seller ads point)
     │       ├── InfoComingSoonPage.tsx # /about /contact (real) · /privacy /terms (holding page + support contact)
     │       ├── ProfilePage.tsx   # /profile — account details + mobile-number linking (SMS OTP)
     │       ├── AddressesPage.tsx # /addresses — saved delivery addresses (one primary)
@@ -2467,13 +2488,15 @@ stops for the three button fills, all cut from `#6c3ef4`) and `--cta-contrast`
 
 ### Brand art (`public/` + `AppLogoLockup`)
 
-Two supplied RGBA assets, both trimmed of their transparent margin and
-downscaled for the web (the originals were 1–1.3 MB):
+Two supplied RGBA assets, downscaled and palette-compressed for the web (the
+originals were 0.2–1.3 MB, and `app_logo.png` loads on every page as the tab
+icon). Sized at 3× the largest they render — `AppLogoFull` at `w-40`, the
+lockup at `h-11` — so they stay sharp on high-DPR phones:
 
 | File | What | Used by |
 | ---- | ---- | ------- |
-| `app_logo.png` | the bag mark — purple U-bag on transparency, **portrait** 1024×1536 | `AppLogoFull` (splash screens), the tab icon in both HTML entries, `favicon.ts`, `push-sw.js` |
-| `app_logo_with_name.png` | the lockup — mark + "UnieMax", 888×224 | `AppLogoLockup` (light scheme) |
+| `app_logo.png` | the bag mark — purple U-bag on transparency, **portrait** 480×720 (~58 KB) | `AppLogoFull` (splash screens), the tab icon in both HTML entries, `favicon.ts`, `push-sw.js` |
+| `app_logo_with_name.png` | the lockup — mark + "UnieMax", 800×263 (~20 KB; 800 wide because it is also the `og:image`) | `AppLogoLockup` (light scheme) |
 | `app_logo_with_name_dark.png` | the same lockup with "Unie" lifted to white | `AppLogoLockup` (dark scheme + `tone="on-dark"`) |
 | `pwa-192.png` · `pwa-512.png` | square install icons | `manifest.json` (`purpose: any`) |
 | `pwa-maskable-512.png` | the same mark inset to 72% | `manifest.json` (`purpose: maskable`) |

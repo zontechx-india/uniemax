@@ -447,6 +447,40 @@ curl -s -o /dev/null -w '%{http_code}\n' \
 curl -sI http://127.0.0.1:8081/assets/<a real file>.js | grep -i cache-control   # immutable
 ```
 
+### Compression — NOT YET APPLIED
+
+`/etc/nginx/nginx.conf` has `gzip on` but leaves `gzip_types` commented out,
+so nginx compresses only `text/html`: every JS and CSS file goes out at full
+size. A first visit to uniemax.com downloads ~620 KB before anything paints
+(`RouteError-*.js` alone is 309 KB → 99 KB gzipped; the main CSS 79 KB →
+14 KB). The fix is scoped to the four uniemax vhosts — the same pattern as the
+SPA cache snippet — so the other projects on this box are untouched. Run once:
+
+```bash
+sudo tee /etc/nginx/snippets/uniemax-gzip.conf >/dev/null <<'EOF'
+# Unie Max — compression (shared by all four uniemax vhosts).
+# Rationale in docs/DEPLOYMENT.md -> "Compression".
+gzip_vary on;
+gzip_proxied any;
+gzip_comp_level 5;
+gzip_min_length 1024;
+gzip_types text/css text/plain text/javascript application/javascript
+           application/json application/manifest+json application/xml image/svg+xml;
+EOF
+for s in uniemax-com uniemax-domain uniemax uniemax-prod; do
+  f=/etc/nginx/sites-available/$s
+  sudo cp "$f" "$f.pre-gzip"
+  sudo sed -i 's#^\(\s*\)include /etc/nginx/snippets/uniemax-spa-cache.conf;#&\n\1include /etc/nginx/snippets/uniemax-gzip.conf;#' "$f"
+done
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Verify: `curl -sI -H 'Accept-Encoding: gzip' https://uniemax.com/assets/<any>.js`
+must show `Content-Encoding: gzip`. Roll back: copy each `*.pre-gzip` back,
+`sudo rm /etc/nginx/snippets/uniemax-gzip.conf`, `sudo nginx -t && sudo
+systemctl reload nginx`. Once applied, retitle this section and drop the
+"not yet applied" note.
+
 ### Web Push env (`VAPID_*`)
 
 Push notifications need a VAPID key pair in the server's `backend/.env`.

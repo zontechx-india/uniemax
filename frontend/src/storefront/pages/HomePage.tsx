@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useSeo } from '../../shared/seo'
 import { ThemeToggle } from '../../shared/theme/ThemeToggle'
 import { AppLogoLockup } from '../../shared/ui/AppLogo'
@@ -21,6 +21,11 @@ import {
   TruckIcon,
 } from '../layout/icons'
 import { openAuthDialog } from '../features/auth/authDialogStore'
+import {
+  CreateStoreLink,
+  SELLER_PROOF_POINTS,
+  SELLER_STEPS,
+} from '../features/selling/sellerPitch'
 import { useCart } from '../features/cart/cart'
 import { BannerCarousel } from '../features/banners/BannerCarousel'
 import { discoveryApi } from '../features/discovery/discoveryApi'
@@ -1464,32 +1469,6 @@ function MyStoresSection({ stores }: { stores: Store[] }) {
 // Become a Seller — the growth pitch (one of the largest sections by design)
 // ---------------------------------------------------------------------------
 
-const SELLER_PROOF_POINTS = [
-  'Free to start — publish when you are ready',
-  'Your own branding, theme and web address',
-  'Cash on Delivery and online payments built in',
-] as const
-
-/**
- * What actually happens, in the order it happens. Three steps because that is
- * how many there are: the Create Store wizard, the product wizard, and the
- * Publish switch in the Store Builder.
- */
-const SELLER_STEPS = [
-  {
-    title: 'Create your store',
-    body: 'Name it, add your logo and business details. A few minutes.',
-  },
-  {
-    title: 'Add your products',
-    body: 'Photos, prices and stock, guided one product at a time.',
-  },
-  {
-    title: 'Publish',
-    body: 'Your shop goes live at its own address, ready to share.',
-  },
-] as const
-
 /**
  * The growth pitch — the page's closing argument, and the largest panel on it.
  *
@@ -1565,46 +1544,6 @@ function BecomeSellerSection({ ownsStores }: { ownsStores: boolean }) {
         </div>
       </div>
     </section>
-  )
-}
-
-/**
- * "Create a store" CTA that works for everyone: guests get the auth dialog
- * and land on the creation page once signed in.
- */
-function CreateStoreLink({
-  className,
-  children,
-}: {
-  className?: string
-  children: React.ReactNode
-}) {
-  const { state } = useMarketSession()
-  const navigate = useNavigate()
-  if (state.status === 'authed') {
-    return (
-      <Link to="/mystores/new" className={className}>
-        {children}
-      </Link>
-    )
-  }
-  // Guest (or still probing): sign in right here, then carry on to the
-  // wizard — the dialog can't navigate itself (it sits outside the router),
-  // so the follow-up is passed in.
-  return (
-    <button
-      type="button"
-      onClick={() =>
-        openAuthDialog({
-          intent: 'sell',
-          initialView: 'register',
-          onSignedIn: () => navigate('/mystores/new'),
-        })
-      }
-      className={className}
-    >
-      {children}
-    </button>
   )
 }
 

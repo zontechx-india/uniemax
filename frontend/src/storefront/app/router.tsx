@@ -79,6 +79,14 @@ export const router = createBrowserRouter([
         }),
       },
       { path: '/login', element: <LoginRoute /> },
+      // Seller landing page — where seller-acquisition ads point. Public; the
+      // homepage speaks to shoppers, this one only to people opening a store.
+      {
+        path: '/sell',
+        lazy: async () => ({
+          Component: (await import('../pages/SellPage')).SellPage,
+        }),
+      },
       // Global category landing pages — the platform's only pages about a KIND of
       // product rather than about a shop, and so the only ones that can rank for
       // a category term. Public, no layout wrapper (the page brings its own

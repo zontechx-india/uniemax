@@ -682,7 +682,9 @@ follow from that, and they decide most of what is on the page:
   on one side, **how it actually works** (create your store → add your
   products → publish) on the other. The button reads "Create another store"
   for existing owners, and guests pass through sign-in straight to store
-  creation.
+  creation. The same pitch stands alone at **`/sell`** — the seller landing
+  page that seller ads link to, with the offer and the sign-up button on the
+  first phone screen and nothing shopper-facing around it.
 - **Platform stats** — published-store, product and order counters exist in
   the API but are **not shown on the homepage**. They will be worth showing
   when they are worth reading.
