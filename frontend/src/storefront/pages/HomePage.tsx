@@ -217,7 +217,7 @@ export function MarketHeader() {
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-3 md:ml-0 md:gap-4 lg:gap-6">
-          <CreateStoreLink className="hidden whitespace-nowrap text-sm font-semibold text-muted transition-colors hover:text-fg lg:block">
+          <CreateStoreLink placement="home_header" className="hidden whitespace-nowrap text-sm font-semibold text-muted transition-colors hover:text-fg lg:block">
             Sell on UnieMax
           </CreateStoreLink>
           <ThemeToggle className="h-9 w-9 sm:h-10 sm:w-10" />
@@ -966,7 +966,7 @@ function NewStoresSection() {
             No stores have been published yet.
           </p>
           <p className="mt-1 text-sm text-muted">Be the first seller!</p>
-          <CreateStoreLink className={buttonClass({ size: 'md', className: 'mt-4' })}>
+          <CreateStoreLink placement="home_new_stores_empty" className={buttonClass({ size: 'md', className: 'mt-4' })}>
             Create Store →
           </CreateStoreLink>
         </div>
@@ -1515,7 +1515,7 @@ function BecomeSellerSection({ ownsStores }: { ownsStores: boolean }) {
                   with the brand as its text, so it separates from the brand
                   gradient in either scheme (white/purple in light,
                   near-black/purple in dark) without a third color. */}
-              <CreateStoreLink className="mt-8 inline-block rounded-md bg-brand-contrast px-8 py-3 text-sm font-bold text-brand transition hover:opacity-90">
+              <CreateStoreLink placement="home_seller_panel" className="mt-8 inline-block rounded-md bg-brand-contrast px-8 py-3 text-sm font-bold text-brand transition hover:opacity-90">
                 {ownsStores ? 'Create another store' : 'Create your store'}
               </CreateStoreLink>
             </div>
@@ -1611,7 +1611,7 @@ export function MarketFooter() {
             <p className="mt-3 text-sm text-muted">
               Open your own store in minutes — no technical knowledge required.
             </p>
-            <CreateStoreLink className="mt-4 inline-block rounded-md border border-line px-4 py-2 text-sm font-semibold text-fg transition-colors hover:border-accent">
+            <CreateStoreLink placement="home_footer" className="mt-4 inline-block rounded-md border border-line px-4 py-2 text-sm font-semibold text-fg transition-colors hover:border-accent">
               Become a Seller
             </CreateStoreLink>
           </div>

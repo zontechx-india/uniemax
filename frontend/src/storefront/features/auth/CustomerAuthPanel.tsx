@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { trackCompleteRegistration } from '../../../shared/analytics/metaPixel'
+import { trackCompleteRegistration } from '../../../shared/analytics/track'
 import { customerAuth } from '../../../shared/auth/authApi'
 import type { Customer } from '../../../shared/auth/authApi'
 import {

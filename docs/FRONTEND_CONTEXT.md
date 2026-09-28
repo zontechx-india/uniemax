@@ -2089,10 +2089,41 @@ and what a future catalog feed (dynamic product ads) will have to match.
 - It waits for the payment to settle: COD, or `paymentStatus === 'PAID'`.
   A `PENDING` or `FAILED` gateway order reports nothing, so a drop-off at
   Cashfree is never counted as revenue.
-- `trackPurchase()` de-duplicates by order id (in-memory + `localStorage`),
-  which is **required**, not defensive: the confirmation page polls while an
-  online payment settles, and its URL is deliberately shareable and
-  bookmarkable. Unguarded, one sale would report several times.
+- `trackPurchase()` (in `track.ts`) de-duplicates by order id (in-memory +
+  `localStorage`) before reporting to Meta **and** GA4, which is **required**,
+  not defensive: the confirmation page polls while an online payment settles,
+  and its URL is deliberately shareable and bookmarkable. Unguarded, one sale
+  would report several times.
+
+## Analytics — Google Analytics 4 (storefront only)
+
+Measurement ID `G-5L4JD4WH2V`. Google's gtag.js loader sits in the head of
+`index.html` (not `admin.html`), wrapped in a hostname check so it loads
+**only on `uniemax.com` / `www.uniemax.com`** — dev, previews and localhost
+send nothing, and verifying an event means production + GA4 DebugView /
+Realtime. In the head rather than the bundle because most ad visitors leave
+before the app boots.
+
+- **Page views are automatic**: the web stream's Enhanced measurement ("page
+  changes based on browser history events") reports every client-side
+  navigation. The app sends no `page_view` — one would double-count.
+- **Call sites import `shared/analytics/track.ts`, never `metaPixel.ts` or
+  `ga4.ts`**: each `track*` function reports the same moment to both, so Meta
+  and GA4 cannot disagree about what happened.
+
+| GA4 event | Meta event | Fired from |
+| --------- | ---------- | ---------- |
+| `view_item` | `ViewContent` | `StoreProductPage` |
+| `add_to_cart` | `AddToCart` | `cart.add()` |
+| `begin_checkout` | `InitiateCheckout` | `CheckoutPage` |
+| `purchase` (`transaction_id` = order id) | `Purchase` | `OrderSuccessPage`, once per order |
+| `sign_up` (`method`) | `CompleteRegistration` | `CustomerAuthPanel`, new accounts only |
+| `seller_cta_click` (`placement`) | — | every `CreateStoreLink` (`sell_hero`, `sell_bottom`, `home_header`, `home_seller_panel`, `home_new_stores_empty`, `home_footer`) |
+| `store_created` | — | `CreateStorePage`, after `storesApi.create` succeeds |
+
+Items use the product slug as `item_id`, like Meta's `content_ids`; currency
+is `INR`. `sign_up`, `store_created` and `purchase` are the ones to mark as
+**Key events** in GA4 (Admin → Events).
 
 ---
 
@@ -2184,9 +2215,13 @@ frontend/
     │   │   │                     #   friendly "Something went wrong" + Reload
     │   │   └── socialIcons.tsx   # Social brand glyphs + SOCIAL_META (label + icon per platform)
     │   ├── analytics/
-    │   │   └── metaPixel.ts     # Meta Pixel: SPA PageView, CompleteRegistration,
-    │   │                        #   and the ViewContent→Purchase funnel
-    │   │                        #   (layers on the index.html base snippet)
+    │   │   ├── track.ts         # THE tracking API call sites import: fans each
+    │   │   │                    #   moment out to Meta + GA4; purchase once-per-order guard
+    │   │   ├── metaPixel.ts     # Meta Pixel: SPA PageView, CompleteRegistration,
+    │   │   │                    #   and the ViewContent→Purchase funnel
+    │   │   │                    #   (layers on the index.html base snippet)
+    │   │   └── ga4.ts           # GA4 events (view_item…purchase, sign_up,
+    │   │                        #   seller_cta_click, store_created)
     │   ├── maps/
     │   │   └── googleMaps.ts     # Maps JS API script loader (VITE_GOOGLE_MAPS_API_KEY,
     │   │                         #   minimal typings) + googleMapsLink() builder

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { trackSellerCtaClick } from '../../../shared/analytics/track'
 import { useMarketSession } from '../../app/marketSession'
 import { openAuthDialog } from '../auth/authDialogStore'
 
@@ -40,17 +41,21 @@ export const SELLER_STEPS = [
  * once signed in.
  */
 export function CreateStoreLink({
+  placement,
   className,
   children,
 }: {
+  /** Which button this is, for analytics (`seller_cta_click`), e.g. `sell_hero`. */
+  placement: string
   className?: string
   children: ReactNode
 }) {
   const { state } = useMarketSession()
   const navigate = useNavigate()
+  const track = () => trackSellerCtaClick(placement)
   if (state.status === 'authed') {
     return (
-      <Link to="/mystores/new" className={className}>
+      <Link to="/mystores/new" onClick={track} className={className}>
         {children}
       </Link>
     )
@@ -61,13 +66,14 @@ export function CreateStoreLink({
   return (
     <button
       type="button"
-      onClick={() =>
+      onClick={() => {
+        track()
         openAuthDialog({
           intent: 'sell',
           initialView: 'register',
           onSignedIn: () => navigate('/mystores/new'),
         })
-      }
+      }}
       className={className}
     >
       {children}

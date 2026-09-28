@@ -3,6 +3,7 @@ import { colourFor, initialsOf, makeLetterLogo } from '../../../shared/media/let
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { FormEvent } from 'react'
+import { trackStoreCreated } from '../../../shared/analytics/track'
 import { toApiError } from '../../../shared/auth/http'
 import { ImageEditDialog } from '../../../shared/media/ImageEditDialog'
 import {
@@ -346,9 +347,13 @@ function StoreStep({
         blob: await makeLetterLogo(name.trim()),
         filename: 'logo.png',
       }
-      onDone(
-        await storesApi.create({ name: name.trim() }, mark.blob, mark.filename),
+      const created = await storesApi.create(
+        { name: name.trim() },
+        mark.blob,
+        mark.filename,
       )
+      trackStoreCreated()
+      onDone(created)
     } catch (err) {
       setError(toApiError(err).message)
     } finally {

@@ -13,7 +13,9 @@
  *   - The shopping funnel — `ViewContent` → `AddToCart` → `InitiateCheckout` →
  *     `Purchase`. `Purchase` is what lets Meta report revenue and optimise for
  *     buyers rather than browsers, so it carries the order total and is fired
- *     at most once per order.
+ *     at most once per order (guarded in `track.ts`).
+ *
+ * Call sites use `track.ts`, which reports each of these to GA4 as well.
  *
  * The admin console (`admin.html`) has no pixel: nothing about operator
  * activity belongs in an ad platform.
@@ -114,54 +116,15 @@ export function trackInitiateCheckout(lines: PixelLine[]): void {
   trackEvent('InitiateCheckout', contentPayload(lines))
 }
 
-const PURCHASES_KEY = 'uniemax.pixel.purchases'
-/** Enough history to cover any realistic revisit without growing unbounded. */
-const PURCHASES_KEPT = 50
-/** Guards the confirmation page's own poll-driven re-renders. */
-const reportedThisLoad = new Set<string>()
-
 /**
- * True the first time an order id is seen, false ever after.
- *
- * The confirmation page polls while an online payment settles, and its URL is
- * deliberately shareable and bookmarkable, so an unguarded `Purchase` would
- * report the same sale several times and inflate reported revenue.
- */
-function claimPurchase(orderId: string): boolean {
-  if (reportedThisLoad.has(orderId)) return false
-  reportedThisLoad.add(orderId)
-  try {
-    const raw = localStorage.getItem(PURCHASES_KEY)
-    const parsed: unknown = raw ? JSON.parse(raw) : []
-    const seen = Array.isArray(parsed)
-      ? parsed.filter((v): v is string => typeof v === 'string')
-      : []
-    if (seen.includes(orderId)) return false
-    localStorage.setItem(
-      PURCHASES_KEY,
-      JSON.stringify([...seen, orderId].slice(-PURCHASES_KEPT)),
-    )
-  } catch {
-    // Storage unavailable (private mode). The in-memory guard above still
-    // stops the polling duplicate; a much later revisit may re-report, which
-    // beats losing the sale from reporting altogether.
-  }
-  return true
-}
-
-/**
- * Order paid (or placed, for cash on delivery). Fires **at most once per
- * order** — see `claimPurchase`.
+ * Order paid (or placed, for cash on delivery). Unguarded: the at-most-once
+ * per order check lives in `track.ts`, shared with GA4 — always report a
+ * purchase through there.
  *
  * `value` is the order total rather than the sum of the lines, because that is
  * what the customer actually paid: it includes shipping.
  */
-export function trackPurchase(
-  orderId: string,
-  total: number,
-  lines: PixelLine[],
-): void {
-  if (!claimPurchase(orderId)) return
+export function trackPurchase(total: number, lines: PixelLine[]): void {
   trackEvent('Purchase', { ...contentPayload(lines), value: round2(total) })
 }
 

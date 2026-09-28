@@ -88,6 +88,31 @@
       fbq('track', 'PageView');
     </script>
     <!-- End Meta Pixel Code -->
+
+    <!--
+      Google Analytics 4 (G-5L4JD4WH2V) — Google's gtag.js snippet, loaded only
+      on the production hosts so dev, previews and localhost never pollute the
+      reports. In the head, before the bundle, because most ad visitors leave
+      before the app has booted and would otherwise go uncounted. SPA
+      navigations are picked up by the stream's Enhanced measurement ("page
+      changes based on browser history events"), so the app sends no
+      page_view of its own; commerce and sign-up events come from
+      `shared/analytics/ga4.ts`.
+    -->
+    <script>
+      (function () {
+        var id = 'G-5L4JD4WH2V';
+        if (!/^(www\.)?uniemax\.com$/.test(location.hostname)) return;
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=' + id;
+        document.head.appendChild(s);
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { dataLayer.push(arguments); };
+        gtag('js', new Date());
+        gtag('config', id);
+      })();
+    </script>
     <!--
       The base snippet only reports the FIRST url of a visit: this is a
       client-side-routed SPA, so every later navigation is reported by

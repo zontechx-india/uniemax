@@ -20,7 +20,7 @@ import {
   categoryTrail,
   productJsonLd,
 } from '../../features/publicStore/structuredData'
-import { trackViewContent } from '../../../shared/analytics/metaPixel'
+import { trackViewContent } from '../../../shared/analytics/track'
 import { ProductGrid } from '../../features/publicStore/ProductCard'
 import { ShareButton } from '../../features/publicStore/ShareButton'
 import {

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { trackAddToCart } from '../../../shared/analytics/metaPixel'
+import { trackAddToCart } from '../../../shared/analytics/track'
 
 /**
  * Shopping cart — the LOCAL half.

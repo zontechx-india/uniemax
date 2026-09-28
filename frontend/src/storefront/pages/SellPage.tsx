@@ -54,6 +54,7 @@ export function SellPage() {
               </p>
 
               <CreateStoreLink
+                placement="sell_hero"
                 className={buttonClass({
                   size: 'lg',
                   full: true,
@@ -109,6 +110,7 @@ export function SellPage() {
 
               <div className="mt-8 text-center">
                 <CreateStoreLink
+                  placement="sell_bottom"
                   className={buttonClass({
                     size: 'lg',
                     full: true,
