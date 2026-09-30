@@ -39,10 +39,6 @@
 
 ## 🟢 Trust, SEO & accessibility
 
-- [ ] **13. Real meta/OG tags (SSR/prerender).** Per-route `document.title`
-  shipped (25 Jul 2026, `shared/usePageTitle.ts`), but crawlers that don't
-  run JS still see one static title and no OG tags — sharing previews and
-  SEO need prerendering or SSR for the public storefront routes.
 - [x] **14. Store trust surface is empty.** ~~Footer is only
   "Powered by UnieMax" — no about/contact/policies.~~ Resolved by Footer
   management (July 2026): owner-configured locations, contacts, social,

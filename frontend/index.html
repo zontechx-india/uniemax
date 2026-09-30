@@ -8,23 +8,24 @@
     <link rel="preload" href="/fonts/Manrope-Variable.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="icon" type="image/png" href="/app_logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>UnieMax — Online Shops You Can Buy From Directly</title>
 
     <!--
-      STATIC SEO/social defaults. This is a client-rendered SPA, so these
-      tags are the only ones a crawler that does not run JavaScript ever
-      sees — which is every social-link scraper (WhatsApp, Instagram,
-      Facebook, X, Slack) and most non-Google search crawlers.
+      SEO/social defaults — they describe the PLATFORM, never a page.
 
-      `shared/seo.ts` rewrites all of them per route once React mounts, so
-      Googlebot's rendering pass gets the real per-store/per-product values.
-      What is written HERE is the fallback the first byte carries: it must
-      therefore describe the PLATFORM, never a page.
+      Store and category pages (/store/**, /c/**) are served through the API,
+      which replaces everything between the two seo markers below with that
+      page's own title, description, canonical, social card and JSON-LD
+      (backend/src/modules/seo/pageHead.ts), so link previews and crawlers
+      that never run JavaScript see the page itself. Every other URL is this
+      file as built, and these values are what its first byte carries.
 
-      Serving per-page tags in the first byte needs the HTML shell to be
-      built per request — see docs/BACKEND_CONTEXT.md (SEO). Until that
-      lands, a shared store link previews as UnieMax rather than as blank.
+      `shared/seo.ts` rewrites the same tags per route once React mounts, and
+      reads its fallbacks from here. Keep the markers, and keep each tag's
+      attributes in the order written (the API reads the defaults back out
+      of this block).
     -->
+    <!-- seo:start -->
+    <title>UnieMax — Online Shops You Can Buy From Directly</title>
     <meta
       name="description"
       content="Discover independent online shops on UnieMax and order directly from the seller — clothing, sports gear, electronics, groceries and more, with cash on delivery or secure online payment."
@@ -46,6 +47,7 @@
       content="Discover independent online shops on UnieMax and order directly from the seller."
     />
     <meta name="twitter:image" content="/app_logo_with_name.png" />
+    <!-- seo:end -->
 
     <!--
       Installable app (PWA). Without the manifest below, Chrome offers only

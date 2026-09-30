@@ -1964,8 +1964,8 @@ these links never lands on a dead end.
 
 ## Sitemaps — `/api/v1/public` (no auth)
 
-XML sitemaps for the public storefronts. The **only** public endpoints that
-do not answer the `ok()` / `list()` JSON envelope — the sitemap protocol is
+XML sitemaps for the public storefronts. Like the page shells below, they do
+not answer the `ok()` / `list()` JSON envelope — the sitemap protocol is
 XML. Errors still answer JSON through the central handler.
 
 They live under the API prefix rather than at the site root so the nginx
@@ -2008,6 +2008,44 @@ product with its `updatedAt` as `lastmod`. Unknown *and* unpublished slugs
 both `404`, matching every other public endpoint.
 
 Capped at 50,000 URLs per file (the protocol limit).
+
+---
+
+## Page shells — site root, HTML (no auth)
+
+The storefront's built `index.html`, served on the storefront pages' **own
+URLs** with that page's `<head>` already written in, so link previews
+(WhatsApp, Instagram, Facebook, X, Slack) and crawlers that never run
+JavaScript see the page rather than the platform defaults. Mounted at the
+root, **not** under `/api/v1`: nginx forwards the browser's navigation to
+these paths unchanged (`DEPLOYMENT.md` → Page shells). Not an API a client
+calls — the SPA boots from the response exactly as from the static file.
+
+| Route | Pages |
+| ----- | ----- |
+| `GET /store/*` | `/store/{slug}` · `/category/{slug}` · `/product/{slug}` · `/shop[?q=][?section=]` · `/support[/{ticketId}]` |
+| `GET /c/*` | `/c/{slug}[?page=][&sort=]` |
+
+**Response** — `text/html; charset=utf-8`, `cache-control: no-cache` (the
+policy nginx gives `index.html`), no helmet headers. The region between
+`<!-- seo:start -->` and `<!-- seo:end -->` is replaced with the page's
+`<title>`, `description`, `robots`, `canonical`, Open Graph + Twitter tags and
+JSON-LD — the same values the page's `useSeo` call writes after mount. The
+title, description and `og:image` also carry the platform default in
+`data-default`; JSON-LD blocks carry `data-seo`.
+
+| Status | When |
+| ------ | ---- |
+| `200` | The page exists (anonymously visible). Scoped listings — `/shop?q=`, `/shop?section=`, `/c/…?page=2`, `/c/…?sort=` — and support threads are `200` with `noindex, follow`. |
+| `404` | Unknown or unpublished store, unknown product / category / `/c/` node, an unknown sub-path, or an undecodable path. Same shell (`noindex, follow`), so the SPA still renders its own not-found screen. |
+| `200`, head unchanged | The page data took over 1.5 s or its lookup failed — the shell exactly as built. |
+| `503` (text) | No frontend build at `WEB_SHELL_PATH`. nginx replaces it with its static `index.html`. |
+
+Query parameters are read like the SPA reads them and never rejected: `q` is
+trimmed, an unknown `section`/`sort` is ignored, an unusable `page` is 1.
+Every other parameter (`utm_*`, `fbclid` …) is ignored and never reaches the
+canonical. Resolved `200` heads are cached in process for 60 s; `404`s are
+not cached.
 
 ---
 

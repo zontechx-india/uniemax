@@ -4,25 +4,25 @@ import { useEffect } from 'react'
  * Per-route `<head>`: title, description, canonical, robots, Open Graph /
  * Twitter cards and JSON-LD structured data.
  *
- * ## What this can and cannot do
+ * ## Two writers, one head
  *
- * The storefront is a client-rendered SPA, so `index.html` is byte-identical
- * for every URL. This module rewrites the head **after** React mounts, which
- * means:
+ * The storefront is a client-rendered SPA: this module rewrites the head
+ * **after** React mounts. Googlebot renders JavaScript and reads that; social
+ * scrapers (WhatsApp, Instagram, Facebook, X, Slack) and most other crawlers
+ * never run JS and read only the first byte.
  *
- *   - **Googlebot** — works. It renders JavaScript and reads the head from
- *     the rendered DOM, so per-product titles, descriptions, canonicals and
- *     `Product` / `BreadcrumbList` JSON-LD all land.
- *   - **Social scrapers** (WhatsApp, Instagram, Facebook, X, Slack) — does
- *     NOT work. They fetch the raw HTML and never execute JS, so they see
- *     only the platform defaults in `index.html`.
- *   - **Bing and most AI crawlers** — partial at best, same reason.
+ * For `/store/**` and `/c/**` that first byte is built by the API
+ * (`backend/src/modules/seo/pageShell.service.ts` + `pageHead.ts`), which
+ * writes the same tags this module writes, from the same data, before the
+ * HTML leaves the server. The page components' `useSeo` calls and those
+ * server resolvers are twins — **a change to a page's head rules belongs in
+ * both**. Every other route (the marketplace home, `/sell`) is the static
+ * `index.html`, and only this module ever changes its head.
  *
- * Closing that gap needs the HTML shell built per request (the first byte
- * carrying the tags). This module is written so that is a drop-in change
- * rather than a rewrite: the *resolution* of a page's SEO fields already
- * lives in the page components, so a server renderer only has to call the
- * same public endpoints and emit the same `SeoOptions`.
+ * The server marks its tags so this module can take over cleanly: the title,
+ * description and `og:image` carry the PLATFORM value in `data-default`
+ * (read by `DEFAULTS` below), and its JSON-LD blocks carry `data-seo`, so the
+ * first `applySeo` replaces them like its own.
  *
  * ## Why it always writes the full set
  *
@@ -51,19 +51,26 @@ const MANAGED = 'data-seo'
  * The platform fallbacks, read out of `index.html` at import time — i.e.
  * before any route has had a chance to overwrite them. One source of truth:
  * editing the static tags changes the fallback here too.
+ *
+ * A server-rendered page shell has already replaced those tags with the
+ * page's own values, and keeps the platform value in `data-default` — which
+ * is why that attribute wins. Without it, a product's description would
+ * become the "default" for every page opened after it.
  */
 const DEFAULTS = {
-  title: document.title || APP_NAME,
+  title:
+    document.head.querySelector('title')?.getAttribute('data-default') ||
+    document.title ||
+    APP_NAME,
   description: readMeta('name', 'description'),
   image: readMeta('property', 'og:image'),
 }
 
 function readMeta(attr: 'name' | 'property', key: string): string {
-  return (
-    document.head
-      .querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`)
-      ?.content ?? ''
+  const tag = document.head.querySelector<HTMLMetaElement>(
+    `meta[${attr}="${key}"]`,
   )
+  return tag?.getAttribute('data-default') ?? tag?.content ?? ''
 }
 
 export interface SeoOptions {
@@ -142,8 +149,8 @@ function setLink(rel: string, href: string) {
 }
 
 /**
- * Writes the resolved head. Split out of the hook so a future server
- * renderer (or a test) can call it with the same options object.
+ * Writes the resolved head. Its server twin is `renderHead` in
+ * `backend/src/modules/seo/pageHead.ts` — same tags, same fallbacks.
  */
 export function applySeo(options: SeoOptions) {
   const parts = (options.title ?? []).filter(Boolean) as string[]

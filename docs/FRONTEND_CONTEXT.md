@@ -1326,9 +1326,9 @@ which still live in `HomePage.tsx` (exported, not moved — a third consumer is
 the moment to lift them).
 
 `noindex, follow` also covers the **owner draft preview** (an unpublished
-store resolves only for its owner), a missing product/category (the SPA
-fallback answers `200`, so there is no other way to keep a "not found" page
-out of the index), and every per-customer page — cart, checkout, order
+store resolves only for its owner), a missing product/category (the API's
+page shell already answers those with a real `404`; this covers one that
+vanishes while the tab is open), and every per-customer page — cart, checkout, order
 confirmation, addresses, support threads. `robots.txt` disallows those paths
 too; the two do different jobs, and the failure mode worth double-covering is
 a shared order-confirmation link getting indexed.
@@ -1339,11 +1339,25 @@ two rules: **never invent a fact** (there is no review system, so no
 **omit rather than guess** (`prune()` drops empty fields, since an absent
 optional is valid where an empty string is an error).
 
-**The limit**: this is a client-rendered SPA, so these tags land after React
-mounts. Googlebot renders JS and reads them; social-link scrapers (WhatsApp,
-Instagram, Facebook, X, Slack) and most non-Google crawlers do not, and see
-only the platform defaults now in `index.html`. Fixing that needs the HTML
-shell built per request — see `docs/BACKEND_CONTEXT.md`.
+**First byte**: these tags land after React mounts, which Googlebot reads
+but social-link scrapers (WhatsApp, Instagram, Facebook, X, Slack) and most
+other crawlers never see. For `/store/**` and `/c/**` the API therefore
+serves `index.html` itself with the same head already written in, plus a
+real 404 for a dead slug (`docs/BACKEND_CONTEXT.md` → page shells). What
+that means on this side:
+
+- `index.html` brackets the title and every SEO/social tag with
+  `<!-- seo:start -->` / `<!-- seo:end -->`. The API replaces that region and
+  reads the platform defaults back out of it, so keep the markers and each
+  tag's attribute order.
+- The page components' `useSeo` calls have **server twins** in
+  `backend/src/modules/seo/pageShell.service.ts`, and `structuredData.ts` /
+  `productDescription.ts` have ports beside it. A change to a page's head
+  rules belongs in both.
+- `seo.ts` reads its fallbacks from `data-default` when present — the server
+  keeps the platform value there, since the tags themselves now carry the
+  page's — and replaces the server's JSON-LD like its own (`data-seo`).
+- `/` and `/sell` are still the static file: only `seo.ts` changes their head.
 
 - `storesApi.ts` — typed HTTP client (list/create/get/update/updateTheme/
   setPublished + `storeCatalogApi` for per-store categories/subcategories/

@@ -481,6 +481,104 @@ must show `Content-Encoding: gzip`. Roll back: copy each `*.pre-gzip` back,
 `sudo rm /etc/nginx/snippets/uniemax-gzip.conf`, `sudo nginx -t && sudo
 systemctl reload nginx`.
 
+### Page shells (`/store/**`, `/c/**` → the API)
+
+**Status: not yet applied on the server.** Until it is, those URLs are
+served by the SPA fallback exactly as before and the API routes sit unused.
+
+Store and category pages are answered by the backend's page-shell routes
+(`API.md` → Page shells): the built `index.html` with that page's title,
+description, social card and JSON-LD already written in, so a link shared on
+WhatsApp/Instagram/Facebook previews as the product or shop, and a dead slug
+is a real `404`. nginx forwards only those two prefixes; everything else
+(`/`, `/sell`, `/cart`, `/assets/` …) stays a static file. Any API failure —
+down, 5xx, rate-limited, a malformed URL — falls back to the static
+`index.html`, so a store page is never worse than before.
+
+> ⚠️ **Order matters.** Apply to a vhost only once the backend behind it runs
+> a release that has the page shells (dev: after the push to `main` has
+> deployed; prod: after the `v*` tag containing them). An older backend
+> answers these paths with its JSON 404, which nginx passes through. For the
+> same reason, **remove the prod include before rolling production back** to
+> a release older than the page shells.
+
+One snippet per environment (the port differs), included by that
+environment's two vhosts next to the gzip snippet:
+
+```bash
+shells() {   # $1 = env, $2 = that env's API port
+sudo tee /etc/nginx/snippets/uniemax-page-shells-$1.conf >/dev/null <<'EOF'
+# Unie Max — page shells. Rationale in docs/DEPLOYMENT.md -> "Page shells".
+# Store/category navigations go to the API, which answers the built
+# index.html with that page's <head> written in (real 404 for a dead slug).
+# Any API failure falls back to the static index.html.
+location ^~ /store/ {
+    proxy_pass http://127.0.0.1:__PORT__;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 10s;
+    proxy_intercept_errors on;
+    error_page 400 429 500 502 503 504 = @uniemax_static_shell;
+}
+location ^~ /c/ {
+    proxy_pass http://127.0.0.1:__PORT__;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 10s;
+    proxy_intercept_errors on;
+    error_page 400 429 500 502 503 504 = @uniemax_static_shell;
+}
+# Re-enters `location = /index.html` from the SPA cache snippet (no-cache).
+location @uniemax_static_shell {
+    rewrite ^ /index.html last;
+}
+EOF
+sudo sed -i "s/__PORT__/$2/" /etc/nginx/snippets/uniemax-page-shells-$1.conf
+}
+include_in() {   # $1 = env, then the vhosts
+env=$1; shift
+for s in "$@"; do
+  f=/etc/nginx/sites-available/$s
+  sudo cp "$f" "$f.pre-shells"
+  sudo sed -i "s#^\(\s*\)include /etc/nginx/snippets/uniemax-gzip.conf;#&\n\1include /etc/nginx/snippets/uniemax-page-shells-$env.conf;#" "$f"
+done
+}
+
+# DEV first (backend :4001), verify, then PROD (backend :4000) after its release.
+shells dev 4001 && include_in dev uniemax-domain uniemax
+sudo nginx -t && sudo systemctl reload nginx
+
+shells prod 4000 && include_in prod uniemax-com uniemax-prod
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+`404` is deliberately **not** in `error_page`: the API's 404 is the point
+(same HTML, `noindex`), and intercepting it would turn every dead product back
+into a `200`.
+
+Verify (`8080` = dev, `8081` = prod; use a real published store slug):
+
+```bash
+curl -s -o /dev/null -w '%{http_code} %{content_type}\n' http://127.0.0.1:8081/store/<slug>   # 200 text/html
+curl -s http://127.0.0.1:8081/store/<slug> | grep -o '<title[^<]*</title>'                    # the store's own title
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8081/store/no-such-store-zz9        # 404
+curl -s http://127.0.0.1:8081/ | grep -c 'seo:start'                                           # 1 (home still static)
+```
+
+Then from outside: paste a product URL into Meta's Sharing Debugger
+(<https://developers.facebook.com/tools/debug/>) — it must show the product's
+title and image — and into Google's Rich Results Test for the `Product`
+block. WhatsApp caches previews per URL, so a link shared before this went
+live keeps its old card; add any query string (`?v=2`) to see the new one.
+
+Roll back: copy each `*.pre-shells` back over its vhost,
+`sudo rm /etc/nginx/snippets/uniemax-page-shells-*.conf`,
+`sudo nginx -t && sudo systemctl reload nginx`.
+
 ### Web Push env (`VAPID_*`)
 
 Push notifications need a VAPID key pair in the server's `backend/.env`.

@@ -1,32 +1,16 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import * as service from "./sitemap.service.js";
+import { siteOrigin } from "./siteOrigin.js";
 
 /**
- * Sitemap endpoints. These are the only public responses that are **not** the
- * `ok()` / `list()` JSON envelope — the sitemap protocol is XML, and a
- * crawler will not unwrap anything. Errors still go through the central
- * handler and answer JSON, which is correct: only a search engine reads the
- * success path, and only a developer reads the failure path.
+ * Sitemap endpoints. These are the XML exception to the `ok()` / `list()`
+ * JSON envelope — the sitemap protocol is XML, and a crawler will not unwrap
+ * anything. Errors still go through the central handler and answer JSON,
+ * which is correct: only a search engine reads the success path, and only a
+ * developer reads the failure path. (The page shells in `pageShell.*` are the
+ * other non-JSON responses.)
  */
-
-/**
- * The site's own origin, which is what every `<loc>` must be built from.
- *
- * `PUBLIC_WEB_URL` wins when set (the same variable the mail package uses for
- * links in emails). Otherwise it is derived from the request, because nginx
- * serves the SPA and this API from **one** origin — so the host a crawler
- * asked for is by definition the host the storefront lives on. That keeps
- * dev, the IP-and-port vhosts and production all correct with no config.
- */
-function siteOrigin(request: FastifyRequest): string {
-  const configured = process.env["PUBLIC_WEB_URL"]?.trim();
-  if (configured) return configured.replace(/\/+$/, "");
-
-  // `protocol` and `hostname` already honour X-Forwarded-* via trustProxy.
-  const host = request.headers.host ?? request.hostname;
-  return `${request.protocol}://${host}`;
-}
 
 /**
  * Crawlers re-fetch a sitemap often. An hour of shared caching matches the

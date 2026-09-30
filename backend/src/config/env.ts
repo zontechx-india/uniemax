@@ -60,6 +60,11 @@ const envSchema = z.object({
   SUPPORT_PHONE: z.string().default("+91 7708774542"),
   SUPPORT_HOURS: z.string().default("Mon–Sat, 10 AM – 7 PM IST"),
 
+  // The built storefront index.html the page shells (/store/**, /c/**) write
+  // each page's <head> into. Unset = this clone's ../frontend/dist/index.html,
+  // which is right on the server and locally after `npm run build`.
+  WEB_SHELL_PATH: z.string().trim().min(1).optional(),
+
   // NOTE: all auth config (JWT, cookies, OTP/verification codes, OAuth) lives
   // inside the self-contained auth package (src/package/auth/core/config/env.ts),
   // not here.

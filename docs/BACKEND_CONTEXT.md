@@ -129,8 +129,13 @@ backend/
 │   │   │                      #   landing pages (/c/{slug}), aggregated
 │   │   │                      #   across stores via globalCategoryId
 │   │   ├── seo/               # XML sitemaps (index · marketplace · per store)
-│   │   │                      #   — the one public surface answering XML, not
-│   │   │                      #   the JSON envelope. 1 h in-process cache.
+│   │   │                      #   — XML, not the JSON envelope; 1 h cache —
+│   │   │                      #   + pageShell.* — the storefront index.html
+│   │   │                      #   per request for /store/** and /c/** with
+│   │   │                      #   that page's head (pageHead.ts renders it;
+│   │   │                      #   productText.ts + structuredData.ts are
+│   │   │                      #   ports of the SPA's own), real 404s. Root-
+│   │   │                      #   level routes, not under /api/v1.
 │   │   ├── notifications/     # feed + push subscriptions (one handler set,
 │   │   │                      #   guard picks the principal) + notify()/
 │   │   │                      #   notifyAdmins() dispatch + admin broadcast
@@ -1485,16 +1490,44 @@ change re-crawled. Reuses the same visibility predicates as discovery, and
 additionally drops `hideFromSearch` products. Cached 1 h in process; the
 `<loc>` origin comes from `PUBLIC_WEB_URL` or the request's own host.
 
-**Not yet: per-request HTML.** The frontend is a client-rendered SPA, so
-`index.html` is byte-identical for every URL — meaning per-page `<title>`,
-description, canonical, Open Graph and JSON-LD reach Googlebot (it renders
-JS) but **not** social-link scrapers or most non-Google crawlers, which never
-execute JS. Closing that needs the shell built per request: a handler that
-reads `dist/index.html`, calls the existing public store/product services and
-injects the head tags (plus a real `404` for a dead slug, which the nginx SPA
-fallback currently answers `200` to), with nginx routing HTML navigations
-under `/store` to it. The client-side resolution already lives in
-`frontend/src/shared/seo.ts` in the shape such a renderer would emit.
+Also done: **page shells (per-request HTML)** — `modules/seo/pageShell.*`.
+The frontend is a client-rendered SPA whose `index.html` is byte-identical
+for every URL, so the per-page head `shared/seo.ts` writes after mount
+reached Googlebot (it renders JS) but **not** social-link scrapers
+(WhatsApp, Instagram, Facebook, X, Slack) or most other crawlers. Now nginx
+forwards HTML navigations under `/store/` and `/c/` to root-level
+`GET /store/*` and `GET /c/*` here (see `API.md` → Page shells,
+`DEPLOYMENT.md` → Page shells), which:
+
+- read the built `index.html` (`WEB_SHELL_PATH`, default this clone's
+  `../frontend/dist/index.html`; re-read whenever its mtime/size changes, so
+  a frontend-only deploy is picked up without a restart);
+- resolve the page through the **same public services** the SPA calls
+  (`getPublicStoreShell` / `getVisibleStore` / `getPublicCategory` /
+  `getPublicProduct` / `browseCategory`) — so visibility is decided by the
+  same predicates — **anonymously**, so an owner's unpublished draft is a
+  404 here while the SPA still loads it for them over the API;
+- replace the region between `<!-- seo:start -->` / `<!-- seo:end -->` with
+  that page's title, description, canonical, robots, OG/Twitter tags and
+  JSON-LD (`pageHead.ts`), and answer a **real `404`** for a missing store,
+  product, category, `/c/` node or unknown sub-path — same shell, so the
+  visitor still gets the SPA's not-found screen.
+
+The head rules are **twins** of the page components' `useSeo` calls, and
+`productText.ts` / `structuredData.ts` are ports of the SPA's
+`productDescription.ts` / `structuredData.ts` — a change to either side
+belongs in both. The server marks its tags for the hand-over:
+`data-default` (platform value, read by `seo.ts` for its fallbacks) on the
+title, description and `og:image`, and `data-seo` on JSON-LD blocks.
+
+Failure never costs a visitor the page: a lookup slower than 1.5 s or one
+that throws serves the shell **unmodified** (200), and a missing build
+answers 503, which nginx swaps for its own static `index.html`. Resolved
+200 heads are cached in process for 60 s (≤ 500 entries) to absorb a viral
+link; 404s are never cached, so a store is shareable the moment it
+publishes. Helmet is off for these routes — its API defaults
+(`Referrer-Policy: no-referrer`) on a *document* would break the
+referrer-restricted Maps key on every page opened afterwards.
 
 Also done: **orders** — `modules/orders` places per-store orders from the
 storefront checkout (**signed-in customers only** — placement runs behind

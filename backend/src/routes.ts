@@ -19,6 +19,7 @@ import {
 } from "./modules/themeTemplates/themeTemplates.routes.js";
 import { publicDiscoveryRoutes } from "./modules/discovery/discovery.routes.js";
 import { publicSeoRoutes } from "./modules/seo/seo.routes.js";
+import { pageShellRoutes } from "./modules/seo/pageShell.routes.js";
 import {
   adminBannerRoutes,
   publicBannerRoutes,
@@ -52,6 +53,11 @@ import {
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   // Infrastructure / probes — no version prefix.
   await app.register(healthRoutes);
+
+  // Storefront HTML on the pages' own URLs (/store/**, /c/**): the built
+  // index.html with each page's head written in, so link previews and
+  // non-JS crawlers see the page rather than the platform defaults.
+  await app.register(pageShellRoutes);
 
   await app.register(
     async (api) => {

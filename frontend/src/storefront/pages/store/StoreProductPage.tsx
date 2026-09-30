@@ -94,9 +94,13 @@ const CARD_HIGHLIGHTS = 4
  * Two things are deliberately `noindex`:
  *  - the **owner draft preview** (`store.isPublished === false`), which is a
  *    page only its owner can see and must never reach a results list;
- *  - a **missing product**, because the SPA fallback answers 200 for a dead
- *    slug. Until the shell is rendered per request there is no way to send a
- *    real 404, and an indexed "Product not found" page is worse than none.
+ *  - a **missing product**. The API's page shell already answers a dead slug
+ *    with a real 404; this covers a product that disappears while the tab
+ *    is open, and any route not served through the shell.
+ *
+ * The API writes this same head into the first byte for crawlers that never
+ * run JS — `backend/src/modules/seo/pageShell.service.ts`
+ * (`storeProductPage`). Keep the two in step.
  */
 function useProductSeo(
   store: PublicStore,

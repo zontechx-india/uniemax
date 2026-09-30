@@ -12,8 +12,10 @@ import {
  *
  * This is the part of SEO that pays off fastest for a marketplace: a
  * `Product` block is what turns a plain blue link into a result carrying a
- * price, a stock state and (once reviews exist) stars — and Google reads it
- * from the rendered DOM, so it works today without server rendering.
+ * price, a stock state and (once reviews exist) stars. Google reads it from
+ * the rendered DOM; for everything else the API writes the same blocks into
+ * the first byte from its own copy of this file,
+ * `backend/src/modules/seo/structuredData.ts` — a change here belongs there.
  *
  * Two rules everything here follows:
  *

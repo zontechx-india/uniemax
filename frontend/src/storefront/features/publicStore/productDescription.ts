@@ -120,6 +120,10 @@ function toParagraphs(lines: string[]): string[] {
  *
  * The price is deliberately included in the fallback: a snippet carrying a
  * number earns clicks against ones that do not.
+ *
+ * The API composes the same line for the first byte from its own copy of
+ * this and `parseDescription` (`backend/src/modules/seo/productText.ts`) —
+ * a change here belongs there too.
  */
 export function productMetaDescription(
   product: {

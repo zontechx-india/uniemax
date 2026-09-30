@@ -613,8 +613,7 @@ dedicated store policy pages (policy links are already supported in
 the footer), and additional configuration.
 
 **SEO still to come**, on top of what has landed (see Non-Functional
-Requirements): per-request HTML so link previews and non-Google crawlers see
-real tags; **seller-editable SEO fields** — a meta title, description and
+Requirements): **seller-editable SEO fields** — a meta title, description and
 share image per store and per product, with a live result preview, sensible
 auto-generated defaults and a home in the Store Builder; a crawlable
 `/search?q=` results page (global search is still a dropdown with no URL);
@@ -1174,18 +1173,18 @@ Full rules and design: [AFFILIATE.md](./AFFILIATE.md).
 
 - Responsive Website
 - Fast Loading
-- SEO Friendly — **partly met.** Every public page now carries its own title,
-  meta description, canonical, social card and schema.org structured data
-  (`Product`, `Store`, `BreadcrumbList`), there is a `robots.txt`, and XML
-  sitemaps expose every published store's categories and products. Two gaps
-  remain, both deliberate and both listed under Future releases below:
-  **global category pages** (`/c/{slug}`) give a search like "men's jackets"
-  a URL on this platform to rank — a page about the *category*, drawing
-  products from every published store, that hands the visitor on to whichever
-  seller stocks one. One gap remains, listed under Future releases below:
-  those head tags are written by JavaScript, so social-link scrapers
-  (WhatsApp, Instagram, Facebook) and non-Google crawlers still see only the
-  platform defaults.
+- SEO Friendly — **met for the storefront.** Every public page carries its
+  own title, meta description, canonical, social card and schema.org
+  structured data (`Product`, `Store`, `BreadcrumbList`), there is a
+  `robots.txt`, and XML sitemaps expose every published store's categories
+  and products. **Global category pages** (`/c/{slug}`) give a search like
+  "men's jackets" a URL on this platform to rank — a page about the
+  *category*, drawing products from every published store, that hands the
+  visitor on to whichever seller stocks one. Store, product and category
+  pages arrive with those tags **already in the HTML**, so a link shared on
+  WhatsApp, Instagram or Facebook previews as that product or shop, and a
+  deleted product answers a real "not found" to search engines. What is still
+  to come is listed under Future releases.
 - Secure APIs
 - Image Optimization
 - Cloud Storage
