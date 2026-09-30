@@ -1,7 +1,7 @@
 import { usePrivatePageTitle } from '../../../shared/seo'
 import { colourFor, initialsOf, makeLetterLogo } from '../../../shared/media/letterLogo'
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import type { FormEvent } from 'react'
 import { trackStoreCreated } from '../../../shared/analytics/track'
 import { toApiError } from '../../../shared/auth/http'
@@ -15,6 +15,7 @@ import { ErrorNote, TextField } from '../../../shared/ui/form'
 import { Wizard, WizardActions } from '../../../shared/ui/Wizard'
 import type { WizardStep } from '../../../shared/ui/Wizard'
 import { useGoBack } from '../../../shared/useGoBack'
+import { STORE_NAME_MAX, suggestedStoreName } from '../../features/selling/startSelling'
 import { storesApi } from '../../features/stores/storesApi'
 import type { Store } from '../../features/stores/storesApi'
 import { useStores } from '../../features/stores/useStores'
@@ -71,6 +72,8 @@ const STEPS: (WizardStep & { key: StepKey })[] = [
 export function CreateStorePage() {
   usePrivatePageTitle('Create your shop')
   const navigate = useNavigate()
+  // A name the seller typed on /sell before signing up — pre-fills step 1.
+  const initialName = suggestedStoreName(useLocation().state)
   const [index, setIndex] = useState(0)
 
   /**
@@ -162,6 +165,7 @@ export function CreateStorePage() {
           {step.key === 'store' && (
             <StoreStep
               store={store}
+              initialName={initialName}
               onDone={(created) => {
                 setStore(created)
                 next()
@@ -297,18 +301,23 @@ function ResumePanel({
  * Name + logo, posted together as one multipart request so a store is never
  * written without its mark. Re-entering this step after the store exists
  * shows it as already done rather than creating a second one.
+ *
+ * `initialName` is a suggestion carried from the /sell page — it only fills
+ * the field; the store is still created by this step's own button.
  */
 function StoreStep({
   store,
+  initialName,
   onDone,
 }: {
   store: Store | null
+  initialName: string
   onDone: (store: Store) => void
 }) {
   const config = useMediaConfig()
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const [name, setName] = useState(store?.name ?? '')
+  const [name, setName] = useState(store?.name ?? initialName)
   const [cropFile, setCropFile] = useState<File | null>(null)
   const [logo, setLogo] = useState<{ blob: Blob; filename: string } | null>(null)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
@@ -370,7 +379,7 @@ function StoreStep({
         placeholder="e.g. Anwin's Sports Hub"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        maxLength={60}
+        maxLength={STORE_NAME_MAX}
         disabled={busy || store !== null}
         autoFocus
       />

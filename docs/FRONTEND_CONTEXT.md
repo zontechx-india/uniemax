@@ -353,17 +353,51 @@ for guests and signed-in customers alike and adapts per session state.
 `pages/SellPage.tsx` — the page seller-acquisition ads point at
 (`https://uniemax.com/sell?utm_…`). The homepage speaks to shoppers and keeps
 its seller pitch in the last section, which mobile ad visitors never reached;
-this page is only that pitch. Its first phone screen holds the headline
-("Create your online store — free"), the **Create your free store** button
-(`CreateStoreLink`: guests get the auth dialog on Register with `intent:
-'sell'` and continue to `/mystores/new`; signed-in visitors go straight there),
-and the three proof points; below are the three how-it-works steps and the same
-button again. Its own minimal chrome: logo + "Already selling? Sign in" (→
-`/mystores` after sign-in), no search, cart or product rails, and **no API calls
-of its own**, so it renders as soon as the bundle does. The copy
-(`SELLER_PROOF_POINTS`, `SELLER_STEPS`) and the CTA live in
-`features/selling/sellerPitch.tsx`, shared with the homepage's Become a Seller
-panel, so the two cannot drift.
+this page is only that pitch, built for a phone in an in-app browser. Section
+pieces live in `features/selling/`.
+
+- **Hero** (navy): the headline and a **"Name your store"** form
+  (`ClaimStoreForm`) whose button — the page's one `sheen` — starts sign-up
+  (guests: auth dialog on Register with `intent: 'sell'`; signed-in: straight
+  to the wizard). As the visitor types it shows a **link preview**
+  (`previewStoreSlug()`, a mirror of the backend `slugify`, labelled a preview
+  because the server appends `-2`… when a slug is taken), and the name rides
+  into the Create Store wizard's first field (see Create Store below). Beside
+  it, `HeroVisual`: a phone storefront with the seller's real new-order alert
+  text dropping in over it.
+- Then, in order: a four-fact **trust strip** (free to start, GSTIN optional,
+  COD + online payments, made for mobile); **chats vs orders** (`ChatToOrder`
+  — a WhatsApp-style thread beside the same order as a UnieMax order card);
+  **features** (seven shipped capabilities; payments and orders as wide cards
+  with pictures); **Make it yours** (`ThemeShowcase` — five kinds of business
+  re-skin one phone through the real `storeVars()`; it auto-plays while on
+  screen until the visitor picks one, and never under reduced motion); the
+  **three steps** (`SELLER_STEPS`, a picture each); an **FAQ** (`SellFaq`,
+  native `<details>` — its requirement answers mirror the backend's
+  `storeReadiness.ts` and must change with it); and a navy closing band with
+  the same form. The two forms share one name.
+- **Chrome**: logo, section links (`lg`), "Sign in" (→ `/mystores` after
+  sign-in) or "My stores", a `Start free` button (`sm`+), a slim footer. On
+  phones a **sticky "Create store" bar** appears once the hero form scrolls
+  away and steps aside at the closing form (`useInView`; `inert` while
+  hidden).
+- **Nothing invented**: no seller counts, sales figures or testimonials. The
+  phone and order pictures are markup with illustrative content
+  (`demoStores.ts` — invented businesses, never presented as sellers).
+- **Light**: no API calls of its own and no images — product shots are
+  markup, with emoji as product photos. Motion is CSS on transform/opacity
+  only (`.sell-enter`, `.sell-float`, `.sell-notify`, `.sell-ping`, and the
+  `Reveal` scroll-in), all stopped under `prefers-reduced-motion`.
+- **Its own look**: `.sell-light` / `.sell-dark` in `index.css` re-point the
+  design-system variables for the page's subtree, the way `storeVars()` does
+  for a store — cool neutrals, navy bands (where text-brand steps up to a
+  lavender), the brand purple kept for the buttons. Both are fixed, whatever
+  the visitor's light/dark choice.
+
+`sellerPitch.tsx` keeps what the homepage's Become a Seller panel shares
+(`SELLER_PROOF_POINTS`, `SELLER_STEPS`, `CreateStoreLink`), so the two cannot
+drift; `startSelling.ts#useStartSelling()` is the start logic every seller CTA
+runs — track, sign in if needed, open the wizard with the name.
 
 ### Storefront account shell (routed dashboard)
 
@@ -1347,7 +1381,10 @@ draws a 512px PNG of the name's first letters on a colour picked from the
 name, previewed live beside the field, so a seller with no logo is never
 stopped; they replace it later in Store Details) and **Business & contact**. Its steps map 1:1 onto the
 `wizard: true` steps of the backend requirement registry, so the flow and
-the publish gate cannot drift.
+the publish gate cannot drift. A store name typed on `/sell` arrives as
+`location.state.storeName` (validated by `suggestedStoreName()`) and pre-fills
+step 1's field — only a suggestion: nothing is created until the seller
+presses Create store.
 
 It was four steps — **Address** and **Tax details** followed — and sellers
 were abandoning it on those. Neither is needed to open a shop, so both left
@@ -2118,7 +2155,7 @@ before the app boots.
 | `begin_checkout` | `InitiateCheckout` | `CheckoutPage` |
 | `purchase` (`transaction_id` = order id) | `Purchase` | `OrderSuccessPage`, once per order |
 | `sign_up` (`method`) | `CompleteRegistration` | `CustomerAuthPanel`, new accounts only |
-| `seller_cta_click` (`placement`) | — | every `CreateStoreLink` (`sell_hero`, `sell_bottom`, `home_header`, `home_seller_panel`, `home_new_stores_empty`, `home_footer`) |
+| `seller_cta_click` (`placement`, `store_name_entered`) | — | every seller CTA, via `useStartSelling` / `CreateStoreLink` (`sell_hero`, `sell_final`, `sell_header`, `sell_sticky`, `home_header`, `home_seller_panel`, `home_new_stores_empty`, `home_footer`); `store_name_entered` says whether a name was typed first |
 | `store_created` | — | `CreateStorePage`, after `storesApi.create` succeeds |
 
 Items use the product slug as `item_id`, like Meta's `content_ids`; currency
@@ -2324,9 +2361,20 @@ frontend/
     │   │   │   ├── DeliveryCheck.tsx # Product page: "Delivers to / Not deliverable to <pincode>"
     │   │   │   ├── deliveryPincode.ts # useDeliveryPincode: typed pincode (localStorage) → primary address
     │   │   │   └── FilterPanel.tsx   # Availability + Price filters (slide-over/bottom sheet)
-    │   │   ├── selling/
-    │   │   │   └── sellerPitch.tsx # SELLER_PROOF_POINTS · SELLER_STEPS · CreateStoreLink
-    │   │   │                     #   (shared by the homepage panel and /sell)
+    │   │   ├── selling/          # The seller pitch: homepage panel + the /sell page
+    │   │   │   ├── sellerPitch.tsx # SELLER_PROOF_POINTS · SELLER_STEPS · CreateStoreLink
+    │   │   │   │                 #   (shared by the homepage panel and /sell)
+    │   │   │   ├── startSelling.ts # useStartSelling (every seller CTA) · name → wizard
+    │   │   │   │                 #   router state · previewStoreSlug (slugify mirror)
+    │   │   │   ├── ClaimStoreForm.tsx # "Name your store" → Create, with link preview
+    │   │   │   ├── StorePhone.tsx  # Storefront-on-a-phone mockup, themed via storeVars()
+    │   │   │   ├── demoStores.ts   # Illustrative stores for the mockups (invented)
+    │   │   │   ├── sellVisuals.tsx # Hero shot + payment / order-track / step pictures
+    │   │   │   ├── ChatToOrder.tsx # Chat thread vs order card
+    │   │   │   ├── ThemeShowcase.tsx # "Make it yours" kind-of-business picker
+    │   │   │   ├── SellFaq.tsx     # FAQ (mirrors the backend requirement registry)
+    │   │   │   ├── Reveal.tsx      # One-time scroll-in
+    │   │   │   └── useInView.ts    # IntersectionObserver hook (null until measured)
     │   │   └── stores/           # Customer-owned stores (see Stores feature above)
     │   │       ├── storesApi.ts  # Typed HTTP client for /api/v1/stores
     │   │       ├── deliveryRules.ts # Pincode parsing/validation + rule summaries (seller editors)

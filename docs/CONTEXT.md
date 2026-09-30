@@ -680,11 +680,14 @@ follow from that, and they decide most of what is on the page:
   create-another card.
 - **Become a Seller** — prominent CTA panel: the offer and its proof points
   on one side, **how it actually works** (create your store → add your
-  products → publish) on the other. The button reads "Create another store"
-  for existing owners, and guests pass through sign-in straight to store
+  products → publish and share) on the other. The button reads "Create another
+  store" for existing owners, and guests pass through sign-in straight to store
   creation. The same pitch stands alone at **`/sell`** — the seller landing
-  page that seller ads link to, with the offer and the sign-up button on the
-  first phone screen and nothing shopper-facing around it.
+  page that seller ads link to: a "Name your store" form on the first phone
+  screen (the name carries through sign-up into store creation), then the case
+  for it — selling in chats vs taking orders, what's included, theming, the
+  three steps and an FAQ — with nothing shopper-facing around it, and no seller
+  counts, sales figures or testimonials until real ones exist.
 - **Platform stats** — published-store, product and order counters exist in
   the API but are **not shown on the homepage**. They will be worth showing
   when they are worth reading.

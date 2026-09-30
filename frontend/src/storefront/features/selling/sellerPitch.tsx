@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { trackSellerCtaClick } from '../../../shared/analytics/track'
 import { useMarketSession } from '../../app/marketSession'
-import { openAuthDialog } from '../auth/authDialogStore'
+import { useStartSelling } from './startSelling'
 
 /**
  * The seller pitch, shared by the homepage's Become-a-Seller panel and the
@@ -23,59 +23,49 @@ export const SELLER_PROOF_POINTS = [
 export const SELLER_STEPS = [
   {
     title: 'Create your store',
-    body: 'Name it, add your logo and business details. A few minutes.',
+    body: 'Name it and add your logo — no logo yet? We make one from your initials.',
   },
   {
     title: 'Add your products',
-    body: 'Photos, prices and stock, guided one product at a time.',
+    body: 'Photos, prices, sizes and stock, guided one product at a time.',
   },
   {
-    title: 'Publish',
-    body: 'Your shop goes live at its own address, ready to share.',
+    title: 'Publish and share',
+    body: 'Your shop goes live at its own link, ready to share on WhatsApp and Instagram.',
   },
 ] as const
 
 /**
  * "Create a store" CTA that works for everyone: guests get the auth dialog
  * (opened on Register, with the seller copy) and land on the creation page
- * once signed in.
+ * once signed in. Signed-in visitors get a real link, so it still opens in a
+ * new tab.
  */
 export function CreateStoreLink({
   placement,
   className,
   children,
 }: {
-  /** Which button this is, for analytics (`seller_cta_click`), e.g. `sell_hero`. */
+  /** Which button this is, for analytics (`seller_cta_click`), e.g. `home_header`. */
   placement: string
   className?: string
   children: ReactNode
 }) {
   const { state } = useMarketSession()
-  const navigate = useNavigate()
-  const track = () => trackSellerCtaClick(placement)
+  const start = useStartSelling()
   if (state.status === 'authed') {
     return (
-      <Link to="/mystores/new" onClick={track} className={className}>
+      <Link
+        to="/mystores/new"
+        onClick={() => trackSellerCtaClick(placement)}
+        className={className}
+      >
         {children}
       </Link>
     )
   }
-  // Guest (or still probing): sign in right here, then carry on to the
-  // wizard — the dialog can't navigate itself (it sits outside the router),
-  // so the follow-up is passed in.
   return (
-    <button
-      type="button"
-      onClick={() => {
-        track()
-        openAuthDialog({
-          intent: 'sell',
-          initialView: 'register',
-          onSignedIn: () => navigate('/mystores/new'),
-        })
-      }}
-      className={className}
-    >
+    <button type="button" onClick={() => start(placement)} className={className}>
       {children}
     </button>
   )

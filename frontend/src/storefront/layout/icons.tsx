@@ -506,3 +506,53 @@ export function PanelLeftIcon({ className }: { className?: string }) {
     </Svg>
   )
 }
+
+/** Bell — order alerts. */
+export function BellIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z" />
+      <path d="M10 21a2.2 2.2 0 0 0 4 0" />
+    </Svg>
+  )
+}
+
+/** Two people — partners / affiliates. */
+export function UsersIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <circle cx="9" cy="8.5" r="3.5" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+      <path d="M16 5.2a3.5 3.5 0 0 1 0 6.6M18 14.2a6.5 6.5 0 0 1 3.5 5.8" />
+    </Svg>
+  )
+}
+
+/** Right arrow — "go" on a call to action. */
+export function ArrowRightIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M4.5 12h15M13.5 6l6 6-6 6" />
+    </Svg>
+  )
+}
+
+/** Chain link — a store's shareable address. */
+export function LinkIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1" />
+      <path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1" />
+    </Svg>
+  )
+}
+
+/** Phone handset outline — "works from your phone". */
+export function SmartphoneIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <rect x="6.5" y="2.5" width="11" height="19" rx="2.5" />
+      <path d="M10.5 18.5h3" />
+    </Svg>
+  )
+}

@@ -36,9 +36,13 @@ export function trackCompleteRegistration(method: 'email' | 'phone_otp' | 'googl
   ga4.signUp(method)
 }
 
-/** A "Create your store" CTA was tapped; `placement` names which one. GA4 only. */
-export function trackSellerCtaClick(placement: string): void {
-  ga4.sellerCtaClick(placement)
+/**
+ * A "Create your store" CTA was tapped; `placement` names which one, and
+ * `storeNameEntered` whether the visitor had already typed a store name
+ * (the `/sell` form). GA4 only.
+ */
+export function trackSellerCtaClick(placement: string, storeNameEntered = false): void {
+  ga4.sellerCtaClick(placement, storeNameEntered)
 }
 
 /** A new store was created — the seller funnel's finish line. GA4 only. */

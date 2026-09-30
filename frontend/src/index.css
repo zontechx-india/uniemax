@@ -598,3 +598,175 @@
     pointer-events: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Seller landing page (/sell) — the one marketing surface with its own art
+ * direction.
+ *
+ * Paid traffic lands here cold, so the page reads as a product, not as the
+ * shop around it: deep-navy bands for the hero and the closing call, a cool
+ * neutral canvas between them, and the brand purple kept to what it is FOR —
+ * the buttons and a handful of marks — instead of washing whole panels.
+ *
+ * `sell-light` / `sell-dark` re-point the same design-system variables a
+ * store page re-points with `storeVars()`, so every semantic utility inside
+ * (`bg-surface`, `text-fg`, `border-line`, `text-brand`, the CTA fills) just
+ * follows. Both are fixed: the page keeps its look whatever the visitor's
+ * light/dark choice, and a light panel can sit inside a dark band by
+ * carrying `sell-light` itself.
+ * ------------------------------------------------------------------------- */
+@layer utilities {
+  .sell-light {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-alt: #f5f7fb;
+    --input-bg: #ffffff;
+    --line: #e3e7ef;
+    --fg: #0d1321;
+    /* 6.6:1 on white, 6.1:1 on the #f5f7fb band. */
+    --fg-muted: #525d72;
+    --brand: #6c3ef4;
+    --brand-hover: #5428d9;
+    --brand-contrast: #ffffff;
+    --brand-soft: #f1edff;
+    --brand-gradient: linear-gradient(135deg, #6c3ef4 0%, #5428d9 100%);
+    color-scheme: light;
+  }
+
+  .sell-dark {
+    --bg: #0a0e1a;
+    --surface: #11172a;
+    --surface-alt: #0d1221;
+    --input-bg: #11172a;
+    --line: rgb(255 255 255 / 0.09);
+    --fg: #f4f6fb;
+    /* 8.6:1 on the #0a0e1a band. */
+    --fg-muted: #a3adc2;
+    /* The purple is 3:1 on navy — as TEXT on a dark band the brand steps up
+       to a lavender (8.6:1). The CTA fills read `--cta-*`, not this. */
+    --brand: #b3a1ff;
+    --brand-hover: #c7b9ff;
+    --brand-contrast: #0a0e1a;
+    --brand-soft: rgb(179 161 255 / 0.14);
+    color-scheme: dark;
+  }
+
+  /* Hero atmosphere: two soft light sources on the navy (brand purple top
+     right, a cool sky bottom left) and a faint grid that fades out toward
+     the edges. Static — nothing here repaints on scroll. */
+  .sell-glow {
+    background-image:
+      radial-gradient(55% 45% at 80% 12%, rgb(108 62 244 / 0.36) 0%, transparent 70%),
+      radial-gradient(45% 40% at 5% 100%, rgb(56 189 248 / 0.12) 0%, transparent 70%);
+  }
+  .sell-grid {
+    background-image:
+      linear-gradient(to right, rgb(255 255 255 / 0.045) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.045) 1px, transparent 1px);
+    background-size: 44px 44px;
+    -webkit-mask-image: radial-gradient(ellipse 75% 65% at 50% 30%, #000 20%, transparent 75%);
+    mask-image: radial-gradient(ellipse 75% 65% at 50% 30%, #000 20%, transparent 75%);
+  }
+
+  /* Phone mockup chrome — the bezel and the long, soft drop it sits on. */
+  .sell-phone {
+    background-color: #05070d;
+    box-shadow:
+      0 0 0 1px rgb(255 255 255 / 0.08),
+      0 36px 72px -24px rgb(5 7 13 / 0.6);
+  }
+
+  /* Scroll reveal (`Reveal`): rises into place once, the first time it is
+     seen. */
+  .sell-reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition:
+      opacity 700ms ease-out,
+      transform 700ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .sell-reveal.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* First-paint entrance for the hero's supporting pieces (never the
+     headline — animating it would hold back the page's largest paint). */
+  .sell-enter {
+    animation: sell-enter 800ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  }
+  .sell-float {
+    animation: sell-float 7s ease-in-out infinite;
+  }
+  /* The "new order" alert: drops in, holds, lifts away, and comes back. */
+  .sell-notify {
+    animation: sell-notify 7s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+  }
+  /* A live dot's expanding ring. */
+  .sell-ping {
+    animation: sell-ping 2s ease-out infinite;
+  }
+
+  @keyframes sell-enter {
+    from {
+      opacity: 0;
+      transform: translateY(28px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes sell-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+  @keyframes sell-notify {
+    0% {
+      opacity: 0;
+      transform: translateY(-14px) scale(0.96);
+    }
+    7%,
+    80% {
+      opacity: 1;
+      transform: none;
+    }
+    88%,
+    100% {
+      opacity: 0;
+      transform: translateY(-14px) scale(0.96);
+    }
+  }
+  @keyframes sell-ping {
+    0% {
+      transform: scale(1);
+      opacity: 0.55;
+    }
+    100% {
+      transform: scale(2.6);
+      opacity: 0;
+    }
+  }
+
+  /* The global rule only shortens durations, which would make these
+     infinite loops flicker — so under reduced motion they stop outright and
+     everything simply sits in its final place. */
+  @media (prefers-reduced-motion: reduce) {
+    .sell-reveal {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+    .sell-enter,
+    .sell-float,
+    .sell-notify,
+    .sell-ping {
+      animation: none;
+    }
+  }
+}

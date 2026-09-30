@@ -87,10 +87,15 @@ export function signUp(method: string): void {
 
 /**
  * A "Create your store" button was tapped. `placement` says which one, so
- * the /sell page's buttons can be told apart from the homepage's.
+ * the /sell page's buttons can be told apart from the homepage's;
+ * `store_name_entered` says whether a store name was typed first.
  */
-export function sellerCtaClick(placement: string): void {
-  event('seller_cta_click', { placement, page_path: window.location.pathname })
+export function sellerCtaClick(placement: string, storeNameEntered: boolean): void {
+  event('seller_cta_click', {
+    placement,
+    store_name_entered: storeNameEntered,
+    page_path: window.location.pathname,
+  })
 }
 
 /** The Create Store wizard's first step succeeded — a seller now exists. */
