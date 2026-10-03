@@ -7,7 +7,7 @@
 > image normalization are **live on dev and production** (`v1.21.0`), and
 > every existing image has been brought up to date ([§9](#9-operations)).
 > **Sized photos** (`srcset` — phones download a copy that fits, not the
-> original; [§4.6](#46-sized-photos-srcset)) are built — live once deployed.
+> original; [§4.6](#46-sized-photos-srcset)) are **live on dev and production** (`v1.22.0`).
 > Everything else in the [roadmap](#11-roadmap) is not started.
 >
 > **This file owns SEO.** What SEO is for this platform, how it is built, the
@@ -129,7 +129,7 @@ For search, nobody googles a shop they have never heard of; they google
 | **Page shells**: per-page tags in the first byte for `/store/**` and `/c/**`, real 404s | `backend/src/modules/seo/pageShell.*`, `pageHead.ts` · contract in [`API.md`](./API.md) → Page shells | 1 Oct 2026, dev + prod |
 | Share button (native share sheet / copy link) on store header and product page | `frontend/src/storefront/features/publicStore/ShareButton.tsx` | before Sep 2026 |
 | **Share images**: every `og:image` on a page shell is a preview-safe JPEG (≤ 1200 px, < 300 KB) of the cover photo or logo, so WhatsApp shows it — see [§4.5](#45-share-images-link-preview-images) | `backend/src/package/storage/images.ts`, `backend/src/modules/media/` · contract in [`API.md`](./API.md) → Share images | 4 Oct 2026, dev + prod (`v1.21.0`) |
-| **Sized photos**: every stored image is offered at 320/640/960/1280 px via `srcset`, so the browser downloads the copy that fits — see [§4.6](#46-sized-photos-srcset) | `frontend/src/shared/media/MediaImg.tsx`, `backend/src/package/storage/images.ts` · contract in [`API.md`](./API.md) → Image derivatives | 4 Oct 2026 (built) |
+| **Sized photos**: every stored image is offered at 320/640/960/1280 px via `srcset`, so the browser downloads the copy that fits — see [§4.6](#46-sized-photos-srcset) | `frontend/src/shared/media/MediaImg.tsx`, `backend/src/package/storage/images.ts` · contract in [`API.md`](./API.md) → Image derivatives | 4 Oct 2026, dev + prod (`v1.22.0`) |
 | Measurement: GA4 + Meta Pixel (not SEO, but how SEO results are measured) | `frontend/index.html`, `frontend/src/shared/analytics/` · [`FRONTEND_CONTEXT.md`](./FRONTEND_CONTEXT.md) | 28 Sep 2026 |
 
 ---
@@ -306,8 +306,9 @@ hover-zoom draws it at 1.9×. Phones (no zoom) get a sized copy.
 
 Measured on dev, same pages and photos, old code vs new (phone 390 px @3×):
 marketplace home 1,646 → 750 KB (desktop 611 KB), store home 157 → 69 KB,
-product page 429 → 223 KB. Photos on dev were already normalized; on
-production, whose photos were larger, the gap is bigger.
+product page 429 → 223 KB. Production after release (phone): KC Trends'
+watch page 464 KB where the same images at full size are 2,160 KB; the
+marketplace home 1,257 KB vs 3,216 KB.
 
 ---
 
@@ -397,7 +398,7 @@ re-crawled.
 | ⚠️ Rolling production back past `747a9b3` | Remove the prod page-shell include **first** — an older backend answers those paths with a JSON 404. |
 | Google Search Console / Bing Webmaster Tools | **Not confirmed.** The repo has no verification tag (only Meta's `facebook-domain-verification`), so if they are set up it is by DNS. Submit `sitemap.xml` in both. |
 | `PUBLIC_WEB_URL` | Origin for canonicals, `og:url`, `og:image` and sitemap `<loc>`s. Prod: `https://uniemax.com`. |
-| Sized copies for existing images | **Not yet rendered** (they render on first view anyway). After the deploy, per environment: `npm run optimize-media -- --apply` pre-renders them so no visitor waits. |
+| Sized copies for existing images | **Done on dev and production, 4 Oct 2026** (`optimize-media -- --apply`): prod 121 images (86 product photos, 28 logos, 7 banners), dev 84; nothing failed. New uploads get them via `storeUpload`, so this is not a recurring job. |
 | Existing images (`npm run optimize-media`) | **Done on dev and production, 4 Oct 2026.** Prod: 8 product photos (KC Trends' 2–3 MB PNGs, 22.7 MB → 2.1 MB), 20 logos (1.4 MB → 0.6 MB) and 1 banner (1.4 MB → 59 KB) re-encoded; 57 share images rendered; nothing failed. Dev: 2 logos, 3 banners, 42 share images. New uploads are normalized on arrival, so this is not a recurring job — re-run only if images were written around the upload path. Commands: [`backend/README.md`](../backend/README.md). |
 
 Quick checks (public, safe to run any time):
@@ -456,7 +457,7 @@ change-log line.
 | --- | --- | --- | --- |
 | 1 | **Per-page tags in the first byte** | Page shells for `/store/**`, `/c/**`; real 404s | ✅ Done 1 Oct 2026 |
 | 2 | **Free shopping listings** | Google Merchant Center + Meta catalog product feeds; new product fields `brand`, `gtin`/`mpn`, `condition`; `shippingDetails` + `hasMerchantReturnPolicy` in `Product` JSON-LD | Not started |
-| 3 | **Image sizes** | Server-side normalization of every upload + share images for `og:image`; sized copies (320–1280 px) served with `srcset` through `MediaImg` ([§4.6](#46-sized-photos-srcset)) | ✅ Done 4 Oct 2026 (built; live once deployed) |
+| 3 | **Image sizes** | Server-side normalization of every upload + share images for `og:image`; sized copies (320–1280 px) served with `srcset` through `MediaImg` ([§4.6](#46-sized-photos-srcset)) | ✅ Done 4 Oct 2026, dev + prod (`v1.22.0`) |
 | 4 | **Reviews & ratings** | Reviews only from buyers with a delivered order; then `aggregateRating` in JSON-LD (stars in results) | Not started |
 | 5 | **Better listings from sellers** | Listing quality score in the product editor; duplicate-description warning; optional seller SEO title/description/share image with a result preview; alt-text editing; prompt to tag products on the global taxonomy; finish converting legacy shelves | Not started |
 | 6 | **More landing pages** | Brand pages (after step 2); city pages ("cricket bats in Kochi") only where stock exists, thin ones `noindex`; a crawlable `/search?q=` page (enables the `WebSite` `SearchAction`); "more from this store" / "other sellers" links | Not started |
@@ -514,4 +515,4 @@ search/filter URLs get indexed, mass-produced pages with nothing on them.
 | 1 Oct 2026 | Page shells (`747a9b3`): per-page tags in the first byte for `/store/**` and `/c/**`, real 404s; nginx forwarding live on dev and prod |
 | 3 Oct 2026 | Path params up to 500 chars (`b15e72f`) so long product slugs resolve; this file created as the SEO source of truth |
 | 4 Oct 2026 | Share images for `og:image` (WhatsApp dropped large product photos); server-side normalization of every image upload; `npm run optimize-media` for existing images; media audit understands `derived/` objects. Released as `v1.21.0`; existing images updated on dev and prod |
-| 4 Oct 2026 | Sized photos (`srcset`): copies at 320/640/960/1280 px for every stored image, one derived-image registry shared with share images, every upload via `storeUpload`, `<MediaImg>` on every stored image in the frontend; roadmap step 3 done |
+| 4 Oct 2026 | Sized photos (`srcset`): copies at 320/640/960/1280 px for every stored image, one derived-image registry shared with share images, every upload via `storeUpload`, `<MediaImg>` on every stored image in the frontend; roadmap step 3 done. Released as `v1.22.0`; copies pre-rendered on dev and prod |
