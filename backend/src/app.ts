@@ -27,6 +27,12 @@ export async function buildApp(): Promise<FastifyInstance> {
     // true behind Nginx / a load balancer; false when exposed directly so
     // clients can't spoof their IP past the per-IP rate limits.
     trustProxy: resolveTrustProxy(),
+    routerOptions: {
+      // Fastify rejects any path param over 100 chars with a 414 before the
+      // route runs. Product names may be 120 chars, so their slugs (plus a
+      // "-2" collision suffix) outgrow that and the product page 404s.
+      maxParamLength: 500,
+    },
   });
 
   // ---------------------------------------------------------------------------

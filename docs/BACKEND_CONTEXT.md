@@ -178,7 +178,9 @@ backend/
 
 1. `server.ts` calls `buildApp()`.
 2. `buildApp()` (in `app.ts`):
-   - creates Fastify (`trustProxy: true`, Pino logger),
+   - creates Fastify (`trustProxy: true`, Pino logger,
+     `routerOptions.maxParamLength: 500` — the default 100 answered long
+     product slugs with a 414, so their product page showed "not found"),
    - registers `@fastify/cors` with an explicit `methods` list (v10+ defaults to
      GET/HEAD/POST only, which silently blocked every PATCH/PUT/DELETE from a
      cross-origin frontend such as local dev on :5173 → :4000),
