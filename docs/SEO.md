@@ -4,8 +4,8 @@
 > XML sitemaps, global category pages (`/c/{slug}`) and **page shells**
 > (per-page tags in the first byte of HTML, real 404s) are **live on dev and
 > production**. **Share images** (small JPEG link previews) and server-side
-> image normalization are built — live once deployed; existing images are
-> brought up to date by `npm run optimize-media` ([§9](#9-operations)).
+> image normalization are **live on dev and production** (`v1.21.0`), and
+> every existing image has been brought up to date ([§9](#9-operations)).
 > Everything else in the [roadmap](#11-roadmap) is not started.
 >
 > **This file owns SEO.** What SEO is for this platform, how it is built, the
@@ -126,7 +126,7 @@ For search, nobody googles a shop they have never heard of; they google
 | Global category landing pages `/c/{slug}` | `frontend/src/storefront/pages/BrowseCategoryPage.tsx` · `backend/src/modules/discovery/browse.service.ts` | 23 Sep 2026 |
 | **Page shells**: per-page tags in the first byte for `/store/**` and `/c/**`, real 404s | `backend/src/modules/seo/pageShell.*`, `pageHead.ts` · contract in [`API.md`](./API.md) → Page shells | 1 Oct 2026, dev + prod |
 | Share button (native share sheet / copy link) on store header and product page | `frontend/src/storefront/features/publicStore/ShareButton.tsx` | before Sep 2026 |
-| **Share images**: every `og:image` on a page shell is a preview-safe JPEG (≤ 1200 px, < 300 KB) of the cover photo or logo, so WhatsApp shows it — see [§4.5](#45-share-images-link-preview-images) | `backend/src/package/storage/images.ts`, `backend/src/modules/media/` · contract in [`API.md`](./API.md) → Share images | 4 Oct 2026 (built) |
+| **Share images**: every `og:image` on a page shell is a preview-safe JPEG (≤ 1200 px, < 300 KB) of the cover photo or logo, so WhatsApp shows it — see [§4.5](#45-share-images-link-preview-images) | `backend/src/package/storage/images.ts`, `backend/src/modules/media/` · contract in [`API.md`](./API.md) → Share images | 4 Oct 2026, dev + prod (`v1.21.0`) |
 | Measurement: GA4 + Meta Pixel (not SEO, but how SEO results are measured) | `frontend/index.html`, `frontend/src/shared/analytics/` · [`FRONTEND_CONTEXT.md`](./FRONTEND_CONTEXT.md) | 28 Sep 2026 |
 
 ---
@@ -360,7 +360,7 @@ re-crawled.
 | ⚠️ Rolling production back past `747a9b3` | Remove the prod page-shell include **first** — an older backend answers those paths with a JSON 404. |
 | Google Search Console / Bing Webmaster Tools | **Not confirmed.** The repo has no verification tag (only Meta's `facebook-domain-verification`), so if they are set up it is by DNS. Submit `sitemap.xml` in both. |
 | `PUBLIC_WEB_URL` | Origin for canonicals, `og:url`, `og:image` and sitemap `<loc>`s. Prod: `https://uniemax.com`. |
-| Existing images (`npm run optimize-media`) | **Not yet run on production.** Dry run on dev (4 Oct): 57 product photos already fine, 2 logos (1.66 MB → 145 KB) and 3 banners to optimize, 42 share images to render. After the deploy, per environment: dry run, then `-- --apply`. Commands: [`backend/README.md`](../backend/README.md). |
+| Existing images (`npm run optimize-media`) | **Done on dev and production, 4 Oct 2026.** Prod: 8 product photos (KC Trends' 2–3 MB PNGs, 22.7 MB → 2.1 MB), 20 logos (1.4 MB → 0.6 MB) and 1 banner (1.4 MB → 59 KB) re-encoded; 57 share images rendered; nothing failed. Dev: 2 logos, 3 banners, 42 share images. New uploads are normalized on arrival, so this is not a recurring job — re-run only if images were written around the upload path. Commands: [`backend/README.md`](../backend/README.md). |
 
 Quick checks (public, safe to run any time):
 
@@ -473,4 +473,4 @@ search/filter URLs get indexed, mass-produced pages with nothing on them.
 | 30 Sep 2026 | SEO roadmap agreed ([§11](#11-roadmap)) |
 | 1 Oct 2026 | Page shells (`747a9b3`): per-page tags in the first byte for `/store/**` and `/c/**`, real 404s; nginx forwarding live on dev and prod |
 | 3 Oct 2026 | Path params up to 500 chars (`b15e72f`) so long product slugs resolve; this file created as the SEO source of truth |
-| 4 Oct 2026 | Share images for `og:image` (WhatsApp dropped large product photos); server-side normalization of every image upload; `npm run optimize-media` for existing images; media audit understands `derived/` objects |
+| 4 Oct 2026 | Share images for `og:image` (WhatsApp dropped large product photos); server-side normalization of every image upload; `npm run optimize-media` for existing images; media audit understands `derived/` objects. Released as `v1.21.0`; existing images updated on dev and prod |
