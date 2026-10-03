@@ -7,7 +7,7 @@ import {
   mediaUrl,
   newObjectKey,
   storage,
-  warmShareImage,
+  storeUpload,
 } from "../../package/storage/index.js";
 import type { UploadedFile } from "../../package/storage/index.js";
 import { getMyStore } from "./stores.service.js";
@@ -1502,8 +1502,7 @@ export async function addProductMedia(
     `products/${storeId}/${productId}`,
     file.contentType,
   );
-  await storage.put("media", key, file.buffer, file.contentType);
-  if (!isVideo) warmShareImage("media", key);
+  await storeUpload("media", key, file);
 
   await prisma.storeProductMedia.create({
     data: {
@@ -1557,8 +1556,7 @@ export async function replaceProductMediaFile(
     `products/${storeId}/${productId}`,
     file.contentType,
   );
-  await storage.put("media", key, file.buffer, file.contentType);
-  if (incoming === "IMAGE") warmShareImage("media", key);
+  await storeUpload("media", key, file);
   await prisma.storeProductMedia.update({
     where: { id: media.id },
     data: { key },

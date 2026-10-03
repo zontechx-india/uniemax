@@ -12,6 +12,7 @@ import {
 } from '../../../layout/icons'
 import type { PreviewDevice } from './BuilderPreview'
 import { BlockerLinks, useGateBlockers } from '../GateBlockers'
+import { MediaImg } from '../../../../shared/media/MediaImg'
 
 /**
  * The builder's top bar: where you are, what it looks like on, whether your
@@ -93,7 +94,8 @@ export function BuilderHeader({
 
         <div className="flex min-w-0 items-center gap-2.5">
           {store.logoUrl ? (
-            <img
+            <MediaImg
+              sizes="32px"
               src={store.logoUrl}
               alt=""
               className="h-8 w-8 shrink-0 rounded-md object-cover"

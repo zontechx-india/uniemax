@@ -6,7 +6,7 @@ import {
   mediaUrl,
   newObjectKey,
   storage,
-  warmShareImage,
+  storeUpload,
 } from "../../package/storage/index.js";
 import type { UploadedFile } from "../../package/storage/index.js";
 import {
@@ -313,8 +313,7 @@ export async function createStore(
 
   try {
     const key = newObjectKey(`store-logo/${created.id}`, logo.contentType);
-    await storage.put("logo", key, logo.buffer, logo.contentType);
-    warmShareImage("logo", key);
+    await storeUpload("logo", key, logo);
     const row = await prisma.store.update({
       where: { id: created.id },
       data: { logoKey: key },
@@ -379,8 +378,7 @@ export async function updateStoreLogo(
   });
 
   const key = newObjectKey(`store-logo/${store.id}`, file.contentType);
-  await storage.put("logo", key, file.buffer, file.contentType);
-  warmShareImage("logo", key);
+  await storeUpload("logo", key, file);
 
   const row = await prisma.store.update({
     where: { id: store.id },

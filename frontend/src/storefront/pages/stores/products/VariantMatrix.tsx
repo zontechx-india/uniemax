@@ -13,6 +13,7 @@ import type {
 import type { StoreProductMediaItem } from '../../../features/stores/storesApi'
 import { ActiveSwitch } from '../ActiveSwitch'
 import { CheckIcon, ChevronDownIcon, TrashIcon } from '../../../layout/icons'
+import { MediaImg } from '../../../../shared/media/MediaImg'
 
 /**
  * Every combination of the option types, one row each — photo, SKU, price,
@@ -525,7 +526,7 @@ function PhotoPicker({
       >
         <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded bg-surface-alt">
           {shown?.url ? (
-            <img src={shown.url} alt="" className="h-full w-full object-cover" />
+            <MediaImg sizes="40px" src={shown.url} alt="" className="h-full w-full object-cover" />
           ) : (
             <span className="text-[9px] font-semibold uppercase text-muted">Cover</span>
           )}
@@ -591,7 +592,7 @@ function PhotoTile({
       }`}
     >
       {url ? (
-        <img src={url} alt="" className="h-full w-full object-cover" />
+        <MediaImg sizes="96px" src={url} alt="" className="h-full w-full object-cover" />
       ) : (
         <span className="flex h-full w-full items-center justify-center bg-surface-alt text-[9px] text-muted">
           —

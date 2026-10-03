@@ -25,6 +25,7 @@ import {
   needsBannerCrop,
 } from '../../storefront/features/stores/bannerSpec'
 import { ImageEditDialog } from '../../shared/media/ImageEditDialog'
+import { MediaImg } from '../../shared/media/MediaImg'
 
 /**
  * Marketplace banners — the promo carousel at the top of the marketplace
@@ -368,7 +369,8 @@ function BannerCard({
         className={`group relative ${BANNER_FORMAT.aspect} w-full bg-surface-alt`}
       >
         {banner.imageUrl ? (
-          <img
+          <MediaImg
+            sizes="(min-width: 1024px) 50vw, 100vw"
             src={banner.imageUrl}
             alt=""
             className={`h-full w-full object-cover ${

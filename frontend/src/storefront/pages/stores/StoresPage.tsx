@@ -4,6 +4,7 @@ import { useStores } from '../../features/stores/useStores'
 import type { Store } from '../../features/stores/storesApi'
 import { ChevronRightIcon, GlobeIcon, PlusIcon, StoreIcon } from '../../layout/icons'
 import { buttonClass } from '../../../shared/ui/Button'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
  * Store selection ("My Store" in the account menu): pick one of the
@@ -64,7 +65,8 @@ function StoreCard({ store }: { store: Store }) {
     >
       <div className="flex items-start justify-between gap-3">
         {store.logoUrl ? (
-          <img
+          <MediaImg
+            sizes="48px"
             src={store.logoUrl}
             alt=""
             className="h-12 w-12 shrink-0 rounded-lg object-cover"

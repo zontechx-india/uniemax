@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { formatPrice, storeProductUrl } from '../stores/storesApi'
 import type { PublicProductGroup } from '../stores/storesApi'
 import { SaleTag } from './CartControls'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /** The storefront skin classes the row needs — a structural subset. */
 interface RowSkin {
@@ -50,7 +51,8 @@ export function GroupSwatchRow({
                 <>
                   <span className={`block aspect-[3/4] ${skin.chip}`}>
                     {member.image?.url ? (
-                      <img
+                      <MediaImg
+                        sizes="80px"
                         src={member.image.url}
                         alt=""
                         loading="lazy"

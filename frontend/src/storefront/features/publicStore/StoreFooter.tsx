@@ -25,6 +25,7 @@ import {
   UserIcon,
 } from '../../layout/icons'
 import type { Skin } from './storeTheme'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
  * Storefront footer — renders the owner's Footer settings (locations, social
@@ -221,7 +222,8 @@ function BrandBlock({
         className="inline-flex items-center gap-2.5"
       >
         {store.logoUrl && (
-          <img
+          <MediaImg
+            sizes="36px"
             src={store.logoUrl}
             alt=""
             className="h-9 w-9 rounded-md object-cover"

@@ -40,6 +40,7 @@ import {
   HERO_DEFAULT_CTA,
   sectionCopy,
 } from '../../features/publicStore/sectionCopy'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
  * Products shown in a capped single-row section. Only as many as fill the
@@ -614,7 +615,8 @@ function Hero({
             className={`flex items-center gap-3 ${hasArt ? '' : 'justify-center'}`}
           >
             {store.logoUrl && (
-              <img
+              <MediaImg
+                sizes="44px"
                 src={store.logoUrl}
                 alt=""
                 className={`h-11 w-11 shrink-0 rounded-md border object-cover ${skin.border}`}
@@ -684,7 +686,8 @@ function HeroArt({ covers, skin }: { covers: string[]; skin: Skin }) {
       className={`grid select-none gap-3 lg:gap-4 ${trio ? 'grid-cols-3 lg:grid-cols-2' : 'grid-cols-2'}`}
     >
       {covers.map((url, index) => (
-        <img
+        <MediaImg
+          sizes="(min-width: 1024px) 320px, 50vw"
           key={url}
           src={url}
           alt=""

@@ -1,5 +1,6 @@
 import type { PublicStore } from '../../features/stores/storesApi'
 import { StoreIcon } from '../../layout/icons'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
  * Store identity badge on the cart/checkout pages: the store's uploaded logo
@@ -17,7 +18,8 @@ export function StoreLogo({
 }) {
   if (shell?.logoUrl) {
     return (
-      <img
+      <MediaImg
+        sizes="96px"
         src={shell.logoUrl}
         alt={`${name} logo`}
         loading="lazy"

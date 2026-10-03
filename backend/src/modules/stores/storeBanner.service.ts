@@ -5,6 +5,7 @@ import {
   mediaUrl,
   newObjectKey,
   storage,
+  storeUpload,
   type UploadedFile,
 } from "../../package/storage/index.js";
 import { getMyStore } from "./stores.service.js";
@@ -227,7 +228,7 @@ export async function createBanner(
   await assertLinkTarget(store.id, input.linkType, input.linkValue ?? null);
 
   const key = newObjectKey(`banners/${store.id}`, file.contentType);
-  await storage.put("media", key, file.buffer, file.contentType);
+  await storeUpload("media", key, file);
 
   const last = await prisma.storeBanner.findFirst({
     where: { storeId: store.id },
@@ -309,7 +310,7 @@ export async function replaceBannerImage(
   if (!current) throw HttpError.notFound("Banner not found");
 
   const key = newObjectKey(`banners/${store.id}`, file.contentType);
-  await storage.put("media", key, file.buffer, file.contentType);
+  await storeUpload("media", key, file);
 
   const previous = current.imageKey;
   await prisma.storeBanner.update({

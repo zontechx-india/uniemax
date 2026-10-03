@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronLeftIcon, ChevronRightIcon } from '../../layout/icons'
 import { BANNER_FORMAT } from '../stores/bannerSpec'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
  * The banner carousel, shared by the MARKETPLACE homepage (platform banners,
@@ -188,7 +189,8 @@ function BannerSlide({
   eager: boolean
 }) {
   const image = (
-    <img
+    <MediaImg
+      sizes="100vw"
       src={banner.imageUrl ?? ''}
       alt={banner.title ?? ''}
       // The first banner is above the fold on every screen — lazy-loading it

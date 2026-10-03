@@ -17,6 +17,7 @@ import type { StoreProduct } from '../../../features/stores/storesApi'
 import { BoxIcon, PlusIcon, TrashIcon } from '../../../layout/icons'
 import { CreateMemberDialog } from './CreateMemberDialog'
 import { GroupMemberPicker } from './GroupMemberPicker'
+import { MediaImg } from '../../../../shared/media/MediaImg'
 
 /** Everything the editor edits, changed together so the cards stay one list. */
 export interface OptionsDraft {
@@ -242,7 +243,8 @@ export function OptionTypesEditor({
                           className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 sm:flex-nowrap"
                         >
                           {member.imageUrl ? (
-                            <img
+                            <MediaImg
+                              sizes="40px"
                               src={member.imageUrl}
                               alt=""
                               className="h-10 w-10 shrink-0 rounded-md border border-line object-cover"

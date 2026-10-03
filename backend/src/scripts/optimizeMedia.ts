@@ -4,7 +4,9 @@ import path from "node:path";
 import { appEnv } from "../config/loadEnv.js";
 import { prisma } from "../config/prisma.js";
 import {
-  getShareImage,
+  ALL_DERIVATIVES,
+  SIZED_DERIVATIVES,
+  ensureDerivedImages,
   newObjectKey,
   normalizeImage,
   sniffContentType,
@@ -14,9 +16,10 @@ import {
 
 /**
  * Brings images uploaded before server-side normalization up to today's
- * rules (`package/storage/images.ts`), and pre-renders link-preview share
- * images so the first WhatsApp share of an old product is not the one that
- * waits.
+ * rules (`package/storage/images.ts`), and pre-renders their derived
+ * images — sized copies for `srcset`, and link-preview share images — so
+ * the first visitor (or WhatsApp share) of an old product is not the one
+ * that waits.
  *
  * For every stored image — product photos, store logos, store banners,
  * marketplace banners:
@@ -30,8 +33,9 @@ import {
  *     moment always wins. The old object is kept: order history snapshots
  *     (`OrderItem.imageKey`) and browser caches may still point at it;
  *     `npm run audit-media` reports it once nothing does.
- *  3. Product covers and store logos get their share image (small JPEG for
- *     `og:image`) rendered and stored, if it is not already there.
+ *  3. Every image gets its sized copies, and product covers and store logos
+ *     their share image (small JPEG for `og:image`), rendered and stored
+ *     where not already there.
  *
  * Dry run by default — it reads and measures, writes nothing:
  *
@@ -64,7 +68,7 @@ interface Item {
   key: string;
   bucket: MediaBucket;
   rule: "image" | "logo";
-  /** Render this image's share image (product covers, logos). */
+  /** Also render a share image (product covers, logos), not only sized copies. */
   share: boolean;
   /** Switches the row to a new key iff it still holds `from`. Returns false if it had changed. */
   swap: (from: string, to: string) => Promise<boolean>;
@@ -170,7 +174,7 @@ interface Tally {
   optimized: number;
   bytesBefore: number;
   bytesAfter: number;
-  shareImages: number;
+  derived: number;
   missing: string[];
   changedMeanwhile: string[];
   failed: string[];
@@ -213,10 +217,16 @@ async function processItem(item: Item, tally: Tally) {
     }
   }
 
-  if (item.share) {
-    if (apply) await getShareImage(item.bucket, finalKey);
-    tally.shareImages += 1;
+  if (apply) {
+    const stored = finalKey === item.key ? original : normalized.buffer;
+    await ensureDerivedImages(
+      item.bucket,
+      finalKey,
+      item.share ? ALL_DERIVATIVES : SIZED_DERIVATIVES,
+      stored,
+    );
   }
+  tally.derived += 1;
 }
 
 async function main() {
@@ -235,7 +245,7 @@ async function main() {
       optimized: 0,
       bytesBefore: 0,
       bytesAfter: 0,
-      shareImages: 0,
+      derived: 0,
       missing: [],
       changedMeanwhile: [],
       failed: [],
@@ -259,7 +269,7 @@ async function main() {
       [
         `  checked ${tally.checked} · already fine ${tally.alreadyFine}`,
         `${apply ? "optimized" : "to optimize"} ${tally.optimized} (${kb(tally.bytesBefore)} → ${kb(tally.bytesAfter)})`,
-        `share images ${apply ? "ensured" : "to ensure"} ${tally.shareImages}`,
+        `sized copies + share images ${apply ? "ensured" : "to ensure"} for ${tally.derived} image(s)`,
       ].join(" · "),
     );
     for (const [label, list] of [

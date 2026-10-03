@@ -5,7 +5,7 @@ import type { MediaBucket } from "./types.js";
  * Image rules — the ONE place that decides what an image we store or serve
  * looks like. Pure functions over bytes; storage I/O lives in the facade.
  *
- * Two outputs:
+ * Three outputs:
  *
  *  - **Originals** (`normalizeImage`) — what an upload is stored as. The
  *    browser editor already crops and compresses to WebP, but the server
@@ -22,6 +22,14 @@ import type { MediaBucket } from "./types.js";
  *    Instagram/Facebook accept large ones — so a big photo previewed on one
  *    and not the other. A small baseline JPEG is the one format every
  *    preview service renders.
+ *
+ *  - **Sized copies** (`renderSizedImage`) — the same photo at a few fixed
+ *    widths, offered to browsers as `srcset` candidates so a product grid on
+ *    a phone downloads a 320 px copy, not the 1920 px original.
+ *
+ * Share images and sized copies are both *derived images*: made from an
+ * original on first request, stored beside it, cached forever (see
+ * `DERIVATIVES` below).
  */
 
 // One-off images: libvips' operation cache would only hold memory.
@@ -41,7 +49,7 @@ const MAX_INPUT_PIXELS = 50_000_000;
  * (`BANNER_FORMAT.width`) share the "image" rule, so it takes the larger.
  * Logos are shown at most a few hundred pixels wide.
  */
-const MAX_EDGE = { image: 1920, logo: 1024 } as const;
+export const MAX_EDGE = { image: 1920, logo: 1024 } as const;
 
 /** Visually lossless for photos at a fraction of PNG/JPEG size. */
 const WEBP_QUALITY = 82;
@@ -133,19 +141,84 @@ export async function renderShareImage(buffer: Buffer): Promise<Buffer> {
   return output!;
 }
 
+// ---------------------------------------------------------------------------
+// Sized copies (responsive images)
+// ---------------------------------------------------------------------------
+
 /**
- * Where an original's share image is stored, in the original's own bucket:
- * `products/a/b/uuid.webp` → `derived/share/products/a/b/uuid.jpg`.
+ * Widths browsers may ask for, as `srcset` candidates. A fixed set, never an
+ * arbitrary number: each width is one stored copy per photo, and an
+ * open-ended size parameter would let anyone fill the bucket. The original
+ * (≤ `MAX_EDGE`) is the largest candidate, so the set stops below it.
+ */
+export const IMAGE_WIDTHS = [320, 640, 960, 1280] as const;
+export type ImageWidth = (typeof IMAGE_WIDTHS)[number];
+
+/**
+ * The image `width` px wide (never enlarged), upright, as WebP. Animated
+ * inputs use their first frame.
+ */
+export function renderSizedImage(buffer: Buffer, width: ImageWidth): Promise<Buffer> {
+  return decode(buffer)
+    .rotate()
+    .resize({ width, withoutEnlargement: true })
+    .webp({ quality: WEBP_QUALITY })
+    .toBuffer();
+}
+
+// ---------------------------------------------------------------------------
+// Derived images — where every copy lives and how it is made
+// ---------------------------------------------------------------------------
+
+/**
+ * A copy made FROM an original lives beside it, in the original's own
+ * bucket, at `derived/<name>/<original key minus extension>.<ext>`:
+ * `products/a/b/uuid.webp` → `derived/w640/products/a/b/uuid.webp`.
  *
  * Derived from the key, so no database column records it: originals are
- * immutable (a replace mints a new key), hence so is their share image,
- * and both cache forever. `derived/` objects are never referenced by a row —
+ * immutable (a replace mints a new key), hence so are their copies, and all
+ * of them cache forever. `derived/` objects are never referenced by a row —
  * the media audit counts them as belonging to their source key.
  */
 export const DERIVED_PREFIX = "derived/";
 
-export function shareImageKey(key: string): string {
-  return `${DERIVED_PREFIX}share/${key.replace(/\.[A-Za-z0-9]+$/, "")}.jpg`;
+interface Derivative {
+  ext: string;
+  contentType: string;
+  render: (original: Buffer) => Promise<Buffer>;
+}
+
+const sized = (width: ImageWidth): Derivative => ({
+  ext: "webp",
+  contentType: "image/webp",
+  render: (original) => renderSizedImage(original, width),
+});
+
+/** Every kind of derived image. A new preset is one entry here. */
+const DERIVATIVES = {
+  share: { ext: "jpg", contentType: "image/jpeg", render: renderShareImage },
+  w320: sized(320),
+  w640: sized(640),
+  w960: sized(960),
+  w1280: sized(1280),
+} satisfies Record<string, Derivative>;
+
+export type DerivativeName = keyof typeof DERIVATIVES;
+
+/** The sized copies, smallest first. */
+export const SIZED_DERIVATIVES: readonly DerivativeName[] = IMAGE_WIDTHS.map(
+  (width) => `w${width}` as const,
+);
+
+/** Every derived image — what a stored image gets on upload. */
+export const ALL_DERIVATIVES = Object.keys(DERIVATIVES) as DerivativeName[];
+
+export function derivative(name: DerivativeName): Derivative {
+  return DERIVATIVES[name];
+}
+
+export function derivedKey(name: DerivativeName, key: string): string {
+  return `${DERIVED_PREFIX}${name}/${key.replace(/\.[A-Za-z0-9]+$/, "")}.${DERIVATIVES[name].ext}`;
 }
 
 /**
@@ -162,7 +235,9 @@ export function shareImagePath(bucket: MediaBucket, key: string): string {
 export const SHARE_URL_SUFFIX = ".jpg";
 
 /**
- * Keys the share endpoint will render: an ordinary object key (no `derived/`
- * recursion, no `..`, no odd characters) with an image extension.
+ * Keys the image endpoints derive from: an ordinary object key (no
+ * `derived/` recursion, no `..`, no odd characters) with an image extension.
+ * Its source is also published in `/public/media-config`, so the storefront
+ * asks for sized copies of exactly the keys the server accepts.
  */
-export const SHAREABLE_KEY = /^(?!derived\/)(?!.*\.\.)[A-Za-z0-9_-]+(?:\/[A-Za-z0-9._-]+)*\.(?:jpe?g|png|webp|avif)$/;
+export const SOURCE_IMAGE_KEY = /^(?!derived\/)(?!.*\.\.)[A-Za-z0-9_-]+(?:\/[A-Za-z0-9._-]+)*\.(?:jpe?g|png|webp|avif)$/;

@@ -5,6 +5,7 @@ import { Dialog } from '../../../../shared/ui/Dialog'
 import { formatPrice, storeCatalogApi } from '../../../features/stores/storesApi'
 import type { GroupCandidate } from '../../../features/stores/storesApi'
 import { BoxIcon, SearchIcon } from '../../../layout/icons'
+import { MediaImg } from '../../../../shared/media/MediaImg'
 
 /**
  * "Select products" — the store's own products as the values of an option.
@@ -147,7 +148,8 @@ export function GroupMemberPicker({
                     className="h-4 w-4 accent-[var(--brand)]"
                   />
                   {row.imageUrl ? (
-                    <img
+                    <MediaImg
+                      sizes="40px"
                       src={row.imageUrl}
                       alt=""
                       className="h-10 w-10 shrink-0 rounded-md border border-line object-cover"

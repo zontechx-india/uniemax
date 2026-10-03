@@ -14,6 +14,7 @@ import {
 } from '../../ui/format'
 import { ExternalIcon } from '../../layout/icons'
 import { ProductVisibilityDialog } from './ProductVisibilityDialog'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
  * One seller listing in full, opened over whichever list led to it (the
@@ -308,7 +309,8 @@ function Gallery({ media, name }: { media: ProductDetail['media']; name: string 
         {current.type === 'VIDEO' ? (
           <video src={current.url ?? undefined} controls className="aspect-square w-full object-contain" />
         ) : (
-          <img
+          <MediaImg
+            sizes="(min-width: 768px) 420px, 100vw"
             src={current.url ?? undefined}
             alt={current.altText ?? name}
             className="aspect-square w-full object-contain"
@@ -333,7 +335,7 @@ function Gallery({ media, name }: { media: ProductDetail['media']; name: string 
                   Video
                 </span>
               ) : (
-                <img src={item.url ?? undefined} alt="" className="h-full w-full object-cover" loading="lazy" />
+                <MediaImg sizes="64px" src={item.url ?? undefined} alt="" className="h-full w-full object-cover" loading="lazy" />
               )}
             </button>
           ))}

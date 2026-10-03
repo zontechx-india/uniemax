@@ -68,6 +68,11 @@ Rules:
   *beside* a primary (Add to Cart next to Buy Now).
 - All three fills are cut from the **store owner's** primary via the `--cta-*` stops in
   `storeVars()` — never hardcode a gradient or a brand color in a component.
+- **Never a bare `<img>` for a stored image.** Product photos, logos and banners are drawn
+  with `shared/media/MediaImg.tsx` — `<MediaImg src sizes>`, where `sizes` says how wide
+  it is drawn (`"48px"`, `"(min-width: 1024px) 25vw, 50vw"`). It offers the server's
+  sized copies so phones never download the 1920 px original. Bare `<img>` only for
+  local `blob:` previews and static assets.
 
 ## SEO Conventions (summary — full detail in docs/SEO.md)
 

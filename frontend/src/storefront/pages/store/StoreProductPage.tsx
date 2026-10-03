@@ -58,6 +58,7 @@ import {
   TruckIcon,
 } from '../../layout/icons'
 import type { Skin } from '../../features/publicStore/storeTheme'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
  * `/store/{storeSlug}/product/{productSlug}` — full product detail.
@@ -774,7 +775,7 @@ function StickyBuyBar({
           className={`hidden h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md sm:flex ${skin.well}`}
         >
           {image ? (
-            <img src={image} alt="" className="h-full w-full object-cover" />
+            <MediaImg sizes="48px" src={image} alt="" className="h-full w-full object-cover" />
           ) : (
             <BoxIcon className="h-6 w-6" />
           )}
@@ -909,7 +910,8 @@ function MediaGallery({
                   </span>
                 ) : (
                   item.url && (
-                    <img
+                    <MediaImg
+                      sizes="80px"
                       src={item.url}
                       alt=""
                       loading="lazy"
@@ -948,7 +950,10 @@ function MediaGallery({
             className="h-full w-full bg-black object-contain"
           />
         ) : (
-          <img
+          <MediaImg
+            // Desktop hover-zoom draws the photo at 1.9× its box, so desktops
+            // take the full original; phones (no zoom) get a sized copy.
+            sizes="(min-width: 1024px) 95vw, 100vw"
             src={active.url}
             alt={active.altText ?? product.name}
             decoding="async"

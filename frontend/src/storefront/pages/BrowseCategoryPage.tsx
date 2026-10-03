@@ -12,6 +12,7 @@ import { CONTENT_COLUMN } from '../layout/contentWidth'
 import { MarketChrome } from '../layout/MarketChrome'
 import { BoxIcon } from '../layout/icons'
 import { buttonClass } from '../../shared/ui/Button'
+import { MediaImg } from '../../shared/media/MediaImg'
 
 /**
  * `/c/{slug}` — a **global category landing page**.
@@ -293,7 +294,8 @@ function ProductCard({ product }: { product: MarketProduct }) {
       >
         <div className="flex aspect-square items-center justify-center overflow-hidden bg-bg">
           {product.image?.url ? (
-            <img
+            <MediaImg
+              sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
               src={product.image.url}
               alt={product.image.altText ?? product.name}
               loading="lazy"

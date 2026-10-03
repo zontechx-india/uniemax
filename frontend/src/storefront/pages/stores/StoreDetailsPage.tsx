@@ -13,6 +13,7 @@ import { storesApi } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import { ImageIcon } from '../../layout/icons'
 import { Button } from '../../../shared/ui/Button'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
  * Store Details section — name plus the store logo. The logo flow is
@@ -125,7 +126,8 @@ function LogoField() {
       </span>
       <div className="flex items-center gap-4">
         {store.logoUrl ? (
-          <img
+          <MediaImg
+            sizes="80px"
             src={store.logoUrl}
             alt={`${store.name} logo`}
             className="h-20 w-20 shrink-0 rounded-md border border-line object-cover"

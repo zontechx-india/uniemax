@@ -21,6 +21,7 @@ import {
   TrashIcon,
 } from '../../layout/icons'
 import { ActiveSwitch } from './ActiveSwitch'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
  * Categories section of the store manage page — first step of the hierarchy
@@ -576,7 +577,8 @@ function CategoryRow({
       </div>
 
       {category.imageUrl ? (
-        <img
+        <MediaImg
+          sizes="36px"
           src={category.imageUrl}
           alt=""
           className={`shrink-0 rounded-md border border-line object-cover ${

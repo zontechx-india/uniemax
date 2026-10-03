@@ -17,6 +17,7 @@ import {
   StoreIcon,
 } from '../../layout/icons'
 import { useStoreManageScope } from '../../features/stores/storeManageScope'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
  * Store management — Flipkart-account style split inside the app's main
@@ -187,7 +188,8 @@ export function StoreManageLayout() {
             }`}
           >
             {store.logoUrl ? (
-              <img
+              <MediaImg
+                sizes="44px"
                 src={store.logoUrl}
                 alt=""
                 title={rail ? store.name : undefined}

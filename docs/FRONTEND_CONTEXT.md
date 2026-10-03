@@ -2227,8 +2227,20 @@ frontend/
     │   │   └── googleMaps.ts     # Maps JS API script loader (VITE_GOOGLE_MAPS_API_KEY,
     │   │                         #   minimal typings) + googleMapsLink() builder
     │   ├── share.ts              # shareOrCopy + copyToClipboard (native sheet / clipboard)
-    │   ├── media/                # Upload building blocks (logo + product media)
-    │   │   ├── mediaConfig.ts    # Server upload rules (/public/media-config) +
+    │   ├── media/                # Showing stored images + upload building blocks
+    │   │   ├── MediaImg.tsx      # THE way to draw a stored image (product photo,
+    │   │   │                     #   logo, banner): <MediaImg src sizes> adds a
+    │   │   │                     #   srcset of the server's sized copies so the
+    │   │   │                     #   browser downloads the copy that fits. `sizes`
+    │   │   │                     #   is required — state how wide it is drawn.
+    │   │   │                     #   Bare <img> only for local previews (blob:)
+    │   │   │                     #   and static assets
+    │   │   ├── imageSrcSet.ts    # srcset builder from `images` in media-config
+    │   │   │                     #   (widths, per-bucket URL roots, key pattern);
+    │   │   │                     #   anything not stored by us → undefined (as is)
+    │   │   ├── mediaConfig.ts    # /public/media-config: upload rules + image
+    │   │   │                     #   delivery; fetched once at boot (main.tsx),
+    │   │   │                     #   read synchronously after (useMediaConfig);
     │   │   │                     #   validateFile/acceptAttr/ruleHint helpers
     │   │   ├── cropImage.ts      # Canvas rotate/crop/downscale → WebP (≤1600px,
     │   │   │                     #   q0.85); `prepareImage` is the no-crop path and

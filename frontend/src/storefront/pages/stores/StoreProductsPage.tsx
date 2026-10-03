@@ -25,6 +25,7 @@ import { ShopNotLiveNudge } from './StorePublishCard'
 import { ProductWizard } from './products/wizard/ProductWizard'
 import type { StepKey } from './products/wizard/shared'
 import { Button, buttonClass } from '../../../shared/ui/Button'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
  * Products section of the store manage page.
@@ -446,7 +447,8 @@ function ProductRow({
           completeness nudge into a column a few words wide. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 sm:flex-nowrap">
         {cover ? (
-          <img
+          <MediaImg
+            sizes="40px"
             src={cover}
             alt=""
             className={`h-10 w-10 shrink-0 rounded-md border border-line object-cover ${

@@ -35,6 +35,7 @@ import { RevalidationNote } from './CartPage'
 import { CheckoutSteps } from './CheckoutSteps'
 import type { CheckoutState } from './CheckoutSteps'
 import { StoreLogo } from './StoreLogo'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
  * Per-store order page (/checkout/{storeSlug}) — target of a store group's
@@ -564,7 +565,8 @@ function OrderLine({
   return (
     <li className="flex items-center gap-3 py-3.5">
       {item.imageUrl ? (
-        <img
+        <MediaImg
+          sizes="48px"
           src={item.imageUrl}
           alt={item.name}
           loading="lazy"

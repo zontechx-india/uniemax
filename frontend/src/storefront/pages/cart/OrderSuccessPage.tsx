@@ -31,6 +31,7 @@ import {
   MapPinIcon,
   PhoneCallIcon,
 } from '../../layout/icons'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /** How long after placing the page still greets the buyer with "Order placed!". */
 const FRESH_MS = 30 * 60 * 1000
@@ -367,7 +368,8 @@ export function OrderSuccessPage({
                 {order.items.map((item) => (
                   <li key={item.id} className="flex items-center gap-3 py-3.5">
                     {item.imageUrl ? (
-                      <img
+                      <MediaImg
+                        sizes="48px"
                         src={item.imageUrl}
                         alt={item.productName}
                         loading="lazy"

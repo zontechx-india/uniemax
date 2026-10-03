@@ -7,7 +7,16 @@ import { mediaRules, storageConfig } from "./config.js";
 import type { MediaKind } from "./config.js";
 import { createLocalDriver, localRoot } from "./drivers/local.js";
 import { createS3Driver } from "./drivers/s3.js";
-import { normalizeImage, renderShareImage, shareImageKey } from "./images.js";
+import {
+  ALL_DERIVATIVES,
+  IMAGE_WIDTHS,
+  MAX_EDGE,
+  SOURCE_IMAGE_KEY,
+  derivative,
+  derivedKey,
+  normalizeImage,
+  type DerivativeName,
+} from "./images.js";
 import type { MediaBucket, StorageDriver } from "./types.js";
 
 /**
@@ -21,8 +30,10 @@ import type { MediaBucket, StorageDriver } from "./types.js";
  *     configured size/type rules for that media kind, and normalizes images
  *     (upright, size-capped, WebP — `images.ts`) whatever client sent them
  *   - `newObjectKey(prefix, contentType)` — collision-free key generation
- *   - `getShareImage` / `warmShareImage` — the small JPEG link previews use,
- *     generated once per original and stored beside it (`images.ts`)
+ *   - `getDerivedImage` / `warmDerivedImages` — copies made from an original
+ *     (link-preview JPEG, sized copies for `srcset`), generated once and
+ *     stored beside it (`images.ts`)
+ *   - `imageDelivery()` — where sized copies are served, for clients
  *   - `mediaRules` — the configured limits (also served to clients via the
  *     public /media-config endpoint, so UI hints always match the server)
  *
@@ -34,13 +45,16 @@ export { mediaRules } from "./config.js";
 export type { MediaKind } from "./config.js";
 export type { MediaBucket, StorageDriver } from "./types.js";
 export {
+  ALL_DERIVATIVES,
   DERIVED_PREFIX,
-  SHAREABLE_KEY,
+  IMAGE_WIDTHS,
+  SIZED_DERIVATIVES,
+  SOURCE_IMAGE_KEY,
   SHARE_URL_SUFFIX,
   normalizeImage,
-  shareImageKey,
   shareImagePath,
 } from "./images.js";
+export type { DerivativeName, ImageWidth } from "./images.js";
 
 export const storage: StorageDriver =
   storageConfig.driver === "s3" ? createS3Driver() : createLocalDriver();
@@ -164,55 +178,111 @@ export async function readUpload(
 }
 
 // ---------------------------------------------------------------------------
-// Share images (link previews)
+// Derived images (link-preview JPEG, sized copies) — images.ts decides what
+// they look like; this is where they are read, rendered and stored.
 // ---------------------------------------------------------------------------
 
-/** Concurrent requests for one share image render it once. */
-const shareInFlight = new Map<string, Promise<Buffer | null>>();
+/** Concurrent requests for one derived image render it once. */
+const derivedInFlight = new Map<string, Promise<Buffer | null>>();
 
 /**
- * The share image (small JPEG for `og:image`) of a stored image: read from
- * its derived key, or rendered from the original and stored there on first
- * request — so it exists for every image, including ones uploaded before
- * share images did. `null` when the original does not exist.
+ * A derived image of a stored original: read from its derived key, or
+ * rendered from the original and stored there on first request — so it
+ * exists for every image, including ones stored before that kind of copy
+ * did. `null` when the original does not exist. Pass `original` when the
+ * caller already holds its bytes, to skip reading it back.
  */
-export function getShareImage(bucket: MediaBucket, key: string): Promise<Buffer | null> {
-  const id = `${bucket}:${key}`;
-  let pending = shareInFlight.get(id);
+export function getDerivedImage(
+  bucket: MediaBucket,
+  key: string,
+  name: DerivativeName,
+  original?: Buffer,
+): Promise<Buffer | null> {
+  const id = `${bucket}:${name}:${key}`;
+  let pending = derivedInFlight.get(id);
   if (!pending) {
-    pending = buildShareImage(bucket, key).finally(() => shareInFlight.delete(id));
-    shareInFlight.set(id, pending);
+    pending = buildDerivedImage(bucket, key, name, original).finally(() =>
+      derivedInFlight.delete(id),
+    );
+    derivedInFlight.set(id, pending);
   }
   return pending;
 }
 
-async function buildShareImage(bucket: MediaBucket, key: string): Promise<Buffer | null> {
-  const derived = shareImageKey(key);
-  const existing = await storage.get(bucket, derived);
+async function buildDerivedImage(
+  bucket: MediaBucket,
+  key: string,
+  name: DerivativeName,
+  original?: Buffer,
+): Promise<Buffer | null> {
+  const target = derivedKey(name, key);
+  const existing = await storage.get(bucket, target);
   if (existing) return existing;
 
-  const original = await storage.get(bucket, key);
-  if (!original) return null;
-  const rendered = await renderShareImage(original);
-  await storage.put(bucket, derived, rendered, "image/jpeg");
+  const source = original ?? (await storage.get(bucket, key));
+  if (!source) return null;
+  const { render, contentType } = derivative(name);
+  const rendered = await render(source);
+  await storage.put(bucket, target, rendered, contentType);
   return rendered;
 }
 
 /**
- * Render a new upload's share image in the background, so the first person
- * to share the link is not the one who waits for it. Never fails the upload:
- * the share endpoint renders on demand anyway.
+ * Every derived image of an original, one after another (bounded CPU, the
+ * original read at most once). Resolves to false when the original is gone.
  */
-export function warmShareImage(
+export async function ensureDerivedImages(
   bucket: MediaBucket,
   key: string,
-  log: { warn: (obj: object, msg: string) => void } = {
-    warn: (obj, msg) => console.warn(msg, obj),
-  },
-): void {
-  getShareImage(bucket, key).catch((err: unknown) =>
-    log.warn({ err, bucket, key }, "share image: background render failed"),
+  names: readonly DerivativeName[],
+  original?: Buffer,
+): Promise<boolean> {
+  let source = original;
+  for (const name of names) {
+    source ??= (await storage.get(bucket, key)) ?? undefined;
+    if (!source) return false;
+    await getDerivedImage(bucket, key, name, source);
+  }
+  return true;
+}
+
+/**
+ * Stores a file read by `readUpload` — the one way an upload reaches the
+ * bucket. For an image it also starts rendering every derived copy in the
+ * background, so the first visitor (or the first WhatsApp share) does not
+ * wait for them. That never fails the upload: the image endpoints render on
+ * demand anyway.
+ */
+export async function storeUpload(
+  bucket: MediaBucket,
+  key: string,
+  file: Pick<UploadedFile, "buffer" | "contentType" | "kind">,
+): Promise<void> {
+  await storage.put(bucket, key, file.buffer, file.contentType);
+  if (file.kind === "video") return;
+  ensureDerivedImages(bucket, key, ALL_DERIVATIVES, file.buffer).catch((err: unknown) =>
+    console.warn("derived images: background render failed", { err, bucket, key }),
   );
+}
+
+/**
+ * How clients reach sized copies — published in `/public/media-config`.
+ * A stored image's public URL is `root + key`; its copy `width` px wide is
+ * `GET /api/v1/public/images/w/{width}/{bucket}/{key}` for any key matching
+ * `keyPattern`. `maxWidth` is the most an original in that bucket can be
+ * (the upload cap), i.e. the `srcset` width of the original itself.
+ */
+export function imageDelivery() {
+  const buckets: MediaBucket[] = ["media", "logo"];
+  return {
+    widths: IMAGE_WIDTHS,
+    keyPattern: SOURCE_IMAGE_KEY.source,
+    sources: buckets.map((bucket) => ({
+      bucket,
+      root: storage.publicUrl(bucket, ""),
+      maxWidth: bucket === "logo" ? MAX_EDGE.logo : MAX_EDGE.image,
+    })),
+  };
 }
 
 /**

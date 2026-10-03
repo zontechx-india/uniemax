@@ -48,6 +48,7 @@ import {
   SECTION_PADDING,
 } from '../layout/contentWidth'
 import { buttonClass } from '../../shared/ui/Button'
+import { MediaImg } from '../../shared/media/MediaImg'
 
 /**
  * Marketplace homepage (`/`) — the platform's public entry point. Not a
@@ -495,7 +496,8 @@ function SearchResultsPanel({
               onPick={() => onPick(`/store/${store.slug}`)}
               icon={
                 store.logoUrl ? (
-                  <img
+                  <MediaImg
+                    sizes="36px"
                     src={store.logoUrl}
                     alt=""
                     className="h-9 w-9 rounded-md object-cover"
@@ -549,7 +551,8 @@ function SearchResultsPanel({
               }
               icon={
                 product.image?.url ? (
-                  <img
+                  <MediaImg
+                    sizes="36px"
                     src={product.image.url}
                     alt={product.image.altText ?? ''}
                     className="h-9 w-9 rounded-md object-cover"
@@ -899,7 +902,8 @@ function StoreLogoTile({
 }) {
   if (logoUrl) {
     return (
-      <img
+      <MediaImg
+        sizes="96px"
         src={logoUrl}
         alt=""
         loading="lazy"
@@ -1128,7 +1132,8 @@ function StorePreview({ images }: { images: string[] }) {
 
 function Cover({ url }: { url: string }) {
   return (
-    <img
+    <MediaImg
+      sizes="(min-width: 640px) 220px, 50vw"
       src={url}
       alt=""
       loading="lazy"
@@ -1328,7 +1333,8 @@ function ProductCard({ product }: { product: MarketProduct }) {
           the divider below it doesn't scale along. */}
       <div className="aspect-square w-full overflow-hidden border-b border-line bg-surface-alt">
         {product.image?.url ? (
-          <img
+          <MediaImg
+            sizes="(min-width: 1024px) 20vw, (min-width: 640px) 33vw, 50vw"
             src={product.image.url}
             alt={product.image.altText ?? product.name}
             loading="lazy"

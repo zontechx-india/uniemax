@@ -1235,7 +1235,21 @@ the next image.
 
 The upload rules the server enforces, for client-side hints + pre-upload
 validation: `{ image | video | logo: { maxMB, contentTypes[] } }` — driven by
-the `MEDIA_MAX_*_MB` / `MEDIA_*_TYPES` env vars. Every upload is also checked
+the `MEDIA_MAX_*_MB` / `MEDIA_*_TYPES` env vars — plus `images`, where
+sized copies of stored images are served (see [Sized images](#get-apiv1publicimageswwidthbucketkey)):
+
+```jsonc
+"images": {
+  "widths": [320, 640, 960, 1280],   // the only widths served
+  "keyPattern": "^(?!derived\\/)…$",   // RegExp source: keys that have sized copies
+  "sources": [                       // a stored image's URL is root + key
+    { "bucket": "media", "root": "https://…/product_media/", "maxWidth": 1920 },
+    { "bucket": "logo",  "root": "https://…/store_logo/",    "maxWidth": 1024 }
+  ]                                  // maxWidth = the upload cap = the original's srcset width
+}
+```
+
+Every upload is also checked
 **by its bytes**: a file whose magic bytes are not one of the allowed types is
 `400` whatever mimetype it declares (e.g. HTML/SVG renamed to `.png`), and a
 mislabelled but valid file is read as the type it really is.
@@ -2026,7 +2040,7 @@ Capped at 50,000 URLs per file (the protocol limit).
 
 ---
 
-## Share images — `/api/v1/public/images` (no auth)
+## Image derivatives — `/api/v1/public/images` (no auth)
 
 > Why they exist and where they are used: [`SEO.md`](./SEO.md).
 
@@ -2049,6 +2063,25 @@ background.
 | `200` | The image |
 | `404` | No original at that key |
 | `422` | Unknown bucket, a path not ending in `.jpg`, or not a plain image key (`derived/…`, `..`, non-image extension) |
+
+### `GET /api/v1/public/images/w/:width/:bucket/{key}`
+A stored image **`:width` px wide** (never enlarged), for `srcset`.
+`:width` is one of `images.widths` from `/public/media-config` (320, 640,
+960, 1280); `:bucket` + `{key}` are the original's, read off its URL with
+`images.sources` (`url = root + key`). The storefront's `MediaImg` builds
+these; nothing else needs to.
+
+Answers `image/webp`, upright, `cache-control: public, max-age=31536000,
+immutable`. Rendered from the original on the **first** request and stored
+at `derived/w{width}/<key minus extension>.webp` in the same bucket; later
+requests read the stored copy. Every image upload renders all widths (and the
+share image) in the background.
+
+| Status | When |
+| --- | --- |
+| `200` | The image |
+| `404` | No original at that key |
+| `422` | A width not in the list, unknown bucket, or not a plain image key (`derived/…`, `..`, non-image extension) |
 
 ---
 

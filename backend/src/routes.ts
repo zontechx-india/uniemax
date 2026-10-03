@@ -5,7 +5,7 @@ import {
   requireAdmin,
   requireAdminCsrf,
 } from "./package/auth/index.js";
-import { mediaRules } from "./package/storage/index.js";
+import { imageDelivery, mediaRules } from "./package/storage/index.js";
 import { ok } from "./utils/response.js";
 import { healthRoutes } from "./modules/health/health.routes.js";
 import {
@@ -98,25 +98,27 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       // /api proxy serves them without a new location block on every vhost —
       // frontend/public/robots.txt points a crawler at the index.
       await api.register(publicSeoRoutes, { prefix: "/public" });
-      // Image derivatives — the small JPEG link previews use (og:image),
-      // rendered from the original on first request and stored beside it.
+      // Image derivatives — link-preview JPEGs (og:image) and sized copies
+      // (srcset), rendered from the original on first request, stored beside it.
       await api.register(publicMediaRoutes, { prefix: "/public/images" });
       // Marketplace homepage banners — anonymous read of the active set.
       await api.register(publicBannerRoutes, { prefix: "/public/banners" });
       // Payment gateway callbacks (Cashfree webhook — signature-guarded).
       await api.register(paymentRoutes, { prefix: "/payments" });
 
-      // Upload rules (max sizes + allowed types) — read by clients so their
-      // hints and pre-upload validation always match the server's env config.
+      // Upload rules (max sizes + allowed types) and where sized copies of
+      // stored images are served — read by clients so their hints, pre-upload
+      // validation and srcset always match the server's config.
       api.get("/public/media-config", async () =>
-        ok(
-          Object.fromEntries(
+        ok({
+          ...Object.fromEntries(
             Object.entries(mediaRules).map(([kind, rule]) => [
               kind,
               { maxMB: rule.maxMB, contentTypes: rule.contentTypes },
             ]),
           ),
-        ),
+          images: imageDelivery(),
+        }),
       );
 
       // ---- Admin ------------------------------------------------------

@@ -3,6 +3,7 @@ import { cart, lineTotal } from '../../features/cart/cart'
 import type { CartItem } from '../../features/cart/cart'
 import { formatPrice, storeProductUrl } from '../../features/stores/storesApi'
 import { BoxIcon, MinusIcon, PlusIcon, TrashIcon } from '../../layout/icons'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
  * One cart line — shared by the grouped cart page (/cart) and the
@@ -19,7 +20,8 @@ export function CartLine({ item }: { item: CartItem }) {
   const productUrl = storeProductUrl(item.storeSlug, item.productSlug)
 
   const thumb = item.imageUrl ? (
-    <img
+    <MediaImg
+      sizes="56px"
       src={item.imageUrl}
       alt={item.name}
       loading="lazy"

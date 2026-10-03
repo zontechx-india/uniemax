@@ -26,6 +26,7 @@ import { ImageEditDialog } from '../../../shared/media/ImageEditDialog'
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import { ActiveSwitch } from './ActiveSwitch'
 import { GripIcon, ImageIcon, PlusIcon, TrashIcon } from '../../layout/icons'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
  * Banners section of Store Management — the promo carousel above the
@@ -495,7 +496,8 @@ function BannerCard({
         className={`group relative ${BANNER_FORMAT.aspect} w-full bg-surface-alt`}
       >
         {banner.imageUrl ? (
-          <img
+          <MediaImg
+            sizes="(min-width: 1024px) 50vw, 100vw"
             src={banner.imageUrl}
             alt=""
             className={`h-full w-full object-cover ${banner.isActive ? '' : 'opacity-50 grayscale'}`}

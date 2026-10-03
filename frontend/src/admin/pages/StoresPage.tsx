@@ -8,6 +8,7 @@ import type { Column } from '../ui/DataTable'
 import { FilterSelect, SearchInput, Tabs, Toolbar } from '../ui/Toolbar'
 import { SetupChip, StoreStatusChip } from '../ui/statusMeta'
 import { formatCount, formatDate, formatMoney } from '../ui/format'
+import { MediaImg } from '../../shared/media/MediaImg'
 
 /**
  * Stores and the sellers behind them.
@@ -35,7 +36,8 @@ export function StoreAvatar({
   size?: string
 }) {
   return logoUrl ? (
-    <img
+    <MediaImg
+      sizes="96px"
       src={logoUrl}
       alt=""
       className={`${size} shrink-0 rounded-pill border border-line object-cover`}

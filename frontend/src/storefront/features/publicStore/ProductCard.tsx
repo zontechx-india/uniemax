@@ -8,6 +8,7 @@ import {
 import { ImageIcon } from '../../layout/icons'
 import { StockBadge } from './CartControls'
 import type { Skin } from './storeTheme'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
  * Product listing card — used by every grid, rail and spotlight on the
@@ -136,7 +137,8 @@ function ProductMedia({
         } ${skin.well}`}
       >
         {product.image?.url ? (
-          <img
+          <MediaImg
+            sizes={large ? '(min-width: 1024px) 33vw, 100vw' : '(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw'}
             src={product.image.url}
             alt={product.image.altText ?? product.name}
             loading="lazy"

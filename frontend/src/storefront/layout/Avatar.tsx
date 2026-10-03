@@ -1,4 +1,5 @@
 import type { Customer } from '../../shared/auth/authApi'
+import { MediaImg } from '../../shared/media/MediaImg'
 
 /**
  * Customer avatar: the profile photo when set, otherwise a brand-tinted
@@ -13,7 +14,8 @@ export function Avatar({
 }) {
   if (customer.avatarUrl) {
     return (
-      <img
+      <MediaImg
+        sizes="96px"
         src={customer.avatarUrl}
         alt=""
         className={`shrink-0 rounded-full object-cover ring-2 ring-surface ${className}`}

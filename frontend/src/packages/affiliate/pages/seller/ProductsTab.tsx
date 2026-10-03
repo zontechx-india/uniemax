@@ -6,6 +6,7 @@ import { sellerAffiliateApi } from '../../api'
 import type { CommissionType, SellerProduct } from '../../api'
 import { Empty, Pager, inputClass, money, rateText, useLoad } from '../../ui'
 import { useSellerAffiliate } from './AffiliateLayout'
+import { MediaImg } from '../../../../shared/media/MediaImg'
 
 /** Which products partners may promote, and any product-specific rate. */
 export function ProductsTab() {
@@ -78,7 +79,7 @@ function ProductRow({
     <li className={`rounded-lg border border-line p-3 ${product.enabled ? '' : 'opacity-70'}`}>
       <div className="flex items-center gap-3">
         {product.imageUrl ? (
-          <img src={product.imageUrl} alt="" className="h-11 w-11 shrink-0 rounded-md object-cover" />
+          <MediaImg sizes="44px" src={product.imageUrl} alt="" className="h-11 w-11 shrink-0 rounded-md object-cover" />
         ) : (
           <div className="h-11 w-11 shrink-0 rounded-md bg-surface-alt" />
         )}

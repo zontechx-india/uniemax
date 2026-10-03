@@ -6,6 +6,7 @@ import { Card, CardHeader, Chip, Detail, ErrorState, PageHeader, Skeleton } from
 import { OrderStatusChip, PaymentChip } from '../ui/statusMeta'
 import { formatDateTime, formatMoneyExact } from '../ui/format'
 import { BackIcon } from '../layout/icons'
+import { MediaImg } from '../../shared/media/MediaImg'
 
 /**
  * One order, everything known about it — the page a support conversation is
@@ -110,7 +111,8 @@ export default function OrderDetailPage() {
               {order.items.map((item) => (
                 <li key={item.id} className="flex items-center gap-3 py-3">
                   {item.imageUrl ? (
-                    <img
+                    <MediaImg
+                      sizes="48px"
                       src={item.imageUrl}
                       alt=""
                       className="h-12 w-12 shrink-0 rounded-md border border-line object-cover"

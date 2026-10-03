@@ -14,6 +14,7 @@ import {
   Skeleton,
   TextInput,
 } from '../ui/primitives'
+import { MediaImg } from '../../shared/media/MediaImg'
 
 /**
  * The GLOBAL category taxonomy — one hierarchy every store on the platform
@@ -433,7 +434,8 @@ function CategoryRow({
       </div>
 
       {node.imageUrl ? (
-        <img
+        <MediaImg
+          sizes="32px"
           src={node.imageUrl}
           alt=""
           className="h-8 w-8 shrink-0 rounded-md border border-line object-cover"

@@ -5,6 +5,7 @@ import { ErrorNote } from '../../../../shared/ui/form'
 import { CHANNELS, partnerApi } from '../../api'
 import type { AffiliateLink, Channel, PartnerProduct, PartnerStore } from '../../api'
 import { CopyButton, Empty, Pager, StatusChip, inputClass, money, rateText, useLoad } from '../../ui'
+import { MediaImg } from '../../../../shared/media/MediaImg'
 
 /** Pick a store, browse what it lets you promote, get a link for it. */
 export function StoresPage() {
@@ -126,7 +127,7 @@ function ProductRow({
   return (
     <li className="flex items-center gap-3 rounded-lg border border-line p-3">
       {product.imageUrl ? (
-        <img src={product.imageUrl} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" />
+        <MediaImg sizes="48px" src={product.imageUrl} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" />
       ) : (
         <div className="h-12 w-12 shrink-0 rounded-md bg-surface-alt" />
       )}

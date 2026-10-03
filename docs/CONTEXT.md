@@ -613,7 +613,7 @@ dedicated store policy pages (policy links are already supported in
 the footer), and additional configuration.
 
 **SEO still to come** — feeds for Google Merchant Center and the Meta
-catalog, image sizes, reviews, seller-editable SEO fields, more landing
+catalog, reviews, seller-editable SEO fields, more landing
 pages and seller sharing tools — is the roadmap in [SEO.md](./SEO.md). (Footer/business
 info, bank accounts, payment + shipping + checkout settings, customer
 addresses, order placement, and seller order management — confirm → pack

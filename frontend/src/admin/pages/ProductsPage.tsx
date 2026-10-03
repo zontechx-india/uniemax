@@ -11,6 +11,7 @@ import { ActiveChip } from '../ui/statusMeta'
 import { formatCount, formatPriceRange } from '../ui/format'
 import { ProductDetailDialog } from './products/ProductDetailDialog'
 import { ProductVisibilityDialog } from './products/ProductVisibilityDialog'
+import { MediaImg } from '../../shared/media/MediaImg'
 
 /**
  * The catalog across every store — inventory oversight plus the one
@@ -59,7 +60,8 @@ export default function ProductsPage() {
       cell: (product) => (
         <div className="flex min-w-0 items-center gap-2.5">
           {product.imageUrl ? (
-            <img
+            <MediaImg
+              sizes="36px"
               src={product.imageUrl}
               alt=""
               className="h-9 w-9 shrink-0 rounded-md border border-line object-cover"

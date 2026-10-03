@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useSyncExternalStore } from 'react'
 import { call, http } from '../auth/http'
 
 /**
- * Upload rules (max sizes + allowed types) as configured on the BACKEND —
- * fetched once from /api/v1/public/media-config so the hints shown next to
- * upload fields and the client-side pre-upload validation can never drift
- * from what the server actually enforces.
+ * Upload rules (max sizes + allowed types) and image delivery (where sized
+ * copies of stored images are served) as configured on the BACKEND —
+ * fetched once from /api/v1/public/media-config so upload hints, pre-upload
+ * validation and every `srcset` can never drift from what the server does.
  */
 
 export interface MediaRule {
@@ -13,10 +13,22 @@ export interface MediaRule {
   contentTypes: string[]
 }
 
+/**
+ * A stored image's URL is `root + key`; its copy `width` px wide is served
+ * at `/api/v1/public/images/w/{width}/{bucket}/{key}` for keys matching
+ * `keyPattern`. `maxWidth` is the `srcset` width of the original itself.
+ */
+export interface ImageDelivery {
+  widths: number[]
+  keyPattern: string
+  sources: { bucket: string; root: string; maxWidth: number }[]
+}
+
 export interface MediaConfig {
   image: MediaRule
   video: MediaRule
   logo: MediaRule
+  images: ImageDelivery
 }
 
 /** Mirror of the backend defaults — used only if the config fetch fails. */
@@ -33,30 +45,40 @@ const FALLBACK: MediaConfig = {
     maxMB: 2,
     contentTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/avif'],
   },
+  // No sources: every image is shown as its plain original.
+  images: { widths: [], keyPattern: '^$', sources: [] },
 }
 
 let cached: Promise<MediaConfig> | null = null
+let loaded: MediaConfig | null = null
+const listeners = new Set<() => void>()
 
+/** Starts the one fetch (also kicked off at boot, beside the page's own data). */
 export function getMediaConfig(): Promise<MediaConfig> {
-  cached ??= call<MediaConfig>(http.get('/api/v1/public/media-config')).catch(
-    () => FALLBACK,
-  )
+  cached ??= call<MediaConfig>(http.get('/api/v1/public/media-config'))
+    .catch(() => FALLBACK)
+    .then((config) => {
+      loaded = config
+      listeners.forEach((notify) => notify())
+      return config
+    })
   return cached
 }
 
-/** The config, or null while loading (rules arrive within one round-trip). */
+function subscribe(notify: () => void) {
+  listeners.add(notify)
+  void getMediaConfig()
+  return () => {
+    listeners.delete(notify)
+  }
+}
+
+/**
+ * The config, or null until the one fetch lands. Synchronous once loaded, so
+ * components mounted later never render a loading pass.
+ */
 export function useMediaConfig(): MediaConfig | null {
-  const [config, setConfig] = useState<MediaConfig | null>(null)
-  useEffect(() => {
-    let cancelled = false
-    getMediaConfig().then((loaded) => {
-      if (!cancelled) setConfig(loaded)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-  return config
+  return useSyncExternalStore(subscribe, () => loaded)
 }
 
 /** Pre-upload validation — returns a user-facing error message, or null. */

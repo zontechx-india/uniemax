@@ -6,6 +6,7 @@ import type { PlacedOrder } from '../features/stores/storesApi'
 import { orderStatusCopy } from '../features/stores/orderStatus'
 import { BoxIcon, CartIcon, ChevronRightIcon } from '../layout/icons'
 import { buttonClass } from '../../shared/ui/Button'
+import { MediaImg } from '../../shared/media/MediaImg'
 
 /**
  * Orders (/orders) — the signed-in customer's order history, newest first.
@@ -142,7 +143,8 @@ export function OrdersPage() {
                 {order.items.map((item) => (
                   <li key={item.id} className="flex items-center gap-3 py-3">
                     {item.imageUrl ? (
-                      <img
+                      <MediaImg
+                        sizes="44px"
                         src={item.imageUrl}
                         alt={item.productName}
                         loading="lazy"

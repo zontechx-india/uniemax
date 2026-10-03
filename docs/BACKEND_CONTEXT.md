@@ -65,10 +65,11 @@ backend/
 │   │   └── errorHandler.ts    # Central error + 404 handler
 │   ├── package/               # Self-contained sub-systems (extraction-ready)
 │   │   ├── storage/           # Provider-agnostic media storage — see "Media storage"
-│   │   │   ├── index.ts       #   facade: storage driver, readUpload, mediaRules,
-│   │   │   │                  #     share images, registerStoragePlugins
+│   │   │   ├── index.ts       #   facade: storage driver, readUpload, storeUpload,
+│   │   │   │                  #     derived images, imageDelivery, mediaRules,
+│   │   │   │                  #     registerStoragePlugins
 │   │   │   ├── images.ts      #   image rules (sharp): normalize uploads, render
-│   │   │   │                  #     share images, derived keys — see "Media storage"
+│   │   │   │                  #     share images + sized copies, derived keys
 │   │   │   ├── config.ts      #   own env parsing
 │   │   │   ├── types.ts       #   StorageDriver port (put / get / remove / publicUrl)
 │   │   │   └── drivers/       #   s3.ts (AWS) · local.ts (dev, served at /uploads)
@@ -134,9 +135,9 @@ backend/
 │   │   ├── seo/               # XML sitemaps + page shells (root-level
 │   │   │                      #   GET /store/*, /c/* serving index.html with
 │   │   │                      #   the page's head). Design: docs/SEO.md
-│   │   ├── media/             # GET /public/images/share/:bucket/{key}.jpg —
-│   │   │                      #   link-preview JPEGs (og:image); rendering and
-│   │   │                      #   storage live in package/storage
+│   │   ├── media/             # GET /public/images/share/… (og:image JPEGs) and
+│   │   │                      #   /public/images/w/:width/… (srcset copies);
+│   │   │                      #   rendering and storage live in package/storage
 │   │   ├── notifications/     # feed + push subscriptions (one handler set,
 │   │   │                      #   guard picks the principal) + notify()/
 │   │   │                      #   notifyAdmins() dispatch + admin broadcast
@@ -168,7 +169,7 @@ backend/
 │   │   │                      # categoryPresets.ts — its option/spec suggestions
 │   │   ├── generatePushKeys.ts# VAPID key pair (npm run push-keys)
 │   │   ├── auditMedia.ts      # S3 objects vs DB media keys, per env + merged (npm run audit-media)
-│   │   └── optimizeMedia.ts   # bring stored images up to the upload rules + render share images (npm run optimize-media)
+│   │   └── optimizeMedia.ts   # bring stored images up to the upload rules + render their derived images (npm run optimize-media)
 │   ├── utils/                 # response, slug, httpError, zodHelpers, logger, password
 │   └── generated/prisma/      # Prisma client (generated, git-ignored)
 └── .env                       # runtime, DB, JWT, cookie, OTP config (see Environment below)
@@ -355,16 +356,31 @@ photo). `npm run optimize-media` applies the same function to images stored
 earlier (new key + compare-and-swap on the row; the old object is kept for
 order snapshots and caches).
 
-**Share images** are the second output: a preview-safe JPEG (≤ 1200 px,
-white behind transparency, under ~300 KB) of a product cover or store logo,
-used as `og:image` because WhatsApp drops preview images it cannot fetch
-quickly. Stored beside the original at a key derived from it
-(`derived/share/<key>.jpg`, no DB column — originals are immutable, so is
-their share image), rendered on the first request to
-`GET /api/v1/public/images/share/:bucket/{key}.jpg` (`modules/media`) and
-warmed in the background after a cover/logo upload. `audit-media` judges a
-`derived/` object by its source image. Why and where they are used:
-[`SEO.md`](./SEO.md).
+**Derived images** are copies made from an original, all declared in one
+registry (`DERIVATIVES` in `images.ts`; a new preset is one entry):
+
+- **share** — a preview-safe JPEG (≤ 1200 px, white behind transparency,
+  under ~300 KB), used as `og:image` because WhatsApp drops preview images
+  it cannot fetch quickly. Why and where: [`SEO.md`](./SEO.md).
+- **w320 / w640 / w960 / w1280** — the image at that width as WebP, the
+  `srcset` candidates the storefront's `MediaImg` offers, so a phone grid
+  downloads a 320 px copy instead of the 1920 px original. The widths are a
+  fixed list: an open-ended size would let anyone fill the bucket.
+
+Each lives beside its original at `derived/<name>/<key minus extension>.<ext>`
+(no DB column — originals are immutable, so are their copies) and is made by
+one function, `getDerivedImage`: read the stored copy, else render it from
+the original and store it (concurrent requests share one render). So every
+copy exists for every image, including ones stored before that copy did.
+Served by `modules/media` (`/public/images/share/…`, `/public/images/w/…`).
+`audit-media` judges a `derived/` object by its source image.
+
+**Every upload is written with `storeUpload`**, never `storage.put` directly:
+it stores the file and, for an image, renders all its derived images in the
+background (never failing the upload). That one funnel is why no upload path
+can forget them. `imageDelivery()` publishes the widths, the per-bucket URL
+roots and the accepted key pattern in `/public/media-config`, so the
+frontend builds `srcset` from the server's own rules.
 
 ### Push notifications — `package/push` + `modules/notifications`
 
@@ -1410,7 +1426,7 @@ and `NotificationKind.AFFILIATE`.
 | `npm run seed-theme-templates` | Create the five starter store appearance templates — palettes (colors only) lifted from real configured stores, topped up from curated fallbacks. Idempotent; `-- --force` tops an existing table back up to five |
 | `npm run seed-categories` | Seed the global category taxonomy (29 top-level + 125 sub) from `scripts/data/globalCategories.ts` — upserts by slug, idempotent, never deletes; fills `optionTemplates`/`specTemplates` from `scripts/data/categoryPresets.ts` only where never set; `-- --dry-run` reports without writing |
 | `npm run audit-media` | List every S3 object and which DB rows reference it (logo/media/order-item keys + bucket-hosted legacy URLs); run per env, `-- --merge <other-env.json>` on the second run yields objects referenced by neither DB. Read-only unless `--delete-orphans --yes` on a merged run. Reports go to `migration-backups/` |
-| `npm run optimize-media` | Bring stored images up to the upload rules and render missing share images (see Media storage). Dry run unless `-- --apply`; `--only=products,logos,store-banners,marketplace-banners`, `--limit=N`. Per environment; never deletes |
+| `npm run optimize-media` | Bring stored images up to the upload rules and render their missing derived images — sized copies for all, share images for covers and logos (see Media storage). Dry run unless `-- --apply`; `--only=products,logos,store-banners,marketplace-banners`, `--limit=N`. Per environment; never deletes |
 | `npx prisma generate` | Regenerate client after schema edits            |
 
 **Environment files are layered, never edited to switch.** `config/loadEnv.ts`

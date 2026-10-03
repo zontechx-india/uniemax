@@ -24,6 +24,7 @@ import { useCustomerSession } from '../../app/sessionContext'
 import { useMarketSession } from '../../app/marketSession'
 import { ArrowLeftIcon, CheckIcon, ImageIcon } from '../../layout/icons'
 import { Button } from '../../../shared/ui/Button'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
  * Create Store — a two-step guided flow.
@@ -254,7 +255,8 @@ function ResumePanel({
               className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
             >
               {draft.logoUrl ? (
-                <img
+                <MediaImg
+                  sizes="44px"
                   src={draft.logoUrl}
                   alt=""
                   className="h-11 w-11 shrink-0 rounded-md border border-line object-cover"

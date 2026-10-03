@@ -9,6 +9,7 @@ import { closeAuthDialog, useAuthDialog } from './authDialogStore'
 import type { AuthDialogBrand, AuthDialogRequest, AuthIntent } from './authDialogStore'
 import { CustomerAuthPanel } from './CustomerAuthPanel'
 import { StorefrontHero } from './StorefrontHero'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
  * The in-place sign-in dialog — mounted ONCE in `StorefrontApp`, opened from
@@ -262,7 +263,7 @@ function StoreLogo({
   className: string
 }) {
   if (brand.logoUrl) {
-    return <img src={brand.logoUrl} alt="" className={`shrink-0 object-cover ${className}`} />
+    return <MediaImg sizes="96px" src={brand.logoUrl} alt="" className={`shrink-0 object-cover ${className}`} />
   }
   return (
     <span className={`flex shrink-0 items-center justify-center metal-chip text-cta-contrast ${className}`}>

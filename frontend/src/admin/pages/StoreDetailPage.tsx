@@ -37,6 +37,7 @@ import {
 import { StoreAvatar } from './StoresPage'
 import { useAdminSession } from '../app/adminSession'
 import { BackIcon, ExternalIcon } from '../layout/icons'
+import { MediaImg } from '../../shared/media/MediaImg'
 
 /**
  * One store, in full — the page an admin lands on from a support ticket or a
@@ -380,7 +381,8 @@ export default function StoreDetailPage() {
                   className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-md px-2 py-2.5 text-left hover:bg-surface-alt"
                 >
                   {product.imageUrl ? (
-                    <img
+                    <MediaImg
+                      sizes="44px"
                       src={product.imageUrl}
                       alt=""
                       className="h-11 w-11 shrink-0 rounded-md border border-line object-cover"

@@ -6,6 +6,7 @@ import type {
   PublicProductMediaItem,
   PublicStoreVariant,
 } from '../stores/storesApi'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /** The storefront skin classes the picker needs — a structural subset. */
 interface PickerSkin {
@@ -145,7 +146,8 @@ export function OptionPicker({
                     >
                       <span className={`block aspect-[3/4] ${skin.chip}`}>
                         {picture ? (
-                          <img
+                          <MediaImg
+                            sizes="80px"
                             src={picture}
                             alt=""
                             loading="lazy"

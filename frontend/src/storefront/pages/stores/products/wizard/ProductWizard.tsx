@@ -14,6 +14,7 @@ import { PhotosStep } from './PhotosStep'
 import { PricingStep } from './PricingStep'
 import { STEPS, StepButtons, StepShell, categoryOptions } from './shared'
 import type { StepKey } from './shared'
+import { MediaImg } from '../../../../../shared/media/MediaImg'
 
 /**
  * Adding — or finishing — a product, one question at a time.
@@ -284,7 +285,7 @@ function ReviewStep({
         <div className="overflow-hidden rounded-lg border border-line bg-surface">
           <div className="flex aspect-square items-center justify-center bg-surface-alt">
             {cover ? (
-              <img src={cover} alt="" className="h-full w-full object-cover" />
+              <MediaImg sizes="(min-width: 1024px) 256px, 100vw" src={cover} alt="" className="h-full w-full object-cover" />
             ) : (
               <BoxIcon className="h-12 w-12 text-muted" />
             )}

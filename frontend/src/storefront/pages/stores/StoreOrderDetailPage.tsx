@@ -16,6 +16,7 @@ import {
   paymentLabel,
 } from './orderMeta'
 import { Button } from '../../../shared/ui/Button'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
  * One order of the store — the seller's working view. Shows the items,
@@ -234,7 +235,8 @@ export function StoreOrderDetailPage() {
                   {order.items.map((item) => (
                     <li key={item.id} className="flex items-center gap-3 py-3">
                       {item.imageUrl ? (
-                        <img
+                        <MediaImg
+                          sizes="48px"
                           src={item.imageUrl}
                           alt={item.productName}
                           loading="lazy"

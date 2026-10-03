@@ -34,6 +34,7 @@ import {
   StoreIcon,
 } from '../../layout/icons'
 import type { Skin } from './storeTheme'
+import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
  * Storefront chrome: logo · Home · Shop · Categories ▾ · Help · search ·
@@ -139,7 +140,8 @@ function StoreHeaderBar({
           className="flex min-w-0 flex-1 items-center gap-2.5 lg:flex-none"
         >
           {store.logoUrl ? (
-            <img
+            <MediaImg
+              sizes="40px"
               src={store.logoUrl}
               alt=""
               loading="lazy"
