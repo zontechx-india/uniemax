@@ -11,6 +11,7 @@ import { appEnv } from "../config/loadEnv.js";
 import { prisma } from "../config/prisma.js";
 import { storageConfig } from "../package/storage/config.js";
 import type { MediaBucket } from "../package/storage/types.js";
+import { DERIVED_PREFIX } from "../package/storage/images.js";
 
 /**
  * Media audit — which S3 objects does the database still point at, and
@@ -278,12 +279,35 @@ async function main() {
   const referencedBy = (id: string) =>
     envs.filter((e) => id in e.referenced).map((e) => e.mode);
 
+  // Derived objects (share images under "<prefix>/derived/<kind>/…") are
+  // never referenced by a row: they belong to the image they were rendered
+  // from and live or die with it. Every referenced id is indexed by its
+  // extension-less stem, and a derived object is judged by its source.
+  const stem = (id: string) => id.replace(/\.[A-Za-z0-9]+$/, "");
+  const sourceByStem = new Map(
+    envs.flatMap((e) => Object.keys(e.referenced)).map((id) => [stem(id), id] as const),
+  );
+  /** The id an object is judged by — its own, or its source image's when derived. */
+  const ownerId = (o: S3Object): string => {
+    for (const bucket of Object.values(storageConfig.buckets)) {
+      if (bucket.name !== o.bucket) continue;
+      const head = bucket.keyPrefix ? `${bucket.keyPrefix}/` : "";
+      if (!o.key.startsWith(head + DERIVED_PREFIX)) continue;
+      // "<prefix>/derived/share/a/b.jpg" → source "<bucket>/<prefix>/a/b.jpg",
+      // matched to the referenced original by stem (its extension differs).
+      const rest = o.key.slice((head + DERIVED_PREFIX).length); // "share/a/b.jpg"
+      const source = refId(o.bucket, head + rest.slice(rest.indexOf("/") + 1));
+      return sourceByStem.get(stem(source)) ?? source;
+    }
+    return refId(o.bucket, o.key);
+  };
+
   // Zero-byte "folder/" keys are console-created placeholders, not media —
   // reported separately so they never inflate the orphan count.
   const isFolderMarker = (o: S3Object) => o.key.endsWith("/") && o.size === 0;
   const folderMarkers = s3.filter(isFolderMarker);
   const orphans = s3.filter(
-    (o) => !isFolderMarker(o) && referencedBy(refId(o.bucket, o.key)).length === 0,
+    (o) => !isFolderMarker(o) && referencedBy(ownerId(o)).length === 0,
   );
   const s3Ids = new Set(s3.map((o) => refId(o.bucket, o.key)));
   const broken = envs.flatMap((e) =>
@@ -345,7 +369,7 @@ async function main() {
   lines.push("## Every S3 object and who references it", "");
   lines.push(`| Key | Size | Referenced by |`, `| --- | ---: | --- |`);
   for (const o of [...s3].sort((a, b) => a.key.localeCompare(b.key))) {
-    const id = refId(o.bucket, o.key);
+    const id = ownerId(o);
     const by = referencedBy(id);
     const rows = envs
       .flatMap((e) => (e.referenced[id] ?? []).map((r) => `${e.mode}: ${r.table}.${r.column} ${r.id}`))
@@ -378,7 +402,7 @@ async function main() {
     ["bucket,key,size_bytes,last_modified,referenced_by,referenced_rows"]
       .concat(
         s3.map((o) => {
-          const id = refId(o.bucket, o.key);
+          const id = ownerId(o);
           const by = referencedBy(id);
           const rows = envs
             .flatMap((e) => (e.referenced[id] ?? []).map((r) => `${r.table}.${r.column} ${r.id}`))

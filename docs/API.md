@@ -1238,7 +1238,16 @@ validation: `{ image | video | logo: { maxMB, contentTypes[] } }` — driven by
 the `MEDIA_MAX_*_MB` / `MEDIA_*_TYPES` env vars. Every upload is also checked
 **by its bytes**: a file whose magic bytes are not one of the allowed types is
 `400` whatever mimetype it declares (e.g. HTML/SVG renamed to `.png`), and a
-mislabelled but valid file is stored under the type it really is.
+mislabelled but valid file is read as the type it really is.
+
+**Every uploaded image is normalized by the server** before it is stored —
+product photos, store and marketplace banners, logos: rotated upright from
+its EXIF orientation, longest edge capped (**1920 px** for the `image` rule,
+**1024 px** for `logo`), metadata stripped, re-encoded as **WebP**. An image
+that already meets the rules (WebP/AVIF, upright, within the cap) is stored
+as sent. So the stored file (and its URL extension) is usually `.webp`
+whatever was uploaded. An image the server cannot decode is `400`. Videos
+are stored as uploaded.
 
 ---
 
@@ -1443,6 +1452,8 @@ products**. Small and cacheable; fetched once per store visit.
 
 ```jsonc
 { "id", "name", "slug", "logoUrl", "theme",
+  "shareImageUrl",                // the logo as a link-preview JPEG (relative path,
+                                  // see "Share images" below); null without a logo
   "isPublished",                  // false only on an owner draft preview
   "footer": { … },                // owner-managed footer content, resolved to the
                                   // full shape (see PATCH /stores/:id/footer)
@@ -1573,6 +1584,8 @@ Full product detail — the **only** endpoint that returns variants, because the
 product page is where a customer picks one.
 ```jsonc
 { "id", "name", "slug", "description", "price", "priceMax", "stockQuantity",
+  "shareImageUrl",                // cover photo as a link-preview JPEG (relative path,
+                                  // see "Share images" below); null without a photo
   "category": { "name", "slug", "ancestors": [ { "name", "slug" } ] },   // root first
   "optionTypes": [ { "name": "Size", "values": ["S", "M", "XL"] } ],     // picker dimensions, in order
   "specifications": [ { "label": "Fabric", "value": "100% cotton" } ],   // ordered; [] → description fallback
@@ -1964,6 +1977,8 @@ these links never lands on a dead end.
 
 ## Sitemaps — `/api/v1/public` (no auth)
 
+> Why sitemaps and the indexing policy they follow: [`SEO.md`](./SEO.md).
+
 XML sitemaps for the public storefronts. Like the page shells below, they do
 not answer the `ok()` / `list()` JSON envelope — the sitemap protocol is
 XML. Errors still answer JSON through the central handler.
@@ -2011,7 +2026,36 @@ Capped at 50,000 URLs per file (the protocol limit).
 
 ---
 
+## Share images — `/api/v1/public/images` (no auth)
+
+> Why they exist and where they are used: [`SEO.md`](./SEO.md).
+
+### `GET /api/v1/public/images/share/:bucket/{key}.jpg`
+The **link-preview image** (`og:image`) of a stored image: `:bucket` is
+`logo` or `media`, `{key}` the original's object key, `.jpg` appended.
+Clients never build this URL — it arrives as `shareImageUrl` on the public
+store shell and product detail.
+
+Answers `image/jpeg`: upright, longest edge ≤ 1200 px, transparency on
+white, under ~300 KB (WhatsApp drops larger preview images).
+`cache-control: public, max-age=31536000, immutable` — the key is immutable,
+so the image is too. Rendered from the original on the **first** request and
+stored at `derived/share/<key>.jpg` in the same bucket; later requests read
+the stored copy. Uploads of a product cover or logo warm it in the
+background.
+
+| Status | When |
+| --- | --- |
+| `200` | The image |
+| `404` | No original at that key |
+| `422` | Unknown bucket, a path not ending in `.jpg`, or not a plain image key (`derived/…`, `..`, non-image extension) |
+
+---
+
 ## Page shells — site root, HTML (no auth)
+
+> Design, per-page head rules and failure modes: [`SEO.md`](./SEO.md). This
+> section is the HTTP contract only.
 
 The storefront's built `index.html`, served on the storefront pages' **own
 URLs** with that page's `<head>` already written in, so link previews

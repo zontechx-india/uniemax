@@ -483,8 +483,10 @@ systemctl reload nginx`.
 
 ### Page shells (`/store/**`, `/c/**` → the API)
 
-**Status: not yet applied on the server.** Until it is, those URLs are
-served by the SPA fallback exactly as before and the API routes sit unused.
+**Status: live since 2026-10-01** on all four vhosts — dev (`uniemax-domain`,
+`uniemax` → `:4001`) and prod (`uniemax-com`, `uniemax-prod` → `:4000`).
+Pre-change backups: `/etc/nginx/sites-available/*.pre-shells`. Why this
+exists and how it works: [`SEO.md`](./SEO.md).
 
 Store and category pages are answered by the backend's page-shell routes
 (`API.md` → Page shells): the built `index.html` with that page's title,

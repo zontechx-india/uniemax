@@ -115,7 +115,9 @@ function useProductSeo(
     title: product ? [product.name, store.name] : [store.name],
     description,
     canonical: product ? storeProductUrl(store.slug, product.slug) : null,
-    image: product?.media.find((item) => item.type === 'IMAGE')?.url ?? store.logoUrl,
+    // Share images (small JPEGs), never originals: WhatsApp drops a preview
+    // image it cannot fetch quickly. Same choice as the page shell.
+    image: product?.shareImageUrl ?? store.shareImageUrl,
     type: 'product',
     robots: draft || product === null ? 'noindex, follow' : null,
     jsonLd:

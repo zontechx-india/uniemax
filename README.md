@@ -414,6 +414,7 @@ Every code change keeps these in sync — one fact lives in exactly one file.
 | [`docs/FRONTEND_CONTEXT.md`](./docs/FRONTEND_CONTEXT.md) | Frontend architecture and conventions |
 | [`docs/API.md`](./docs/API.md) | Every endpoint — params, responses |
 | [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) | EC2, nginx, pm2, CI/CD, env files |
+| [`docs/SEO.md`](./docs/SEO.md) | SEO source of truth — head tags, page shells, sitemaps, indexing rules, roadmap |
 | [`docs/CASHFREE_PAYMENTS.md`](./docs/CASHFREE_PAYMENTS.md) | Payment gateway integration |
 | [`docs/PUSH_NOTIFICATIONS.md`](./docs/PUSH_NOTIFICATIONS.md) | Web Push + notification feed |
 | [`docs/PRODUCTION_READINESS.md`](./docs/PRODUCTION_READINESS.md) | Hardening checklist |

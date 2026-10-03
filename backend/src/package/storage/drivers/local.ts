@@ -1,5 +1,5 @@
 import { mkdirSync } from "node:fs";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import { storageConfig } from "../config.js";
 import type { MediaBucket, StorageDriver } from "../types.js";
@@ -31,6 +31,15 @@ export function createLocalDriver(): StorageDriver {
       const path = filePath(bucket, key);
       await mkdir(dirname(path), { recursive: true });
       await writeFile(path, body);
+    },
+
+    async get(bucket, key) {
+      try {
+        return await readFile(filePath(bucket, key));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+        throw error;
+      }
     },
 
     async remove(bucket, key) {

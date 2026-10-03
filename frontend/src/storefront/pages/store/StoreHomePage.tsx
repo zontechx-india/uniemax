@@ -180,7 +180,7 @@ function useStoreHomeSeo(store: PublicStore) {
         ? `Shop ${shelves} at ${store.name} on UnieMax. Order online with delivery or store pickup.`
         : `Shop ${store.name} on UnieMax — order online with delivery or store pickup.`),
     canonical: storeHomeUrl(store.slug),
-    image: store.logoUrl,
+    image: store.shareImageUrl,
     // An unpublished store is a private draft its owner is previewing. It
     // resolves for them and 404s for everyone else, so it must never be a
     // result — and it is the one storefront page a signed-in owner reaches

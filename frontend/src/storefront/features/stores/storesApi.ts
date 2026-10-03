@@ -557,6 +557,11 @@ export interface PublicStore {
   name: string
   slug: string
   logoUrl: string | null
+  /**
+   * The logo as a link-preview image (small JPEG, served by the API) — what
+   * store pages put in `og:image`. Null without a logo. See docs/SEO.md.
+   */
+  shareImageUrl: string | null
   theme: StoreTheme
   /**
    * False only when the viewer is the store's owner looking at an
@@ -643,6 +648,8 @@ export interface PublicProductDetail {
   name: string
   slug: string
   description: string | null
+  /** The cover photo as a link-preview image (small JPEG) — the `og:image`. Null without a photo. */
+  shareImageUrl: string | null
   price: string | null
   priceMax: string | null
   /** Simple products: strike-through MRP and SKU; option products carry them per variant. */

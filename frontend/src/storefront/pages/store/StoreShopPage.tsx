@@ -53,7 +53,7 @@ export function StoreShopPage() {
       ? null
       : `Browse every product from ${store.name} on UnieMax — order online with delivery or store pickup.`,
     canonical: storeShopUrl(store.slug),
-    image: store.logoUrl,
+    image: store.shareImageUrl,
     robots: scoped || !store.isPublished ? 'noindex, follow' : null,
   })
 

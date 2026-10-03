@@ -4,7 +4,7 @@
  * (drivers) knows how bytes are actually stored.
  *
  * Swapping AWS S3 for Cloudflare R2, MinIO, Azure Blob or GCS means writing
- * one new driver implementing these three methods — no database or module
+ * one new driver implementing these four methods — no database or module
  * changes, because rows only ever hold object keys.
  */
 
@@ -19,6 +19,9 @@ export interface StorageDriver {
     body: Buffer,
     contentType: string,
   ): Promise<void>;
+
+  /** Reads an object's bytes. `null` (not an error) for a missing key. */
+  get(bucket: MediaBucket, key: string): Promise<Buffer | null>;
 
   /** Deletes an object. MUST be a no-op (not an error) for a missing key. */
   remove(bucket: MediaBucket, key: string): Promise<void>;

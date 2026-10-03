@@ -1,5 +1,6 @@
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -48,6 +49,27 @@ export function createS3Driver(): StorageDriver {
           CacheControl: "public, max-age=31536000, immutable",
         }),
       );
+    },
+
+    async get(bucket, key) {
+      try {
+        const response = await client.send(
+          new GetObjectCommand({
+            Bucket: bucketName(bucket),
+            Key: objectKey(bucket, key),
+          }),
+        );
+        return response.Body
+          ? Buffer.from(await response.Body.transformToByteArray())
+          : null;
+      } catch (error) {
+        // NoSuchKey (404) means "not there". Anything else — AccessDenied,
+        // network — is a real failure and must not pass for a missing file.
+        const status = (error as { $metadata?: { httpStatusCode?: number } })
+          .$metadata?.httpStatusCode;
+        if ((error as Error).name === "NoSuchKey" || status === 404) return null;
+        throw error;
+      }
     },
 
     async remove(bucket, key) {

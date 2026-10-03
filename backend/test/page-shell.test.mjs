@@ -80,6 +80,26 @@ test("product page: Product + BreadcrumbList, og:type product", async (t) => {
   assert.equal(p.jsonLd[0].offers.priceCurrency, "INR");
 });
 
+test("link-preview images are small JPEGs (WhatsApp drops big ones)", async (t) => {
+  const live = await liveStore();
+  if (!live) return t.skip("no published store with products on this target");
+  for (const path of [
+    `/store/${live.store.slug}`,
+    `/store/${live.store.slug}/product/${live.product.slug}`,
+  ]) {
+    const html = await (await fetch(`${API_BASE}${path}`)).text();
+    const image = /<meta property="og:image" content="([^"]*)"/.exec(html)?.[1];
+    assert.ok(image, `${path}: og:image`);
+    if (!image.includes("/api/v1/public/images/share/")) continue; // no logo / photo → platform default
+    // The URL's origin is PUBLIC_WEB_URL; fetch the path from the target.
+    const res = await fetch(`${API_BASE}${new URL(image).pathname}`);
+    const bytes = (await res.arrayBuffer()).byteLength;
+    assert.equal(res.status, 200, image);
+    assert.equal(res.headers.get("content-type"), "image/jpeg", image);
+    assert.ok(bytes <= 300 * 1024, `${image}: ${bytes} bytes`);
+  }
+});
+
 test("category and shop pages; scoped listings are noindex", async (t) => {
   const live = await liveStore();
   if (!live) return t.skip("no published store with products on this target");

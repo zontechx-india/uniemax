@@ -20,6 +20,7 @@ import {
 import { publicDiscoveryRoutes } from "./modules/discovery/discovery.routes.js";
 import { publicSeoRoutes } from "./modules/seo/seo.routes.js";
 import { pageShellRoutes } from "./modules/seo/pageShell.routes.js";
+import { publicMediaRoutes } from "./modules/media/media.routes.js";
 import {
   adminBannerRoutes,
   publicBannerRoutes,
@@ -97,6 +98,9 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       // /api proxy serves them without a new location block on every vhost —
       // frontend/public/robots.txt points a crawler at the index.
       await api.register(publicSeoRoutes, { prefix: "/public" });
+      // Image derivatives — the small JPEG link previews use (og:image),
+      // rendered from the original on first request and stored beside it.
+      await api.register(publicMediaRoutes, { prefix: "/public/images" });
       // Marketplace homepage banners — anonymous read of the active set.
       await api.register(publicBannerRoutes, { prefix: "/public/banners" });
       // Payment gateway callbacks (Cashfree webhook — signature-guarded).

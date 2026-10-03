@@ -40,7 +40,7 @@ function useCategorySeo(
         : `Shop ${category.name} at ${store.name} on UnieMax. Order online with delivery or store pickup.`
       : null,
     canonical: storeCategoryUrl(store.slug, categorySlug),
-    image: store.logoUrl,
+    image: store.shareImageUrl,
     robots: draft || category === null ? 'noindex, follow' : null,
     jsonLd:
       category && !draft

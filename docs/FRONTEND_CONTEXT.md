@@ -1282,27 +1282,11 @@ the store is one browser step back.
 **SEO / head tags — `shared/seo.ts`.** `useSeo({ title, description,
 canonical, image, type, robots, jsonLd })` owns the whole `<head>` per route;
 `usePageTitle(...parts)` is the title-only shorthand and `usePrivatePageTitle`
-the same plus `noindex, follow`. Titles read "Product · Store · UnieMax".
-
-Every call writes **every** managed tag, falling back to the platform
-defaults captured from `index.html` at import time — so a product page's
-`og:image` or `Product` JSON-LD can never survive onto the next page (a stale
-JSON-LD block is a structured-data error against the whole domain, not just
-the page). A route that calls neither hook inherits the previous route's tags,
-which is cosmetic only: a crawler loads every URL fresh. A layout-level reset
-would be wrong — a parent's effect runs *after* its children's, so it would
-clobber the page that did the right thing.
-
-What each public page contributes:
-
-| Page | Adds |
-| ---- | ---- |
-| Store home | About text (or a line naming its shelves) · logo card · `Store` JSON-LD — address, map pin, phone, socials from Footer management, degrading to `Organization` with no address |
-| Product | Seller's prose → highlights → a composed line with the price (`productMetaDescription`) · cover image · `Product` + `Offer`/`AggregateOffer` + `BreadcrumbList` |
-| Category | Subcategory names or the product count · `BreadcrumbList` |
-| Shop | Canonicals to bare `/shop`; `?q=`/`?section=` are `noindex, follow` — they re-list what category pages already list |
-| Marketplace home | Platform description · `WebSite` · the `<h1>` in `MarketIdentityBar` |
-| `/c/{slug}` | Category name + product/shop counts · `BreadcrumbList` + `ItemList` · `?page=`/`?sort=` canonical to the bare slug and go `noindex, follow` · an empty branch is `noindex` |
+the same plus `noindex, follow`. Everything else about SEO — the per-page
+rules, the page shells that write the same tags server-side for `/store/**`
+and `/c/**`, the `seo:start`/`seo:end` markers in `index.html`, structured
+data, indexing policy and the roadmap — lives in [`SEO.md`](./SEO.md). Read it
+before changing any `useSeo` call: each one has a server twin.
 
 **Global category pages — `pages/BrowseCategoryPage.tsx` (`/c/{slug}`).** The
 only page type whose subject is a *kind of product* rather than a shop.
@@ -1324,40 +1308,6 @@ to pass nothing to anything. The search-intent bus it used went with it.
 `layout/MarketChrome.tsx` wraps the page in the homepage's header/footer,
 which still live in `HomePage.tsx` (exported, not moved — a third consumer is
 the moment to lift them).
-
-`noindex, follow` also covers the **owner draft preview** (an unpublished
-store resolves only for its owner), a missing product/category (the API's
-page shell already answers those with a real `404`; this covers one that
-vanishes while the tab is open), and every per-customer page — cart, checkout, order
-confirmation, addresses, support threads. `robots.txt` disallows those paths
-too; the two do different jobs, and the failure mode worth double-covering is
-a shared order-confirmation link getting indexed.
-
-Structured data lives in `features/publicStore/structuredData.ts` and follows
-two rules: **never invent a fact** (there is no review system, so no
-`aggregateRating` — claiming one is a manual action against the domain) and
-**omit rather than guess** (`prune()` drops empty fields, since an absent
-optional is valid where an empty string is an error).
-
-**First byte**: these tags land after React mounts, which Googlebot reads
-but social-link scrapers (WhatsApp, Instagram, Facebook, X, Slack) and most
-other crawlers never see. For `/store/**` and `/c/**` the API therefore
-serves `index.html` itself with the same head already written in, plus a
-real 404 for a dead slug (`docs/BACKEND_CONTEXT.md` → page shells). What
-that means on this side:
-
-- `index.html` brackets the title and every SEO/social tag with
-  `<!-- seo:start -->` / `<!-- seo:end -->`. The API replaces that region and
-  reads the platform defaults back out of it, so keep the markers and each
-  tag's attribute order.
-- The page components' `useSeo` calls have **server twins** in
-  `backend/src/modules/seo/pageShell.service.ts`, and `structuredData.ts` /
-  `productDescription.ts` have ports beside it. A change to a page's head
-  rules belongs in both.
-- `seo.ts` reads its fallbacks from `data-default` when present — the server
-  keeps the platform value there, since the tags themselves now carry the
-  page's — and replaces the server's JSON-LD like its own (`data-seo`).
-- `/` and `/sell` are still the static file: only `seo.ts` changes their head.
 
 - `storesApi.ts` — typed HTTP client (list/create/get/update/updateTheme/
   setPublished + `storeCatalogApi` for per-store categories/subcategories/
@@ -2282,7 +2232,10 @@ frontend/
     │   │   │                     #   validateFile/acceptAttr/ruleHint helpers
     │   │   ├── cropImage.ts      # Canvas rotate/crop/downscale → WebP (≤1600px,
     │   │   │                     #   q0.85); `prepareImage` is the no-crop path and
-    │   │   │                     #   retries smaller if still over the size limit
+    │   │   │                     #   retries smaller if still over the size limit.
+    │   │   │                     #   A convenience, not the guard: the server
+    │   │   │                     #   normalizes every image upload itself
+    │   │   │                     #   (BACKEND_CONTEXT → Media storage)
     │   │   └── ImageEditDialog.tsx # react-easy-crop modal — OPTIONAL crop: aspect
     │   │                         #   chips (Original/Square/Portrait/Landscape),
     │   │                         #   rotate, zoom, Reset, "Use original". The stage

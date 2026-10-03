@@ -1,7 +1,7 @@
 import { prisma } from "../../config/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../../utils/httpError.js";
-import { mediaUrl } from "../../package/storage/index.js";
+import { mediaUrl, shareImagePath } from "../../package/storage/index.js";
 import {
   resolveCheckoutFields,
   resolveFooter,
@@ -369,6 +369,8 @@ export async function getPublicStoreShell(slug: string, viewerId?: string) {
   return {
     ...shell,
     logoUrl: mediaUrl("logo", logoKey),
+    /** The logo as a link-preview image (small JPEG) — the store pages' `og:image`. */
+    shareImageUrl: logoKey ? shareImagePath("logo", logoKey) : null,
     footer: resolveFooter(footer),
     payments: resolvePayments(payments),
     shipping: { mode, rate },
@@ -735,6 +737,7 @@ export async function getPublicProduct(
 
   const idx = shelfIndex(await loadShelves(store.id));
   const storeShipping = resolveShipping(store.shipping);
+  const cover = product.media.find((item) => item.type === "IMAGE");
   return {
     id: product.id,
     name: product.name,
@@ -798,6 +801,12 @@ export async function getPublicProduct(
       stockQuantity: variant.stockQuantity,
       optionValues: variant.optionValues,
     })),
+    /**
+     * The cover photo as a link-preview image (small JPEG) — the product
+     * page's `og:image`. Null without a photo (the page falls back to the
+     * store's).
+     */
+    shareImageUrl: cover ? shareImagePath("media", cover.key) : null,
     /** Gallery, ordered: images by display order (first = cover), video last. */
     media: product.media.map((item) => ({
       id: item.id,

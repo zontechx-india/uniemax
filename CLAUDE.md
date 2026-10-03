@@ -20,6 +20,7 @@ one file (no duplication).
 | Prisma schema models/enums                       | [`docs/BACKEND_CONTEXT.md`](./docs/BACKEND_CONTEXT.md) (Data Model section) |
 | Frontend structure, shared UI, theme tokens, per-store theming | [`docs/FRONTEND_CONTEXT.md`](./docs/FRONTEND_CONTEXT.md) |
 | Affiliate system (programmes, invitations, links, attribution, commission, payouts) | [`docs/AFFILIATE.md`](./docs/AFFILIATE.md) |
+| Anything SEO — head tags, structured data, `robots.txt`, sitemaps, page shells, indexing rules, `/c/` landing pages' SEO, the SEO roadmap | [`docs/SEO.md`](./docs/SEO.md) (rules tables, status, roadmap **and** change log) |
 
 Rules:
 - If a change spans several concerns, update **each** relevant doc.
@@ -67,3 +68,19 @@ Rules:
   *beside* a primary (Add to Cart next to Buy Now).
 - All three fills are cut from the **store owner's** primary via the `--cta-*` stops in
   `storeVars()` — never hardcode a gradient or a brand color in a component.
+
+## SEO Conventions (summary — full detail in docs/SEO.md)
+
+- **`docs/SEO.md` is the single source of truth for SEO.** Read it before touching
+  SEO-related code; update it in the same task after any change (rules tables, status,
+  roadmap, change log). Its §12 lists which files count as SEO-related.
+- **Every head rule exists twice.** A page's `useSeo` call (browser) has a server twin in
+  `backend/src/modules/seo/pageShell.service.ts` (page shells for `/store/**`, `/c/**`);
+  `backend/src/modules/seo/structuredData.ts` and `productText.ts` are ports of the
+  frontend's `structuredData.ts` and `productDescription.ts`. Change both sides together.
+- **Keep the `<!-- seo:start -->` / `<!-- seo:end -->` markers** in `frontend/index.html`
+  and each tag's attribute order — the backend replaces that region per request.
+- **Structured data never invents a fact** (no ratings until real reviews exist) and omits
+  empty fields rather than emitting blanks.
+- Search/filter/paginated views are `noindex, follow` with a canonical to the bare page;
+  per-customer pages are `noindex` **and** disallowed in `robots.txt`.

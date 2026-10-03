@@ -7,6 +7,7 @@ import { mediaRules, storageConfig } from "./config.js";
 import type { MediaKind } from "./config.js";
 import { createLocalDriver, localRoot } from "./drivers/local.js";
 import { createS3Driver } from "./drivers/s3.js";
+import { normalizeImage, renderShareImage, shareImageKey } from "./images.js";
 import type { MediaBucket, StorageDriver } from "./types.js";
 
 /**
@@ -17,8 +18,11 @@ import type { MediaBucket, StorageDriver } from "./types.js";
  *   - `registerStoragePlugins(app)` — multipart parsing (+ /uploads static
  *     serving when the local driver is active)
  *   - `readUpload(request, kind)` — reads ONE multipart file, enforcing the
- *     configured size/type rules for that media kind
+ *     configured size/type rules for that media kind, and normalizes images
+ *     (upright, size-capped, WebP — `images.ts`) whatever client sent them
  *   - `newObjectKey(prefix, contentType)` — collision-free key generation
+ *   - `getShareImage` / `warmShareImage` — the small JPEG link previews use,
+ *     generated once per original and stored beside it (`images.ts`)
  *   - `mediaRules` — the configured limits (also served to clients via the
  *     public /media-config endpoint, so UI hints always match the server)
  *
@@ -29,6 +33,14 @@ import type { MediaBucket, StorageDriver } from "./types.js";
 export { mediaRules } from "./config.js";
 export type { MediaKind } from "./config.js";
 export type { MediaBucket, StorageDriver } from "./types.js";
+export {
+  DERIVED_PREFIX,
+  SHAREABLE_KEY,
+  SHARE_URL_SUFFIX,
+  normalizeImage,
+  shareImageKey,
+  shareImagePath,
+} from "./images.js";
 
 export const storage: StorageDriver =
   storageConfig.driver === "s3" ? createS3Driver() : createLocalDriver();
@@ -124,13 +136,83 @@ export async function readUpload(
     );
   }
 
+  // Images are stored by the server's rules, not the client's: whatever
+  // sent the file, what lands in the bucket is upright, size-capped WebP
+  // with no EXIF (see images.ts). Videos are stored as uploaded.
+  let stored = { buffer, contentType: sniffed };
+  if (resolvedKind !== "video") {
+    try {
+      stored = await normalizeImage(
+        buffer,
+        sniffed,
+        resolvedKind === "logo" ? "logo" : "image",
+      );
+    } catch {
+      throw HttpError.badRequest(
+        "The image could not be read — it may be corrupted or incomplete",
+      );
+    }
+  }
+
   return {
-    buffer,
-    contentType: sniffed,
+    buffer: stored.buffer,
+    contentType: stored.contentType,
     filename: file.filename,
     kind: resolvedKind,
     fields: textFields(file.fields),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Share images (link previews)
+// ---------------------------------------------------------------------------
+
+/** Concurrent requests for one share image render it once. */
+const shareInFlight = new Map<string, Promise<Buffer | null>>();
+
+/**
+ * The share image (small JPEG for `og:image`) of a stored image: read from
+ * its derived key, or rendered from the original and stored there on first
+ * request — so it exists for every image, including ones uploaded before
+ * share images did. `null` when the original does not exist.
+ */
+export function getShareImage(bucket: MediaBucket, key: string): Promise<Buffer | null> {
+  const id = `${bucket}:${key}`;
+  let pending = shareInFlight.get(id);
+  if (!pending) {
+    pending = buildShareImage(bucket, key).finally(() => shareInFlight.delete(id));
+    shareInFlight.set(id, pending);
+  }
+  return pending;
+}
+
+async function buildShareImage(bucket: MediaBucket, key: string): Promise<Buffer | null> {
+  const derived = shareImageKey(key);
+  const existing = await storage.get(bucket, derived);
+  if (existing) return existing;
+
+  const original = await storage.get(bucket, key);
+  if (!original) return null;
+  const rendered = await renderShareImage(original);
+  await storage.put(bucket, derived, rendered, "image/jpeg");
+  return rendered;
+}
+
+/**
+ * Render a new upload's share image in the background, so the first person
+ * to share the link is not the one who waits for it. Never fails the upload:
+ * the share endpoint renders on demand anyway.
+ */
+export function warmShareImage(
+  bucket: MediaBucket,
+  key: string,
+  log: { warn: (obj: object, msg: string) => void } = {
+    warn: (obj, msg) => console.warn(msg, obj),
+  },
+): void {
+  getShareImage(bucket, key).catch((err: unknown) =>
+    log.warn({ err, bucket, key }, "share image: background render failed"),
+  );
 }
 
 /**

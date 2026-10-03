@@ -66,8 +66,11 @@ backend/
 │   ├── package/               # Self-contained sub-systems (extraction-ready)
 │   │   ├── storage/           # Provider-agnostic media storage — see "Media storage"
 │   │   │   ├── index.ts       #   facade: storage driver, readUpload, mediaRules,
-│   │   │   ├── config.ts      #     registerStoragePlugins; own env parsing
-│   │   │   ├── types.ts       #   StorageDriver port (put / remove / publicUrl)
+│   │   │   │                  #     share images, registerStoragePlugins
+│   │   │   ├── images.ts      #   image rules (sharp): normalize uploads, render
+│   │   │   │                  #     share images, derived keys — see "Media storage"
+│   │   │   ├── config.ts      #   own env parsing
+│   │   │   ├── types.ts       #   StorageDriver port (put / get / remove / publicUrl)
 │   │   │   └── drivers/       #   s3.ts (AWS) · local.ts (dev, served at /uploads)
 │   │   ├── mail/              # Transactional email (Resend REST / console
 │   │   │                      #   fallback) — order notifications use it
@@ -128,14 +131,12 @@ backend/
 │   │   │                      #   + browse.service.ts — the GLOBAL category
 │   │   │                      #   landing pages (/c/{slug}), aggregated
 │   │   │                      #   across stores via globalCategoryId
-│   │   ├── seo/               # XML sitemaps (index · marketplace · per store)
-│   │   │                      #   — XML, not the JSON envelope; 1 h cache —
-│   │   │                      #   + pageShell.* — the storefront index.html
-│   │   │                      #   per request for /store/** and /c/** with
-│   │   │                      #   that page's head (pageHead.ts renders it;
-│   │   │                      #   productText.ts + structuredData.ts are
-│   │   │                      #   ports of the SPA's own), real 404s. Root-
-│   │   │                      #   level routes, not under /api/v1.
+│   │   ├── seo/               # XML sitemaps + page shells (root-level
+│   │   │                      #   GET /store/*, /c/* serving index.html with
+│   │   │                      #   the page's head). Design: docs/SEO.md
+│   │   ├── media/             # GET /public/images/share/:bucket/{key}.jpg —
+│   │   │                      #   link-preview JPEGs (og:image); rendering and
+│   │   │                      #   storage live in package/storage
 │   │   ├── notifications/     # feed + push subscriptions (one handler set,
 │   │   │                      #   guard picks the principal) + notify()/
 │   │   │                      #   notifyAdmins() dispatch + admin broadcast
@@ -166,7 +167,8 @@ backend/
 │   │   ├── data/              # globalCategories.ts — the seeded taxonomy;
 │   │   │                      # categoryPresets.ts — its option/spec suggestions
 │   │   ├── generatePushKeys.ts# VAPID key pair (npm run push-keys)
-│   │   └── auditMedia.ts      # S3 objects vs DB media keys, per env + merged (npm run audit-media)
+│   │   ├── auditMedia.ts      # S3 objects vs DB media keys, per env + merged (npm run audit-media)
+│   │   └── optimizeMedia.ts   # bring stored images up to the upload rules + render share images (npm run optimize-media)
 │   ├── utils/                 # response, slug, httpError, zodHelpers, logger, password
 │   └── generated/prisma/      # Prisma client (generated, git-ignored)
 └── .env                       # runtime, DB, JWT, cookie, OTP config (see Environment below)
@@ -319,7 +321,7 @@ and say why, as the three exclusions above do.
 ### Media storage — the `package/storage` sub-system
 
 All file storage goes through one self-contained package (`src/package/storage`)
-whose boundary is the `StorageDriver` port (`put` / `remove` / `publicUrl`).
+whose boundary is the `StorageDriver` port (`put` / `get` / `remove` / `publicUrl`).
 The app deals only in **logical buckets** (`"logo"` for store logos —
 bucket A — and `"media"` for product images/videos — bucket B) plus **object
 keys**; the database stores keys, **never URLs** (e.g.
@@ -339,6 +341,30 @@ via `GET /api/v1/public/media-config`, so UI hints can't drift from what the
 server enforces. Keys are never reused (a replace mints a new key), which
 makes objects immutable and infinitely cacheable. The package parses its own
 env (`config.ts`) — see Environment below.
+
+**Images are stored by the server's rules, not the client's**
+(`images.ts`, `sharp`). `readUpload` runs every image — product photos,
+banners, logos — through `normalizeImage`: EXIF orientation applied, longest
+edge capped (1920 for "image", 1024 for "logo" — never below what the
+browser editor produces), metadata (incl. phone GPS) stripped, WebP. An image
+that already meets the rules (WebP/AVIF, upright, within the cap — what the
+editor sends) is stored untouched, so nothing is compressed twice; animated
+images and videos are never re-encoded; an undecodable file is a 400. Before
+this, anything that skipped the editor went in as sent (a 2.2 MB PNG product
+photo). `npm run optimize-media` applies the same function to images stored
+earlier (new key + compare-and-swap on the row; the old object is kept for
+order snapshots and caches).
+
+**Share images** are the second output: a preview-safe JPEG (≤ 1200 px,
+white behind transparency, under ~300 KB) of a product cover or store logo,
+used as `og:image` because WhatsApp drops preview images it cannot fetch
+quickly. Stored beside the original at a key derived from it
+(`derived/share/<key>.jpg`, no DB column — originals are immutable, so is
+their share image), rendered on the first request to
+`GET /api/v1/public/images/share/:bucket/{key}.jpg` (`modules/media`) and
+warmed in the background after a cover/logo upload. `audit-media` judges a
+`derived/` object by its source image. Why and where they are used:
+[`SEO.md`](./SEO.md).
 
 ### Push notifications — `package/push` + `modules/notifications`
 
@@ -1384,6 +1410,7 @@ and `NotificationKind.AFFILIATE`.
 | `npm run seed-theme-templates` | Create the five starter store appearance templates — palettes (colors only) lifted from real configured stores, topped up from curated fallbacks. Idempotent; `-- --force` tops an existing table back up to five |
 | `npm run seed-categories` | Seed the global category taxonomy (29 top-level + 125 sub) from `scripts/data/globalCategories.ts` — upserts by slug, idempotent, never deletes; fills `optionTemplates`/`specTemplates` from `scripts/data/categoryPresets.ts` only where never set; `-- --dry-run` reports without writing |
 | `npm run audit-media` | List every S3 object and which DB rows reference it (logo/media/order-item keys + bucket-hosted legacy URLs); run per env, `-- --merge <other-env.json>` on the second run yields objects referenced by neither DB. Read-only unless `--delete-orphans --yes` on a merged run. Reports go to `migration-backups/` |
+| `npm run optimize-media` | Bring stored images up to the upload rules and render missing share images (see Media storage). Dry run unless `-- --apply`; `--only=products,logos,store-banners,marketplace-banners`, `--limit=N`. Per environment; never deletes |
 | `npx prisma generate` | Regenerate client after schema edits            |
 
 **Environment files are layered, never edited to switch.** `config/loadEnv.ts`
@@ -1481,55 +1508,12 @@ Branch matching (the node **and** its descendants) comes from
 module's in-memory taxonomy cache — a recursive CTE per page view would be
 the one expensive thing on an otherwise cheap page.
 
-Also done: **sitemaps** — `modules/seo` serves an XML sitemap index, a
-marketplace file, a category file and one file per published store under
-`/api/v1/public`
-(see `API.md` → Sitemaps). A marketplace cannot rely on link-crawling to
-expose its catalog: a product sits three clicks down behind a Load-More
-listing, so a crawler reaches the newest handful in a store and stops. The
-sitemap is how the rest is discovered, and `lastmod` is what gets a price
-change re-crawled. Reuses the same visibility predicates as discovery, and
-additionally drops `hideFromSearch` products. Cached 1 h in process; the
-`<loc>` origin comes from `PUBLIC_WEB_URL` or the request's own host.
-
-Also done: **page shells (per-request HTML)** — `modules/seo/pageShell.*`.
-The frontend is a client-rendered SPA whose `index.html` is byte-identical
-for every URL, so the per-page head `shared/seo.ts` writes after mount
-reached Googlebot (it renders JS) but **not** social-link scrapers
-(WhatsApp, Instagram, Facebook, X, Slack) or most other crawlers. Now nginx
-forwards HTML navigations under `/store/` and `/c/` to root-level
-`GET /store/*` and `GET /c/*` here (see `API.md` → Page shells,
-`DEPLOYMENT.md` → Page shells), which:
-
-- read the built `index.html` (`WEB_SHELL_PATH`, default this clone's
-  `../frontend/dist/index.html`; re-read whenever its mtime/size changes, so
-  a frontend-only deploy is picked up without a restart);
-- resolve the page through the **same public services** the SPA calls
-  (`getPublicStoreShell` / `getVisibleStore` / `getPublicCategory` /
-  `getPublicProduct` / `browseCategory`) — so visibility is decided by the
-  same predicates — **anonymously**, so an owner's unpublished draft is a
-  404 here while the SPA still loads it for them over the API;
-- replace the region between `<!-- seo:start -->` / `<!-- seo:end -->` with
-  that page's title, description, canonical, robots, OG/Twitter tags and
-  JSON-LD (`pageHead.ts`), and answer a **real `404`** for a missing store,
-  product, category, `/c/` node or unknown sub-path — same shell, so the
-  visitor still gets the SPA's not-found screen.
-
-The head rules are **twins** of the page components' `useSeo` calls, and
-`productText.ts` / `structuredData.ts` are ports of the SPA's
-`productDescription.ts` / `structuredData.ts` — a change to either side
-belongs in both. The server marks its tags for the hand-over:
-`data-default` (platform value, read by `seo.ts` for its fallbacks) on the
-title, description and `og:image`, and `data-seo` on JSON-LD blocks.
-
-Failure never costs a visitor the page: a lookup slower than 1.5 s or one
-that throws serves the shell **unmodified** (200), and a missing build
-answers 503, which nginx swaps for its own static `index.html`. Resolved
-200 heads are cached in process for 60 s (≤ 500 entries) to absorb a viral
-link; 404s are never cached, so a store is shareable the moment it
-publishes. Helmet is off for these routes — its API defaults
-(`Referrer-Policy: no-referrer`) on a *document* would break the
-referrer-restricted Maps key on every page opened afterwards.
+Also done: **SEO** — `modules/seo`: XML sitemaps under `/api/v1/public`
+and **page shells**, root-level `GET /store/*` and `GET /c/*` that serve the
+built `index.html` with that page's head written in and a real `404` for a
+dead slug (nginx forwards those prefixes here). Both reuse the public
+visibility predicates. Design, per-page rules, failure modes, caching and the
+roadmap: [`SEO.md`](./SEO.md); contracts: `API.md` → Sitemaps / Page shells.
 
 Also done: **orders** — `modules/orders` places per-store orders from the
 storefront checkout (**signed-in customers only** — placement runs behind

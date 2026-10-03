@@ -4,6 +4,9 @@ import { useEffect } from 'react'
  * Per-route `<head>`: title, description, canonical, robots, Open Graph /
  * Twitter cards and JSON-LD structured data.
  *
+ * docs/SEO.md is the source of truth for SEO — per-page rules, the server
+ * twins, indexing policy, roadmap. Update it whenever this changes.
+ *
  * ## Two writers, one head
  *
  * The storefront is a client-rendered SPA: this module rewrites the head

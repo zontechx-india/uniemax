@@ -612,14 +612,9 @@ shipping-charge rules, customer-side order tracking/cancellation,
 dedicated store policy pages (policy links are already supported in
 the footer), and additional configuration.
 
-**SEO still to come**, on top of what has landed (see Non-Functional
-Requirements): **seller-editable SEO fields** — a meta title, description and
-share image per store and per product, with a live result preview, sensible
-auto-generated defaults and a home in the Store Builder; a crawlable
-`/search?q=` results page (global search is still a dropdown with no URL);
-a **product feed** for Google Merchant Center and the Meta catalog; and a
-**seller-facing taxonomy prompt**, since a product left untagged on the
-global taxonomy cannot appear on any `/c/{slug}` page. (Footer/business
+**SEO still to come** — feeds for Google Merchant Center and the Meta
+catalog, image sizes, reviews, seller-editable SEO fields, more landing
+pages and seller sharing tools — is the roadmap in [SEO.md](./SEO.md). (Footer/business
 info, bank accounts, payment + shipping + checkout settings, customer
 addresses, order placement, and seller order management — confirm → pack
 → ship → deliver + pre-shipment cancellation — have all landed.)
@@ -1173,18 +1168,12 @@ Full rules and design: [AFFILIATE.md](./AFFILIATE.md).
 
 - Responsive Website
 - Fast Loading
-- SEO Friendly — **met for the storefront.** Every public page carries its
-  own title, meta description, canonical, social card and schema.org
-  structured data (`Product`, `Store`, `BreadcrumbList`), there is a
-  `robots.txt`, and XML sitemaps expose every published store's categories
-  and products. **Global category pages** (`/c/{slug}`) give a search like
-  "men's jackets" a URL on this platform to rank — a page about the
-  *category*, drawing products from every published store, that hands the
-  visitor on to whichever seller stocks one. Store, product and category
-  pages arrive with those tags **already in the HTML**, so a link shared on
-  WhatsApp, Instagram or Facebook previews as that product or shop, and a
-  deleted product answers a real "not found" to search engines. What is still
-  to come is listed under Future releases.
+- SEO Friendly — **met for the storefront.** Every public page has its own
+  title, description, social card and structured data; store, product and
+  category pages arrive with them already in the HTML, so shared links preview
+  as the product or shop and deleted pages answer "not found"; sitemaps list
+  every published store and product; `/c/{slug}` pages let category searches
+  land on the platform. Details, rules and the roadmap: [SEO.md](./SEO.md).
 - Secure APIs
 - Image Optimization
 - Cloud Storage

@@ -1,5 +1,5 @@
 import type { FastifyBaseLogger } from "fastify";
-import { mediaUrl } from "../../package/storage/index.js";
+import { shareImagePath } from "../../package/storage/index.js";
 import { HttpError } from "../../utils/httpError.js";
 import { browseCategory } from "../discovery/browse.service.js";
 import {
@@ -25,6 +25,7 @@ import {
 
 /**
  * Which head a storefront URL gets, and whether it is a real page.
+ * docs/SEO.md (§4, §5) is the source of truth — update it with any change here.
  *
  * Each resolver mirrors the SPA page's own `useSeo` call — `StoreHomePage`,
  * `StoreCategoryPage`, `StoreProductPage`, `StoreShopPage`, the support
@@ -178,11 +179,19 @@ async function storePage(
   return pageNotFound;
 }
 
-/** Name, slug and logo — all a non-home store page's head needs. One query. */
+/**
+ * Name, slug and the logo's share image — all a non-home store page's head
+ * needs. One query. Heads use share images (small JPEGs), never originals:
+ * WhatsApp drops a preview image it cannot fetch quickly.
+ */
 async function findStore(slug: string) {
   const store = await orNull(getVisibleStore(slug));
   return store
-    ? { name: store.name, slug: store.slug, logoUrl: mediaUrl("logo", store.logoKey) }
+    ? {
+        name: store.name,
+        slug: store.slug,
+        shareImageUrl: store.logoKey ? shareImagePath("logo", store.logoKey) : null,
+      }
     : null;
 }
 
@@ -206,7 +215,7 @@ async function storeHomePage(slug: string, origin: string): Promise<ResolvedPage
           ? `Shop ${shelves} at ${store.name} on UnieMax. Order online with delivery or store pickup.`
           : `Shop ${store.name} on UnieMax — order online with delivery or store pickup.`),
       canonical: storeHomePath(store.slug),
-      image: store.logoUrl,
+      image: store.shareImageUrl,
       jsonLd: [storeJsonLd(store, origin)],
     },
   };
@@ -228,7 +237,7 @@ async function storeCategoryPage(
   if (!category) {
     return {
       status: 404,
-      head: { title: [store.name], canonical, image: store.logoUrl, robots: NOINDEX },
+      head: { title: [store.name], canonical, image: store.shareImageUrl, robots: NOINDEX },
     };
   }
 
@@ -241,7 +250,7 @@ async function storeCategoryPage(
         ? `${category.name} at ${store.name} — ${children}. Order online with delivery or store pickup on UnieMax.`
         : `Shop ${category.name} at ${store.name} on UnieMax. Order online with delivery or store pickup.`,
       canonical,
-      image: store.logoUrl,
+      image: store.shareImageUrl,
       jsonLd: [storeBreadcrumbJsonLd(store, categoryTrail(store.slug, category), origin)],
     },
   };
@@ -261,7 +270,7 @@ async function storeProductPage(
   if (!product) {
     return {
       status: 404,
-      head: { title: [store.name], image: store.logoUrl, type: "product", robots: NOINDEX },
+      head: { title: [store.name], image: store.shareImageUrl, type: "product", robots: NOINDEX },
     };
   }
 
@@ -282,7 +291,7 @@ async function storeProductPage(
       title: [product.name, store.name],
       description,
       canonical: url,
-      image: product.media.find((item) => item.type === "IMAGE")?.url ?? store.logoUrl,
+      image: product.shareImageUrl ?? store.shareImageUrl,
       type: "product",
       jsonLd: [
         productJsonLd(store, product, description, origin),
@@ -313,7 +322,7 @@ async function storeShopPage(slug: string, query: PageShellQuery): Promise<Resol
         ? null
         : `Browse every product from ${store.name} on UnieMax — order online with delivery or store pickup.`,
       canonical: `/store/${store.slug}/shop`,
-      image: store.logoUrl,
+      image: store.shareImageUrl,
       robots: scoped ? NOINDEX : null,
     },
   };

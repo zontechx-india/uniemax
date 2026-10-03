@@ -17,6 +17,7 @@
     "seed-theme-templates": "tsx src/scripts/seedThemeTemplates.ts",
     "seed-categories": "tsx src/scripts/seedCategories.ts",
     "audit-media": "tsx src/scripts/auditMedia.ts",
+    "optimize-media": "tsx src/scripts/optimizeMedia.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:api": "node --test --test-concurrency=1 \"test/**/*.test.mjs\""
   },
@@ -40,6 +41,7 @@
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.22.0",
     "prisma": "^7.8.0",
+    "sharp": "^0.35.5",
     "web-push": "^3.6.7",
     "zod": "^4.4.3"
   },
