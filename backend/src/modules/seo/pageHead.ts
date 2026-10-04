@@ -38,7 +38,7 @@ const END = "<!-- seo:end -->";
 
 /** What one page wants in its head — the server twin of the SPA's `SeoOptions`. */
 export interface PageHead {
-  /** Most specific first; joined "Part · Part · UnieMax". Empty = "UnieMax". */
+  /** Most specific first; joined "Part · Part · UnieMax". Empty = the platform title. */
   title: string[];
   /** Falsy = the platform default. Clamped to ~160 chars. */
   description?: string | null;
@@ -159,7 +159,9 @@ export function renderHead(
   { origin, path: requestPath }: { origin: string; path: string },
 ): string {
   const parts = head.title.filter(Boolean);
-  const title = parts.length ? `${parts.join(" · ")} · ${APP_NAME}` : APP_NAME;
+  // No parts = a platform page (the homepage): it gets the platform's own
+  // descriptive title from index.html, not the bare brand name.
+  const title = parts.length ? `${parts.join(" · ")} · ${APP_NAME}` : defaults.title;
   const description = head.description ? clampDescription(head.description) : defaults.description;
   const canonical = absoluteUrl(head.canonical || requestPath || "/", origin);
   const image = absoluteUrl(head.image || defaults.image, origin);

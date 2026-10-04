@@ -1,12 +1,24 @@
 import { useState } from 'react'
 import { adminApi } from '../features/adminApi'
-import type { ShelfConversionPlan, ShelfRow } from '../features/adminApi'
-import { useAdminList } from '../features/useAdminQuery'
+import type { CatalogCoverage, ShelfConversionPlan, ShelfRow } from '../features/adminApi'
+import { useAdminList, useAdminQuery } from '../features/useAdminQuery'
+import type { QueryResult } from '../features/useAdminQuery'
 import { CategoryPicker } from '../../shared/categories/CategoryPicker'
 import { toApiError } from '../../shared/auth/http'
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
-import { Button, Card, Chip, EmptyState, ErrorState, PageHeader, Skeleton } from '../ui/primitives'
+import {
+  Button,
+  Card,
+  CardHeader,
+  Chip,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  Skeleton,
+} from '../ui/primitives'
 import { Pagination } from '../ui/DataTable'
+import { formatCount } from '../ui/format'
+import { StatTile } from '../ui/StatTile'
 import { SearchInput, Tabs, Toolbar } from '../ui/Toolbar'
 
 /**
@@ -22,6 +34,12 @@ import { SearchInput, Tabs, Toolbar } from '../ui/Toolbar'
  * Conversion is one-way — a merge cannot be un-merged — so the server plans
  * it first and the confirm dialog shows exactly that plan. What the admin
  * approves is what runs; nothing is folded in silently.
+ *
+ * The coverage panel on top is why this work matters: a product on an
+ * unconverted shelf has no platform category, so it is missing from every
+ * global category page (`/c/{slug}`) and the category sitemap. It shows how
+ * much of the live catalog those pages reach, and which stores to convert
+ * first — picking one filters the queue to its shelves.
  */
 
 type Status = 'PENDING' | 'CONVERTED' | 'ALL'
@@ -29,15 +47,33 @@ type Status = 'PENDING' | 'CONVERTED' | 'ALL'
 export default function CategoryMappingPage() {
   const list = useAdminList<ShelfRow>(
     (query) => adminApi.listShelves(query),
-    { keys: ['q', 'status'], pageSize: 20 },
+    { keys: ['q', 'status', 'storeId'], pageSize: 20 },
   )
+  const coverage = useAdminQuery(() => adminApi.catalogCoverage())
   const status = (list.filters.status as Status) ?? 'PENDING'
+  const storeId = list.filters.storeId ?? null
+  const storeName =
+    coverage.data?.stores.find((store) => store.id === storeId)?.name ??
+    list.rows.find((row) => row.store.id === storeId)?.store.name ??
+    'this store'
+
+  // A conversion moves the coverage numbers as well as the queue.
+  const refreshAll = () => {
+    list.refresh()
+    coverage.refresh()
+  }
 
   return (
     <div>
       <PageHeader
         title="Category mapping"
         subtitle="Shelves sellers typed themselves, before categories were chosen from a list. Convert each one into the platform category it stands for — the typed shelf is replaced, and its products move with it."
+      />
+
+      <CoveragePanel
+        query={coverage}
+        activeStoreId={storeId}
+        onPickStore={(id) => list.setFilter('storeId', id === storeId ? '' : id)}
       />
 
       <Card>
@@ -56,6 +92,15 @@ export default function CategoryMappingPage() {
             onChange={(value) => list.setFilter('q', value)}
             placeholder="Search shelf or store…"
           />
+          {storeId && (
+            <button
+              type="button"
+              onClick={() => list.setFilter('storeId', '')}
+              aria-label={`Show every store, not only ${storeName}`}
+            >
+              <Chip tone="info">{storeName} ×</Chip>
+            </button>
+          )}
         </Toolbar>
 
         {list.loading ? (
@@ -80,7 +125,7 @@ export default function CategoryMappingPage() {
         ) : (
           <div className="divide-y divide-line">
             {list.rows.map((shelf) => (
-              <ShelfRowView key={shelf.id} shelf={shelf} onConverted={list.refresh} />
+              <ShelfRowView key={shelf.id} shelf={shelf} onConverted={refreshAll} />
             ))}
           </div>
         )}
@@ -93,6 +138,94 @@ export default function CategoryMappingPage() {
           busy={list.loading}
         />
       </Card>
+    </div>
+  )
+}
+
+/**
+ * How much of the live catalog the global category pages reach, and where
+ * the gap is. Counted by the server over exactly the products a category
+ * page could list (`GET /admin/catalog/coverage`).
+ */
+function CoveragePanel({
+  query,
+  activeStoreId,
+  onPickStore,
+}: {
+  query: QueryResult<CatalogCoverage>
+  activeStoreId: string | null
+  onPickStore: (storeId: string) => void
+}) {
+  if (query.error) {
+    return (
+      <Card className="mb-4">
+        <ErrorState message={query.error} onRetry={query.refresh} />
+      </Card>
+    )
+  }
+  if (!query.data) {
+    return (
+      <Card className="mb-4">
+        <Skeleton rows={2} />
+      </Card>
+    )
+  }
+
+  const c = query.data
+  // Floored, so a single missing product never rounds up to "100%".
+  const reach = c.discoverableProducts
+    ? Math.floor((c.onCategoryPages / c.discoverableProducts) * 100)
+    : 100
+
+  return (
+    <div className="mb-4 space-y-4">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatTile
+          label="On category pages"
+          value={`${reach}%`}
+          hint={`${formatCount(c.onCategoryPages)} of ${formatCount(c.discoverableProducts)} live products`}
+        />
+        <StatTile
+          label="Missing — no category"
+          value={formatCount(c.unclassifiedProducts)}
+          hint={
+            c.shelvesToConvert > 0
+              ? `On ${formatCount(c.shelvesToConvert)} shelf${c.shelvesToConvert === 1 ? '' : 'ves'} to convert`
+              : 'Every live product has a category'
+          }
+          tone={c.unclassifiedProducts > 0 ? 'warning' : 'default'}
+        />
+        <StatTile
+          label="Missing — category disabled"
+          value={formatCount(c.inDisabledCategories)}
+          hint="Re-enable the category to bring them back"
+          to="/categories"
+          tone={c.inDisabledCategories > 0 ? 'warning' : 'default'}
+        />
+      </div>
+
+      {c.stores.length > 0 && (
+        <Card>
+          <CardHeader
+            title="Convert first"
+            subtitle="Stores with the most live products missing from category pages. Pick one to see only its shelves."
+          />
+          <div className="flex flex-wrap gap-2">
+            {c.stores.map((store) => (
+              <button
+                key={store.id}
+                type="button"
+                onClick={() => onPickStore(store.id)}
+                aria-pressed={store.id === activeStoreId}
+              >
+                <Chip tone={store.id === activeStoreId ? 'info' : 'neutral'}>
+                  {store.name} · {formatCount(store.unclassifiedProducts)}
+                </Chip>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   )
 }

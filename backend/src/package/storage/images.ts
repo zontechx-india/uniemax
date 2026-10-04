@@ -5,7 +5,7 @@ import type { MediaBucket } from "./types.js";
  * Image rules — the ONE place that decides what an image we store or serve
  * looks like. Pure functions over bytes; storage I/O lives in the facade.
  *
- * Three outputs:
+ * Four outputs:
  *
  *  - **Originals** (`normalizeImage`) — what an upload is stored as. The
  *    browser editor already crops and compresses to WebP, but the server
@@ -23,13 +23,17 @@ import type { MediaBucket } from "./types.js";
  *    and not the other. A small baseline JPEG is the one format every
  *    preview service renders.
  *
+ *  - **Store cards** (`renderCardImage`) — a store logo set on a wide
+ *    1200×630 canvas, the link preview for store pages. WhatsApp gives a
+ *    square image (every logo) only the small thumbnail card; a ~1.91:1
+ *    image gets the large one.
+ *
  *  - **Sized copies** (`renderSizedImage`) — the same photo at a few fixed
  *    widths, offered to browsers as `srcset` candidates so a product grid on
  *    a phone downloads a 320 px copy, not the 1920 px original.
  *
- * Share images and sized copies are both *derived images*: made from an
- * original on first request, stored beside it, cached forever (see
- * `DERIVATIVES` below).
+ * All but originals are *derived images*: made from an original on first
+ * request, stored beside it, cached forever (see `DERIVATIVES` below).
  */
 
 // One-off images: libvips' operation cache would only hold memory.
@@ -142,6 +146,99 @@ export async function renderShareImage(buffer: Buffer): Promise<Buffer> {
 }
 
 // ---------------------------------------------------------------------------
+// Store cards (wide link previews for logos)
+// ---------------------------------------------------------------------------
+
+/** The size Facebook, WhatsApp, X and LinkedIn all treat as a large card. */
+export const CARD_SIZE = { width: 1200, height: 630 } as const;
+
+/**
+ * The logo's box on the card: centred, with margin on every side, because
+ * X crops a large card to 2:1 and some apps round its corners.
+ */
+const CARD_LOGO_BOX = { width: 840, height: 400 } as const;
+
+const WHITE = { r: 255, g: 255, b: 255 };
+
+/**
+ * Edge pixels may drift this far (per channel, 0–255) from their mean and
+ * still count as one flat colour — room for JPEG noise and anti-aliasing.
+ */
+const FLAT_EDGE_TOLERANCE = 24;
+
+/**
+ * The canvas colour for a logo: the logo's own background when its edges are
+ * one flat colour (a white mark on a solid purple square becomes a purple
+ * card, with no visible box around the logo), white otherwise. A transparent
+ * logo's edges flatten to white, so it lands on white — the same backdrop
+ * share images use.
+ */
+async function cardBackground(buffer: Buffer): Promise<{ r: number; g: number; b: number }> {
+  const SAMPLE = 32;
+  const { data } = await decode(buffer)
+    .rotate()
+    .flatten({ background: WHITE })
+    .resize(SAMPLE, SAMPLE, { fit: "fill" })
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const edge: [number, number, number][] = [];
+  for (let y = 0; y < SAMPLE; y++) {
+    for (let x = 0; x < SAMPLE; x++) {
+      if (x !== 0 && y !== 0 && x !== SAMPLE - 1 && y !== SAMPLE - 1) continue;
+      const i = (y * SAMPLE + x) * 3;
+      edge.push([data[i]!, data[i + 1]!, data[i + 2]!]);
+    }
+  }
+  const mean = [0, 1, 2].map(
+    (c) => edge.reduce((sum, pixel) => sum + pixel[c]!, 0) / edge.length,
+  ) as [number, number, number];
+  const flat = edge.every((pixel) =>
+    pixel.every((value, c) => Math.abs(value - mean[c]!) <= FLAT_EDGE_TOLERANCE),
+  );
+  if (!flat) return WHITE;
+  const [r, g, b] = mean.map(Math.round) as [number, number, number];
+  return { r, g, b };
+}
+
+/**
+ * The logo without the blank margin its file may carry (transparent, or a
+ * flat colour matching its corner), so the mark itself — not its padding —
+ * is what gets scaled to the card. A logo that is all margin, or that trim
+ * cannot read, is used as it is.
+ */
+async function trimmedLogo(buffer: Buffer): Promise<Buffer> {
+  const upright = await decode(buffer).rotate().png().toBuffer();
+  try {
+    return await sharp(upright).trim({ threshold: 12 }).png().toBuffer();
+  } catch {
+    return upright;
+  }
+}
+
+/**
+ * A logo centred on a 1200×630 baseline JPEG, the canvas filled with the
+ * logo's own background colour (see `cardBackground`). The logo's margin is
+ * trimmed and the mark scaled to fill its box — small logos are enlarged,
+ * because a 200 px mark lost in a 1200 px card reads as an empty preview.
+ * Flat colour compresses to a few tens of KB, far under the share-image
+ * ceiling.
+ */
+export async function renderCardImage(buffer: Buffer): Promise<Buffer> {
+  const [background, logo] = await Promise.all([
+    cardBackground(buffer),
+    trimmedLogo(buffer).then((trimmed) =>
+      sharp(trimmed).resize({ ...CARD_LOGO_BOX, fit: "inside" }).png().toBuffer(),
+    ),
+  ]);
+  return sharp({ create: { ...CARD_SIZE, channels: 3, background } })
+    .composite([{ input: logo, gravity: "centre" }])
+    .jpeg({ quality: 85, mozjpeg: true })
+    .toBuffer();
+}
+
+// ---------------------------------------------------------------------------
 // Sized copies (responsive images)
 // ---------------------------------------------------------------------------
 
@@ -197,6 +294,7 @@ const sized = (width: ImageWidth): Derivative => ({
 /** Every kind of derived image. A new preset is one entry here. */
 const DERIVATIVES = {
   share: { ext: "jpg", contentType: "image/jpeg", render: renderShareImage },
+  card: { ext: "jpg", contentType: "image/jpeg", render: renderCardImage },
   w320: sized(320),
   w640: sized(640),
   w960: sized(960),
@@ -205,13 +303,28 @@ const DERIVATIVES = {
 
 export type DerivativeName = keyof typeof DERIVATIVES;
 
+/** The derived images that are link previews (`og:image`). */
+export type PreviewDerivative = Extract<DerivativeName, "share" | "card">;
+
+/**
+ * Which preview each bucket's images get. Product photos and banners keep
+ * their own shape (`share`); logos go on a wide card (`card`), since a
+ * square logo only ever earns WhatsApp's small thumbnail.
+ */
+const PREVIEW_BY_BUCKET: Record<MediaBucket, PreviewDerivative> = {
+  media: "share",
+  logo: "card",
+};
+
 /** The sized copies, smallest first. */
 export const SIZED_DERIVATIVES: readonly DerivativeName[] = IMAGE_WIDTHS.map(
   (width) => `w${width}` as const,
 );
 
-/** Every derived image — what a stored image gets on upload. */
-export const ALL_DERIVATIVES = Object.keys(DERIVATIVES) as DerivativeName[];
+/** Every derived image an original in `bucket` gets — its preview and its sized copies. */
+export function derivativesFor(bucket: MediaBucket): DerivativeName[] {
+  return [PREVIEW_BY_BUCKET[bucket], ...SIZED_DERIVATIVES];
+}
 
 export function derivative(name: DerivativeName): Derivative {
   return DERIVATIVES[name];
@@ -222,14 +335,17 @@ export function derivedKey(name: DerivativeName, key: string): string {
 }
 
 /**
- * The public URL path that serves an original's share image
- * (`GET /api/v1/public/images/share/{bucket}/{key}.jpg`, generated on first
- * request). The `.jpg` suffix makes the URL say what it serves — some
- * preview scrapers judge an image by its extension, and the original's may
- * be `.webp`. Relative — callers make it absolute against the site origin.
+ * The public URL path of an original's link-preview image — the share image
+ * of a photo (`/api/v1/public/images/share/media/{key}.jpg`) or the card of
+ * a logo (`/api/v1/public/images/card/logo/{key}.jpg`), generated on first
+ * request. Every `og:image` goes through here, so which preview a kind of
+ * image gets is decided once (`PREVIEW_BY_BUCKET`). The `.jpg` suffix makes
+ * the URL say what it serves — some preview scrapers judge an image by its
+ * extension, and the original's may be `.webp`. Relative — callers make it
+ * absolute against the site origin.
  */
 export function shareImagePath(bucket: MediaBucket, key: string): string {
-  return `/api/v1/public/images/share/${bucket}/${key}${SHARE_URL_SUFFIX}`;
+  return `/api/v1/public/images/${PREVIEW_BY_BUCKET[bucket]}/${bucket}/${key}${SHARE_URL_SUFFIX}`;
 }
 
 export const SHARE_URL_SUFFIX = ".jpg";

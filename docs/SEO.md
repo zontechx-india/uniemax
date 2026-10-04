@@ -8,6 +8,12 @@
 > every existing image has been brought up to date ([§9](#9-operations)).
 > **Sized photos** (`srcset` — phones download a copy that fits, not the
 > original; [§4.6](#46-sized-photos-srcset)) are **live on dev and production** (`v1.22.0`).
+> **In code, not yet released:** page shells for `/` and `/sell` (absolute
+> `og:image`, own canonical), **store cards** (wide link previews for store
+> pages, [§4.7](#47-store-cards-wide-link-previews)), product images in the
+> store sitemaps, `/sell` in the sitemap, and the category-page **coverage**
+> report for admins ([§10](#10-known-gaps-and-caveats)). Rollout steps:
+> [§9](#9-operations).
 > Everything else in the [roadmap](#11-roadmap) is not started.
 >
 > **This file owns SEO.** What SEO is for this platform, how it is built, the
@@ -84,9 +90,11 @@ JavaScript *after* that happens.
 - A deleted product still answered **HTTP 200** (the SPA fallback serves
   `index.html` for anything), so search engines could not tell it was gone.
 
-**Page shells** fix both for store and category pages: the backend sends the
-same `index.html`, but with *that page's* tags already written into it, and a
-real **404** when the page does not exist. See [§4](#4-architecture).
+**Page shells** fix both for every page meant to be found or shared (the
+home page, `/sell`, store and category pages): the backend sends the same
+`index.html`, but with *that page's* tags already written into it — every URL
+absolute — and a real **404** when the page does not exist. See
+[§4](#4-architecture).
 
 > **Common question — does `index.html` now contain all our products?** No.
 > It is a ~8 KB template that never grows. For each request the backend looks
@@ -124,11 +132,13 @@ For search, nobody googles a shop they have never heard of; they google
 | Per-route head (title, description, canonical, robots, OG/Twitter, JSON-LD) written in the browser | `frontend/src/shared/seo.ts` (`useSeo`, `usePageTitle`, `usePrivatePageTitle`) | 23 Sep 2026 (titles only since 25 Jul) |
 | Structured data: `Product`/`Offer`/`AggregateOffer`, `Store`/`Organization`, `BreadcrumbList`, `ItemList`, `WebSite` | `frontend/src/storefront/features/publicStore/structuredData.ts` + page components | 23 Sep 2026 |
 | `robots.txt` (per-customer pages, consoles, affiliate redirects, `?q=` disallowed; declares the sitemap) | `frontend/public/robots.txt` | 23 Sep 2026 |
-| XML sitemaps (index · stores · categories · one per store) | `backend/src/modules/seo/sitemap.service.ts` · contract in [`API.md`](./API.md) → Sitemaps | 23 Sep 2026 |
+| XML sitemaps (index · stores · categories · one per store); per-store files list product photos and the logo as `<image:image>` | `backend/src/modules/seo/sitemap.service.ts` · contract in [`API.md`](./API.md) → Sitemaps | 23 Sep 2026; images and `/sell` in code, not yet released |
 | Global category landing pages `/c/{slug}` | `frontend/src/storefront/pages/BrowseCategoryPage.tsx` · `backend/src/modules/discovery/browse.service.ts` | 23 Sep 2026 |
 | **Page shells**: per-page tags in the first byte for `/store/**` and `/c/**`, real 404s | `backend/src/modules/seo/pageShell.*`, `pageHead.ts` · contract in [`API.md`](./API.md) → Page shells | 1 Oct 2026, dev + prod |
+| Page shells for `/` and `/sell` (absolute `og:image`, own canonical, `WebSite` JSON-LD in the first byte) | same files; nginx step in [`DEPLOYMENT.md`](./DEPLOYMENT.md) → Adding `/` and `/sell` | in code, not yet released |
+| **Store cards**: store pages' `og:image` is the logo on a 1200×630 card, so WhatsApp shows the large preview — see [§4.7](#47-store-cards-wide-link-previews) | `renderCardImage` in `backend/src/package/storage/images.ts` · contract in [`API.md`](./API.md) → Image derivatives | in code, not yet released |
 | Share button (native share sheet / copy link) on store header and product page | `frontend/src/storefront/features/publicStore/ShareButton.tsx` | before Sep 2026 |
-| **Share images**: every `og:image` on a page shell is a preview-safe JPEG (≤ 1200 px, < 300 KB) of the cover photo or logo, so WhatsApp shows it — see [§4.5](#45-share-images-link-preview-images) | `backend/src/package/storage/images.ts`, `backend/src/modules/media/` · contract in [`API.md`](./API.md) → Share images | 4 Oct 2026, dev + prod (`v1.21.0`) |
+| **Share images**: every product page's `og:image` is a preview-safe JPEG (≤ 1200 px, < 300 KB) of the cover photo, so WhatsApp shows it — see [§4.5](#45-share-images-link-preview-images) | `backend/src/package/storage/images.ts`, `backend/src/modules/media/` · contract in [`API.md`](./API.md) → Share images | 4 Oct 2026, dev + prod (`v1.21.0`) |
 | **Sized photos**: every stored image is offered at 320/640/960/1280 px via `srcset`, so the browser downloads the copy that fits — see [§4.6](#46-sized-photos-srcset) | `frontend/src/shared/media/MediaImg.tsx`, `backend/src/package/storage/images.ts` · contract in [`API.md`](./API.md) → Image derivatives | 4 Oct 2026, dev + prod (`v1.22.0`) |
 | Measurement: GA4 + Meta Pixel (not SEO, but how SEO results are measured) | `frontend/index.html`, `frontend/src/shared/analytics/` · [`FRONTEND_CONTEXT.md`](./FRONTEND_CONTEXT.md) | 28 Sep 2026 |
 
@@ -144,13 +154,14 @@ For search, nobody googles a shop they have never heard of; they google
                                 nginx
           ┌───────────────────────┼─────────────────────────────┐
           │                       │                             │
-  /store/** and /c/**      /api/** (JSON API)        everything else
-  (page shells)                   │                  ( /, /sell, /cart,
-          │                       │                    /assets/ … )
+  /, /sell, /store/**,     /api/** (JSON API)        everything else
+  /c/** (page shells)             │                  ( /cart, /checkout/,
+          │                       │                    /mystores, /assets/ … )
           ▼                       ▼                             ▼
-  Fastify GET /store/*     Fastify /api/v1/…         static files from the
-  Fastify GET /c/*                                    frontend build
-          │                                           (index.html as built)
+  Fastify GET / · /sell    Fastify /api/v1/…         static files from the
+  Fastify GET /store/*                                frontend build
+  Fastify GET /c/*                                    (index.html as built)
+          │
           ├─ 1. load frontend/dist/index.html (cached until the file changes)
           ├─ 2. look up the page with the SAME public services the API uses
           ├─ 3. replace the region between <!-- seo:start --> … <!-- seo:end -->
@@ -164,8 +175,9 @@ For search, nobody googles a shop they have never heard of; they google
 
 If the backend is down, slow (> 1.5 s), throws, or rate-limits, the visitor
 still gets a working page: the backend serves `index.html` unmodified, or
-nginx serves its own static copy. A store page can never be worse than before
-page shells existed.
+nginx serves its own static copy. A page can never be worse than before
+page shells existed. (`/` and `/sell` are live on nginx only once the step in
+[§9](#9-operations) is applied; until then they are the static file.)
 
 ### 4.2 Two writers, one head
 
@@ -173,7 +185,7 @@ The same tags are written in two places, and they must agree:
 
 | Who writes | When | Who sees it | Code |
 | --- | --- | --- | --- |
-| **Backend** (page shell) | Before the first byte, only for `/store/**` and `/c/**` | Everyone — scrapers, every crawler, the browser | `backend/src/modules/seo/pageShell.service.ts` (rules), `pageHead.ts` (rendering) |
+| **Backend** (page shell) | Before the first byte, for `/`, `/sell`, `/store/**` and `/c/**` | Everyone — scrapers, every crawler, the browser | `backend/src/modules/seo/pageShell.service.ts` (rules), `pageHead.ts` (rendering) |
 | **Browser** (`seo.ts`) | After React mounts, and on every in-app navigation, on every route | Googlebot and visitors (tab title) | `frontend/src/shared/seo.ts` + each page's `useSeo` call |
 
 So every per-page rule exists twice — the page component's `useSeo` call and
@@ -209,8 +221,11 @@ different things — not an error, but inconsistent.
   (`name=` then `content=`) — the backend matches that shape.
 - Without the markers the backend serves `index.html` untouched (and logs a
   warning) rather than half-editing it.
-- Routes not served by page shells (`/`, `/sell`, …) get this file as built,
-  so these values must describe the **platform**, never a page.
+- Routes not served by page shells (cart, checkout, account, the seller
+  console) get this file as built, so these values must describe the
+  **platform**, never a page. Its `og:image` is a relative path
+  (`/og-image.jpg`, the platform's 1200×630 card); page shells make it
+  absolute, which is why every shareable page is a page shell.
 
 Hand-over details between the two writers:
 
@@ -236,7 +251,7 @@ Hand-over details between the two writers:
 | Headers | `text/html; charset=utf-8`, `cache-control: no-cache` (same as nginx gives `index.html`). Helmet is **off** for these routes: its `Referrer-Policy: no-referrer` on a document would break the referrer-restricted Google Maps key on every page opened afterwards. |
 | Query params | Read like the SPA reads them, never rejected. `utm_*`, `fbclid` etc. are ignored and never reach the canonical. |
 | URL limits | Path params up to 500 chars (`maxParamLength` in `app.ts`) — long product names make long slugs. |
-| Images | `og:image` / `twitter:image` are **share images** ([§4.5](#45-share-images-link-preview-images)), never originals. JSON-LD `image` keeps the full-size originals — Google wants the largest. |
+| Images | `og:image` / `twitter:image` are **share images** on product pages ([§4.5](#45-share-images-link-preview-images)) and **store cards** on store pages ([§4.7](#47-store-cards-wide-link-previews)), never originals. JSON-LD `image` keeps the full-size originals — Google wants the largest. |
 
 ### 4.5 Share images (link-preview images)
 
@@ -258,7 +273,8 @@ re-share reuses whatever it got first.
    skipped the editor went in at full size. An image that already meets the
    rules is stored untouched. Details: [`BACKEND_CONTEXT.md`](./BACKEND_CONTEXT.md) → Media storage.
 2. **Previews use a dedicated copy.** A preview-safe JPEG of each product
-   cover and store logo: ≤ 1200 px, white behind transparency, < 300 KB,
+   cover (logos get a wide store card instead — [§4.7](#47-store-cards-wide-link-previews)):
+   ≤ 1200 px, white behind transparency, < 300 KB,
    baseline JPEG (the one format every preview service renders). It lives
    beside the original at `derived/share/<key>.jpg` (no DB column — originals
    are immutable, so their share image is too) and is served by
@@ -310,12 +326,49 @@ product page 429 → 223 KB. Production after release (phone): KC Trends'
 watch page 464 KB where the same images at full size are 2,160 KB; the
 marketplace home 1,257 KB vs 3,216 KB.
 
+### 4.7 Store cards (wide link previews)
+
+**The problem.** WhatsApp, Facebook and LinkedIn pick the card layout from
+the image's shape: a wide image (~1.91:1) gets the **large** card, a square
+one only a small thumbnail beside the text. Store logos are square (or
+portrait), so every shared store link got the small card — while a product
+photo shared next to it got the large one.
+
+**The fix, at the root.** A **store card** derived image
+(`renderCardImage` in `backend/src/package/storage/images.ts`), registered
+beside share images and sized copies, so it gets the same lifecycle for free
+(rendered on first request, stored at `derived/card/<key>.jpg`, cached
+forever, warmed on every logo upload, pre-rendered by `optimize-media`):
+
+- **1200×630** baseline JPEG, typically 10–30 KB.
+- The logo's blank margin is trimmed, then the mark is scaled to a centred
+  840×400 box (enlarged if small — a tiny mark in a big card reads as an
+  empty preview) with margin for X's 2:1 crop.
+- The canvas is the logo's **own background colour** when its edges are one
+  flat colour (an orange square logo becomes an orange card, with no box
+  around the mark), otherwise white — the same backdrop share images use.
+
+Which preview a kind of image gets is decided in **one place**
+(`PREVIEW_BY_BUCKET`: product photos → share image, logos → card), and every
+`og:image` URL is built by `shareImagePath(bucket, key)`, so store home,
+category, shop and product-fallback heads all switched with no change at the
+call sites. Old logo share-image URLs keep working for previews cached
+before the switch.
+
+The platform's own card (`frontend/public/og-image.jpg`, the default
+`og:image`) is the logo lockup rendered by the same function.
+
+No text is drawn on the card: the store name is already the `og:title`
+printed under it, and text rendering would need fonts for every script a
+store name can be written in.
+
 ---
 
 ## 5. Per-page head rules
 
 Title format everywhere: parts joined with ` · ` and suffixed ` · UnieMax`
-(no parts → `UnieMax`). Descriptions are flattened and cut at ~160 chars on a
+(no parts → the platform title in `index.html`, "UnieMax — Online Shops You
+Can Buy From Directly"; only the home page has none). Descriptions are flattened and cut at ~160 chars on a
 word boundary. Canonicals are absolute, built from `PUBLIC_WEB_URL` on the
 server and `window.location.origin` in the browser; when a page gives no
 canonical it is the current path **without** the query string.
@@ -324,15 +377,15 @@ canonical it is the current path **without** the query string.
 
 | Page | Title parts | Description | Canonical | Robots | Image | JSON-LD | Missing → |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Store home `/store/{s}` **S** | store | Footer "About" text, else `Shop {first 6 shelves} at {store} on UnieMax. Order online with delivery or store pickup.`, else `Shop {store} on UnieMax — …` | `/store/{s}` | index (draft: noindex, browser only) | logo's share image | `Store` (has a footer address) or `Organization` | 404 "Store not available" |
-| Category `/store/{s}/category/{c}` **S** | category, store | `{cat} at {store} — {subcategories}. …` or `Shop {cat} at {store} on UnieMax. …` | itself | index | logo's share image | `BreadcrumbList` | 404, title = store, noindex |
-| Product `/store/{s}/product/{p}` **S** | product, store | Seller's prose → their bullet highlights → `Buy {name} from ₹{price} — {category} from {store} on UnieMax. …` | itself | index | cover photo's share image, else the logo's | `Product` + `Offer`/`AggregateOffer` (full-size photos), `BreadcrumbList` | 404, title = store, noindex |
-| Shop `/store/{s}/shop` **S** | `Shop` / `Search "{q}"` / section name, store | `Browse every product from {store} on UnieMax — …` (unscoped only) | `/store/{s}/shop` | `?q=` or `?section=` → noindex | logo's share image | — | 404 "Store not available" |
+| Store home `/store/{s}` **S** | store | Footer "About" text, else `Shop {first 6 shelves} at {store} on UnieMax. Order online with delivery or store pickup.`, else `Shop {store} on UnieMax — …` | `/store/{s}` | index (draft: noindex, browser only) | store card | `Store` (has a footer address) or `Organization` | 404 "Store not available" |
+| Category `/store/{s}/category/{c}` **S** | category, store | `{cat} at {store} — {subcategories}. …` or `Shop {cat} at {store} on UnieMax. …` | itself | index | store card | `BreadcrumbList` | 404, title = store, noindex |
+| Product `/store/{s}/product/{p}` **S** | product, store | Seller's prose → their bullet highlights → `Buy {name} from ₹{price} — {category} from {store} on UnieMax. …` | itself | index | cover photo's share image, else the store card | `Product` + `Offer`/`AggregateOffer` (full-size photos), `BreadcrumbList` | 404, title = store, noindex |
+| Shop `/store/{s}/shop` **S** | `Shop` / `Search "{q}"` / section name, store | `Browse every product from {store} on UnieMax — …` (unscoped only) | `/store/{s}/shop` | `?q=` or `?section=` → noindex | store card | — | 404 "Store not available" |
 | Store support `/store/{s}/support` **S** | `Help & Support`, store | platform default | path | index | platform | — | — |
 | Support thread `/store/{s}/support/{id}` **S** | `Support request`, store | platform default | path | noindex | platform | — | — |
 | Global category `/c/{slug}` **S** | category, `Shop by category` | `Shop {cat} on UnieMax — {n} products from {k} independent shops. …` (or a no-count line when empty) | `/c/{slug}` | noindex when empty, `?page=` > 1, or `?sort=` ≠ newest | platform | `BreadcrumbList` + `ItemList` (indexable pages only) | 404, noindex |
-| Marketplace home `/` **B** | — (`UnieMax`) | platform description | `/` | index | platform | `WebSite` | — |
-| `/sell` **B** | `Create your free online store` | seller pitch | `/sell` | index | platform | — | — |
+| Marketplace home `/` **S** | — (the platform title) | platform description | `/` | index | platform card (`og-image.jpg`) | `WebSite` | — |
+| `/sell` **S** | `Create your free online store` | seller pitch | `/sell` | index | platform card | — | — |
 | Cart, checkout, order confirmation, account, addresses, marketplace support **B** | page name | platform | path | **noindex** (`usePrivatePageTitle`) + `robots.txt` disallow | platform | — | — |
 
 ---
@@ -380,8 +433,15 @@ sitemaps list everything, and `lastmod` is what gets a price change
 re-crawled.
 
 - `robots.txt` declares `https://uniemax.com/api/v1/public/sitemap.xml`
-  (an index → `sitemap-stores.xml`, `sitemap-categories.xml`, one
-  `sitemap-store-{slug}.xml` per published store).
+  (an index → `sitemap-stores.xml` (`/`, `/sell` and every store's front
+  page), `sitemap-categories.xml`, one `sitemap-store-{slug}.xml` per
+  published store).
+- **Image sitemap:** each per-store file lists the logo on the store home and
+  every product's photos (gallery order, full-size originals) as
+  `<image:image>`, so photos reach Google Images even though the page draws
+  them with JavaScript. Alt text is read from the page itself — sellers set
+  it per photo ("Describe this photo" in the product editor), falling back
+  to the product name.
 - One file per store on purpose: Search Console reports coverage per
   sitemap, which answers "how much of this seller's catalog is indexed".
 - Same visibility predicates as the storefront, plus `hideFromSearch`
@@ -395,6 +455,8 @@ re-crawled.
 | Item | State |
 | --- | --- |
 | nginx forwards `/store/` and `/c/` to the API | **Live since 1 Oct 2026** on all four vhosts (dev → `:4001`, prod → `:4000`). Commands, verification and rollback: [`DEPLOYMENT.md`](./DEPLOYMENT.md) → Page shells. |
+| nginx forwards `/` and `/sell` to the API | **Applied on dev and prod, 4 Oct 2026** ([`DEPLOYMENT.md`](./DEPLOYMENT.md) → Adding `/` and `/sell`). Until each environment runs a release with their routes, its backend 404s and nginx serves the static `index.html` (relative `og:image`) — they become page shells with that release, no further server step. |
+| Store cards for existing logos | **Dev done, 4 Oct 2026** (20 logos). **Prod to do:** `$env:APP_ENV="production"; npm run optimize-media -- --apply --only=logos` (dry run: 30 logos, cards only, nothing re-encoded). Without it, each store's first share renders its card (~0.5 s). |
 | ⚠️ Rolling production back past `747a9b3` | Remove the prod page-shell include **first** — an older backend answers those paths with a JSON 404. |
 | Google Search Console / Bing Webmaster Tools | **Not confirmed.** The repo has no verification tag (only Meta's `facebook-domain-verification`), so if they are set up it is by DNS. Submit `sitemap.xml` in both. |
 | `PUBLIC_WEB_URL` | Origin for canonicals, `og:url`, `og:image` and sitemap `<loc>`s. Prod: `https://uniemax.com`. |
@@ -406,6 +468,8 @@ Quick checks (public, safe to run any time):
 ```bash
 curl -s https://uniemax.com/store/<slug> | grep -o '<title[^<]*</title>'   # the store's own title
 curl -s -o /dev/null -w '%{http_code}\n' https://uniemax.com/store/no-such-store-zz9   # 404
+curl -s https://uniemax.com/store/<slug> | grep -o 'og:image" content="[^"]*'   # …/images/card/logo/….jpg
+curl -s https://uniemax.com/ | grep -o 'og:image" content="[^"]*'   # https://uniemax.com/og-image.jpg (absolute)
 ```
 
 External tools: Meta **Sharing Debugger** (developers.facebook.com/tools/debug)
@@ -424,13 +488,13 @@ Automated tests: `backend/test/page-shell.test.mjs` (read-only; part of
 - **WhatsApp caches previews per URL** on each phone. A link shared before
   share images went live keeps its image-less card there; any query string
   (`?v=2`) gets a fresh one.
-- **Store links get WhatsApp's compact card** (small thumbnail beside the
-  text) because logos are square; only wide images (~1.91:1, e.g.
-  1200×630) get the large card. A generated wide store card would fix that
-  (roadmap step 7).
-- **`/` and `/sell`** are not page shells. Their `og:image` in `index.html`
-  is a relative path (`/app_logo_with_name.png`), which some scrapers cannot
-  load — an absolute URL there would fix their previews.
+- **Product photos are previewed in their own shape.** A square product photo
+  still gets WhatsApp's compact card; it is kept as is on purpose — the photo
+  itself, large, is what sells, and padding it onto a wide canvas would shrink
+  it. Store pages use wide store cards ([§4.7](#47-store-cards-wide-link-previews)).
+- **Static fallback.** Any page served as the static `index.html` (backend
+  down, or `/` and `/sell` before their nginx step) carries the relative
+  `og:image` `/og-image.jpg`, which some scrapers cannot load.
 - **Logic exists twice** (browser + server, [§4.2](#42-two-writers-one-head)).
   There is no shared package between `frontend/` and `backend/`, so the twins
   are kept in step by hand.
@@ -438,10 +502,14 @@ Automated tests: `backend/test/page-shell.test.mjs` (read-only; part of
   counts) to build the head — the slowest page shell, still well under the
   1.5 s limit.
 - **Legacy free-text shelves** whose products have no global category are
-  invisible on `/c/` pages and the category sitemap until converted in the
-  admin mapping tool.
-- **Image alt text** exists in the schema (`StoreProductMedia.altText`) but
-  sellers have no screen to set it; the product name is used instead.
+  invisible on `/c/` pages and the category sitemap until an admin converts
+  them (conversion stays admin-only: it renames or merges a shop's shelves).
+  The gap is **measured**: the admin Category mapping page shows the share of
+  live products on category pages, the products missing (no category ·
+  disabled category) and a "Convert first" list of the stores holding the
+  most (`GET /admin/catalog/coverage`); sellers see such shelves flagged
+  "not shown on UnieMax category pages". Dev, 4 Oct 2026: 35 of 38 live
+  products reached, 3 missing on 3 shelves.
 - ESLint crashes on this project (tooling issue, not SEO) — verify frontend
   changes with `tsc -b` + `vite build`.
 
@@ -459,10 +527,10 @@ change-log line.
 | 2 | **Free shopping listings** | Google Merchant Center + Meta catalog product feeds; new product fields `brand`, `gtin`/`mpn`, `condition`; `shippingDetails` + `hasMerchantReturnPolicy` in `Product` JSON-LD | Not started |
 | 3 | **Image sizes** | Server-side normalization of every upload + share images for `og:image`; sized copies (320–1280 px) served with `srcset` through `MediaImg` ([§4.6](#46-sized-photos-srcset)) | ✅ Done 4 Oct 2026, dev + prod (`v1.22.0`) |
 | 4 | **Reviews & ratings** | Reviews only from buyers with a delivered order; then `aggregateRating` in JSON-LD (stars in results) | Not started |
-| 5 | **Better listings from sellers** | Listing quality score in the product editor; duplicate-description warning; optional seller SEO title/description/share image with a result preview; alt-text editing; prompt to tag products on the global taxonomy; finish converting legacy shelves | Not started |
+| 5 | **Better listings from sellers** | Listing quality score in the product editor; duplicate-description warning; optional seller SEO title/description/share image with a result preview; prompt to tag products on the global taxonomy; finish converting legacy shelves (progress measured on the admin Category mapping page) | Not started (per-photo alt text exists — "Describe this photo") |
 | 6 | **More landing pages** | Brand pages (after step 2); city pages ("cricket bats in Kochi") only where stock exists, thin ones `noindex`; a crawlable `/search?q=` page (enables the `WebSite` `SearchAction`); "more from this store" / "other sellers" links | Not started |
 | 7 | **Tools for sellers' own traffic** | WhatsApp share with prefilled text; QR poster; generated share images with price; per-seller traffic analytics (referrer/UTM); seller's own Pixel/GA4 IDs; seller Search Console verification tag (needs page shells — now possible) | Not started (basic Share button exists) |
-| 8 | **Operations** | Submit sitemaps in Search Console + Bing; IndexNow ping on publish/price change (not Google's Indexing API — jobs/livestreams only); HTTP caching on public API responses ([`IMPROVEMENTS.md`](../IMPROVEMENTS.md) #17); `pg_trgm` search index (#15); absolute `og:image` for `/` and `/sell` | Not started |
+| 8 | **Operations** | Submit sitemaps in Search Console + Bing; IndexNow ping on publish/price change (not Google's Indexing API — jobs/livestreams only); HTTP caching on public API responses ([`IMPROVEMENTS.md`](../IMPROVEMENTS.md) #17); `pg_trgm` search index (#15) | Not started (absolute `og:image` for `/` and `/sell`: in code, page shells) |
 
 Things to never do: fake or incentivised reviews, keyword stuffing, letting
 search/filter URLs get indexed, mass-produced pages with nothing on them.
@@ -479,9 +547,9 @@ search/filter URLs get indexed, mass-produced pages with nothing on them.
 | Template | `frontend/index.html` (the `seo:start`/`seo:end` region) |
 | Structured data / snippets | `frontend/src/storefront/features/publicStore/structuredData.ts`, `…/productDescription.ts` |
 | Server | everything in `backend/src/modules/seo/` and `backend/src/modules/media/` |
-| Images | `backend/src/package/storage/images.ts` (upload rules, derived images), `storeUpload`/`imageDelivery` in `package/storage/index.ts`, `shareImageUrl` in `publicStore.service.ts`, `backend/src/scripts/optimizeMedia.ts`, `frontend/src/shared/media/MediaImg.tsx` + `imageSrcSet.ts`, every `<MediaImg sizes>` |
+| Images | `backend/src/package/storage/images.ts` (upload rules, derived images incl. store cards, `PREVIEW_BY_BUCKET`), `storeUpload`/`imageDelivery` in `package/storage/index.ts`, `shareImageUrl` in `publicStore.service.ts`, `backend/src/scripts/optimizeMedia.ts`, `frontend/src/shared/media/MediaImg.tsx` + `imageSrcSet.ts`, every `<MediaImg sizes>`, `frontend/public/og-image.jpg` |
 | Crawl control | `frontend/public/robots.txt`, sitemap visibility rules |
-| Landing pages | `BrowseCategoryPage.tsx`, `backend/src/modules/discovery/browse.service.ts` (SEO shape only) |
+| Landing pages | `BrowseCategoryPage.tsx`, `backend/src/modules/discovery/browse.service.ts` (SEO shape only, `DISCOVERABLE_PRODUCT`), `getCoverage` in `adminCategoryMapping.service.ts` |
 | Infra | the nginx page-shell snippets (record changes in `DEPLOYMENT.md` too) |
 | Data that feeds tags | new product/store fields used in titles, descriptions, images or JSON-LD |
 
@@ -501,6 +569,7 @@ search/filter URLs get indexed, mass-produced pages with nothing on them.
 | Upload size caps in `images.ts` | Keep them ≥ the browser editor's (`MAX_EDGE` in `cropImage.ts`, `BANNER_FORMAT.width`) |
 | How wide a stored image is drawn (grid columns, thumbnail size) | That `<MediaImg>`'s `sizes` — a stale one makes the browser download the wrong copy |
 | `IMAGE_WIDTHS` in `images.ts` | Nothing else — the frontend reads them from `/public/media-config`; run `optimize-media -- --apply` to pre-render the new width |
+| How a derived image looks (`renderCardImage`, `renderShareImage`, …) | Stored copies are immutable and never re-rendered, so a visible change needs a new preset name in `DERIVATIVES` (e.g. `card2`, which also gives scrapers a new URL). For `renderCardImage`, also re-render `frontend/public/og-image.jpg` from `app_logo_with_name.png` |
 | The `seo:start`/`seo:end` tags in `index.html` | Keep attribute order; re-run `backend/test/page-shell.test.mjs` |
 
 ---
@@ -516,3 +585,4 @@ search/filter URLs get indexed, mass-produced pages with nothing on them.
 | 3 Oct 2026 | Path params up to 500 chars (`b15e72f`) so long product slugs resolve; this file created as the SEO source of truth |
 | 4 Oct 2026 | Share images for `og:image` (WhatsApp dropped large product photos); server-side normalization of every image upload; `npm run optimize-media` for existing images; media audit understands `derived/` objects. Released as `v1.21.0`; existing images updated on dev and prod |
 | 4 Oct 2026 | Sized photos (`srcset`): copies at 320/640/960/1280 px for every stored image, one derived-image registry shared with share images, every upload via `storeUpload`, `<MediaImg>` on every stored image in the frontend; roadmap step 3 done. Released as `v1.22.0`; copies pre-rendered on dev and prod |
+| 4 Oct 2026 | Page shells for `/` and `/sell` (absolute `og:image` + canonical, `WebSite` JSON-LD first byte); no title parts → the platform title, not "UnieMax", in both writers; platform card `og-image.jpg`; store cards (1200×630, logo's own edge colour) as store pages' `og:image`, preview kind chosen per bucket; product photos + logo in per-store sitemaps, `/sell` in the marketplace sitemap; admin category-page coverage report. In code — not yet released; nginx step applied on dev + prod; logo cards pre-rendered on dev (prod pending, §9) |

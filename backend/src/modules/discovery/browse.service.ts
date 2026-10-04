@@ -43,13 +43,13 @@ import type { BrowseQuery } from "./discovery.schema.js";
  * the in-memory taxonomy cache (`getCategoryBranch`) rather than by a
  * recursive query per view.
  *
- * Visibility is the platform-wide `discoverable` rule — published store,
+ * Visibility is the platform-wide `DISCOVERABLE_PRODUCT` rule — published store,
  * active product and category chain, sellable, and not opted out with
  * "Hide from Search". A browse page can never show what in-store search
  * would hide.
  */
 
-const discoverable = {
+export const DISCOVERABLE_PRODUCT = {
   ...PUBLIC_PRODUCT_VISIBILITY,
   hideFromSearch: false,
   store: PUBLIC_STORE_VISIBILITY,
@@ -134,7 +134,7 @@ export async function browseCategory(
   if (!branch) return null;
 
   const where: Prisma.StoreProductWhereInput = {
-    ...discoverable,
+    ...DISCOVERABLE_PRODUCT,
     globalCategoryId: { in: branch.descendantIds },
   };
 
@@ -186,7 +186,7 @@ async function childCounts(
       if (!branch) return null;
       const productCount = await prisma.storeProduct.count({
         where: {
-          ...discoverable,
+          ...DISCOVERABLE_PRODUCT,
           globalCategoryId: { in: branch.descendantIds },
         },
       });
@@ -230,7 +230,7 @@ export async function listBrowsableCategories(): Promise<BrowsableCategory[]> {
   const [grouped, nodes] = await Promise.all([
     prisma.storeProduct.groupBy({
       by: ["globalCategoryId"],
-      where: { ...discoverable, globalCategoryId: { not: null } },
+      where: { ...DISCOVERABLE_PRODUCT, globalCategoryId: { not: null } },
       _count: { _all: true },
     }),
     getActiveCategoryNodes(),

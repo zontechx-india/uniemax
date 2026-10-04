@@ -13,12 +13,17 @@
       SEO/social defaults — they describe the PLATFORM, never a page.
       How SEO works on this platform: docs/SEO.md (the source of truth).
 
-      Store and category pages (/store/**, /c/**) are served through the API,
-      which replaces everything between the two seo markers below with that
-      page's own title, description, canonical, social card and JSON-LD
-      (backend/src/modules/seo/pageHead.ts), so link previews and crawlers
-      that never run JavaScript see the page itself. Every other URL is this
-      file as built, and these values are what its first byte carries.
+      Every page meant to be found or shared (/, /sell, /store/**, /c/**) is
+      served through the API, which replaces everything between the two seo
+      markers below with that page's own title, description, canonical,
+      social card and JSON-LD (backend/src/modules/seo/pageHead.ts) — with
+      absolute URLs, which link previews and crawlers that never run
+      JavaScript need. Every other URL (cart, account, the seller console) is
+      this file as built.
+
+      og-image.jpg is the platform's 1200×630 card, rendered from
+      app_logo_with_name.png by the same function that makes store cards
+      (renderCardImage in backend/src/package/storage/images.ts).
 
       `shared/seo.ts` rewrites the same tags per route once React mounts, and
       reads its fallbacks from here. Keep the markers, and keep each tag's
@@ -40,14 +45,14 @@
       property="og:description"
       content="Discover independent online shops on UnieMax and order directly from the seller."
     />
-    <meta property="og:image" content="/app_logo_with_name.png" />
+    <meta property="og:image" content="/og-image.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="UnieMax — Online Shops You Can Buy From Directly" />
     <meta
       name="twitter:description"
       content="Discover independent online shops on UnieMax and order directly from the seller."
     />
-    <meta name="twitter:image" content="/app_logo_with_name.png" />
+    <meta name="twitter:image" content="/og-image.jpg" />
     <!-- seo:end -->
 
     <!--

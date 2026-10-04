@@ -481,21 +481,25 @@ must show `Content-Encoding: gzip`. Roll back: copy each `*.pre-gzip` back,
 `sudo rm /etc/nginx/snippets/uniemax-gzip.conf`, `sudo nginx -t && sudo
 systemctl reload nginx`.
 
-### Page shells (`/store/**`, `/c/**` → the API)
+### Page shells (`/`, `/sell`, `/store/**`, `/c/**` → the API)
 
-**Status: live since 2026-10-01** on all four vhosts — dev (`uniemax-domain`,
-`uniemax` → `:4001`) and prod (`uniemax-com`, `uniemax-prod` → `:4000`).
-Pre-change backups: `/etc/nginx/sites-available/*.pre-shells`. Why this
+**Status:** `/store/` and `/c/` **live since 2026-10-01** on all four vhosts —
+dev (`uniemax-domain`, `uniemax` → `:4001`) and prod (`uniemax-com`,
+`uniemax-prod` → `:4000`). `/` and `/sell` **applied 2026-10-04** on all four vhosts (see [Adding `/` and `/sell`](#adding--and-sell)); until a
+backend release has their routes, its 404 falls back to the static file.
+Pre-change backups: `/etc/nginx/sites-available/*.pre-shells`; snippets
+before `/` and `/sell`: `/etc/nginx/snippets/uniemax-page-shells-*.conf.pre-home`. Why this
 exists and how it works: [`SEO.md`](./SEO.md).
 
-Store and category pages are answered by the backend's page-shell routes
-(`API.md` → Page shells): the built `index.html` with that page's title,
-description, social card and JSON-LD already written in, so a link shared on
-WhatsApp/Instagram/Facebook previews as the product or shop, and a dead slug
-is a real `404`. nginx forwards only those two prefixes; everything else
-(`/`, `/sell`, `/cart`, `/assets/` …) stays a static file. Any API failure —
-down, 5xx, rate-limited, a malformed URL — falls back to the static
-`index.html`, so a store page is never worse than before.
+The marketplace home, the seller landing page, store and category pages are
+answered by the backend's page-shell routes (`API.md` → Page shells): the
+built `index.html` with that page's title, description, social card and
+JSON-LD already written in — with absolute URLs, which link-preview scrapers
+need — so a link shared on WhatsApp/Instagram/Facebook previews as the page,
+and a dead slug is a real `404`. nginx forwards only those paths; everything
+else (`/cart`, `/checkout/`, `/mystores`, `/assets/` …) stays a static file.
+Any API failure — down, 5xx, rate-limited, a malformed URL — falls back to the
+static `index.html`, so a page is never worse than before.
 
 > ⚠️ **Order matters.** Apply to a vhost only once the backend behind it runs
 > a release that has the page shells (dev: after the push to `main` has
@@ -511,9 +515,31 @@ environment's two vhosts next to the gzip snippet:
 shells() {   # $1 = env, $2 = that env's API port
 sudo tee /etc/nginx/snippets/uniemax-page-shells-$1.conf >/dev/null <<'EOF'
 # Unie Max — page shells. Rationale in docs/DEPLOYMENT.md -> "Page shells".
-# Store/category navigations go to the API, which answers the built
-# index.html with that page's <head> written in (real 404 for a dead slug).
-# Any API failure falls back to the static index.html.
+# Home, /sell, store and category navigations go to the API, which answers
+# the built index.html with that page's <head> written in (real 404 for a
+# dead slug). Any API failure falls back to the static index.html.
+# `/` and `/sell` also fall back on 404: they always exist, so a 404 can only
+# be a backend that predates their routes.
+location = / {
+    proxy_pass http://127.0.0.1:__PORT__;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 10s;
+    proxy_intercept_errors on;
+    error_page 400 404 429 500 502 503 504 = @uniemax_static_shell;
+}
+location = /sell {
+    proxy_pass http://127.0.0.1:__PORT__;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 10s;
+    proxy_intercept_errors on;
+    error_page 400 404 429 500 502 503 504 = @uniemax_static_shell;
+}
 location ^~ /store/ {
     proxy_pass http://127.0.0.1:__PORT__;
     proxy_set_header Host $host;
@@ -539,7 +565,7 @@ location @uniemax_static_shell {
     rewrite ^ /index.html last;
 }
 EOF
-sudo sed -i "s/__PORT__/$2/" /etc/nginx/snippets/uniemax-page-shells-$1.conf
+sudo sed -i "s/__PORT__/$2/g" /etc/nginx/snippets/uniemax-page-shells-$1.conf
 }
 include_in() {   # $1 = env, then the vhosts
 env=$1; shift
@@ -558,9 +584,11 @@ shells prod 4000 && include_in prod uniemax-com uniemax-prod
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-`404` is deliberately **not** in `error_page`: the API's 404 is the point
-(same HTML, `noindex`), and intercepting it would turn every dead product back
-into a `200`.
+`404` is deliberately **not** in `error_page` for `/store/` and `/c/`: the
+API's 404 is the point (same HTML, `noindex`), and intercepting it would turn
+every dead product back into a `200`. `/` and `/sell` never 404 legitimately,
+so for them it is in — which also makes their order relative to a backend
+release irrelevant.
 
 Verify (`8080` = dev, `8081` = prod; use a real published store slug):
 
@@ -568,7 +596,8 @@ Verify (`8080` = dev, `8081` = prod; use a real published store slug):
 curl -s -o /dev/null -w '%{http_code} %{content_type}\n' http://127.0.0.1:8081/store/<slug>   # 200 text/html
 curl -s http://127.0.0.1:8081/store/<slug> | grep -o '<title[^<]*</title>'                    # the store's own title
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8081/store/no-such-store-zz9        # 404
-curl -s http://127.0.0.1:8081/ | grep -c 'seo:start'                                           # 1 (home still static)
+curl -s http://127.0.0.1:8081/ | grep -o '<link rel="canonical"[^>]*>'                         # absolute canonical (home is a page shell)
+curl -s http://127.0.0.1:8081/sell | grep -o 'og:image" content="[^"]*'                         # https://…/og-image.jpg (absolute)
 ```
 
 Then from outside: paste a product URL into Meta's Sharing Debugger
@@ -579,6 +608,23 @@ live keeps its old card; add any query string (`?v=2`) to see the new one.
 
 Roll back: copy each `*.pre-shells` back over its vhost,
 `sudo rm /etc/nginx/snippets/uniemax-page-shells-*.conf`,
+`sudo nginx -t && sudo systemctl reload nginx`.
+
+#### Adding `/` and `/sell`
+
+The vhosts already include the snippet, so this is only a rewrite of the
+snippet files — re-run `shells` (above) with the current snippet text, **not**
+`include_in`. Safe before or after the backend release that adds the routes
+(an older backend's 404 falls back to the static file). Then:
+
+```bash
+shells dev 4001 && sudo nginx -t && sudo systemctl reload nginx
+# verify dev (the two home/sell checks above, on :8080), then:
+shells prod 4000 && sudo nginx -t && sudo systemctl reload nginx
+```
+
+Done on dev and prod 2026-10-04. Roll back just these two: copy each
+`uniemax-page-shells-*.conf.pre-home` back over its snippet, then
 `sudo nginx -t && sudo systemctl reload nginx`.
 
 ### Web Push env (`VAPID_*`)

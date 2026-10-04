@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma.js";
+import { storage } from "../../package/storage/index.js";
 import { HttpError } from "../../utils/httpError.js";
 import {
   PUBLIC_PRODUCT_VISIBILITY,
@@ -6,6 +7,7 @@ import {
 } from "../stores/publicStore.service.js";
 import { loadShelves, shelfIndex } from "../stores/shelfTree.js";
 import { listBrowsableCategories } from "../discovery/browse.service.js";
+import { absoluteUrl } from "./structuredData.js";
 
 /**
  * XML sitemaps for the public storefronts.
@@ -90,7 +92,17 @@ interface SitemapUrl {
    * days. It is emitted because Bing still reads it and it costs nothing.
    */
   priority?: number;
+  /**
+   * Absolute URLs of the images shown on the page (Google's image-sitemap
+   * extension) — how a product photo reaches Google Images even when the
+   * page renders it with JavaScript. Location only: Google retired the
+   * caption/title tags in 2022 and reads alt text from the page itself.
+   */
+  images?: string[];
 }
+
+/** Google's per-URL ceiling for `<image:image>` entries. */
+const MAX_IMAGES_PER_URL = 1_000;
 
 function urlSet(urls: SitemapUrl[]): string {
   const body = urls
@@ -100,10 +112,16 @@ function urlSet(urls: SitemapUrl[]): string {
       if (url.lastmod) parts.push(`<lastmod>${url.lastmod.toISOString()}</lastmod>`);
       if (url.priority !== undefined)
         parts.push(`<priority>${url.priority.toFixed(1)}</priority>`);
+      for (const image of (url.images ?? []).slice(0, MAX_IMAGES_PER_URL)) {
+        parts.push(`<image:image><image:loc>${escapeXml(image)}</image:loc></image:image>`);
+      }
       return `<url>${parts.join("")}</url>`;
     })
     .join("");
-  return `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${body}</urlset>`;
+  const imageNs = urls.some((url) => url.images?.length)
+    ? ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"'
+    : "";
+  return `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${imageNs}>${body}</urlset>`;
 }
 
 function sitemapIndex(entries: { loc: string; lastmod?: Date | null }[]): string {
@@ -154,7 +172,10 @@ export function buildSitemapIndex(origin: string): Promise<string> {
   });
 }
 
-/** The marketplace surface: the homepage and every published store's front page. */
+/**
+ * The marketplace surface: the platform's own pages (the homepage and the
+ * seller landing page) and every published store's front page.
+ */
 export function buildMarketplaceSitemap(origin: string): Promise<string> {
   return cached(`stores:${origin}`, async () => {
     const stores = await prisma.store.findMany({
@@ -166,6 +187,7 @@ export function buildMarketplaceSitemap(origin: string): Promise<string> {
 
     return urlSet([
       { loc: `${origin}/`, priority: 1 },
+      { loc: `${origin}/sell`, priority: 0.8 },
       ...stores.map((store) => ({
         loc: `${origin}/store/${store.slug}`,
         lastmod: store.updatedAt,
@@ -177,7 +199,9 @@ export function buildMarketplaceSitemap(origin: string): Promise<string> {
 
 /**
  * One store's own pages: its homepage, its browse-all page, every category
- * that has something to show, and every publicly visible product.
+ * that has something to show, and every publicly visible product — each
+ * product with its photos and the homepage with the logo, as full-size
+ * originals (Google Images wants the largest copy).
  *
  * A category is included only when the products query found something in it
  * **or beneath it** — a parent shelf whose stock all lives in its children is
@@ -188,7 +212,7 @@ export function buildStoreSitemap(origin: string, slug: string): Promise<string>
   return cached(`store:${origin}:${slug}`, async () => {
     const store = await prisma.store.findFirst({
       where: { slug, ...PUBLIC_STORE_VISIBILITY },
-      select: { id: true, slug: true, updatedAt: true },
+      select: { id: true, slug: true, updatedAt: true, logoKey: true },
     });
     // Unpublished and non-existent are the same answer everywhere else on
     // the public surface; a sitemap must not be the one place that leaks the
@@ -201,10 +225,23 @@ export function buildStoreSitemap(origin: string, slug: string): Promise<string>
         ...PUBLIC_PRODUCT_VISIBILITY,
         hideFromSearch: false,
       },
-      select: { slug: true, updatedAt: true, categoryId: true },
+      select: {
+        slug: true,
+        updatedAt: true,
+        categoryId: true,
+        // Gallery order, the order the product page shows them in.
+        media: {
+          where: { type: "IMAGE" },
+          orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+          select: { key: true },
+          take: MAX_IMAGES_PER_URL,
+        },
+      },
       orderBy: { updatedAt: "desc" },
       take: MAX_URLS,
     });
+    const imageUrl = (bucket: "logo" | "media", key: string) =>
+      absoluteUrl(storage.publicUrl(bucket, key), origin);
 
     const shelves = await loadShelves(store.id);
     const index = shelfIndex(shelves);
@@ -216,7 +253,12 @@ export function buildStoreSitemap(origin: string, slug: string): Promise<string>
     );
 
     return urlSet([
-      { loc: `${origin}/store/${store.slug}`, lastmod: store.updatedAt, priority: 0.8 },
+      {
+        loc: `${origin}/store/${store.slug}`,
+        lastmod: store.updatedAt,
+        priority: 0.8,
+        images: store.logoKey ? [imageUrl("logo", store.logoKey)] : [],
+      },
       { loc: `${origin}/store/${store.slug}/shop`, priority: 0.5 },
       ...categories.map((category) => ({
         loc: `${origin}/store/${store.slug}/category/${category.slug}`,
@@ -226,6 +268,7 @@ export function buildStoreSitemap(origin: string, slug: string): Promise<string>
         loc: `${origin}/store/${store.slug}/product/${product.slug}`,
         lastmod: product.updatedAt,
         priority: 0.6,
+        images: product.media.map((item) => imageUrl("media", item.key)),
       })),
     ]);
   });

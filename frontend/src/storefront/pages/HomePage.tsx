@@ -100,10 +100,11 @@ export function HomePage() {
   // needs a crawlable results URL to point at, which is why it names a target
   // this router does not serve yet and stays commented out rather than
   // shipping a promise Google would find broken.
+  // Title and description are the platform defaults from `index.html` — the
+  // same values its server twin (`homePage` in pageShell.service.ts) leaves
+  // in place, so the two can never disagree.
   useSeo({
     title: [],
-    description:
-      'Discover independent online shops on UnieMax and order directly from the seller — clothing, sports gear, electronics, groceries and more, with cash on delivery or secure online payment.',
     canonical: '/',
     jsonLd: {
       '@context': 'https://schema.org',

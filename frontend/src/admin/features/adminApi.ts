@@ -278,6 +278,22 @@ export interface ShelfConversionPlan {
   nameChanges: boolean
 }
 
+/**
+ * How much of the live catalog the global category pages (`/c/{slug}`) can
+ * show. Every count is over products a category page could list.
+ */
+export interface CatalogCoverage {
+  discoverableProducts: number
+  onCategoryPages: number
+  /** On an unconverted shelf — no platform category. */
+  unclassifiedProducts: number
+  /** Tagged with a category that is currently disabled. */
+  inDisabledCategories: number
+  shelvesToConvert: number
+  /** Where the unclassified products are, most first (top 10). */
+  stores: { id: string; name: string; slug: string; unclassifiedProducts: number }[]
+}
+
 export interface ShelfRow {
   id: string
   name: string
@@ -599,6 +615,9 @@ export const adminApi = {
   },
 
   // Converting sellers' legacy free-text shelves into platform categories
+  catalogCoverage() {
+    return call<CatalogCoverage>(http.get(`${BASE}/catalog/coverage`))
+  },
   listShelves(query: Params) {
     return callList<ShelfRow>(http.get(`${BASE}/catalog/shelves`, params(query)))
   },

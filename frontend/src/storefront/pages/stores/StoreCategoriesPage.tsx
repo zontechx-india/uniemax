@@ -457,7 +457,7 @@ function CategoryEditPanel({
           <p className="mt-1.5 text-xs text-muted">
             {category.taxonomy
               ? 'Set from the platform categories when you added this shelf.'
-              : 'Added before platform categories existed. Contact support to link it to one.'}
+              : 'Added before platform categories existed, so its products are not shown on UnieMax category pages. Contact support to link it to one.'}
           </p>
         </div>
 
@@ -626,7 +626,11 @@ function CategoryRow({
           {category.taxonomy ? (
             <span className="text-brand">{category.taxonomy.pathLabel}</span>
           ) : (
-            <span className="text-muted/70">No platform category</span>
+            // Says what it costs: these products are missing from every
+            // UnieMax category page until an admin converts the shelf.
+            <span className="text-warning">
+              No platform category — not shown on UnieMax category pages
+            </span>
           )}
         </p>
       </div>

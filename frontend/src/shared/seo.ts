@@ -14,13 +14,14 @@ import { useEffect } from 'react'
  * scrapers (WhatsApp, Instagram, Facebook, X, Slack) and most other crawlers
  * never run JS and read only the first byte.
  *
- * For `/store/**` and `/c/**` that first byte is built by the API
+ * For `/`, `/sell`, `/store/**` and `/c/**` — every page meant to be found
+ * or shared — that first byte is built by the API
  * (`backend/src/modules/seo/pageShell.service.ts` + `pageHead.ts`), which
  * writes the same tags this module writes, from the same data, before the
  * HTML leaves the server. The page components' `useSeo` calls and those
  * server resolvers are twins — **a change to a page's head rules belongs in
- * both**. Every other route (the marketplace home, `/sell`) is the static
- * `index.html`, and only this module ever changes its head.
+ * both**. Every other route (cart, checkout, account, the seller console) is
+ * the static `index.html`, and only this module ever changes its head.
  *
  * The server marks its tags so this module can take over cleanly: the title,
  * description and `og:image` carry the PLATFORM value in `data-default`
@@ -81,7 +82,7 @@ export interface SeoOptions {
    * Most specific part first — `['Leather Jacket', 'Rahul Fashion']` becomes
    * "Leather Jacket · Rahul Fashion · UnieMax". Empty/undefined parts are
    * dropped, so a loading state can pass `undefined` and refine once the
-   * fetch lands.
+   * fetch lands. No parts at all = the platform title from `index.html`.
    */
   title?: (string | null | undefined)[]
   /** Meta description. Trimmed to ~160 chars; falsy = the platform default. */
@@ -157,7 +158,9 @@ function setLink(rel: string, href: string) {
  */
 export function applySeo(options: SeoOptions) {
   const parts = (options.title ?? []).filter(Boolean) as string[]
-  const title = parts.length ? `${parts.join(' · ')} · ${APP_NAME}` : APP_NAME
+  // No parts = a platform page (the homepage): it gets the platform's own
+  // descriptive title from index.html, not the bare brand name.
+  const title = parts.length ? `${parts.join(' · ')} · ${APP_NAME}` : DEFAULTS.title
   const description = options.description
     ? clampDescription(options.description)
     : DEFAULTS.description

@@ -1,4 +1,4 @@
-// Page shells: /store/** and /c/** come back as the storefront's index.html
+// Page shells: /, /sell, /store/** and /c/** come back as the storefront's index.html
 // with THAT page's head written in (what WhatsApp/Facebook/non-JS crawlers
 // read), and a dead slug is a real 404 instead of the SPA fallback's 200.
 //
@@ -80,6 +80,26 @@ test("product page: Product + BreadcrumbList, og:type product", async (t) => {
   assert.equal(p.jsonLd[0].offers.priceCurrency, "INR");
 });
 
+test("platform pages: / and /sell carry their own head with absolute URLs", async () => {
+  const home = await page("/");
+  assert.equal(home.status, 200);
+  assert.equal(home.headers.get("referrer-policy"), null);
+  assert.equal(home.robots, "index, follow");
+  assert.match(home.canonical, /^https?:\/\/[^/]+\/$/);
+  assert.deepEqual(home.jsonLd.map((block) => block["@type"]), ["WebSite"]);
+  assert.match(home.html, /<div id="root">/);
+
+  const sell = await page("/sell?utm_source=instagram");
+  assert.equal(sell.status, 200);
+  assert.match(sell.title, /^Create your free online store · UnieMax/);
+  assert.match(sell.canonical, /^https?:\/\/[^/]+\/sell$/);
+
+  // Scrapers cannot resolve a relative og:image; every shell makes it absolute.
+  for (const p of [home, sell]) {
+    assert.match(p.html, /<meta property="og:image" content="https?:\/\/[^"]+"/);
+  }
+});
+
 test("link-preview images are small JPEGs (WhatsApp drops big ones)", async (t) => {
   const live = await liveStore();
   if (!live) return t.skip("no published store with products on this target");
@@ -90,7 +110,7 @@ test("link-preview images are small JPEGs (WhatsApp drops big ones)", async (t) 
     const html = await (await fetch(`${API_BASE}${path}`)).text();
     const image = /<meta property="og:image" content="([^"]*)"/.exec(html)?.[1];
     assert.ok(image, `${path}: og:image`);
-    if (!image.includes("/api/v1/public/images/share/")) continue; // no logo / photo → platform default
+    if (!image.includes("/api/v1/public/images/")) continue; // no logo / photo → platform default
     // The URL's origin is PUBLIC_WEB_URL; fetch the path from the target.
     const res = await fetch(`${API_BASE}${new URL(image).pathname}`);
     const bytes = (await res.arrayBuffer()).byteLength;
@@ -98,6 +118,24 @@ test("link-preview images are small JPEGs (WhatsApp drops big ones)", async (t) 
     assert.equal(res.headers.get("content-type"), "image/jpeg", image);
     assert.ok(bytes <= 300 * 1024, `${image}: ${bytes} bytes`);
   }
+});
+
+test("store pages preview with the wide store card, not the square logo", async (t) => {
+  const live = await liveStore();
+  if (!live?.store.logoUrl) return t.skip("no published store with a logo on this target");
+  const html = await (await fetch(`${API_BASE}/store/${live.store.slug}`)).text();
+  const image = /<meta property="og:image" content="([^"]*)"/.exec(html)?.[1];
+  assert.match(image, /\/api\/v1\/public\/images\/card\/logo\/.+\.jpg$/);
+  const bytes = Buffer.from(await (await fetch(`${API_BASE}${new URL(image).pathname}`)).arrayBuffer());
+  // JPEG SOFn marker carries height then width; find the first frame header.
+  let size = null;
+  for (let i = 2; i < bytes.length - 9; i++) {
+    if (bytes[i] === 0xff && bytes[i + 1] >= 0xc0 && bytes[i + 1] <= 0xc2) {
+      size = { height: bytes.readUInt16BE(i + 5), width: bytes.readUInt16BE(i + 7) };
+      break;
+    }
+  }
+  assert.deepEqual(size, { width: 1200, height: 630 });
 });
 
 test("category and shop pages; scoped listings are noindex", async (t) => {

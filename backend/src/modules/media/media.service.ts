@@ -21,6 +21,10 @@ export function shareImage(bucket: MediaBucket, key: string): Promise<Buffer> {
   return derived(bucket, key, "share");
 }
 
+export function cardImage(bucket: MediaBucket, key: string): Promise<Buffer> {
+  return derived(bucket, key, "card");
+}
+
 export function sizedImage(bucket: MediaBucket, key: string, width: ImageWidth): Promise<Buffer> {
   return derived(bucket, key, `w${width}`);
 }

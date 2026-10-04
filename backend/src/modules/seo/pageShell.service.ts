@@ -27,9 +27,10 @@ import {
  * Which head a storefront URL gets, and whether it is a real page.
  * docs/SEO.md (§4, §5) is the source of truth — update it with any change here.
  *
- * Each resolver mirrors the SPA page's own `useSeo` call — `StoreHomePage`,
- * `StoreCategoryPage`, `StoreProductPage`, `StoreShopPage`, the support
- * pages and `BrowseCategoryPage` — using the same public services the SPA's
+ * Each resolver mirrors the SPA page's own `useSeo` call — `HomePage`,
+ * `SellPage`, `StoreHomePage`, `StoreCategoryPage`, `StoreProductPage`,
+ * `StoreShopPage`, the support pages and `BrowseCategoryPage` — using the
+ * same public services the SPA's
  * API calls hit, so visibility is decided by exactly the same predicates.
  * When a page's head rules change in the SPA, they change here too.
  *
@@ -45,7 +46,8 @@ import {
  * not-found screen).
  */
 
-export type PageKind = "store" | "browse";
+/** `home` = `/`, `sell` = `/sell`, `store` = `/store/**`, `browse` = `/c/**`. */
+export type PageKind = "home" | "sell" | "store" | "browse";
 
 export interface ResolvedPage {
   status: 200 | 404;
@@ -120,8 +122,7 @@ export async function resolvePage(
   });
 
   try {
-    const work = kind === "store" ? storePage(segments, query, origin) : browsePage(segments, query, origin);
-    const result = await Promise.race([work, timeout]);
+    const result = await Promise.race([pageFor(kind, segments, query, origin), timeout]);
     if (result === "timeout") {
       log.warn({ path }, "page shell: page data was too slow — serving the default head");
       return null;
@@ -136,6 +137,24 @@ export async function resolvePage(
     return null;
   } finally {
     clearTimeout(timer);
+  }
+}
+
+function pageFor(
+  kind: PageKind,
+  segments: string[],
+  query: PageShellQuery,
+  origin: string,
+): Promise<ResolvedPage> {
+  switch (kind) {
+    case "home":
+      return Promise.resolve(homePage(origin));
+    case "sell":
+      return Promise.resolve(sellPage);
+    case "store":
+      return storePage(segments, query, origin);
+    case "browse":
+      return browsePage(segments, query, origin);
   }
 }
 
@@ -159,6 +178,44 @@ async function orNull<T>(promise: Promise<T>): Promise<T | null> {
 }
 
 // ---------------------------------------------------------------------------
+// / and /sell — the platform's own pages
+// ---------------------------------------------------------------------------
+
+/**
+ * `HomePage`. Title and description are the platform defaults from
+ * `index.html` (both sides leave them unset), so the one page competing for
+ * "UnieMax" itself always says what the shell says.
+ */
+function homePage(origin: string): ResolvedPage {
+  return {
+    status: 200,
+    head: {
+      title: [],
+      canonical: "/",
+      jsonLd: [
+        {
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: "UnieMax",
+          url: origin,
+        },
+      ],
+    },
+  };
+}
+
+/** `SellPage`. */
+const sellPage: ResolvedPage = {
+  status: 200,
+  head: {
+    title: ["Create your free online store"],
+    description:
+      "Open your own online store on UnieMax — free to start. Your own branding and store link, Cash on Delivery and online payments, delivery by pincode and instant order alerts. Set it all up from your phone.",
+    canonical: "/sell",
+  },
+};
+
+// ---------------------------------------------------------------------------
 // /store/{slug}/…
 // ---------------------------------------------------------------------------
 
@@ -180,9 +237,10 @@ async function storePage(
 }
 
 /**
- * Name, slug and the logo's share image — all a non-home store page's head
- * needs. One query. Heads use share images (small JPEGs), never originals:
- * WhatsApp drops a preview image it cannot fetch quickly.
+ * Name, slug and the store card (the logo on a wide canvas) — all a non-home
+ * store page's head needs. One query. Heads use preview images (small
+ * JPEGs), never originals: WhatsApp drops a preview image it cannot fetch
+ * quickly.
  */
 async function findStore(slug: string) {
   const store = await orNull(getVisibleStore(slug));

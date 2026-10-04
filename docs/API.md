@@ -1466,8 +1466,8 @@ products**. Small and cacheable; fetched once per store visit.
 
 ```jsonc
 { "id", "name", "slug", "logoUrl", "theme",
-  "shareImageUrl",                // the logo as a link-preview JPEG (relative path,
-                                  // see "Share images" below); null without a logo
+  "shareImageUrl",                // the logo on a 1200×630 link-preview card (relative
+                                  // path, see "Image derivatives" below); null without a logo
   "isPublished",                  // false only on an owner draft preview
   "footer": { … },                // owner-managed footer content, resolved to the
                                   // full shape (see PATCH /stores/:id/footer)
@@ -1599,7 +1599,7 @@ product page is where a customer picks one.
 ```jsonc
 { "id", "name", "slug", "description", "price", "priceMax", "stockQuantity",
   "shareImageUrl",                // cover photo as a link-preview JPEG (relative path,
-                                  // see "Share images" below); null without a photo
+                                  // see "Image derivatives" below); null without a photo
   "category": { "name", "slug", "ancestors": [ { "name", "slug" } ] },   // root first
   "optionTypes": [ { "name": "Size", "values": ["S", "M", "XL"] } ],     // picker dimensions, in order
   "specifications": [ { "label": "Fabric", "value": "100% cotton" } ],   // ordered; [] → description fallback
@@ -2019,8 +2019,9 @@ coverage per sitemap, so this shape answers "how much of this seller's
 catalog is indexed" without any extra reporting.
 
 ### `GET /api/v1/public/sitemap-stores.xml`
-The marketplace homepage (`/`) and every published store's front page
-(`/store/{slug}`), `lastmod` from the store's `updatedAt`.
+The marketplace homepage (`/`), the seller landing page (`/sell`) and every
+published store's front page (`/store/{slug}`), `lastmod` from the store's
+`updatedAt`.
 
 ### `GET /api/v1/public/sitemap-categories.xml`
 The global category landing pages (`/c/{slug}`) — only nodes that
@@ -2036,6 +2037,12 @@ stock lives in its children is a real page), and each publicly visible
 product with its `updatedAt` as `lastmod`. Unknown *and* unpublished slugs
 both `404`, matching every other public endpoint.
 
+Images use Google's image-sitemap extension
+(`xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"`): the store
+home lists the logo, each product its photos in gallery order — one
+`<image:image><image:loc>` per image, the full-size original's absolute URL
+(≤ 1,000 per URL). Location only; Google reads alt text from the page.
+
 Capped at 50,000 URLs per file (the protocol limit).
 
 ---
@@ -2045,24 +2052,42 @@ Capped at 50,000 URLs per file (the protocol limit).
 > Why they exist and where they are used: [`SEO.md`](./SEO.md).
 
 ### `GET /api/v1/public/images/share/:bucket/{key}.jpg`
-The **link-preview image** (`og:image`) of a stored image: `:bucket` is
-`logo` or `media`, `{key}` the original's object key, `.jpg` appended.
-Clients never build this URL — it arrives as `shareImageUrl` on the public
-store shell and product detail.
+The **link-preview image** (`og:image`) of a product photo: `:bucket` is
+`media` (or `logo` — logo previews are store cards now, but links shared
+earlier still carry this URL), `{key}` the original's object key, `.jpg`
+appended. Clients never build this URL — it arrives as `shareImageUrl` on the
+product detail.
 
 Answers `image/jpeg`: upright, longest edge ≤ 1200 px, transparency on
 white, under ~300 KB (WhatsApp drops larger preview images).
 `cache-control: public, max-age=31536000, immutable` — the key is immutable,
 so the image is too. Rendered from the original on the **first** request and
 stored at `derived/share/<key>.jpg` in the same bucket; later requests read
-the stored copy. Uploads of a product cover or logo warm it in the
-background.
+the stored copy. Every `media` upload warms it in the background.
 
 | Status | When |
 | --- | --- |
 | `200` | The image |
 | `404` | No original at that key |
 | `422` | Unknown bucket, a path not ending in `.jpg`, or not a plain image key (`derived/…`, `..`, non-image extension) |
+
+### `GET /api/v1/public/images/card/logo/{key}.jpg`
+The **store card** — the link-preview image (`og:image`) of store pages: the
+logo, its blank margin trimmed, centred on a **1200×630** canvas filled with
+the logo's own background colour when its edges are one flat colour, white
+otherwise. Wide, so WhatsApp shows the large preview rather than the
+thumbnail it gives a square logo. `{key}` is the logo's object key, `.jpg`
+appended; it arrives as `shareImageUrl` on the public store shell.
+
+Answers `image/jpeg` (typically 10–30 KB), same caching as share images.
+Rendered on the **first** request and stored at `derived/card/<key>.jpg` in
+the `logo` bucket; every logo upload warms it in the background.
+
+| Status | When |
+| --- | --- |
+| `200` | The image |
+| `404` | No logo at that key |
+| `422` | A bucket other than `logo`, a path not ending in `.jpg`, or not a plain image key |
 
 ### `GET /api/v1/public/images/w/:width/:bucket/{key}`
 A stored image **`:width` px wide** (never enlarged), for `srcset`.
@@ -2074,8 +2099,8 @@ these; nothing else needs to.
 Answers `image/webp`, upright, `cache-control: public, max-age=31536000,
 immutable`. Rendered from the original on the **first** request and stored
 at `derived/w{width}/<key minus extension>.webp` in the same bucket; later
-requests read the stored copy. Every image upload renders all widths (and the
-share image) in the background.
+requests read the stored copy. Every image upload renders all widths (and its
+bucket's preview — share image or store card) in the background.
 
 | Status | When |
 | --- | --- |
@@ -2100,8 +2125,13 @@ calls — the SPA boots from the response exactly as from the static file.
 
 | Route | Pages |
 | ----- | ----- |
+| `GET /` | The marketplace home (`WebSite` JSON-LD) |
+| `GET /sell` | The seller landing page |
 | `GET /store/*` | `/store/{slug}` · `/category/{slug}` · `/product/{slug}` · `/shop[?q=][?section=]` · `/support[/{ticketId}]` |
 | `GET /c/*` | `/c/{slug}[?page=][&sort=]` |
+
+Every URL in the head (`canonical`, `og:url`, `og:image`) is absolute, built
+from `PUBLIC_WEB_URL` (else the request's host).
 
 **Response** — `text/html; charset=utf-8`, `cache-control: no-cache` (the
 policy nginx gives `index.html`), no helmet headers. The region between
@@ -2771,6 +2801,26 @@ Body `{ "isActive": false, "reason"?: "…" }` — content moderation. Flips the
 **same `isActive` flag the seller toggles**, so there is one visibility rule
 in the system rather than two that can contradict each other. The seller is
 notified with the reason. Already in that state → `409`.
+
+### `GET /api/v1/admin/catalog/coverage`
+
+How much of the live catalog the global category pages (`/c/{slug}`) reach —
+what converting shelves improves. Counted over exactly the products a
+category page could list (published store, live product, not hidden from
+search):
+
+```jsonc
+{
+  "discoverableProducts": 38,   // could be on a category page
+  "onCategoryPages": 35,        // …are, today (tagged with an active category)
+  "unclassifiedProducts": 3,    // no platform category — on an unconverted shelf
+  "inDisabledCategories": 0,    // tagged with a category that is disabled
+  "shelvesToConvert": 3,        // distinct shelves holding the unclassified ones
+  "stores": [                   // where the unclassified ones are, most first (top 10)
+    { "id", "name", "slug", "unclassifiedProducts": 2 }
+  ]
+}
+```
 
 ### `GET /api/v1/admin/catalog/shelves`
 

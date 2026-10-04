@@ -37,7 +37,9 @@ export const adminConsoleRoutes: FastifyPluginAsync = async (app) => {
   app.get("/catalog/products/:id", controller.getProduct);
   app.patch("/catalog/products/:id/visibility", controller.setProductVisibility);
 
-  // Converting sellers' legacy free-text shelves into platform categories.
+  // Converting sellers' legacy free-text shelves into platform categories,
+  // and how much of the catalog the global category pages reach meanwhile.
+  app.get("/catalog/coverage", controller.getCatalogCoverage);
   app.get("/catalog/shelves", controller.listShelfMappings);
   app.post("/catalog/shelves/:id/convert", controller.convertShelf);
 

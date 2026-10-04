@@ -558,8 +558,9 @@ export interface PublicStore {
   slug: string
   logoUrl: string | null
   /**
-   * The logo as a link-preview image (small JPEG, served by the API) — what
-   * store pages put in `og:image`. Null without a logo. See docs/SEO.md.
+   * The logo on a wide 1200×630 link-preview card (small JPEG, served by the
+   * API) — what store pages put in `og:image`. Null without a logo. See
+   * docs/SEO.md.
    */
   shareImageUrl: string | null
   theme: StoreTheme

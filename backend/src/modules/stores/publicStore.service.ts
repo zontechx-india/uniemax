@@ -369,7 +369,7 @@ export async function getPublicStoreShell(slug: string, viewerId?: string) {
   return {
     ...shell,
     logoUrl: mediaUrl("logo", logoKey),
-    /** The logo as a link-preview image (small JPEG) — the store pages' `og:image`. */
+    /** The logo on a wide 1200×630 card (small JPEG) — the store pages' `og:image`. */
     shareImageUrl: logoKey ? shareImagePath("logo", logoKey) : null,
     footer: resolveFooter(footer),
     payments: resolvePayments(payments),

@@ -6,9 +6,11 @@ import * as controller from "./media.controller.js";
  * `/api` prefix every vhost already proxies, so no nginx change is needed.
  *
  *   GET /share/:bucket/{key}.jpg     preview-safe JPEG of an original (og:image)
+ *   GET /card/logo/{key}.jpg         a logo on a wide 1200×630 card (store og:image)
  *   GET /w/:width/:bucket/{key}      the original at a published width (srcset)
  */
 export const publicMediaRoutes: FastifyPluginAsync = async (app) => {
   app.get("/share/:bucket/*", controller.shareImage);
+  app.get("/card/:bucket/*", controller.cardImage);
   app.get("/w/:width/:bucket/*", controller.sizedImage);
 };

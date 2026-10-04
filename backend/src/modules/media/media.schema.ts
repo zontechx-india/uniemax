@@ -14,15 +14,22 @@ import {
 const bucket = z.enum(["logo", "media"]);
 const sourceKey = z.string().regex(SOURCE_IMAGE_KEY, "Not an image key");
 
-/** `GET /public/images/share/:bucket/{key}.jpg` — `shareImagePath` adds the `.jpg`. */
-export const shareImageParamsSchema = z.object({
-  bucket,
-  "*": z
-    .string()
-    .refine((path) => path.endsWith(SHARE_URL_SUFFIX), "Share image URLs end in .jpg")
-    .transform((path) => path.slice(0, -SHARE_URL_SUFFIX.length))
-    .pipe(sourceKey),
-});
+/** `{key}.jpg` — `shareImagePath` adds the `.jpg` to every preview URL. */
+const previewKey = z
+  .string()
+  .refine((path) => path.endsWith(SHARE_URL_SUFFIX), "Preview image URLs end in .jpg")
+  .transform((path) => path.slice(0, -SHARE_URL_SUFFIX.length))
+  .pipe(sourceKey);
+
+/**
+ * `GET /public/images/share/:bucket/{key}.jpg`. Logos are accepted too:
+ * their previews moved to store cards, but links shared before then still
+ * carry share-image URLs, and preview caches re-fetch them.
+ */
+export const shareImageParamsSchema = z.object({ bucket, "*": previewKey });
+
+/** `GET /public/images/card/logo/{key}.jpg` — store cards exist for logos only. */
+export const cardImageParamsSchema = z.object({ bucket: z.literal("logo"), "*": previewKey });
 
 /** `GET /public/images/w/:width/:bucket/{key}` — only the published widths. */
 export const sizedImageParamsSchema = z.object({

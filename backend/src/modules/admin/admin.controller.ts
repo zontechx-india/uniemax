@@ -160,6 +160,11 @@ export async function setProductVisibility(request: FastifyRequest) {
 // ---- Audit trail ----------------------------------------------------------
 
 /** Shelves a seller typed before the taxonomy existed. */
+/** How much of the live catalog the global category pages can show. */
+export async function getCatalogCoverage() {
+  return ok(await categoryMapping.getCoverage());
+}
+
 export async function listShelfMappings(request: FastifyRequest) {
   const query = schema.shelfListQuery.parse(request.query);
   const result = await categoryMapping.listShelves(query);

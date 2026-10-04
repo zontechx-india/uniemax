@@ -69,7 +69,8 @@ backend/
 │   │   │   │                  #     derived images, imageDelivery, mediaRules,
 │   │   │   │                  #     registerStoragePlugins
 │   │   │   ├── images.ts      #   image rules (sharp): normalize uploads, render
-│   │   │   │                  #     share images + sized copies, derived keys
+│   │   │   │                  #     share images, store cards + sized copies,
+│   │   │   │                  #     derived keys
 │   │   │   ├── config.ts      #   own env parsing
 │   │   │   ├── types.ts       #   StorageDriver port (put / get / remove / publicUrl)
 │   │   │   └── drivers/       #   s3.ts (AWS) · local.ts (dev, served at /uploads)
@@ -133,9 +134,11 @@ backend/
 │   │   │                      #   landing pages (/c/{slug}), aggregated
 │   │   │                      #   across stores via globalCategoryId
 │   │   ├── seo/               # XML sitemaps + page shells (root-level
-│   │   │                      #   GET /store/*, /c/* serving index.html with
-│   │   │                      #   the page's head). Design: docs/SEO.md
-│   │   ├── media/             # GET /public/images/share/… (og:image JPEGs) and
+│   │   │                      #   GET /, /sell, /store/*, /c/* serving
+│   │   │                      #   index.html with the page's head).
+│   │   │                      #   Design: docs/SEO.md
+│   │   ├── media/             # GET /public/images/share/… and /card/logo/…
+│   │   │                      #   (og:image JPEGs) and
 │   │   │                      #   /public/images/w/:width/… (srcset copies);
 │   │   │                      #   rendering and storage live in package/storage
 │   │   ├── notifications/     # feed + push subscriptions (one handler set,
@@ -362,6 +365,9 @@ registry (`DERIVATIVES` in `images.ts`; a new preset is one entry):
 - **share** — a preview-safe JPEG (≤ 1200 px, white behind transparency,
   under ~300 KB), used as `og:image` because WhatsApp drops preview images
   it cannot fetch quickly. Why and where: [`SEO.md`](./SEO.md).
+- **card** — a logo, margin trimmed, centred on a 1200×630 JPEG filled with
+  the logo's own flat edge colour (else white): the store pages' `og:image`,
+  wide so WhatsApp shows the large preview, not the square-logo thumbnail.
 - **w320 / w640 / w960 / w1280** — the image at that width as WebP, the
   `srcset` candidates the storefront's `MediaImg` offers, so a phone grid
   downloads a 320 px copy instead of the 1920 px original. The widths are a
@@ -372,12 +378,17 @@ Each lives beside its original at `derived/<name>/<key minus extension>.<ext>`
 one function, `getDerivedImage`: read the stored copy, else render it from
 the original and store it (concurrent requests share one render). So every
 copy exists for every image, including ones stored before that copy did.
-Served by `modules/media` (`/public/images/share/…`, `/public/images/w/…`).
-`audit-media` judges a `derived/` object by its source image.
+Which preview a bucket's images get is decided once (`PREVIEW_BY_BUCKET`:
+`media` → share, `logo` → card); `derivativesFor(bucket)` is that preview plus
+the sized copies, and `shareImagePath(bucket, key)` builds its URL — so no
+caller picks a preview kind itself. Served by `modules/media`
+(`/public/images/share/…`, `/public/images/card/logo/…`,
+`/public/images/w/…`). `audit-media` judges a `derived/` object by its
+source image.
 
 **Every upload is written with `storeUpload`**, never `storage.put` directly:
-it stores the file and, for an image, renders all its derived images in the
-background (never failing the upload). That one funnel is why no upload path
+it stores the file and, for an image, renders its bucket's derived images
+(`derivativesFor`) in the background (never failing the upload). That one funnel is why no upload path
 can forget them. `imageDelivery()` publishes the widths, the per-bucket URL
 roots and the accepted key pattern in `/public/media-config`, so the
 frontend builds `srcset` from the server's own rules.
@@ -988,6 +999,13 @@ White-label design — one codebase, any business:
   planned first — the console shows the server's plan before it runs; a
   shelf's own subcategories come along with it. Brand and model shelves are
   the admin's call: convert them to the nearest category, or leave them typed.
+  What a typed shelf costs is measured by `getCoverage` (same service,
+  `GET /admin/catalog/coverage`): of the products a `/c/` page could list
+  (`DISCOVERABLE_PRODUCT` from `browse.service.ts`), how many are on one,
+  how many have no category (unconverted shelf) or a disabled one, and which
+  stores hold the most — the console's "Convert first" list. Sellers see a
+  typed shelf flagged "not shown on UnieMax category pages" but cannot
+  convert it themselves.
   `StoreProduct` requires a category — root or subcategory — of the
   same store, and holds `name`, optional `description`, and two JSON columns:
   **`optionTypes`** (ordered `[{ name, values[] }]` — the dimensions it is
@@ -1426,7 +1444,7 @@ and `NotificationKind.AFFILIATE`.
 | `npm run seed-theme-templates` | Create the five starter store appearance templates — palettes (colors only) lifted from real configured stores, topped up from curated fallbacks. Idempotent; `-- --force` tops an existing table back up to five |
 | `npm run seed-categories` | Seed the global category taxonomy (29 top-level + 125 sub) from `scripts/data/globalCategories.ts` — upserts by slug, idempotent, never deletes; fills `optionTemplates`/`specTemplates` from `scripts/data/categoryPresets.ts` only where never set; `-- --dry-run` reports without writing |
 | `npm run audit-media` | List every S3 object and which DB rows reference it (logo/media/order-item keys + bucket-hosted legacy URLs); run per env, `-- --merge <other-env.json>` on the second run yields objects referenced by neither DB. Read-only unless `--delete-orphans --yes` on a merged run. Reports go to `migration-backups/` |
-| `npm run optimize-media` | Bring stored images up to the upload rules and render their missing derived images — sized copies for all, share images for covers and logos (see Media storage). Dry run unless `-- --apply`; `--only=products,logos,store-banners,marketplace-banners`, `--limit=N`. Per environment; never deletes |
+| `npm run optimize-media` | Bring stored images up to the upload rules and render their missing derived images — sized copies for all, link previews for covers (share images) and logos (store cards) (see Media storage). Dry run unless `-- --apply`; `--only=products,logos,store-banners,marketplace-banners`, `--limit=N`. Per environment; never deletes |
 | `npx prisma generate` | Regenerate client after schema edits            |
 
 **Environment files are layered, never edited to switch.** `config/loadEnv.ts`
@@ -1525,9 +1543,10 @@ module's in-memory taxonomy cache — a recursive CTE per page view would be
 the one expensive thing on an otherwise cheap page.
 
 Also done: **SEO** — `modules/seo`: XML sitemaps under `/api/v1/public`
-and **page shells**, root-level `GET /store/*` and `GET /c/*` that serve the
-built `index.html` with that page's head written in and a real `404` for a
-dead slug (nginx forwards those prefixes here). Both reuse the public
+and **page shells**, root-level `GET /`, `GET /sell`, `GET /store/*` and
+`GET /c/*` that serve the built `index.html` with that page's head written in
+(absolute URLs) and a real `404` for a dead slug (nginx forwards those paths
+here). Both reuse the public
 visibility predicates. Design, per-page rules, failure modes, caching and the
 roadmap: [`SEO.md`](./SEO.md); contracts: `API.md` → Sitemaps / Page shells.
 

@@ -2,8 +2,9 @@ import { prisma } from "../../config/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../../utils/httpError.js";
 import { buildListMeta } from "../../utils/response.js";
-import { getCategoryPath } from "../category/categoryTree.js";
+import { getActiveCategoryNodes, getCategoryPath } from "../category/categoryTree.js";
 import type { CategoryCrumb, CategoryNode } from "../category/categoryTree.js";
+import { DISCOVERABLE_PRODUCT } from "../discovery/browse.service.js";
 import { uniqueCategorySlug } from "../stores/catalogSlug.js";
 import { loadShelves, shelfIndex } from "../stores/shelfTree.js";
 import type { Shelf } from "../stores/shelfTree.js";
@@ -127,6 +128,73 @@ export async function listShelves(query: ShelfListQuery) {
   return {
     rows: filtered.slice(start, start + query.pageSize),
     meta: buildListMeta(filtered.length, query.page, query.pageSize),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Coverage — what the unconverted shelves cost
+// ---------------------------------------------------------------------------
+
+/** Stores listed in the coverage breakdown, worst first. */
+const COVERAGE_STORES = 10;
+
+/**
+ * How much of the live catalog the global category pages (`/c/{slug}`) can
+ * show, and where the rest is — the measure this page's work moves.
+ *
+ * Counted over exactly the products a category page could list
+ * (`DISCOVERABLE_PRODUCT`: published store, live product, not hidden from
+ * search). One of those is missing from every category page when it has no
+ * platform category (it sits on an unconverted shelf — fixed by converting
+ * that shelf) or when its category has been disabled (fixed in Categories,
+ * not here). Stores are ranked by unclassified products, so the first one
+ * listed is where a conversion helps most.
+ */
+export async function getCoverage() {
+  const activeIds = (await getActiveCategoryNodes()).map((node) => node.id);
+  const unclassified = {
+    ...DISCOVERABLE_PRODUCT,
+    globalCategoryId: null,
+  } satisfies Prisma.StoreProductWhereInput;
+
+  const [discoverable, onCategoryPages, unclassifiedCount, byStore, byShelf] = await Promise.all([
+    prisma.storeProduct.count({ where: DISCOVERABLE_PRODUCT }),
+    prisma.storeProduct.count({
+      where: { ...DISCOVERABLE_PRODUCT, globalCategoryId: { in: activeIds } },
+    }),
+    prisma.storeProduct.count({ where: unclassified }),
+    prisma.storeProduct.groupBy({
+      by: ["storeId"],
+      where: unclassified,
+      _count: { _all: true },
+      orderBy: { _count: { storeId: "desc" } },
+      take: COVERAGE_STORES,
+    }),
+    prisma.storeProduct.groupBy({ by: ["categoryId"], where: unclassified }),
+  ]);
+
+  const names = await prisma.store.findMany({
+    where: { id: { in: byStore.map((row) => row.storeId) } },
+    select: { id: true, name: true, slug: true },
+  });
+  const storeById = new Map(names.map((store) => [store.id, store]));
+
+  return {
+    /** Products a category page could list, if each had a live category. */
+    discoverableProducts: discoverable,
+    /** …of which this many are on one today. */
+    onCategoryPages,
+    /** On an unconverted shelf — no platform category at all. */
+    unclassifiedProducts: unclassifiedCount,
+    /** Tagged with a category that is currently disabled. */
+    inDisabledCategories: discoverable - onCategoryPages - unclassifiedCount,
+    /** Distinct shelves holding the unclassified products — the work left. */
+    shelvesToConvert: byShelf.length,
+    /** Where the unclassified products are, most first. */
+    stores: byStore.flatMap((row) => {
+      const store = storeById.get(row.storeId);
+      return store ? [{ ...store, unclassifiedProducts: row._count._all }] : [];
+    }),
   };
 }
 

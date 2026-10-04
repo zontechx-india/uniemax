@@ -59,6 +59,7 @@ import {
  * bands, cool neutrals, the brand purple kept for the buttons.
  */
 export function SellPage() {
+  // Server twin: `sellPage` in backend/src/modules/seo/pageShell.service.ts.
   useSeo({
     title: ['Create your free online store'],
     description:

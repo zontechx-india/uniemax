@@ -8,11 +8,11 @@ import type { MediaKind } from "./config.js";
 import { createLocalDriver, localRoot } from "./drivers/local.js";
 import { createS3Driver } from "./drivers/s3.js";
 import {
-  ALL_DERIVATIVES,
   IMAGE_WIDTHS,
   MAX_EDGE,
   SOURCE_IMAGE_KEY,
   derivative,
+  derivativesFor,
   derivedKey,
   normalizeImage,
   type DerivativeName,
@@ -30,9 +30,9 @@ import type { MediaBucket, StorageDriver } from "./types.js";
  *     configured size/type rules for that media kind, and normalizes images
  *     (upright, size-capped, WebP — `images.ts`) whatever client sent them
  *   - `newObjectKey(prefix, contentType)` — collision-free key generation
- *   - `getDerivedImage` / `warmDerivedImages` — copies made from an original
- *     (link-preview JPEG, sized copies for `srcset`), generated once and
- *     stored beside it (`images.ts`)
+ *   - `getDerivedImage` / `ensureDerivedImages` — copies made from an original
+ *     (link-preview JPEG or store card, sized copies for `srcset`), generated
+ *     once and stored beside it (`images.ts`)
  *   - `imageDelivery()` — where sized copies are served, for clients
  *   - `mediaRules` — the configured limits (also served to clients via the
  *     public /media-config endpoint, so UI hints always match the server)
@@ -45,12 +45,12 @@ export { mediaRules } from "./config.js";
 export type { MediaKind } from "./config.js";
 export type { MediaBucket, StorageDriver } from "./types.js";
 export {
-  ALL_DERIVATIVES,
   DERIVED_PREFIX,
   IMAGE_WIDTHS,
   SIZED_DERIVATIVES,
   SOURCE_IMAGE_KEY,
   SHARE_URL_SUFFIX,
+  derivativesFor,
   normalizeImage,
   shareImagePath,
 } from "./images.js";
@@ -178,7 +178,7 @@ export async function readUpload(
 }
 
 // ---------------------------------------------------------------------------
-// Derived images (link-preview JPEG, sized copies) — images.ts decides what
+// Derived images (link previews, sized copies) — images.ts decides what
 // they look like; this is where they are read, rendered and stored.
 // ---------------------------------------------------------------------------
 
@@ -248,9 +248,9 @@ export async function ensureDerivedImages(
 
 /**
  * Stores a file read by `readUpload` — the one way an upload reaches the
- * bucket. For an image it also starts rendering every derived copy in the
- * background, so the first visitor (or the first WhatsApp share) does not
- * wait for them. That never fails the upload: the image endpoints render on
+ * bucket. For an image it also starts rendering every derived copy its
+ * bucket gets (`derivativesFor`) in the background, so the first visitor (or
+ * the first WhatsApp share) does not wait for them. That never fails the upload: the image endpoints render on
  * demand anyway.
  */
 export async function storeUpload(
@@ -260,7 +260,7 @@ export async function storeUpload(
 ): Promise<void> {
   await storage.put(bucket, key, file.buffer, file.contentType);
   if (file.kind === "video") return;
-  ensureDerivedImages(bucket, key, ALL_DERIVATIVES, file.buffer).catch((err: unknown) =>
+  ensureDerivedImages(bucket, key, derivativesFor(bucket), file.buffer).catch((err: unknown) =>
     console.warn("derived images: background render failed", { err, bucket, key }),
   );
 }

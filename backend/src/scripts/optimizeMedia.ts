@@ -4,8 +4,8 @@ import path from "node:path";
 import { appEnv } from "../config/loadEnv.js";
 import { prisma } from "../config/prisma.js";
 import {
-  ALL_DERIVATIVES,
   SIZED_DERIVATIVES,
+  derivativesFor,
   ensureDerivedImages,
   newObjectKey,
   normalizeImage,
@@ -17,9 +17,9 @@ import {
 /**
  * Brings images uploaded before server-side normalization up to today's
  * rules (`package/storage/images.ts`), and pre-renders their derived
- * images — sized copies for `srcset`, and link-preview share images — so
- * the first visitor (or WhatsApp share) of an old product is not the one
- * that waits.
+ * images — sized copies for `srcset`, and link previews (share images,
+ * store cards) — so the first visitor (or WhatsApp share) of an old product
+ * is not the one that waits.
  *
  * For every stored image — product photos, store logos, store banners,
  * marketplace banners:
@@ -34,8 +34,9 @@ import {
  *     (`OrderItem.imageKey`) and browser caches may still point at it;
  *     `npm run audit-media` reports it once nothing does.
  *  3. Every image gets its sized copies, and product covers and store logos
- *     their share image (small JPEG for `og:image`), rendered and stored
- *     where not already there.
+ *     their link preview for `og:image` (a cover's share image, a logo's
+ *     wide store card — `derivativesFor`), rendered and stored where not
+ *     already there.
  *
  * Dry run by default — it reads and measures, writes nothing:
  *
@@ -68,8 +69,8 @@ interface Item {
   key: string;
   bucket: MediaBucket;
   rule: "image" | "logo";
-  /** Also render a share image (product covers, logos), not only sized copies. */
-  share: boolean;
+  /** Also render its link preview (product covers, logos), not only sized copies. */
+  preview: boolean;
   /** Switches the row to a new key iff it still holds `from`. Returns false if it had changed. */
   swap: (from: string, to: string) => Promise<boolean>;
 }
@@ -100,7 +101,7 @@ const KINDS: Kind[] = [
         key: row.key,
         bucket: "media" as const,
         rule: "image" as const,
-        share: covers.has(row.id),
+        preview: covers.has(row.id),
         swap: async (from, to) =>
           (await prisma.storeProductMedia.updateMany({
             where: { id: row.id, key: from },
@@ -121,7 +122,7 @@ const KINDS: Kind[] = [
         key: row.logoKey!,
         bucket: "logo" as const,
         rule: "logo" as const,
-        share: true,
+        preview: true,
         swap: async (from, to) =>
           (await prisma.store.updateMany({
             where: { id: row.id, logoKey: from },
@@ -139,7 +140,7 @@ const KINDS: Kind[] = [
         key: row.imageKey,
         bucket: "media" as const,
         rule: "image" as const,
-        share: false,
+        preview: false,
         swap: async (from, to) =>
           (await prisma.storeBanner.updateMany({
             where: { id: row.id, imageKey: from },
@@ -157,7 +158,7 @@ const KINDS: Kind[] = [
         key: row.imageKey,
         bucket: "media" as const,
         rule: "image" as const,
-        share: false,
+        preview: false,
         swap: async (from, to) =>
           (await prisma.banner.updateMany({
             where: { id: row.id, imageKey: from },
@@ -222,7 +223,7 @@ async function processItem(item: Item, tally: Tally) {
     await ensureDerivedImages(
       item.bucket,
       finalKey,
-      item.share ? ALL_DERIVATIVES : SIZED_DERIVATIVES,
+      item.preview ? derivativesFor(item.bucket) : SIZED_DERIVATIVES,
       stored,
     );
   }
@@ -269,7 +270,7 @@ async function main() {
       [
         `  checked ${tally.checked} · already fine ${tally.alreadyFine}`,
         `${apply ? "optimized" : "to optimize"} ${tally.optimized} (${kb(tally.bytesBefore)} → ${kb(tally.bytesAfter)})`,
-        `sized copies + share images ${apply ? "ensured" : "to ensure"} for ${tally.derived} image(s)`,
+        `sized copies + link previews ${apply ? "ensured" : "to ensure"} for ${tally.derived} image(s)`,
       ].join(" · "),
     );
     for (const [label, list] of [
