@@ -62,6 +62,24 @@
    * deeper and wider, so a lifted card gains weight rather than a drop shadow. */
   --shadow-lifted: 0 0 24px 0 rgba(0, 0, 0, 0.13);
 
+  /* Seller workspace (/mystores) sizes — in PX on purpose. The 90% root
+   * below shrinks every rem, which left inputs at 12.6px (iOS zooms the page
+   * on focus under 16px) and controls at 30-odd px. These do not shrink:
+   *   h-tap / min-h-tap / size-tap  44px  smallest thing a thumb should hit
+   *   h-field                       48px  input / select height
+   *   text-field                    16px  input text (stops the iOS zoom)
+   *   text-hint                     13px  helper lines, the floor for any copy
+   *   rounded-glass / rounded-sheet       workspace cards / bottom sheets
+   * See docs/MYSTORES_UX_PLAN.md §3. */
+  --spacing-tap: 44px;
+  --spacing-field: 48px;
+  --text-field: 16px;
+  --text-field--line-height: 1.4;
+  --text-hint: 13px;
+  --text-hint--line-height: 1.45;
+  --radius-glass: 16px;
+  --radius-sheet: 22px;
+
   /* Dialog entrance (the auth dialog): a short settle rather than a slide —
    * enters from below per the motion rules, ease-out, well under 300ms. The
    * reduced-motion rule at the bottom collapses both durations. */
@@ -123,6 +141,11 @@
   /* Setup-status marks — see the pending block in the palette below. */
   --color-pending: var(--pending);
   --color-pending-soft: var(--pending-soft);
+
+  /* Seller workspace — see the glass block in the palette below. */
+  --color-scrim: var(--scrim);
+  --color-whatsapp: var(--whatsapp);
+  --color-whatsapp-contrast: var(--whatsapp-contrast);
 }
 
 /* ------------------------------------------------------------------ *
@@ -216,6 +239,12 @@
   --danger: #ef443b;
   --info: #0000ee;
   --overlay: rgba(0, 0, 0, 0.6);
+  /* Lighter, tinted overlay for glass sheets — the frosted panel needs some
+   * page left behind it to frost, which a 60% black leaves too little of. */
+  --overlay-soft: rgba(17, 12, 46, 0.4);
+  /* Dark wash over a PHOTO so a white label on it stays legible. Not themed:
+   * it sits on the image, not on the page. */
+  --scrim: rgba(0, 0, 0, 0.55);
 
   /* Chart series (admin dashboard).
    *
@@ -249,6 +278,37 @@
   --pending: #c2410c;
   --pending-soft: #fff4ec;
   --pending-gradient: linear-gradient(120deg, #f97316 0%, #c2410c 50%, #f97316 100%);
+
+  /* --- glass (seller workspace) --------------------------------------
+   * Frosted panels over the `.seller-canvas` colour field. Text on glass is
+   * always --fg / --fg-muted, and every fill here is opaque enough (≥ .7)
+   * that it keeps AA over the brightest part of the backdrop. The fallbacks
+   * at the bottom of this file swap these for solid surfaces when the
+   * browser cannot blur or the person asked for less transparency, so the
+   * utilities never need their own fallback. */
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-strong: rgba(255, 255, 255, 0.86);
+  --glass-inset: rgba(255, 255, 255, 0.9);
+  --glass-border: rgba(255, 255, 255, 0.6);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  --glass-shadow: 0 8px 32px -6px rgba(30, 18, 80, 0.14);
+  --glass-blur: 16px;
+  --glass-blur-strong: 22px;
+  /* Secondary text ON glass. #707070 measured 4.0:1 over the frosted purple
+   * corner (below AA); this step reads 5.4:1 there. Applied by the glass
+   * utilities themselves, so muted text outside glass is unchanged. */
+  --glass-fg-muted: #5c5c66;
+  /* Status text on glass, for the same reason: the global danger red is
+   * 3.4:1 on the frosted canvas. Light keeps the global green (4.6:1). */
+  --glass-success: #008000;
+  --glass-danger: #c8281f;
+  /* The colour field behind the glass: brand purple, accent blue, a rose. */
+  --canvas-1: rgba(108, 62, 244, 0.24);
+  --canvas-2: rgba(24, 99, 220, 0.2);
+  --canvas-3: rgba(236, 72, 153, 0.16);
+  /* WhatsApp's own green — the share button is the one place it appears. */
+  --whatsapp: #25d366;
+  --whatsapp-contrast: #0b3d1f;
 
   color-scheme: light;
 }
@@ -288,6 +348,23 @@
   --pending: #f08c4b;
   --pending-soft: rgba(240, 140, 75, 0.14);
   --pending-gradient: linear-gradient(120deg, #f8b078 0%, #f08c4b 50%, #f8b078 100%);
+
+  /* Glass on the dark canvas: tinted, not white, so panels read as lifted
+   * smoked glass rather than grey fog. */
+  --glass-bg: rgba(30, 28, 40, 0.62);
+  --glass-strong: rgba(24, 22, 32, 0.82);
+  --glass-inset: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --glass-shadow: 0 10px 36px -8px rgba(0, 0, 0, 0.55);
+  --glass-fg-muted: #a4a4ae;
+  /* #008000 is 3.1:1 on dark glass; these read 6.7:1 and 5.7:1. */
+  --glass-success: #3fbf6a;
+  --glass-danger: #ff6b63;
+  --canvas-1: rgba(149, 116, 247, 0.22);
+  --canvas-2: rgba(24, 99, 220, 0.16);
+  --canvas-3: rgba(236, 72, 153, 0.1);
+  --overlay-soft: rgba(0, 0, 0, 0.55);
 
   color-scheme: dark;
 }
@@ -768,5 +845,121 @@
     .sell-ping {
       animation: none;
     }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Seller workspace glass (/mystores/**) — docs/MYSTORES_UX_PLAN.md §4.
+ *
+ * Three surfaces, one rule each:
+ *   glass         cards and panels
+ *   glass-strong  chrome that floats over moving content: the top bar, the
+ *                 bottom tab bar, sticky save bars, sheets
+ *   glass-inset   fields and wells INSIDE glass — near-opaque, because a
+ *                 field is where the seller reads what they typed
+ *
+ * Long lists keep plain rows inside ONE glass container: blur is paid per
+ * blurred layer, and a cheap phone stacking forty of them would stutter.
+ * Real `@utility`s (not plain classes) so `lg:glass` and friends work.
+ * ------------------------------------------------------------------------- */
+@utility glass {
+  --fg-muted: var(--glass-fg-muted);
+  --success: var(--glass-success);
+  --danger: var(--glass-danger);
+  background-color: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+}
+
+@utility glass-strong {
+  --fg-muted: var(--glass-fg-muted);
+  --success: var(--glass-success);
+  --danger: var(--glass-danger);
+  background-color: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(170%);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(170%);
+}
+
+@utility glass-inset {
+  background-color: var(--glass-inset);
+  border: 1px solid var(--line);
+}
+
+/* The colour field the glass frosts. ONE fixed layer of soft radial light
+ * behind the whole workspace — gradients are already soft, so no `filter:
+ * blur` is needed to paint it, and being fixed it is painted once rather
+ * than per scroll frame. `isolation` keeps the negative z-index inside. */
+@utility seller-canvas {
+  position: relative;
+  isolation: isolate;
+
+  &::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-color: var(--bg);
+    background-image:
+      radial-gradient(42% 38% at 88% 6%, var(--canvas-1) 0%, transparent 70%),
+      radial-gradient(38% 36% at 4% 38%, var(--canvas-2) 0%, transparent 70%),
+      radial-gradient(40% 34% at 70% 96%, var(--canvas-3) 0%, transparent 72%),
+      radial-gradient(30% 28% at 22% 92%, var(--canvas-1) 0%, transparent 70%);
+  }
+}
+
+/* Sheet / toast entrance: rises from the bottom edge, the direction a phone
+ * sheet comes from. The global reduced-motion rule collapses it. */
+@utility animate-sheet-in {
+  animation: sheet-in 200ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Glass fallbacks. Re-pointing the TOKENS (rather than overriding the
+ * utilities) means every variant — `lg:glass`, `glass-strong` on a sheet —
+ * falls back together. Repeated for the dark selector so it wins there too. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root,
+  :root[data-theme='dark'] {
+    --glass-bg: var(--surface);
+    --glass-strong: var(--surface);
+    --glass-border: var(--line);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  :root[data-theme='dark'] {
+    --glass-bg: var(--surface);
+    --glass-strong: var(--surface);
+    --glass-inset: var(--input-bg);
+    --glass-border: var(--line);
+    --glass-blur: 0px;
+    --glass-blur-strong: 0px;
+  }
+}
+
+/* Phone inputs never below 16px. iOS Safari zooms the whole page when a
+ * field under 16px takes focus, and the 90% root put every `text-sm` field
+ * at 12.6px — so every tap on a form zoomed. Unlayered on purpose: it must
+ * beat the `text-sm` / `text-xs` utilities a field already carries. Scoped
+ * to touch screens so dense desktop tables keep their size. */
+@media (pointer: coarse) {
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']),
+  select,
+  textarea {
+    font-size: 16px;
   }
 }

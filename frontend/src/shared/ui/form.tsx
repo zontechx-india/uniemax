@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -118,18 +119,34 @@ interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   icon?: ReactNode
   /** Optional trailing control (e.g. a show/hide password toggle). */
   trailing?: ReactNode
+  /** One plain line under the field — "where do I find this?". */
+  hint?: ReactNode
+  /** Shown under THIS field (not in a note at the bottom of the form), and
+   *  marks the input invalid for screen readers. Replaces the hint. */
+  error?: ReactNode
 }
 
+/**
+ * Labelled text input.
+ *
+ * Sized in px, not rem: 48px tall, 14px label, 13px hint — the 90% root
+ * would otherwise shrink a field to 43px with 12.6px text, which iOS zooms
+ * on focus. (Phones also get a 16px input floor from `index.css`.)
+ */
 export function TextField({
   label,
   icon,
   trailing,
+  hint,
+  error,
   className = '',
   ...props
 }: TextFieldProps) {
+  const noteId = useId()
+  const note = error ?? hint
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-medium text-muted">
+      <span className="mb-2 block text-[14px] font-medium text-muted">
         {label}
       </span>
       <div className="group relative">
@@ -139,9 +156,11 @@ export function TextField({
           </span>
         )}
         <input
-          className={`h-12 w-full rounded-md border border-line bg-input text-sm text-fg outline-none transition-colors placeholder:text-muted placeholder:tracking-normal hover:border-fg/30 focus:border-accent ${
-            icon ? 'pl-11' : 'pl-4'
-          } ${trailing ? 'pr-11' : 'pr-4'} ${className}`}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={note ? noteId : undefined}
+          className={`h-field w-full rounded-md border bg-input text-sm text-fg outline-none transition-colors placeholder:text-muted placeholder:tracking-normal hover:border-fg/30 focus:border-accent ${
+            error ? 'border-danger' : 'border-line'
+          } ${icon ? 'pl-11' : 'pl-4'} ${trailing ? 'pr-11' : 'pr-4'} ${className}`}
           {...props}
         />
         {trailing && (
@@ -150,6 +169,15 @@ export function TextField({
           </span>
         )}
       </div>
+      {note && (
+        <span
+          id={noteId}
+          role={error ? 'alert' : undefined}
+          className={`mt-1.5 block text-hint ${error ? 'font-medium text-danger' : 'text-muted'}`}
+        >
+          {note}
+        </span>
+      )}
     </label>
   )
 }
@@ -236,7 +264,7 @@ export function SegmentedTabs<T extends string>({
           key={tab.value}
           type="button"
           onClick={() => onChange(tab.value)}
-          className={`h-9 rounded-sm text-sm font-medium transition-colors ${
+          className={`h-tap rounded-sm text-sm font-medium transition-colors ${
             value === tab.value
               ? 'bg-surface text-fg shadow-floating'
               : 'text-muted hover:text-fg'

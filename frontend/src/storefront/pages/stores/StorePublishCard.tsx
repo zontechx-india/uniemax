@@ -168,7 +168,7 @@ export function StorePublishCard({
               href={whatsAppShareUrl(store.name, shareUrl)}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#25D366] text-sm font-semibold text-white transition hover:opacity-90"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-whatsapp text-sm font-semibold text-whatsapp-contrast transition hover:opacity-90"
             >
               <ChatIcon className="h-4 w-4" />
               Share on WhatsApp

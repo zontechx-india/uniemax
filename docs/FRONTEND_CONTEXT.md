@@ -1834,7 +1834,7 @@ still look like one product.
 | `primitives.tsx` | Card/CardHeader/PageHeader, Chip (6 tones), Button, TextInput/TextArea/SelectInput, Empty/Error/Skeleton, Detail row |
 | `DataTable.tsx` | **The** table + `Pagination`. Below `md` each row re-renders as a stacked card (that's why every column declares a `header` string; one column may be `primary`, and `hideOnMobile` drops detail). One definition per page instead of a desktop table plus a drifting mobile list. |
 | `Toolbar.tsx` | Filter row: debounced `SearchInput`, `FilterSelect`, scrollable status `Tabs` |
-| `shared/ui/Dialog.tsx` | Content dialog — a record opened *in place* over the list that led to it (header, scrollable body, optional action footer; sheet on phones, centred on desktop). Distinct from the shared `ConfirmDialog`, which is a two-button question. Portalled to `<body>` for the same `backdrop-filter` reason. Lives in `shared/ui` because the seller's product wizard uses it too (`GroupMemberPicker`, `CreateMemberDialog`). |
+| `shared/ui/Dialog.tsx` | Content dialog — a record opened *in place* over the list that led to it (header, scrollable body, optional action footer; sheet on phones with a grab-handle, centred on desktop; `glass-strong` panel over `--overlay-soft`, 44px close, safe-area bottom padding; `flush` drops the body padding for edge-to-edge action rows). Distinct from the shared `ConfirmDialog`, which is a two-button question. Portalled to `<body>` for the same `backdrop-filter` reason. Lives in `shared/ui` because the seller's product wizard uses it too (`GroupMemberPicker`, `CreateMemberDialog`). |
 | `statusMeta.tsx` | One label + tone per domain state, defined once — so "Shipped" is the same word and color everywhere. Every chip carries its label; color is a second signal, never the only one. |
 | `charts.tsx` | `TrendChart` · `BarList` · `Donut` · `Sparkline` · `ChartFrame` (see below) |
 | `StatTile.tsx` | Headline number + optional sparkline; a `to` makes it a link |
@@ -2201,7 +2201,8 @@ frontend/
     │   │   │                     #   panel, WizardActions (Back / Skip / Continue;
     │   │   │                     #   primary under the thumb on mobile via
     │   │   │                     #   flex-col-reverse). Domain-agnostic.
-    │   │   ├── ConfirmDialog.tsx # Reusable confirmation modal (used by logout).
+    │   │   ├── ConfirmDialog.tsx # Reusable confirmation modal (used by logout) —
+    │   │   │                     #   bottom sheet on phones, card from `sm`, glass.
     │   │   ├── Dialog.tsx        # Content dialog (header / scrolling body / footer) — admin + seller pickers
     │   │   │                     #   Portals into document.body — callers mount it
     │   │   │                     #   beside their trigger, and a `backdrop-blur`
@@ -2475,7 +2476,11 @@ frontend/
     │           │   ├── CreateMemberDialog.tsx # "Create new product for this value" — draft twin
     │           │   ├── VariantMatrix.tsx     # Generated combinations: photo / SKU / price / MRP / stock / on-off / not offered
     │           │   └── SpecificationsEditor.tsx # Ordered label/value rows
-    │           └── ActiveSwitch.tsx     # Enable/disable pill switch (rows)
+    │           ├── ui/                  # Seller UI kit (glass) — GlassCard, PageHeader,
+    │           │                        #   SaveBar + useUnsavedChangesGuard, ActionRow,
+    │           │                        #   RowMenu, BigSwitch, StatusPill, EmptyState,
+    │           │                        #   Toast (showToast/ToastHost), HelpHint
+    │           └── ActiveSwitch.tsx     # Compact enable/disable pill switch (44px hit area); successor: ui/BigSwitch
     └── admin/                   # Platform console — served at /admin
         ├── main.tsx             # Mounts <AdminApp/>
         ├── AdminApp.tsx         # Session gate + BrowserRouter basename="/admin"
@@ -2606,6 +2611,20 @@ an approved design decision matching 90% browser zoom. Every rem-derived
 Tailwind size (text, spacing, heights) scales with it across both apps;
 pixel values (borders, the 1920px shell cap) are unaffected. Don't
 compensate with larger per-component sizes — the compact scale is intended.
+
+**The touch-size exception (px, not rem).** Three things must not shrink,
+because the scale pushed them under what a phone needs: the 90% root put
+`text-sm` inputs at 12.6px (iOS zooms the page on focus under 16px) and
+`h-11` controls at 39.6px (under the 44px tap minimum). So:
+
+- `@theme` px tokens: `h-tap` / `min-h-tap` / `size-tap` **44px**, `h-field`
+  **48px**, `text-field` **16px**, `text-hint` **13px** (the floor for helper
+  copy), `rounded-glass` 16px, `rounded-sheet` 22px.
+- `Button` heights are px: `sm` 36 · `md` 44 (`h-tap`) · `lg` 48 (`h-field`).
+- `TextField` is `h-field` with a 14px label.
+- An **unlayered** rule in `index.css` sets every text `input` / `select` /
+  `textarea` to **16px under `(pointer: coarse)`** — it must beat the
+  `text-sm` utilities fields already carry. Desktop keeps the compact size.
 
 ### Light / dark theming (runtime)
 
@@ -2883,6 +2902,67 @@ hardcodes its height: it publishes `--store-header` and the listing sort/filter
 bar reads it. That bar must also be a *direct child* of the page column — a
 sticky element can only travel inside its parent's box, and the wrapper div it
 used to sit in was exactly as tall as the bar, so it scrolled away instantly.
+
+### Seller workspace glass + UI kit (`/mystores/**`)
+
+The seller area is being redesigned phase by phase (plan, status and design
+rules: [`MYSTORES_UX_PLAN.md`](./MYSTORES_UX_PLAN.md)). Phase 0 laid the
+foundation below; the pages adopt it in later phases.
+
+**Glass tokens** (`index.css`, light in `:root`, dark in `[data-theme='dark']`;
+JS mirror `glassByScheme` in `colors.ts`): `--glass-bg` (.70 white / .62 smoked),
+`--glass-strong` (.86 / .82), `--glass-inset`, `--glass-border`,
+`--glass-highlight`, `--glass-shadow`, `--glass-blur` 16px / `--glass-blur-strong`
+22px, the canvas lights `--canvas-1..3`, `--overlay-soft` (sheet backdrop),
+`--scrim` (dark wash over a *photo*, `bg-scrim`) and `--whatsapp` /
+`--whatsapp-contrast` (`bg-whatsapp text-whatsapp-contrast`, 6.2:1).
+
+**Utilities** (real `@utility`s, so `lg:glass` works):
+
+| Utility | Use |
+| ------- | --- |
+| `glass` | Cards and panels |
+| `glass-strong` | Chrome over moving content — top bar, tab bar, sticky bars, sheets, toasts |
+| `glass-inset` | Fields / wells inside glass (near-opaque, for legibility) |
+| `seller-canvas` | On the workspace root: ONE fixed layer of radial brand light behind everything (painted once, no `filter: blur`) |
+| `animate-sheet-in` | 200ms rise for sheets, bars, toasts |
+
+Rules that keep it legible and fast:
+
+- **Contrast is re-pointed inside glass.** `glass` / `glass-strong` set
+  `--fg-muted`, `--success` and `--danger` to glass-safe steps
+  (`--glass-fg-muted` #5c5c66 / #a4a4ae, `--glass-danger` #c8281f / #ff6b63,
+  dark `--glass-success` #3fbf6a). Measured over the most saturated canvas
+  corner: muted 5.9:1 light / 6.4:1 dark (plain #707070 was 4.4:1), brand
+  5.1:1 / 4.6:1. Outside glass nothing changes.
+- **Fallbacks re-point the tokens, not the utilities**: no
+  `backdrop-filter` support → solid `--surface`; `prefers-reduced-transparency`
+  → solid and zero blur. Every variant falls back together.
+- **Never nest blurred layers.** A child's `backdrop-filter` only sees up to
+  the nearest ancestor that has one, so the sheet overlays are a plain tint
+  (`--overlay-soft`) — a blurred overlay left the sheet showing the page
+  through unfrosted. Long lists are plain rows inside ONE `glass` card.
+- A `position: fixed` element inside a glass panel is trapped by it (the
+  filter makes a containing block) — use `sticky`, or portal to `<body>`.
+
+**Seller UI kit** — `storefront/pages/stores/ui/` (barrel `index.ts`):
+
+| Component | Purpose |
+| --------- | ------- |
+| `GlassCard` | The one card: optional icon chip + title + one plain sentence + `aside` (pill/action). `padded={false}` for row lists. Replaces Business `Card`, Footer `SectionCard`, Shipping border-top sections. |
+| `PageHeader` | Section heading: gradient icon chip, 22px title, required one-line description, optional action (full width on phones). |
+| `SaveBar` | THE save model for forms: hidden until `dirty`; then a sticky `glass-strong` bar (message, **Undo changes**, **Save changes**) that stays under the thumb; shows `error`. Sits above the mobile tab bar via `--seller-dock`. Renders the unsaved-changes guard. |
+| `useUnsavedChangesGuard(dirty)` | `beforeunload` + react-router `useBlocker` with a plain-words "Leave without saving?" sheet. The blocker half renders only under a data router (`UNSAFE_DataRouterContext`) — the admin console mounts these pages under `<BrowserRouter>`, where `useBlocker` would throw. Ignores same-path (query-only) moves. |
+| `ActionRow` | One list item: leading photo, title + status, ≤2 facts, then ONE labelled primary action, a `toggle` kept apart, and `menu` → `RowMenu`. Actions drop below the text on phones so the name keeps the width. |
+| `RowMenu` | "⋯ More" (44px; word shown from `sm`) → bottom sheet of 56px rows with icon, label and note; `danger` rows forced last and red. |
+| `BigSwitch` | Successor to `ActiveSwitch` (same core props): 52×32 track, 44px hit area, the state *written* beside it (`onText` / `offText`, width reserved for the longer word so lists stay aligned). |
+| `StatusPill` | One badge: tone `success` / `pending` / `brand` / `danger` / `neutral`, dot + 12px text. |
+| `EmptyState` | Gradient icon, title, one sentence, optional numbered picture `steps`, one action. |
+| `showToast()` / `ToastHost` | "Saved ✓" for instant saves. Module store (`useSyncExternalStore`), no provider; `ToastHost` is mounted once in `StoreManageLayout`. |
+| `HelpHint` | ⓘ (44px hit, inline in a label) → a sheet explaining a term in plain words. |
+
+`ActiveSwitch` keeps its compact visual for the rows not yet migrated, but its
+hit area is now 44px tall (`before:` inset).
 
 ---
 

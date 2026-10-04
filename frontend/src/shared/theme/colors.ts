@@ -163,6 +163,36 @@ export const invariants = {
   danger: palette.red,
   info: palette.info,
   backdrop: 'rgba(0, 0, 0, 0.6)',
+  /** Dark wash over a photo so a white label on it reads (`bg-scrim`). */
+  scrim: 'rgba(0, 0, 0, 0.55)',
+  /** WhatsApp green + the dark label that passes AA on it. */
+  whatsapp: '#25d366',
+  whatsappContrast: '#0b3d1f',
+} as const
+
+/**
+ * Seller-workspace glass (`/mystores/**`) — `glass`, `glass-strong`,
+ * `glass-inset` utilities over the `seller-canvas` colour field. Fallbacks
+ * (no backdrop-filter / reduced transparency) re-point these to solid
+ * surfaces in `index.css`. See docs/MYSTORES_UX_PLAN.md §4.
+ */
+export const glassByScheme = {
+  light: {
+    glassBg: 'rgba(255, 255, 255, 0.62)',
+    glassStrong: 'rgba(255, 255, 255, 0.8)',
+    glassInset: 'rgba(255, 255, 255, 0.9)',
+    glassBorder: 'rgba(255, 255, 255, 0.6)',
+    overlaySoft: 'rgba(17, 12, 46, 0.4)',
+    canvas: ['rgba(108, 62, 244, 0.28)', 'rgba(24, 99, 220, 0.2)', 'rgba(236, 72, 153, 0.16)'],
+  },
+  dark: {
+    glassBg: 'rgba(30, 28, 40, 0.62)',
+    glassStrong: 'rgba(24, 22, 32, 0.82)',
+    glassInset: 'rgba(255, 255, 255, 0.06)',
+    glassBorder: 'rgba(255, 255, 255, 0.09)',
+    overlaySoft: 'rgba(0, 0, 0, 0.55)',
+    canvas: ['rgba(149, 116, 247, 0.22)', 'rgba(24, 99, 220, 0.16)', 'rgba(236, 72, 153, 0.1)'],
+  },
 } as const
 
 export type ThemeMode = keyof typeof schemes

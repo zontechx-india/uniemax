@@ -531,7 +531,7 @@ function PhotoPicker({
             <span className="text-[9px] font-semibold uppercase text-muted">Cover</span>
           )}
           {!chosen && shown?.url && (
-            <span className="absolute inset-x-0 bottom-0 bg-black/55 text-center text-[8px] font-semibold uppercase leading-3 text-white">
+            <span className="absolute inset-x-0 bottom-0 bg-scrim text-center text-[8px] font-semibold uppercase leading-3 text-white">
               Cover
             </span>
           )}
@@ -598,7 +598,7 @@ function PhotoTile({
           —
         </span>
       )}
-      <span className="absolute inset-x-0 bottom-0 bg-black/55 text-center text-[9px] font-semibold uppercase leading-4 text-white">
+      <span className="absolute inset-x-0 bottom-0 bg-scrim text-center text-[9px] font-semibold uppercase leading-4 text-white">
         {caption}
       </span>
       {selected && (

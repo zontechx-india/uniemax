@@ -512,7 +512,7 @@ function BannerCard({
           type="button"
           onClick={() => imageInput.current?.click()}
           disabled={busy}
-          className="absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-semibold text-white opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 disabled:cursor-not-allowed"
+          className="absolute inset-0 flex items-center justify-center bg-scrim text-xs font-semibold text-white opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 disabled:cursor-not-allowed"
         >
           Replace image
         </button>
@@ -533,17 +533,17 @@ function BannerCard({
           onPointerDown={() => setArmed(true)}
           onPointerUp={() => setArmed(false)}
           title="Drag to reorder"
-          className="absolute left-2 top-2 z-10 flex h-8 w-8 cursor-grab items-center justify-center rounded-md bg-black/55 text-white active:cursor-grabbing"
+          className="absolute left-2 top-2 z-10 flex h-8 w-8 cursor-grab items-center justify-center rounded-md bg-scrim text-white active:cursor-grabbing"
         >
           <GripIcon className="h-4 w-4" />
         </span>
 
-        <span className="pointer-events-none absolute right-2 top-2 z-10 rounded-pill bg-black/55 px-2 py-0.5 text-[11px] font-semibold text-white">
+        <span className="pointer-events-none absolute right-2 top-2 z-10 rounded-pill bg-scrim px-2 py-0.5 text-[11px] font-semibold text-white">
           {index + 1} of {total}
         </span>
 
         {!banner.isActive && (
-          <span className="pointer-events-none absolute bottom-2 left-2 z-10 rounded-sm bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+          <span className="pointer-events-none absolute bottom-2 left-2 z-10 rounded-sm bg-scrim px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
             Hidden
           </span>
         )}

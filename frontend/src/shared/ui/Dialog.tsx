@@ -19,12 +19,17 @@ import type { ReactNode } from 'react'
  * On a phone it rises from the bottom edge and takes the full width, as a
  * sheet; on a desktop it centres. The body scrolls, the header and footer
  * do not, so the actions stay reachable however long the content is.
+ *
+ * The panel is frosted glass (`glass-strong`) over a lighter tinted overlay,
+ * with a grab-handle on phones so it reads as a sheet, a 44px close target,
+ * and the home-indicator inset kept clear on notched phones.
  */
 export function Dialog({
   open,
   title,
   subtitle,
   size = 'md',
+  flush = false,
   footer,
   onClose,
   children,
@@ -34,6 +39,8 @@ export function Dialog({
   subtitle?: ReactNode
   /** `md` suits a form; `lg` suits a record with media and tables. */
   size?: 'md' | 'lg'
+  /** Body without padding — for edge-to-edge action rows (a sheet menu). */
+  flush?: boolean
   footer?: ReactNode
   onClose: () => void
   children: ReactNode
@@ -74,7 +81,7 @@ export function Dialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-40 flex items-end justify-center bg-[var(--overlay)] sm:items-center sm:p-4"
+      className="fixed inset-0 z-40 flex animate-dialog-backdrop items-end justify-center bg-[var(--overlay-soft)] sm:items-center sm:p-4"
       onMouseDown={onClose}
     >
       <div
@@ -82,34 +89,49 @@ export function Dialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`flex max-h-[92vh] w-full flex-col rounded-t-lg border border-line bg-surface shadow-floating sm:max-h-[88vh] sm:rounded-lg ${width}`}
+        className={`glass-strong flex max-h-[92dvh] w-full animate-sheet-in flex-col rounded-t-sheet sm:max-h-[88vh] sm:rounded-glass ${width}`}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <header className="flex items-start justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
-          <div className="min-w-0">
+        {/* Grab-handle: phones only, where the panel is a sheet. */}
+        <span
+          aria-hidden
+          className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-pill bg-fg/15 sm:hidden"
+        />
+        <header className="flex items-start justify-between gap-3 border-b border-line py-2 pr-2 pl-4 sm:pl-5">
+          <div className="min-w-0 py-1.5">
             <h2
               id={titleId}
-              className="truncate font-heading text-base font-semibold text-fg sm:text-lg"
+              className="truncate font-heading text-[17px] font-semibold text-fg sm:text-lg"
             >
               {title}
             </h2>
-            {subtitle ? <div className="mt-0.5 text-sm text-muted">{subtitle}</div> : null}
+            {subtitle ? <div className="mt-0.5 text-hint text-muted">{subtitle}</div> : null}
           </div>
           <button
             ref={closeRef}
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="-mr-1 shrink-0 rounded-md p-1.5 text-muted transition-colors hover:bg-surface-alt hover:text-fg"
+            className="flex size-tap shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-fg/5 hover:text-fg"
           >
             <CloseIcon />
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">{children}</div>
+        <div
+          className={`min-h-0 flex-1 overflow-y-auto ${flush ? '' : 'px-4 pt-4 sm:px-5'} ${
+            footer
+              ? flush
+                ? ''
+                : 'pb-4'
+              : 'pb-[max(1rem,env(safe-area-inset-bottom))]'
+          }`}
+        >
+          {children}
+        </div>
 
         {footer ? (
-          <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-4 py-3 sm:px-5">
+          <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
             {footer}
           </footer>
         ) : null}

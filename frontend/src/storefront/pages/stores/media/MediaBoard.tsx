@@ -710,13 +710,13 @@ function Tile({
         </span>
       )}
       {(photo.edited || photo.ratioLabel) && (
-        <span className="absolute bottom-1 left-1 rounded-sm bg-black/55 px-1 py-0.5 text-[9px] font-semibold text-white">
+        <span className="absolute bottom-1 left-1 rounded-sm bg-scrim px-1 py-0.5 text-[9px] font-semibold text-white">
           {photo.edited ? 'Edited' : photo.ratioLabel}
         </span>
       )}
       {/* A visible affordance that the tile is the way in — the sheet holds
           every action, so the tile needs no toolbar of its own. */}
-      <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/55 text-white transition group-hover:bg-accent">
+      <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-scrim text-white transition group-hover:bg-accent">
         <PencilIcon className="h-3 w-3" />
       </span>
     </button>

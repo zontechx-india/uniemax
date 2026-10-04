@@ -556,3 +556,25 @@ export function SmartphoneIcon({ className }: { className?: string }) {
     </Svg>
   )
 }
+
+/** Three dots — the "More" menu that holds a row's rarer actions. */
+export function DotsIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none" />
+    </Svg>
+  )
+}
+
+/** Circled "i" — opens a plain-words explanation of a field. */
+export function InfoIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5" />
+      <path d="M12 7.5h.01" />
+    </Svg>
+  )
+}

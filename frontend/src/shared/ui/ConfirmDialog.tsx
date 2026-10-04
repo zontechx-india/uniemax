@@ -88,7 +88,9 @@ export function ConfirmDialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-[var(--overlay)] p-4 sm:items-center"
+      // A bottom sheet on phones (where the thumb is), a centred card from
+      // `sm` up — the same shape as `Dialog`, so every modal moves alike.
+      className="fixed inset-0 z-50 flex animate-dialog-backdrop items-end justify-center bg-[var(--overlay-soft)] sm:items-center sm:p-4"
       onMouseDown={() => {
         if (!busy) onCancel()
       }}
@@ -101,16 +103,16 @@ export function ConfirmDialog({
         // Dialogs that carry a field are taller than a bare confirm — cap the
         // height so a small phone screen scrolls the dialog instead of
         // pushing the buttons off the bottom.
-        className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-lg border border-line bg-surface p-6 shadow-floating"
+        className="glass-strong max-h-[90dvh] w-full animate-sheet-in overflow-y-auto rounded-t-sheet px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:max-w-sm sm:rounded-glass sm:p-6"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <h2
           id="confirm-dialog-title"
-          className="font-heading text-base font-semibold text-fg"
+          className="font-heading text-[17px] font-semibold text-fg"
         >
           {title}
         </h2>
-        <div className="mt-2 text-sm text-muted">{description}</div>
+        <div className="mt-2 text-[14px] leading-relaxed text-muted">{description}</div>
 
         <div className="mt-6 grid grid-cols-2 gap-3">
           <button
@@ -118,7 +120,7 @@ export function ConfirmDialog({
             type="button"
             disabled={busy}
             onClick={onCancel}
-            className="h-11 rounded-md border border-line bg-surface text-sm font-semibold text-fg transition-colors hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
+            className="h-field rounded-md border border-line bg-surface text-[15px] font-semibold text-fg transition-colors hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
           >
             {cancelLabel}
           </button>
@@ -126,7 +128,7 @@ export function ConfirmDialog({
             type="button"
             disabled={busy}
             onClick={onConfirm}
-            className={`h-11 rounded-md text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:bg-line disabled:text-muted ${confirmClass}`}
+            className={`h-field rounded-md text-[15px] font-semibold transition-colors disabled:cursor-not-allowed disabled:bg-line disabled:text-muted ${confirmClass}`}
           >
             {busy ? 'Please wait…' : confirmLabel}
           </button>

@@ -18,6 +18,7 @@ import {
 } from '../../layout/icons'
 import { useStoreManageScope } from '../../features/stores/storeManageScope'
 import { MediaImg } from '../../../shared/media/MediaImg'
+import { ToastHost } from './ui/Toast'
 
 /**
  * Store management — Flipkart-account style split inside the app's main
@@ -276,6 +277,9 @@ export function StoreManageLayout() {
           />
         </section>
       </div>
+
+      {/* "Saved ✓" confirmations for instant saves (stores/ui `showToast`). */}
+      <ToastHost />
     </div>
   )
 }

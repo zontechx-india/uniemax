@@ -40,10 +40,13 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 export type ButtonVariant = 'rise' | 'sheen' | 'ring'
 export type ButtonSize = 'sm' | 'md' | 'lg'
 
+// Heights in PX (36 / 44 / 48), not rem: the 90% root scale turned `h-11`
+// into 39.6px and `h-12` into 43.2px — under the 44px a thumb needs, and not
+// the sizes this file documents. `h-tap` / `h-field` are the px tokens.
 const SIZE: Record<ButtonSize, string> = {
-  sm: 'h-9 gap-1.5 px-3.5 text-xs',
-  md: 'h-11 gap-2 px-5 text-sm',
-  lg: 'h-12 gap-2 px-6 text-sm',
+  sm: 'h-[36px] gap-1.5 px-3.5 text-xs',
+  md: 'h-tap gap-2 px-5 text-sm',
+  lg: 'h-field gap-2 px-6 text-sm',
 }
 
 const VARIANT: Record<ButtonVariant, string> = {

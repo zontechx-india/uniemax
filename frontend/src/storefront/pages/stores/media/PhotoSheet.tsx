@@ -2,12 +2,12 @@ import type { ReactNode } from 'react'
 import {
   ChevronDownIcon,
   ChevronRightIcon,
-  CloseIcon,
   ImageIcon,
   PencilIcon,
   StarIcon,
   TrashIcon,
 } from '../../../layout/icons'
+import { Dialog } from '../../../../shared/ui/Dialog'
 import { media } from './strings'
 import type { BoardPhoto } from './types'
 
@@ -54,113 +54,93 @@ export function PhotoSheet({
   const isCover = index === 1
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={media.sheet.photoLabel(index)}
-      onClick={onClose}
+    <Dialog
+      open
+      title={media.sheet.photoLabel(index)}
+      subtitle={media.sheet.title}
+      onClose={onClose}
+      flush
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-t-xl bg-surface shadow-floating sm:rounded-xl"
-      >
-        <div className="flex items-center gap-3 border-b border-line p-4">
-          {photo.previewUrl && (
-            <img
-              src={photo.previewUrl}
-              alt=""
-              className="h-12 w-12 shrink-0 rounded-md border border-line bg-surface-alt object-contain"
-            />
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-fg">
-              {media.sheet.photoLabel(index)}
-            </p>
-            <p className="text-[11px] text-muted">{media.sheet.title}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={media.sheet.close}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-muted transition hover:bg-surface-alt hover:text-fg"
-          >
-            <CloseIcon className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="divide-y divide-line">
-          {isCover ? (
-            <Row
-              icon={<StarIcon className="h-4.5 w-4.5" filled />}
-              label={media.sheet.isCover}
-              note={media.sheet.isCoverNote}
-              tone="quiet"
-            />
-          ) : (
-            <Row
-              icon={<StarIcon className="h-4.5 w-4.5" />}
-              label={media.sheet.makeCover}
-              note={media.sheet.makeCoverNote}
-              disabled={busy}
-              onClick={onMakeCover}
-            />
-          )}
-
-          {canEdit ? (
-            <Row
-              icon={<PencilIcon className="h-4.5 w-4.5" />}
-              label={media.sheet.edit}
-              disabled={busy}
-              onClick={onEdit}
-            />
-          ) : null}
-
-          <Row
-            icon={<ImageIcon className="h-4.5 w-4.5" />}
-            label={media.sheet.replace}
-            note={canEdit ? undefined : media.sheet.editUnavailable}
-            disabled={busy}
-            onClick={onReplace}
-          />
-
-          {canDescribe && (
-            <Row
-              icon={<PencilIcon className="h-4.5 w-4.5" />}
-              label={media.describe.title}
-              note={photo.altText ?? media.sheet.describeNote}
-              disabled={busy}
-              onClick={onDescribe}
-            />
-          )}
-
-          {index > 1 && (
-            <Row
-              icon={<ChevronDownIcon className="h-4.5 w-4.5 rotate-90" />}
-              label={media.sheet.moveEarlier}
-              disabled={busy}
-              onClick={() => onMove(-1)}
-            />
-          )}
-          {index < total && (
-            <Row
-              icon={<ChevronRightIcon className="h-4.5 w-4.5" />}
-              label={media.sheet.moveLater}
-              disabled={busy}
-              onClick={() => onMove(1)}
-            />
-          )}
-
-          <Row
-            icon={<TrashIcon className="h-4.5 w-4.5" />}
-            label={media.sheet.remove}
-            tone="danger"
-            disabled={busy}
-            onClick={onRemove}
+      {photo.previewUrl && (
+        <div className="flex justify-center border-b border-line bg-fg/5 py-3">
+          <img
+            src={photo.previewUrl}
+            alt=""
+            className="h-24 w-24 rounded-xl border border-line bg-surface-alt object-contain"
           />
         </div>
+      )}
+      <div className="divide-y divide-line pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        {isCover ? (
+          <Row
+            icon={<StarIcon className="h-4.5 w-4.5" filled />}
+            label={media.sheet.isCover}
+            note={media.sheet.isCoverNote}
+            tone="quiet"
+          />
+        ) : (
+          <Row
+            icon={<StarIcon className="h-4.5 w-4.5" />}
+            label={media.sheet.makeCover}
+            note={media.sheet.makeCoverNote}
+            disabled={busy}
+            onClick={onMakeCover}
+          />
+        )}
+
+        {canEdit ? (
+          <Row
+            icon={<PencilIcon className="h-4.5 w-4.5" />}
+            label={media.sheet.edit}
+            disabled={busy}
+            onClick={onEdit}
+          />
+        ) : null}
+
+        <Row
+          icon={<ImageIcon className="h-4.5 w-4.5" />}
+          label={media.sheet.replace}
+          note={canEdit ? undefined : media.sheet.editUnavailable}
+          disabled={busy}
+          onClick={onReplace}
+        />
+
+        {canDescribe && (
+          <Row
+            icon={<PencilIcon className="h-4.5 w-4.5" />}
+            label={media.describe.title}
+            note={photo.altText ?? media.sheet.describeNote}
+            disabled={busy}
+            onClick={onDescribe}
+          />
+        )}
+
+        {index > 1 && (
+          <Row
+            icon={<ChevronDownIcon className="h-4.5 w-4.5 rotate-90" />}
+            label={media.sheet.moveEarlier}
+            disabled={busy}
+            onClick={() => onMove(-1)}
+          />
+        )}
+        {index < total && (
+          <Row
+            icon={<ChevronRightIcon className="h-4.5 w-4.5" />}
+            label={media.sheet.moveLater}
+            disabled={busy}
+            onClick={() => onMove(1)}
+          />
+        )}
+
+        <Row
+          icon={<TrashIcon className="h-4.5 w-4.5" />}
+          label={media.sheet.remove}
+          tone="danger"
+          disabled={busy}
+          onClick={onRemove}
+        />
       </div>
-    </div>
+    </Dialog>
   )
 }
 
@@ -192,9 +172,9 @@ function Row({
         {icon}
       </span>
       <span className="min-w-0 flex-1 text-left">
-        <span className="block text-sm font-semibold">{label}</span>
+        <span className="block text-[15px] font-semibold">{label}</span>
         {note && (
-          <span className="mt-0.5 block text-[11px] font-normal text-muted">
+          <span className="mt-0.5 block text-hint font-normal text-muted">
             {note}
           </span>
         )}
@@ -204,7 +184,7 @@ function Row({
 
   if (!onClick) {
     return (
-      <div className={`flex items-center gap-3 px-4 py-3.5 ${text}`}>
+      <div className={`flex min-h-[56px] items-center gap-3 px-5 py-3 ${text}`}>
         {content}
       </div>
     )
@@ -215,7 +195,7 @@ function Row({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`flex w-full items-center gap-3 px-4 py-3.5 transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-50 ${text}`}
+      className={`flex min-h-[56px] w-full items-center gap-3 px-5 py-3 transition hover:bg-fg/5 disabled:cursor-not-allowed disabled:opacity-50 ${text}`}
     >
       {content}
     </button>
