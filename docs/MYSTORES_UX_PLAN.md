@@ -23,7 +23,7 @@ English only for now, in plain words (i18n later).
 | 4 | Products, product wizard, categories, media | ✅ Done (2026-10-04) |
 | 5 | Orders list + order detail | ✅ Done (2026-10-04) |
 | 6 | Settings pages (Business, Bank, Payments, Checkout, Shipping, Details, Footer, Banners) | ✅ Done (2026-10-04) |
-| 7 | Store Builder mobile pass | ⬜ Not started |
+| 7 | Store Builder mobile pass | ✅ Done (2026-10-04) |
 | 8 | Support pages, skeletons, final polish | ⬜ Not started |
 
 Legend: ⬜ not started · 🟨 in progress · ✅ done. A phase is done only after the
@@ -362,11 +362,11 @@ Each phase ships on its own and is approved before the next one starts.
 
 ### Phase 7 — Store Builder (mobile)
 
-- [ ] Save status chip always visible on mobile
-- [ ] "Published" toggle → "Take shop offline", behind a confirmation
-- [ ] 44 px ↑ / ↓ beside the drag handle
-- [ ] Fix sticky-bar overflow and the mobile preview copy
-- [ ] Glass panels
+- [x] Save status pill always visible on mobile (Saving… / Saved / Not saved)
+- [x] "Published" → "Live · Take offline", behind a confirmation
+- [x] 44 px ↑ / ↓ beside the drag handle; 56px section rows
+- [x] Sticky colour bar fixed (no edge overflow) with plain copy; Change / See my shop switch
+- [x] Glass save bar; the builder's own panels stay solid (they sit beside a live iframe)
 
 ### Phase 8 — Support pages & polish
 

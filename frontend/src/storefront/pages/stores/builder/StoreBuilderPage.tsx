@@ -318,9 +318,9 @@ function Builder({
           <button
             type="button"
             onClick={() => setTarget(null)}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted transition hover:bg-surface-alt hover:text-fg"
+            className="flex size-tap shrink-0 items-center justify-center rounded-xl text-muted transition hover:bg-fg/5 hover:text-fg"
           >
-            <ArrowLeftIcon className="h-4 w-4" />
+            <ArrowLeftIcon className="h-5 w-5" />
             <span className="sr-only">Back to sections</span>
           </button>
           <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-fg">
@@ -446,13 +446,13 @@ function Builder({
               type="button"
               onClick={() => setMobileView(view)}
               aria-pressed={mobileView === view}
-              className={`h-8 flex-1 rounded text-xs font-semibold transition-colors ${
+              className={`h-10 flex-1 rounded-lg text-[14px] font-semibold transition-colors ${
                 mobileView === view
-                  ? 'bg-brand-soft text-brand'
+                  ? 'bg-brand text-brand-contrast'
                   : 'text-muted hover:text-fg'
               }`}
             >
-              {view === 'edit' ? 'Edit' : 'Preview'}
+              {view === 'edit' ? 'Change' : 'See my shop'}
             </button>
           ))}
         </div>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toApiError } from '../../../../shared/auth/http'
 import { Button } from '../../../../shared/ui/Button'
+import { ConfirmDialog } from '../../../../shared/ui/ConfirmDialog'
 import { publicStoreUrl, storesApi } from '../../../features/stores/storesApi'
 import type { Store } from '../../../features/stores/storesApi'
 import {
@@ -53,6 +54,9 @@ export function BuilderHeader({
 }) {
   const [busy, setBusy] = useState(false)
   const [publishError, setPublishError] = useState<string | null>(null)
+  // Taking a live shop offline asks first — it used to happen on one tap of
+  // a button that merely read "Published".
+  const [confirmOffline, setConfirmOffline] = useState(false)
 
   /**
    * What stops this store going live, straight from the server's own
@@ -71,6 +75,7 @@ export function BuilderHeader({
     setBusy(true)
     try {
       onStoreChange(await storesApi.setPublished(store.id, !store.isPublished))
+      setConfirmOffline(false)
     } catch (err) {
       setPublishError(toApiError(err).message)
     } finally {
@@ -86,9 +91,9 @@ export function BuilderHeader({
         <Link
           to={backTo}
           title={`Back to ${store.name}`}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted transition hover:bg-surface-alt hover:text-fg"
+          className="flex size-tap shrink-0 items-center justify-center rounded-xl text-muted transition hover:bg-fg/5 hover:text-fg"
         >
-          <ArrowLeftIcon className="h-4 w-4" />
+          <ArrowLeftIcon className="h-5 w-5" />
           <span className="sr-only">Back to {store.name}</span>
         </Link>
 
@@ -106,10 +111,10 @@ export function BuilderHeader({
             </span>
           )}
           <span className="min-w-0">
-            <span className="block truncate text-sm font-semibold text-fg">
-              Store Builder
+            <span className="block truncate text-[15px] font-semibold text-fg">
+              Design your shop
             </span>
-            <span className="block truncate text-xs text-muted">
+            <span className="block truncate text-hint text-muted">
               {store.name}
             </span>
           </span>
@@ -149,28 +154,30 @@ export function BuilderHeader({
             href={publicStoreUrl(store.slug)}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-line px-3 text-xs font-semibold text-fg transition-colors hover:bg-surface-alt"
+            className="inline-flex h-tap shrink-0 items-center gap-1.5 rounded-xl border border-line px-3 text-[14px] font-semibold text-fg transition-colors hover:bg-fg/5"
           >
-            <ExternalLinkIcon className="h-3.5 w-3.5" />
+            <ExternalLinkIcon className="h-4 w-4" />
             <span className="hidden sm:inline">
               {store.isPublished ? 'View store' : 'Preview store'}
             </span>
           </a>
 
           {store.isPublished ? (
+            // Says what it IS ("Live") and what tapping DOES ("Take
+            // offline"), and asks before it does it.
             <button
               type="button"
-              onClick={togglePublished}
+              onClick={() => setConfirmOffline(true)}
               disabled={busy}
-              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-line px-3 text-xs font-semibold text-fg transition-colors hover:bg-surface-alt disabled:opacity-50"
+              className="inline-flex h-tap shrink-0 items-center gap-1.5 rounded-xl border border-line px-3 text-[14px] font-semibold text-fg transition-colors hover:bg-fg/5 disabled:opacity-50"
             >
               <span className="h-2 w-2 rounded-full bg-success" aria-hidden />
-              {busy ? 'Saving…' : 'Published'}
+              <span className="hidden sm:inline">Live ·</span> Take offline
             </button>
           ) : (
             <Button
               variant="rise"
-              size="sm"
+              size="md"
               onClick={togglePublished}
               disabled={busy || blocked}
               title={
@@ -187,7 +194,7 @@ export function BuilderHeader({
           control in a dashboard, so the reasons are on screen and each one is
           a link to the screen that fixes it. */}
       {blocked && (
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-line bg-pending-soft px-3 py-2 text-xs sm:px-4">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-line bg-pending-soft px-3 py-2.5 text-hint sm:px-4">
           <span className="font-semibold text-fg">
             Almost ready to publish.
           </span>
@@ -197,10 +204,21 @@ export function BuilderHeader({
       )}
 
       {publishError && (
-        <p className="border-t border-line bg-danger-soft px-3 py-2 text-xs font-medium text-danger sm:px-4">
+        <p className="border-t border-line bg-danger-soft px-3 py-2 text-hint font-medium text-danger sm:px-4">
           {publishError}
         </p>
       )}
+
+      <ConfirmDialog
+        open={confirmOffline}
+        title="Take your shop offline?"
+        description="Customers will not be able to see your shop or order until you publish it again. Your design, products and orders are kept."
+        confirmLabel="Take offline"
+        cancelLabel="Keep it live"
+        busy={busy}
+        onConfirm={() => void togglePublished()}
+        onCancel={() => setConfirmOffline(false)}
+      />
     </header>
   )
 }
@@ -208,7 +226,9 @@ export function BuilderHeader({
 /**
  * "Saved" rather than a Save button, because the builder has no unsaved state
  * to lose — but the seller still has to be *told* that, or they will hunt for
- * a button that does not exist.
+ * a button that does not exist. Shown on EVERY screen size: on a phone it
+ * used to be hidden, so a failed save went unnoticed. On a phone it is a
+ * compact pill; the full error text is its title and the sr status.
  */
 function SaveStatus({
   state,
@@ -222,15 +242,15 @@ function SaveStatus({
       <span
         role="status"
         title={error ?? undefined}
-        className="hidden max-w-[16rem] truncate text-xs font-semibold text-danger sm:inline"
+        className="inline-flex max-w-[16rem] items-center gap-1 truncate rounded-pill bg-danger/10 px-2.5 py-1 text-[12px] font-semibold text-danger"
       >
-        Couldn&rsquo;t save — {error}
+        Not saved<span className="hidden sm:inline"> — {error}</span>
       </span>
     )
   }
   if (state === 'saving') {
     return (
-      <span role="status" className="hidden text-xs text-muted sm:inline">
+      <span role="status" className="rounded-pill bg-fg/5 px-2.5 py-1 text-[12px] font-semibold text-muted">
         Saving…
       </span>
     )
@@ -239,9 +259,9 @@ function SaveStatus({
     return (
       <span
         role="status"
-        className="hidden items-center gap-1 text-xs text-muted sm:inline-flex"
+        className="inline-flex items-center gap-1 rounded-pill bg-success/10 px-2.5 py-1 text-[12px] font-semibold text-success"
       >
-        <CheckIcon className="h-3.5 w-3.5 text-success" />
+        <CheckIcon className="h-3.5 w-3.5" />
         Saved
       </span>
     )

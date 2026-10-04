@@ -289,18 +289,18 @@ function PinnedRow({
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors ${
+      className={`flex min-h-[56px] w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-colors ${
         active
           ? 'border-brand bg-brand-soft'
-          : 'border-line bg-surface hover:border-fg/25'
+          : 'border-line bg-surface/70 hover:border-fg/25'
       }`}
     >
       <Icon className="h-[18px] w-[18px] shrink-0 text-muted" />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold text-fg">
+        <span className="block truncate text-[15px] font-semibold text-fg">
           {label}
         </span>
-        <span className="mt-0.5 block truncate text-xs text-muted">{hint}</span>
+        <span className="mt-0.5 block truncate text-hint text-muted">{hint}</span>
       </span>
       <ChevronRightIcon className="h-4 w-4 shrink-0 text-muted" />
     </button>
@@ -324,10 +324,10 @@ function MoveButton({
       disabled={disabled}
       onClick={onClick}
       aria-label={label}
-      className="rounded p-0.5 text-muted transition hover:bg-surface-alt hover:text-fg disabled:opacity-30 disabled:hover:bg-transparent"
+      className="flex size-tap items-center justify-center rounded-xl text-muted transition hover:bg-fg/5 hover:text-fg disabled:opacity-30 disabled:hover:bg-transparent"
     >
       <ChevronDownIcon
-        className={`h-4 w-4 ${dir === 'up' ? 'rotate-180' : ''}`}
+        className={`h-5 w-5 ${dir === 'up' ? 'rotate-180' : ''}`}
       />
     </button>
   )

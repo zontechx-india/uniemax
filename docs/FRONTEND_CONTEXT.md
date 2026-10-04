@@ -1554,8 +1554,8 @@ is never shown a pickup-address item.
   every homepage section as a row with a drag handle, an `ActiveSwitch` and a
   click target, bracketed by pinned **Store header** and **Footer** rows (real
   parts of the shop, but never moved or switched off). Reordering is offered
-  twice on purpose: native HTML5 drag for a mouse, ▲/▼ buttons for keyboard,
-  screen readers and phones. Opening a row swaps the panel for that section's
+  twice on purpose: native HTML5 drag for a mouse, 44px ▲/▼ buttons for
+  keyboard, screen readers and phones. Opening a row swaps the panel for that section's
   editor. *Design* (`BuilderDesignPanel`) is colour and nothing else — it is
   called **Color theme**, not "Template", because colour is genuinely all it
   changes; a seller picks one of the platform's palettes in a click, and the
@@ -1583,9 +1583,19 @@ is never shown a pickup-address item.
   `PATCH /stores/:id/homepage`, clicks go out immediately and typing is
   debounced 600ms (a pending write is **flushed on unmount**, so the last
   keystroke before leaving is never lost), with the header reporting
-  Saving…/Saved and a failed write rolling the panel back to the server's
-  answer. Colour is the deliberate exception and has its own Save, because it
-  is the one change that can make a shop unreadable.
+  Saving… / Saved / Not saved as a pill on **every** screen size (it used to
+  be hidden on phones, so a failed save went unnoticed) and a failed write
+  rolling the panel back to the server's answer. Colour is the deliberate
+  exception and has its own Save — a sticky glass bar ("You changed the
+  colours but have not saved them yet" · Undo · Save colours), because it is
+  the one change that can make a shop unreadable.
+
+  **Header & phones.** The header (`BuilderHeader`) reads "Design your shop";
+  a live shop shows **Live · Take offline**, which asks first in a
+  `ConfirmDialog` (it used to unpublish on one tap of a button labelled
+  "Published"); an unpublished one shows **Publish** with the blockers as
+  links. Below `lg` one column is switched with a 40px **Change / See my
+  shop** toggle; back buttons are 44px.
 
   **Section editors** (`BuilderSectionEditor`) are generated from one table,
   `builderSections.ts`, which is most of the product: label, plain-English
@@ -2547,7 +2557,7 @@ frontend/
     │           ├── builder/             # Store Builder — the one storefront workspace
     │           │   ├── StoreBuilderPage.tsx  # Shell: header + controls + live preview,
     │           │   │                        #   owns section state and autosave
-    │           │   ├── BuilderHeader.tsx     # Device switch, save state, Publish
+    │           │   ├── BuilderHeader.tsx     # Device switch, save-state pill, Publish / confirmed Take offline
     │           │   ├── BuilderSectionList.tsx# Reorder / show / open, + pinned header & footer
     │           │   ├── BuilderSectionEditor.tsx # Layout + title, rest under More options
     │           │   ├── BuilderDesignPanel.tsx# Color theme + the five pickers

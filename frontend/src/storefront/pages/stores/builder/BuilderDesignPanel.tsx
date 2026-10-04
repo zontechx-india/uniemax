@@ -166,20 +166,22 @@ export function BuilderDesignPanel({
       {/* Sticky so the commit is reachable however far the colour grid has
           scrolled — the one place in the builder with a save to press. */}
       {dirty && (
-        <div className="sticky bottom-0 -mx-4 flex items-center gap-2 border-t border-line bg-surface px-4 py-3 sm:-mx-5 sm:px-5">
-          <span className="min-w-0 flex-1 text-xs font-medium text-muted">
-            You have unsaved colors. The preview is showing them.
+        // Sticky inside the panel's own padding (the old -mx bled 4px past
+        // the edge on phones), and worded for wherever the preview is.
+        <div className="glass-strong sticky bottom-3 flex flex-wrap items-center gap-2 rounded-glass p-2.5">
+          <span className="min-w-0 flex-1 basis-40 text-hint font-medium text-fg">
+            You changed the colours but have not saved them yet.
           </span>
           <button
             type="button"
             onClick={onDiscard}
             disabled={busy}
-            className="h-9 shrink-0 rounded-md border border-line px-3 text-xs font-semibold text-fg transition-colors hover:bg-surface-alt disabled:opacity-50"
+            className="min-h-tap shrink-0 rounded-xl border border-line px-4 text-[14px] font-semibold text-fg transition-colors hover:bg-fg/5 disabled:opacity-50"
           >
-            Discard
+            Undo
           </button>
-          <Button variant="rise" size="sm" onClick={onSave} disabled={busy}>
-            {busy ? 'Saving…' : 'Save colors'}
+          <Button variant="rise" size="md" onClick={onSave} disabled={busy}>
+            {busy ? 'Saving…' : 'Save colours'}
           </Button>
         </div>
       )}
