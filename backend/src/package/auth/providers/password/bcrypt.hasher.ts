@@ -1,4 +1,8 @@
-import { hashPassword, verifyPassword } from "../../../../utils/password.js";
+import {
+  hashPassword,
+  verifyPassword,
+  passwordNeedsRehash,
+} from "../../../../utils/password.js";
 import type { PasswordHasher } from "../provider.types.js";
 
 /**
@@ -10,4 +14,5 @@ import type { PasswordHasher } from "../provider.types.js";
 export const bcryptPasswordHasher: PasswordHasher = {
   hash: hashPassword,
   verify: verifyPassword,
+  needsRehash: passwordNeedsRehash,
 };

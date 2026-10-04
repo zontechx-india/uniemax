@@ -77,4 +77,6 @@ export interface OAuthVerifier {
 export interface PasswordHasher {
   hash(plain: string): Promise<string>;
   verify(plain: string, hash: string): Promise<boolean>;
+  /** True when a stored hash should be re-made at today's work factor. */
+  needsRehash(hash: string): boolean;
 }

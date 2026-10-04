@@ -84,7 +84,13 @@ the API same-origin — matching production, so no CORS/SameSite issues.
   — what EVERY "Sign in" control opens, in place, on whichever page the
   visitor is on (marketplace header, "Sell on UnieMax", the store header's
   account slot and mobile drawer, the checkout guest gate, the store Help
-  page). It is mounted once in `StorefrontApp` beside the `RouterProvider`,
+  page). Inside a store the form column always carries the UnieMax lockup
+  and says "Sign in with your UnieMax account": the store's name, logo and
+  palette frame the dialog, but the password form must never read as the
+  shop's own (a shop-branded password form is what phishing classifiers
+  flag). Credential inputs carry `autoComplete` (`username` /
+  `current-password` / `new-password`) so password managers file them under
+  uniemax.com. It is mounted once in `StorefrontApp` beside the `RouterProvider`,
   inside `MarketSessionProvider`, so both routers share it; on success it
   calls `signedIn(customer)` and closes, and every consumer re-renders as
   signed in — no reload, no `?next=`. Because it sits OUTSIDE the router it

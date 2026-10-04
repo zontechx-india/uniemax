@@ -73,10 +73,10 @@ Verify: `curl http://localhost:4000/health`
 | Var            | Notes                                                     |
 | -------------- | --------------------------------------------------------- |
 | `NODE_ENV`     | `development` \| `test` \| `production`                   |
-| `PORT`/`HOST`  | HTTP bind (default `4000` / `0.0.0.0`)                    |
+| `PORT`/`HOST`  | HTTP bind (default `4000` / `0.0.0.0`). The EC2 clones set `HOST=127.0.0.1` — only nginx on the same box should reach the API |
 | `LOG_LEVEL`    | Pino level (default `info`)                               |
 | `CORS_ORIGIN`  | `*` or comma-separated allowlist (**production requires an explicit allowlist**) |
-| `TRUST_PROXY`  | `true` (default — behind Nginx/LB) \| `false` (exposed directly) \| hop count \| address list. Controls whether `X-Forwarded-*` is believed — set `false` when direct, or clients can spoof IPs past the rate limits |
+| `TRUST_PROXY`  | `true` (default — behind Nginx/LB) \| `false` (exposed directly) \| address list (hop counts are refused at boot — Fastify 5.12 dropped them). Controls whether `X-Forwarded-*` is believed — set `false` when direct, or clients can spoof IPs past the rate limits |
 | `PUBLIC_WEB_URL` | Optional storefront origin (e.g. `https://shop.example.com`) — when set, order emails carry deep links and Cashfree payments return to the order page |
 | `CASHFREE_APP_ID` / `CASHFREE_SECRET_KEY` | Cashfree PG credentials. Both set → real ONLINE payments (sandbox keys work in dev); unset → dev simulates, production answers 503. **Production refuses to boot with only one of the two** |
 | `CASHFREE_ENV` | `sandbox` (default — `sandbox.cashfree.com/pg`) \| `production` (`api.cashfree.com/pg`); also picks the web SDK mode |

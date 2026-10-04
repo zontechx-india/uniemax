@@ -24,9 +24,16 @@ cross-origin resource policy relaxed so `/uploads` images render on the
 storefront origin). Abuse protection via `@fastify/rate-limit` — global
 300/min per IP, with strict per-route overrides on the code-sending
 endpoints (5 / 5 min), credential/code checks (10/min) and order placement
-(10/min); 429s flow through the standard error envelope. `TRUST_PROXY`
-controls whether `X-Forwarded-*` is believed (set `false` when the API is
-exposed without a proxy, or clients could spoof IPs past the limits).
+(10/min); 429s flow through the standard error envelope. Password sign-in
+(customer and admin) also has a **per-account** cool-down
+(`package/auth/core/loginThrottle.ts`, in process memory): 10 failed
+passwords for one email inside 15 min → that email is refused with 429 for
+15 min from any IP, so credential stuffing spread over many IPs is still
+throttled. It counts unknown emails too, so the 429 reveals nothing.
+`TRUST_PROXY` controls whether `X-Forwarded-*` is believed (`true` /
+`false` / an address list — hop counts are refused, Fastify 5.12 dropped
+them; set `false` when the API is exposed without a proxy, or clients could
+spoof IPs past the limits).
 Media uploads via
 `@fastify/multipart` + the **`package/storage`** sub-system (S3 driver via
 `@aws-sdk/client-s3`, local-disk driver for dev served by `@fastify/static`;
@@ -760,7 +767,9 @@ extracted into a standalone service later with minimal churn. The rest of the ap
   self-service: `/me`, orders, change/set password, identifier linking. Password reset
   revokes all sessions; a password change revokes every session **except the one that
   made the change**. Login failures cost the same bcrypt work whether the email exists
-  or not (no timing-based account enumeration — same for admin login). Google
+  or not (no timing-based account enumeration — same for admin login). bcrypt work
+  factor is 12 (`utils/password.ts`); a hash made at a lower factor is re-made on the
+  next successful login (customer and admin), the only moment the plaintext exists. Google
   resolution: linked `(provider, sub)` → sign-in; else
   customer owning the provider-verified email → linked; else account created. Accounts
   therefore always start with a **verified email**.

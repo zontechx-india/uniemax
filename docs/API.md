@@ -19,7 +19,7 @@
 | 404    | Not found                                                   |
 | 409    | Conflict (duplicate `sku`/`slug`, delete guard)             |
 | 422    | Validation failed (`issues[]` has field-level detail)       |
-| 429    | Rate-limited — per-IP 300/min globally; stricter on code-sending (5 / 5 min), login/verify (10/min) and order placement (10/min) |
+| 429    | Rate-limited — per-IP 300/min globally; stricter on code-sending (5 / 5 min), login/verify (10/min) and order placement (10/min). Password logins also cool down **per account**: 10 failures for one email in 15 min → 429 for 15 min from any IP |
 | 500    | Server error                                                |
 
 **Auth:** short-lived **access token** (JWT) + long-lived **refresh token** (opaque,
@@ -157,7 +157,8 @@ customer in (cookies on web; tokens in body on mobile):
 { "email": "ravi@example.com", "password": "Passw0rd123" }
 ```
 `401` on bad credentials — same message whether the email is unknown, the password is
-wrong, or the account has no password (social/OTP-only).
+wrong, or the account has no password (social/OTP-only). `429` for 15 min after 10
+failures for the same email within 15 min, from any IP (unknown emails count too).
 
 ### `POST /api/v1/auth/password/forgot` → `201`
 ```jsonc
@@ -254,7 +255,7 @@ claimed by another account in the meantime.
 
 ### `POST /api/v1/admin/auth/web/login`  ·  `POST /api/v1/admin/auth/mobile/login`
 ```jsonc
-{ "email": "admin@store.com", "password": "…" }
+{ "email": "you@example.com", "password": "…" }
 ```
 Verifies credentials, then delivers per profile:
 ```jsonc
@@ -264,7 +265,8 @@ Verifies credentials, then delivers per profile:
 { "success": true, "data": { "admin": { id, email, name, role, … },
     "accessToken": "…", "refreshToken": "…", "expiresIn": "15m" } }
 ```
-`401` on bad credentials (same message whether email or password is wrong).
+`401` on bad credentials (same message whether email or password is wrong). `429` for
+15 min after 10 failures for the same email within 15 min, from any IP.
 
 ### `GET /api/v1/admin/auth/me` 🔒 admin
 The logged-in admin's profile.

@@ -15,6 +15,11 @@ import {
   authResult,
 } from "../customer.shared.js";
 import type { CustomerAuthResult } from "../customer.shared.js";
+import {
+  assertLoginAllowed,
+  clearLoginFailures,
+  recordLoginFailure,
+} from "../../core/loginThrottle.js";
 import type {
   RegisterRequestInput,
   RegisterVerifyInput,
@@ -106,6 +111,10 @@ export async function verifyRegistration(
 }
 
 export async function login(input: PasswordLoginInput): Promise<CustomerAuthResult> {
+  // Per-account cool-down (see loginThrottle.ts) — checked before any bcrypt
+  // work, and keyed by the submitted email whether or not it has an account.
+  assertLoginAllowed("customer", input.email);
+
   const row = await prisma.customer.findUnique({
     where: { email: input.email },
     select: customerAuthSelect,
@@ -116,11 +125,23 @@ export async function login(input: PasswordLoginInput): Promise<CustomerAuthResu
   // message OR in timing (the dummy compare keeps the cost identical).
   if (!row?.passwordHash) {
     await hasher().verify(input.password, await dummyHashPromise);
+    recordLoginFailure("customer", input.email);
     throw HttpError.unauthorized("Invalid email or password");
   }
   const valid = await hasher().verify(input.password, row.passwordHash);
   if (!valid) {
+    recordLoginFailure("customer", input.email);
     throw HttpError.unauthorized("Invalid email or password");
+  }
+  clearLoginFailures("customer", input.email);
+
+  // Hashes made at an older work factor are upgraded now, while the
+  // plaintext is in hand — the only moment that is possible.
+  if (hasher().needsRehash(row.passwordHash)) {
+    await prisma.customer.update({
+      where: { id: row.id },
+      data: { passwordHash: await hasher().hash(input.password) },
+    });
   }
 
   return authResult(row);

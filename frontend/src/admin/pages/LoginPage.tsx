@@ -48,7 +48,7 @@ export function LoginPage({ onSignedIn }: { onSignedIn: (admin: Admin) => void }
       hero={<AdminHero />}
       footer={
         <p className="text-xs text-muted">
-          Authorized personnel only · admin.shop.example.com
+          Authorized UnieMax staff only · uniemax.com
         </p>
       }
     >
@@ -56,7 +56,7 @@ export function LoginPage({ onSignedIn }: { onSignedIn: (admin: Admin) => void }
         badge={<AppLogoLockup className="h-11" />}
         badgeClass=""
         title="Admin Console"
-        subtitle="Sign in to manage your store"
+        subtitle="Sign in to the UnieMax platform console"
       />
 
       <AuthCard>
@@ -64,7 +64,8 @@ export function LoginPage({ onSignedIn }: { onSignedIn: (admin: Admin) => void }
           <TextField
             label="Email"
             type="email"
-            placeholder="admin@store.com"
+            placeholder="you@example.com"
+            autoComplete="username"
             icon={<MailIcon />}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -73,6 +74,7 @@ export function LoginPage({ onSignedIn }: { onSignedIn: (admin: Admin) => void }
           <TextField
             label="Password"
             type={showPassword ? 'text' : 'password'}
+            autoComplete="current-password"
             placeholder="••••••••"
             icon={<LockIcon />}
             value={password}
@@ -93,7 +95,7 @@ export function LoginPage({ onSignedIn }: { onSignedIn: (admin: Admin) => void }
             {busy ? 'Signing in…' : 'Sign in'}
           </PrimaryButton>
           <p className="text-center text-xs text-muted">
-            Locked out? Ask the store owner to reset your account.
+            Locked out? Ask a UnieMax super admin to reset your account.
           </p>
         </form>
       </AuthCard>

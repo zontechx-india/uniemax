@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import type { Customer } from '../../../shared/auth/authApi'
-import { AppLogoFull } from '../../../shared/ui/AppLogo'
+import { AppLogoFull, AppLogoLockup } from '../../../shared/ui/AppLogo'
 import { useMarketSession } from '../../app/marketSession'
 import { CloseIcon, StoreIcon } from '../../layout/icons'
 import { storeVars } from '../publicStore/storeTheme'
@@ -174,17 +174,29 @@ function OpenAuthDialog({ req }: { req: AuthDialogRequest }) {
               </div>
             )}
 
+            {brand.kind === 'store' && (
+              // The password form belongs to UnieMax, not to the shop around
+              // it. Saying so at every width keeps a seller's name and logo
+              // from reading as the owner of the credentials — a shop-branded
+              // password form is exactly what phishing classifiers look for.
+              <AppLogoLockup className="mb-4 h-7" />
+            )}
+
             <h2 id="auth-dialog-title" className="font-heading text-2xl font-bold text-fg">
               {/* The same dialog serves first-timers (checkout sends them
                   here) and returning buyers — "Welcome back" greeted
                   people who had never been here. */}
-              {selling ? 'Start selling on UnieMax' : 'Sign in or create an account'}
+              {selling
+                ? 'Start selling on UnieMax'
+                : brand.kind === 'store'
+                  ? 'Sign in with your UnieMax account'
+                  : 'Sign in or create an account'}
             </h2>
             <p className="mb-6 mt-1 text-sm text-muted">
               {selling
                 ? 'Create a free account (or sign in), then set up your store in a few minutes.'
                 : brand.kind === 'store'
-                  ? `To order from ${brand.name}. New here? It takes a minute.`
+                  ? `One UnieMax account works in every shop on UnieMax — use it to order from ${brand.name}. New here? It takes a minute.`
                   : 'To place orders and track them. New here? It takes a minute.'}
             </p>
 
@@ -242,8 +254,8 @@ function BrandPanel({
         <StoreLogo brand={brand} className="h-16 w-16 rounded-lg" />
         <h2 className="metal-text mt-6 font-heading text-3xl font-bold">{brand.name}</h2>
         <p className="mt-2 max-w-xs text-sm text-muted">
-          Sign in to shop at {brand.name} — track orders, check out faster and
-          message the store.
+          Sign in with your UnieMax account to shop at {brand.name} — track
+          orders, check out faster and message the store.
         </p>
       </div>
       <p className="flex items-center gap-2 text-xs text-muted">

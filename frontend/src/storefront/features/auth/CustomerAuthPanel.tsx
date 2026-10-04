@@ -185,6 +185,7 @@ function EmailSignIn({
         <TextField
           label="Email"
           type="email"
+          autoComplete="username"
           placeholder="you@example.com"
           icon={<MailIcon />}
           value={email}
@@ -195,6 +196,7 @@ function EmailSignIn({
           <TextField
             label="Password"
             type={showPassword ? 'text' : 'password'}
+            autoComplete="current-password"
             placeholder="••••••••"
             icon={<LockIcon />}
             value={password}
@@ -323,6 +325,7 @@ function Register({
         <TextField
           label="Email"
           type="email"
+          autoComplete="username"
           placeholder="you@example.com"
           icon={<MailIcon />}
           value={email}
@@ -331,6 +334,7 @@ function Register({
         <TextField
           label="Password"
           type={showPassword ? 'text' : 'password'}
+          autoComplete="new-password"
           placeholder="At least 8 characters"
           icon={<LockIcon />}
           value={password}
@@ -466,6 +470,7 @@ function ForgotPassword({
         <TextField
           label="Email"
           type="email"
+          autoComplete="username"
           placeholder="you@example.com"
           icon={<MailIcon />}
           value={email}
@@ -502,6 +507,7 @@ function ForgotPassword({
       <TextField
         label="New password"
         type="password"
+        autoComplete="new-password"
         placeholder="At least 8 characters"
         icon={<LockIcon />}
         value={newPassword}

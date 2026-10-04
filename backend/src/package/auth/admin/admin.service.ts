@@ -2,6 +2,11 @@ import { prisma, Prisma } from "../core/config/prisma.js";
 import { HttpError } from "../../../utils/httpError.js";
 import { authProviders } from "../providers/index.js";
 import type { Principal } from "../core/authCore.types.js";
+import {
+  assertLoginAllowed,
+  clearLoginFailures,
+  recordLoginFailure,
+} from "../core/loginThrottle.js";
 import type { AdminLoginInput } from "./admin.schema.js";
 
 /** Compared against for unknown/inactive accounts — see `authenticate`. */
@@ -25,6 +30,9 @@ const publicAdminSelect = {
  * core to issue a session — this service never mints tokens.
  */
 export async function authenticate(input: AdminLoginInput) {
+  // Per-account cool-down (see loginThrottle.ts), before any bcrypt work.
+  assertLoginAllowed("admin", input.email);
+
   const admin = await prisma.admin.findUnique({
     where: { email: input.email },
   });
@@ -37,6 +45,7 @@ export async function authenticate(input: AdminLoginInput) {
       input.password,
       await dummyHashPromise,
     );
+    recordLoginFailure("admin", input.email);
     throw HttpError.unauthorized("Invalid email or password");
   }
 
@@ -45,12 +54,20 @@ export async function authenticate(input: AdminLoginInput) {
     admin.passwordHash,
   );
   if (!valid) {
+    recordLoginFailure("admin", input.email);
     throw HttpError.unauthorized("Invalid email or password");
   }
+  clearLoginFailures("admin", input.email);
 
   await prisma.admin.update({
     where: { id: admin.id },
-    data: { lastLoginAt: new Date() },
+    data: {
+      lastLoginAt: new Date(),
+      // Upgrade an older-work-factor hash while the plaintext is in hand.
+      ...(authProviders.passwordHasher.needsRehash(admin.passwordHash)
+        ? { passwordHash: await authProviders.passwordHasher.hash(input.password) }
+        : {}),
+    },
   });
 
   const { passwordHash: _omit, ...safe } = admin;

@@ -31,9 +31,16 @@ const envSchema = z.object({
   // "true" (default) when the API sits behind Nginx / a load balancer;
   // set "false" when it is exposed directly, otherwise a client can spoof
   // X-Forwarded-For and rotate its identity past every per-IP rate limit.
-  // Also accepts a hop count ("1") or a comma-separated address list,
-  // passed straight through to Fastify's `trustProxy`.
-  TRUST_PROXY: z.string().default("true"),
+  // Also accepts a comma-separated address/CIDR list (e.g. "127.0.0.1"),
+  // passed straight through to Fastify's `trustProxy`. A bare hop count is
+  // refused: Fastify 5.12 dropped it because it cannot tell a real proxy
+  // from a client that reaches the server directly.
+  TRUST_PROXY: z
+    .string()
+    .default("true")
+    .refine((v) => !/^\d+$/.test(v.trim()), {
+      message: 'hop counts are not supported — use "true", "false" or an address list',
+    }),
 
   // Database (optional for now — the base server boots without it)
   DATABASE_URL: z.string().optional(),
@@ -103,12 +110,11 @@ console.log(
   `env: mode=${appEnv} NODE_ENV=${env.NODE_ENV} db=${dbTarget(env.DATABASE_URL)} web=${process.env["PUBLIC_WEB_URL"] ?? "(unset)"}`,
 );
 
-/** `TRUST_PROXY` → Fastify's `trustProxy` (boolean, hop count, or address list). */
-export function resolveTrustProxy(): boolean | number | string {
+/** `TRUST_PROXY` → Fastify's `trustProxy` (boolean or address list). */
+export function resolveTrustProxy(): boolean | string {
   const value = env.TRUST_PROXY.trim();
   if (value === "true") return true;
   if (value === "false") return false;
-  if (/^\d+$/.test(value)) return Number(value);
   return value;
 }
 
