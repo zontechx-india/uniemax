@@ -17,6 +17,7 @@ import {
 } from "./storeCatalog.schema.js";
 import { sortByOptionOrder } from "./productOptions.js";
 import { activeShelfChain, loadShelves, shelfIndex } from "./shelfTree.js";
+import { MAX_CATEGORY_DEPTH } from "../category/categoryTree.js";
 import {
   effectiveDeliveryRule,
   isDeliverable,
@@ -125,6 +126,23 @@ export const PUBLIC_PRODUCT_VISIBILITY = {
   category: activeShelfChain(),
 } satisfies Prisma.StoreProductWhereInput;
 
+/**
+ * Prisma filter: an active shelf with a visible product anywhere beneath it —
+ * the SQL twin of the shell tree's pruning, for queries that cannot load each
+ * store's tree. Meant for **root** shelves: the walk descends through active
+ * children only, so a product it reaches already has an active chain and only
+ * the product's own half of `PUBLIC_PRODUCT_VISIBILITY` is re-checked.
+ */
+function shoppableShelf(levels = MAX_CATEGORY_DEPTH): Prisma.StoreCategoryWhereInput {
+  const { category: _chain, ...ownRule } = PUBLIC_PRODUCT_VISIBILITY;
+  const hasProduct = { products: { some: ownRule } };
+  if (levels <= 1) return { isActive: true, ...hasProduct };
+  return {
+    isActive: true,
+    OR: [hasProduct, { children: { some: shoppableShelf(levels - 1) } }],
+  };
+}
+
 /** `PUBLIC_PRODUCT_VISIBILITY` scoped to one store. */
 export function visibleProductWhere(storeId: string): Prisma.StoreProductWhereInput {
   return { storeId, ...PUBLIC_PRODUCT_VISIBILITY };
@@ -232,7 +250,8 @@ const STORE_CARD_CATEGORIES = 2;
  * shelves — so a marketplace card can show real merchandise, and say what kind
  * of shop it is, without shipping catalog data. Products use
  * `PUBLIC_PRODUCT_VISIBILITY`, so the card never previews (or counts) anything
- * the store page would hide, and only **active** shelves are named.
+ * the store page would hide, and only shelves the store page shows (active,
+with a visible product beneath them) are named.
  */
 export async function listPublicStores(query: PublicStoreListQuery) {
   const where: Prisma.StoreWhereInput = { ...PUBLIC_STORE_VISIBILITY };
@@ -249,11 +268,13 @@ export async function listPublicStores(query: PublicStoreListQuery) {
         publishedAt: true,
         _count: { select: { products: { where: PUBLIC_PRODUCT_VISIBILITY } } },
         // Top-level shelves only: a card says "Fashion", not "Fashion ›
-        // Women › Sarees". Ordered the way the owner ordered them, so the
-        // shelf they lead with is the one the card names.
+        // Women › Sarees". Same shelves, same order as the store's own menu
+        // (`getPublicStoreShell`): empty ones are skipped, so a card never
+        // names a shelf the store page doesn't show, and the shelf the owner
+        // leads with is the one the card names.
         categories: {
-          where: { parentId: null, isActive: true },
-          orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+          where: { parentId: null, ...shoppableShelf() },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
           take: STORE_CARD_CATEGORIES,
           select: { name: true },
         },

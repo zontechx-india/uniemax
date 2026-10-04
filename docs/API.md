@@ -1444,10 +1444,11 @@ nulls last, then `createdAt`. Each card carries a taste of the catalog:
 `productCount` (publicly visible products), `previewImages` (cover-image URLs
 of the newest visible products that have a photo, max 4) — both follow the same
 visibility rule the store page enforces — and `categories`, the names of the
-store's first two **top-level active** shelves in the owner's own order, which
+store's first two **top-level** shelves exactly as the store's own menu lists
+them (active, with a visible product somewhere beneath, owner's order), which
 is what lets a card say what kind of shop it is ("Poorvika" means nothing;
-"Poorvika · Mobiles · Accessories" does). Empty array for a store with no
-active categories.
+"Poorvika · Mobiles · Accessories" does). An empty shelf is never named. Empty
+array for a store with no such shelves.
 
 | Query      | Type | Default | Notes            |
 | ---------- | ---- | ------- | ---------------- |
