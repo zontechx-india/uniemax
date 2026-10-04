@@ -1,142 +1,235 @@
 import { usePrivatePageTitle } from '../../../shared/seo'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useStores } from '../../features/stores/useStores'
+import { isLaunchStep } from '../../features/stores/storeProfile'
 import type { Store } from '../../features/stores/storesApi'
-import { ChevronRightIcon, GlobeIcon, PlusIcon, StoreIcon } from '../../layout/icons'
+import { BoxIcon, ChevronRightIcon, PlusIcon, ShareIcon, StoreIcon } from '../../layout/icons'
 import { buttonClass } from '../../../shared/ui/Button'
 import { MediaImg } from '../../../shared/media/MediaImg'
+import { StoreShareSheet } from './StorePublishCard'
+import { EmptyState, PageHeader, StatusPill, ToastHost } from './ui'
 
 /**
- * Store selection ("My Store" in the account menu): pick one of the
- * customer's stores — a click goes straight to that store's management
- * page — or create a new one. First-run visitors get an empty state.
+ * My Stores ("My Store" in the account menu): every shop the customer owns,
+ * as glass cards that each answer the seller's first two questions — *is it
+ * live?* and *what is left to do?* — and offer the two things they come here
+ * for: **Manage** it, or **Share** it (Publish, until it is live).
  *
- * Cards carry the store's live status (Published / Draft) and its public
- * URL path, so the list doubles as an at-a-glance health check.
+ * The share sheet is the same one the store strip opens inside management,
+ * so a seller can send their link to a customer without opening the shop.
+ * First-run visitors get a picture-led empty state instead of an empty grid.
  */
 export function StoresPage() {
   usePrivatePageTitle('My Stores')
   const { stores } = useStores()
+  // Publishing from a card's sheet returns the fresh store; this list has no
+  // setter of its own, so the fresh copies overlay the fetched ones.
+  const [fresh, setFresh] = useState<Record<string, Store>>({})
+  const [sharing, setSharing] = useState<string | null>(null)
 
-  if (stores === null) {
-    return (
-      <div className="flex h-64 items-center justify-center text-sm text-muted">
-        Loading…
-      </div>
-    )
-  }
-
-  if (stores.length === 0) return <EmptyState />
+  const list = stores?.map((store) => fresh[store.id] ?? store) ?? null
+  const shared = list?.find((store) => store.id === sharing) ?? null
 
   return (
-    <div className="space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-fg sm:text-3xl">
-            My Stores
-          </h1>
-          <p className="mt-1 text-sm text-muted">
-            Select a store to manage it.
-          </p>
+    // Room at the bottom on phones for the floating New shop button.
+    <div className="mx-auto max-w-6xl space-y-5 pb-24 sm:pb-6">
+      {list === null ? (
+        <LoadingCards />
+      ) : list.length === 0 ? (
+        <div className="glass mx-auto max-w-2xl rounded-glass">
+          <EmptyState
+            icon={StoreIcon}
+            title="Open your first shop"
+            description="All you need is a name. You can add your logo, products and everything else later."
+            steps={[
+              { icon: StoreIcon, label: 'Name your shop' },
+              { icon: BoxIcon, label: 'Add products' },
+              { icon: ShareIcon, label: 'Share the link' },
+            ]}
+            action={
+              <Link to="/mystores/new" className={buttonClass({ size: 'lg', className: 'px-8' })}>
+                <PlusIcon className="h-5 w-5" />
+                Create my shop
+              </Link>
+            }
+          />
         </div>
-        <Link
-          to="/mystores/new"
-          className={buttonClass({ size: 'md' })}
-        >
-          <PlusIcon className="h-4 w-4" />
-          Create New Store
-        </Link>
-      </header>
+      ) : (
+        <>
+          <PageHeader
+            icon={StoreIcon}
+            title="My shops"
+            description="Tap Manage to work on a shop, or Share to send its link to customers."
+            action={
+              // Wrapped, not `hidden` on the link: the button's own
+              // `inline-flex` would compete with an unprefixed `hidden`.
+              <div className="hidden sm:block">
+                <Link to="/mystores/new" className={buttonClass({ size: 'lg' })}>
+                  <PlusIcon className="h-5 w-5" />
+                  New shop
+                </Link>
+              </div>
+            }
+          />
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-        {stores.map((store) => (
-          <StoreCard key={store.id} store={store} />
-        ))}
-      </section>
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {list.map((store) => (
+              <StoreCard key={store.id} store={store} onShare={() => setSharing(store.id)} />
+            ))}
+          </section>
+
+          {/* Phone: the create action floats under the thumb instead of
+              sitting above the list, where it pushed the shops down. */}
+          <Link
+            to="/mystores/new"
+            className={buttonClass({
+              size: 'lg',
+              className:
+                'fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 rounded-pill px-6 shadow-[0_10px_30px_-8px_var(--cta-glow)] sm:hidden',
+            })}
+          >
+            <PlusIcon className="h-5 w-5" />
+            New shop
+          </Link>
+        </>
+      )}
+
+      {shared && (
+        <StoreShareSheet
+          open
+          store={shared}
+          onStoreChange={(next) => setFresh((current) => ({ ...current, [next.id]: next }))}
+          onClose={() => setSharing(null)}
+        />
+      )}
+      <ToastHost />
     </div>
   )
 }
 
-function StoreCard({ store }: { store: Store }) {
+/** Launch-step progress — the same readiness the store's checklist reads. */
+function setupProgress(store: Store): { done: number; total: number } {
+  const steps = store.readiness.steps.filter(
+    (step) => step.totalCount > 0 && isLaunchStep(step),
+  )
+  return { done: steps.filter((step) => step.complete).length, total: steps.length }
+}
+
+function StoreCard({ store, onShare }: { store: Store; onShare: () => void }) {
+  const { done, total } = setupProgress(store)
+  const showProgress = !store.isPublished && total > 0
+
   return (
-    <Link
-      to={`/mystores/${store.slug}`}
-      className="group flex flex-col rounded-xl border border-line bg-surface p-5 shadow-floating transition duration-200 hover:-translate-y-0.5 hover:border-brand/50 focus:outline-none"
-    >
-      <div className="flex items-start justify-between gap-3">
+    <article className="glass flex flex-col rounded-glass p-4 sm:p-5">
+      <div className="flex items-start gap-3.5">
         {store.logoUrl ? (
           <MediaImg
-            sizes="48px"
+            sizes="56px"
             src={store.logoUrl}
             alt=""
-            className="h-12 w-12 shrink-0 rounded-lg object-cover"
+            className="h-14 w-14 shrink-0 rounded-2xl object-cover shadow-[0_4px_14px_-6px_rgba(0,0,0,0.3)]"
           />
         ) : (
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">
-            <StoreIcon className="h-6 w-6" />
-          </div>
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-soft text-brand">
+            <StoreIcon className="h-7 w-7" />
+          </span>
         )}
-        <StatusChip published={store.isPublished} />
+        <div className="min-w-0 flex-1">
+          {/* User-typed names render in the body face, two lines at most. */}
+          <h2 className="line-clamp-2 font-body text-[17px] leading-snug font-bold tracking-normal break-words text-fg">
+            {store.name}
+          </h2>
+          <div className="mt-1.5">
+            {store.isPublished ? (
+              <StatusPill tone="success">Live</StatusPill>
+            ) : (
+              <StatusPill tone="pending">Not live yet</StatusPill>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* User-typed names render in the standard body face — the condensed
-          display font is for page headings, not people's store names. */}
-      <h2 className="mt-4 truncate font-body text-lg font-semibold tracking-normal text-fg">
-        {store.name}
-      </h2>
-      <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-muted">
-        <GlobeIcon className="h-3.5 w-3.5 shrink-0" />
-        /store/{store.slug}
-      </p>
+      <div className="mt-4 flex min-h-[52px] items-center gap-3 rounded-xl bg-fg/[0.04] px-3 py-2.5">
+        {showProgress ? (
+          <>
+            <ProgressRing done={done} total={total} />
+            <p className="min-w-0 text-hint text-fg">
+              <span className="font-semibold">
+                {done} of {total} steps done
+              </span>
+              <span className="block text-muted">
+                {done === total ? 'Ready to publish.' : 'Finish setup to open your shop.'}
+              </span>
+            </p>
+          </>
+        ) : (
+          <p className="min-w-0 text-hint text-muted">
+            {store.isPublished
+              ? 'Customers can see your shop and place orders.'
+              : 'Open your shop to finish setting it up.'}
+          </p>
+        )}
+      </div>
 
-      <div className="mt-4 flex items-center justify-between border-t border-line pt-3">
-        <span className="text-xs text-muted">
-          Created {new Date(store.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-        </span>
-        <span className="flex items-center gap-1 text-xs font-semibold text-brand">
+      <div className="mt-4 grid grid-cols-[1fr_auto] gap-2">
+        <Link
+          to={`/mystores/${store.slug}`}
+          className={buttonClass({ size: 'lg', full: true })}
+        >
           Manage
-          <ChevronRightIcon className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-        </span>
+          <ChevronRightIcon className="h-4 w-4" />
+        </Link>
+        <button
+          type="button"
+          onClick={onShare}
+          aria-haspopup="dialog"
+          aria-label={store.isPublished ? `Share ${store.name}` : `Publish ${store.name}`}
+          className={buttonClass({ variant: 'ring', size: 'lg', className: 'px-4' })}
+        >
+          <ShareIcon className="h-4 w-4" />
+          {store.isPublished ? 'Share' : 'Publish'}
+        </button>
       </div>
-    </Link>
+    </article>
   )
 }
 
-/** Live-status chip: customers can only see Published stores. */
-function StatusChip({ published }: { published: boolean }) {
-  return published ? (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-[11px] font-semibold text-success">
-      <span className="h-1.5 w-1.5 rounded-full bg-success" />
-      Published
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-alt px-2.5 py-1 text-[11px] font-semibold text-muted">
-      <span className="h-1.5 w-1.5 rounded-full bg-line" />
-      Draft
-    </span>
-  )
-}
-
-function EmptyState() {
+/** "3 of 5" as a ring — fills with the brand as setup completes. */
+function ProgressRing({ done, total }: { done: number; total: number }) {
+  const r = 16
+  const c = 2 * Math.PI * r
+  const ratio = total === 0 ? 0 : done / total
   return (
-    <div className="flex flex-col items-center rounded-xl border border-line bg-surface px-6 py-20 text-center shadow-floating">
-      <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-brand/10 text-brand">
-        <StoreIcon className="h-8 w-8" />
+    <svg viewBox="0 0 40 40" className="h-10 w-10 shrink-0 -rotate-90" aria-hidden>
+      <circle cx="20" cy="20" r={r} fill="none" strokeWidth="4" className="stroke-fg/10" />
+      <circle
+        cx="20"
+        cy="20"
+        r={r}
+        fill="none"
+        strokeWidth="4"
+        strokeLinecap="round"
+        strokeDasharray={c}
+        strokeDashoffset={c * (1 - ratio)}
+        className={`transition-[stroke-dashoffset] duration-500 ${
+          ratio === 1 ? 'stroke-success' : 'stroke-brand'
+        }`}
+      />
+    </svg>
+  )
+}
+
+/** Card-shaped placeholders while the list loads — not a bare "Loading…". */
+function LoadingCards() {
+  return (
+    <div aria-busy="true" aria-label="Loading your shops" className="space-y-5">
+      <div className="h-14 w-56 animate-pulse rounded-xl bg-fg/10" />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {[0, 1, 2].map((key) => (
+          <div key={key} className="glass h-[232px] animate-pulse rounded-glass" />
+        ))}
       </div>
-      <h1 className="mt-5 text-2xl font-semibold text-fg">
-        Create Your First Store
-      </h1>
-      <p className="mt-2 max-w-sm text-sm text-muted">
-        Start selling by creating your store. All you need is a name —
-        everything else can be set up later.
-      </p>
-      <Link
-        to="/mystores/new"
-        className={buttonClass({ size: 'md', className: 'mt-6' })}
-      >
-        <PlusIcon className="h-4 w-4" />
-        Create Store
-      </Link>
     </div>
   )
 }

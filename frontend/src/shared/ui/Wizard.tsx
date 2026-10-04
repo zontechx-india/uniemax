@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Button } from './Button'
+import { Button, buttonClass } from './Button'
 
 /**
  * A generic, presentational multi-step form shell.
@@ -15,6 +15,10 @@ import { Button } from './Button'
  *     Four labelled circles would either wrap or truncate to nothing useful.
  *   - **sm+** — the full rail: numbered circles, titles, connectors, with
  *     completed steps ticked and clickable to jump back.
+ *
+ * The panel is frosted glass, and on a phone the action row is a sticky
+ * glass bar so Continue never scrolls out from under the thumb — the seller
+ * area's design rules (docs/MYSTORES_UX_PLAN.md §3).
  */
 
 export interface WizardStep {
@@ -45,31 +49,31 @@ export function Wizard({
   children: ReactNode
 }) {
   const step = steps[current]
-  const progress = ((current + 1) / steps.length) * 100
 
   return (
     <div className="mx-auto w-full max-w-2xl">
-      {/* --- Mobile: counter + bar ------------------------------------ */}
+      {/* --- Mobile: one segment per step, then "Step 2 of 3" --------- */}
       <div className="sm:hidden">
-        <div className="flex items-baseline justify-between">
-          <span className="text-xs font-semibold uppercase tracking-wide text-accent">
-            Step {current + 1} of {steps.length}
-          </span>
-          <span className="text-xs text-muted">{step?.title}</span>
-        </div>
         <div
-          className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-alt"
+          className="flex gap-1.5"
           role="progressbar"
           aria-valuenow={current + 1}
           aria-valuemin={1}
           aria-valuemax={steps.length}
           aria-label={`Step ${current + 1} of ${steps.length}`}
         >
-          <div
-            className="h-full rounded-full bg-brand-gradient transition-all duration-300"
-            style={{ width: `${progress}%` }}
-          />
+          {steps.map((s, i) => (
+            <span
+              key={s.key}
+              className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
+                i <= current ? 'bg-brand-gradient' : 'bg-fg/10'
+              }`}
+            />
+          ))}
         </div>
+        <p className="mt-2 text-[13px] font-semibold text-brand">
+          Step {current + 1} of {steps.length}
+        </p>
       </div>
 
       {/* --- sm+: the full rail --------------------------------------- */}
@@ -88,23 +92,23 @@ export function Wizard({
                 onClick={clickable ? () => onStepSelect(i) : undefined}
                 disabled={!clickable}
                 aria-current={active ? 'step' : undefined}
-                className={`flex min-w-0 items-center gap-2 rounded-md px-1 py-1 text-left transition ${
-                  clickable ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
+                className={`flex min-h-tap min-w-0 items-center gap-2 rounded-xl px-1.5 text-left transition ${
+                  clickable ? 'cursor-pointer hover:bg-fg/5' : 'cursor-default'
                 }`}
               >
                 <span
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition ${
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] font-bold transition ${
                     done
-                      ? 'bg-success text-white'
+                      ? 'bg-success text-brand-contrast'
                       : active
-                        ? 'bg-brand-gradient text-brand-contrast shadow-floating'
-                        : 'border border-line bg-surface text-muted'
+                        ? 'bg-brand-gradient text-brand-contrast shadow-[0_6px_16px_-6px_var(--cta-glow)]'
+                        : 'glass-inset text-muted'
                   }`}
                 >
                   {done ? <TickIcon /> : i + 1}
                 </span>
                 <span
-                  className={`hidden truncate text-xs font-medium md:block ${
+                  className={`truncate text-[14px] font-semibold ${
                     active ? 'text-fg' : 'text-muted'
                   }`}
                 >
@@ -114,8 +118,8 @@ export function Wizard({
               {i < steps.length - 1 && (
                 <span
                   aria-hidden
-                  className={`mx-2 h-px flex-1 transition-colors ${
-                    done ? 'bg-success' : 'bg-line'
+                  className={`mx-2 h-0.5 flex-1 rounded-full transition-colors ${
+                    done ? 'bg-success' : 'bg-fg/10'
                   }`}
                 />
               )}
@@ -125,14 +129,14 @@ export function Wizard({
       </ol>
 
       {/* --- The panel ------------------------------------------------- */}
-      <div className="mt-4 rounded-lg bg-surface p-5 shadow-floating sm:mt-6 sm:p-7">
+      <div className="glass mt-3 rounded-glass p-5 sm:mt-6 sm:p-7">
         {step && (
-          <header className="mb-5">
-            <h1 className="font-body text-lg font-bold tracking-tight text-fg sm:text-xl">
+          <header className="mb-6">
+            <h1 className="font-heading text-[24px] leading-tight font-bold text-fg">
               {step.title}
             </h1>
             {step.blurb && (
-              <p className="mt-1 text-sm text-muted">{step.blurb}</p>
+              <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{step.blurb}</p>
             )}
           </header>
         )}
@@ -145,11 +149,10 @@ export function Wizard({
 /**
  * The wizard's action row.
  *
- * Order differs by breakpoint on purpose. On a phone the primary action is
- * full-width and FIRST in the DOM but rendered last visually via
- * `flex-col-reverse`, so it sits under the thumb while Back stays reachable
- * above it. On sm+ the pair returns to the conventional Back-left /
- * Continue-right.
+ * On a phone it is a sticky frosted bar at the bottom of the screen — Back
+ * compact on the left, the primary filling the rest — so the next step is
+ * always under the thumb, however long the step is. On sm+ it returns to the
+ * conventional Back-left / Continue-right, in flow.
  */
 export function WizardActions({
   onBack,
@@ -165,14 +168,14 @@ export function WizardActions({
   disabled?: boolean
 }) {
   return (
-    <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-2">
+    <div className="sticky bottom-[calc(var(--seller-dock,0px)+0.75rem)] z-10 -mx-2 mt-8 flex items-center gap-2 rounded-glass p-2 max-sm:glass-strong sm:static sm:mx-0 sm:justify-between sm:p-0">
+      <div className="flex shrink-0 items-center gap-2">
         {onBack && (
           <button
             type="button"
             onClick={onBack}
             disabled={busy}
-            className="h-11 rounded-md border border-line px-5 text-sm font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
+            className={buttonClass({ variant: 'ring', size: 'lg', className: 'px-5' })}
           >
             Back
           </button>
@@ -182,7 +185,7 @@ export function WizardActions({
             type="button"
             onClick={onSkip}
             disabled={busy}
-            className="h-11 rounded-md px-3 text-sm font-medium text-muted underline-offset-4 transition hover:text-fg hover:underline disabled:cursor-not-allowed"
+            className="min-h-tap rounded-md px-3 text-[15px] font-semibold text-muted transition hover:bg-fg/5 hover:text-fg disabled:cursor-not-allowed"
           >
             Skip for now
           </button>
@@ -191,9 +194,10 @@ export function WizardActions({
 
       <Button
         type="submit"
+        size="lg"
         loading={busy}
         disabled={disabled}
-        className="w-full px-8 sm:w-auto"
+        className="min-w-0 flex-1 px-6 text-[15px] sm:flex-none sm:px-8"
       >
         {busy ? 'Saving…' : submitLabel}
       </Button>

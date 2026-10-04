@@ -529,11 +529,15 @@ as long as those rows live. New seller notification URLs are emitted as
 `/mystores/…` (see BACKEND_CONTEXT). The admin console's own `/stores` route
 is a different app on a different mount and is unaffected.
 
-Routes: `/mystores` (select a store — clicking a card goes straight to its
-management page — or create; first-run empty state; each card shows the
-store's **Published/Draft** status chip and its public `/store/{slug}` path,
-so the list doubles as an at-a-glance health check), `/mystores/new` (the
-**two-step Create Store wizard** — see below), and
+Routes: `/mystores` ("My shops": glass cards, each with the logo, a
+**Live / Not live yet** pill, the launch-setup progress — "3 of 5 steps done"
+with a ring, from the same `readiness` launch steps the checklist reads — and
+two actions, **Manage** and **Share** (labelled **Publish** until live; opens
+the same `StoreShareSheet` as the store strip, and publishing from it updates
+the card in place). Phones get a floating **+ New shop** button instead of the
+header one; first-run is an `EmptyState` with three numbered picture steps;
+loading shows card skeletons), `/mystores/new` (the **Create Store wizard**
+— name → logo → about you, see below), and
 `/mystores/:storeSlug` — **desktop**: a split inside the main outlet —
 `StoreManageLayout` renders a sticky left **glass** section card (it scrolls
 itself when taller than the window) and the selected section in a right glass
@@ -1364,18 +1368,23 @@ the moment to lift them).
 - `useStores.ts` — data hooks: `useStores` (list), `useStore` (by id;
   404/foreign → `null` → redirect to `/mystores`).
 
-**Create Store (`CreateStorePage`)** — a two-step wizard over the shared
-`Wizard` shell: **Your store** (name + logo, the same
-validate → crop 1:1 → upload pipeline as before, posted as one multipart
-create; the photo is **optional** — without one, `shared/media/letterLogo.ts`
-draws a 512px PNG of the name's first letters on a colour picked from the
-name, previewed live beside the field, so a seller with no logo is never
-stopped; they replace it later in Store Details) and **Business & contact**. Its steps map 1:1 onto the
-`wizard: true` steps of the backend requirement registry, so the flow and
-the publish gate cannot drift. A store name typed on `/sell` arrives as
-`location.state.storeName` (validated by `suggestedStoreName()`) and pre-fills
-step 1's field — only a suggestion: nothing is created until the seller
-presses Create store.
+**Create Store (`CreateStorePage`)** — a three-screen wizard over the shared
+`Wizard` shell, **one question per screen**: **Name your shop** (with a live
+"Your shop link" preview built by `previewStoreSlug()`, labelled as a preview
+because the server appends `-2`… when a slug is taken), **Add your logo**
+(the same validate → crop 1:1 → upload pipeline; the photo is **optional** —
+without one, `shared/media/letterLogo.ts` draws a 512px PNG of the name's
+first letters on a colour picked from the name, shown large on the screen so
+the seller sees what they get; they replace it later in Store Details) and
+**About you**. Name and logo are two screens of ONE `StoreStep` component (its
+state survives moving between them) and are posted as one multipart create
+when the seller presses **Create my shop** on the logo screen. Each screen
+carries a `readinessKey` — name and logo both map to the registry's `store`
+step, About you to `business` — so resuming and the publish gate still reason
+in the backend registry's `wizard: true` steps and cannot drift. A store name
+typed on `/sell` arrives as `location.state.storeName` (validated by
+`suggestedStoreName()`) and pre-fills the name field — only a suggestion:
+nothing is created until the seller presses Create my shop.
 
 It was four steps — **Address** and **Tax details** followed — and sellers
 were abandoning it on those. Neither is needed to open a shop, so both left
@@ -1383,29 +1392,32 @@ the wizard: they are filled in on Business Details and become mandatory only
 when a payout bank account is added (the backend `PAYOUT_SETUP` gate; see
 `StoreBankPage` below). The wizard itself no longer knows about them.
 
-The store is created at the **end of step 1**, not the end of step 2, which
-makes onboarding resumable: leaving on step 2 still leaves a real store, and
-the dashboard's `SetupChecklist` picks up exactly where the seller stopped. A
-"Finish later" control appears on step 2, which is a
+The store is created at the **end of the logo screen**, not the end of the
+wizard, which makes onboarding resumable: leaving on About you still leaves a
+real store, and the dashboard's `SetupChecklist` picks up exactly where the
+seller stopped. A "Finish later" control appears once the store exists. About
+you is a
 `PATCH /stores/:id/profile` sending only its own keys. Nothing already known
 is asked for again — the server seeds the profile from the customer account,
 and the business name defaults to the store name.
 
-Before step 1 renders, the page loads the seller's stores (`useStores`) and,
+Before the first screen renders, the page loads the seller's stores (`useStores`) and,
 if any is an **unfinished draft** — unpublished with a wizard step still
 open — shows a `ResumePanel` in place of the wizard: each draft with its
-logo, slug and the step it needs next, a **Continue** that adopts the draft
-and jumps to that step, and "Start a new store instead". Creating at step 1
+logo and the screen it needs next, a **Continue** that adopts the draft
+and jumps to that screen, and "Start a new shop instead". Creating early
 made onboarding resumable, but on its own it also made every abandoned run a
 permanent store; this is the counterweight, and it is why returning to Create
 Store no longer mints a duplicate. Open checklist items (address, tax,
 products, bank account) do not make a store a draft — a seller coming back
 with only those outstanding wants a *second* store — the fetch is gated
-rather than rendered-then-swapped so step 1 never flashes and gets replaced,
+rather than rendered-then-swapped (a glass skeleton meanwhile) so the first
+screen never flashes and gets replaced,
 and `useStores` resolves to `[]` on failure so the wizard is never blocked
 by it.
 
-Step 2 renders the contact phone and email **read-only**, as the seller's
+About you asks for the **Business name** and **Your name** (each with a
+one-line hint) and renders the contact phone and email **read-only**, as the seller's
 verified account identifiers, and offers no way to type them: they are what
 order alerts reach and what shoppers see, so a free-text field would invite an
 address nobody controls. A seller with no linked number — the ordinary case,
@@ -2217,10 +2229,11 @@ frontend/
     │   │   │                     #   auth heroes)
     │   │   ├── ChipInput.tsx     # Keyed chip list (add / rename / remove) — option values
     │   │   ├── Wizard.tsx        # Generic multi-step form shell: numbered rail
-    │   │   │                     #   (sm+) / "Step 2 of 4" + bar (mobile), titled
-    │   │   │                     #   panel, WizardActions (Back / Skip / Continue;
-    │   │   │                     #   primary under the thumb on mobile via
-    │   │   │                     #   flex-col-reverse). Domain-agnostic.
+    │   │   │                     #   (sm+) / one segment per step + "Step 2 of 3"
+    │   │   │                     #   (mobile), glass panel, WizardActions (Back /
+    │   │   │                     #   Skip / Continue) — a sticky glass bar on
+    │   │   │                     #   phones so Continue stays under the thumb.
+    │   │   │                     #   Domain-agnostic.
     │   │   ├── ConfirmDialog.tsx # Reusable confirmation modal (used by logout) —
     │   │   │                     #   bottom sheet on phones, card from `sm`, glass.
     │   │   ├── Dialog.tsx        # Content dialog (header / scrolling body / footer) — admin + seller pickers
@@ -2419,9 +2432,10 @@ frontend/
     │       │   ├── OrderSuccessPage.tsx # /order/{slug}/{orderId} confirmation
     │       │   └── CartLine.tsx       # Shared line row (stepper, remove, total)
     │       └── stores/
-    │           ├── StoresPage.tsx       # My Stores list / first-run empty state
-    │           ├── CreateStorePage.tsx  # 2-step wizard: store → business
-    │           │                        #   (store created at step 1, so it
+    │           ├── StoresPage.tsx       # "My shops": glass cards (Live pill, setup ring,
+    │           │                        #   Manage + Share/Publish sheet), FAB, empty state
+    │           ├── CreateStorePage.tsx  # Wizard: name → logo → about you
+    │           │                        #   (store created on the logo screen, so it
     │           │                        #   is resumable; address/tax gate
     │           │                        #   bank accounts instead)
     │           ├── StoreManageLayout.tsx# Desktop: sticky glass sections card + <Outlet/>; phone: store strip + tab bar

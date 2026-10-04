@@ -15,19 +15,31 @@ import { ErrorNote, TextField } from '../../../shared/ui/form'
 import { Wizard, WizardActions } from '../../../shared/ui/Wizard'
 import type { WizardStep } from '../../../shared/ui/Wizard'
 import { useGoBack } from '../../../shared/useGoBack'
-import { STORE_NAME_MAX, suggestedStoreName } from '../../features/selling/startSelling'
+import {
+  STORE_NAME_MAX,
+  previewStoreSlug,
+  suggestedStoreName,
+} from '../../features/selling/startSelling'
 import { storesApi } from '../../features/stores/storesApi'
 import type { Store } from '../../features/stores/storesApi'
 import { useStores } from '../../features/stores/useStores'
 import { VerifyPhoneForm } from '../../../shared/auth/VerifyPhoneForm'
 import { useCustomerSession } from '../../app/sessionContext'
 import { useMarketSession } from '../../app/marketSession'
-import { ArrowLeftIcon, CheckIcon, ImageIcon } from '../../layout/icons'
-import { Button } from '../../../shared/ui/Button'
+import { ArrowLeftIcon, GlobeIcon, ImageIcon } from '../../layout/icons'
+import { Button, buttonClass } from '../../../shared/ui/Button'
+import { StatusPill } from './ui/StatusPill'
 import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
- * Create Store — a two-step guided flow.
+ * Create Store — a short guided flow: name → logo → about you.
+ *
+ * The shop itself used to be ONE step (name and logo together). For a seller
+ * who does not read easily, two questions on one screen is two chances to
+ * stall, so it is now one question per screen: "Name your shop" (with a live
+ * preview of the shop's link) and "Add your logo" (skippable — a letter logo
+ * is made from the name). Both still create the store in ONE request at the
+ * end of the logo screen, so a store is never written without its mark.
  *
  * Three decisions shape everything here.
  *
@@ -55,20 +67,36 @@ import { MediaImg } from '../../../shared/media/MediaImg'
  * store may publish — so the flow and the gate can never drift apart.
  */
 
-type StepKey = 'store' | 'business'
+type StepKey = 'name' | 'logo' | 'business'
 
-const STEPS: (WizardStep & { key: StepKey })[] = [
+/**
+ * Screens, each tied to the backend readiness step it fills in. `name` and
+ * `logo` are two screens of the registry's ONE `store` step — resuming and
+ * the gate still reason in registry steps.
+ */
+const STEPS: (WizardStep & { key: StepKey; readinessKey: 'store' | 'business' })[] = [
   {
-    key: 'store',
-    title: 'Your store',
-    blurb: 'The name and logo your customers will see.',
+    key: 'name',
+    readinessKey: 'store',
+    title: 'Name your shop',
+    blurb: 'This is the name your customers will see.',
+  },
+  {
+    key: 'logo',
+    readinessKey: 'store',
+    title: 'Add your logo',
+    blurb: 'A small picture for your shop. You can skip this and add it later.',
   },
   {
     key: 'business',
-    title: 'Business & contact',
-    blurb: "Who's selling, and how we reach you about orders.",
+    readinessKey: 'business',
+    title: 'About you',
+    blurb: 'Who is selling, and how we reach you about orders.',
   },
 ]
+
+/** Where a resumed draft lands when only the business screen is left. */
+const BUSINESS_INDEX = STEPS.findIndex((step) => step.key === 'business')
 
 export function CreateStorePage() {
   usePrivatePageTitle('Create your shop')
@@ -113,20 +141,20 @@ export function CreateStorePage() {
   /** Adopt an existing draft and land on the first step it still needs. */
   const resume = (draft: Store) => {
     setStore(draft)
-    setIndex(firstUnfinishedStep(draft) ?? 1)
+    setIndex(firstUnfinishedStep(draft) ?? BUSINESS_INDEX)
   }
 
   const step = STEPS[index]!
 
   return (
     <div className="px-1 pb-10">
-      <div className="mx-auto mb-3 flex w-full max-w-2xl items-center justify-between">
+      <div className="mx-auto mb-2 flex w-full max-w-2xl items-center justify-between">
         <button
           type="button"
           onClick={index === 0 ? goBack : back}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted transition hover:text-fg"
+          className="-ml-2 inline-flex min-h-tap items-center gap-1.5 rounded-xl px-2 text-[15px] font-semibold text-muted transition hover:bg-fg/5 hover:text-fg"
         >
-          <ArrowLeftIcon className="h-4 w-4" />
+          <ArrowLeftIcon className="h-5 w-5" />
           Back
         </button>
 
@@ -136,7 +164,7 @@ export function CreateStorePage() {
           <button
             type="button"
             onClick={finishLater}
-            className="text-sm font-medium text-muted underline-offset-4 transition hover:text-fg hover:underline"
+            className="-mr-2 inline-flex min-h-tap items-center rounded-xl px-3 text-[15px] font-semibold text-muted transition hover:bg-fg/5 hover:text-fg"
           >
             Finish later
           </button>
@@ -147,9 +175,11 @@ export function CreateStorePage() {
         // Gated rather than rendered-then-swapped: flashing step 1 and then
         // replacing it with "resume this instead?" is worse than a beat of
         // nothing. The list is a handful of the seller's own rows.
-        <p className="mx-auto w-full max-w-2xl py-12 text-center text-sm text-muted">
-          Checking for unfinished stores…
-        </p>
+        <div
+          aria-busy="true"
+          aria-label="Checking for unfinished shops"
+          className="glass mx-auto h-72 w-full max-w-2xl animate-pulse rounded-glass"
+        />
       ) : offerResume ? (
         <ResumePanel
           drafts={drafts}
@@ -163,10 +193,15 @@ export function CreateStorePage() {
           // Only backwards: moving forward has to clear that step's validation.
           onStepSelect={(i) => i < index && setIndex(i)}
         >
-          {step.key === 'store' && (
+          {/* One component for both screens, so the typed name and the
+              chosen logo survive moving between them. */}
+          {(step.key === 'name' || step.key === 'logo') && (
             <StoreStep
+              part={step.key}
               store={store}
               initialName={initialName}
+              onNext={next}
+              onBack={back}
               onDone={(created) => {
                 setStore(created)
                 next()
@@ -195,12 +230,12 @@ export function CreateStorePage() {
  * with those open means the seller wants a second store — not to be nagged
  * about the first. And the `store` step is always complete for any store
  * that exists, since one cannot be created without a name and logo, so in
- * practice this is never 0.
+ * practice this is the business screen.
  */
 function firstUnfinishedStep(store: Store): number | null {
   const byKey = new Map(store.readiness.steps.map((s) => [s.key, s]))
   const index = STEPS.findIndex((step) => {
-    const state = byKey.get(step.key)
+    const state = byKey.get(step.readinessKey)
     return state !== undefined && !state.complete && state.totalCount > 0
   })
   return index === -1 ? null : index
@@ -236,45 +271,50 @@ function ResumePanel({
 }) {
   const one = drafts.length === 1
   return (
-    <div className="mx-auto w-full max-w-2xl rounded-lg border border-line bg-surface p-5 sm:p-6">
-      <h2 className="text-lg font-semibold text-fg">
-        {one ? 'Pick up where you left off?' : 'You have unfinished stores'}
+    <div className="glass mx-auto w-full max-w-2xl rounded-glass p-5 sm:p-7">
+      <h2 className="font-heading text-[22px] leading-tight font-bold text-fg">
+        {one ? 'Pick up where you left off?' : 'You have unfinished shops'}
       </h2>
-      <p className="mt-1 text-sm text-muted">
+      <p className="mt-1.5 text-[15px] leading-relaxed text-muted">
         {one
-          ? 'You started setting up a store but didn’t finish. Continue it, or start a new one.'
+          ? 'You started setting up a shop but didn’t finish. Continue it, or start a new one.'
           : 'You started these but didn’t finish. Continue one, or start a new one.'}
       </p>
 
-      <ul className="mt-4 divide-y divide-line">
+      <ul className="mt-5 divide-y divide-line">
         {drafts.map((draft) => {
-          const nextStep = STEPS[firstUnfinishedStep(draft) ?? 1]!
+          const nextStep = STEPS[firstUnfinishedStep(draft) ?? BUSINESS_INDEX]!
           return (
             <li
               key={draft.id}
-              className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+              className="flex flex-wrap items-center gap-3 py-3.5 first:pt-0 last:pb-0"
             >
               {draft.logoUrl ? (
                 <MediaImg
-                  sizes="44px"
+                  sizes="48px"
                   src={draft.logoUrl}
                   alt=""
-                  className="h-11 w-11 shrink-0 rounded-md border border-line object-cover"
+                  className="h-12 w-12 shrink-0 rounded-xl object-cover"
                 />
               ) : (
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-line bg-surface-alt text-muted">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
                   <ImageIcon className="h-5 w-5" />
                 </div>
               )}
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-fg">
+                <p className="truncate text-[15px] font-semibold text-fg">
                   {draft.name}
                 </p>
-                <p className="truncate text-xs text-muted">
-                  /store/{draft.slug} · Next: {nextStep.title}
+                <p className="truncate text-hint text-muted">
+                  Next: {nextStep.title}
                 </p>
               </div>
-              <Button type="button" size="md" onClick={() => onResume(draft)}>
+              <Button
+                type="button"
+                size="lg"
+                onClick={() => onResume(draft)}
+                className="w-full sm:w-auto"
+              >
                 Continue
               </Button>
             </li>
@@ -286,9 +326,9 @@ function ResumePanel({
         <button
           type="button"
           onClick={onStartFresh}
-          className="text-sm font-medium text-muted underline-offset-4 transition hover:text-fg hover:underline"
+          className={buttonClass({ variant: 'ring', size: 'lg', full: true })}
         >
-          Start a new store instead
+          Start a new shop instead
         </button>
       </div>
     </div>
@@ -296,24 +336,32 @@ function ResumePanel({
 }
 
 // ---------------------------------------------------------------------------
-// Step 1 — the store itself
+// Screens 1–2 — the shop itself (name, then logo)
 // ---------------------------------------------------------------------------
 
 /**
- * Name + logo, posted together as one multipart request so a store is never
- * written without its mark. Re-entering this step after the store exists
- * shows it as already done rather than creating a second one.
+ * Name and logo, on two screens (`part`), posted together as ONE multipart
+ * request at the end of the logo screen so a store is never written without
+ * its mark. Re-entering either screen after the store exists shows it as
+ * already done rather than creating a second one.
  *
  * `initialName` is a suggestion carried from the /sell page — it only fills
- * the field; the store is still created by this step's own button.
+ * the field; the store is still created by the logo screen's own button.
  */
 function StoreStep({
+  part,
   store,
   initialName,
+  onNext,
+  onBack,
   onDone,
 }: {
+  part: 'name' | 'logo'
   store: Store | null
   initialName: string
+  /** Name screen → logo screen. */
+  onNext: () => void
+  onBack: () => void
   onDone: (store: Store) => void
 }) {
   const config = useMediaConfig()
@@ -344,12 +392,13 @@ function StoreStep({
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    // Already created — this step is behind us, just move on.
-    if (store) return onDone(store)
+    // Already created — these screens are behind us, just move on.
+    if (store) return part === 'name' ? onNext() : onDone(store)
 
-    if (!name.trim()) return setError('Please enter a store name.')
-
+    if (!name.trim()) return setError('Please type a name for your shop.')
     setError(null)
+    if (part === 'name') return onNext()
+
     setBusy(true)
     try {
       // No logo chosen → make a letter logo from the name rather than stop a
@@ -373,66 +422,106 @@ function StoreStep({
   }
 
   const preview = logoPreview ?? store?.logoUrl ?? null
+  // The address the shop will get — a PREVIEW (the server appends -2, -3…
+  // when a name is taken), and labelled as one.
+  const slug = store?.slug ?? previewStoreSlug(name)
 
   return (
-    <form onSubmit={submit} className="space-y-5" noValidate>
-      <TextField
-        label="Store name *"
-        placeholder="e.g. Anwin's Sports Hub"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        maxLength={STORE_NAME_MAX}
-        disabled={busy || store !== null}
-        autoFocus
-      />
+    <form onSubmit={submit} noValidate>
+      {part === 'name' ? (
+        <div className="space-y-4">
+          <TextField
+            label="Shop name"
+            placeholder="e.g. Lakshmi Sarees"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={STORE_NAME_MAX}
+            disabled={busy || store !== null}
+            hint={
+              store
+                ? 'Your shop is already made. You can change its name later in Store Details.'
+                : 'Use the name your customers know you by.'
+            }
+            autoFocus
+          />
 
-      <div>
-        <span className="mb-2 block text-sm font-medium text-muted">
-          Store logo (optional)
-        </span>
-        <div className="flex items-center gap-4">
+          {/* What the name becomes: the link the seller will share. */}
+          <div className="glass-inset flex items-start gap-3 rounded-xl px-3.5 py-3">
+            <GlobeIcon className="mt-0.5 h-5 w-5 shrink-0 text-brand" />
+            <div className="min-w-0">
+              <p className="text-hint font-semibold text-fg">Your shop link</p>
+              {slug ? (
+                <>
+                  <p className="mt-0.5 text-[15px] font-medium break-words text-fg">
+                    {window.location.host}/store/
+                    <span className="text-brand">{slug}</span>
+                  </p>
+                  {!store && (
+                    <p className="mt-1 text-hint text-muted">
+                      If this name is taken, a number is added at the end.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="mt-0.5 text-hint text-muted">
+                  Made from your shop name once you type it.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center text-center">
           {preview ? (
             <img
               src={preview}
-              alt="Store logo preview"
-              className="h-20 w-20 shrink-0 rounded-md border border-line object-cover"
+              alt="Your logo"
+              className="h-32 w-32 rounded-3xl object-cover shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
             />
-          ) : name.trim() ? (
+          ) : (
             // What they get if they don't pick a photo — seen before saving.
             <div
               aria-hidden="true"
-              className="flex h-20 w-20 shrink-0 items-center justify-center rounded-md text-2xl font-bold text-white"
-              style={{ backgroundColor: colourFor(name.trim()) }}
+              className="flex h-32 w-32 items-center justify-center rounded-3xl text-4xl font-bold text-white shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
+              style={{ backgroundColor: colourFor(name.trim() || '?') }}
             >
-              {initialsOf(name)}
-            </div>
-          ) : (
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-md border-2 border-dashed border-line bg-surface-alt text-muted">
-              <ImageIcon className="h-7 w-7" />
+              {initialsOf(name || '?')}
             </div>
           )}
-          <div className="min-w-0">
+
+          <p className="mt-3 max-w-xs text-hint text-muted">
+            {preview
+              ? 'This is your logo. A square photo works best.'
+              : 'No photo? We will use these letters. You can change it any time.'}
+          </p>
+
+          {!store && (
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              disabled={busy || !config || store !== null}
-              className="h-11 rounded-md border border-line bg-surface px-4 text-sm font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
+              disabled={busy || !config}
+              className={buttonClass({
+                variant: 'ring',
+                size: 'lg',
+                className: 'mt-4 w-full px-6 sm:w-auto',
+              })}
             >
-              {preview ? 'Change photo' : 'Choose a photo'}
+              <ImageIcon className="h-5 w-5" />
+              {preview ? 'Choose a different photo' : 'Choose a photo'}
             </button>
-            <p className="mt-1.5 text-xs text-muted">
-              {preview
-                ? 'A square photo works best.'
-                : "No logo? No problem — we'll use your shop's first letters. You can change it later."}
-            </p>
-          </div>
+          )}
         </div>
-      </div>
+      )}
 
-      {error && <ErrorNote>{error}</ErrorNote>}
+      {error && (
+        <div className="mt-4">
+          <ErrorNote>{error}</ErrorNote>
+        </div>
+      )}
 
       <WizardActions
-        submitLabel={store ? 'Continue' : 'Create store'}
+        onBack={part === 'logo' ? onBack : undefined}
+        submitLabel={part === 'name' || store ? 'Next' : 'Create my shop'}
         busy={busy}
       />
 
@@ -467,7 +556,7 @@ function StoreStep({
 }
 
 // ---------------------------------------------------------------------------
-// Step 2 — who is selling (the last step)
+// Screen 3 — who is selling (the last step)
 // ---------------------------------------------------------------------------
 
 /**
@@ -542,8 +631,9 @@ function BusinessStep({
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
       <TextField
-        label="Business name *"
+        label="Business name"
         placeholder="The name you trade under"
+        hint="Often the same as your shop name. It goes on your bills."
         value={businessName}
         onChange={(e) => setBusinessName(e.target.value)}
         maxLength={120}
@@ -551,8 +641,9 @@ function BusinessStep({
         autoFocus
       />
       <TextField
-        label="Seller name *"
-        placeholder="Who we should contact"
+        label="Your name"
+        placeholder="e.g. Lakshmi Devi"
+        hint="The person we contact about orders."
         value={sellerName}
         onChange={(e) => setSellerName(e.target.value)}
         maxLength={80}
@@ -560,11 +651,11 @@ function BusinessStep({
         autoComplete="name"
       />
 
-      <div className="rounded-lg border border-line bg-surface-alt/60 p-4">
-        <p className="text-sm font-medium text-fg">Contact details</p>
-        <p className="mt-0.5 text-xs text-muted">
-          Where we send order alerts, and what your customers see. These come
-          from your verified account — they can&apos;t be typed in by hand.
+      <div className="glass-inset rounded-xl p-4">
+        <p className="text-[15px] font-semibold text-fg">How we reach you</p>
+        <p className="mt-0.5 text-hint text-muted">
+          New order alerts go here, and customers see them on your shop. They
+          come from your account and are already verified.
         </p>
 
         <div className="mt-3 space-y-3">
@@ -574,9 +665,10 @@ function BusinessStep({
             <ContactRow label="Mobile number" value={phone} />
           ) : (
             <div>
-              <p className="mb-3 text-sm text-muted">
-                Add a mobile number so we can reach you about orders. You can
-                also do this later — it&apos;s needed before you publish.
+              <p className="mb-3 text-hint text-muted">
+                Add your mobile number so we can tell you about new orders.
+                You can also do this later — it is needed before your shop
+                goes live.
               </p>
               <VerifyPhoneForm
                 autoFocus={false}
@@ -591,7 +683,7 @@ function BusinessStep({
       {error && <ErrorNote>{error}</ErrorNote>}
       <WizardActions
         onBack={onBack}
-        submitLabel="Finish setup"
+        submitLabel="Finish"
         busy={busy}
       />
     </form>
@@ -602,15 +694,10 @@ function BusinessStep({
 function ContactRow({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
-      <p className="text-xs font-medium text-muted">{label}</p>
+      <p className="text-hint font-medium text-muted">{label}</p>
       <div className="mt-0.5 flex flex-wrap items-center gap-2">
-        <p className="truncate text-sm font-medium text-fg">{value ?? '—'}</p>
-        {value && (
-          <span className="inline-flex items-center gap-1 rounded-pill bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
-            <CheckIcon className="h-3 w-3" />
-            Verified
-          </span>
-        )}
+        <p className="min-w-0 truncate text-[15px] font-medium text-fg">{value ?? '—'}</p>
+        {value && <StatusPill tone="success">Verified</StatusPill>}
       </div>
     </div>
   )

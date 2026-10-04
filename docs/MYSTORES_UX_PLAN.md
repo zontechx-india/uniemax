@@ -18,7 +18,7 @@ English only for now, in plain words (i18n later).
 | ----- | ----- | ------ |
 | 0 | Glass tokens + shared seller UI kit + form/dialog upgrades | ✅ Done (2026-10-04) |
 | 1 | Shell & navigation (bottom tabs, More sheet, Share sheet) | ✅ Done (2026-10-04) |
-| 2 | My Stores list + Create Store wizard | ⬜ Not started |
+| 2 | My Stores list + Create Store wizard | ✅ Done (2026-10-04) |
 | 3 | Dashboard, setup checklist, publish card | ⬜ Not started |
 | 4 | Products, product wizard, categories, media | ⬜ Not started |
 | 5 | Orders list + order detail | ⬜ Not started |
@@ -298,10 +298,12 @@ Each phase ships on its own and is approved before the next one starts.
 
 ### Phase 2 — My Stores & Create Store
 
-- [ ] Glass store cards: big logo, Live / Not live, setup progress ring, **Manage** + **Share**
-- [ ] Floating "+ New store" button on mobile
-- [ ] Empty state with 3 steps: Name → Add products → Share
-- [ ] Create wizard: one question per screen on mobile, progress bar, sticky Continue, "Shop web address" with live preview
+- [x] Glass store cards: big logo, Live / Not live, setup progress ring, **Manage** + **Share** (Publish until live — same sheet as the store strip)
+- [x] Floating "+ New shop" button on mobile
+- [x] Empty state with 3 steps: Name → Add products → Share
+- [x] Create wizard: one question per screen (Name your shop → Add your logo → About you), segmented progress bar, sticky glass Continue bar, "Your shop link" live preview
+- [x] Resume panel, loading skeletons, plain labels and hints ("Your name", "How we reach you", "Verified")
+- [x] Shared `Wizard` shell upgraded in place (glass panel, 44 px rail targets, sticky mobile actions)
 
 ### Phase 3 — Dashboard
 
