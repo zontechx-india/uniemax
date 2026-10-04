@@ -175,8 +175,7 @@ For search, nobody googles a shop they have never heard of; they google
 If the backend is down, slow (> 1.5 s), throws, or rate-limits, the visitor
 still gets a working page: the backend serves `index.html` unmodified, or
 nginx serves its own static copy. A page can never be worse than before
-page shells existed. (`/` and `/sell` are live on nginx only once the step in
-[§9](#9-operations) is applied; until then they are the static file.)
+page shells existed.
 
 ### 4.2 Two writers, one head
 
@@ -274,7 +273,8 @@ re-share reuses whatever it got first.
 2. **Previews use a dedicated copy.** A preview-safe JPEG of each product
    cover (logos get a wide store card instead — [§4.7](#47-store-cards-wide-link-previews)):
    ≤ 1200 px, white behind transparency, < 300 KB,
-   baseline JPEG (the one format every preview service renders). It lives
+   JPEG (the one format every preview service renders; progressive, from
+   sharp's `mozjpeg` encoder — Meta's Sharing Debugger renders it). It lives
    beside the original at `derived/share/<key>.jpg` (no DB column — originals
    are immutable, so their share image is too) and is served by
    `GET /api/v1/public/images/share/{bucket}/{key}.jpg`.
@@ -339,7 +339,7 @@ beside share images and sized copies, so it gets the same lifecycle for free
 (rendered on first request, stored at `derived/card/<key>.jpg`, cached
 forever, warmed on every logo upload, pre-rendered by `optimize-media`):
 
-- **1200×630** baseline JPEG, typically 10–30 KB.
+- **1200×630** JPEG (progressive, like share images), typically 10–30 KB.
 - The logo's blank margin is trimmed, then the mark is scaled to a centred
   840×400 box (enlarged if small — a tiny mark in a big card reads as an
   empty preview) with margin for X's 2:1 crop.
@@ -492,8 +492,16 @@ Automated tests: `backend/test/page-shell.test.mjs` (read-only; part of
   itself, large, is what sells, and padding it onto a wide canvas would shrink
   it. Store pages use wide store cards ([§4.7](#47-store-cards-wide-link-previews)).
 - **Static fallback.** Any page served as the static `index.html` (backend
-  down, or `/` and `/sell` before their nginx step) carries the relative
-  `og:image` `/og-image.jpg`, which some scrapers cannot load.
+  down) carries the relative `og:image` `/og-image.jpg`, which some scrapers
+  cannot load.
+- **Meta's Sharing Debugger warns "missing properties: fb:app_id"** on every
+  page. Not an SEO or preview problem: the preview renders fully without it,
+  and no search engine reads it. `fb:app_id` only links the domain to a
+  Facebook App for Facebook's own sharing insights. To clear the warning:
+  create a Facebook App and add `<meta property="fb:app_id" content="…">`
+  to the `seo:start` region of `index.html` (and to `renderHead` in
+  `pageHead.ts`, [§4.2](#42-two-writers-one-head)). Not done — nothing
+  depends on it.
 - **Logic exists twice** (browser + server, [§4.2](#42-two-writers-one-head)).
   There is no shared package between `frontend/` and `backend/`, so the twins
   are kept in step by hand.
@@ -529,7 +537,7 @@ change-log line.
 | 5 | **Better listings from sellers** | Listing quality score in the product editor; duplicate-description warning; optional seller SEO title/description/share image with a result preview; prompt to tag products on the global taxonomy; finish converting legacy shelves (progress measured on the admin Category mapping page) | Not started (per-photo alt text exists — "Describe this photo") |
 | 6 | **More landing pages** | Brand pages (after step 2); city pages ("cricket bats in Kochi") only where stock exists, thin ones `noindex`; a crawlable `/search?q=` page (enables the `WebSite` `SearchAction`); "more from this store" / "other sellers" links | Not started |
 | 7 | **Tools for sellers' own traffic** | WhatsApp share with prefilled text; QR poster; generated share images with price; per-seller traffic analytics (referrer/UTM); seller's own Pixel/GA4 IDs; seller Search Console verification tag (needs page shells — now possible) | Not started (basic Share button exists) |
-| 8 | **Operations** | Submit sitemaps in Search Console + Bing; IndexNow ping on publish/price change (not Google's Indexing API — jobs/livestreams only); HTTP caching on public API responses ([`IMPROVEMENTS.md`](../IMPROVEMENTS.md) #17); `pg_trgm` search index (#15) | Not started (absolute `og:image` for `/` and `/sell`: in code, page shells) |
+| 8 | **Operations** | Submit sitemaps in Search Console + Bing; IndexNow ping on publish/price change (not Google's Indexing API — jobs/livestreams only); HTTP caching on public API responses ([`IMPROVEMENTS.md`](../IMPROVEMENTS.md) #17); `pg_trgm` search index (#15) | Not started (absolute `og:image` for `/` and `/sell`: done, page shells, `v1.23.0`) |
 
 Things to never do: fake or incentivised reviews, keyword stuffing, letting
 search/filter URLs get indexed, mass-produced pages with nothing on them.
