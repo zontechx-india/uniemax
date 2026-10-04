@@ -19,7 +19,7 @@ English only for now, in plain words (i18n later).
 | 0 | Glass tokens + shared seller UI kit + form/dialog upgrades | ✅ Done (2026-10-04) |
 | 1 | Shell & navigation (bottom tabs, More sheet, Share sheet) | ✅ Done (2026-10-04) |
 | 2 | My Stores list + Create Store wizard | ✅ Done (2026-10-04) |
-| 3 | Dashboard, setup checklist, publish card | ⬜ Not started |
+| 3 | Dashboard, setup checklist, publish card | ✅ Done (2026-10-04) |
 | 4 | Products, product wizard, categories, media | ⬜ Not started |
 | 5 | Orders list + order detail | ⬜ Not started |
 | 6 | Settings pages (Business, Bank, Payments, Checkout, Shipping, Details, Footer, Banners) | ⬜ Not started |
@@ -307,10 +307,12 @@ Each phase ships on its own and is approved before the next one starts.
 
 ### Phase 3 — Dashboard
 
-- [ ] Glass hero: greeting, today's orders + revenue, the one next step
-- [ ] Setup checklist as a numbered vertical stepper with one "Do it" button each, progress ring
-- [ ] Order pipeline as scrollable glass chips with a fade-edge hint
-- [ ] Latest orders as tappable cards
+- [x] Hero: greeting, Today / Waiting / Total sales, and ONE next step (missing step → publish → waiting orders → WhatsApp share)
+- [x] Setup checklist as a numbered vertical stepper (current step highlighted, one filled button), progress ring
+- [x] Order pipeline as scrollable glass chips with a fade-edge hint (grid from `sm`)
+- [x] Latest orders as tappable cards (`SellerOrderRow`: customer + total first, "25 min ago")
+- [x] `glass-card` utility: cards inside the glass panel no longer stack a second blur
+- [x] `setupSteps.ts` shared by hero, checklist and My shops cards; `ProgressRing` moved into the kit
 - [x] Confirmation sheet before taking the shop offline (done in Phase 1)
 
 ### Phase 4 — Products & categories

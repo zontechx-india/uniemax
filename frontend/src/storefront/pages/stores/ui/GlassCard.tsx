@@ -12,6 +12,11 @@ import type { ComponentType, ReactNode } from 'react'
  *
  * Long lists go INSIDE one card as plain rows (`ActionRow`); never a glass
  * card per row — every blurred layer costs a cheap phone a frame.
+ *
+ * Section pages render inside the layout's glass panel, which has already
+ * frosted the canvas, so by default this is `glass-card` — the glass look
+ * without a second blur. Pass `blur` for a card that sits directly on the
+ * canvas (outside any panel).
  */
 export function GlassCard({
   id,
@@ -20,6 +25,7 @@ export function GlassCard({
   icon: Icon,
   aside,
   padded = true,
+  blur = false,
   className = '',
   children,
 }: {
@@ -32,6 +38,8 @@ export function GlassCard({
   aside?: ReactNode
   /** False for edge-to-edge content (a list of rows that brings its own). */
   padded?: boolean
+  /** Own backdrop blur — only for a card placed directly on the canvas. */
+  blur?: boolean
   /** Layout only (margins, `scroll-mt-*`, a highlight ring). */
   className?: string
   children?: ReactNode
@@ -42,7 +50,7 @@ export function GlassCard({
     <section
       id={id}
       tabIndex={id ? -1 : undefined}
-      className={`glass rounded-glass outline-none ${padded ? 'p-4 sm:p-5' : ''} ${className}`}
+      className={`${blur ? 'glass' : 'glass-card'} rounded-glass outline-none ${padded ? 'p-4 sm:p-5' : ''} ${className}`}
     >
       {hasHeader && (
         <header

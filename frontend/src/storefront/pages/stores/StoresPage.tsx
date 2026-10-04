@@ -2,13 +2,13 @@ import { usePrivatePageTitle } from '../../../shared/seo'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useStores } from '../../features/stores/useStores'
-import { isLaunchStep } from '../../features/stores/storeProfile'
+import { launchSteps } from './setupSteps'
 import type { Store } from '../../features/stores/storesApi'
 import { BoxIcon, ChevronRightIcon, PlusIcon, ShareIcon, StoreIcon } from '../../layout/icons'
 import { buttonClass } from '../../../shared/ui/Button'
 import { MediaImg } from '../../../shared/media/MediaImg'
 import { StoreShareSheet } from './StorePublishCard'
-import { EmptyState, PageHeader, StatusPill, ToastHost } from './ui'
+import { EmptyState, PageHeader, ProgressRing, StatusPill, ToastHost } from './ui'
 
 /**
  * My Stores ("My Store" in the account menu): every shop the customer owns,
@@ -110,9 +110,7 @@ export function StoresPage() {
 
 /** Launch-step progress — the same readiness the store's checklist reads. */
 function setupProgress(store: Store): { done: number; total: number } {
-  const steps = store.readiness.steps.filter(
-    (step) => step.totalCount > 0 && isLaunchStep(step),
-  )
+  const steps = launchSteps(store)
   return { done: steps.filter((step) => step.complete).length, total: steps.length }
 }
 
@@ -192,31 +190,6 @@ function StoreCard({ store, onShare }: { store: Store; onShare: () => void }) {
         </button>
       </div>
     </article>
-  )
-}
-
-/** "3 of 5" as a ring — fills with the brand as setup completes. */
-function ProgressRing({ done, total }: { done: number; total: number }) {
-  const r = 16
-  const c = 2 * Math.PI * r
-  const ratio = total === 0 ? 0 : done / total
-  return (
-    <svg viewBox="0 0 40 40" className="h-10 w-10 shrink-0 -rotate-90" aria-hidden>
-      <circle cx="20" cy="20" r={r} fill="none" strokeWidth="4" className="stroke-fg/10" />
-      <circle
-        cx="20"
-        cy="20"
-        r={r}
-        fill="none"
-        strokeWidth="4"
-        strokeLinecap="round"
-        strokeDasharray={c}
-        strokeDashoffset={c * (1 - ratio)}
-        className={`transition-[stroke-dashoffset] duration-500 ${
-          ratio === 1 ? 'stroke-success' : 'stroke-brand'
-        }`}
-      />
-    </svg>
   )
 }
 

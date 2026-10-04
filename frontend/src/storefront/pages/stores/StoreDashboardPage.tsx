@@ -1,27 +1,44 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { shareOrCopy } from '../../../shared/share'
 import { buttonClass } from '../../../shared/ui/Button'
 import { ErrorNote } from '../../../shared/ui/form'
 import { formatPrice, publicStoreUrl } from '../../features/stores/storesApi'
 import type { Store, StoreDashboard } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
+import { useStoreManageScope } from '../../features/stores/storeManageScope'
 import {
+  ArrowRightIcon,
+  BoxIcon,
+  CartIcon,
   ChatIcon,
   CheckIcon,
-  EyeIcon,
-  GlobeIcon,
   ShareIcon,
+  StoreIcon,
 } from '../../layout/icons'
 import { SellerOrderRow } from './orderMeta'
 import { SetupChecklist } from './SetupChecklist'
-import { whatsAppShareUrl } from './usePublishActions'
+import { launchSteps, stepAction, stepMissing } from './setupSteps'
+import { usePublishActions, whatsAppShareUrl } from './usePublishActions'
+import { EmptyState } from './ui/EmptyState'
 
 /**
- * Dashboard section of Store Management — the landing view: today's orders,
- * the order pipeline (Pending → Processing → Shipped → Completed +
- * Cancelled/Refunded), revenue, and the latest orders. Tiles and rows link
- * into the Orders section, where statuses are progressed.
+ * Dashboard — the landing view of store management.
+ *
+ * It opens on a HERO that answers the only two questions a seller has when
+ * they arrive: *how am I doing?* (today's orders, waiting orders, sales) and
+ * *what should I do now?* — ONE next step with ONE button, picked from the
+ * shop's state:
+ *
+ *   not live, something missing → the first missing launch step
+ *   not live, ready             → Publish my shop
+ *   live, orders waiting        → See waiting orders
+ *   live, no orders yet         → Share on WhatsApp
+ *   live, all caught up         → Share on WhatsApp again
+ *
+ * Under it: the order pipeline as tappable chips (scrolling sideways on a
+ * phone), the latest orders as cards, and the setup checklist — above the
+ * numbers until the shop is live, below them once orders are coming in.
  */
 
 const PIPELINE: {
@@ -29,16 +46,16 @@ const PIPELINE: {
   label: string
   /** Deep link into the Orders section (relative to the manage layout). */
   to?: string
-  hint?: string
+  dot: string
 }[] = [
-  { key: 'pending', label: 'Pending Orders', to: 'orders?status=PENDING' },
+  { key: 'pending', label: 'Waiting', to: 'orders?status=PENDING', dot: 'bg-pending' },
   // Processing spans two statuses (Confirmed + Packed) — link to the full
   // list rather than pretending one status covers it.
-  { key: 'processing', label: 'Processing', to: 'orders' },
-  { key: 'shipped', label: 'Shipped', to: 'orders?status=SHIPPED' },
-  { key: 'completed', label: 'Completed', to: 'orders?status=DELIVERED' },
-  { key: 'cancelled', label: 'Cancelled', to: 'orders?status=CANCELLED' },
-  { key: 'refunded', label: 'Refunded', hint: 'via cancelled paid orders' },
+  { key: 'processing', label: 'Getting ready', to: 'orders', dot: 'bg-accent' },
+  { key: 'shipped', label: 'Sent', to: 'orders?status=SHIPPED', dot: 'bg-brand' },
+  { key: 'completed', label: 'Delivered', to: 'orders?status=DELIVERED', dot: 'bg-success' },
+  { key: 'cancelled', label: 'Cancelled', to: 'orders?status=CANCELLED', dot: 'bg-muted' },
+  { key: 'refunded', label: 'Refunded', dot: 'bg-muted' },
 ]
 
 export function StoreDashboardPage() {
@@ -57,128 +74,80 @@ export function StoreDashboardPage() {
   // section, so pull a fresh copy. Empty means the layout's own initial load
   // is already in flight — asking again would just duplicate it.
   const reEntered = useRef(dashboard !== null)
-  // Once a LIVE store has orders, they are the daily job: the optional
-  // online-payments setup moves below them. (Unpublished, "get live" leads.)
-  const setupBelow =
-    store.isPublished && (dashboard?.stats.totalOrders ?? 0) > 0
   useEffect(() => {
     if (reEntered.current) refreshDashboard()
   }, [refreshDashboard])
 
+  const hasOrders = (dashboard?.stats.totalOrders ?? 0) > 0
+  // Once a LIVE store has orders, they are the daily job: the optional
+  // online-payments setup moves below them. (Unpublished, "get live" leads.)
+  const setupBelow = store.isPublished && hasOrders
+
   return (
-    <div>
-      <h2 className="font-body text-xl font-semibold tracking-normal text-fg">
-        Dashboard
-      </h2>
-      <p className="mt-1 text-sm text-muted">
-        How {store.name} is doing — orders land here the moment customers
-        place them.
-      </p>
+    <div className="space-y-5">
+      <Hero store={store} dashboard={dashboard} onStoreChange={onStoreChange} />
 
-      {/* Above the numbers on purpose: until the store is live there are no
-          numbers to read, and this is the only thing worth doing. */}
-      <div className="mt-5 space-y-5">
-        {store.isPublished && dashboard?.stats.totalOrders === 0 && (
-          <FirstOrderCard store={store} />
-        )}
-        {!setupBelow && (
-          <SetupChecklist store={store} onStoreChange={onStoreChange} />
-        )}
-      </div>
+      {error && <ErrorNote>{error}</ErrorNote>}
 
-      {error && (
-        <div className="mt-4">
-          <ErrorNote>{error}</ErrorNote>
-        </div>
-      )}
-      {dashboard === null && !error && (
-        <p className="py-16 text-center text-sm text-muted">
-          Loading your dashboard…
-        </p>
-      )}
+      {!setupBelow && <SetupChecklist store={store} onStoreChange={onStoreChange} />}
 
-      {/* Nine tiles reading 0 teach a new seller nothing — the numbers
+      {dashboard === null && !error && <DashboardSkeleton />}
+
+      {/* Six tiles reading 0 teach a new seller nothing — the numbers
           appear with the first order. */}
-      {dashboard && dashboard.stats.totalOrders > 0 && (
-        <div className="mt-5 space-y-5">
-          {/* Headline tiles */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {/* Same selected treatment as the section nav: brand left edge
-                over the Light-Purple tint, ink label, in both schemes. */}
-            <div className="rounded-lg border-l-[3px] border-brand bg-brand-soft p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-fg">
-                Today's Orders
-              </p>
-              <p className="mt-1 text-3xl font-bold text-fg">
-                {dashboard.stats.today}
-              </p>
-            </div>
-            <div className="rounded-lg border border-line p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-                Total Orders
-              </p>
-              <p className="mt-1 text-3xl font-bold text-fg">
-                {dashboard.stats.totalOrders}
-              </p>
-            </div>
-            <div className="col-span-2 rounded-lg border border-line p-4 sm:col-span-1">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-                Revenue
-              </p>
-              <p className="mt-1 text-3xl font-bold text-fg">
-                {formatPrice(dashboard.stats.revenue)}
-              </p>
-            </div>
-          </div>
-
-          {/* Order pipeline */}
-          <div>
-            <h3 className="font-body text-sm font-semibold uppercase tracking-wide text-muted">
-              Order pipeline
+      {dashboard && hasOrders && (
+        <>
+          <section aria-labelledby="pipeline-heading">
+            <h3 id="pipeline-heading" className="mb-2.5 text-[15px] font-bold text-fg">
+              Your orders
             </h3>
-            <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {PIPELINE.map(({ key, label, to, hint }) =>
-                to ? (
-                  <Link
-                    key={key}
-                    to={to}
-                    className="rounded-lg border border-line p-3.5 transition hover:bg-surface-alt"
-                  >
-                    <p className="text-xs font-semibold text-muted">{label}</p>
-                    <p className="mt-0.5 text-2xl font-bold text-fg">
-                      {dashboard.stats[key]}
-                    </p>
-                  </Link>
-                ) : (
-                  <div key={key} className="rounded-lg border border-line p-3.5">
-                    <p className="text-xs font-semibold text-muted">{label}</p>
-                    <p className="mt-0.5 text-2xl font-bold text-fg">
-                      {dashboard.stats[key]}
-                    </p>
-                    {hint && (
-                      <p className="mt-0.5 text-[11px] text-muted">{hint}</p>
-                    )}
-                  </div>
-                ),
-              )}
+            {/* Phone: one row that scrolls sideways (the fade on the right
+                says there is more). From sm: a grid, nothing hidden. */}
+            <div className="-mx-4 [mask-image:linear-gradient(to_right,#000_85%,transparent)] sm:mx-0 sm:[mask-image:none]">
+              <div className="flex snap-x gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:grid sm:grid-cols-3 sm:px-0 lg:grid-cols-6">
+                {PIPELINE.map(({ key, label, to, dot }) => {
+                  const body = (
+                    <>
+                      <span className="flex items-center gap-1.5 text-hint font-semibold text-muted">
+                        <span aria-hidden className={`h-2 w-2 rounded-full ${dot}`} />
+                        {label}
+                      </span>
+                      <span className="mt-1 block font-heading text-[26px] leading-none font-bold text-fg">
+                        {dashboard.stats[key]}
+                      </span>
+                    </>
+                  )
+                  const chip =
+                    'glass-card block min-w-[124px] shrink-0 snap-start rounded-2xl px-3.5 py-3 sm:min-w-0'
+                  return to ? (
+                    <Link key={key} to={to} className={`${chip} transition hover:border-brand/40`}>
+                      {body}
+                    </Link>
+                  ) : (
+                    <div key={key} className={chip}>
+                      {body}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          </div>
+          </section>
 
-          {/* Latest orders */}
-          <div>
-            <div className="flex items-center justify-between">
-              <h3 className="font-body text-sm font-semibold uppercase tracking-wide text-muted">
+          <section aria-labelledby="latest-heading">
+            <div className="mb-2.5 flex items-center justify-between gap-3">
+              <h3 id="latest-heading" className="text-[15px] font-bold text-fg">
                 Latest orders
               </h3>
               <Link
                 to="orders"
-                className="text-xs font-semibold text-brand hover:underline"
+                className="inline-flex min-h-tap items-center gap-1 rounded-xl px-2 text-[14px] font-semibold text-brand transition hover:bg-brand-soft"
               >
-                View all orders →
+                See all
+                <ArrowRightIcon className="h-4 w-4" />
               </Link>
             </div>
             {dashboard.recentOrders.length > 0 && (
-              <ul className="mt-2 divide-y divide-line rounded-lg border border-line">
+              <ul className="glass-card divide-y divide-line overflow-hidden rounded-glass">
                 {dashboard.recentOrders.map((order) => (
                   <li key={order.id}>
                     <SellerOrderRow order={order} to={`orders/${order.id}`} />
@@ -186,81 +155,218 @@ export function StoreDashboardPage() {
                 ))}
               </ul>
             )}
-          </div>
+          </section>
 
-          {setupBelow && (
-            <SetupChecklist store={store} onStoreChange={onStoreChange} />
-          )}
+          {setupBelow && <SetupChecklist store={store} onStoreChange={onStoreChange} />}
+        </>
+      )}
+
+      {/* Live with no orders yet: say so plainly under the hero (which
+          already offers the WhatsApp share) instead of a blank page. */}
+      {dashboard && !hasOrders && store.isPublished && (
+        <div className="glass-card rounded-glass">
+          <EmptyState
+            icon={CartIcon}
+            title="No orders yet"
+            description="When a customer orders, it shows up here straight away."
+          />
         </div>
       )}
     </div>
   )
 }
 
-/**
- * The moment after publishing, until the first order: the store is live, so
- * the one useful thing left is getting the link in front of customers. This
- * replaces an empty stats grid, and leads with WhatsApp — how most small
- * sellers here reach their buyers.
- */
-function FirstOrderCard({ store }: { store: Store }) {
-  const url = publicStoreUrl(store.slug)
-  const [copied, setCopied] = useState(false)
+// ---------------------------------------------------------------------------
+// Hero
+// ---------------------------------------------------------------------------
 
-  const share = async () => {
-    if ((await shareOrCopy({ title: store.name, url })) === 'copied') {
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 2000)
-    }
-  }
+function greeting(hour: number): string {
+  if (hour < 12) return 'Good morning'
+  if (hour < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
+function Hero({
+  store,
+  dashboard,
+  onStoreChange,
+}: {
+  store: Store
+  dashboard: StoreDashboard | null
+  onStoreChange: (store: Store) => void
+}) {
+  const stats = dashboard?.stats
+  const showStats = store.isPublished && stats !== undefined && stats.totalOrders > 0
 
   return (
-    <section className="rounded-lg border border-success/40 bg-success/5 p-4 sm:p-5">
-      <p className="flex items-center gap-2 text-base font-semibold text-fg">
-        <span className="h-2 w-2 rounded-full bg-success" aria-hidden />
-        Your store is live
-      </p>
-      <p className="mt-1 text-sm text-muted">
-        Share your link to get your first order — it will show up here the
-        moment it&apos;s placed.
-      </p>
-      <a
-        href={url}
-        target="_blank"
-        rel="noreferrer"
-        className="mt-3 flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-sm text-fg transition hover:bg-surface-alt"
-      >
-        <GlobeIcon className="h-4 w-4 shrink-0 text-muted" />
-        <span className="truncate">{url.replace(/^https?:\/\//, '')}</span>
-      </a>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <a
-          href={whatsAppShareUrl(store.name, url)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={buttonClass({ size: 'sm' })}
-        >
-          <ChatIcon className="h-3.5 w-3.5" />
-          Share on WhatsApp
-        </a>
-        <button
-          type="button"
-          onClick={() => void share()}
-          className={buttonClass({ variant: 'ring', size: 'sm' })}
-        >
-          {copied ? <CheckIcon className="h-3.5 w-3.5" /> : <ShareIcon className="h-3.5 w-3.5" />}
-          {copied ? 'Link copied' : 'Copy link'}
-        </button>
-        <a
-          href={url}
-          target="_blank"
-          rel="noreferrer"
-          className={buttonClass({ variant: 'ring', size: 'sm' })}
-        >
-          <EyeIcon className="h-3.5 w-3.5" />
-          View store
-        </a>
+    <section className="relative overflow-hidden rounded-glass bg-brand-gradient p-5 text-brand-contrast shadow-[0_18px_40px_-18px_var(--cta-glow)] sm:p-6">
+      {/* Two soft lights for depth — decoration only. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -top-16 -right-10 h-48 w-48 rounded-full bg-brand-contrast/15 blur-2xl"
+      />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -bottom-20 -left-12 h-44 w-44 rounded-full bg-brand-contrast/10 blur-2xl"
+      />
+
+      <div className="relative">
+        <p className="text-[14px] font-medium opacity-90">{greeting(new Date().getHours())}</p>
+        <h2 className="mt-0.5 font-heading text-[24px] leading-tight font-bold break-words">
+          {store.name}
+        </h2>
+
+        {showStats && (
+          <dl className="mt-4 grid grid-cols-3 gap-2">
+            <HeroStat label="Today" value={stats.today} />
+            <HeroStat label="Waiting" value={stats.pending} />
+            <HeroStat label="Total sales" value={formatPrice(stats.revenue)} small />
+          </dl>
+        )}
+
+        <NextStep store={store} dashboard={dashboard} onStoreChange={onStoreChange} />
       </div>
     </section>
+  )
+}
+
+function HeroStat({
+  label,
+  value,
+  small = false,
+}: {
+  label: string
+  value: ReactNode
+  small?: boolean
+}) {
+  return (
+    <div className="min-w-0 rounded-2xl bg-brand-contrast/15 px-3 py-2.5">
+      <dt className="text-[12px] font-semibold opacity-90">{label}</dt>
+      <dd
+        className={`mt-0.5 truncate font-heading leading-tight font-bold ${
+          small ? 'text-[18px] sm:text-[22px]' : 'text-[24px]'
+        }`}
+      >
+        {value}
+      </dd>
+    </div>
+  )
+}
+
+/**
+ * The ONE thing to do next, on a solid card inside the hero so it reads as
+ * the button on the page. See the component doc above for the order.
+ */
+function NextStep({
+  store,
+  dashboard,
+  onStoreChange,
+}: {
+  store: Store
+  dashboard: StoreDashboard | null
+  onStoreChange: (store: Store) => void
+}) {
+  const { hiddenSections } = useStoreManageScope()
+  const actions = usePublishActions(store, onStoreChange)
+  const url = publicStoreUrl(store.slug)
+
+  let icon: ComponentType<{ className?: string }>
+  let title: string
+  let detail: string
+  let action: ReactNode
+
+  if (!store.isPublished) {
+    const next = launchSteps(store).find((step) => !step.complete)
+    if (next) {
+      const go = stepAction(next)
+      icon = next.key === 'catalog' ? BoxIcon : StoreIcon
+      title = go.label
+      detail = `To open your shop, add: ${stepMissing(next).join(' · ')}`
+      action = hiddenSections.includes(next.href) ? null : (
+        <Link to={go.to} className={buttonClass({ size: 'lg', full: true })}>
+          {go.label}
+          <ArrowRightIcon className="h-4 w-4" />
+        </Link>
+      )
+    } else {
+      icon = CheckIcon
+      title = 'Your shop is ready'
+      detail = 'Publish it so customers can see it and order.'
+      action = (
+        <button
+          type="button"
+          onClick={actions.publish}
+          disabled={actions.busy || !store.readiness.gates.PUBLISH.allowed}
+          className={buttonClass({ variant: 'sheen', size: 'lg', full: true })}
+        >
+          {actions.busy ? 'Publishing…' : 'Publish my shop'}
+        </button>
+      )
+    }
+  } else if (dashboard && dashboard.stats.pending > 0) {
+    const waiting = dashboard.stats.pending
+    icon = CartIcon
+    title = `${waiting} order${waiting === 1 ? ' is' : 's are'} waiting`
+    detail = 'Confirm them so your customers know their order is coming.'
+    action = (
+      <Link to="orders?status=PENDING" className={buttonClass({ size: 'lg', full: true })}>
+        See waiting orders
+        <ArrowRightIcon className="h-4 w-4" />
+      </Link>
+    )
+  } else {
+    const first = (dashboard?.stats.totalOrders ?? 0) === 0
+    icon = first ? ShareIcon : CheckIcon
+    title = first ? 'Get your first order' : 'All caught up'
+    detail = first
+      ? 'Send your shop link to your customers on WhatsApp.'
+      : 'No orders are waiting. Share your shop to get more.'
+    action = (
+      <a
+        href={whatsAppShareUrl(store.name, url)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex h-field w-full items-center justify-center gap-2 rounded-md bg-whatsapp text-[15px] font-bold text-whatsapp-contrast transition hover:opacity-90"
+      >
+        <ChatIcon className="h-5 w-5" />
+        Share on WhatsApp
+      </a>
+    )
+  }
+
+  const Icon = icon
+  return (
+    <div className="mt-4 rounded-2xl bg-surface p-3.5 text-fg shadow-[0_8px_24px_-12px_rgba(0,0,0,0.35)]">
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
+          <Icon className="h-5 w-5" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-[12px] font-bold tracking-[0.06em] text-brand uppercase">Next step</p>
+          <p className="text-[16px] leading-snug font-bold text-fg">{title}</p>
+          <p className="mt-0.5 text-hint text-muted">{detail}</p>
+        </div>
+      </div>
+      {action && <div className="mt-3">{action}</div>}
+      {actions.error && (
+        <p role="alert" className="mt-2 text-hint font-medium text-danger">
+          {actions.error}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** Shape of the numbers while the layout's dashboard fetch is in flight. */
+function DashboardSkeleton() {
+  return (
+    <div aria-busy="true" aria-label="Loading your orders" className="space-y-3">
+      <div className="h-5 w-32 animate-pulse rounded-md bg-fg/10" />
+      <div className="flex gap-2.5">
+        {[0, 1, 2].map((key) => (
+          <div key={key} className="glass-card h-[76px] flex-1 animate-pulse rounded-2xl" />
+        ))}
+      </div>
+    </div>
   )
 }

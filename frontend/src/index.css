@@ -894,6 +894,20 @@
   border: 1px solid var(--line);
 }
 
+/* A card INSIDE a glass panel: the same frosted fill, edge and highlight,
+ * but no backdrop-filter of its own. The panel behind it already blurred the
+ * canvas, and a second blur layer per card (a dashboard has six) is exactly
+ * the stacking a cheap phone stutters on. Looks like glass, costs a fill. */
+@utility glass-card {
+  --fg-muted: var(--glass-fg-muted);
+  --success: var(--glass-success);
+  --danger: var(--glass-danger);
+  --pending: var(--glass-pending);
+  background-color: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), 0 4px 18px -8px rgba(30, 18, 80, 0.12);
+}
+
 /* The colour field the glass frosts. ONE fixed layer of soft radial light
  * behind the whole workspace — gradients are already soft, so no `filter:
  * blur` is needed to paint it, and being fixed it is painted once rather

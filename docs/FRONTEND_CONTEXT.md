@@ -631,7 +631,7 @@ store is **published** — a column of ticks that can never change again is
 decoration. Payout prerequisites (address, tax, bank account) never mark a
 row: a cash-on-delivery shop may never need them, and "Pending" on Business
 Details forever read as an unfinished store. They live on the Dashboard's
-"Accept online payments" card instead.
+"Take online payments" card instead.
 
 **Dashboard** (`StoreDashboardPage`, the manage landing at
 `/mystores/{slug}`; Store Details moved to `/mystores/{slug}/details`) — over
@@ -650,13 +650,29 @@ badge and tiles never lag the order they describe. Likewise
 created/deleted, product enabled/disabled/deleted, product wizard closed) —
 `store.readiness`, which drives the sidebar setup badges and the publish
 card's "Before publishing, add…", is computed server-side from the catalog.
-It renders: Today's
-Orders / Total Orders / Revenue
-tiles, the order pipeline (Pending / Processing / Shipped / Completed /
-Cancelled / Refunded — each tile deep-links into the Orders section
-filtered to its status; Processing spans two statuses so it links to the
-full list), and the latest 8 orders, each row linking to its order detail
-page (plus a "View all orders" link).
+It renders, top to bottom:
+
+- A **hero** (`bg-brand-gradient`, the one solid-colour block in the
+  workspace): a time-of-day greeting and the shop name; once a live shop has
+  orders, three stats — **Today** / **Waiting** / **Total sales**; and a white
+  **Next step** card with ONE action picked from the shop's state — the first
+  unfinished launch step (its `stepAction` button), **Publish my shop**
+  (`sheen`) when ready, **See waiting orders** when orders are pending, else
+  **Share on WhatsApp** ("Get your first order" / "All caught up").
+- The `SetupChecklist` (above the numbers until the shop is live and has
+  orders, below them after).
+- **Your orders** — the pipeline as `glass-card` chips with a coloured dot
+  (Waiting / Getting ready / Sent / Delivered / Cancelled / Refunded); one
+  sideways-scrolling row with a right-edge fade on phones, a 3- then 6-column
+  grid from `sm` / `lg`. Each deep-links into Orders filtered to its status
+  (Getting ready spans Confirmed + Packed, so it opens the full list).
+- **Latest orders** — up to 8 `SellerOrderRow` cards in one `glass-card`
+  list, with **See all**.
+- Live with no orders yet: an `EmptyState` ("No orders yet") under the hero
+  (whose next step is already the WhatsApp share).
+
+Stats, pipeline and latest orders stay hidden until there is an order to
+count; a card skeleton shows while the layout's fetch is in flight.
 
 **Orders** (`StoreOrdersPage` at `/mystores/{slug}/orders` +
 `StoreOrderDetailPage` at `…/orders/{orderId}`, shared chips/labels in
@@ -667,8 +683,11 @@ page (plus a "View all orders" link).
   `?status=` so dashboard tiles land pre-filtered), a debounced search
   (order number / customer name / phone), newest first, server-paginated
   with Load More; every row opens the detail page. Rows are the shared
-  `SellerOrderRow` (`orderMeta.tsx`, also the Dashboard's latest orders): one
-  line from `sm`, on a phone number + total, then details, then the chips.
+  `SellerOrderRow` (`orderMeta.tsx`, also the Dashboard's latest orders): the
+  customer's name (or the order number) and the total lead at 15px bold, then
+  `timeAgo()` ("25 min ago", "Yesterday", then the date) · items · order
+  number, then the status and payment chips (12px); the whole ≥64px row is
+  the tap target.
 - **Detail** — items with thumbnails + money summary, customer/delivery
   snapshot (tel: link, pickup note for PICKUP orders), payment card
   (flags dev-simulated payments), a **lifecycle timeline** (Placed →
@@ -1439,28 +1458,30 @@ anywhere would quietly reintroduce unverified contact details. It renders no
 step) where a nested form would be invalid HTML that browsers silently drop;
 Enter is handled on the inputs instead.
 
-**`SetupChecklist`** (the Dashboard's top card) renders from
+**`SetupChecklist`** (the Dashboard's checklist card) renders from
 `store.readiness` (never from local inspection of the profile), split by what
-the seller is trying to do rather than one "n of 12" list:
+the seller is trying to do rather than one "n of 12" list. It is a **vertical
+stepper** — 36px numbered circles on a connector line, done steps ticked green
+and quiet, the **current** step (the first unfinished one) tinted with the
+only filled button — headed by a `ProgressRing` ("3/4"). The reading of
+readiness (`launchSteps`, `payoutSteps`, `stepAction`, `stepMissing`) lives in
+`setupSteps.ts`, shared with the Dashboard hero and the My shops cards.
 
-- **Unpublished → "Get your store live"**: only the launch steps (store,
+- **Unpublished → "Get your shop live"**: only the launch steps (store,
   business & contact, first product) — done ones ticked, open ones naming
   exactly what is missing ("Still needed: Contact phone number") with a
   button saying what it opens ("Add details", "Add a product" — or "Choose a
   category", straight to Categories, while no category exists) — then an
   optional **Make it look yours** row (→ Store Builder; every store already
-  has a default look, so it never blocks), then **Preview and publish** with
-  Preview and the Publish button right there, or the linked blockers.
-- **Published → "Accept online payments — optional"**: the address, tax and
+  has a default look, so it never blocks), then **Check and publish** with
+  Preview and **Publish my shop** right there (via `usePublishActions`, so it
+  toasts), or the linked blockers.
+- **Published → "Take online payments (optional)"**: the address, tax and
   payout steps still open, under "Cash on Delivery already works". Hidden
   once they are done.
 
 Steps with no applicable requirements are skipped, so a delivery-only store
-is never shown a pickup-address item. The Dashboard also shows **"Your store
-is live"** (the link, Share on WhatsApp, Copy link, View store) from publish
-until the first order, and hides the stat tiles / pipeline / latest orders
-until there is an order to count; once a live store has orders, the optional
-payments card moves below the numbers.
+is never shown a pickup-address item.
 - Sections: `StoreDetailsPage` (name update + **logo upload**: pick →
   validate the format → crop 1:1 (`ImageEditDialog`, square-locked) → upload
   as WebP with a progress bar; Replace / Remove with confirmation — saves
@@ -2442,12 +2463,13 @@ frontend/
     │           ├── StoreSectionNav.tsx  # Desktop collapsible groups / icon rail; SectionSheetList (phone More sheet)
     │           ├── StoreMobileNav.tsx   # Phone glass tab bar (Home·Orders·Products·Design·More) + More sheet
     │           ├── usePublishActions.ts # Publish / offline-confirm / share state + whatsAppShareUrl
-    │           ├── SetupChecklist.tsx   # Dashboard "Get your store live" / "Accept online payments" cards
+    │           ├── SetupChecklist.tsx   # Dashboard steppers: "Get your shop live" / "Take online payments"
+    │           ├── setupSteps.ts        # launchSteps / payoutSteps / stepAction / stepMissing (readiness reading)
     │           ├── GateBlockers.tsx     # useGateBlockers + BlockerLinks: each gate blocker → link to its fix
     │           ├── SetupStatus.tsx      # Shared setup marks: StatusMark / StatusBadge /
     │           │                        #   SectionJumpBar, all from store.readiness
     │           ├── StoreBusinessPage.tsx# Business & contact / address / tax cards
-    │           ├── StoreDashboardPage.tsx # Manage landing: order stats + latest orders
+    │           ├── StoreDashboardPage.tsx # Manage landing: hero (stats + ONE next step), order chips, latest orders
     │           ├── StoreOrdersPage.tsx  # Seller orders list (status tabs, search, Load More)
     │           ├── StoreOrderDetailPage.tsx # One order: items, timeline, status actions + cancel
     │           ├── orderMeta.tsx        # Shared status chips / payment labels / date formats
@@ -2960,6 +2982,7 @@ JS mirror `glassByScheme` in `colors.ts`): `--glass-bg` (.70 white / .62 smoked)
 | `glass` | Cards and panels |
 | `glass-strong` | Chrome over moving content — top bar, tab bar, sticky bars, sheets, toasts |
 | `glass-inset` | Fields / wells inside glass (near-opaque, for legibility) |
+| `glass-card` | A card INSIDE a glass panel: glass fill, edge, highlight and the glass-safe text steps, but **no** `backdrop-filter` (the panel already blurred the canvas) |
 | `seller-canvas` | On the workspace root: ONE fixed layer of radial brand light behind everything (painted once, no `filter: blur`) |
 | `animate-sheet-in` | 200ms rise for sheets, bars, toasts |
 
@@ -2987,13 +3010,14 @@ Rules that keep it legible and fast:
 
 | Component | Purpose |
 | --------- | ------- |
-| `GlassCard` | The one card: optional icon chip + title + one plain sentence + `aside` (pill/action). `padded={false}` for row lists. Replaces Business `Card`, Footer `SectionCard`, Shipping border-top sections. |
+| `GlassCard` | The one card: optional icon chip + title + one plain sentence + `aside` (pill/action). `padded={false}` for row lists. Default fill is `glass-card` (no own blur — it sits in the already-frosted panel); `blur` for a card directly on the canvas. Replaces Business `Card`, Footer `SectionCard`, Shipping border-top sections. |
 | `PageHeader` | Section heading: gradient icon chip, 22px title, required one-line description, optional action (full width on phones). |
 | `SaveBar` | THE save model for forms: hidden until `dirty`; then a sticky `glass-strong` bar (message, **Undo changes**, **Save changes**) that stays under the thumb; shows `error`. Sits above the mobile tab bar via `--seller-dock`. Renders the unsaved-changes guard. |
 | `useUnsavedChangesGuard(dirty)` | `beforeunload` + react-router `useBlocker` with a plain-words "Leave without saving?" sheet. The blocker half renders only under a data router (`UNSAFE_DataRouterContext`) — the admin console mounts these pages under `<BrowserRouter>`, where `useBlocker` would throw. Ignores same-path (query-only) moves. |
 | `ActionRow` | One list item: leading photo, title + status, ≤2 facts, then ONE labelled primary action, a `toggle` kept apart, and `menu` → `RowMenu`. Actions drop below the text on phones so the name keeps the width. |
 | `RowMenu` | "⋯ More" (44px; word shown from `sm`) → bottom sheet of 56px rows with icon, label and note; `danger` rows forced last and red. |
 | `BigSwitch` | Successor to `ActiveSwitch` (same core props): 52×32 track, 44px hit area, the state *written* beside it (`onText` / `offText`, width reserved for the longer word so lists stay aligned). |
+| `ProgressRing` | "3 of 5" as a ring (brand → green when complete); optional "3/5" label. My shops cards, setup checklist. |
 | `StatusPill` | One badge: tone `success` / `pending` / `brand` / `danger` / `neutral`, dot + 12px text. |
 | `EmptyState` | Gradient icon, title, one sentence, optional numbered picture `steps`, one action. |
 | `showToast()` / `ToastHost` | "Saved ✓" for instant saves. Module store (`useSyncExternalStore`), no provider; `ToastHost` is mounted once in `StoreManageLayout`. |

@@ -1,15 +1,15 @@
-import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { toApiError } from '../../../shared/auth/http'
-import { Button, buttonClass } from '../../../shared/ui/Button'
-import { isLaunchStep } from '../../features/stores/storeProfile'
+import { buttonClass } from '../../../shared/ui/Button'
 import type { StepState } from '../../features/stores/storeProfile'
-import { publicStoreUrl, storesApi } from '../../features/stores/storesApi'
+import { publicStoreUrl } from '../../features/stores/storesApi'
 import type { Store } from '../../features/stores/storesApi'
 import { useStoreManageScope } from '../../features/stores/storeManageScope'
 import { CheckIcon, EyeIcon, PaletteIcon } from '../../layout/icons'
 import { BlockerLinks, useGateBlockers } from './GateBlockers'
+import { launchSteps, payoutSteps, stepAction, stepMissing } from './setupSteps'
+import { usePublishActions } from './usePublishActions'
+import { ProgressRing } from './ui/ProgressRing'
 
 /**
  * The seller's path to a live store, on the Dashboard — the resumable half of
@@ -17,16 +17,21 @@ import { BlockerLinks, useGateBlockers } from './GateBlockers'
  *
  * Two cards, because they answer two different questions:
  *
- *  - **Get your store live** (until published): only the steps that block
- *    publishing, then an optional "make it yours" pointer to the Store
+ *  - **Get your shop live** (until published): only the steps that block
+ *    publishing, then an optional "make it look yours" pointer to the Store
  *    Builder, then Preview + Publish right here. It used to be one "4 of 12"
  *    list mixing these with payout KYC, which read as twelve chores before a
  *    shop could open — when a cash-on-delivery shop needs none of the
  *    payout ones.
- *  - **Accept online payments** (once live, while unfinished): address, tax
- *    and bank account — clearly optional, since COD already works.
+ *  - **Take online payments** (once live, while unfinished): address, tax
+ *    and bank account — clearly optional, since Cash on Delivery works.
  *
- * Both render from the SAME server-computed `readiness` that the publish and
+ * Drawn as a vertical STEPPER — numbered circles joined by a line, done steps
+ * ticked and quiet, the one to do now highlighted with a single "Do it"
+ * button — because a seller who follows pictures better than paragraphs can
+ * read their progress from the shape alone.
+ *
+ * Both render from the SAME server-computed `readiness` the publish and
  * payment endpoints enforce, so this can never promise a seller they are done
  * while the server disagrees.
  */
@@ -37,25 +42,11 @@ export function SetupChecklist({
   store: Store
   onStoreChange: (store: Store) => void
 }) {
-  const applicable = store.readiness.steps.filter((step) => step.totalCount > 0)
-  const launch = applicable.filter(isLaunchStep)
-  const payout = applicable.filter((step) => !isLaunchStep(step))
-
   if (!store.isPublished) {
-    return <LaunchCard store={store} steps={launch} onStoreChange={onStoreChange} />
+    return <LaunchCard store={store} steps={launchSteps(store)} onStoreChange={onStoreChange} />
   }
-  const payoutPending = payout.filter((step) => !step.complete)
+  const payoutPending = payoutSteps(store).filter((step) => !step.complete)
   return payoutPending.length > 0 ? <OnlinePaymentsCard steps={payoutPending} /> : null
-}
-
-/** What the jump-to-fix button says, per step — "Add" alone said nothing. */
-const STEP_ACTION: Partial<Record<StepState['key'], string>> = {
-  store: 'Edit details',
-  business: 'Add details',
-  catalog: 'Add a product',
-  address: 'Add address',
-  tax: 'Add tax details',
-  payout: 'Add bank account',
 }
 
 function LaunchCard({
@@ -69,114 +60,92 @@ function LaunchCard({
 }) {
   const { storePath } = useStoreManageScope()
   const blockers = useGateBlockers(store, 'PUBLISH')
+  const actions = usePublishActions(store, onStoreChange)
   const canPublish = store.readiness.gates.PUBLISH.allowed
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const done = steps.filter((step) => step.complete).length
   // +1: publishing is the last step, and it is never "done" on this card.
   const total = steps.length + 1
-  const percent = Math.round((done / total) * 100)
-
-  const publish = async () => {
-    setError(null)
-    setBusy(true)
-    try {
-      onStoreChange(await storesApi.setPublished(store.id, true))
-    } catch (err) {
-      setError(toApiError(err).message)
-    } finally {
-      setBusy(false)
-    }
-  }
+  // The first unfinished step is the one to do NOW — the only highlighted row.
+  const currentKey = steps.find((step) => !step.complete)?.key ?? null
 
   return (
-    <section className="overflow-hidden rounded-lg border border-line bg-surface shadow-floating">
-      <header className="border-b border-line p-4 sm:p-5">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h3 className="font-body text-base font-semibold text-fg">
-            Get your store live
-          </h3>
-          <span className="text-xs font-medium text-muted">
-            Step {Math.min(done + 1, total)} of {total}
-          </span>
-        </div>
-        <div
-          className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-alt"
-          role="progressbar"
-          aria-valuenow={percent}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label="Store launch progress"
-        >
-          <div
-            className="h-full rounded-full bg-brand-gradient transition-all duration-500"
-            style={{ width: `${percent}%` }}
-          />
+    <section className="glass-card overflow-hidden rounded-glass">
+      <header className="flex items-center gap-3.5 border-b border-line p-4 sm:p-5">
+        <ProgressRing done={done} total={total} size={52} label />
+        <div className="min-w-0">
+          <h3 className="font-heading text-[18px] font-bold text-fg">Get your shop live</h3>
+          <p className="mt-0.5 text-hint text-muted">
+            {done} of {total} steps done.{' '}
+            {canPublish ? 'Only publishing is left.' : 'Do the steps below in order.'}
+          </p>
         </div>
       </header>
 
-      <ol className="divide-y divide-line">
+      <ol className="px-4 py-2 sm:px-5">
         {steps.map((step, i) => (
-          <StepRow key={step.key} number={i + 1} step={step} />
+          <StepRow key={step.key} number={i + 1} step={step} current={step.key === currentKey} />
         ))}
 
         {/* Advisory: every store already has a working default look, so
             this never blocks and is never "incomplete". */}
         <Row
-          number={steps.length + 1}
-          icon={<PaletteIcon className="h-3.5 w-3.5" />}
+          marker={<PaletteIcon className="h-4 w-4" />}
           title="Make it look yours"
-          detail="Optional — pick a theme, colours and homepage sections. Your store already has a clean default look."
+          optional
+          detail="Pick colours and what your home page shows. Your shop already has a clean look, so you can skip this."
           action={
             <Link
               to={`${storePath(store.slug)}/builder`}
-              className={buttonClass({ variant: 'ring', size: 'sm' })}
+              className={buttonClass({ variant: 'ring', size: 'md' })}
             >
-              Open Store Builder
+              Open Design
             </Link>
           }
         />
 
         <Row
-          number={total}
-          title="Preview and publish"
+          marker={total}
+          title="Check and publish"
+          current={currentKey === null}
+          last
           detail={
             canPublish ? (
-              'Check your store as customers will see it, then publish to start taking orders.'
+              'Look at your shop as customers will see it, then publish it to start taking orders.'
             ) : (
-              <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-                Still needed: <BlockerLinks blockers={blockers} />
+              <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1.5">
+                First add: <BlockerLinks blockers={blockers} />
               </span>
             )
           }
           action={
-            <span className="flex gap-2">
+            <span className="flex flex-wrap gap-2">
               <a
                 href={publicStoreUrl(store.slug)}
                 target="_blank"
                 rel="noreferrer"
-                className={buttonClass({ variant: 'ring', size: 'sm' })}
+                className={buttonClass({ variant: 'ring', size: 'md' })}
               >
-                <EyeIcon className="h-3.5 w-3.5" />
+                <EyeIcon className="h-4 w-4" />
                 Preview
               </a>
-              <Button
-                size="sm"
-                variant="sheen"
-                loading={busy}
-                disabled={!canPublish}
-                onClick={() => void publish()}
-              >
-                Publish store
-              </Button>
+              {canPublish && (
+                <button
+                  type="button"
+                  onClick={actions.publish}
+                  disabled={actions.busy}
+                  className={buttonClass({ size: 'md' })}
+                >
+                  {actions.busy ? 'Publishing…' : 'Publish my shop'}
+                </button>
+              )}
             </span>
           }
         />
       </ol>
-      {error && (
-        <p className="border-t border-line bg-danger-soft px-4 py-2 text-xs font-medium text-danger sm:px-5">
-          {error}
+      {actions.error && (
+        <p role="alert" className="border-t border-line px-4 py-2.5 text-hint font-medium text-danger sm:px-5">
+          {actions.error}
         </p>
       )}
     </section>
@@ -185,22 +154,28 @@ function LaunchCard({
 
 function OnlinePaymentsCard({ steps }: { steps: StepState[] }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-line bg-surface">
+    <section className="glass-card overflow-hidden rounded-glass">
       <header className="border-b border-line p-4 sm:p-5">
-        <h3 className="font-body text-base font-semibold text-fg">
-          Accept online payments{' '}
-          <span className="text-xs font-medium text-muted">— optional</span>
+        <h3 className="font-heading text-[18px] font-bold text-fg">
+          Take online payments{' '}
+          <span className="text-hint font-semibold text-muted">(optional)</span>
         </h3>
-        <p className="mt-1 text-xs text-muted">
+        <p className="mt-1 text-hint text-muted">
           Cash on Delivery already works. To take UPI and card payments, add
-          these so we know who to pay out.
+          these so we know who to pay.
         </p>
       </header>
-      <ul className="divide-y divide-line">
-        {steps.map((step) => (
-          <StepRow key={step.key} step={step} />
+      <ol className="px-4 py-2 sm:px-5">
+        {steps.map((step, i) => (
+          <StepRow
+            key={step.key}
+            number={i + 1}
+            step={step}
+            current={i === 0}
+            last={i === steps.length - 1}
+          />
         ))}
-      </ul>
+      </ol>
     </section>
   )
 }
@@ -210,29 +185,36 @@ function OnlinePaymentsCard({ steps }: { steps: StepState[] }) {
  * missing (rather than a generic blurb and an n/m counter to expand), and
  * its button says what it opens.
  */
-function StepRow({ step, number }: { step: StepState; number?: number }) {
+function StepRow({
+  step,
+  number,
+  current = false,
+  last = false,
+}: {
+  step: StepState
+  number: number
+  current?: boolean
+  last?: boolean
+}) {
   const { hiddenSections } = useStoreManageScope()
-  const missing = step.requirements.filter((req) => !req.met).map((req) => req.label)
-  // Products can't be added until a category exists — send the seller
-  // straight to the step that unblocks them instead of a gate page.
-  const needsCategory =
-    step.key === 'catalog' &&
-    step.requirements.some((req) => req.key === 'catalog.category' && !req.met)
-  const action = needsCategory
-    ? { to: 'categories', label: 'Choose a category' }
-    : { to: step.href, label: STEP_ACTION[step.key] ?? 'Open' }
+  const action = stepAction(step)
   return (
     <Row
-      number={number}
+      marker={number}
       complete={step.complete}
+      current={current}
+      last={last}
       title={step.title}
-      detail={step.complete ? step.blurb : `Still needed: ${missing.join(' · ')}`}
+      detail={step.complete ? step.blurb : `Still needed: ${stepMissing(step).join(' · ')}`}
       action={
         // An admin still SEES the outstanding step — "this shop has no PAN" is
         // what support needs to explain the block — but gets no button when
         // the section is not routed for them.
         step.complete || hiddenSections.includes(step.href) ? null : (
-          <Link to={action.to} className={buttonClass({ variant: 'ring', size: 'sm' })}>
+          <Link
+            to={action.to}
+            className={buttonClass({ variant: current ? 'rise' : 'ring', size: 'md' })}
+          >
             {action.label}
           </Link>
         )
@@ -241,43 +223,69 @@ function StepRow({ step, number }: { step: StepState; number?: number }) {
   )
 }
 
+/**
+ * A stepper row: a 36px circle on a vertical line (the line runs to the next
+ * row unless `last`), the title, one plain sentence, and the action. The
+ * CURRENT row is tinted so the eye lands on it first.
+ */
 function Row({
-  number,
-  icon,
+  marker,
   complete = false,
+  current = false,
+  optional = false,
+  last = false,
   title,
   detail,
   action,
 }: {
-  number?: number
-  icon?: ReactNode
+  marker: ReactNode
   complete?: boolean
+  current?: boolean
+  optional?: boolean
+  last?: boolean
   title: string
   detail: ReactNode
   action: ReactNode
 }) {
   return (
-    <li className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:px-5">
-      <div className="flex min-w-0 flex-1 items-start gap-3">
+    <li className="relative flex gap-3.5 py-3">
+      {/* The connector, behind the circles. */}
+      {!last && (
         <span
-          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
-            complete
-              ? 'bg-success/15 text-success'
-              : 'border border-line bg-surface-alt text-muted'
-          }`}
           aria-hidden
-        >
-          {complete ? <CheckIcon className="h-3.5 w-3.5" /> : (icon ?? number)}
-        </span>
-        <div className="min-w-0">
-          <p className={`text-sm font-medium ${complete ? 'text-muted' : 'text-fg'}`}>
-            {title}
-            {complete && <span className="sr-only"> — done</span>}
-          </p>
-          <div className="mt-0.5 text-xs text-muted">{detail}</div>
-        </div>
+          className={`absolute top-[3.1rem] bottom-[-0.65rem] left-[17px] w-0.5 rounded-full ${
+            complete ? 'bg-success/50' : 'bg-fg/10'
+          }`}
+        />
+      )}
+      <span
+        aria-hidden
+        className={`relative z-[1] flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[14px] font-bold ${
+          complete
+            ? 'bg-success text-brand-contrast'
+            : current
+              ? 'bg-brand-gradient text-brand-contrast shadow-[0_6px_16px_-6px_var(--cta-glow)]'
+              : optional
+                ? 'bg-brand-soft text-brand'
+                : 'glass-inset text-muted'
+        }`}
+      >
+        {complete ? <CheckIcon className="h-4 w-4" /> : marker}
+      </span>
+
+      <div
+        className={`min-w-0 flex-1 rounded-xl ${
+          current ? '-my-1 bg-brand-soft/70 px-3 py-2.5' : ''
+        }`}
+      >
+        <p className={`text-[15px] font-semibold ${complete ? 'text-muted' : 'text-fg'}`}>
+          {title}
+          {optional && <span className="ml-1.5 text-hint font-medium text-muted">(optional)</span>}
+          {complete && <span className="sr-only"> — done</span>}
+        </p>
+        <div className="mt-0.5 text-hint text-muted">{detail}</div>
+        {action && <div className="mt-2.5">{action}</div>}
       </div>
-      {action && <div className="shrink-0 pl-10 sm:pl-0">{action}</div>}
     </li>
   )
 }
