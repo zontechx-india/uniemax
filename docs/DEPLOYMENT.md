@@ -63,12 +63,12 @@ The EC2's own SSH key is registered with GitHub (user `anwin-paulji`), so
 
 | Port | Service                            | Reachable from internet? |
 | ---- | ---------------------------------- | ------------------------ |
-| 8080 | **nginx → UnieMax frontend + `/api` proxy (dedicated port, for domain mapping)** | needs TCP 8080 inbound in the security group |
-| 8081 | **nginx → UnieMax PROD frontend + `/api` proxy (dedicated port)** | needs TCP 8081 inbound in the security group |
-| 80   | nginx → same UnieMax site (`default_server`, kept temporarily) | ✅ (security group open) |
-| 443  | nginx (other project SSL)          | ✅                       |
-| 4000 | UnieMax **PROD** backend (pm2 `uniemax-backend`) | ❌ internal only — proxied via nginx `/api` |
-| 4001 | UnieMax **DEV** backend (pm2 `uniemax-backend-dev`) | ❌ internal only — proxied via nginx `/api` |
+| 8080 | nginx → UnieMax DEV site by IP — **`127.0.0.1` only** (on-box checks) | ❌ loopback bind (since 2026-10-04) |
+| 8081 | nginx → UnieMax PROD site by IP — **`127.0.0.1` only** (on-box checks) | ❌ loopback bind (since 2026-10-04) |
+| 80   | nginx → named HTTP→HTTPS redirects; bare IP / unknown Host → `444` (connection closed) | ✅ (security group open) |
+| 443  | nginx — `uniemax.com`, `dev.uniemax.zontechx.com`, other projects | ✅                       |
+| 4000 | UnieMax **PROD** backend (pm2 `uniemax-backend`) | ❌ internal only — proxied via nginx `/api` (`HOST=127.0.0.1`) |
+| 4001 | UnieMax **DEV** backend (pm2 `uniemax-backend-dev`) | ❌ internal only — proxied via nginx `/api` (`HOST=127.0.0.1`) |
 | 3000 | ziktag-backend (other project)     | ❌ (SG blocks)           |
 | 3004 | track-user-backend (other project) | ✅                       |
 
@@ -103,11 +103,10 @@ curl -s http://127.0.0.1:4000/api/v1/public/stats   # prod → its own data
 
 The prod backend port is **explicitly** set via `PORT=4000` in `backend/.env` — it is
 not a framework default. The frontend is a static production build served by
-nginx; the `uniemax` site listens on its **dedicated port 8080** and (for now)
-also on 80 as `default_server`. Once the domain is mapped / other projects need
-port 80 by IP, remove the two `listen ... 80` lines from
-`/etc/nginx/sites-available/uniemax` and reload nginx. Ports 3000/3004 and the
-other pm2 apps (`ziktag-backend`, `track-user-backend`) are untouched.
+nginx; the IP sites (`uniemax` :8080, `uniemax-prod` :8081) listen on
+`127.0.0.1` only — the public URLs are the HTTPS domains (see "Security
+hardening" below). Ports 3000/3004 and the other pm2 apps (`ziktag-backend`,
+`track-user-backend`) are untouched.
 
 ## Env files (not in git)
 
@@ -247,8 +246,11 @@ An admin account is per-database: a fresh project has none until
 | **`https://dev.uniemax.zontechx.com/`**        | Storefront (primary URL) |
 | **`https://dev.uniemax.zontechx.com/admin`**   | Admin app               |
 | **`https://dev.uniemax.zontechx.com/api/v1/...`** | API (proxied to :4000) |
-| `http://13.206.249.204:8080/`                  | Same site, direct port (needs TCP 8080 in SG) |
-| `http://13.206.249.204/` (+ `/admin`, `/api`)  | Same site on port 80 (IP fallback) |
+| `http://127.0.0.1:8080/` (on the box only)     | Same site by IP, for on-box checks |
+
+The dev site answers every response with `X-Robots-Tag: noindex, nofollow`.
+There is no public IP access any more: `http://13.206.249.204/` closes the
+connection (`444`).
 
 ### Production site (frontend-only)
 
@@ -258,7 +260,7 @@ An admin account is per-database: a fresh project has none until
 | **`https://uniemax.com/admin`**              | PROD admin app                        |
 | **`https://uniemax.com/api/v1/...`**         | API (proxied to :4000)                |
 | `https://www.uniemax.com/`                   | Same site (covered by the same cert)  |
-| `http://13.206.249.204:8081/`                | Same prod site, direct port (needs TCP 8081 in SG) |
+| `http://127.0.0.1:8081/` (on the box only)   | Same prod site by IP, for on-box checks |
 
 Prod serves its own frontend build from `/var/www/uniemax-prod` (nginx sites
 `uniemax-prod` on port 8081 + `uniemax-com` for the domain) and its **own
@@ -270,7 +272,8 @@ Prod domain & HTTPS: A record `uniemax.com` (+ `www`) → `13.206.249.204`
 (**DNS only** / grey cloud — same renewal rule as dev), Let's Encrypt cert via
 `certbot --nginx` (cert name `uniemax.com`, covers `uniemax.com` +
 `www.uniemax.com`, auto-renews, expires 2026-11-04), HTTP→HTTPS 301 on the
-domain. TCP 8081 is open in the security group for direct-IP access.
+domain. nginx binds 8081 to `127.0.0.1` only, so the prod site is never
+served by IP (the security-group rule for 8081 can be removed).
 
 > The old prod domain `uniemax.zontechx.com` is **retired** — its vhost
 > (`uniemax-prod-domain`) no longer exists on the server, replaced by
@@ -288,8 +291,9 @@ domain. TCP 8081 is open in the security group for direct-IP access.
 - Certificate: Let's Encrypt via `certbot --nginx` (cert name
   `dev.uniemax.zontechx.com`, auto-renewal scheduled by certbot's systemd
   timer; the ziktag cert renews the same way).
-- The plain-IP site (`sites-available/uniemax`, ports 80 + 8080) is separate
-  from the domain vhost, so certbot edits never touch it.
+- The plain-IP site (`sites-available/uniemax`, `127.0.0.1:8080`, plus the
+  port-80 `444` catch-all) is separate from the domain vhost, so certbot edits
+  never touch it.
 
 ## Deployment — GitHub Actions (primary)
 
@@ -391,6 +395,57 @@ of the storefront. Verify after a deploy (`8080` = dev, `8081` = prod):
 ```bash
 curl -s -H 'Accept: text/html' http://127.0.0.1:8080/admin/orders | grep -c assets/admin   # 1
 curl -s http://127.0.0.1:8080/ | grep -c assets/storefront                                 # 1
+```
+
+### Security hardening (live since 2026-10-04)
+
+Done after Search Console reported "Possible phishing detected on user login".
+A UnieMax-branded password form was reachable over **plain HTTP on the bare
+IP** (`:80`, `:8080` dev, `:8081` prod — same accounts as uniemax.com), which
+looks exactly like a phishing clone, and a password saved for one origin and
+typed on the other trips Chrome's password-reuse check.
+
+- **IP sites on loopback.** `uniemax` → `listen 127.0.0.1:8080;`,
+  `uniemax-prod` → `listen 127.0.0.1:8081;`. The port-80 `default_server` is a
+  catch-all block at the end of `sites-available/uniemax` that does
+  `return 444;` (bare IP or unknown Host → connection closed).
+- **Security headers** — `/etc/nginx/snippets/uniemax-security-headers.conf`
+  (`X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, HSTS
+  1 year + `includeSubDomains`, `Referrer-Policy:
+  strict-origin-when-cross-origin`, `Content-Security-Policy: frame-ancestors
+  'self'`, and `X-Robots-Tag: noindex, nofollow` on dev only). Values come from
+  maps in `/etc/nginx/conf.d/uniemax-security-maps.conf`: each yields `""` when
+  the API already sent that header (helmet), and nginx drops an `add_header`
+  with an empty value — so API responses never get duplicates. SAMEORIGIN, not
+  DENY: the store builder previews the storefront in a same-origin iframe.
+  **`add_header` inside a `location` replaces the server's**, so the snippet is
+  included at server level in all four vhosts **and** inside every location
+  with its own `add_header` (the three in `uniemax-spa-cache.conf`, and
+  `location = /admin` in each vhost). A new location with `add_header` must
+  include it too.
+- **Backend env** (both clones): `HOST=127.0.0.1` in `backend/.env`; prod
+  `CORS_ORIGIN=https://uniemax.com,https://www.uniemax.com` (`.env.production`);
+  dev `CORS_ORIGIN=https://dev.uniemax.zontechx.com,http://localhost:5173`
+  (`.env.development` — it had none, so it defaulted to `*`); every `.env*`
+  `chmod 600`. Backups: `~/uniemax/backup/*.pre-sec-20261004-1112`. The env
+  files are read at boot, so a change applies at the next pm2 restart (dev was
+  restarted on 2026-10-04; prod picks it up at its next deploy/restart).
+- nginx backups: `/etc/nginx/uniemax-backup-20261004-1116/`.
+
+> **Reload gotcha.** Changing a `listen 8080;` (wildcard) to `listen
+> 127.0.0.1:8080;` cannot be done in one reload: the running master still
+> holds `0.0.0.0:8080`, the bind fails (`error.log`: `bind() to
+> 127.0.0.1:8080 failed (98: Address already in use)`), and nginx silently
+> keeps the **old** config although `systemctl reload` reports success. Move
+> the listen to a free port, reload, then to the final port and reload again.
+
+Verify:
+
+```bash
+sudo ss -tlnp | grep nginx                       # 8080/8081 only on 127.0.0.1
+curl -sI https://uniemax.com/ | grep -iE 'x-frame|nosniff|strict|referrer|content-security'
+curl -sI https://dev.uniemax.zontechx.com/ | grep -i x-robots   # noindex, nofollow
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: 13.206.249.204' http://127.0.0.1/   # 000
 ```
 
 ### Stale-build errors after a deploy

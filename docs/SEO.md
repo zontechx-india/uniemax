@@ -400,6 +400,7 @@ canonical it is the current path **without** the query string.
 | Missing store / product / category | **404** (page shell) + `noindex` (browser, for one that vanishes while the tab is open) | Lets search engines drop it |
 | Per-customer pages (cart, checkout, orders, addresses, support, profile) | `noindex` **and** `robots.txt` disallow | A disallow stops crawling; `noindex` removes a URL that got indexed anyway (e.g. a shared order-confirmation link) |
 | Seller console (`/mystores`, `/stores`), `/admin`, affiliate redirects (`/a/`) | `robots.txt` disallow | Not content |
+| Everything on `dev.uniemax.zontechx.com` | `X-Robots-Tag: noindex, nofollow` header (nginx, dev host only — `docs/DEPLOYMENT.md` → Security hardening) | A second copy of the site on another domain must never be indexed or mistaken for uniemax.com |
 | `hideFromSearch` products | Left out of sitemaps and on-site search; the product page itself stays indexable | The flag means "not in search results", not "hidden" |
 
 ---
@@ -593,3 +594,4 @@ search/filter URLs get indexed, mass-produced pages with nothing on them.
 | 4 Oct 2026 | Share images for `og:image` (WhatsApp dropped large product photos); server-side normalization of every image upload; `npm run optimize-media` for existing images; media audit understands `derived/` objects. Released as `v1.21.0`; existing images updated on dev and prod |
 | 4 Oct 2026 | Sized photos (`srcset`): copies at 320/640/960/1280 px for every stored image, one derived-image registry shared with share images, every upload via `storeUpload`, `<MediaImg>` on every stored image in the frontend; roadmap step 3 done. Released as `v1.22.0`; copies pre-rendered on dev and prod |
 | 4 Oct 2026 | Page shells for `/` and `/sell` (absolute `og:image` + canonical, `WebSite` JSON-LD first byte); no title parts → the platform title, not "UnieMax", in both writers; platform card `og-image.jpg`; store cards (1200×630, logo's own edge colour) as store pages' `og:image`, preview kind chosen per bucket; product photos + logo in per-store sitemaps, `/sell` in the marketplace sitemap; admin category-page coverage report. Released as `v1.23.0`; nginx `/` + `/sell` applied and logo cards pre-rendered on dev and prod |
+| 4 Oct 2026 | Dev host `dev.uniemax.zontechx.com` sends `X-Robots-Tag: noindex, nofollow`; the bare-IP copies of the site are gone (part of the Search Console "Possible phishing detected on user login" response) |
