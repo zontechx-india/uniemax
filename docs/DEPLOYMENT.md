@@ -273,7 +273,7 @@ Prod domain & HTTPS: A record `uniemax.com` (+ `www`) → `13.206.249.204`
 `certbot --nginx` (cert name `uniemax.com`, covers `uniemax.com` +
 `www.uniemax.com`, auto-renews, expires 2026-11-04), HTTP→HTTPS 301 on the
 domain. nginx binds 8081 to `127.0.0.1` only, so the prod site is never
-served by IP (the security-group rule for 8081 can be removed).
+served by IP (its security-group rule is deleted).
 
 > The old prod domain `uniemax.zontechx.com` is **retired** — its vhost
 > (`uniemax-prod-domain`) no longer exists on the server, replaced by
@@ -428,9 +428,18 @@ typed on the other trips Chrome's password-reuse check.
   dev `CORS_ORIGIN=https://dev.uniemax.zontechx.com,http://localhost:5173`
   (`.env.development` — it had none, so it defaulted to `*`); every `.env*`
   `chmod 600`. Backups: `~/uniemax/backup/*.pre-sec-20261004-1112`. The env
-  files are read at boot, so a change applies at the next pm2 restart (dev was
-  restarted on 2026-10-04; prod picks it up at its next deploy/restart).
+  files are read at boot, so a change applies at the next pm2 restart (both
+  backends restarted on 2026-10-04 and verified).
 - nginx backups: `/etc/nginx/uniemax-backup-20261004-1116/`.
+- **S3 via instance role, no keys.** The instance carries IAM role
+  `uniemax-ec2-role` (policy `uniemax-s3-access`: `s3:GetObject` /
+  `PutObject` / `DeleteObject` on `arn:aws:s3:::uniemax/*`, `s3:ListBucket` on
+  the bucket). `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` are **removed**
+  from both clones' `backend/.env`, so the SDK takes short-lived role
+  credentials (the S3 driver passes explicit keys only when both are set).
+  Backups with the old key: `~/uniemax/backup/{dev,prod}.env.pre-role-20261004-123*`.
+  Never add keys back to a server `.env` — a new S3 action needs the policy
+  extended instead. The security-group rules for 8080/8081 are deleted.
 
 > **Reload gotcha.** Changing a `listen 8080;` (wildcard) to `listen
 > 127.0.0.1:8080;` cannot be done in one reload: the running master still

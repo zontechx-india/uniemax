@@ -103,7 +103,7 @@ Verify: `curl http://localhost:4000/health`
 | `GOOGLE_CLIENT_ID` / `APPLE_CLIENT_ID` | Optional — for the real OAuth verifiers later (the current mock ignores them) |
 | `STORAGE_DRIVER` | `local` (default — files under `uploads/`, served at `/uploads/*`) or `s3`. **Production requires `s3`** — the local driver refuses to boot |
 | `AWS_REGION` | S3 region (required when `STORAGE_DRIVER=s3`) |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Explicit S3 credentials; omit to use the SDK default chain (IAM role) |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Explicit S3 credentials; omit to use the SDK default chain (IAM role). **Unset on EC2** — both clones use the instance role `uniemax-ec2-role` (see `docs/DEPLOYMENT.md`); only local dev needs keys |
 | `STORAGE_LOGO_BUCKET` | Bucket A — store logos (required when `s3`) |
 | `STORAGE_MEDIA_BUCKET` | Bucket B — product images & videos (required when `s3`) |
 | `STORAGE_LOGO_PREFIX` / `STORAGE_MEDIA_PREFIX` | Optional folder inside each bucket — lets both kinds share ONE bucket (e.g. `uniemax` + `store_logo` / `product_media`). Applied at the driver; DB keys never include it |
