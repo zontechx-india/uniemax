@@ -485,8 +485,8 @@ systemctl reload nginx`.
 
 **Status:** `/store/` and `/c/` **live since 2026-10-01** on all four vhosts —
 dev (`uniemax-domain`, `uniemax` → `:4001`) and prod (`uniemax-com`,
-`uniemax-prod` → `:4000`). `/` and `/sell` **applied 2026-10-04** on all four vhosts (see [Adding `/` and `/sell`](#adding--and-sell)); until a
-backend release has their routes, its 404 falls back to the static file.
+`uniemax-prod` → `:4000`). `/` and `/sell` **applied 2026-10-04** on all four vhosts (see [Adding `/` and `/sell`](#adding--and-sell)); page
+shells there since `v1.23.0`.
 Pre-change backups: `/etc/nginx/sites-available/*.pre-shells`; snippets
 before `/` and `/sell`: `/etc/nginx/snippets/uniemax-page-shells-*.conf.pre-home`. Why this
 exists and how it works: [`SEO.md`](./SEO.md).

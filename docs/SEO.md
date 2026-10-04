@@ -8,12 +8,11 @@
 > every existing image has been brought up to date ([§9](#9-operations)).
 > **Sized photos** (`srcset` — phones download a copy that fits, not the
 > original; [§4.6](#46-sized-photos-srcset)) are **live on dev and production** (`v1.22.0`).
-> **In code, not yet released:** page shells for `/` and `/sell` (absolute
+> **Live on dev and production** (`v1.23.0`, 4 Oct 2026): page shells for `/` and `/sell` (absolute
 > `og:image`, own canonical), **store cards** (wide link previews for store
 > pages, [§4.7](#47-store-cards-wide-link-previews)), product images in the
 > store sitemaps, `/sell` in the sitemap, and the category-page **coverage**
-> report for admins ([§10](#10-known-gaps-and-caveats)). Rollout steps:
-> [§9](#9-operations).
+> report for admins ([§10](#10-known-gaps-and-caveats)).
 > Everything else in the [roadmap](#11-roadmap) is not started.
 >
 > **This file owns SEO.** What SEO is for this platform, how it is built, the
@@ -132,11 +131,11 @@ For search, nobody googles a shop they have never heard of; they google
 | Per-route head (title, description, canonical, robots, OG/Twitter, JSON-LD) written in the browser | `frontend/src/shared/seo.ts` (`useSeo`, `usePageTitle`, `usePrivatePageTitle`) | 23 Sep 2026 (titles only since 25 Jul) |
 | Structured data: `Product`/`Offer`/`AggregateOffer`, `Store`/`Organization`, `BreadcrumbList`, `ItemList`, `WebSite` | `frontend/src/storefront/features/publicStore/structuredData.ts` + page components | 23 Sep 2026 |
 | `robots.txt` (per-customer pages, consoles, affiliate redirects, `?q=` disallowed; declares the sitemap) | `frontend/public/robots.txt` | 23 Sep 2026 |
-| XML sitemaps (index · stores · categories · one per store); per-store files list product photos and the logo as `<image:image>` | `backend/src/modules/seo/sitemap.service.ts` · contract in [`API.md`](./API.md) → Sitemaps | 23 Sep 2026; images and `/sell` in code, not yet released |
+| XML sitemaps (index · stores · categories · one per store); per-store files list product photos and the logo as `<image:image>` | `backend/src/modules/seo/sitemap.service.ts` · contract in [`API.md`](./API.md) → Sitemaps | 23 Sep 2026; images and `/sell` 4 Oct 2026 (`v1.23.0`) |
 | Global category landing pages `/c/{slug}` | `frontend/src/storefront/pages/BrowseCategoryPage.tsx` · `backend/src/modules/discovery/browse.service.ts` | 23 Sep 2026 |
 | **Page shells**: per-page tags in the first byte for `/store/**` and `/c/**`, real 404s | `backend/src/modules/seo/pageShell.*`, `pageHead.ts` · contract in [`API.md`](./API.md) → Page shells | 1 Oct 2026, dev + prod |
-| Page shells for `/` and `/sell` (absolute `og:image`, own canonical, `WebSite` JSON-LD in the first byte) | same files; nginx step in [`DEPLOYMENT.md`](./DEPLOYMENT.md) → Adding `/` and `/sell` | in code, not yet released |
-| **Store cards**: store pages' `og:image` is the logo on a 1200×630 card, so WhatsApp shows the large preview — see [§4.7](#47-store-cards-wide-link-previews) | `renderCardImage` in `backend/src/package/storage/images.ts` · contract in [`API.md`](./API.md) → Image derivatives | in code, not yet released |
+| Page shells for `/` and `/sell` (absolute `og:image`, own canonical, `WebSite` JSON-LD in the first byte) | same files; nginx step in [`DEPLOYMENT.md`](./DEPLOYMENT.md) → Adding `/` and `/sell` | 4 Oct 2026, dev + prod (`v1.23.0`) |
+| **Store cards**: store pages' `og:image` is the logo on a 1200×630 card, so WhatsApp shows the large preview — see [§4.7](#47-store-cards-wide-link-previews) | `renderCardImage` in `backend/src/package/storage/images.ts` · contract in [`API.md`](./API.md) → Image derivatives | 4 Oct 2026, dev + prod (`v1.23.0`) |
 | Share button (native share sheet / copy link) on store header and product page | `frontend/src/storefront/features/publicStore/ShareButton.tsx` | before Sep 2026 |
 | **Share images**: every product page's `og:image` is a preview-safe JPEG (≤ 1200 px, < 300 KB) of the cover photo, so WhatsApp shows it — see [§4.5](#45-share-images-link-preview-images) | `backend/src/package/storage/images.ts`, `backend/src/modules/media/` · contract in [`API.md`](./API.md) → Share images | 4 Oct 2026, dev + prod (`v1.21.0`) |
 | **Sized photos**: every stored image is offered at 320/640/960/1280 px via `srcset`, so the browser downloads the copy that fits — see [§4.6](#46-sized-photos-srcset) | `frontend/src/shared/media/MediaImg.tsx`, `backend/src/package/storage/images.ts` · contract in [`API.md`](./API.md) → Image derivatives | 4 Oct 2026, dev + prod (`v1.22.0`) |
@@ -455,8 +454,8 @@ re-crawled.
 | Item | State |
 | --- | --- |
 | nginx forwards `/store/` and `/c/` to the API | **Live since 1 Oct 2026** on all four vhosts (dev → `:4001`, prod → `:4000`). Commands, verification and rollback: [`DEPLOYMENT.md`](./DEPLOYMENT.md) → Page shells. |
-| nginx forwards `/` and `/sell` to the API | **Applied on dev and prod, 4 Oct 2026** ([`DEPLOYMENT.md`](./DEPLOYMENT.md) → Adding `/` and `/sell`). Until each environment runs a release with their routes, its backend 404s and nginx serves the static `index.html` (relative `og:image`) — they become page shells with that release, no further server step. |
-| Store cards for existing logos | **Dev done, 4 Oct 2026** (20 logos). **Prod to do:** `$env:APP_ENV="production"; npm run optimize-media -- --apply --only=logos` (dry run: 30 logos, cards only, nothing re-encoded). Without it, each store's first share renders its card (~0.5 s). |
+| nginx forwards `/` and `/sell` to the API | **Applied on dev and prod, 4 Oct 2026** ([`DEPLOYMENT.md`](./DEPLOYMENT.md) → Adding `/` and `/sell`). Page shells on both since `v1.23.0`. |
+| Store cards for existing logos | **Done on dev and production, 4 Oct 2026** (`optimize-media -- --apply --only=logos`): dev 20, prod 30 logos; nothing re-encoded. New logos get theirs on upload. |
 | ⚠️ Rolling production back past `747a9b3` | Remove the prod page-shell include **first** — an older backend answers those paths with a JSON 404. |
 | Google Search Console / Bing Webmaster Tools | **Not confirmed.** The repo has no verification tag (only Meta's `facebook-domain-verification`), so if they are set up it is by DNS. Submit `sitemap.xml` in both. |
 | `PUBLIC_WEB_URL` | Origin for canonicals, `og:url`, `og:image` and sitemap `<loc>`s. Prod: `https://uniemax.com`. |
@@ -585,4 +584,4 @@ search/filter URLs get indexed, mass-produced pages with nothing on them.
 | 3 Oct 2026 | Path params up to 500 chars (`b15e72f`) so long product slugs resolve; this file created as the SEO source of truth |
 | 4 Oct 2026 | Share images for `og:image` (WhatsApp dropped large product photos); server-side normalization of every image upload; `npm run optimize-media` for existing images; media audit understands `derived/` objects. Released as `v1.21.0`; existing images updated on dev and prod |
 | 4 Oct 2026 | Sized photos (`srcset`): copies at 320/640/960/1280 px for every stored image, one derived-image registry shared with share images, every upload via `storeUpload`, `<MediaImg>` on every stored image in the frontend; roadmap step 3 done. Released as `v1.22.0`; copies pre-rendered on dev and prod |
-| 4 Oct 2026 | Page shells for `/` and `/sell` (absolute `og:image` + canonical, `WebSite` JSON-LD first byte); no title parts → the platform title, not "UnieMax", in both writers; platform card `og-image.jpg`; store cards (1200×630, logo's own edge colour) as store pages' `og:image`, preview kind chosen per bucket; product photos + logo in per-store sitemaps, `/sell` in the marketplace sitemap; admin category-page coverage report. In code — not yet released; nginx step applied on dev + prod; logo cards pre-rendered on dev (prod pending, §9) |
+| 4 Oct 2026 | Page shells for `/` and `/sell` (absolute `og:image` + canonical, `WebSite` JSON-LD first byte); no title parts → the platform title, not "UnieMax", in both writers; platform card `og-image.jpg`; store cards (1200×630, logo's own edge colour) as store pages' `og:image`, preview kind chosen per bucket; product photos + logo in per-store sitemaps, `/sell` in the marketplace sitemap; admin category-page coverage report. Released as `v1.23.0`; nginx `/` + `/sell` applied and logo cards pre-rendered on dev and prod |
