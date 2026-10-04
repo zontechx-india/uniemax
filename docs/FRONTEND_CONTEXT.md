@@ -417,7 +417,10 @@ Signed-in account pages mount inside `RequireCustomer` → `AppLayout`
   ultrawides — the authed shell and the cart/checkout pages still use this and
   have NOT been brought onto `CONTENT_COLUMN`); form-heavy pages constrain
   themselves (`CreateStorePage` `max-w-lg`, `StoreManageLayout` `max-w-7xl`,
-  section forms `max-w-xl`).
+  section forms `max-w-xl`). On `/mystores/**` the shell wears the seller
+  glass theme: the root gets `seller-canvas` and the top bar `glass-strong`
+  (see "Seller workspace glass + UI kit"); every other account page keeps the
+  flat `bg-bg` / `bg-surface` bar.
 - **Account menu** (`layout/AccountMenu.tsx`) — the ONE place account
   navigation lives: Flipkart-style dropdown on the top-bar avatar, opens on
   hover (click/tap on touch), closes on Escape / outside tap / item click.
@@ -531,10 +534,16 @@ management page — or create; first-run empty state; each card shows the
 store's **Published/Draft** status chip and its public `/store/{slug}` path,
 so the list doubles as an at-a-glance health check), `/mystores/new` (the
 **two-step Create Store wizard** — see below), and
-`/mystores/:storeSlug` — a Flipkart-account-style split
-**inside** the main outlet: `StoreManageLayout` renders a left section card
-and the selected section in a right card via a nested `<Outlet/>` (children
-read the loaded store through `useManagedStore()` outlet context).
+`/mystores/:storeSlug` — **desktop**: a split inside the main outlet —
+`StoreManageLayout` renders a sticky left **glass** section card (it scrolls
+itself when taller than the window) and the selected section in a right glass
+card via a nested `<Outlet/>` (children read the loaded store through
+`useManagedStore()` outlet context). **Phone** (`< lg`): no sidebar — a glass
+**store strip** (back to All stores · logo · name · Live / Not live yet ·
+**Share** once live, **Publish** before) over the section card, and a
+floating **bottom tab bar** (`StoreMobileNav`). The layout sets
+`--seller-dock` (tab-bar height incl. safe area; `0px` from `lg`) and pads the
+page by it, so sticky `SaveBar`s and toasts sit above the bar.
 Management URLs use the store's **slug** (the backend resolves id or slug
 interchangeably).
 
@@ -562,9 +571,18 @@ One list, **three presentations**:
   `264px_1fr`), toggled by the `PanelLeftIcon` button in the store header.
   Setup marks and the order badge become corner dots; `StorePublishCard`
   collapses to a single published/not-published dot.
-- **Mobile** (`< lg`) — one dropdown row naming where you are
-  (`Catalog / Products`), opening the same grouped list in a sheet. It replaces
-  a stack of sixteen rows that pushed the actual page a screen and a half down.
+- **Mobile** (`< lg`) — `StoreMobileNav.tsx`: a fixed, floating
+  `glass-strong` tab bar with icon **and** word — **Home** (Dashboard) ·
+  **Orders** (pending badge) · **Products** · **Design** (Store Builder) ·
+  **More**. More (which names the current section when you are on one) opens
+  a `Dialog` sheet with `SectionSheetList` — every group flat and open, 52px
+  rows — plus "Switch to another shop". Tabs a mode cannot open (admin hidden
+  sections) are dropped. It replaced a one-row dropdown that put Orders and
+  Products two taps away. The bar is mounted at the layout root, never inside
+  a glass panel (a `backdrop-filter` ancestor would trap a `fixed` child).
+
+Active rows (desktop and sheet) are a **Light-Purple pill with brand icon and
+label** — the old 3px left bar was dropped with the glass redesign.
 
 Collapsing costs a click before a cross-group jump, so it is paid for three
 ways: **the group you navigate into opens itself** (keyed on the group
@@ -664,26 +682,28 @@ page (plus a "View all orders" link).
   is restored (and a paid order marked refunded). Conflicts (409 — e.g.
   a race with another tab) surface as inline errors.
 
-**Publish & share** — the left card ends in `StorePublishCard` (visible on
-every manage section; below `lg`, where the panel stacks ABOVE the section,
-it collapses to one row — status · View/Preview · share · Publish/Unpublish,
-plus a "What's still needed?" link to the Dashboard when blocked — because the
-full card pushed every section's content below the fold on a phone): a
-Published/Not-published status row with a **Publish store** `Button` (a quiet
-Unpublish once live; `PATCH /stores/:id/publish`), the publish blockers as
+**Publish & share** — one body (`ShareActions` in `StorePublishCard.tsx`, state
+in `usePublishActions.ts`) in two frames: on desktop it ends the left card
+(`StorePublishCard`, compact buttons); on a phone it is `StoreShareSheet`, the
+bottom sheet behind the store strip's Share / Publish button — so phones now
+get WhatsApp sharing, which the old one-row phone version lacked. It shows a
+Live / Not live yet pill, then **Publish my shop** (`sheen`;
+`PATCH /stores/:id/publish`) when nothing blocks it, or the publish blockers as
 **links to the section that fixes each** (`GateBlockers.tsx` —
 `useGateBlockers(store, gate)` maps `blockerKeys` → owning step → `href`,
 honouring the manage scope's hidden sections; the Store Builder header and
-`ShopNotLiveNudge` use the same helper), and a **Share Store**
+`ShopNotLiveNudge` use the same helper), and a **Copy link**
 button that copies the store's public URL (`{origin}/store/{slug}`,
 built by `publicStoreUrl()` in `storesApi.ts`; uses the native share sheet
 where available). Before publishing, the same URL works as a **private
 draft preview** for the signed-in owner (an amber hint says only they can
 open it), and a **Preview** button beside Share opens it in a new tab
-(labelled "View Store" once published). Once live, a full-width green
+(labelled "View shop" once published). Once live, a full-width green
 **Share on WhatsApp** (`wa.me/?text=` with a ready "…is now online. See our
-products and order here: {url}" message, `whatsAppShareUrl()`) leads the
-card. While the shop is unpublished and has at least one live product, the
+products and order here: {url}" message, `whatsAppShareUrl()` in
+`usePublishActions.ts`) leads the panel, and a quiet **Take shop offline**
+closes it — behind a "Take your shop offline?" `ConfirmDialog` (it used to
+unpublish on one tap). Publish / offline confirm with a toast. While the shop is unpublished and has at least one live product, the
 Products section opens with `ShopNotLiveNudge` ("Customers can't see your
 shop yet" + **Publish my shop**, or the remaining publish blockers) — a
 seller who publishes a product otherwise assumes customers can see it.
@@ -2404,8 +2424,10 @@ frontend/
     │           │                        #   (store created at step 1, so it
     │           │                        #   is resumable; address/tax gate
     │           │                        #   bank accounts instead)
-    │           ├── StoreManageLayout.tsx# Left sections card + right <Outlet/>
-    │           ├── StoreSectionNav.tsx  # Collapsible groups / icon rail / mobile dropdown
+    │           ├── StoreManageLayout.tsx# Desktop: sticky glass sections card + <Outlet/>; phone: store strip + tab bar
+    │           ├── StoreSectionNav.tsx  # Desktop collapsible groups / icon rail; SectionSheetList (phone More sheet)
+    │           ├── StoreMobileNav.tsx   # Phone glass tab bar (Home·Orders·Products·Design·More) + More sheet
+    │           ├── usePublishActions.ts # Publish / offline-confirm / share state + whatsAppShareUrl
     │           ├── SetupChecklist.tsx   # Dashboard "Get your store live" / "Accept online payments" cards
     │           ├── GateBlockers.tsx     # useGateBlockers + BlockerLinks: each gate blocker → link to its fix
     │           ├── SetupStatus.tsx      # Shared setup marks: StatusMark / StatusBadge /
@@ -2415,7 +2437,7 @@ frontend/
     │           ├── StoreOrdersPage.tsx  # Seller orders list (status tabs, search, Load More)
     │           ├── StoreOrderDetailPage.tsx # One order: items, timeline, status actions + cancel
     │           ├── orderMeta.tsx        # Shared status chips / payment labels / date formats
-    │           ├── StorePublishCard.tsx # Publish/Unpublish toggle + Share Store
+    │           ├── StorePublishCard.tsx # ShareActions: desktop StorePublishCard + phone StoreShareSheet; ShopNotLiveNudge
     │           ├── StoreDetailsPage.tsx # Name + logo upload (crop → progress → replace/remove)
     │           ├── media/               # The Media Board — the wizard's Photos step
     │           │   ├── MediaBoard.tsx   # Status line, grid, tiles, video slot,
@@ -2930,11 +2952,13 @@ JS mirror `glassByScheme` in `colors.ts`): `--glass-bg` (.70 white / .62 smoked)
 Rules that keep it legible and fast:
 
 - **Contrast is re-pointed inside glass.** `glass` / `glass-strong` set
-  `--fg-muted`, `--success` and `--danger` to glass-safe steps
-  (`--glass-fg-muted` #5c5c66 / #a4a4ae, `--glass-danger` #c8281f / #ff6b63,
-  dark `--glass-success` #3fbf6a). Measured over the most saturated canvas
-  corner: muted 5.9:1 light / 6.4:1 dark (plain #707070 was 4.4:1), brand
-  5.1:1 / 4.6:1. Outside glass nothing changes.
+  `--fg-muted`, `--success`, `--danger` and `--pending` to glass-safe steps
+  (`--glass-fg-muted` #5c5c66 / #a4a4ae, `--glass-success` #007000 / #3fbf6a,
+  `--glass-danger` #c8281f / #ff6b63, `--glass-pending` #b03a0a / #f08c4b).
+  Measured at the most saturated point of the canvas (light purple light at
+  .40, dark at .24): muted 5.5:1 light / 6.2:1 dark, brand 4.8:1 / 4.5:1,
+  success 5.2:1, danger 4.6:1, pending 5.0:1. Outside glass nothing changes.
+  Raising the canvas alphas means re-running that check.
 - **Fallbacks re-point the tokens, not the utilities**: no
   `backdrop-filter` support → solid `--surface`; `prefers-reduced-transparency`
   → solid and zero blur. Every variant falls back together.

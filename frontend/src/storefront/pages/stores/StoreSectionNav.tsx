@@ -32,9 +32,8 @@ import {
  *    decoration if they are quieter than the rows they label.
  *  - **Desktop, rail** — icons only, at 64px, for sellers who want the width
  *    back on the section they are actually working in.
- *  - **Mobile** — a single dropdown naming where you are, because stacking
- *    sixteen rows above the content pushed the actual page a screen and a
- *    half down.
+ *  - **Mobile** — not here: a bottom tab bar for the daily four plus a
+ *    "More" sheet listing everything (`StoreMobileNav` + `SectionSheetList`).
  *
  * Collapsing is a genuine trade (a click before a cross-group jump), so it is
  * paid for in three ways: the group you are IN opens itself and stays open, a
@@ -43,7 +42,7 @@ import {
  * opens all five once and never sees an accordion again.
  */
 
-interface SectionItem {
+export interface SectionItem {
   label: string
   to: string
   icon: ComponentType<{ className?: string }>
@@ -53,7 +52,7 @@ interface SectionItem {
   badge?: boolean
 }
 
-interface SectionGroup {
+export interface SectionGroup {
   /** Stable persistence id — renaming `caption` must not reset preferences. */
   key: string
   caption: string
@@ -151,7 +150,7 @@ const SECTION_GROUPS: SectionGroup[] = [
  * rows disappears rather than showing an empty caption. Sellers hide nothing,
  * so they keep the exact array above — same object identity, no re-render.
  */
-function useSectionGroups(): SectionGroup[] {
+export function useSectionGroups(): SectionGroup[] {
   const { hiddenSections } = useStoreManageScope()
   return useMemo(() => {
     if (hiddenSections.length === 0) return SECTION_GROUPS
@@ -231,7 +230,7 @@ export function useNavRail(): [boolean, () => void] {
  */
 const BUILDER_PARTS = new Set(['banners', 'footer'])
 
-function useActiveSection(): { group: SectionGroup; item: SectionItem } {
+export function useActiveSection(): { group: SectionGroup; item: SectionItem } {
   const base = useResolvedPath('.').pathname
   const { pathname } = useLocation()
   const groups = useSectionGroups()
@@ -271,7 +270,7 @@ function useActiveSection(): { group: SectionGroup; item: SectionItem } {
 // Rows
 // ---------------------------------------------------------------------------
 
-interface NavData {
+export interface NavData {
   pendingOrders: number
   /** Readiness steps keyed by the section `to` they are edited in. */
   setupSteps: Map<string, StepState[]>
@@ -287,7 +286,7 @@ function groupSignals(group: SectionGroup, { pendingOrders, setupSteps }: NavDat
   return { pendingSetup, orders }
 }
 
-function OrderBadge({ count, className = '' }: { count: number; className?: string }) {
+export function OrderBadge({ count, className = '' }: { count: number; className?: string }) {
   return (
     <span
       // Not aria-hidden: "3 orders waiting" is the whole point of the badge
@@ -303,10 +302,13 @@ function OrderBadge({ count, className = '' }: { count: number; className?: stri
 function SectionRow({
   item,
   data,
+  large = false,
   onNavigate,
 }: {
   item: SectionItem
   data: NavData
+  /** Phone sheet size: 52px rows, 15px label, icon in a chip. */
+  large?: boolean
   onNavigate?: () => void
 }) {
   const { label, to, icon: Icon, end, badge } = item
@@ -318,18 +320,26 @@ function SectionRow({
       to={to}
       end={end}
       onClick={onNavigate}
-      // Selection is carried by the solid left BAR plus the Light-Purple
-      // tint, with the label staying ink in both schemes. The transparent
-      // border on every row keeps the text from shifting 3px.
+      // Selection is a Light-Purple PILL with the icon and label in brand —
+      // the glass redesign dropped the old 3px left bar, which read as a
+      // table-row highlight rather than "you are here".
       className={({ isActive }) =>
-        `flex items-center gap-3 rounded-md border-l-[3px] py-2 pr-3 pl-2.5 text-sm transition-colors ${
+        `group/row flex items-center gap-3 rounded-xl transition-colors ${
+          large ? 'min-h-[52px] px-2.5 text-[15px]' : 'min-h-10 px-3 text-sm'
+        } ${
           isActive
-            ? 'border-brand bg-brand-soft font-semibold text-fg'
-            : 'border-transparent font-medium text-muted hover:bg-surface-alt hover:text-fg'
+            ? 'bg-brand-soft font-semibold text-brand'
+            : 'font-medium text-fg/80 hover:bg-fg/5 hover:text-fg'
         }`
       }
     >
-      <Icon className="h-[18px] w-[18px] shrink-0" />
+      {large ? (
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-fg/5 group-aria-[current=page]/row:bg-brand group-aria-[current=page]/row:text-brand-contrast">
+          <Icon className="h-[18px] w-[18px]" />
+        </span>
+      ) : (
+        <Icon className="h-[18px] w-[18px] shrink-0" />
+      )}
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {setup && <StatusTag status={setup} section={label} />}
       {badge && data.pendingOrders > 0 && <OrderBadge count={data.pendingOrders} />}
@@ -368,7 +378,7 @@ function SectionDisclosure({
         onClick={onToggle}
         aria-expanded={open}
         aria-controls={panelId}
-        className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-surface-alt ${
+        className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-fg/5 ${
           activeInside && !open ? 'text-brand' : 'text-fg'
         }`}
       >
@@ -419,7 +429,49 @@ function SectionDisclosure({
   )
 }
 
-/** The full grouped list — shared by the desktop column and the mobile sheet. */
+/**
+ * Every section, flat and fully open, at thumb size — the phone "More" sheet.
+ *
+ * No accordions here: a sheet is opened to FIND something, and collapsed
+ * groups would cost a second tap on a small screen. The group captions stay,
+ * as plain headings, because sixteen rows without them are a wall.
+ */
+export function SectionSheetList({
+  data,
+  onNavigate,
+}: {
+  data: NavData
+  onNavigate: () => void
+}) {
+  const groups = useSectionGroups()
+  return (
+    <div className="space-y-3 px-3 py-3">
+      {groups.map((group) => (
+        <section key={group.key} aria-labelledby={`sheet-group-${group.key}`}>
+          <h3
+            id={`sheet-group-${group.key}`}
+            className="px-2.5 pb-1 text-[12px] font-bold tracking-[0.06em] text-muted uppercase"
+          >
+            {group.caption}
+          </h3>
+          <div className="space-y-0.5">
+            {group.items.map((item) => (
+              <SectionRow
+                key={item.label}
+                item={item}
+                data={data}
+                large
+                onNavigate={onNavigate}
+              />
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  )
+}
+
+/** The full grouped list — the desktop column. */
 function SectionList({
   data,
   collapsed,
@@ -459,8 +511,6 @@ export function StoreSectionNav({ rail, ...data }: NavData & { rail: boolean }) 
   const active = useActiveSection()
   const groups = useSectionGroups()
   const [collapsed, setCollapsed] = useState<string[]>(readCollapsed)
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const mobileRef = useRef<HTMLDivElement | null>(null)
 
   /**
    * The group you navigate INTO opens itself — keyed on the group changing,
@@ -486,23 +536,6 @@ export function StoreSectionNav({ rail, ...data }: NavData & { rail: boolean }) 
     }
   }, [collapsed])
 
-  // Mobile sheet: dismiss on an outside press or Escape, like any menu.
-  useEffect(() => {
-    if (!mobileOpen) return
-    const onPointerDown = (event: PointerEvent) => {
-      if (!mobileRef.current?.contains(event.target as Node)) setMobileOpen(false)
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMobileOpen(false)
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [mobileOpen])
-
   const toggleGroup = (key: string) =>
     setCollapsed((keys) =>
       keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key],
@@ -514,48 +547,15 @@ export function StoreSectionNav({ rail, ...data }: NavData & { rail: boolean }) 
       collapsed={collapsed}
       onToggleGroup={toggleGroup}
       activeKey={active.group.key}
-      onNavigate={() => setMobileOpen(false)}
     />
   )
 
-  const ActiveIcon = active.item.icon
-
+  // Desktop only. Phones get the bottom tab bar + "More" sheet
+  // (`StoreMobileNav`), which replaced the old one-row dropdown here.
   return (
     <>
-      {/* Mobile: one row naming where you are, opening the same list. */}
-      <div ref={mobileRef} className="relative p-2 lg:hidden">
-        <button
-          type="button"
-          onClick={() => setMobileOpen((open) => !open)}
-          aria-expanded={mobileOpen}
-          className="flex w-full items-center gap-3 rounded-md border border-line bg-surface-alt px-3 py-2.5 text-left transition hover:bg-line/40"
-        >
-          <ActiveIcon className="h-[18px] w-[18px] shrink-0 text-brand" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-[10px] font-semibold tracking-widest text-muted uppercase">
-              {active.group.caption}
-            </span>
-            <span className="block truncate text-sm font-semibold text-fg">
-              {active.item.label}
-            </span>
-          </span>
-          {data.pendingOrders > 0 && !mobileOpen && <OrderBadge count={data.pendingOrders} />}
-          <ChevronDownIcon
-            className={`h-4 w-4 shrink-0 text-muted transition-transform duration-200 ${
-              mobileOpen ? 'rotate-180' : ''
-            }`}
-          />
-        </button>
-
-        {mobileOpen && (
-          <div className="absolute inset-x-2 top-[calc(100%-0.25rem)] z-30 max-h-[70vh] overflow-y-auto rounded-lg border border-line bg-surface shadow-floating">
-            {list}
-          </div>
-        )}
-      </div>
-
-      {/* Desktop: the column, or the icon rail. */}
-      <nav className="hidden lg:block" aria-label="Store sections">
+      {/* The column, or the icon rail. */}
+      <nav aria-label="Store sections">
         {rail ? (
           <div className="flex flex-col items-center gap-1 p-2">
             {groups.map((group, index) => (
@@ -576,10 +576,10 @@ export function StoreSectionNav({ rail, ...data }: NavData & { rail: boolean }) 
                       end={end}
                       title={`${group.caption} · ${label}`}
                       className={({ isActive }) =>
-                        `relative flex h-10 w-10 items-center justify-center rounded-md transition-colors ${
+                        `relative flex h-11 w-11 items-center justify-center rounded-xl transition-colors ${
                           isActive
                             ? 'bg-brand-soft text-brand'
-                            : 'text-muted hover:bg-surface-alt hover:text-fg'
+                            : 'text-muted hover:bg-fg/5 hover:text-fg'
                         }`
                       }
                     >

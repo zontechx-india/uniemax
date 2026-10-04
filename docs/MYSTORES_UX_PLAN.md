@@ -17,7 +17,7 @@ English only for now, in plain words (i18n later).
 | Phase | Scope | Status |
 | ----- | ----- | ------ |
 | 0 | Glass tokens + shared seller UI kit + form/dialog upgrades | ✅ Done (2026-10-04) |
-| 1 | Shell & navigation (bottom tabs, More sheet, Share sheet) | ⬜ Not started |
+| 1 | Shell & navigation (bottom tabs, More sheet, Share sheet) | ✅ Done (2026-10-04) |
 | 2 | My Stores list + Create Store wizard | ⬜ Not started |
 | 3 | Dashboard, setup checklist, publish card | ⬜ Not started |
 | 4 | Products, product wizard, categories, media | ⬜ Not started |
@@ -170,8 +170,9 @@ backdrop once, not per card.
 | `--glass-strong` | `rgba(255,255,255,.86)` | `rgba(24,22,32,.82)` | Top bar, bottom tabs, sticky bars, sheets |
 | `--glass-inset` | `rgba(255,255,255,.90)` | `rgba(255,255,255,.06)` | Inputs and wells inside glass |
 | `--glass-border` | `rgba(255,255,255,.60)` | `rgba(255,255,255,.09)` | 1 px card edge |
-| `--glass-fg-muted` | `#5c5c66` | `#a4a4ae` | Secondary text inside glass (5.9:1 / 6.4:1) |
-| `--glass-danger` / `--glass-success` | `#c8281f` / `#008000` | `#ff6b63` / `#3fbf6a` | Status text inside glass |
+| `--glass-fg-muted` | `#5c5c66` | `#a4a4ae` | Secondary text inside glass (5.5:1 / 6.2:1) |
+| `--glass-success` / `--glass-danger` / `--glass-pending` | `#007000` / `#c8281f` / `#b03a0a` | `#3fbf6a` / `#ff6b63` / `#f08c4b` | Status text inside glass |
+| `--canvas-1/2/3` | purple .40 · blue .30 · rose .26 | purple .24 · blue .22 · rose .16 | Colour field (raised in Phase 1 so the glass reads) |
 | `--overlay-soft` | `rgba(17,12,46,.40)` | `rgba(0,0,0,.55)` | Sheet / dialog backdrop (no blur — see §4.4) |
 | `--glass-highlight` | inset `0 1px 0 rgba(255,255,255,.7)` | inset `0 1px 0 rgba(255,255,255,.06)` | Top light edge |
 | `--glass-shadow` | `0 8px 32px -6px rgba(30,18,80,.14)` | `0 10px 36px -8px rgba(0,0,0,.55)` | Elevation |
@@ -280,13 +281,20 @@ Each phase ships on its own and is approved before the next one starts.
 
 ### Phase 1 — Shell & navigation
 
-- [ ] `.seller-canvas` on the workspace; AppLayout top bar `glass-strong` on `/mystores/**`
-- [ ] Mobile: glass top strip — logo, store name, Live / Not live pill, **Share** button
-- [ ] Share sheet (WhatsApp / Copy link / View shop) reusing `shareOrCopy` and `whatsAppShareUrl`
-- [ ] Mobile: bottom tab bar — Home · Orders (badge) · Products · Store · More
-- [ ] "More" sheet reusing `SectionList`; remove the mobile dropdown
-- [ ] Content bottom padding clears the tab bar; SaveBar stacks above it
-- [ ] Desktop: glass sidebar + rail, pill active rows; glass content panel; glass admin warning band
+- [x] `.seller-canvas` on the workspace; AppLayout top bar `glass-strong` on `/mystores/**`
+- [x] Mobile: glass top strip — logo, store name, Live / Not live pill, **Share** button
+- [x] Share sheet (WhatsApp / Copy link / View shop) reusing `shareOrCopy` and `whatsAppShareUrl`
+- [x] Mobile: bottom tab bar — Home · Orders (badge) · Products · Design (Store Builder) · More
+- [x] "More" sheet (`SectionSheetList`, flat 52 px rows + "Switch to another shop"); mobile dropdown removed
+- [x] Content bottom padding clears the tab bar; SaveBar stacks above it
+- [x] Desktop: glass sidebar + rail, pill active rows; glass content panel; glass admin warning band
+- [x] Pulled forward from Phase 3: "Take shop offline" now asks first (`ConfirmDialog`), and publish / offline show a toast
+- [x] Desktop sidebar is sticky and scrolls itself; Copy / View buttons compact in the 264 px column
+
+> Not yet restyled (later phases): the page bodies themselves — the dashboard tiles, lists and forms
+> still use their old markup inside the new glass panels. Header icons from the shared app bar
+> (notifications 32 px, theme toggle 32 px) are below 44 px; they are shared with the storefront
+> and are left for Phase 8.
 
 ### Phase 2 — My Stores & Create Store
 
@@ -301,7 +309,7 @@ Each phase ships on its own and is approved before the next one starts.
 - [ ] Setup checklist as a numbered vertical stepper with one "Do it" button each, progress ring
 - [ ] Order pipeline as scrollable glass chips with a fade-edge hint
 - [ ] Latest orders as tappable cards
-- [ ] Confirmation sheet before taking the shop offline
+- [x] Confirmation sheet before taking the shop offline (done in Phase 1)
 
 ### Phase 4 — Products & categories
 

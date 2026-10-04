@@ -8,11 +8,14 @@ import { useStore } from '../../features/stores/useStores'
 import { isLaunchStep } from '../../features/stores/storeProfile'
 import type { StepState } from '../../features/stores/storeProfile'
 import type { ManagedStoreContext } from '../../features/stores/useManagedStore'
-import { StorePublishCard } from './StorePublishCard'
+import { StorePublishCard, StoreShareSheet } from './StorePublishCard'
 import { StoreSectionNav, useNavRail } from './StoreSectionNav'
+import { StoreMobileNav } from './StoreMobileNav'
+import { buttonClass } from '../../../shared/ui/Button'
 import {
   ArrowLeftIcon,
   PanelLeftIcon,
+  ShareIcon,
   ShieldCheckIcon,
   StoreIcon,
 } from '../../layout/icons'
@@ -47,6 +50,8 @@ export function StoreManageLayout() {
   // Minimised-nav preference. Owned here because the grid track width is this
   // file's; the nav renders the icons.
   const [rail, toggleRail] = useNavRail()
+  // Phone Share / Publish sheet, opened from the store strip.
+  const [shareOpen, setShareOpen] = useState(false)
 
   // The dashboard is fetched HERE, not on the Dashboard page: the nav badge
   // needs it too, and this layout outlives section navigation, so the seller
@@ -138,14 +143,71 @@ export function StoreManageLayout() {
   return (
     // The shell is full-width now; this workbench self-caps so form fields
     // and catalog rows stay a readable length on wide screens.
-    <div className="mx-auto max-w-7xl space-y-3">
+    //
+    // `--seller-dock` is the height of the phone tab bar (`StoreMobileNav`):
+    // the page pads by it so the last row is not hidden under the bar, and
+    // sticky save bars / toasts read it to sit above the bar. Zero from `lg`,
+    // where there is no bar.
+    <div className="mx-auto max-w-7xl space-y-3 pb-[var(--seller-dock)] [--seller-dock:calc(84px+env(safe-area-inset-bottom))] lg:pb-0 lg:[--seller-dock:0px]">
       <Link
         to={scope.indexPath}
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted transition hover:text-fg"
+        className="hidden min-h-tap items-center gap-1.5 text-sm font-medium text-muted transition hover:text-fg lg:inline-flex"
       >
         <ArrowLeftIcon className="h-4 w-4" />
         All stores
       </Link>
+
+      {/* Phone: one glass strip naming the shop, whether it is live, and the
+          ONE thing to do with it — Share once live, Publish until then. It
+          replaced the sidebar card that stacked above every section. */}
+      <div className="glass flex items-center gap-2 rounded-glass p-2 lg:hidden">
+        <Link
+          to={scope.indexPath}
+          aria-label="All stores"
+          className="flex size-tap shrink-0 items-center justify-center rounded-xl text-muted transition hover:bg-fg/5 hover:text-fg"
+        >
+          <ArrowLeftIcon className="h-5 w-5" />
+        </Link>
+        {store.logoUrl ? (
+          <MediaImg
+            sizes="40px"
+            src={store.logoUrl}
+            alt=""
+            className="h-10 w-10 shrink-0 rounded-xl object-cover"
+          />
+        ) : (
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
+            <StoreIcon className="h-5 w-5" />
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-heading text-[16px] font-bold text-fg">{store.name}</p>
+          <span
+            className={`inline-flex items-center gap-1.5 text-[12px] font-semibold ${
+              store.isPublished ? 'text-success' : 'text-pending'
+            }`}
+          >
+            <span
+              aria-hidden
+              className={`h-1.5 w-1.5 rounded-full ${store.isPublished ? 'bg-success' : 'bg-pending'}`}
+            />
+            {store.isPublished ? 'Live' : 'Not live yet'}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShareOpen(true)}
+          aria-haspopup="dialog"
+          className={buttonClass({
+            variant: store.isPublished ? 'ring' : 'rise',
+            size: 'md',
+            className: 'px-3.5',
+          })}
+        >
+          <ShareIcon className="h-4 w-4" />
+          {store.isPublished ? 'Share' : 'Publish'}
+        </button>
+      </div>
 
       {/* Acting on someone else's shop.
           Every screen below this point is the seller's own dashboard, pixel
@@ -157,7 +219,7 @@ export function StoreManageLayout() {
       {scope.mode === 'admin' && (
         <div
           role="status"
-          className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-pending/40 bg-pending-soft px-3 py-2 text-sm"
+          className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-glass border border-pending/40 bg-pending-soft px-4 py-2.5 text-sm"
         >
           <ShieldCheckIcon className="h-4 w-4 shrink-0 text-pending" />
           <span className="font-semibold text-fg">Admin view</span>
@@ -175,8 +237,12 @@ export function StoreManageLayout() {
           rail ? 'lg:grid-cols-[64px_1fr]' : 'lg:grid-cols-[264px_1fr]'
         }`}
       >
-        {/* Left: section picker */}
-        <aside className="min-w-0 rounded-lg bg-surface shadow-floating">
+        {/* Left: section picker — desktop only; phones use the tab bar.
+            Sticky so the publish card stays in view beside a long form. */}
+        <aside className="glass hidden min-w-0 rounded-glass lg:sticky lg:top-[4.5rem] lg:block">
+          {/* The sidebar scrolls itself once it is taller than the window. */}
+          <div className="max-h-[calc(100dvh-5.5rem)] overflow-y-auto">
+
           {/* Store identity + the rail toggle. In rail mode the logo alone
               carries the identity (the name is its tooltip) — a 64px column
               has no room for a second line, and the seller knows which store
@@ -253,6 +319,7 @@ export function StoreManageLayout() {
           <div className={rail ? 'lg:hidden' : ''}>
             <StorePublishCard store={store} onStoreChange={setStore} />
           </div>
+          </div>
         </aside>
 
         {/* Right: the selected section.
@@ -262,7 +329,7 @@ export function StoreManageLayout() {
             strip, a table, a long unbroken string) grows the `1fr` track past
             its share and pushes the whole panel off the right edge instead of
             scrolling or truncating within it. */}
-        <section className="min-w-0 min-h-[400px] rounded-lg bg-surface p-4 shadow-floating sm:p-5">
+        <section className="glass min-h-[400px] min-w-0 rounded-glass p-4 sm:p-6">
           <Outlet
             context={
               {
@@ -277,6 +344,21 @@ export function StoreManageLayout() {
           />
         </section>
       </div>
+
+      {/* Phone navigation + its share sheet. Outside every glass panel on
+          purpose: the bar is `fixed`, and a `backdrop-filter` ancestor would
+          become its containing block. */}
+      <StoreMobileNav
+        storeName={store.name}
+        pendingOrders={pendingOrders}
+        setupSteps={setupSteps}
+      />
+      <StoreShareSheet
+        open={shareOpen}
+        store={store}
+        onStoreChange={setStore}
+        onClose={() => setShareOpen(false)}
+      />
 
       {/* "Saved ✓" confirmations for instant saves (stores/ui `showToast`). */}
       <ToastHost />

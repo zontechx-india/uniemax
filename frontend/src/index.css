@@ -298,14 +298,16 @@
    * corner (below AA); this step reads 5.4:1 there. Applied by the glass
    * utilities themselves, so muted text outside glass is unchanged. */
   --glass-fg-muted: #5c5c66;
-  /* Status text on glass, for the same reason: the global danger red is
-   * 3.4:1 on the frosted canvas. Light keeps the global green (4.6:1). */
-  --glass-success: #008000;
+  /* Status text on glass, for the same reason: over the frosted purple the
+   * global red is 3.4:1, green 4.3:1 and orange 4.2:1. These read 4.6, 5.2
+   * and 5.0:1 at the most saturated point of the canvas. */
+  --glass-success: #007000;
   --glass-danger: #c8281f;
+  --glass-pending: #b03a0a;
   /* The colour field behind the glass: brand purple, accent blue, a rose. */
-  --canvas-1: rgba(108, 62, 244, 0.24);
-  --canvas-2: rgba(24, 99, 220, 0.2);
-  --canvas-3: rgba(236, 72, 153, 0.16);
+  --canvas-1: rgba(108, 62, 244, 0.4);
+  --canvas-2: rgba(24, 99, 220, 0.3);
+  --canvas-3: rgba(236, 72, 153, 0.26);
   /* WhatsApp's own green — the share button is the one place it appears. */
   --whatsapp: #25d366;
   --whatsapp-contrast: #0b3d1f;
@@ -361,9 +363,10 @@
   /* #008000 is 3.1:1 on dark glass; these read 6.7:1 and 5.7:1. */
   --glass-success: #3fbf6a;
   --glass-danger: #ff6b63;
-  --canvas-1: rgba(149, 116, 247, 0.22);
-  --canvas-2: rgba(24, 99, 220, 0.16);
-  --canvas-3: rgba(236, 72, 153, 0.1);
+  --glass-pending: #f08c4b;
+  --canvas-1: rgba(149, 116, 247, 0.24);
+  --canvas-2: rgba(24, 99, 220, 0.22);
+  --canvas-3: rgba(236, 72, 153, 0.16);
   --overlay-soft: rgba(0, 0, 0, 0.55);
 
   color-scheme: dark;
@@ -866,6 +869,7 @@
   --fg-muted: var(--glass-fg-muted);
   --success: var(--glass-success);
   --danger: var(--glass-danger);
+  --pending: var(--glass-pending);
   background-color: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-highlight), var(--glass-shadow);
@@ -877,6 +881,7 @@
   --fg-muted: var(--glass-fg-muted);
   --success: var(--glass-success);
   --danger: var(--glass-danger);
+  --pending: var(--glass-pending);
   background-color: var(--glass-strong);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-highlight), var(--glass-shadow);
@@ -908,7 +913,10 @@
       radial-gradient(42% 38% at 88% 6%, var(--canvas-1) 0%, transparent 70%),
       radial-gradient(38% 36% at 4% 38%, var(--canvas-2) 0%, transparent 70%),
       radial-gradient(40% 34% at 70% 96%, var(--canvas-3) 0%, transparent 72%),
-      radial-gradient(30% 28% at 22% 92%, var(--canvas-1) 0%, transparent 70%);
+      radial-gradient(30% 28% at 22% 92%, var(--canvas-1) 0%, transparent 70%),
+      /* Mid-screen light, so a phone (where cards cover the corners) still
+       * shows colour through the glass. */
+      radial-gradient(55% 26% at 35% 55%, var(--canvas-2) 0%, transparent 72%);
   }
 }
 

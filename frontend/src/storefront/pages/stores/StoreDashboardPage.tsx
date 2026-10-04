@@ -15,7 +15,7 @@ import {
 } from '../../layout/icons'
 import { SellerOrderRow } from './orderMeta'
 import { SetupChecklist } from './SetupChecklist'
-import { whatsAppShareUrl } from './StorePublishCard'
+import { whatsAppShareUrl } from './usePublishActions'
 
 /**
  * Dashboard section of Store Management — the landing view: today's orders,

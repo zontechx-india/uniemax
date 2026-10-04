@@ -1,33 +1,173 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { toApiError } from '../../../shared/auth/http'
-import { Button } from '../../../shared/ui/Button'
-import { shareOrCopy } from '../../../shared/share'
-import { publicStoreUrl, storesApi } from '../../features/stores/storesApi'
+import { Button, buttonClass } from '../../../shared/ui/Button'
+import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
+import { Dialog } from '../../../shared/ui/Dialog'
+import { storesApi } from '../../features/stores/storesApi'
 import type { Store } from '../../features/stores/storesApi'
 import { ChatIcon, CheckIcon, EyeIcon, GlobeIcon, ShareIcon } from '../../layout/icons'
 import { BlockerLinks, useGateBlockers } from './GateBlockers'
-import { Link } from 'react-router-dom'
-import { useStoreManageScope } from '../../features/stores/storeManageScope'
+import { usePublishActions, whatsAppShareUrl } from './usePublishActions'
+import { StatusPill } from './ui/StatusPill'
 
 /**
- * Publish & share panel shown on every store-management section (left card).
+ * Publish & share — in two frames over ONE body (`ShareActions`):
  *
- * - Publish/Unpublish toggles the store's public page. Only published
- *   stores are reachable by customers — unpublished ones 404 for everyone
- *   except the signed-in owner, who gets a **draft preview** at the same URL.
- * - Preview opens the storefront in a new tab (labelled "View Store" once
- *   published, since it is then simply the live page).
- * - Share Store copies the store's public URL (/store/{slug}) so the owner
- *   can hand it straight to customers.
- * - Once live, **Share on WhatsApp** opens WhatsApp with a ready-made
- *   message + link — how most small Indian sellers reach their customers.
+ * - **Desktop**: `StorePublishCard`, the foot of the section sidebar.
+ * - **Phone**: `StoreShareSheet`, opened by the Share / Publish button in the
+ *   store strip at the top of every section. (The old phone version was a
+ *   cramped row of 36px icons; the WhatsApp button — how most small sellers
+ *   here reach buyers — was desktop-only.)
+ *
+ * What the body says depends on where the shop is:
+ *   - **Not live, something missing** → what to add, each a link to its fix.
+ *   - **Not live, ready** → one big **Publish my shop**.
+ *   - **Live** → **Share on WhatsApp** first, then copy / view, and a quiet
+ *     "Take shop offline" that asks before it does anything.
+ *
+ * Unpublished shops 404 for everyone except the signed-in owner, who gets a
+ * draft preview at the same URL — so "Preview" is safe to offer before launch.
  */
 
-/** wa.me link with a ready-to-send message announcing the shop. */
-export function whatsAppShareUrl(storeName: string, url: string): string {
-  const text = `Hi! ${storeName} is now online. See our products and order here: ${url}`
-  return `https://wa.me/?text=${encodeURIComponent(text)}`
+function ShareActions({
+  store,
+  onStoreChange,
+  onNavigate,
+  compact = false,
+}: {
+  store: Store
+  onStoreChange: (store: Store) => void
+  /** Called when a blocker link navigates away (closes the phone sheet). */
+  onNavigate?: () => void
+  /** The 264px desktop column: smaller secondary buttons that fit one line. */
+  compact?: boolean
+}) {
+  const actions = usePublishActions(store, onStoreChange)
+  const blockers = useGateBlockers(store, 'PUBLISH')
+  const { shareUrl, blocked, copied } = actions
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        {store.isPublished ? (
+          <StatusPill tone="success">Live</StatusPill>
+        ) : (
+          <StatusPill tone="pending">Not live yet</StatusPill>
+        )}
+        <p className="min-w-0 text-hint text-muted">
+          {store.isPublished
+            ? 'Customers can see your shop and order.'
+            : 'Only you can see your shop for now.'}
+        </p>
+      </div>
+
+      {/* Naming the blockers beats a disabled button with no explanation. */}
+      {blocked ? (
+        <div className="rounded-xl bg-pending-soft px-3 py-2.5">
+          <p className="mb-2 text-[14px] font-semibold text-fg">
+            Before customers can see your shop, add:
+          </p>
+          <div onClick={onNavigate}>
+            <BlockerLinks blockers={blockers} />
+          </div>
+        </div>
+      ) : (
+        !store.isPublished && (
+          <Button
+            variant="sheen"
+            size="lg"
+            full
+            loading={actions.busy}
+            onClick={actions.publish}
+          >
+            {actions.busy ? 'Publishing…' : 'Publish my shop'}
+          </Button>
+        )
+      )}
+
+      {store.isPublished && (
+        <a
+          href={whatsAppShareUrl(store.name, shareUrl)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex h-field w-full items-center justify-center gap-2 rounded-md bg-whatsapp text-[15px] font-bold text-whatsapp-contrast transition hover:opacity-90"
+        >
+          <ChatIcon className="h-5 w-5" />
+          Share on WhatsApp
+        </a>
+      )}
+
+      <a
+        href={shareUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="glass-inset flex min-h-tap items-center gap-2 rounded-md px-3 text-hint text-muted transition hover:text-fg"
+      >
+        <GlobeIcon className="h-4 w-4 shrink-0" />
+        <span className="truncate">{shareUrl.replace(/^https?:\/\//, '')}</span>
+      </a>
+
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => void actions.share()}
+          className={buttonClass({
+            variant: 'ring',
+            size: compact ? 'sm' : 'md',
+            full: true,
+            className: 'whitespace-nowrap',
+          })}
+        >
+          {copied ? <CheckIcon className="h-4 w-4" /> : <ShareIcon className="h-4 w-4" />}
+          {copied ? 'Copied!' : 'Copy link'}
+        </button>
+        <a
+          href={shareUrl}
+          target="_blank"
+          rel="noreferrer"
+          className={buttonClass({
+            variant: 'ring',
+            size: compact ? 'sm' : 'md',
+            full: true,
+            className: 'whitespace-nowrap',
+          })}
+        >
+          <EyeIcon className="h-4 w-4" />
+          {store.isPublished ? 'View shop' : 'Preview'}
+        </a>
+      </div>
+
+      {actions.error && (
+        <p role="alert" className="text-hint font-medium text-danger">
+          {actions.error}
+        </p>
+      )}
+
+      {store.isPublished && (
+        <button
+          type="button"
+          onClick={actions.askUnpublish}
+          className="flex min-h-tap w-full items-center justify-center rounded-md text-[14px] font-semibold text-muted transition hover:bg-fg/5 hover:text-danger"
+        >
+          Take shop offline
+        </button>
+      )}
+
+      <ConfirmDialog
+        open={actions.confirmingUnpublish}
+        title="Take your shop offline?"
+        description="Customers will not be able to see your shop or place orders until you publish it again. Your products and orders are kept."
+        confirmLabel="Take offline"
+        cancelLabel="Keep it live"
+        busy={actions.busy}
+        onConfirm={actions.confirmUnpublish}
+        onCancel={actions.cancelUnpublish}
+      />
+    </div>
+  )
 }
+
+/** Desktop: the publish & share block at the foot of the section sidebar. */
 export function StorePublishCard({
   store,
   onStoreChange,
@@ -35,194 +175,34 @@ export function StorePublishCard({
   store: Store
   onStoreChange: (store: Store) => void
 }) {
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
-  const copiedTimer = useRef<number | undefined>(undefined)
-
-  useEffect(() => () => window.clearTimeout(copiedTimer.current), [])
-
-  const shareUrl = publicStoreUrl(store.slug)
-
-  /**
-   * What stops this store going live, straight from the server's evaluation —
-   * the same object the publish endpoint checks, so the button is disabled
-   * for exactly the reasons a request would have been rejected. Unpublishing
-   * is never blocked: a seller must always be able to take their shop down.
-   */
-  const blockers = useGateBlockers(store, 'PUBLISH')
-  const blocked = !store.isPublished && !store.readiness.gates.PUBLISH.allowed
-  const { storePath } = useStoreManageScope()
-
-  const togglePublished = async () => {
-    setError(null)
-    setBusy(true)
-    try {
-      onStoreChange(await storesApi.setPublished(store.id, !store.isPublished))
-    } catch (err) {
-      setError(toApiError(err).message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const share = async () => {
-    setError(null)
-    const outcome = await shareOrCopy({ title: store.name, url: shareUrl })
-    if (outcome === 'copied') {
-      setCopied(true)
-      window.clearTimeout(copiedTimer.current)
-      copiedTimer.current = window.setTimeout(() => setCopied(false), 2000)
-    }
-  }
-
   return (
     <div className="border-t border-line p-4">
-      <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
-          <span
-            className={`h-2 w-2 rounded-full ${
-              store.isPublished ? 'bg-success' : 'bg-line'
-            }`}
-          />
-          {store.isPublished ? 'Published' : 'Not published'}
-        </span>
-        {/* Phone: this card stacks ABOVE every section, so there it is one
-            row — status, view, share, publish — instead of a block that
-            pushed the page itself below the fold. The full card is lg+. */}
-        <span className="ml-auto flex items-center gap-1 lg:hidden">
-          <a
-            href={shareUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold text-fg transition hover:bg-surface-alt"
-          >
-            <EyeIcon className="h-3.5 w-3.5" />
-            {store.isPublished ? 'View' : 'Preview'}
-          </a>
-          <button
-            type="button"
-            onClick={share}
-            aria-label={copied ? 'Link copied' : 'Share store link'}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-fg transition hover:bg-surface-alt"
-          >
-            {copied ? (
-              <CheckIcon className="h-3.5 w-3.5 text-success" />
-            ) : (
-              <ShareIcon className="h-3.5 w-3.5" />
-            )}
-          </button>
-        </span>
-        {store.isPublished ? (
-          <button
-            type="button"
-            onClick={togglePublished}
-            disabled={busy}
-            className="h-9 rounded-md px-3 text-xs font-semibold text-muted transition hover:bg-surface-alt hover:text-fg disabled:cursor-not-allowed"
-          >
-            {busy ? 'Saving…' : 'Unpublish'}
-          </button>
-        ) : (
-          <Button
-            size="sm"
-            onClick={togglePublished}
-            loading={busy}
-            disabled={blocked}
-          >
-            Publish store
-          </Button>
-        )}
-      </div>
-
-      {blocked && (
-        <Link
-          to={storePath(store.slug)}
-          className="mt-1 block text-right text-[11px] font-medium text-brand lg:hidden"
-        >
-          What&apos;s still needed?
-        </Link>
-      )}
-      {error && (
-        <p className="mt-1 text-[11px] leading-4 text-danger lg:hidden">{error}</p>
-      )}
-
-      <div className="hidden lg:block">
-        {/* Naming the blockers beats a disabled button with no explanation —
-            the seller can act without hunting for what is missing. */}
-        {blocked ? (
-          <div className="mt-2 rounded-md border border-line bg-surface-alt px-2.5 py-2">
-            <p className="mb-1.5 text-xs font-medium text-fg">Before publishing, add:</p>
-            <BlockerLinks blockers={blockers} />
-          </div>
-        ) : (
-          <p className="mt-2 text-xs text-muted">
-            {store.isPublished
-              ? 'Your shop is live! Send the link to your customers so they can order.'
-              : 'Preview your shop with the link below, then tap Publish so customers can see it.'}
-          </p>
-        )}
-
-        <div className="mt-3 space-y-2">
-          {store.isPublished && (
-            <a
-              href={whatsAppShareUrl(store.name, shareUrl)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-whatsapp text-sm font-semibold text-whatsapp-contrast transition hover:opacity-90"
-            >
-              <ChatIcon className="h-4 w-4" />
-              Share on WhatsApp
-            </a>
-          )}
-          <a
-            href={shareUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-2 rounded-md bg-surface-alt px-3 py-2 text-xs text-muted transition hover:bg-line hover:text-fg"
-          >
-            <GlobeIcon className="h-3.5 w-3.5 shrink-0 text-muted" />
-            <span className="truncate">{shareUrl.replace(/^https?:\/\//, '')}</span>
-          </a>
-
-          <div className="grid grid-cols-2 gap-2">
-            <a
-              href={shareUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-line text-xs font-semibold text-fg transition hover:bg-surface-alt"
-            >
-              <EyeIcon className="h-3.5 w-3.5" />
-              {store.isPublished ? 'View Store' : 'Preview'}
-            </a>
-            <button
-              type="button"
-              onClick={share}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-line text-xs font-semibold text-fg transition hover:bg-surface-alt"
-            >
-              {copied ? (
-                <>
-                  <CheckIcon className="h-3.5 w-3.5 text-success" />
-                  Link copied!
-                </>
-              ) : (
-                <>
-                  <ShareIcon className="h-3.5 w-3.5" />
-                  Share Store
-                </>
-              )}
-            </button>
-          </div>
-
-          {!store.isPublished && (
-            <p className="text-[11px] leading-4 text-warning">
-              Until you publish, the link is a private draft preview — only you
-              can open it.
-            </p>
-          )}
-          {error && <p className="text-[11px] leading-4 text-danger">{error}</p>}
-        </div>
-      </div>
+      <ShareActions store={store} onStoreChange={onStoreChange} compact />
     </div>
+  )
+}
+
+/** Phone: the same panel as a bottom sheet, opened from the store strip. */
+export function StoreShareSheet({
+  open,
+  store,
+  onStoreChange,
+  onClose,
+}: {
+  open: boolean
+  store: Store
+  onStoreChange: (store: Store) => void
+  onClose: () => void
+}) {
+  return (
+    <Dialog
+      open={open}
+      title={store.isPublished ? 'Share your shop' : 'Publish your shop'}
+      subtitle={store.name}
+      onClose={onClose}
+    >
+      <ShareActions store={store} onStoreChange={onStoreChange} onNavigate={onClose} />
+    </Dialog>
   )
 }
 
