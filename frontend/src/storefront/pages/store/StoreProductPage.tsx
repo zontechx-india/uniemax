@@ -59,6 +59,7 @@ import {
 } from '../../layout/icons'
 import type { Skin } from '../../features/publicStore/storeTheme'
 import { MediaImg } from '../../../shared/media/MediaImg'
+import { displayName } from '../../features/publicStore/shopShape'
 
 /**
  * `/store/{storeSlug}/product/{productSlug}` — full product detail.
@@ -298,7 +299,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
               <h1
                 className={`mt-1 font-heading text-3xl font-semibold leading-tight sm:text-4xl ${skin.text}`}
               >
-                {product.name}
+                {displayName(product.name)}
               </h1>
             </div>
             {/* Share this product — permanent public URL, opens directly. */}
@@ -782,7 +783,7 @@ function StickyBuyBar({
         </div>
         <div className="min-w-0 flex-1">
           <p className={`truncate text-sm font-semibold ${skin.text}`}>
-            {product.name}
+            {displayName(product.name)}
           </p>
           <p className="font-heading text-base font-bold text-brand">
             {formatPrice(price)}
@@ -950,6 +951,20 @@ function MediaGallery({
             className="h-full w-full bg-black object-contain"
           />
         ) : (
+          <>
+          {/* The photo's own colours fill the square around it (blurred
+              copy, smallest sized file) — a wide banner-shaped upload no
+              longer floats in a grey box. Same idea as `FillImage`; the
+              sharp layer keeps its zoom handlers. */}
+          <MediaImg
+            key={`fill-${active.id}`}
+            sizes="64px"
+            src={active.url}
+            alt=""
+            aria-hidden
+            decoding="async"
+            className="pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover opacity-70 blur-2xl"
+          />
           <MediaImg
             // Desktop hover-zoom draws the photo at 1.9× its box, so desktops
             // take the full original; phones (no zoom) get a sized copy.
@@ -975,8 +990,9 @@ function MediaGallery({
                   }
                 : undefined
             }
-            className="h-full w-full object-contain transition-transform duration-200 ease-out"
+            className="relative h-full w-full object-contain transition-transform duration-200 ease-out"
           />
+          </>
         )}
 
         {media.length > 1 && (

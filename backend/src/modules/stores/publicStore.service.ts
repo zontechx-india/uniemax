@@ -338,6 +338,11 @@ export interface PublicCategoryNode {
   name: string;
   slug: string;
   isFeatured: boolean;
+  /**
+   * Shelf artwork — the seller's picture, else the taxonomy category's.
+   * Null when neither exists; the storefront then uses a product cover.
+   */
+  imageUrl: string | null;
   /** Visible products in this shelf and everything beneath it. */
   productCount: number;
   subcategories: PublicCategoryNode[];
@@ -369,6 +374,7 @@ export async function getPublicStoreShell(slug: string, viewerId?: string) {
           name: shelf.name,
           slug: shelf.slug,
           isFeatured: shelf.isFeatured,
+          imageUrl: shelf.imageUrl ?? shelf.category?.imageUrl ?? null,
           productCount:
             (countOf.get(shelf.id) ?? 0) +
             subcategories.reduce((sum, sub) => sum + sub.productCount, 0),

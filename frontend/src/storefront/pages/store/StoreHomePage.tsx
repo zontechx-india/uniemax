@@ -4,6 +4,7 @@ import {
   publicStoreApi,
   storeCategoryUrl,
   storeHomeUrl,
+  storeProductUrl,
   storeShopUrl,
   type PublicCategory,
   type PublicCategoryRow,
@@ -22,13 +23,38 @@ import {
 } from '../../features/publicStore/storeLayout'
 import { useSeo } from '../../../shared/seo'
 import { storeJsonLd } from '../../features/publicStore/structuredData'
-import { PRODUCT_GRID, ProductCard } from '../../features/publicStore/ProductCard'
+import {
+  discountPercent,
+  FillImage,
+  NoProductImage,
+  PRODUCT_GRID,
+  PriceLabel,
+  ProductCard,
+} from '../../features/publicStore/ProductCard'
+import { StockBadge } from '../../features/publicStore/CartControls'
+import {
+  browsableCategories,
+  categoryPicture,
+  displayName,
+  shopProductCount,
+  shopSize,
+  trustFacts,
+  type ShopSize,
+  type TrustFact,
+} from '../../features/publicStore/shopShape'
 import {
   EmptyCatalog,
   GridSkeleton,
   SectionHeading,
 } from '../../features/publicStore/ListingControls'
-import { ChevronLeftIcon, ChevronRightIcon } from '../../layout/icons'
+import {
+  CardIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  RupeeIcon,
+  StoreIcon,
+  TruckIcon,
+} from '../../layout/icons'
 import type { Skin } from '../../features/publicStore/storeTheme'
 import { BannerCarousel } from '../../features/banners/BannerCarousel'
 import {
@@ -147,6 +173,19 @@ type HomeSectionEntry = PublicStoreHome['sections'][number]
  * every store that has never been customised, renders exactly as it always
  * has.
  *
+ * **The page adapts to the size of the shop** (`shopShape.ts`), because most
+ * sellers list a handful of products and a page built for a big catalogue
+ * shows those few products two or three times:
+ *
+ * | Shop          | Homepage                                                   |
+ * | ------------- | ---------------------------------------------------------- |
+ * | one product   | banners + hero, then that product as a big showcase card    |
+ * | ≤ 12 products | every product ONCE in "All Products", the owner's Featured / Best / New picks first (no curated rows or per-category shelves, which would repeat them) |
+ * | bigger        | everything below; "All Products" skips what earlier rows showed |
+ *
+ * Category pickers only appear when there are two or more categories to pick
+ * between, after single-branch chains are walked down (`browsableCategories`).
+ *
  * The three curated rows are strictly flag-driven — one with nothing flagged
  * renders nothing (there is deliberately no fallback). What keeps an uncurated
  * shop from being a hero over empty space is the two rows below them, which
@@ -227,10 +266,21 @@ export function StoreHomePage() {
     )
   }
 
+  const size = shopSize(store)
+  const facts = trustFacts(store)
+  const heroCta = HERO_CTA[size]
+
   if (home === undefined) {
     return (
       <>
-        <Hero store={store} skin={skin} covers={[]} categoriesAnchor={false} />
+        <Hero
+          store={store}
+          skin={skin}
+          covers={[]}
+          categoriesAnchor={false}
+          facts={facts}
+          cta={heroCta}
+        />
         <StorePageShell>
           <GridSkeleton skin={skin} />
         </StorePageShell>
@@ -241,7 +291,14 @@ export function StoreHomePage() {
   if (home === null) {
     return (
       <>
-        <Hero store={store} skin={skin} covers={[]} categoriesAnchor={false} />
+        <Hero
+          store={store}
+          skin={skin}
+          covers={[]}
+          categoriesAnchor={false}
+          facts={facts}
+          cta={heroCta}
+        />
         <StorePageShell>
           <p className={`py-10 text-center text-sm ${skin.muted}`}>
             Could not load this store's products. Please refresh.
@@ -254,13 +311,23 @@ export function StoreHomePage() {
   // Only sections that will actually paint something, in the ORDER the owner
   // arranged. Filtering BEFORE indexing keeps the alternating band tones
   // strictly alternating — an empty section never burns a tone slot.
-  const visible = home.sections
+  const shaped = shapeHome(home, size)
+  const visible = shaped.home.sections
     .filter((section) => section.enabled)
-    .filter((section) => hasContent(section.key, home))
+    .filter((section) => hasContent(section.key, shaped.home))
+    // A one-product shop shows its identity and then the product itself.
+    .filter(
+      (section) =>
+        shaped.showcase === null || section.key === 'banners' || section.key === 'hero',
+    )
 
   const showsCategories = visible.some((section) => section.key === 'categories')
-  const covers = heroCovers(home)
-  const tones = bandTones(visible, home)
+  // Art beside the hero only for a big shop: a small one shows every product
+  // a few centimetres further down, so the art would only repeat them.
+  const covers = size === 'full' ? heroCovers(home) : []
+  const tones = bandTones(visible, shaped.home)
+  const showcaseTone: BandTone =
+    tones.length > 0 && tones[tones.length - 1] === 'alt' ? 'base' : 'alt'
 
   return (
     <>
@@ -269,15 +336,123 @@ export function StoreHomePage() {
           key={section.key}
           section={section}
           store={store}
-          home={home}
+          home={shaped.home}
           skin={skin}
           tone={tones[index]}
           covers={covers}
           categoriesAnchor={showsCategories}
+          facts={facts}
+          heroCta={heroCta}
+          catalogAll={shaped.catalogAll}
+          pictures={shaped.pictures}
         />
       ))}
+      {shaped.showcase && (
+        <ProductShowcase
+          store={store}
+          product={shaped.showcase}
+          skin={skin}
+          tone={showcaseTone}
+        />
+      )}
     </>
   )
+}
+
+/** Where the hero's button goes, by shop size — see `Hero`. */
+const HERO_CTA: Record<ShopSize, HeroCta> = {
+  one: 'none',
+  small: 'products',
+  full: 'shop',
+}
+
+interface ShapedHome {
+  /** The payload with the sections this shop's size makes redundant emptied. */
+  home: PublicStoreHome
+  /** The single product of a one-product shop, shown as a showcase. */
+  showcase: PublicProduct | null
+  /** "All Products" holds the whole shop — show all of it, uncapped. */
+  catalogAll: boolean
+  /** Every product the page has, for category-tile pictures. */
+  pictures: PublicProduct[]
+}
+
+/**
+ * Fits the homepage payload to the shop. Pure: the owner's section order and
+ * switches are untouched, only what each section would REPEAT is removed.
+ */
+function shapeHome(home: PublicStoreHome, size: ShopSize): ShapedHome {
+  const pictures = [
+    ...home.catalog,
+    ...home.featured,
+    ...home.newArrivals,
+    ...home.bestSellers,
+    ...home.categoryRows.flatMap((row) => row.products),
+  ]
+  const categories = browsableCategories(home.featuredCategories)
+  const base: PublicStoreHome = {
+    ...home,
+    featuredCategories: categories.length >= 2 ? categories : [],
+  }
+
+  if (size === 'one') {
+    return { home: base, showcase: pictures[0] ?? null, catalogAll: false, pictures }
+  }
+
+  const catalogOn =
+    home.catalog.length > 0 &&
+    home.sections.some((section) => section.key === 'catalog' && section.enabled)
+
+  // A small shop is entirely inside "All Products", so per-category shelves
+  // and the curated rows would only show the same few products again (a
+  // "New Arrivals" of one card above an "All Products" holding that card).
+  // The owner's picks are not lost: they LEAD the grid — Featured, then Best
+  // Sellers, then New Arrivals, then everything else newest first.
+  if (size === 'small' && catalogOn) {
+    const picked = [...home.featured, ...home.bestSellers, ...home.newArrivals]
+    const order = new Map<string, number>()
+    for (const product of picked) {
+      if (!order.has(product.id)) order.set(product.id, order.size)
+    }
+    const rank = (product: PublicProduct) => order.get(product.id) ?? order.size
+    const catalog = home.catalog
+      .map((product, index) => ({ product, index }))
+      .sort((a, b) => rank(a.product) - rank(b.product) || a.index - b.index)
+      .map(({ product }) => product)
+    return {
+      home: {
+        ...base,
+        featured: [],
+        newArrivals: [],
+        bestSellers: [],
+        categoryRows: [],
+        catalog,
+      },
+      showcase: null,
+      catalogAll: true,
+      pictures,
+    }
+  }
+
+  // A big shop: "All Products" skips anything a row ABOVE it already showed.
+  const shown = new Set<string>()
+  for (const section of home.sections) {
+    if (section.key === 'catalog') break
+    if (!section.enabled) continue
+    const products =
+      section.key === 'featured' || section.key === 'newArrivals' || section.key === 'bestSellers'
+        ? home[section.key]
+        : section.key === 'categoryRows'
+          ? home.categoryRows.flatMap((row) => row.products)
+          : []
+    for (const product of products) shown.add(product.id)
+  }
+  return {
+    home: { ...base, catalog: home.catalog.filter((product) => !shown.has(product.id)) },
+    showcase: null,
+    catalogAll: false,
+    pictures,
+  }
 }
 
 /** Does this section have anything to render? Drives band alternation. */
@@ -356,6 +531,10 @@ function HomeSection({
   tone,
   covers,
   categoriesAnchor,
+  facts,
+  heroCta,
+  catalogAll,
+  pictures,
 }: {
   section: HomeSectionEntry
   store: PublicStore
@@ -364,6 +543,10 @@ function HomeSection({
   tone: BandTone
   covers: string[]
   categoriesAnchor: boolean
+  facts: TrustFact[]
+  heroCta: HeroCta
+  catalogAll: boolean
+  pictures: PublicProduct[]
 }) {
   // The owner's choice, or the section's own default — never a literal
   // repeated here, which is how a builder button and a storefront drift apart.
@@ -395,6 +578,8 @@ function HomeSection({
           tone={tone}
           covers={covers}
           categoriesAnchor={categoriesAnchor}
+          facts={facts}
+          cta={heroCta}
           heading={section.settings?.title ?? null}
           tagline={section.settings?.subtitle ?? null}
           ctaLabel={copy.ctaLabel}
@@ -407,6 +592,7 @@ function HomeSection({
         <CategoryStrip
           store={store}
           categories={home.featuredCategories}
+          products={pictures}
           title={copy.title}
           layout={layout === 'tiles' ? 'tiles' : 'chips'}
           skin={skin}
@@ -456,12 +642,20 @@ function HomeSection({
     case 'catalog':
       return (
         <ProductSection
+          id="shop-products"
           store={store}
           title={copy.title}
-          eyebrow={copy.subtitle}
+          eyebrow={
+            // The default strapline ("the newest across the whole shop") is
+            // wrong when this IS the whole shop; the owner's own words stay.
+            catalogAll && !section.settings?.subtitle
+              ? `${shopProductCount(store)} products`
+              : copy.subtitle
+          }
           viewAllTo={storeShopUrl(store.slug)}
           products={home.catalog}
           layout={productLayout(layout)}
+          all={catalogAll}
           skin={skin}
           tone={tone}
           builder={builder}
@@ -512,12 +706,12 @@ function Band({
     pad === 'dense'
       ? 'py-3.5 sm:py-4'
       : pad === 'hero'
-        ? 'py-10 sm:py-14 lg:py-16'
+        ? 'py-8 sm:py-12 lg:py-16'
         : 'py-8 sm:py-10'
   return (
     <section
       id={id}
-      className={`${SCROLL_UNDER_HEADER} border-b ${skin.border} ${tone === 'alt' ? skin.surface : ''} ${className}`}
+      className={`${SCROLL_UNDER_HEADER} border-b last:border-b-0 ${skin.border} ${tone === 'alt' ? skin.surface : ''} ${className}`}
       {...builder}
     >
       <div className={`${STORE_CONTAINER} ${padding}`}>{children}</div>
@@ -544,12 +738,28 @@ function Band({
  * not. The art is `alt=""` — it is decoration, and every product in it is
  * reachable from the rows below.
  */
+/**
+ * Where the hero's button leads: the products just below (a small shop — they
+ * are all on this page), the Shop page (a big one), or nowhere (a
+ * one-product shop, whose product is the very next thing on the page).
+ */
+type HeroCta = 'products' | 'shop' | 'none'
+
+const TRUST_ICONS: Record<TrustFact['key'], typeof TruckIcon> = {
+  delivery: TruckIcon,
+  cod: RupeeIcon,
+  online: CardIcon,
+  pickup: StoreIcon,
+}
+
 function Hero({
   store,
   skin,
   tone = 'alt',
   covers,
   categoriesAnchor,
+  facts,
+  cta,
   heading = null,
   tagline = null,
   ctaLabel = null,
@@ -561,9 +771,12 @@ function Hero({
   tone?: BandTone
   covers: string[]
   categoriesAnchor: boolean
+  /** Delivery / payment reassurance from this store's real settings. */
+  facts: TrustFact[]
+  cta: HeroCta
   /** Owner's headline. Null = the store's own name. */
   heading?: string | null
-  /** Owner's intro line. Null = their About text, then a catalog summary. */
+  /** Owner's intro line. Null = their About text, else nothing. */
   tagline?: string | null
   /** Owner's button label. Null = "Start Shopping". */
   ctaLabel?: string | null
@@ -576,15 +789,16 @@ function Hero({
   layout?: 'split' | 'minimal'
   builder?: Record<string, string> | undefined
 }) {
-  const productCount = store.categories.reduce(
-    (sum, c) => sum + c.productCount,
-    0,
-  )
-  const summary = `${productCount} ${productCount === 1 ? 'product' : 'products'} across ${store.categories.length} ${store.categories.length === 1 ? 'category' : 'categories'}`
   const about = store.footer.info.about?.trim()
   const art = covers.slice(0, HERO_ART_SIZE)
   const hasArt = layout === 'split' && art.length >= 2
-  const intro = tagline ?? about
+  // Only words someone wrote. The old generated line ("4 products across 1
+  // category, delivered to your door") was catalogue arithmetic, not a reason
+  // to buy — the trust chips below say what a customer actually needs.
+  const intro = tagline ?? about ?? null
+  const label = ctaLabel ?? HERO_DEFAULT_CTA
+  const ctaClass = `inline-flex h-12 items-center gap-1.5 rounded-md px-6 text-[15px] font-bold transition ${skin.cta}`
+  const align = hasArt ? '' : 'justify-center'
 
   return (
     <Band
@@ -611,59 +825,75 @@ function Hero({
         <div
           className={`select-none ${hasArt ? '' : 'mx-auto max-w-2xl text-center'}`}
         >
-          <div
-            className={`flex items-center gap-3 ${hasArt ? '' : 'justify-center'}`}
-          >
-            {store.logoUrl && (
-              <MediaImg
-                sizes="44px"
-                src={store.logoUrl}
-                alt=""
-                className={`h-11 w-11 shrink-0 rounded-md border object-cover ${skin.border}`}
-              />
-            )}
-            {/* Wide-tracked eyebrow (prototype: "UnieMax · SPORTS FACTORY"). */}
-            <span className="text-[11px] font-semibold uppercase tracking-[0.3em] text-brand">
-              Welcome to
-            </span>
-          </div>
+          {/* The shop's own mark, big enough to recognise — the old 44px logo
+              sat beside a "WELCOME TO" eyebrow that said nothing. */}
+          {store.logoUrl && (
+            <MediaImg
+              sizes="64px"
+              src={store.logoUrl}
+              alt=""
+              className={`h-16 w-16 rounded-xl border object-cover shadow-floating ${hasArt ? '' : 'mx-auto'} ${skin.border}`}
+            />
+          )}
 
-          {/* Prototype hero scale: heading face at 700, near-flush leading.
-              `break-words` so a long single-word shop name wraps instead of
+          {/* `break-words` so a long single-word shop name wraps instead of
               widening the band past the viewport. */}
           <h1
-            className={`mt-3 break-words font-heading text-3xl font-bold leading-[1.05] sm:text-4xl lg:text-5xl ${skin.text}`}
+            className={`mt-4 break-words font-heading text-3xl font-bold leading-[1.05] sm:text-4xl lg:text-5xl ${skin.text}`}
           >
             {heading ?? store.name}
           </h1>
 
-          <p
-            className={`mt-3 max-w-xl text-sm sm:text-base ${hasArt ? '' : 'mx-auto'} ${skin.muted}`}
-          >
-            {intro ?? `Browse our full range — ${summary}, delivered to your door.`}
-          </p>
-          {intro && <p className={`mt-1.5 text-sm ${skin.muted}`}>{summary}</p>}
-
-          <div
-            className={`mt-6 flex flex-wrap items-center gap-3 ${hasArt ? '' : 'justify-center'}`}
-          >
-            <Link
-              to={storeShopUrl(store.slug)}
-              className={`inline-flex h-11 items-center gap-1.5 rounded-md px-6 text-sm font-bold transition ${skin.cta}`}
+          {intro && (
+            <p
+              className={`mt-3 line-clamp-3 max-w-xl text-[15px] sm:line-clamp-none sm:text-base ${hasArt ? '' : 'mx-auto'} ${skin.muted}`}
             >
-              {ctaLabel ?? HERO_DEFAULT_CTA}
-              <ChevronRightIcon className="h-4 w-4" />
-            </Link>
-            {/* Only offered when the categories band is actually on the page. */}
-            {categoriesAnchor && (
-              <a
-                href="#shop-by-category"
-                className={`inline-flex h-11 items-center rounded-md border px-6 text-sm font-semibold transition-colors hover:border-brand ${skin.border} ${skin.text}`}
-              >
-                Shop by Category
-              </a>
-            )}
-          </div>
+              {intro}
+            </p>
+          )}
+
+          {facts.length > 0 && (
+            <ul className={`mt-5 flex flex-wrap gap-2 ${align}`}>
+              {facts.map((fact) => {
+                const Icon = TRUST_ICONS[fact.key]
+                return (
+                  <li
+                    key={fact.key}
+                    className={`inline-flex items-center gap-1.5 rounded-pill border px-3 py-1.5 text-[13px] font-semibold ${skin.border} ${skin.text} ${tone === 'alt' ? 'bg-bg' : skin.surface}`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0 text-brand" />
+                    {fact.label}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+
+          {(cta !== 'none' || categoriesAnchor) && (
+            <div className={`mt-6 flex flex-wrap items-center gap-3 ${align}`}>
+              {cta === 'shop' && (
+                <Link to={storeShopUrl(store.slug)} className={ctaClass}>
+                  {label}
+                  <ChevronRightIcon className="h-4 w-4" />
+                </Link>
+              )}
+              {cta === 'products' && (
+                <a href="#shop-products" className={ctaClass}>
+                  {label}
+                  <ChevronRightIcon className="h-4 w-4" />
+                </a>
+              )}
+              {/* Only offered when the categories band is actually on the page. */}
+              {categoriesAnchor && (
+                <a
+                  href="#shop-by-category"
+                  className={`inline-flex h-12 items-center rounded-md border px-6 text-[15px] font-semibold transition-colors hover:border-brand ${skin.border} ${skin.text}`}
+                >
+                  Shop by Category
+                </a>
+              )}
+            </div>
+          )}
         </div>
 
         {hasArt && <HeroArt covers={art} skin={skin} />}
@@ -725,6 +955,7 @@ function HeroArt({ covers, skin }: { covers: string[]; skin: Skin }) {
 function CategoryStrip({
   store,
   categories,
+  products,
   title,
   layout,
   skin,
@@ -733,6 +964,8 @@ function CategoryStrip({
 }: {
   store: PublicStore
   categories: PublicCategory[]
+  /** Products already on the page — a shelf with no picture borrows a cover. */
+  products: PublicProduct[]
   title: string
   /**
    * `chips` is the scrolling row above — wayfinding that costs one line of
@@ -760,25 +993,68 @@ function CategoryStrip({
         skin={skin}
       />
       {layout === 'tiles' ? (
-        <CategoryTiles store={store} categories={categories} skin={skin} />
+        <CategoryTiles
+          store={store}
+          categories={categories}
+          products={products}
+          skin={skin}
+        />
       ) : (
-        <ul className={`mt-4 flex gap-2.5 pb-1 ${EDGE_SCROLLER}`}>
-          {categories.map((category) => (
-            <li key={category.id} className="shrink-0">
-              <Link
-                to={storeCategoryUrl(store.slug, category.slug)}
-                className={`flex h-10 items-center gap-2 whitespace-nowrap rounded-pill border px-4 text-sm font-semibold transition-colors hover:border-brand hover:text-brand ${skin.border} ${skin.text} ${tone === 'alt' ? 'bg-bg' : skin.surface}`}
-              >
-                {category.name}
-                <span className={`text-[11px] font-bold ${skin.muted}`}>
-                  {category.productCount}
-                </span>
-              </Link>
-            </li>
-          ))}
+        // Round pictures with the name underneath — the shape every shopping
+        // app on a phone uses for categories, so it needs no explaining.
+        <ul className={`mt-4 flex gap-3 pb-1 sm:gap-4 ${EDGE_SCROLLER}`}>
+          {categories.map((category) => {
+            const picture = categoryPicture(category, products)
+            return (
+              <li key={category.id} className="w-[84px] shrink-0 sm:w-24">
+                <Link
+                  to={storeCategoryUrl(store.slug, category.slug)}
+                  className="group flex flex-col items-center gap-2 text-center"
+                >
+                  <span
+                    className={`flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-full border-2 transition-colors group-hover:border-brand sm:h-20 sm:w-20 ${skin.border} ${skin.well}`}
+                  >
+                    {picture ? (
+                      <MediaImg
+                        sizes="80px"
+                        src={picture}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <CategoryInitial name={category.name} />
+                    )}
+                  </span>
+                  <span
+                    className={`line-clamp-2 text-[13px] font-semibold leading-tight ${skin.text}`}
+                  >
+                    {category.name}
+                  </span>
+                </Link>
+              </li>
+            )
+          })}
         </ul>
       )}
     </Band>
+  )
+}
+
+/** A category with no picture anywhere: its first letter in the brand colour. */
+function CategoryInitial({ name }: { name: string }) {
+  return (
+    <span
+      aria-hidden
+      className="font-heading text-xl font-bold text-brand"
+    >
+      {name.trim().charAt(0).toUpperCase()}
+    </span>
+  )
+}
+
+/** How many tiles a band shows    </Band>
   )
 }
 
@@ -786,51 +1062,61 @@ function CategoryStrip({
 const CATEGORY_TILE_CAP = 12
 
 /**
- * Categories as cards — name, count and a monogram cut from the owner's brand.
- *
- * There is no category artwork in the data model, so a tile does NOT pretend
- * to have a photo: it is typographic, which is honest and also what keeps the
- * row looking identical whether a seller has uploaded anything or not. Two
- * across on a phone and up to six on a wide monitor, so a tile never stretches
- * into a billboard on a 2560px screen.
+ * Categories as cards — a picture, the name and the count. The picture is the
+ * shelf's own artwork, else a cover of one of its products already on the
+ * page (`categoryPicture`), else the name's first letter: always something
+ * real. Two across on a phone and up to six on a wide monitor, so a tile
+ * never stretches into a billboard on a 2560px screen.
  */
 function CategoryTiles({
   store,
   categories,
+  products,
   skin,
 }: {
   store: PublicStore
   categories: PublicCategory[]
+  products: PublicProduct[]
   skin: Skin
 }) {
   return (
     <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-6">
-      {categories.slice(0, CATEGORY_TILE_CAP).map((category) => (
-        <li key={category.id}>
-          <Link
-            to={storeCategoryUrl(store.slug, category.slug)}
-            className={`group flex h-full flex-col justify-between gap-4 rounded-lg border p-4 metal-lift ${skin.border} ${skin.surface}`}
-          >
-            <span
-              aria-hidden
-              className="flex h-10 w-10 items-center justify-center rounded-md bg-brand-soft font-heading text-lg font-bold text-brand"
+      {categories.slice(0, CATEGORY_TILE_CAP).map((category) => {
+        const picture = categoryPicture(category, products)
+        return (
+          <li key={category.id}>
+            <Link
+              to={storeCategoryUrl(store.slug, category.slug)}
+              className={`group flex h-full flex-col overflow-hidden rounded-lg border metal-lift ${skin.border} ${skin.surface}`}
             >
-              {category.name.trim().charAt(0).toUpperCase()}
-            </span>
-            <span className="min-w-0">
               <span
-                className={`block truncate text-sm font-semibold ${skin.text}`}
+                className={`relative flex aspect-[4/3] items-center justify-center overflow-hidden ${skin.well}`}
               >
-                {category.name}
+                {picture ? (
+                  <FillImage
+                    src={picture}
+                    alt=""
+                    sizes="(min-width: 1024px) 16vw, (min-width: 640px) 33vw, 50vw"
+                  />
+                ) : (
+                  <CategoryInitial name={category.name} />
+                )}
               </span>
-              <span className={`mt-0.5 block text-xs ${skin.muted}`}>
-                {category.productCount}{' '}
-                {category.productCount === 1 ? 'product' : 'products'}
+              <span className="min-w-0 p-3">
+                <span
+                  className={`block truncate text-[15px] font-semibold ${skin.text}`}
+                >
+                  {category.name}
+                </span>
+                <span className={`mt-0.5 block text-[13px] ${skin.muted}`}>
+                  {category.productCount}{' '}
+                  {category.productCount === 1 ? 'product' : 'products'}
+                </span>
               </span>
-            </span>
-          </Link>
-        </li>
-      ))}
+            </Link>
+          </li>
+        )
+      })}
     </ul>
   )
 }
@@ -849,27 +1135,49 @@ type SectionLayout = 'grid' | 'rail' | 'spotlight'
  * site guessing what a store will have in stock.
  */
 function ProductSection({
+  id,
   store,
   title,
   eyebrow,
   viewAllTo,
   products,
   layout,
+  all = false,
   skin,
   tone,
   builder,
 }: {
+  /** Anchor the hero's button scrolls to. */
+  id?: string
   store: PublicStore
   title: string
   eyebrow?: string
   viewAllTo: string
   products: PublicProduct[]
   layout: SectionLayout
+  /**
+   * These products ARE the whole shop: show every one in a plain grid, with
+   * no "View all" (there is nothing more to view).
+   */
+  all?: boolean
   skin: Skin
   tone: BandTone
   builder?: Record<string, string> | undefined
 }) {
   if (products.length === 0) return null
+
+  if (all) {
+    return (
+      <Band id={id} tone={tone} skin={skin} builder={builder}>
+        <SectionHeading title={title} eyebrow={eyebrow} skin={skin} />
+        <ul className={`mt-5 ${PRODUCT_GRID}`}>
+          {products.map((product) => (
+            <ProductCard key={product.id} store={store} product={product} skin={skin} />
+          ))}
+        </ul>
+      </Band>
+    )
+  }
 
   const effective: SectionLayout =
     layout === 'spotlight' && products.length >= SPOTLIGHT_MIN
@@ -894,7 +1202,7 @@ function ProductSection({
   }
 
   return (
-    <Band tone={tone} skin={skin} builder={builder}>
+    <Band id={id} tone={tone} skin={skin} builder={builder}>
       <SectionHeading
         title={title}
         eyebrow={eyebrow}
@@ -1250,4 +1558,98 @@ function categoryProductCount(
     if (nested > 0) return nested
   }
   return 0
+}
+
+// ---------------------------------------------------------------------------
+// One-product shop
+// ---------------------------------------------------------------------------
+
+/**
+ * A one-product shop's homepage IS that product: one large card — the photo
+ * across the full width of a phone, the name, price and saving, stock, the
+ * seller's description and a single button — instead of a category picker,
+ * a "collection" and an "All Products" grid each holding the same lone card.
+ * Side by side from `lg`.
+ */
+function ProductShowcase({
+  store,
+  product,
+  skin,
+  tone,
+}: {
+  store: PublicStore
+  product: PublicProduct
+  skin: Skin
+  tone: BandTone
+}) {
+  const to = storeProductUrl(store.slug, product.slug)
+  const off = discountPercent(product)
+  const soldOut = product.stockQuantity <= 0
+  return (
+    <Band id="shop-products" tone={tone} skin={skin}>
+      <article
+        className={`overflow-hidden rounded-xl border ${skin.border} ${skin.surface} lg:grid lg:grid-cols-2`}
+      >
+        <Link
+          to={to}
+          className={`relative block aspect-square overflow-hidden ${skin.well}`}
+        >
+          {product.image?.url ? (
+            <FillImage
+              eager
+              src={product.image.url}
+              alt={product.image.altText ?? product.name}
+              sizes="(min-width: 1024px) 50vw, 100vw"
+            />
+          ) : (
+            <NoProductImage />
+          )}
+          {off !== null && !soldOut && (
+            <span className="absolute left-3 top-3 rounded-pill bg-brand px-2.5 py-1 text-[13px] font-bold text-brand-contrast">
+              {off}% off
+            </span>
+          )}
+        </Link>
+
+        <div className="flex flex-col p-5 sm:p-7 lg:justify-center lg:p-10">
+          <p className={`text-[13px] font-semibold ${skin.muted}`}>
+            {product.category.name}
+          </p>
+          <h2
+            className={`mt-1 font-heading text-2xl font-bold leading-tight sm:text-3xl ${skin.text}`}
+          >
+            {displayName(product.name)}
+          </h2>
+          <div className="mt-3">
+            <PriceLabel product={product} size="lg" />
+          </div>
+          <div className="mt-2">
+            {soldOut ? (
+              <span className={`text-sm font-semibold ${skin.muted}`}>Sold out</span>
+            ) : (
+              <StockBadge stock={product.stockQuantity} />
+            )}
+          </div>
+          {product.description && (
+            <p
+              className={`mt-4 line-clamp-4 whitespace-pre-line text-[15px] leading-relaxed ${skin.muted}`}
+            >
+              {product.description}
+            </p>
+          )}
+          <Link
+            to={to}
+            className={`mt-6 inline-flex h-12 w-full items-center justify-center gap-1.5 rounded-md px-8 text-base font-bold sm:w-auto sm:self-start ${skin.cta}`}
+          >
+            {soldOut
+              ? 'See details'
+              : product.variantCount > 0
+                ? 'Choose & buy'
+                : 'Buy now'}
+            <ChevronRightIcon className="h-4 w-4" />
+          </Link>
+        </div>
+      </article>
+    </Band>
+  )
 }

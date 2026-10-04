@@ -856,7 +856,24 @@ full-bleed section bands instead.
   palette. Below `sm` the bar has no room for it beside the search field, so
   the same block (avatar, name, the `ACCOUNT_MENU_ITEMS` rows, My Store,
   Logout) sits at the **top of the mobile drawer** instead.
-- **`StoreHomePage`** — hero, Shop by Category, then the
+- **`StoreHomePage`** — **adapts to the size of the shop**
+  (`features/publicStore/shopShape.ts`, the one place the storefront asks
+  "how big is this shop?"). Most sellers list a handful of products under one
+  category, and a page built for a big catalogue showed those few products two
+  or three times and offered category choices with one answer:
+
+  | Shop (`shopSize`) | Homepage |
+  | ---------------- | -------- |
+  | `one` — 1 product | banners + hero, then **`ProductShowcase`**: that product as one large card (photo full-width on a phone, name, price and % off, stock, description, one button to the product page; side by side from `lg`). Nothing else. |
+  | `small` — ≤ 12 (`SMALL_SHOP_MAX`, the payload's section size) | every product **once** in All Products (uncapped grid, "N products", no "View all"); the curated rows and Category Highlights are dropped and the owner's Featured → Best Sellers → New Arrivals picks **lead** the grid instead |
+  | `full` | every section below; All Products skips products a row **above** it already showed |
+
+  Category pickers (the strip, the hero's "Shop by Category" button) only
+  appear with **two or more categories after `browsableCategories`** walks
+  down single-branch chains ("Fashion" holding only Men and Women offers Men
+  and Women). The hero art only appears for `full` shops. `shapeHome()` does
+  all of this on the payload without touching the owner's order or switches.
+  Otherwise: hero, Shop by Category, then the
   merchandising rows (Featured / New Arrivals / Best Sellers, then Category
   Highlights and All Products) from
   `GET …/home`. Sections render in the **owner-arranged order** (the payload's
@@ -878,7 +895,7 @@ full-bleed section bands instead.
 
     | Section                     | Composition                                       | Falls back below |
     | --------------------------- | ------------------------------------------------- | ---------------- |
-    | Shop by Category            | one scrolling row of chips (`CategoryStrip`)      | —                |
+    | Shop by Category            | one scrolling row of round pictures (`CategoryStrip`) | —            |
     | Featured Products           | spotlight — one `size="lg"` lead + exactly 6       | 7 products       |
     | New Arrivals / Best Sellers | horizontal rail (`ProductRail`)                   | 6 products       |
     | Category Highlights         | shelf panel + that shelf's newest                 | 2 products       |
@@ -898,13 +915,13 @@ full-bleed section bands instead.
     Arrows appear from `lg` (where there is no swipe) inside the section
     heading; they scroll by most of a screenful and **grey out** at each end
     rather than disappearing, so the control row does not reflow as you scroll.
-  - **Shop by Category** (`CategoryStrip`) is **one scrolling row of chips,
-    never a wrapping block**: it is wayfinding, not merchandising. A store with
-    twenty categories must not turn its tallest homepage section into a list of
-    links, and a store with one must not strand a lone tile in a grid — a
-    single sideways-scrolling row is the only shape that holds for both, and on
-    a phone it is the natural gesture. Chips are `h-10` and carry the category's
-    product count.
+  - **Shop by Category** (`CategoryStrip`) is **one scrolling row, never a
+    wrapping block**: it is wayfinding, not merchandising. Each entry is a
+    72–80px **round picture with the name under it** (the shape every shopping
+    app uses on a phone). The picture is `categoryPicture()`: the shelf's
+    `imageUrl` (seller's, else the taxonomy's — from the public shell), else
+    the cover of one of its products already on the page, else the first
+    letter. The `tiles` layout uses the same picture as a 4:3 `FillImage`.
   - **Category Highlights / All Products** — the two sections that need no
     merchandising flags, and what a shop shows before its owner has curated
     anything. All Products is the plain capped row (newest shop-wide, "View
@@ -952,12 +969,16 @@ full-bleed section bands instead.
     from under a click; off-screen slides are `inert` so they are not invisible
     tab stops. A `URL` banner is a plain `<a target="_blank" rel="noopener">`;
     everything else routes through the SPA.
-  - **Hero** — the store's logo mark and a wide-tracked eyebrow, the store
-    name (`text-3xl sm:text-4xl lg:text-5xl`, `break-words` so a long
-    single-word name wraps instead of widening the band), a description, a
-    Start Shopping CTA and — only when the categories band is actually on the
-    page — a `#shop-by-category` anchor button. It sits at `hero` band padding
-    (`py-10 sm:py-14 lg:py-16`) and keeps the radial brand wash.
+  - **Hero** — the store's 64px logo, the store name (`text-3xl sm:text-4xl
+    lg:text-5xl`, `break-words`), the owner's words if any, **trust chips**
+    from the store's real settings (`trustFacts()`: "Free delivery" / "Free
+    delivery above ₹1,000" / "Delivery ₹200", "Cash on delivery", "Pay by UPI
+    or card", "Pick up from the shop"), then the CTA — which scrolls to
+    `#shop-products` for a small shop, opens Shop for a big one, and is absent
+    for a one-product shop (the product is next) — plus, only when the
+    categories band is on the page, a `#shop-by-category` button. No "Welcome
+    to" eyebrow. `hero` band padding is `py-8 sm:py-12 lg:py-16`, with the
+    radial brand wash.
     - **Two shapes, and the empty one is deliberate.** With at least two real
       product covers it is a two-column composition: the pitch on the left,
       `HeroArt` on the right — one grid in two shapes, a triptych of squares
@@ -968,9 +989,10 @@ full-bleed section bands instead.
       (max 3) and decorative (`alt=""`). **With fewer than two there is no
       second column at all** — the copy centres instead of leaving half the
       band empty, which is what a brand-new shop used to look like.
-    - The description is the owner's own **About** text from their Footer
-      settings when they wrote one (with the catalog summary as a second,
-      muted line), and the generated summary alone when they did not.
+    - The description is the owner's tagline or their **About** text (three
+      lines on a phone), and **nothing** when they wrote neither — the old
+      generated "4 products across 1 category, delivered to your door" was
+      catalogue arithmetic, not a reason to buy.
   - **Shop by Category** — see the composition table above.
   - **Capped product rows** — `ROW_SIZE = 5` shown, with `ROW_VISIBILITY`
     hiding the surplus per breakpoint (`hidden md:list-item` …) so **every**
@@ -979,8 +1001,9 @@ full-bleed section bands instead.
     (`/shop?section=featured|newArrivals|bestSellers`). Rows are
     **strictly flag-driven** (a product shows only in the sections its owner
     ticked) and a row with nothing ticked is not rendered at all.
-- **`StoreCategoryPage`** — breadcrumb, title, subcategory chips, then the
-  shared `ProductListing`.
+- **`StoreCategoryPage`** — breadcrumb, title, subcategory chips (hidden
+  when the only subcategory holds every product here — one chip leading to the
+  same products is not a choice), then the shared `ProductListing`.
 - **`StoreShopPage`** — browse-all listing; `?q=` turns it into search
   results and `?section=` scopes it to one merchandising row (title follows,
   e.g. "Best Sellers"). One page, since they are the same listing at a
@@ -1092,17 +1115,20 @@ full-bleed section bands instead.
 - **`ProductCard`** — the **whole card is one link** to the product page; there
   is no Add to Cart on a card. Buying happens on the product page, which keeps
   every card the same shape whether or not the product has options, so a grid
-  of thousands stays uniform. Shows the **cover image**, category label, name
-  (2 lines, then ellipsis), a **"From ₹X"** price in the brand color with the
-  MRP struck through, a **stock badge** only when it matters (Low — plenty in
-  stock says nothing) and **"N Variants Available"** (never the options
-  themselves). The badge line is `mt-auto`, so it sits level across a row
-  however the names wrapped.
+  of thousands stays uniform. Shows the **cover image**, the name through
+  `displayName()` (2 lines; a name typed in ALL CAPITALS shows in Title Case,
+  keeping abbreviations like LED / USB / XL and lower-casing "of", "for"…;
+  display only), a **"From ₹X"** price in the brand color with the MRP struck
+  through, a **stock badge** only when it matters (Low — plenty in stock says
+  nothing) and **"N options"** (never the options themselves). No category
+  label — the page or section already says where you are. The badge line is
+  `mt-auto`, so it sits level across a row however the names wrapped.
   - **The cover slot is always a fixed ratio** (square; `4/3` for a
-    spotlight's lead) with the image `object-contain` inside it, so a mix of
-    portrait, landscape and missing photos never makes a row ragged. It is
-    lazy-loaded (`loading="lazy"`/`decoding="async"`) and inset (`p-2`) so it
-    reads as a framed product rather than a slab bleeding into the card.
+    spotlight's lead), **edge to edge** under the card's one border, drawn by
+    **`FillImage`**: the photo `object-contain` over a blurred, enlarged copy
+    of itself (`sizes="64px"`, so the blur layer is the smallest sized file).
+    Nothing is cropped off a banner-shaped upload and no photo floats small in
+    a grey box. The product page's main gallery image uses the same blur fill.
   - Over that slot: a **"N% off" flag** top-left, computed from the MRP and
     only when the discount is real (it replaced a wordless "Sale" tag — the
     number is what a shopper actually scans for), and a **"Sold out" veil**

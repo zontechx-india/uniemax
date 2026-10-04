@@ -1480,6 +1480,7 @@ products**. Small and cacheable; fetched once per store visit.
   "checkout": { "name", "phone", "email", "address", "pincode", "state", "country" },
   "categories": [                 // enabled ROOT categories with something shoppable
     { "id", "name", "slug", "isFeatured",
+      "imageUrl",                 // shelf picture, else its taxonomy category's; null = none
       "productCount",             // includes everything beneath it
       "subcategories": [ /* same shape, recursively — any depth */ ] }
   ] }

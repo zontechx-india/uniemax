@@ -17,6 +17,7 @@ import {
 } from '../../features/publicStore/structuredData'
 import { ProductListing } from '../../features/publicStore/ProductListing'
 import type { Crumb } from '../../features/publicStore/ListingControls'
+import { findCategory } from '../../features/publicStore/shopShape'
 
 /**
  * A category page is the shop's best shot at a "<thing> in <shop>" query, so
@@ -109,6 +110,16 @@ export function StoreCategoryPage() {
     )
   }
 
+  // A single subcategory holding everything here is not a choice — the chip
+  // would open the same products again ("Office & Business" → "Printing 4").
+  const total = findCategory(store.categories, category.id)?.productCount ?? null
+  const subcategories =
+    category.subcategories.length === 1 &&
+    total !== null &&
+    category.subcategories[0]!.productCount >= total
+      ? []
+      : category.subcategories
+
   const trail: Crumb[] = [
     ...category.ancestors.map((crumb) => ({
       label: crumb.name,
@@ -125,13 +136,13 @@ export function StoreCategoryPage() {
       trail={trail}
       category={category.slug}
     >
-      {category.subcategories.length > 0 && (
+      {subcategories.length > 0 && (
         <ul className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          {category.subcategories.map((sub) => (
+          {subcategories.map((sub) => (
             <li key={sub.id}>
               <Link
                 to={storeCategoryUrl(store.slug, sub.slug)}
-                className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors hover:border-brand ${skin.border} ${skin.chip} ${skin.text}`}
+                className={`flex min-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 text-sm font-semibold transition-colors hover:border-brand ${skin.border} ${skin.chip} ${skin.text}`}
               >
                 {sub.name}
                 <span className={`text-[11px] font-bold ${skin.muted}`}>

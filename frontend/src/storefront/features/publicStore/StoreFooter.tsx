@@ -93,7 +93,7 @@ export function StoreFooter({ store, skin }: { store: PublicStore; skin: Skin })
     // preview it is a hit-target like any homepage band. Nothing is added on a
     // real storefront.
     <footer
-      className={`mt-10 border-t ${skin.border}`}
+      className={`border-t ${skin.border}`}
       {...builderSectionProps('footer')}
     >
       <div className={STORE_CONTAINER}>

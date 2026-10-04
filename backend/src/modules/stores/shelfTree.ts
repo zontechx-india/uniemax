@@ -21,6 +21,10 @@ export const shelfSelect = {
   sortOrder: true,
   createdAt: true,
   categoryId: true,
+  // Shelf artwork for the storefront's category tiles: the seller's own
+  // picture, else the platform taxonomy's.
+  imageUrl: true,
+  category: { select: { imageUrl: true } },
 } satisfies Prisma.StoreCategorySelect;
 
 export type Shelf = Prisma.StoreCategoryGetPayload<{ select: typeof shelfSelect }>;

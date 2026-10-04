@@ -587,6 +587,8 @@ export interface PublicCategory {
   name: string
   /** URL identity — /store/{storeSlug}/category/{slug}. */
   slug: string
+  /** Shelf artwork (seller picture, else taxonomy picture); null = none. */
+  imageUrl: string | null
   /** Owner-picked for the homepage "Featured Categories" row. */
   isFeatured: boolean
   /** Visible products in this category *including* its subcategories. */
