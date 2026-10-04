@@ -1,4 +1,9 @@
 import { useState } from 'react'
+import { ActionRow } from './ui/ActionRow'
+import { PageHeader } from './ui/PageHeader'
+import { StatusPill } from './ui/StatusPill'
+import { showToast } from './ui/Toast'
+import { buttonClass } from '../../../shared/ui/Button'
 import type { FormEvent, ReactNode, TextareaHTMLAttributes } from 'react'
 import { toApiError } from '../../../shared/auth/http'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
@@ -19,6 +24,7 @@ import type {
 } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import {
+  FooterIcon,
   ChevronDownIcon,
   MailIcon,
   MapPinIcon,
@@ -53,17 +59,15 @@ export function StoreFooterPage({
     <div>
       {!embedded && (
         <>
-          <h2 className="font-body text-xl font-semibold tracking-normal text-fg">
-            Footer
-          </h2>
-          <p className="mt-1 text-sm text-muted">
-            Everything shown in your storefront's footer — contact details,
-            locations, social media and more. Each card saves on its own.
-          </p>
+          <PageHeader
+            icon={FooterIcon}
+            title="Shop footer"
+            description="What shows at the bottom of every page of your shop — your address, phone, social media and more. Each card saves on its own."
+          />
         </>
       )}
       {embedded && (
-        <p className="text-sm text-muted">
+        <p className="text-hint text-muted">
           Everything shown at the bottom of every page of your shop. Each card
           saves on its own.
         </p>
@@ -100,6 +104,7 @@ function useFooterSave() {
     try {
       onStoreChange(await storesApi.updateFooter(store.id, patch))
       setSaved(true)
+      showToast('Saved')
       return true
     } catch (err) {
       setError(toApiError(err).message)
@@ -122,9 +127,9 @@ function SectionCard({
   children: ReactNode
 }) {
   return (
-    <section className="rounded-lg border border-line p-4 sm:p-5">
-      <h3 className="font-body text-lg font-semibold tracking-normal text-fg">{title}</h3>
-      <p className="mt-0.5 text-sm text-muted">{description}</p>
+    <section className="glass-card rounded-glass p-4 sm:p-5">
+      <h3 className="font-heading text-[18px] font-bold text-fg">{title}</h3>
+      <p className="mt-0.5 text-hint text-muted">{description}</p>
       <div className="mt-4">{children}</div>
     </section>
   )
@@ -138,9 +143,9 @@ function TextArea({
 }: TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-medium text-muted">{label}</span>
+      <span className="mb-2 block text-[14px] font-medium text-muted">{label}</span>
       <textarea
-        className={`w-full rounded-md border border-line bg-input px-4 py-3 text-sm text-fg outline-none transition-colors placeholder:text-muted hover:border-fg/30 focus:border-accent ${className}`}
+        className={`w-full rounded-md border border-line bg-input px-4 py-3 text-[15px] text-fg outline-none transition-colors placeholder:text-muted hover:border-fg/30 focus:border-accent ${className}`}
         {...props}
       />
     </label>
@@ -149,7 +154,7 @@ function TextArea({
 
 function SaveButton({ busy, dirty }: { busy: boolean; dirty: boolean }) {
   return (
-    <Button type="submit" size="md" loading={busy} disabled={!dirty}>
+    <Button type="submit" size="lg" loading={busy} disabled={!dirty} className="w-full sm:w-auto sm:px-8">
       {busy ? 'Saving…' : 'Save'}
     </Button>
   )
@@ -286,66 +291,72 @@ function LocationsCard() {
                 }
               />
             ) : (
-              <div className="flex items-start gap-3 rounded-md border border-line p-3">
-                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand/10 text-brand">
-                  <MapPinIcon className="h-4 w-4" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-fg">
-                    {location.label || 'Business address'}
-                    {location.isPrimary && (
-                      <span className="ml-2 rounded-pill bg-brand/10 px-2 py-0.5 text-[11px] font-semibold text-brand">
-                        Primary
-                      </span>
-                    )}
-                  </p>
-                  <p className="mt-0.5 truncate text-sm text-muted">
-                    {location.address}
-                  </p>
-                  <p className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-muted">
-                    <span className="inline-flex items-center gap-1">
-                      <PhoneCallIcon className="h-3 w-3" /> {location.phone}
+              <div className="rounded-2xl border border-line bg-surface/60">
+                <ActionRow
+                  leading={
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-soft text-brand">
+                      <MapPinIcon className="h-5 w-5" />
                     </span>
-                    <span className="inline-flex items-center gap-1">
-                      <MailIcon className="h-3 w-3" /> {location.email}
-                    </span>
-                    {location.lat !== null && (
-                      <span className="inline-flex items-center gap-1">
-                        <MapPinIcon className="h-3 w-3" /> Pinned on map
+                  }
+                  title={location.label || 'Business address'}
+                  status={
+                    location.isPrimary ? (
+                      <StatusPill tone="brand" dot={false}>
+                        Main
+                      </StatusPill>
+                    ) : undefined
+                  }
+                  meta={
+                    <>
+                      <span className="block">{location.address}</span>
+                      <span className="mt-0.5 flex flex-wrap gap-x-3">
+                        <span className="inline-flex items-center gap-1">
+                          <PhoneCallIcon className="h-3.5 w-3.5" /> {location.phone}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <MailIcon className="h-3.5 w-3.5" /> {location.email}
+                        </span>
+                        {location.lat !== null && (
+                          <span className="inline-flex items-center gap-1">
+                            <MapPinIcon className="h-3.5 w-3.5" /> Pinned on map
+                          </span>
+                        )}
                       </span>
-                    )}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  {!location.isPrimary && (
+                    </>
+                  }
+                  primary={
                     <button
                       type="button"
-                      onClick={() => setPrimary(location.id)}
+                      onClick={() => setEditing(location.id)}
                       disabled={busy}
-                      className="rounded-md px-2 py-1.5 text-xs font-semibold text-muted transition hover:bg-surface-alt hover:text-fg disabled:cursor-not-allowed"
+                      className={buttonClass({ variant: 'ring', size: 'md', className: 'px-4' })}
                     >
-                      Set primary
+                      <PencilIcon className="h-4 w-4" />
+                      Edit
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setEditing(location.id)}
-                    disabled={busy}
-                    aria-label="Edit location"
-                    className="rounded-md p-1.5 text-muted transition hover:bg-surface-alt hover:text-fg disabled:cursor-not-allowed"
-                  >
-                    <PencilIcon className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDelete(location)}
-                    disabled={busy}
-                    aria-label="Delete location"
-                    className="rounded-md p-1.5 text-muted transition hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
-                </div>
+                  }
+                  menu={[
+                    ...(!location.isPrimary
+                      ? [
+                          {
+                            label: 'Make this the main address',
+                            icon: MapPinIcon,
+                            note: 'Shown first in your footer',
+                            disabled: busy,
+                            onSelect: () => setPrimary(location.id),
+                          },
+                        ]
+                      : []),
+                    {
+                      label: 'Delete address',
+                      icon: TrashIcon,
+                      danger: true,
+                      disabled: busy,
+                      onSelect: () => setConfirmDelete(location),
+                    },
+                  ]}
+                  menuTitle={location.label || 'Business address'}
+                />
               </div>
             )}
           </li>
@@ -923,24 +934,29 @@ function LinksCard() {
 
   return (
     <SectionCard
-      title="Additional Footer Links"
-      description="Custom links such as About Us, Contact Us, FAQ, Careers or Blog."
+      title="Extra links"
+      description="Your own links, like About us, Contact us or FAQ. A link is a web address (https://…)."
     >
       <form onSubmit={submit} noValidate className="space-y-3">
         {rows.map((row, index) => (
-          <div key={index} className="flex items-end gap-2">
-            <div className="w-2/5">
+          // Stacked on a phone (name over link, in a bordered group); one
+          // row from `sm` up, where there is room for both side by side.
+          <div
+            key={index}
+            className="flex flex-col gap-2 rounded-2xl border border-line p-3 sm:flex-row sm:items-end sm:border-0 sm:p-0"
+          >
+            <div className="sm:w-2/5">
               <TextField
-                label={index === 0 ? 'Label' : ''}
+                label="Name"
                 value={row.label}
                 onChange={(e) => setRow(index, { label: e.target.value })}
                 placeholder="About Us"
                 maxLength={40}
               />
             </div>
-            <div className="flex-1">
+            <div className="sm:flex-1">
               <TextField
-                label={index === 0 ? 'URL' : ''}
+                label="Link"
                 value={row.url}
                 onChange={(e) => setRow(index, { url: e.target.value })}
                 placeholder="https://… or /page"
@@ -953,9 +969,10 @@ function LinksCard() {
               onClick={() => setRows((r) => r.filter((_, i) => i !== index))}
               disabled={busy}
               aria-label="Remove link"
-              className="mb-1 rounded-md p-2.5 text-muted transition hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed"
+              className="inline-flex min-h-tap items-center justify-center gap-1.5 rounded-xl px-3 text-[14px] font-semibold text-muted transition hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed sm:mb-0.5"
             >
               <TrashIcon className="h-4 w-4" />
+              <span className="sm:hidden">Remove this link</span>
             </button>
           </div>
         ))}
@@ -965,10 +982,10 @@ function LinksCard() {
             type="button"
             onClick={() => setRows((r) => [...r, { label: '', url: '' }])}
             disabled={busy}
-            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-line bg-surface px-3.5 text-sm font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
+            className={buttonClass({ variant: 'ring', size: 'md' })}
           >
             <PlusIcon className="h-4 w-4" />
-            Add Link
+            Add a link
           </button>
         )}
 
@@ -1012,7 +1029,7 @@ function CopyrightCard() {
           placeholder={defaultLine}
           maxLength={120}
         />
-        <p className="text-xs text-muted">
+        <p className="text-hint text-muted">
           Default: <span className="text-fg">{defaultLine}</span>
         </p>
         {error && <ErrorNote>{error}</ErrorNote>}

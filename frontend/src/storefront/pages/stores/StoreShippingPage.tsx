@@ -22,7 +22,9 @@ import { useManagedStore } from '../../features/stores/useManagedStore'
 import { CheckIcon, MapPinIcon, TruckIcon } from '../../layout/icons'
 import { DeliveryRuleEditor } from './DeliveryRuleEditor'
 import { ShippingRateEditor } from './ShippingRateEditor'
-import { Button } from '../../../shared/ui/Button'
+import { Button, buttonClass } from '../../../shared/ui/Button'
+import { PageHeader } from './ui/PageHeader'
+import { showToast } from './ui/Toast'
 
 /**
  * Shipping section of Store Management — how customers RECEIVE orders:
@@ -58,7 +60,7 @@ const MODES: {
   },
   {
     mode: 'PICKUP',
-    title: 'Store Pickup',
+    title: 'Customer collects',
     description:
       'Customers collect their orders from your business location — no delivery.',
     confirm:
@@ -66,7 +68,7 @@ const MODES: {
   },
   {
     mode: 'BOTH',
-    title: 'Both',
+    title: 'Both — delivery or collect',
     description:
       'Customers choose between delivery and store pickup at checkout.',
     confirm:
@@ -111,16 +113,14 @@ export function StoreShippingPage() {
   const pickupBlocked = !pickupGate.allowed
 
   return (
-    <div>
-      <h2 className="font-body text-xl font-semibold tracking-normal text-fg">
-        Shipping
-      </h2>
-      <p className="mt-1 text-sm text-muted">
-        Choose how customers receive their orders. The change applies to your
-        checkout immediately, so it asks for confirmation.
-      </p>
+    <div className="space-y-4">
+      <PageHeader
+        icon={TruckIcon}
+        title="Delivery"
+        description="How customers get their orders, what delivery costs, and where you deliver."
+      />
 
-      <div className="mt-5 max-w-2xl space-y-3">
+      <div className="space-y-3">
         <ul className="space-y-2" role="radiogroup" aria-label="Fulfilment mode">
           {MODES.map(({ mode, title, description }) => {
             const selected = mode === current
@@ -142,34 +142,34 @@ export function StoreShippingPage() {
                   onClick={() => {
                     if (!selected) setPending(mode)
                   }}
-                  className={`flex w-full items-center gap-4 rounded-lg border p-4 text-left transition disabled:cursor-not-allowed ${
+                  className={`flex min-h-[72px] w-full items-center gap-3.5 rounded-2xl border p-4 text-left transition disabled:cursor-not-allowed ${
                     selected
-                      ? 'border-brand bg-brand/5'
+                      ? 'border-brand bg-brand-soft ring-2 ring-brand/25'
                       : locked
-                        ? 'border-line opacity-60'
-                        : 'border-line hover:bg-surface-alt'
+                        ? 'glass-card opacity-60'
+                        : 'glass-card hover:border-brand/50'
                   }`}
                 >
                   <span
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${
-                      selected ? 'bg-brand/10 text-brand' : 'bg-surface-alt text-muted'
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+                      selected ? 'bg-brand-gradient text-brand-contrast' : 'bg-fg/5 text-muted'
                     }`}
                   >
-                    <Icon className="h-4.5 w-4.5" />
+                    <Icon className="h-5 w-5" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-fg">
+                    <span className="block text-[16px] font-bold text-fg">
                       {title}
                     </span>
-                    <span className="mt-0.5 block text-sm text-muted">
+                    <span className="mt-0.5 block text-hint text-muted">
                       {description}
                     </span>
                   </span>
                   <span
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
                       selected
                         ? 'border-brand bg-brand text-brand-contrast'
-                        : 'border-line'
+                        : 'border-fg/25'
                     }`}
                   >
                     {selected && <CheckIcon className="h-3 w-3" />}
@@ -190,7 +190,7 @@ export function StoreShippingPage() {
               to="../business"
               className="font-semibold text-brand hover:underline"
             >
-              Business Details
+              Business details
             </Link>
             .
           </InfoNote>
@@ -255,6 +255,7 @@ function ShippingCharges({
     try {
       onStoreChange(await storesApi.updateShippingRate(store.id, draft))
       setSavedNote(true)
+      showToast('Delivery charge saved')
     } catch (err) {
       setError(toApiError(err).message)
     } finally {
@@ -263,21 +264,21 @@ function ShippingCharges({
   }
 
   return (
-    <section className="mt-8 max-w-2xl border-t border-line pt-6">
-      <h3 className="font-body text-base font-semibold tracking-normal text-fg">
-        Shipping charges
+    <section className="glass-card rounded-glass p-4 sm:p-5">
+      <h3 className="font-heading text-[18px] font-bold text-fg">
+        Delivery charge
       </h3>
-      <p className="mt-1 text-sm text-muted">
-        What customers pay for delivery. This is the default for every
-        product; a product can ship free or at its own rate from{' '}
+      <p className="mt-1 text-hint text-muted">
+        What customers pay for delivery. This is for every product; a product
+        can ship free or at its own charge from{' '}
         <Link
           to="../products"
           className="font-semibold text-brand hover:underline"
         >
           Products
         </Link>
-        . An order pays the highest rate among its items — never the sum.
-        Pickup orders are always free.
+        . An order pays the highest charge among its items — never added
+        up. Collected orders are always free.
       </p>
 
       <div className="mt-4">
@@ -304,15 +305,15 @@ function ShippingCharges({
         </div>
       )}
 
-      <div className="mt-4 flex items-center gap-3">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button
           type="button"
-          size="md"
+          size="lg"
           onClick={() => void save()}
           loading={busy}
           disabled={!dirty}
         >
-          {busy ? 'Saving…' : 'Save Shipping Charges'}
+          {busy ? 'Saving…' : 'Save delivery charge'}
         </Button>
         {dirty && !busy && (
           <button
@@ -322,9 +323,9 @@ function ShippingCharges({
               setEditorKey((k) => k + 1)
               setError(null)
             }}
-            className="text-sm font-semibold text-muted hover:text-fg"
+            className={buttonClass({ variant: 'ring', size: 'lg' })}
           >
-            Discard changes
+            Undo changes
           </button>
         )}
       </div>
@@ -365,6 +366,7 @@ function DeliveryAreas({
     try {
       onStoreChange(await storesApi.updateDeliveryRule(store.id, draft))
       setSavedNote(true)
+      showToast('Delivery areas saved')
     } catch (err) {
       setError(toApiError(err).message)
     } finally {
@@ -373,12 +375,12 @@ function DeliveryAreas({
   }
 
   return (
-    <section className="mt-8 max-w-2xl border-t border-line pt-6">
-      <h3 className="font-body text-base font-semibold tracking-normal text-fg">
-        Delivery areas
+    <section className="glass-card rounded-glass p-4 sm:p-5">
+      <h3 className="font-heading text-[18px] font-bold text-fg">
+        Where you deliver
       </h3>
-      <p className="mt-1 text-sm text-muted">
-        Where you deliver, by pincode. This is the default for every product;
+      <p className="mt-1 text-hint text-muted">
+        Where you deliver, by pincode. This is for every product;
         a product can set its own delivery areas from{' '}
         <Link
           to="../products"
@@ -413,15 +415,15 @@ function DeliveryAreas({
         </div>
       )}
 
-      <div className="mt-4 flex items-center gap-3">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button
           type="button"
-          size="md"
+          size="lg"
           onClick={() => void save()}
           loading={busy}
           disabled={!dirty}
         >
-          {busy ? 'Saving…' : 'Save Delivery Areas'}
+          {busy ? 'Saving…' : 'Save delivery areas'}
         </Button>
         {dirty && !busy && (
           <button
@@ -430,9 +432,9 @@ function DeliveryAreas({
               setDraft(saved)
               setError(null)
             }}
-            className="text-sm font-semibold text-muted hover:text-fg"
+            className={buttonClass({ variant: 'ring', size: 'lg' })}
           >
-            Discard changes
+            Undo changes
           </button>
         )}
       </div>

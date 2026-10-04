@@ -85,8 +85,8 @@ function ChoiceCard({
       aria-checked={selected}
       disabled={disabled}
       onClick={onSelect}
-      className={`flex items-start gap-3 rounded-md border px-3 py-2.5 text-left transition disabled:cursor-not-allowed ${
-        selected ? 'border-brand bg-brand/5' : 'border-line hover:bg-surface-alt'
+      className={`flex min-h-tap items-start gap-3 rounded-xl border px-3.5 py-3 text-left transition disabled:cursor-not-allowed ${
+        selected ? 'border-brand bg-brand-soft' : 'border-line bg-surface/70 hover:bg-fg/5'
       }`}
     >
       <span
@@ -97,8 +97,8 @@ function ChoiceCard({
         {selected && <CheckIcon className="h-3 w-3" />}
       </span>
       <span className="min-w-0">
-        <span className="block text-sm font-semibold text-fg">{title}</span>
-        <span className="mt-0.5 block text-xs text-muted">{detail}</span>
+        <span className="block text-[15px] font-semibold text-fg">{title}</span>
+        <span className="mt-0.5 block text-hint text-muted">{detail}</span>
       </span>
     </button>
   )
@@ -263,7 +263,7 @@ export function ProductShippingField({
               onChange({ type: 'FLAT', amount: parseAmount(text) ?? 0 })
             }}
           />
-          <p className="mt-1.5 text-xs text-muted">
+          <p className="mt-1.5 text-hint text-muted">
             An order pays the highest rate among its items — this replaces the
             store rate when it is higher, and is not waived by the store&rsquo;s
             free-above threshold.

@@ -170,7 +170,7 @@ function Field({
     <div>
       {children}
       {error && (
-        <p role="alert" className="mt-1.5 text-xs font-medium text-danger">
+        <p role="alert" className="mt-1.5 text-hint font-medium text-danger">
           {error}
         </p>
       )}

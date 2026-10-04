@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
+import { HelpHint } from './ui/HelpHint'
+import { PageHeader } from './ui/PageHeader'
+import { ProgressRing } from './ui/ProgressRing'
+import { StatusPill } from './ui/StatusPill'
+import { showToast } from './ui/Toast'
 import type { FormEvent, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
@@ -8,7 +13,7 @@ import { Button } from '../../../shared/ui/Button'
 import { ErrorNote, SuccessNote, TextField } from '../../../shared/ui/form'
 import { useCustomerSession } from '../../app/sessionContext'
 import { useMarketSession } from '../../app/marketSession'
-import { CheckIcon } from '../../layout/icons'
+import { ShieldCheckIcon } from '../../layout/icons'
 import {
   AddressFields,
   validateAddress,
@@ -174,36 +179,37 @@ export function StoreBusinessPage() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className="font-body text-xl font-semibold tracking-normal text-fg">
-          Business Details
-        </h2>
-        <span className="text-xs font-medium text-muted">
-          {met} of {total} details added
-        </span>
-      </div>
-      <p className="mt-1 text-sm text-muted">
-        Who's behind {store.name}. Address and tax details are only needed
-        once you want to be paid online.
-      </p>
+      <PageHeader
+        icon={ShieldCheckIcon}
+        title="Business details"
+        description={`Who is behind ${store.name}. Your address and tax numbers are only needed when you want to be paid online.`}
+      />
 
       {/* The one number that survives a phone screen. The bar carries the
           animated gradient while anything is outstanding and settles to solid
           green when it is not — motion stops when the work does. */}
-      <div
-        className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-alt"
-        role="progressbar"
-        aria-valuenow={percent}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label="Business details progress"
-      >
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${
-            allComplete ? 'bg-success' : 'bg-pending-gradient'
-          }`}
-          style={{ width: `${percent}%` }}
-        />
+      <div className="glass-card mt-4 flex items-center gap-3 rounded-glass p-3.5">
+        <ProgressRing done={met} total={total} size={44} label />
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-semibold text-fg">
+            {met} of {total} details added
+          </p>
+          <div
+            className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-fg/10"
+            role="progressbar"
+            aria-valuenow={percent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Business details progress"
+          >
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                allComplete ? 'bg-success' : 'bg-pending-gradient'
+              }`}
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Deliberately NOT wrapped in a positioning div: a sticky element is
@@ -263,14 +269,14 @@ function Card({
       id={id}
       // Focusable only programmatically (`jump`), never in the tab order.
       tabIndex={-1}
-      className={`scroll-mt-28 rounded-lg border bg-surface p-4 shadow-floating outline-none transition duration-300 sm:p-5 ${
-        flashing ? 'border-pending shadow-lifted' : 'border-line'
+      className={`glass-card scroll-mt-28 rounded-glass p-4 outline-none transition duration-300 sm:p-5 ${
+        flashing ? 'ring-2 ring-pending' : ''
       }`}
     >
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-body text-base font-semibold text-fg">{title}</h3>
-          <p className="mt-1 text-sm text-muted">{description}</p>
+          <h3 className="font-heading text-[18px] font-bold text-fg">{title}</h3>
+          <p className="mt-1 text-hint text-muted">{description}</p>
         </div>
         <StatusBadge status={status} dirty={dirty} />
       </header>
@@ -283,8 +289,8 @@ function Card({
         // Orange means "blocks your store going live"; an optional card's
         // gaps are listed in neutral so they don't read as a to-do.
         <p
-          className={`mt-3 rounded-md px-3 py-2 text-xs ${
-            status.blocksLaunch ? 'bg-pending-soft text-pending' : 'bg-surface-alt text-muted'
+          className={`mt-3 rounded-xl px-3 py-2.5 text-hint ${
+            status.blocksLaunch ? 'bg-pending-soft text-pending' : 'bg-fg/5 text-muted'
           }`}
         >
           <span className="font-semibold">
@@ -311,7 +317,7 @@ function SaveButton({
   label?: string
 }) {
   return (
-    <Button type="submit" loading={busy} disabled={disabled} className="w-full sm:w-auto">
+    <Button type="submit" size="lg" loading={busy} disabled={disabled} className="w-full sm:w-auto">
       {busy ? 'Saving…' : label}
     </Button>
   )
@@ -367,6 +373,7 @@ function useProfileSave(
         onStoreChange(await storesApi.updateProfile(store.id, patch))
         setSaved(true)
         setDirty(false)
+        showToast('Saved')
       } catch (err) {
         setError(toApiError(err).message)
       } finally {
@@ -443,14 +450,16 @@ function ContactCard({
       <form onSubmit={submit} className="space-y-4" noValidate>
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField
-            label="Business name *"
+            label="Business name"
+            hint="The name you trade under — often your shop name."
             value={businessName}
             onChange={(e) => edit(setBusinessName)(e.target.value)}
             maxLength={120}
             disabled={busy}
           />
           <TextField
-            label="Seller name *"
+            label="Your name"
+            hint="The person we contact about orders."
             value={sellerName}
             onChange={(e) => edit(setSellerName)(e.target.value)}
             maxLength={80}
@@ -459,17 +468,18 @@ function ContactCard({
           />
         </div>
 
-        <div className="rounded-lg border border-line bg-surface-alt/60 p-4">
-          <p className="text-sm font-medium text-fg">Contact details</p>
-          <p className="mt-0.5 text-xs text-muted">
-            Taken from your verified account, and changed there — never typed
-            in here.{' '}
+        <div className="glass-inset rounded-xl p-4">
+          <p className="text-[15px] font-semibold text-fg">How we reach you</p>
+          <p className="mt-0.5 text-hint text-muted">
+            These come from your account and are already verified. To change
+            them, go to{' '}
             <Link
               to="/profile"
-              className="font-medium text-brand hover:text-brand-hover"
+              className="font-semibold text-brand hover:text-brand-hover"
             >
-              Manage sign-in details
+              My profile
             </Link>
+            .
           </p>
 
           <div className="mt-3 space-y-3">
@@ -479,9 +489,9 @@ function ContactCard({
               <VerifiedContact label="Mobile number" value={phone} />
             ) : (
               <div>
-                <p className="mb-3 text-sm text-muted">
-                  Add a mobile number so we can reach you about orders —
-                  it&apos;s needed before you publish.
+                <p className="mb-3 text-hint text-muted">
+                  Add your mobile number so we can tell you about new orders —
+                  it is needed before your shop goes live.
                 </p>
                 <VerifyPhoneForm
                   autoFocus={false}
@@ -495,7 +505,7 @@ function ContactCard({
 
         {error && <ErrorNote>{error}</ErrorNote>}
         {saved && <SuccessNote>Business details saved.</SuccessNote>}
-        <SaveButton busy={busy} label="Save business & contact" />
+        <SaveButton busy={busy} label="Save business details" />
       </form>
     </Card>
   )
@@ -511,15 +521,10 @@ function VerifiedContact({
 }) {
   return (
     <div>
-      <p className="text-xs font-medium text-muted">{label}</p>
+      <p className="text-hint font-medium text-muted">{label}</p>
       <div className="mt-0.5 flex flex-wrap items-center gap-2">
-        <p className="truncate text-sm font-medium text-fg">{value ?? '—'}</p>
-        {value && (
-          <span className="inline-flex items-center gap-1 rounded-pill bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
-            <CheckIcon className="h-3 w-3" />
-            Verified
-          </span>
-        )}
+        <p className="min-w-0 truncate text-[15px] font-medium text-fg">{value ?? '—'}</p>
+        {value && <StatusPill tone="success">Verified</StatusPill>}
       </div>
     </div>
   )
@@ -644,15 +649,31 @@ function TaxCard({
     <Card {...card}>
       <form onSubmit={submit} className="space-y-4" noValidate>
         {onlineBlocked && (
-          <p className="rounded-md border border-accent/30 bg-accent/10 px-3.5 py-3 text-sm text-accent">
-            Online payments stay off until you add:{' '}
-            {store.readiness.gates.ONLINE_PAYMENT.blockers.join(', ')}.
+          <p className="rounded-xl bg-pending-soft px-3.5 py-3 text-hint text-fg">
+            <span className="font-semibold">Only needed for online payments.</span>{' '}
+            To turn them on, add: {store.readiness.gates.ONLINE_PAYMENT.blockers.join(', ')}.
           </p>
         )}
 
         <div>
           <TextField
-            label="PAN"
+            label={
+              <>
+                PAN card number{' '}
+                <HelpHint topic="PAN card number">
+                  <p>
+                    PAN is the 10-letter number printed on your PAN card, from
+                    the Income Tax department. It looks like{' '}
+                    <span className="font-semibold">ABCDE1234F</span>: 5
+                    letters, 4 numbers, then 1 letter.
+                  </p>
+                  <p>
+                    It is optional for a cash-on-delivery shop. With it, less
+                    tax is held back from your online sales.
+                  </p>
+                </HelpHint>
+              </>
+            }
             placeholder="ABCDE1234F"
             value={pan}
             onChange={(e) => {
@@ -662,17 +683,32 @@ function TaxCard({
             disabled={busy}
           />
           <p
-            className={`mt-1.5 text-xs ${panValid ? 'text-muted' : 'text-danger'}`}
+            className={`mt-1.5 text-hint ${panValid ? 'text-muted' : 'font-medium text-danger'}`}
           >
             {panValid
-              ? 'Without a PAN, TDS on your sales is withheld at 5% instead of 1%.'
-              : 'PAN looks like ABCDE1234F — 5 letters, 4 digits, 1 letter.'}
+              ? 'Optional. With a PAN, less tax is held back from online sales (1% instead of 5%).'
+              : 'A PAN looks like ABCDE1234F — 5 letters, 4 numbers, 1 letter.'}
           </p>
         </div>
 
         <div>
           <TextField
-            label="GSTIN"
+            label={
+              <>
+                GST number{' '}
+                <HelpHint topic="GST number (GSTIN)">
+                  <p>
+                    Only if your business is registered for GST. It is the
+                    15-character number on your GST certificate, like{' '}
+                    <span className="font-semibold">33ABCDE1234F1Z5</span>.
+                  </p>
+                  <p>
+                    Most small sellers selling inside their own state do not
+                    need one — tick “I’m not registered for GST” below.
+                  </p>
+                </HelpHint>
+              </>
+            }
             placeholder="33ABCDE1234F1Z5"
             value={gstin}
             onChange={(e) => {
@@ -683,21 +719,21 @@ function TaxCard({
             className={gstExempt ? 'opacity-60' : ''}
           />
           <p
-            className={`mt-1.5 text-xs ${
-              !gstinValid || panMismatch ? 'text-danger' : 'text-muted'
+            className={`mt-1.5 text-hint ${
+              !gstinValid || panMismatch ? 'font-medium text-danger' : 'text-muted'
             }`}
           >
             {!gstinValid
               ? 'A GSTIN is 15 characters, e.g. 33ABCDE1234F1Z5.'
               : panMismatch
-                ? "This GSTIN doesn't match the PAN above."
+                ? "This GST number doesn't match the PAN above."
                 : gstState
                   ? `Registered in ${gstState}.`
-                  : 'Leave blank if you are not GST-registered.'}
+                  : 'Leave empty if you are not registered for GST.'}
           </p>
         </div>
 
-        <label className="flex cursor-pointer items-start gap-3 rounded-md border border-line bg-surface-alt p-3.5">
+        <label className="glass-inset flex min-h-tap cursor-pointer items-start gap-3 rounded-xl p-3.5">
           <input
             type="checkbox"
             checked={gstExempt}
@@ -707,21 +743,22 @@ function TaxCard({
               if (e.target.checked) setGstin('')
             }}
             disabled={busy}
-            className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
+            className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand)]"
           />
           <span className="min-w-0">
-            <span className="block text-sm font-medium text-fg">
+            <span className="block text-[15px] font-semibold text-fg">
               I'm not registered for GST
             </span>
-            <span className="mt-0.5 block text-xs text-muted">
+            <span className="mt-0.5 block text-hint text-muted">
               Fine for small sellers supplying within their own state.
             </span>
           </span>
         </label>
 
         <TextField
-          label="Registration number (optional)"
-          placeholder="CIN, LLPIN, Udyam or shop licence"
+          label="Business registration number (optional)"
+          placeholder="e.g. Udyam or shop licence number"
+          hint="Only if your business is registered — like a company, LLP, MSME (Udyam) or a shop licence."
           value={registrationNumber}
           onChange={(e) => {
             markEdited()
@@ -733,7 +770,7 @@ function TaxCard({
 
         {error && <ErrorNote>{error}</ErrorNote>}
         {saved && <SuccessNote>Tax details saved.</SuccessNote>}
-        <SaveButton busy={busy} disabled={false} label="Save tax details" />
+        <SaveButton busy={busy} disabled={false} label="Save tax numbers" />
       </form>
     </Card>
   )

@@ -24,7 +24,9 @@ import {
 } from '../../features/stores/bannerSpec'
 import { ImageEditDialog } from '../../../shared/media/ImageEditDialog'
 import { useManagedStore } from '../../features/stores/useManagedStore'
-import { ActiveSwitch } from './ActiveSwitch'
+import { BigSwitch } from './ui/BigSwitch'
+import { PageHeader } from './ui/PageHeader'
+import { buttonClass } from '../../../shared/ui/Button'
 import { GripIcon, ImageIcon, PlusIcon, TrashIcon } from '../../layout/icons'
 import { MediaImg } from '../../../shared/media/MediaImg'
 
@@ -199,16 +201,12 @@ export function StoreBannersPage({
     <div>
       {!embedded && (
         <>
-          <h2 className="font-body text-xl font-semibold tracking-normal text-fg">
-            Banners
-          </h2>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
-            Promo images at the top of your storefront. With more than one they
-            rotate automatically, in the order below — drag a card by its
-            handle to change it. Tapping a banner can take shoppers to a
-            category, a product, or any web address.
-          </p>
-          <p className="mt-1 text-sm text-muted">
+          <PageHeader
+            icon={ImageIcon}
+            title="Banners"
+            description="Big pictures at the top of your shop. With more than one, they change by themselves in the order below — use Earlier / Later to move one."
+          />
+          <p className="mt-2 text-hint text-muted">
             The whole strip is switched on and off in the{' '}
             <Link
               to="../builder"
@@ -229,7 +227,7 @@ export function StoreBannersPage({
         </div>
       )}
       {notice && (
-        <p className="mt-3 max-w-2xl rounded-md border border-line bg-surface-alt px-3 py-2 text-xs font-medium text-fg">
+        <p className="mt-3 max-w-2xl rounded-xl bg-fg/5 px-3 py-2.5 text-hint font-medium text-fg">
           {notice}
         </p>
       )}
@@ -248,18 +246,18 @@ export function StoreBannersPage({
         />
         <Button
           variant="rise"
-          size="sm"
+          size="lg"
           disabled={busy || full}
           onClick={() => addInput.current?.click()}
         >
-          <PlusIcon className="h-4 w-4" />
-          Add Banner
+          <PlusIcon className="h-5 w-5" />
+          Add a banner
         </Button>
         {uploadPct !== null && (
-          <span className="text-xs text-muted">Uploading… {uploadPct}%</span>
+          <span className="text-hint text-muted">Uploading… {uploadPct}%</span>
         )}
         {full && (
-          <span className="text-xs text-muted">
+          <span className="text-hint text-muted">
             {MAX_BANNERS} is the maximum — delete one to add another.
           </span>
         )}
@@ -268,7 +266,7 @@ export function StoreBannersPage({
       {banners === null ? (
         <div className={`mt-4 grid gap-4 ${cardGrid}`}>
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-72 animate-pulse rounded-lg bg-surface-alt" />
+            <div key={i} className="glass-card h-72 animate-pulse rounded-glass" />
           ))}
         </div>
       ) : banners.length === 0 ? (
@@ -372,13 +370,13 @@ export function StoreBannersPage({
 function SizeGuide() {
   return (
     <div className="mt-4 max-w-2xl rounded-lg border border-line bg-surface-alt px-4 py-3">
-      <p className="text-xs font-bold uppercase tracking-wide text-muted">
+      <p className="text-[14px] font-bold text-fg">
         Image size
       </p>
       <p className="mt-1.5 text-sm font-semibold text-fg">
         {bannerSizeLabel()} — one image, used on every screen
       </p>
-      <p className="mt-1 text-xs text-muted">
+      <p className="mt-1 text-hint text-muted">
         Nothing is cropped — the whole picture shows on every screen, just
         smaller on a phone. Keep any text large and near the centre so it
         stays readable there.
@@ -487,8 +485,8 @@ function BannerCard({
         e.stopPropagation() // the list itself handles "dropped past the end"
         onDrop()
       }}
-      className={`flex flex-col overflow-hidden rounded-lg border bg-surface transition-colors ${
-        over ? 'border-brand' : 'border-line'
+      className={`glass-card flex flex-col overflow-hidden rounded-glass transition-colors ${
+        over ? 'ring-2 ring-brand' : ''
       } ${dragging ? 'opacity-50' : ''}`}
     >
       {/* Preview — the artwork at the exact shape the storefront gives it. */}
@@ -508,14 +506,6 @@ function BannerCard({
           </span>
         )}
 
-        <button
-          type="button"
-          onClick={() => imageInput.current?.click()}
-          disabled={busy}
-          className="absolute inset-0 flex items-center justify-center bg-scrim text-xs font-semibold text-white opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 disabled:cursor-not-allowed"
-        >
-          Replace image
-        </button>
         <input
           ref={imageInput}
           type="file"
@@ -533,62 +523,74 @@ function BannerCard({
           onPointerDown={() => setArmed(true)}
           onPointerUp={() => setArmed(false)}
           title="Drag to reorder"
-          className="absolute left-2 top-2 z-10 flex h-8 w-8 cursor-grab items-center justify-center rounded-md bg-scrim text-white active:cursor-grabbing"
+          className="absolute top-2 left-2 z-10 hidden h-9 w-9 cursor-grab items-center justify-center rounded-lg bg-scrim text-white active:cursor-grabbing sm:flex"
         >
-          <GripIcon className="h-4 w-4" />
+          <GripIcon className="h-5 w-5" />
         </span>
 
-        <span className="pointer-events-none absolute right-2 top-2 z-10 rounded-pill bg-scrim px-2 py-0.5 text-[11px] font-semibold text-white">
+        <span className="pointer-events-none absolute top-2 right-2 z-10 rounded-pill bg-scrim px-2.5 py-0.5 text-[12px] font-semibold text-white">
           {index + 1} of {total}
         </span>
 
         {!banner.isActive && (
-          <span className="pointer-events-none absolute bottom-2 left-2 z-10 rounded-sm bg-scrim px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+          <span className="pointer-events-none absolute bottom-2 left-2 z-10 rounded-md bg-scrim px-2 py-0.5 text-[12px] font-semibold text-white">
             Hidden
           </span>
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 p-3">
+      <div className="flex flex-1 flex-col gap-3 p-3.5">
+        {/* Visible on every device — this used to appear only on mouse hover. */}
+        <button
+          type="button"
+          onClick={() => imageInput.current?.click()}
+          disabled={busy}
+          className={buttonClass({ variant: 'ring', size: 'md', full: true })}
+        >
+          <ImageIcon className="h-4 w-4" />
+          Change photo
+        </button>
+
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1">
+          <BigSwitch
+            checked={banner.isActive}
+            disabled={busy}
+            label="Show this banner"
+            onText="Showing"
+            offText="Hidden"
+            onChange={(next) => onPatch({ isActive: next })}
+          />
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={busy}
+            className="inline-flex min-h-tap items-center gap-1.5 rounded-xl px-3 text-[14px] font-semibold text-muted transition hover:bg-danger/10 hover:text-danger"
+          >
+            <TrashIcon className="h-4 w-4" />
+            Delete
+          </button>
+        </div>
+
+        {total > 1 && (
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               disabled={busy || index === 0}
               onClick={() => onMove(-1)}
-              aria-label="Move banner earlier"
-              className="rounded px-1.5 py-1 text-sm text-muted transition hover:bg-surface-alt hover:text-fg disabled:opacity-30"
+              className="inline-flex min-h-tap items-center justify-center gap-1 rounded-xl border border-line text-[14px] font-semibold text-fg transition hover:bg-fg/5 disabled:opacity-35"
             >
-              ←
+              ← Earlier
             </button>
             <button
               type="button"
               disabled={busy || index === total - 1}
               onClick={() => onMove(1)}
-              aria-label="Move banner later"
-              className="rounded px-1.5 py-1 text-sm text-muted transition hover:bg-surface-alt hover:text-fg disabled:opacity-30"
+              className="inline-flex min-h-tap items-center justify-center gap-1 rounded-xl border border-line text-[14px] font-semibold text-fg transition hover:bg-fg/5 disabled:opacity-35"
             >
-              →
+              Later →
             </button>
           </div>
-          <div className="flex items-center gap-1">
-            <ActiveSwitch
-              checked={banner.isActive}
-              disabled={busy}
-              label={`${banner.isActive ? 'Hide' : 'Show'} this banner`}
-              onChange={(next) => onPatch({ isActive: next })}
-            />
-            <button
-              type="button"
-              onClick={onDelete}
-              disabled={busy}
-              className="rounded-md p-2 text-muted transition hover:bg-danger/10 hover:text-danger"
-              aria-label="Delete banner"
-            >
-              <TrashIcon className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
+        )}
 
         <TextField
           label="Title"
@@ -644,7 +646,7 @@ function LinkPicker({
 }) {
   return (
     <div>
-      <span className="block text-xs font-semibold text-fg">
+      <span className="block text-[14px] font-semibold text-fg">
         When tapped, go to
       </span>
       <div className="mt-1.5 space-y-2">
@@ -715,7 +717,7 @@ function LinkPicker({
                 onPatch({ linkType: 'URL', linkValue: next })
               }
             }}
-            className="h-10 w-full rounded-md border border-line bg-input px-3.5 text-sm text-fg outline-none transition-colors hover:border-fg/30 focus:border-accent"
+            className="h-field w-full rounded-md border border-line bg-input px-3.5 text-sm text-fg outline-none transition-colors hover:border-fg/30 focus:border-accent"
           />
         )}
       </div>
@@ -724,13 +726,13 @@ function LinkPicker({
           the admin showing a healthy-looking row while the storefront renders
           a dead banner is the failure worth preventing. */}
       {banner.target?.missing && (
-        <p className="mt-1.5 text-[11px] font-semibold text-danger">
+        <p className="mt-1.5 text-hint font-semibold text-danger">
           {banner.target.label} is deleted or switched off — this banner shows
           without a link.
         </p>
       )}
       {banner.linkType !== 'NONE' && !banner.linkValue && (
-        <p className="mt-1.5 text-[11px] text-muted">
+        <p className="mt-1.5 text-hint text-muted">
           Pick a destination, or this banner stays unlinked.
         </p>
       )}

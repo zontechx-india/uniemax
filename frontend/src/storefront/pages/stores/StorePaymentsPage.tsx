@@ -1,53 +1,60 @@
 import { useState } from 'react'
+import type { ComponentType } from 'react'
 import { Link } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { ErrorNote, InfoNote } from '../../../shared/ui/form'
+import { buttonClass } from '../../../shared/ui/Button'
 import { storesApi } from '../../features/stores/storesApi'
 import type { StorePayments } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
-import { ActiveSwitch } from './ActiveSwitch'
+import { BankIcon, CardIcon, ShieldCheckIcon } from '../../layout/icons'
+import { BigSwitch } from './ui/BigSwitch'
+import { PageHeader } from './ui/PageHeader'
+import { showToast } from './ui/Toast'
 
 /**
  * Payments section of Store Management — how customers PAY (how they
  * receive orders is the Shipping section). Because these switches change
  * the live checkout immediately, a toggle only *requests* the change — a
  * ConfirmDialog spells out the effect and nothing is written until it is
- * accepted, so the switches always reflect saved state.
+ * accepted, so the switches always reflect saved state. A toast confirms
+ * the save.
  *
  * Turning ONLINE payment on is a real gate, not a nudge: UnieMax starts
  * collecting money and paying it out, so a PAN and a primary payout account
  * have to exist first. The condition is read from `store.readiness` — the
- * same evaluation the endpoint enforces — rather than from a bank-account
- * lookup this page used to run for itself, so the switch is disabled for
- * exactly the reasons a save would be rejected.
+ * same evaluation the endpoint enforces — so the switch is disabled for
+ * exactly the reasons a save would be rejected, and the card says what to add.
  */
 
 const METHODS: {
   key: keyof StorePayments
   title: string
+  icon: ComponentType<{ className?: string }>
   description: string
   /** Dialog copy when switching ON / OFF. */
   confirmOn: string
   confirmOff: string
 }[] = [
   {
-    key: 'acceptOnlinePayment',
-    title: 'Accept Online Payment',
-    description:
-      'Customers pay through UnieMax (UPI, cards…). Your earnings are paid out to your primary bank account.',
-    confirmOn:
-      'Customers will be able to pay online through UnieMax, and your earnings will be paid out to your primary bank account.',
-    confirmOff:
-      'Customers will no longer be able to pay online — only your other enabled methods remain available at checkout.',
+    key: 'acceptCod',
+    title: 'Cash on delivery',
+    icon: BankIcon,
+    description: 'Customers pay you in cash when the order arrives.',
+    confirmOn: 'Customers will be able to pay in cash when the order arrives.',
+    confirmOff: 'Customers will no longer see Cash on delivery at your checkout.',
   },
   {
-    key: 'acceptCod',
-    title: 'Accept Cash on Delivery',
-    description: 'Customers pay in cash when the order is delivered.',
-    confirmOn: 'Customers will be able to pay in cash when the order arrives.',
+    key: 'acceptOnlinePayment',
+    title: 'Online payment (UPI, cards)',
+    icon: CardIcon,
+    description:
+      'Customers pay online through UnieMax. The money is sent to your main bank account.',
+    confirmOn:
+      'Customers will be able to pay online through UnieMax, and the money will be sent to your main bank account.',
     confirmOff:
-      'Customers will no longer see Cash on Delivery at your checkout.',
+      'Customers will no longer be able to pay online — only your other payment options stay at checkout.',
   },
 ]
 
@@ -77,6 +84,7 @@ export function StorePaymentsPage() {
           [pending.key]: pending.next,
         }),
       )
+      showToast(pending.next ? 'Turned on' : 'Turned off')
       setPending(null)
     } catch (err) {
       setError(toApiError(err).message)
@@ -90,83 +98,76 @@ export function StorePaymentsPage() {
   const allOff = METHODS.every(({ key }) => !payments[key])
 
   return (
-    <div>
-      <h2 className="font-body text-xl font-semibold tracking-normal text-fg">
-        Payments
-      </h2>
-      <p className="mt-1 text-sm text-muted">
-        Choose how customers can pay you. Changes apply to your checkout
-        immediately, so each change asks for confirmation. Delivery and
-        pickup options live in the Shipping section.
-      </p>
+    <div className="space-y-4">
+      <PageHeader
+        icon={CardIcon}
+        title="Payments"
+        description="Choose how customers can pay you. Changes show at your checkout straight away."
+      />
 
-      <div className="mt-5 max-w-2xl space-y-3">
-        <ul className="space-y-2">
-          {METHODS.map(({ key, title, description }) => {
-            const locked = key === 'acceptOnlinePayment' && onlineBlocked
-            return (
-              <li
-                key={key}
-                className={`flex items-center gap-4 rounded-lg border border-line p-4 ${
-                  locked ? 'opacity-75' : ''
-                }`}
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-fg">{title}</p>
-                  <p className="mt-0.5 text-sm text-muted">{description}</p>
-                </div>
-                <span className="shrink-0 text-xs font-semibold text-muted">
-                  {payments[key] ? 'Yes' : 'No'}
+      {allOff && (
+        <InfoNote>
+          Every payment option is off — customers cannot order from your shop
+          until you turn at least one on.
+        </InfoNote>
+      )}
+
+      <ul className="space-y-3">
+        {METHODS.map(({ key, title, description, icon: Icon }) => {
+          const locked = key === 'acceptOnlinePayment' && onlineBlocked
+          return (
+            <li key={key} className="glass-card rounded-glass p-4 sm:p-5">
+              <div className="flex items-start gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
+                  <Icon className="h-5 w-5" />
                 </span>
-                <ActiveSwitch
+                <div className="min-w-0 flex-1">
+                  <p className="text-[16px] font-bold text-fg">{title}</p>
+                  <p className="mt-0.5 text-hint text-muted">{description}</p>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
+                <span className="text-hint text-muted">
+                  {locked ? 'Add the details below to turn this on.' : 'At your checkout:'}
+                </span>
+                <BigSwitch
                   checked={payments[key]}
                   disabled={busy || pending !== null || locked}
                   label={title}
                   onChange={(next) => setPending({ key, next })}
                 />
-              </li>
-            )
-          })}
-        </ul>
+              </div>
 
-        {/* The switch above is disabled; this says why, and links to each
-            place the missing piece is added. */}
-        {onlineBlocked && (
-          <InfoNote>
-            To accept online payments, first add:{' '}
-            {onlineGate.blockers.join(', ')}. You'll find these under{' '}
-            <Link
-              to="../business"
-              className="font-semibold text-brand hover:underline"
-            >
-              Business Details
-            </Link>{' '}
-            and{' '}
-            <Link
-              to="../bank-accounts"
-              className="font-semibold text-brand hover:underline"
-            >
-              Bank Accounts
-            </Link>
-            .
-          </InfoNote>
-        )}
+              {/* The switch is disabled; this says why, and where to fix it. */}
+              {locked && (
+                <div className="mt-3 rounded-xl bg-pending-soft p-3">
+                  <p className="text-[14px] font-semibold text-fg">
+                    First add: {onlineGate.blockers.join(', ')}
+                  </p>
+                  <div className="mt-2.5 flex flex-wrap gap-2">
+                    <Link to="../business" className={buttonClass({ variant: 'ring', size: 'md' })}>
+                      <ShieldCheckIcon className="h-4 w-4" />
+                      Business details
+                    </Link>
+                    <Link to="../bank-accounts" className={buttonClass({ variant: 'ring', size: 'md' })}>
+                      <BankIcon className="h-4 w-4" />
+                      Bank account
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </li>
+          )
+        })}
+      </ul>
 
-        {allOff && (
-          <InfoNote>
-            Every payment method is switched off — customers won't be able to
-            place orders from your store until at least one is on.
-          </InfoNote>
-        )}
-
-        {error && <ErrorNote>{error}</ErrorNote>}
-      </div>
+      {error && <ErrorNote>{error}</ErrorNote>}
 
       <ConfirmDialog
         open={pending !== null}
         title={
           pending && pendingMethod
-            ? `Turn ${pending.next ? 'on' : 'off'} ${pendingMethod.title.replace('Accept ', '')}?`
+            ? `Turn ${pending.next ? 'on' : 'off'} ${pendingMethod.title}?`
             : ''
         }
         description={
@@ -176,7 +177,7 @@ export function StorePaymentsPage() {
               : pendingMethod.confirmOff
             : ''
         }
-        confirmLabel={pending?.next ? 'Turn On' : 'Turn Off'}
+        confirmLabel={pending?.next ? 'Turn on' : 'Turn off'}
         tone={pending?.next ? 'neutral' : 'danger'}
         busy={busy}
         onConfirm={() => void confirmPending()}

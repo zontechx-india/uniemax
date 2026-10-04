@@ -11,6 +11,7 @@ import type {
   DeliveryRuleType,
 } from '../../features/stores/storesApi'
 import { CheckIcon } from '../../layout/icons'
+import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 
 /**
  * Editor for one delivery-area rule: the rule TYPE (all / only selected /
@@ -141,6 +142,7 @@ function PincodeListInput({
 }) {
   const [draft, setDraft] = useState('')
   const [hint, setHint] = useState<string | null>(null)
+  const [confirmClear, setConfirmClear] = useState(false)
 
   const full = pincodes.length >= DELIVERY_RULE_LIMITS.pincodes
 
@@ -189,21 +191,18 @@ function PincodeListInput({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-3">
-        <span className="text-sm font-medium text-muted">{label}</span>
-        <span className="text-xs text-muted">
+        <span className="text-[14px] font-medium text-muted">{label}</span>
+        <span className="flex items-center gap-1 text-hint text-muted">
           {pincodes.length} / {DELIVERY_RULE_LIMITS.pincodes}
           {pincodes.length > 0 && (
-            <>
-              {' · '}
-              <button
-                type="button"
-                onClick={() => onChange([])}
-                disabled={disabled}
-                className="font-semibold text-danger hover:underline disabled:opacity-50"
-              >
-                Clear all
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={() => setConfirmClear(true)}
+              disabled={disabled}
+              className="min-h-9 rounded-lg px-2 font-semibold text-danger hover:bg-danger/10 disabled:opacity-50"
+            >
+              Clear all
+            </button>
           )}
         </span>
       </div>
@@ -215,7 +214,7 @@ function PincodeListInput({
         {pincodes.map((pincode) => (
           <span
             key={pincode}
-            className="inline-flex h-7 items-center gap-1 rounded-pill bg-surface-alt pl-2.5 pr-1 font-mono text-xs font-medium text-fg"
+            className="inline-flex h-9 items-center gap-0.5 rounded-pill bg-brand-soft pl-3 text-[14px] font-semibold tabular-nums text-fg"
           >
             {pincode}
             <button
@@ -223,7 +222,7 @@ function PincodeListInput({
               onClick={() => onChange(pincodes.filter((p) => p !== pincode))}
               disabled={disabled}
               aria-label={`Remove ${pincode}`}
-              className="flex h-5 w-5 items-center justify-center rounded-full text-muted transition hover:bg-danger/10 hover:text-danger disabled:cursor-default"
+              className="relative flex h-7 w-7 items-center justify-center rounded-full text-[18px] leading-none text-muted transition before:absolute before:-inset-2 before:content-[''] hover:bg-danger/10 hover:text-danger disabled:cursor-default"
             >
               ×
             </button>
@@ -248,16 +247,44 @@ function PincodeListInput({
           inputMode="numeric"
           disabled={disabled || full}
           aria-label={label}
-          className="h-8 min-w-40 flex-1 bg-transparent px-1.5 text-sm text-fg outline-none placeholder:text-muted disabled:cursor-not-allowed"
+          className="h-9 min-w-32 flex-1 bg-transparent px-1.5 text-[15px] text-fg outline-none placeholder:text-muted disabled:cursor-not-allowed"
         />
+        {/* Many number keypads have no Enter or comma key — so a real button. */}
+        {draft.trim() !== '' && (
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault()
+              addFrom(draft)
+            }}
+            onClick={() => {
+              if (draft.trim()) addFrom(draft)
+            }}
+            disabled={disabled}
+            className="h-9 shrink-0 rounded-lg bg-brand px-4 text-[14px] font-bold text-brand-contrast transition hover:bg-brand-hover"
+          >
+            Add
+          </button>
+        )}
       </div>
       {hint ? (
-        <p className="mt-1.5 text-xs font-medium text-danger">{hint}</p>
+        <p className="mt-1.5 text-hint font-medium text-danger">{hint}</p>
       ) : (
-        <p className="mt-1.5 text-xs text-muted">
-          Press Enter after each pincode, or paste a comma-separated list.
+        <p className="mt-1.5 text-hint text-muted">
+          Type a 6-digit pincode and tap Add. You can also paste many at once.
         </p>
       )}
+      <ConfirmDialog
+        open={confirmClear}
+        title="Remove all pincodes?"
+        description={`All ${pincodes.length} pincodes will be taken off this list.`}
+        confirmLabel="Remove all"
+        onConfirm={() => {
+          onChange([])
+          setConfirmClear(false)
+        }}
+        onCancel={() => setConfirmClear(false)}
+      />
     </div>
   )
 }
@@ -300,12 +327,12 @@ export function ProductDeliveryField({
   const options = [
     {
       custom: false,
-      title: 'Use store default',
+      title: 'Same as my shop',
       detail: describeDeliveryRule(storeRule),
     },
     {
       custom: true,
-      title: 'Custom for this product',
+      title: 'Different for this product',
       detail: 'Set where this product can be delivered.',
     },
   ]
@@ -326,10 +353,10 @@ export function ProductDeliveryField({
               aria-checked={selected}
               disabled={disabled}
               onClick={() => choose(option.custom)}
-              className={`flex items-start gap-3 rounded-md border px-3 py-2.5 text-left transition disabled:cursor-not-allowed ${
+              className={`flex min-h-tap items-start gap-3 rounded-xl border px-3.5 py-3 text-left transition disabled:cursor-not-allowed ${
                 selected
-                  ? 'border-brand bg-brand/5'
-                  : 'border-line bg-surface hover:bg-surface-alt'
+                  ? 'border-brand bg-brand-soft'
+                  : 'border-line bg-surface/70 hover:bg-fg/5'
               }`}
             >
               <span
@@ -342,10 +369,10 @@ export function ProductDeliveryField({
                 {selected && <CheckIcon className="h-3 w-3" />}
               </span>
               <span className="min-w-0">
-                <span className="block text-sm font-semibold text-fg">
+                <span className="block text-[15px] font-semibold text-fg">
                   {option.title}
                 </span>
-                <span className="mt-0.5 block text-xs text-muted">
+                <span className="mt-0.5 block text-hint text-muted">
                   {option.detail}
                 </span>
               </span>

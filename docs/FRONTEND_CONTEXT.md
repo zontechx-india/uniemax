@@ -1649,37 +1649,49 @@ is never shown a pickup-address item.
   Footer Links** — up to 10 custom label+URL rows (in-app paths allowed);
   and **Copyright** — custom line defaulting to
   "© {year} {store name}. All Rights Reserved."),
-  `StoreBankPage` (**Bank Accounts** — the seller's payout accounts over
-  `/stores/:id/bank-accounts`: list up to 5 accounts (bank + masked
-  ····last-4, holder, IFSC, branch, optional UPI), each with a
-  verification chip — Pending verification / Verified / Verification
-  failed (with the failure note) — and a **Primary** badge; actions: Set
-  primary, inline edit (warns that changing details of a verified account
-  resets it to pending), guarded delete (deleting the primary warns that
-  payouts hold until another is chosen; nothing auto-promotes). The add
-  form validates holder name, 9–18-digit account number with a
-  **confirm-account-number** field, IFSC shape, bank, branch and optional
-  UPI VPA. A banner flags "no primary selected" whenever accounts exist
+  `StoreBankPage` (**Bank account** — the seller's payout accounts over
+  `/stores/:id/bank-accounts`: up to 5 accounts as `ActionRow`s in one
+  glass card (bank + masked ····last-4, holder, branch, IFSC, optional UPI),
+  each with a verification pill — Being checked / Verified / Check failed
+  (with the failure note) — and a **Main account** pill; **Edit** on the row,
+  "⋯" with **Make this my main account** and **Delete account** (deleting
+  the main account warns that payouts hold until another is chosen; nothing
+  auto-promotes); editing warns that changing a verified account sends it
+  back for checking. The add / edit form (a `GlassCard`) asks in the order
+  a seller holds the details — name on the account, then **Bank branch code
+  (IFSC)** with an ⓘ sheet ("printed on your cheque book or passbook"),
+  which **looks the branch up** (`useIfscLookup`: once the code has the
+  valid 11-character shape it calls Razorpay's public, CORS-enabled IFSC
+  directory `https://ifsc.razorpay.com/{IFSC}` from the browser — an IFSC
+  is a public branch code, nothing private leaves — and fills Bank name and
+  Branch ("Bank, Branch, City", title-cased) unless the seller typed them;
+  a failed / unknown lookup just leaves the fields to type), then the
+  9–18-digit account number with a **"Type the account number again"**
+  field that flags a mismatch as you type, and an optional UPI ID with its
+  own ⓘ sheet. Errors are plain sentences ("The two account numbers are not
+  the same"). A banner flags "no primary selected" whenever accounts exist
   without one. **Add Bank Account is withheld** while
   `store.readiness.gates.PAYOUT_SETUP` is blocked — the business address,
   PAN and GST status moved out of the signup wizard and this is where they
   become mandatory — with a note naming the missing pieces and linking to
   Business Details; editing, re-prioritising and deleting are never gated),
-  `StorePaymentsPage` (**Payments** — how customers PAY: Accept Online
-  Payment (pays out to the primary bank account — the page warns and links
-  to Bank Accounts when it's on without a primary account) and Accept Cash
-  on Delivery. Because a toggle changes the live checkout, it only
+  `StorePaymentsPage` (**Payments** — how customers PAY: one glass card per
+  method — **Cash on delivery** and **Online payment (UPI, cards)** (paid
+  out to the main bank account) — each with an icon, one sentence and a
+  labelled On / Off `BigSwitch`. Because a switch changes the live checkout,
+  it only
   *requests* the change — a `ConfirmDialog` (neutral tone for on, danger
   for off) spells out the effect and nothing is written until accepted →
   `PATCH /stores/:id/payments`; an all-off state warns that customers
   can't order. The **online-payment switch is disabled** while
-  `store.readiness.gates.ONLINE_PAYMENT` is blocked, naming the missing
-  requirements and linking to Business Details / Bank Accounts — this
+  `store.readiness.gates.ONLINE_PAYMENT` is blocked, with an orange "First
+  add: …" box and two buttons to Business details / Bank account — this
   replaced a bank-account lookup the page used to run for itself, which
   only ever produced a hint. The checkout's payment step offers exactly the
   accepted methods from the public shell's `payments`),
-  `StoreShippingPage` (**Shipping** — how customers RECEIVE orders: a
-  radio-card choice of Delivery / Store Pickup / Both →
+  `StoreShippingPage` (**Delivery** — how customers RECEIVE orders: a
+  radio-card choice of Delivery / Customer collects / Both — delivery or
+  collect (72px glass cards with icon and radio) →
   `PATCH /stores/:id/shipping`, likewise confirmed via `ConfirmDialog`
   before saving. **Pickup / Both are disabled** while
   `readiness.gates.PICKUP` is blocked — previously this checked the
@@ -1688,12 +1700,14 @@ is never shown a pickup-address item.
   `shipping`. Below the mode (hidden for pickup-only), **Delivery areas**:
   the store's default pincode rule drafted in `DeliveryRuleEditor`
   (`pages/stores/DeliveryRuleEditor.tsx` — All / Only selected / All
-  except selected, plus a chip list that accepts pasted comma-separated
-  pincodes, validates 6 digits and reports rejects) and saved with its own
-  button → the same PATCH with `{ deliveryRule }`; helpers
+  except selected, plus a chip list of 36px pincode chips with an explicit
+  **Add** button — many number keypads have no Enter or comma key — that also
+  accepts pasted lists, validates 6 digits and reports rejects; "Clear all"
+  confirms first) and saved with its own button ("Save delivery areas",
+  with "Undo changes"; a toast confirms) → the same PATCH with `{ deliveryRule }`; helpers
   (`parsePincodes`, `describeDeliveryRule`, `sameDeliveryRule`,
   `deliveryRuleProblem`) in `features/stores/deliveryRules.ts`). Above
-  it, **Shipping charges**: the store's default rate drafted in
+  it, **Delivery charge**: the store's default rate drafted in
   `ShippingRateEditor` (`pages/stores/ShippingRateEditor.tsx` — Free /
   Flat rate per order with an optional free-above threshold, rupee inputs
   kept as text while typing) and saved with its own button → the same PATCH
@@ -1701,9 +1715,11 @@ is never shown a pickup-address item.
   `shippingRateProblem`, `parseAmount`) in
   `features/stores/shippingRates.ts`. The page never computes a charge),
   `StoreCheckoutPage` (**Checkout** — which customer details the checkout
-  collects: seven toggles (Name / Phone / Email / Address / Pincode /
-  State / Country, all on by default) grouped into contact + delivery
-  fields, drafted locally and saved with one button →
+  asks for: seven Asked / Not asked switches (Name / Mobile number / Email /
+  Address / Pincode / State / Country, all on by default) in two glass
+  cards — "About the customer" and "Where to deliver" — drafted locally and
+  saved through the shared sticky `SaveBar` (appears on change, warns before
+  leaving) →
   `PATCH /stores/:id/checkout`; a disabled field is hidden from customers
   and skipped in validation. Warns when a delivering store switches all
   address fields off),

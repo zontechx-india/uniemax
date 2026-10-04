@@ -22,7 +22,7 @@ English only for now, in plain words (i18n later).
 | 3 | Dashboard, setup checklist, publish card | ✅ Done (2026-10-04) |
 | 4 | Products, product wizard, categories, media | ✅ Done (2026-10-04) |
 | 5 | Orders list + order detail | ✅ Done (2026-10-04) |
-| 6 | Settings pages (Business, Bank, Payments, Checkout, Shipping, Details, Footer, Banners) | ⬜ Not started |
+| 6 | Settings pages (Business, Bank, Payments, Checkout, Shipping, Details, Footer, Banners) | ✅ Done (2026-10-04) |
 | 7 | Store Builder mobile pass | ⬜ Not started |
 | 8 | Support pages, skeletons, final polish | ⬜ Not started |
 
@@ -346,13 +346,19 @@ Each phase ships on its own and is approved before the next one starts.
 
 ### Phase 6 — Settings pages
 
-- [ ] Every page on `PageHeader` + `GlassCard` + one `SaveBar`
-- [ ] Payments and Checkout switches share one model (instant + toast; confirm when live checkout is affected) and the same On/Off wording
-- [ ] Bank: plain IFSC / UPI hints, inline errors, `ActionRow`. IFSC → bank/branch autofill **only if approved** (would need an endpoint; see §9)
-- [ ] Business: plain PAN / GSTIN hints, "optional" tags, TDS removed from copy
-- [ ] Footer: one SaveBar; link rows stack on mobile; GST read from Business instead of asked again
-- [ ] Shipping / delivery rules: pincode "Add" button; confirm before "Clear all"
-- [ ] Banners: visible "Change photo"; ↑ / ↓ buttons beside drag; overlay tokens
+- [x] Every page on `PageHeader` + glass cards; `SaveBar` on Store Details and Checkout (single-form pages)
+- [x] Payments: labelled On/Off `BigSwitch`, confirm (live checkout) + toast; Checkout: Asked / Not asked + SaveBar
+- [x] Bank: plain IFSC / UPI hints with ⓘ sheets, live account-number match, `ActionRow` + "⋯". **IFSC → bank/branch autofill** shipped via Razorpay's public IFSC directory (client-side, no backend; an IFSC is public data)
+- [x] Business: plain PAN / GST labels with ⓘ sheets, TDS removed from copy, progress ring, toasts
+- [x] Footer: glass cards, location rows as `ActionRow`, link rows stack on mobile, 48px saves, toasts
+- [x] Shipping / delivery rules: pincode "Add" button; confirm before "Clear all"; plain names (Customer collects, Delivery charge)
+- [x] Banners: visible "Change photo"; Earlier / Later buttons beside drag; labelled Showing switch and Delete
+
+> Kept on purpose: Business and Footer still save per card (each card is independent and
+> named — "Save address", "Save tax numbers"); merging seven footer cards into one SaveBar
+> would mean one request touching every section. The Footer still asks for a GST number in
+> "Store information" (it is what the footer shows) — de-duplicating it against Business
+> needs a backend decision.
 
 ### Phase 7 — Store Builder (mobile)
 
