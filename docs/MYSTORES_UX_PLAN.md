@@ -20,7 +20,7 @@ English only for now, in plain words (i18n later).
 | 1 | Shell & navigation (bottom tabs, More sheet, Share sheet) | ✅ Done (2026-10-04) |
 | 2 | My Stores list + Create Store wizard | ✅ Done (2026-10-04) |
 | 3 | Dashboard, setup checklist, publish card | ✅ Done (2026-10-04) |
-| 4 | Products, product wizard, categories, media | ⬜ Not started |
+| 4 | Products, product wizard, categories, media | ✅ Done (2026-10-04) |
 | 5 | Orders list + order detail | ⬜ Not started |
 | 6 | Settings pages (Business, Bank, Payments, Checkout, Shipping, Details, Footer, Banners) | ⬜ Not started |
 | 7 | Store Builder mobile pass | ⬜ Not started |
@@ -317,15 +317,23 @@ Each phase ships on its own and is approved before the next one starts.
 
 ### Phase 4 — Products & categories
 
-- [ ] Product rows: photo, name, price, one status pill, **Edit**; `BigSwitch` separate; Delete / Placement in "⋯"
-- [ ] Search + filter sheet; floating "+ Add product"
-- [ ] Wizard full-screen on mobile; "Step 2 of 6 · Price" header with thin progress bar
-- [ ] Sticky Back / Continue; Skip and Finish later as real buttons; no autofocus zoom
-- [ ] Pricing split: "Sizes or colours?" Yes/No → pick choices → price & stock per choice → photos per colour
-- [ ] Options editor reworded (§5); advanced linking collapsed by default
-- [ ] Bulk tools in a sheet; variant photo picker as a bottom sheet
-- [ ] Media: 44 px Retry / Discard / Add more; readable labels
-- [ ] Categories: capped indent + breadcrumb chip; actions in "⋯"; Move up/down instead of Sort order; photo picker instead of Image URL
+- [x] Product rows: photo, name, price, one status pill, **Edit**; `BigSwitch` separate; Delete / Placement in "⋯"
+- [x] Search + filter chips (inline, not a sheet — four chips fit); "+ Add product" in the header (not floating — see below)
+- [x] Wizard full-screen on mobile; "Step 2 of 6 · Price" header with thin progress bar
+- [x] Sticky Back / Continue; Skip and Finish later as real buttons; no autofocus zoom
+- [x] Pricing split: "Sizes or colours?" Yes/No → pick choices → price & stock per choice (photo per choice is picked on the price cards and via "Same photo for every…", not a third screen)
+- [x] Options editor reworded (§5); advanced linking collapsed by default
+- [x] Bulk tools in a sheet; variant photo picker as a bottom sheet
+- [x] Media: 44 px Retry / Discard / Add more; readable labels
+- [x] Categories: capped indent + "Level n" pill; actions in "⋯"; Move up/down instead of Sort order; "Image URL" reworded as an optional "Picture link" (no upload — see below)
+- [x] Extras: "Not finished" filter chips + search (>5 products); next-step nudge as a 44px tappable strip; delivery / COD facts kept as pills; `useMediaQuery` hook (`shared/`)
+
+> Deviations, on purpose: Photos still come right after "What is it?" (the draft must exist
+> before a photo can upload to it). The phone FAB was not added — the content panel is glass,
+> which traps `position: fixed`; the header's full-width **Add product** sits at the top
+> instead. "Image URL" became a "Picture link" field (a real upload would need a new endpoint).
+> The shared `CategoryPicker` input is still 40px — it is shared with the admin console and
+> is left for Phase 8.
 
 ### Phase 5 — Orders
 

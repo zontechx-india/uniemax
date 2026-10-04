@@ -100,9 +100,10 @@ export function StoreMobileNav({
             >
               <DotsIcon className="h-[22px] w-[22px]" />
             </span>
-            {/* On a "More" section, name it — the seller should still be
-                able to read where they are from the bar. */}
-            <span className="max-w-full truncate px-1">{onMore ? active.item.label : 'More'}</span>
+            {/* Always the word "More" — a section name here was cut to
+                "Categori…". The highlight says you are in one of these; the
+                page heading names which. */}
+            More
           </button>
         </div>
       </nav>

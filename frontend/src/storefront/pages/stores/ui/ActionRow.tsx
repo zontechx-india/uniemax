@@ -25,6 +25,7 @@ export function ActionRow({
   leading,
   title,
   meta,
+  below,
   status,
   primary,
   toggle,
@@ -37,6 +38,8 @@ export function ActionRow({
   title: ReactNode
   /** Up to two short facts ("₹499 · 12 in stock"). Wraps, never truncates. */
   meta?: ReactNode
+  /** A third line under the facts — a progress nudge, linked-product chips. */
+  below?: ReactNode
   /** A `StatusPill`, beside the title. */
   status?: ReactNode
   /** The ONE labelled action — usually an Edit button. */
@@ -63,19 +66,22 @@ export function ActionRow({
 
   return (
     <div className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-4 sm:px-5">
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="flex min-w-0 flex-1 items-start gap-3">
         {leading && <div className="shrink-0">{leading}</div>}
+        <div className="min-w-0 flex-1">
         {onOpen ? (
           <button
             type="button"
             onClick={onOpen}
-            className="min-w-0 flex-1 rounded-md text-left outline-offset-4"
+            className="block w-full min-w-0 rounded-md text-left outline-offset-4"
           >
             {text}
           </button>
         ) : (
-          <div className="min-w-0 flex-1">{text}</div>
+          <div className="min-w-0">{text}</div>
         )}
+        {below && <div className="mt-2">{below}</div>}
+        </div>
       </div>
 
       {hasActions && (

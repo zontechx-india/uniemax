@@ -578,7 +578,7 @@ One list, **three presentations**:
 - **Mobile** (`< lg`) — `StoreMobileNav.tsx`: a fixed, floating
   `glass-strong` tab bar with icon **and** word — **Home** (Dashboard) ·
   **Orders** (pending badge) · **Products** · **Design** (Store Builder) ·
-  **More**. More (which names the current section when you are on one) opens
+  **More**. More (highlighted when you are on one of its sections — it keeps the word "More"; a section name was cut to "Categori…") opens
   a `Dialog` sheet with `SectionSheetList` — every group flat and open, 52px
   rows — plus "Switch to another shop". Tabs a mode cannot open (admin hidden
   sections) are dropped. It replaced a one-row dropdown that put Orders and
@@ -1721,19 +1721,25 @@ is never shown a pickup-address item.
   chooses a category and cannot type one, so no shop invents its own
   vocabulary. Picking a deep category adds its ancestors too, making
   "Fashion › Women › Sarees" one action; a category already added is named
-  as such and Add is disabled. A per-row **edit panel** covers artwork and
-  sort order only — the name is the category's. Shelves that predate the rule
-  keep their free-text names and read "Added before platform categories
-  existed", which is the seller's cue that only support can link it. Plus a
-  **collapsible nested list** of any depth, each level indented, children
-  "Sub"-chipped, product/subcategory counts, guarded delete via
-  `ConfirmDialog`. Branches get an expand/collapse chevron plus an Expand-all /
-  Collapse-all control; the open set is remembered per store in
-  localStorage (`storefront.categories.expanded.{storeId}`) and a root
-  auto-expands when a subcategory is added to it, so long catalogs stay
-  scannable. Every row (root or sub) has an **inline rename** — a pencil
-  swaps the name for an input with save/cancel, Enter saves, Escape
-  cancels → `PATCH /stores/:id/categories/:categoryId` with `{ name }`),
+  as such and Add is disabled (the form sits in a "Add a category"
+  `GlassCard` under a `PageHeader`). Shelves that predate the rule keep their
+  free-text names and read "Not on UnieMax category pages", the seller's cue
+  that only support can link them. Plus a **collapsible nested list** of any
+  depth in one `glass-card`: each row has a 44px expand button (branches
+  only), the name with an "On home page" pill when featured, product /
+  "n inside" counts and the platform path, a labelled **Showing / Hidden**
+  `BigSwitch`, and a "⋯" `RowMenu` with **Show on / Remove from home page**
+  (roots only — the "Featured categories" row), **Move up / Move down**,
+  **Change picture** and **Delete category** (guarded by `ConfirmDialog`).
+  Move up / down replaces the typed "Sort order" number: the sibling run is
+  renumbered 0, 10, 20… and only changed rows are PATCHed (`sortOrder`;
+  the list is served by `sortOrder`). Indentation is 16px per level and
+  stops after three levels — deeper rows carry a "Level n" pill. Change
+  picture opens the edit panel (a picture link; the name is the category's
+  and is never editable). Open all / Close all, with the open set
+  remembered per store in localStorage
+  (`storefront.categories.expanded.{storeId}`); a root auto-expands when a
+  subcategory is added to it),
   and `StoreProductsPage`
   (**gated**: with zero categories it shows a "First, choose what you sell"
   state linking to the Categories section — the category-first sequence;
@@ -1741,29 +1747,45 @@ is never shown a pickup-address item.
   product" + **Add a product** while the store still has no product;
   otherwise the **`ProductWizard`**
   (`pages/stores/products/wizard/`) for adding *and* editing — one question
-  per step, written for sellers who are not technical: **1 What is it?**
+  per step, written for sellers who are not technical. **On a phone it is
+  full-screen** (portalled to `<body>` so the glass panel cannot trap it;
+  `useMediaQuery('(min-width: 640px)')` picks the frame): a frosted header
+  with close, the product name, "Step 2 of 6 · Photos" — a button that opens
+  an **All steps** sheet to jump anywhere — and a segmented progress bar,
+  over a scrolling step whose Back / Continue bar (`StepButtons`) is sticky.
+  From `sm` up it stays inline in a `glass-card` with a 44px clickable step
+  row. Fields are 48px (`inputClass` = `h-field`), labels 15px, hints 13px.
+  **1 What is it?**
   (name + category; Continue creates the product as a **draft** on the
   server, so every later step saves on Continue and "Finish later" always
   keeps what was done) · **2 Photos** (the shared Media Board on
   `useLiveMedia`, uploading straight onto the draft) · **3 Price & choices**
-  (two cards — "One version" = price, MRP, stock, item code; "Comes in
-  choices" = the category's **suggested options** as one-tap chips with
-  their usual values, the `OptionTypesEditor` for anything else, and the
-  `VariantMatrix` with "Set every price / MRP / stock" so a grid is one
-  number, a photo per combination picked by sight — the thumbnail opens the
-  product's own photos, "Cover" meaning the first — or for a whole value at
-  once ("same photo for every Pink"); saved as one `PUT …/options`, dropped
-  saved combinations confirmed first. Every option card has a kind switch —
-  **Typed here** (the above) or **Other products**: the values are other
-  products of the store, a *family* (`features/stores/productGroups.ts`
-  draft — one row per member with its cover and an editable value, in
-  swatch order, and two buttons: **Select products** opens
-  `GroupMemberPicker`, a ticked list of the store's products, same shelf
-  first, ineligible rows disabled with the reason; **Create new product for
-  this value** opens `CreateMemberDialog`, which makes a draft twin via
-  `POST …/copy`, saves the family and switches the wizard onto the new
-  product at Photos). Both kinds sit in one ordered list and a card converts
-  in place. Continue validates everything locally, then saves typed options
+  (two radio cards — **"No — one kind only"** = selling price, printed price /
+  MRP, how many you have, product code (optional); **"Yes — sizes, colours or
+  weights"** = TWO screens inside one `PricingStep` (state survives between
+  them; a "1 Choices · 2 Prices" strip shows where you are):
+  **Choices** — the category's **suggested options** as one-tap 44px chips
+  ("Tap to add a common choice") and the `OptionTypesEditor`; Continue
+  checks every choice is named and has options, then **Prices** — the
+  `VariantMatrix`, whose bulk tools ("Same price for all…", MRP, stock,
+  Turn all on, "Same photo for every…") live in ONE sheet, and whose
+  per-choice photo is picked by sight in a bottom sheet ("Main" = the first
+  photo). Saved as one `PUT …/options`; dropped saved choices confirmed
+  first. In the editor a choice is "Choice 1: Size" with "Size options" as
+  chips (`ChipInput`: 36px chips, a visible **Add** button while typing,
+  "S, M, L" typed at once becomes three) and a worded **Remove**. The
+  second kind — **linked products** — is an advanced path behind "More ways
+  to add choices": the values are other products of the store, a *family*
+  (`features/stores/productGroups.ts` draft — one row per member with its
+  cover and an editable value, in swatch order, and two buttons: **Pick from
+  my products** opens `GroupMemberPicker`, a ticked list of the store's
+  products, same shelf first, ineligible rows disabled with the reason;
+  **Make a new product for this** opens `CreateMemberDialog`, which makes a
+  draft twin via `POST …/copy`, saves the family and switches the wizard
+  onto the new product at Photos). Both kinds sit in one ordered list and a
+  card converts in place ("These are my other products" / "Type the options
+  instead"); the advanced section opens itself when the product already has
+  a family. Continue validates everything locally, then saves typed options
   (or the single price fields when the product has only a family) and, if
   changed, the family through `PUT …/groups`; the product list reloads
   because other members' rows changed) · **4
@@ -1778,20 +1800,24 @@ is never shown a pickup-address item.
   once the draft exists, and its ticks reflect the product's real state
   (photo, price, description, published) rather than position; a bar reads
   "Product N% complete". Every field
-  has a one-line hint with an example — no tooltips. The product list shows
-  "Root › Sub" paths, price ranges, a **Draft** badge, one chip per family
-  ("Colour · Blue"), and a small
-  completeness bar with the one next thing to do ("70% — add a
-  description") that opens the wizard at that step, so a shop fills up
-  gradually. Renames keep the slug/public URL.  A **Placement** toggle on each row opens the
-  **Storefront placement** checkboxes (Featured Product · Best Seller · New
-  Arrival · Hide from Search); the toggle sits inline with the row's buttons
-  from `sm` up and becomes a chip under the product's meta on phones, where
-  that line is already full. Each maps to exactly one storefront row, and
-  because ticking one changes what customers see immediately, the checkbox
-  only *requests* the change — a `ConfirmDialog` names the affected row and
-  nothing is written until it is accepted, so the boxes always reflect saved
-  state. Root categories get a matching **star** toggle.
+  has a one-line hint with an example — no tooltips. The product list
+  (`PageHeader` + **Add product**) is one `glass-card` of `ActionRow`s: a
+  56px photo, the name with a **Showing / Hidden / Not finished** pill, the
+  price (or range) · stock · "n choices", the "Root › Sub" path, then a
+  tappable orange nudge with the completeness bar and the one next thing to
+  do ("50% done — next: add a description", opening the wizard at that
+  step), and pills for families ("Colour: Blue"), home-page rows, "Not in
+  search", its own delivery / shipping rule and "No cash on delivery".
+  Actions: **Edit**, a labelled Showing / Hidden `BigSwitch` (toast on save),
+  and "⋯" with **Home page & search** and **Delete product**. With more than
+  five products a search box and filter chips (All · Showing · Hidden · Not
+  finished, with counts) appear. Empty / no-category states are
+  `EmptyState`s. Renames keep the slug/public URL. **Home page & search**
+  opens a sheet of four switches (Featured · Best Seller · New Arrival ·
+  Hide from Search), each naming the one storefront row it maps to; because
+  each changes what customers see immediately, a switch only *requests* the
+  change — a `ConfirmDialog` names the affected row and nothing is written
+  until it is accepted, so the switches always reflect saved state.
 
   **The Media Board** (`pages/stores/media/`) is the wizard's Photos step. It
   owns everything visible — picking, the crop question, the editor, the grid,
@@ -2251,7 +2277,8 @@ frontend/
     │   │   │                     #   (mark + name; size by HEIGHT only, the aspect
     │   │   │                     #   ratio sets the width; tone="on-dark" for the
     │   │   │                     #   auth heroes)
-    │   │   ├── ChipInput.tsx     # Keyed chip list (add / rename / remove) — option values
+    │   │   ├── ChipInput.tsx     # Keyed chip list (add / rename / remove) — option values;
+    │   │   │                     #   visible Add button, "S, M, L" splits on commas
     │   │   ├── Wizard.tsx        # Generic multi-step form shell: numbered rail
     │   │   │                     #   (sm+) / one segment per step + "Step 2 of 3"
     │   │   │                     #   (mobile), glass panel, WizardActions (Back /
@@ -2521,21 +2548,23 @@ frontend/
     │           ├── StoreCustomerSupportTicketPage.tsx # One request + reply + status
     │           ├── StoreCategoriesPage.tsx # Choose shelves from the platform
     │           │                        #   taxonomy (CategoryPicker, any depth,
-    │           │                        #   no free text) + image URL, sort order
-    │           ├── StoreProductsPage.tsx # List with completeness + Draft badges; opens the wizard
+    │           │                        #   no free text); rows: Showing switch +
+    │           │                        #   ⋯ (home page, move up/down, picture, delete)
+    │           ├── StoreProductsPage.tsx # ActionRow list (search + filters, next-step nudge,
+    │           │                        #   Showing switch, ⋯ placement/delete); opens the wizard
     │           ├── products/             # Editors the product wizard composes
     │           │   ├── wizard/               # ProductWizard — steps, progress, review/publish
-    │           │   │   ├── ProductWizard.tsx    # Container + step header + Review step
+    │           │   │   ├── ProductWizard.tsx    # Full-screen on phones (portal) / inline card; step sheet; Review
     │           │   │   ├── BasicsStep.tsx       # Name + category → creates the draft
     │           │   │   ├── PhotosStep.tsx       # Media Board on the draft
-    │           │   │   ├── PricingStep.tsx      # One version / choices, presets, matrix
+    │           │   │   ├── PricingStep.tsx      # One kind / choices → Choices screen → Prices screen
     │           │   │   ├── DetailsStep.tsx      # Description + suggested spec rows
     │           │   │   ├── DeliveryStep.tsx     # Store settings vs per-product overrides
     │           │   │   └── shared.tsx           # Steps, Field/Hint/StepShell, categoryOptions
-    │           │   ├── OptionTypesEditor.tsx # ≤3 options, each "Typed here" (chips) or "Other products" (a family)
+    │           │   ├── OptionTypesEditor.tsx # ≤3 choices (chips); linked products (a family) behind "More ways"
     │           │   ├── GroupMemberPicker.tsx # Tick the store's products as a family's members
     │           │   ├── CreateMemberDialog.tsx # "Create new product for this value" — draft twin
-    │           │   ├── VariantMatrix.tsx     # Generated combinations: photo / SKU / price / MRP / stock / on-off / not offered
+    │           │   ├── VariantMatrix.tsx     # Price per choice: cards (phone) / table; bulk + photo pickers as sheets
     │           │   └── SpecificationsEditor.tsx # Ordered label/value rows
     │           ├── ui/                  # Seller UI kit (glass) — GlassCard, PageHeader,
     │           │                        #   SaveBar + useUnsavedChangesGuard, ActionRow,
@@ -3018,11 +3047,11 @@ Rules that keep it legible and fast:
 | `PageHeader` | Section heading: gradient icon chip, 22px title, required one-line description, optional action (full width on phones). |
 | `SaveBar` | THE save model for forms: hidden until `dirty`; then a sticky `glass-strong` bar (message, **Undo changes**, **Save changes**) that stays under the thumb; shows `error`. Sits above the mobile tab bar via `--seller-dock`. Renders the unsaved-changes guard. |
 | `useUnsavedChangesGuard(dirty)` | `beforeunload` + react-router `useBlocker` with a plain-words "Leave without saving?" sheet. The blocker half renders only under a data router (`UNSAFE_DataRouterContext`) — the admin console mounts these pages under `<BrowserRouter>`, where `useBlocker` would throw. Ignores same-path (query-only) moves. |
-| `ActionRow` | One list item: leading photo, title + status, ≤2 facts, then ONE labelled primary action, a `toggle` kept apart, and `menu` → `RowMenu`. Actions drop below the text on phones so the name keeps the width. |
+| `ActionRow` | One list item: leading photo, title + status, ≤2 facts, an optional `below` line (a nudge, chips), then ONE labelled primary action, a `toggle` kept apart, and `menu` → `RowMenu`. Actions drop below the text on phones so the name keeps the width. |
 | `RowMenu` | "⋯ More" (44px; word shown from `sm`) → bottom sheet of 56px rows with icon, label and note; `danger` rows forced last and red. |
 | `BigSwitch` | Successor to `ActiveSwitch` (same core props): 52×32 track, 44px hit area, the state *written* beside it (`onText` / `offText`, width reserved for the longer word so lists stay aligned). |
 | `ProgressRing` | "3 of 5" as a ring (brand → green when complete); optional "3/5" label. My shops cards, setup checklist. |
-| `StatusPill` | One badge: tone `success` / `pending` / `brand` / `danger` / `neutral`, dot + 12px text. |
+| `StatusPill` | One badge (`wrap` lets a long one — a delivery rule — wrap): tone `success` / `pending` / `brand` / `danger` / `neutral`, dot + 12px text. |
 | `EmptyState` | Gradient icon, title, one sentence, optional numbered picture `steps`, one action. |
 | `showToast()` / `ToastHost` | "Saved ✓" for instant saves. Module store (`useSyncExternalStore`), no provider; `ToastHost` is mounted once in `StoreManageLayout`. |
 | `HelpHint` | ⓘ (44px hit, inline in a label) → a sheet explaining a term in plain words. |

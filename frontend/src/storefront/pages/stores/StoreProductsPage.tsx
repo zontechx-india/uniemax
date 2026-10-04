@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
@@ -14,14 +14,24 @@ import type {
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import {
   BoxIcon,
-  ChevronDownIcon,
   PencilIcon,
   PlusIcon,
+  SearchIcon,
+  ShareIcon,
+  StarIcon,
   TagIcon,
   TrashIcon,
 } from '../../layout/icons'
-import { ActiveSwitch } from './ActiveSwitch'
+import { Dialog } from '../../../shared/ui/Dialog'
+import { CameraIcon } from './media/icons'
 import { ShopNotLiveNudge } from './StorePublishCard'
+import { ActionRow } from './ui/ActionRow'
+import { BigSwitch } from './ui/BigSwitch'
+import { EmptyState } from './ui/EmptyState'
+import { GlassCard } from './ui/GlassCard'
+import { PageHeader } from './ui/PageHeader'
+import { StatusPill } from './ui/StatusPill'
+import { showToast } from './ui/Toast'
 import { ProductWizard } from './products/wizard/ProductWizard'
 import type { StepKey } from './products/wizard/shared'
 import { Button, buttonClass } from '../../../shared/ui/Button'
@@ -37,6 +47,12 @@ import { MediaImg } from '../../../shared/media/MediaImg'
  * filled gradually instead of in one sitting. Until the store has a category
  * this section is a gate pointing to Categories (a product must belong to
  * one — the backend enforces the same rule).
+ *
+ * Each product is one `ActionRow`: photo, name, a Showing / Hidden / Draft
+ * pill, price and stock, the one next thing to do, then **Edit**, a labelled
+ * Showing / Hidden switch, and "⋯ More" for the rarer actions (home-page
+ * placement, delete) — so Delete is never a stray tap beside the switch.
+ * Search and filter chips appear once a shop has enough products to need them.
  */
 export function StoreProductsPage() {
   const { store, onStoreChange, refreshStore } = useManagedStore()
@@ -56,6 +72,8 @@ export function StoreProductsPage() {
   /** A merchandising change awaiting confirmation (nothing written yet). */
   const [pendingFlag, setPendingFlag] = useState<PendingFlag | null>(null)
   const [savingFlag, setSavingFlag] = useState(false)
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<Filter>('all')
 
   useEffect(() => {
     let cancelled = false
@@ -126,8 +144,10 @@ export function StoreProductsPage() {
         }),
       )
       refreshStore?.()
+      showToast(next ? 'Showing in your shop' : 'Hidden from your shop')
     } catch (err) {
       setError(toApiError(err).message)
+      showToast('Could not save — try again', 'danger')
     } finally {
       setTogglingId(null)
     }
@@ -182,11 +202,9 @@ export function StoreProductsPage() {
 
   if (categories === null || products === null) {
     return (
-      <div>
-        <h2 className="font-body text-xl font-semibold tracking-normal text-fg">
-          Products
-        </h2>
-        <p className="mt-4 text-sm text-muted">Loading products…</p>
+      <div className="space-y-4" aria-busy="true" aria-label="Loading products">
+        <PageHeader icon={BoxIcon} title="Products" description="Loading your products…" />
+        <div className="glass-card h-64 animate-pulse rounded-glass" />
       </div>
     )
   }
@@ -194,30 +212,21 @@ export function StoreProductsPage() {
   // Setup sequence gate: no categories yet → products can't be added.
   if (categories.length === 0) {
     return (
-      <div>
-        <h2 className="font-body text-xl font-semibold tracking-normal text-fg">
-          Products
-        </h2>
-
-        <div className="mt-4 flex flex-col items-center rounded-lg bg-surface-alt px-6 py-12 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-md bg-surface text-brand shadow-floating">
-            <TagIcon className="h-6 w-6" />
-          </div>
-          <p className="mt-4 text-sm font-medium text-fg">
-            First, choose what you sell
-          </p>
-          <p className="mt-1 max-w-sm text-sm text-muted">
-            Pick a category for your products — type what you sell, like
-            "saree" or "atta". Then you can add products.
-          </p>
-          <Link
-            to="../categories"
-            className={buttonClass({ size: 'md', className: 'mt-5' })}
-          >
-            <PlusIcon className="h-4 w-4" />
-            Choose a category
-          </Link>
-        </div>
+      <div className="space-y-4">
+        <PageHeader icon={BoxIcon} title="Products" description="Everything you sell." />
+        <GlassCard>
+          <EmptyState
+            icon={TagIcon}
+            title="First, choose what you sell"
+            description='Pick a category for your products — type what you sell, like "saree" or "atta". Then you can add products.'
+            action={
+              <Link to="../categories" className={buttonClass({ size: 'lg' })}>
+                <PlusIcon className="h-5 w-5" />
+                Choose a category
+              </Link>
+            }
+          />
+        </GlassCard>
       </div>
     )
   }
@@ -225,36 +234,32 @@ export function StoreProductsPage() {
   const drafts = products.filter((p) => p.isDraft).length
 
   return (
-    <div>
+    <div className="space-y-4">
       {/* Only once there is something live to see — a new seller with no
           products isn't nagged about publishing. */}
       {!wizard && products.some((p) => !p.isDraft && p.isActive) && (
         <ShopNotLiveNudge store={store} onStoreChange={onStoreChange} />
       )}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="font-body text-xl font-semibold tracking-normal text-fg">
-            Products
-          </h2>
-          <p className="mt-1 text-sm text-muted">
-            What your customers browse and buy. Add a product in a few small
-            steps — you can stop any time and finish later.
-          </p>
-        </div>
-        {!wizard && (
-          <Button
-            type="button"
-            size="md"
-            onClick={() => setWizard({ product: null, startAt: 'basics' })}
-          >
-            <PlusIcon className="h-4 w-4" />
-            Add Product
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        icon={BoxIcon}
+        title="Products"
+        description="What your customers see and buy. Add one in a few small steps — you can stop any time."
+        action={
+          !wizard && products.length > 0 ? (
+            <Button
+              type="button"
+              size="lg"
+              onClick={() => setWizard({ product: null, startAt: 'basics' })}
+            >
+              <PlusIcon className="h-5 w-5" />
+              Add product
+            </Button>
+          ) : undefined
+        }
+      />
 
       {error && (
-        <div className="mt-4 max-w-md">
+        <div className="max-w-md">
           <ErrorNote>{error}</ErrorNote>
         </div>
       )}
@@ -273,63 +278,64 @@ export function StoreProductsPage() {
             refreshStore?.()
           }}
         />
+      ) : products.length === 0 ? (
+        <GlassCard>
+          <EmptyState
+            icon={BoxIcon}
+            title="Add your first product"
+            description="A name, a photo and a price are enough to start selling. You can add more details later."
+            steps={[
+              { icon: TagIcon, label: 'Name it' },
+              { icon: CameraIcon, label: 'Add a photo' },
+              { icon: ShareIcon, label: 'Set a price' },
+            ]}
+            action={
+              <Button
+                type="button"
+                size="lg"
+                onClick={() => setWizard({ product: null, startAt: 'basics' })}
+              >
+                <PlusIcon className="h-5 w-5" />
+                Add my first product
+              </Button>
+            }
+          />
+        </GlassCard>
       ) : (
-        <div className="mt-4">
-          {products.length === 0 ? (
-            <div className="flex flex-col items-center rounded-lg bg-surface-alt px-6 py-12 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-md bg-surface text-brand shadow-floating">
-                <BoxIcon className="h-6 w-6" />
-              </div>
-              <p className="mt-4 text-sm font-medium text-fg">No products yet</p>
-              <p className="mt-1 max-w-sm text-sm text-muted">
-                Add your first product — a name, a category and a photo are
-                enough to start.
-              </p>
-            </div>
-          ) : (
-            <>
-              {drafts > 0 && (
-                <p className="mb-2 text-xs text-muted">
-                  {drafts} draft{drafts === 1 ? '' : 's'} not yet published —
-                  open one and finish its checklist to make it live.
-                </p>
-              )}
-              <ul className="divide-y divide-line rounded-lg border border-line">
-                {products.map((product) => (
-                  <ProductRow
-                    key={product.id}
-                    product={product}
-                    categories={categories}
-                    placementOpen={placementId === product.id}
-                    onTogglePlacement={() =>
-                      setPlacementId((id) => (id === product.id ? null : product.id))
-                    }
-                    onEdit={(startAt) => setWizard({ product, startAt })}
-                    toggling={togglingId === product.id}
-                    onToggleActive={(next) => toggleActive(product, next)}
-                    onDelete={() => setToDelete(product)}
-                    onMerchandising={(key, next) =>
-                      setPendingFlag({ product, key, next })
-                    }
-                  />
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
+        <ProductList
+          products={products}
+          categories={categories}
+          drafts={drafts}
+          query={query}
+          onQuery={setQuery}
+          filter={filter}
+          onFilter={setFilter}
+          togglingId={togglingId}
+          onEdit={(product, startAt) => setWizard({ product, startAt })}
+          onToggleActive={toggleActive}
+          onDelete={setToDelete}
+          onPlacement={setPlacementId}
+        />
       )}
+
+      {/* Home-page placement for one product, as a sheet of switches. */}
+      <PlacementSheet
+        product={products.find((p) => p.id === placementId) ?? null}
+        onClose={() => setPlacementId(null)}
+        onRequest={(product, key, next) => setPendingFlag({ product, key, next })}
+      />
 
       <ConfirmDialog
         open={toDelete !== null}
-        title="Delete product?"
+        title="Delete this product?"
         description={
           toDelete ? (
             <>
               <span className="font-medium text-fg">{toDelete.name}</span>{' '}
-              will be removed from your store
+              will be removed from your shop
               {toDelete.variants.length > 0 &&
-                ` along with its ${toDelete.variants.length} variant${toDelete.variants.length === 1 ? '' : 's'}`}
-              .
+                ` along with its ${toDelete.variants.length} choice${toDelete.variants.length === 1 ? '' : 's'}`}
+              . You cannot undo this.
             </>
           ) : null
         }
@@ -361,6 +367,124 @@ export function StoreProductsPage() {
         onConfirm={confirmMerchandising}
         onCancel={() => setPendingFlag(null)}
       />
+    </div>
+  )
+}
+
+type Filter = 'all' | 'showing' | 'hidden' | 'draft'
+
+const FILTERS: { key: Filter; label: string; test: (p: StoreProduct) => boolean }[] = [
+  { key: 'all', label: 'All', test: () => true },
+  { key: 'showing', label: 'Showing', test: (p) => !p.isDraft && p.isActive },
+  { key: 'hidden', label: 'Hidden', test: (p) => !p.isDraft && !p.isActive },
+  { key: 'draft', label: 'Not finished', test: (p) => p.isDraft },
+]
+
+/** Search + filter chips (once there are enough products), then the rows. */
+function ProductList({
+  products,
+  categories,
+  drafts,
+  query,
+  onQuery,
+  filter,
+  onFilter,
+  togglingId,
+  onEdit,
+  onToggleActive,
+  onDelete,
+  onPlacement,
+}: {
+  products: StoreProduct[]
+  categories: StoreCategory[]
+  drafts: number
+  query: string
+  onQuery: (q: string) => void
+  filter: Filter
+  onFilter: (f: Filter) => void
+  togglingId: string | null
+  onEdit: (product: StoreProduct, startAt: StepKey) => void
+  onToggleActive: (product: StoreProduct, next: boolean) => void
+  onDelete: (product: StoreProduct) => void
+  onPlacement: (id: string) => void
+}) {
+  // A handful of products needs no search; past that, finding one does.
+  const searchable = products.length > 5
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const test = FILTERS.find((f) => f.key === filter)!.test
+    return products.filter((p) => test(p) && (!q || p.name.toLowerCase().includes(q)))
+  }, [products, query, filter])
+
+  return (
+    <div className="space-y-3">
+      {searchable && (
+        <div className="space-y-2.5">
+          <label className="relative block">
+            <span className="sr-only">Search products</span>
+            <SearchIcon className="pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-muted" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => onQuery(e.target.value)}
+              placeholder="Search your products"
+              className="glass-inset h-field w-full rounded-xl pr-4 pl-11 text-[15px] text-fg outline-none placeholder:text-muted focus:border-accent"
+            />
+          </label>
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]" role="group" aria-label="Show">
+            {FILTERS.map(({ key, label, test }) => {
+              const count = products.filter(test).length
+              if (key !== 'all' && count === 0) return null
+              const on = filter === key
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => onFilter(key)}
+                  className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-pill border px-4 text-[14px] font-semibold transition ${
+                    on
+                      ? 'border-brand bg-brand text-brand-contrast'
+                      : 'border-line bg-surface/70 text-fg hover:border-brand/50'
+                  }`}
+                >
+                  {label}
+                  <span className={on ? 'opacity-85' : 'text-muted'}>{count}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {drafts > 0 && filter === 'all' && !query && (
+        <p className="text-hint text-muted">
+          {drafts} product{drafts === 1 ? ' is' : 's are'} not finished — open one
+          and add what it still needs to put it in your shop.
+        </p>
+      )}
+
+      {visible.length === 0 ? (
+        <p className="glass-card rounded-glass px-4 py-8 text-center text-[15px] text-muted">
+          No products match. Try another word{filter !== 'all' ? ' or tap “All”' : ''}.
+        </p>
+      ) : (
+        <ul className="glass-card divide-y divide-line overflow-hidden rounded-glass">
+          {visible.map((product) => (
+            <li key={product.id}>
+              <ProductRow
+                product={product}
+                categories={categories}
+                toggling={togglingId === product.id}
+                onEdit={(startAt) => onEdit(product, startAt)}
+                onToggleActive={(next) => onToggleActive(product, next)}
+                onDelete={() => onDelete(product)}
+                onPlacement={() => onPlacement(product.id)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
@@ -410,28 +534,21 @@ const NEXT_STEP: Record<
 function ProductRow({
   product,
   categories,
-  placementOpen,
-  onTogglePlacement,
-  onEdit,
   toggling,
+  onEdit,
   onToggleActive,
   onDelete,
-  onMerchandising,
+  onPlacement,
 }: {
   product: StoreProduct
   categories: StoreCategory[]
-  placementOpen: boolean
-  onTogglePlacement: () => void
+  toggling: boolean
   /** Opens the wizard on this product, at the given step. */
   onEdit: (startAt: StepKey) => void
-  toggling: boolean
   onToggleActive: (next: boolean) => void
   onDelete: () => void
-  /** Requests a merchandising change — confirmed by the page before saving. */
-  onMerchandising: (
-    key: keyof StoreProductMerchandising,
-    next: boolean,
-  ) => void
+  /** Opens the home-page placement sheet. */
+  onPlacement: () => void
 }) {
   const cover = product.media.find((m) => m.type === 'IMAGE')?.url ?? null
   const stock = product.stockQuantity
@@ -439,184 +556,143 @@ function ProductRow({
     ? NEXT_STEP[product.completeness.missing[0]]
     : null
   const complete = product.completeness.percent
+  const placed = MERCHANDISING.filter(({ key }) => key !== 'hideFromSearch' && product[key])
 
   return (
-    <li>
-      {/* Wraps on phones: the product gets the full width of its line and the
-          controls drop under it, instead of squeezing the name and the
-          completeness nudge into a column a few words wide. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 sm:flex-nowrap">
-        {cover ? (
+    <ActionRow
+      leading={
+        cover ? (
           <MediaImg
-            sizes="40px"
+            sizes="56px"
             src={cover}
             alt=""
-            className={`h-10 w-10 shrink-0 rounded-md border border-line object-cover ${
+            className={`h-14 w-14 rounded-xl border border-line object-cover ${
               product.isActive ? '' : 'opacity-60'
             }`}
           />
         ) : (
-          <div
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${
-              product.isActive
-                ? 'bg-brand/10 text-brand'
-                : 'bg-surface-alt text-muted'
+          <span
+            className={`flex h-14 w-14 items-center justify-center rounded-xl ${
+              product.isActive ? 'bg-brand-soft text-brand' : 'bg-fg/5 text-muted'
             }`}
           >
-            <BoxIcon className="h-4 w-4" />
-          </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <p
-            className={`truncate text-sm font-semibold ${
-              product.isActive ? 'text-fg' : 'text-muted'
-            }`}
-          >
-            {product.name}
-            {product.isDraft ? (
-              <span className="ml-1.5 rounded-sm bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
-                Draft
-              </span>
-            ) : (
-              !product.isActive && (
-                <span className="ml-1.5 rounded-sm bg-surface-alt px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
-                  Disabled
-                </span>
-              )
-            )}
-            {product.groups.map((group) => (
-              <span
-                key={group.id}
-                className="ml-1.5 rounded-sm bg-brand/10 px-1.5 py-0.5 text-[10px] font-semibold text-brand"
-                title={`One of ${group.members.length} "${group.optionName}" products`}
-              >
-                {group.optionName} · {group.value}
-              </span>
-            ))}
-          </p>
-          <p className="truncate text-xs text-muted">
-            {categoryPath(product.category, categories)} · {priceLabel(product)}
-            {' · '}
-            {stock > 0 ? `${stock} in stock` : 'Out of stock'}
-            {product.hasVariants &&
-              ` · ${product.variants.length} variant${product.variants.length === 1 ? '' : 's'}`}
-            {product.deliveryRule && (
-              <> · Delivery: {describeDeliveryRule(product.deliveryRule)}</>
-            )}
-            {product.shippingOverride && (
-              <> · Shipping: {describeShippingOverride(product.shippingOverride)}</>
-            )}
-            {!product.codAvailable && <> · No COD</>}
-          </p>
+            <BoxIcon className="h-6 w-6" />
+          </span>
+        )
+      }
+      title={product.name}
+      status={
+        product.isDraft ? (
+          <StatusPill tone="pending">Not finished</StatusPill>
+        ) : product.isActive ? (
+          <StatusPill tone="success">Showing</StatusPill>
+        ) : (
+          <StatusPill>Hidden</StatusPill>
+        )
+      }
+      meta={
+        <>
+          <span className="font-semibold text-fg">{priceLabel(product)}</span>
+          {' · '}
+          {stock > 0 ? `${stock} in stock` : 'Sold out'}
+          {product.hasVariants &&
+            ` · ${product.variants.length} choice${product.variants.length === 1 ? '' : 's'}`}
+          <span className="block truncate">{categoryPath(product.category, categories)}</span>
+        </>
+      }
+      below={
+        <div className="space-y-2">
           {/* How complete, and the one next thing — the nudge that fills a shop gradually. */}
-          <div className="mt-1.5 flex items-center gap-2">
-            <div className="h-1 w-24 overflow-hidden rounded-full bg-surface-alt">
-              <div
-                className={`h-full rounded-full ${complete === 100 ? 'bg-success' : 'bg-brand'}`}
-                style={{ width: `${complete}%` }}
-              />
-            </div>
-            <span className="text-[11px] text-muted">
-              {complete}%
-              {nextUp && (
-                <>
-                  {' — '}
-                  <button
-                    type="button"
-                    onClick={() => onEdit(nextUp.step)}
-                    className="font-semibold text-brand hover:underline"
-                  >
-                    {nextUp.label}
-                  </button>
-                </>
+          {nextUp && (
+            <button
+              type="button"
+              onClick={() => onEdit(nextUp.step)}
+              className="flex min-h-tap w-full items-center gap-2.5 rounded-xl bg-pending-soft px-3 text-left transition hover:brightness-95"
+            >
+              <span className="h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-fg/10">
+                <span
+                  className="block h-full rounded-full bg-pending"
+                  style={{ width: `${complete}%` }}
+                />
+              </span>
+              <span className="text-hint font-semibold text-pending">
+                {complete}% done — next: {nextUp.label}
+              </span>
+            </button>
+          )}
+          {(product.groups.length > 0 ||
+            placed.length > 0 ||
+            product.hideFromSearch ||
+            product.deliveryRule ||
+            product.shippingOverride ||
+            !product.codAvailable) && (
+            <div className="flex flex-wrap gap-1.5">
+              {product.groups.map((group) => (
+                <StatusPill key={group.id} tone="brand" dot={false}>
+                  {group.optionName}: {group.value}
+                </StatusPill>
+              ))}
+              {placed.map(({ key, label }) => (
+                <StatusPill key={key} tone="brand" dot={false}>
+                  <StarIcon className="h-3 w-3" filled />
+                  {label}
+                </StatusPill>
+              ))}
+              {product.hideFromSearch && <StatusPill dot={false}>Not in search</StatusPill>}
+              {/* Its own delivery settings, where they differ from the shop's. */}
+              {product.deliveryRule && (
+                <StatusPill dot={false} wrap>
+                  Delivery: {describeDeliveryRule(product.deliveryRule)}
+                </StatusPill>
               )}
-            </span>
-          </div>
-          {/* On phones the trigger rides here as a chip — the action line is full. */}
-          <PlacementToggle
-            open={placementOpen}
-            onToggle={onTogglePlacement}
-            productName={product.name}
-            className={`mt-2 inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 sm:hidden ${
-              placementOpen
-                ? 'border-accent bg-accent/10 text-accent'
-                : 'border-line bg-surface text-muted'
-            }`}
-          />
+              {product.shippingOverride && (
+                <StatusPill dot={false} wrap>
+                  Shipping: {describeShippingOverride(product.shippingOverride)}
+                </StatusPill>
+              )}
+              {!product.codAvailable && <StatusPill dot={false}>No cash on delivery</StatusPill>}
+            </div>
+          )}
         </div>
-        <div className="flex w-full items-center justify-end gap-1 sm:w-auto sm:gap-3">
-        {/* From `sm` up there is room for it inline with the row's buttons. */}
-        <PlacementToggle
-          open={placementOpen}
-          onToggle={onTogglePlacement}
-          productName={product.name}
-          className={`hidden shrink-0 items-center gap-1 rounded-md px-2.5 py-1.5 sm:flex ${
-            placementOpen
-              ? 'bg-accent/15 text-accent'
-              : 'text-muted hover:bg-surface-alt'
-          }`}
-        />
+      }
+      primary={
         <button
           type="button"
           onClick={() => onEdit('basics')}
-          className="rounded-md p-2 text-muted transition hover:bg-surface-alt hover:text-fg"
           aria-label={`Edit ${product.name}`}
+          className={buttonClass({ variant: 'ring', size: 'md', className: 'px-4' })}
         >
           <PencilIcon className="h-4 w-4" />
+          Edit
         </button>
-        <ActiveSwitch
+      }
+      toggle={
+        <BigSwitch
           checked={product.isActive}
           disabled={toggling}
-          label={`${product.isActive ? 'Disable' : 'Publish'} ${product.name}`}
+          label={`Show ${product.name} in your shop`}
+          onText="Showing"
+          offText="Hidden"
           onChange={onToggleActive}
         />
-        <button
-          type="button"
-          onClick={onDelete}
-          className="rounded-md p-2 text-muted transition hover:bg-danger/10 hover:text-danger"
-          aria-label={`Delete ${product.name}`}
-        >
-          <TrashIcon className="h-4 w-4" />
-        </button>
-        </div>
-      </div>
-
-      {placementOpen && (
-        <MerchandisingPanel product={product} onRequest={onMerchandising} />
-      )}
-    </li>
-  )
-}
-
-/**
- * Opens the merchandising panel. Rendered twice per row — inline with the
- * action buttons from `sm` up, and as a chip under the product's meta on
- * phones, where that line is already full.
- */
-function PlacementToggle({
-  open,
-  onToggle,
-  productName,
-  className,
-}: {
-  open: boolean
-  onToggle: () => void
-  productName: string
-  className: string
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-expanded={open}
-      aria-label={`Storefront placement for ${productName}`}
-      className={`text-xs font-semibold transition ${className}`}
-    >
-      Placement
-      <ChevronDownIcon
-        className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`}
-      />
-    </button>
+      }
+      menu={[
+        {
+          label: 'Home page & search',
+          icon: StarIcon,
+          note: 'Feature it on your home page, or hide it from search',
+          onSelect: onPlacement,
+        },
+        {
+          label: 'Delete product',
+          icon: TrashIcon,
+          note: 'Removes it from your shop for good',
+          danger: true,
+          onSelect: onDelete,
+        },
+      ]}
+      menuTitle={product.name}
+    />
   )
 }
 
@@ -641,8 +717,8 @@ const MERCHANDISING: {
 }[] = [
   {
     key: 'isFeatured',
-    label: 'Featured Product',
-    hint: 'Featured Products row',
+    label: 'Featured',
+    hint: 'In the “Featured Products” row on your home page',
     title: (on) => (on ? 'Add to Featured Products?' : 'Remove from Featured Products?'),
     body: (on, name) =>
       on
@@ -652,7 +728,7 @@ const MERCHANDISING: {
   {
     key: 'isBestSeller',
     label: 'Best Seller',
-    hint: 'Best Sellers row',
+    hint: 'In the “Best Sellers” row on your home page',
     title: (on) => (on ? 'Add to Best Sellers?' : 'Remove from Best Sellers?'),
     body: (on, name) =>
       on
@@ -662,7 +738,7 @@ const MERCHANDISING: {
   {
     key: 'isNewArrival',
     label: 'New Arrival',
-    hint: 'New Arrivals row',
+    hint: 'In the “New Arrivals” row on your home page',
     title: (on) => (on ? 'Add to New Arrivals?' : 'Remove from New Arrivals?'),
     body: (on, name) =>
       on
@@ -672,7 +748,7 @@ const MERCHANDISING: {
   {
     key: 'hideFromSearch',
     label: 'Hide from Search',
-    hint: 'Still browsable in its category',
+    hint: 'Customers can still find it in its category',
     title: (on) => (on ? 'Hide from search?' : 'Show in search again?'),
     body: (on, name) =>
       on
@@ -682,38 +758,50 @@ const MERCHANDISING: {
 ]
 
 /**
- * Merchandising controls — which storefront sections this product appears in.
- * Each checkbox *requests* a change; nothing is written until the owner
- * confirms, so the boxes always show the saved state.
+ * Where one product shows on the storefront — the home-page rows and search
+ * — as a sheet of labelled switches (it was an inline panel of 16px
+ * checkboxes). Each switch *requests* a change; nothing is written until the
+ * owner confirms, so the switches always show the saved state.
  */
-function MerchandisingPanel({
+function PlacementSheet({
   product,
+  onClose,
   onRequest,
 }: {
-  product: StoreProduct
-  onRequest: (key: keyof StoreProductMerchandising, next: boolean) => void
+  product: StoreProduct | null
+  onClose: () => void
+  onRequest: (
+    product: StoreProduct,
+    key: keyof StoreProductMerchandising,
+    next: boolean,
+  ) => void
 }) {
   return (
-    <div className="border-t border-line bg-surface-alt/40 px-4 py-3">
-      <p className="text-xs font-bold uppercase tracking-wide text-muted">
-        Storefront placement
-      </p>
-      <div className="mt-2.5 grid gap-x-6 gap-y-2 sm:grid-cols-2">
-        {MERCHANDISING.map(({ key, label, hint }) => (
-          <label key={key} className="flex cursor-pointer items-start gap-2.5">
-            <input
-              type="checkbox"
-              checked={product[key]}
-              onChange={(e) => onRequest(key, e.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--brand)]"
-            />
-            <span className="min-w-0">
-              <span className="block text-sm font-medium text-fg">{label}</span>
-              <span className="block text-[11px] text-muted">{hint}</span>
-            </span>
-          </label>
-        ))}
-      </div>
-    </div>
+    <Dialog
+      open={product !== null}
+      title="Home page & search"
+      subtitle={product?.name}
+      onClose={onClose}
+      flush
+    >
+      {product && (
+        <ul className="divide-y divide-line pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          {MERCHANDISING.map(({ key, label, hint }) => (
+            <li key={key} className="flex items-center gap-3 px-5 py-3">
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold text-fg">{label}</span>
+                <span className="block text-hint text-muted">{hint}</span>
+              </span>
+              <BigSwitch
+                checked={product[key]}
+                label={label}
+                showState={false}
+                onChange={(next) => onRequest(product, key, next)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </Dialog>
   )
 }

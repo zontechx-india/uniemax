@@ -31,7 +31,7 @@ export function SpecificationsEditor({
   }
 
   const inputClass =
-    'h-10 w-full rounded-md border border-line bg-input px-3 text-sm text-fg outline-none transition placeholder:text-muted focus:border-accent disabled:opacity-60'
+    'h-tap w-full rounded-md border border-line bg-input px-3 text-[15px] text-fg outline-none transition placeholder:text-muted focus:border-accent disabled:opacity-60'
 
   return (
     <div>
@@ -68,7 +68,7 @@ export function SpecificationsEditor({
                   onClick={() => move(index, -1)}
                   disabled={disabled || index === 0}
                   aria-label="Move up"
-                  className="flex h-9 w-9 items-center justify-center rounded-md text-muted transition hover:bg-surface-alt hover:text-fg disabled:opacity-30"
+                  className="flex size-tap items-center justify-center rounded-xl text-muted transition hover:bg-surface-alt hover:text-fg disabled:opacity-30"
                 >
                   ▲
                 </button>
@@ -77,7 +77,7 @@ export function SpecificationsEditor({
                   onClick={() => move(index, 1)}
                   disabled={disabled || index === value.length - 1}
                   aria-label="Move down"
-                  className="flex h-9 w-9 items-center justify-center rounded-md text-muted transition hover:bg-surface-alt hover:text-fg disabled:opacity-30"
+                  className="flex size-tap items-center justify-center rounded-xl text-muted transition hover:bg-surface-alt hover:text-fg disabled:opacity-30"
                 >
                   ▼
                 </button>
@@ -86,7 +86,7 @@ export function SpecificationsEditor({
                   onClick={() => remove(index)}
                   disabled={disabled}
                   aria-label={`Remove specification ${index + 1}`}
-                  className="flex h-9 w-9 items-center justify-center rounded-md text-muted transition hover:bg-danger/10 hover:text-danger disabled:opacity-40"
+                  className="flex size-tap items-center justify-center rounded-xl text-muted transition hover:bg-danger/10 hover:text-danger disabled:opacity-40"
                 >
                   <TrashIcon className="h-4 w-4" />
                 </button>
@@ -100,14 +100,14 @@ export function SpecificationsEditor({
         type="button"
         onClick={() => onChange([...value, { label: '', value: '' }])}
         disabled={disabled || value.length >= OPTION_LIMITS.specs}
-        className={`inline-flex items-center gap-1.5 rounded-md border border-dashed border-line px-3 py-2 text-xs font-semibold text-muted transition hover:text-fg disabled:cursor-not-allowed disabled:opacity-50 ${
+        className={`inline-flex items-center gap-1.5 min-h-tap rounded-xl border-2 border-dashed border-brand/40 px-4 text-[14px] font-semibold text-brand transition hover:text-fg disabled:cursor-not-allowed disabled:opacity-50 ${
           value.length > 0 ? 'mt-2' : ''
         }`}
       >
         <PlusIcon className="h-3.5 w-3.5" />
         Add specification
       </button>
-      <p className="mt-2 text-xs text-muted">
+      <p className="mt-2 text-hint text-muted">
         Facts about the product, shown as a table on its page. Things customers
         choose between (size, colour…) are options, not specifications.
       </p>

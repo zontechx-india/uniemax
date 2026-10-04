@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { toApiError } from '../../../../../shared/auth/http'
 import { ConfirmDialog } from '../../../../../shared/ui/ConfirmDialog'
 import { ErrorNote } from '../../../../../shared/ui/form'
@@ -27,7 +28,7 @@ import type {
   StoreCategory,
   StoreProduct,
 } from '../../../../features/stores/storesApi'
-import { PlusIcon } from '../../../../layout/icons'
+import { CheckIcon, PlusIcon, SlidersIcon, TagIcon } from '../../../../layout/icons'
 import { OptionTypesEditor } from '../OptionTypesEditor'
 import type { OptionsDraft } from '../OptionTypesEditor'
 import { VariantMatrix } from '../VariantMatrix'
@@ -46,6 +47,11 @@ type PendingDrop = Draft & { groups: GroupDraft[]; order: string[]; dropped: Var
  * PRODUCTS of the store make a family — Maroon / Blue / Tan each a product
  * of its own, this one among them. A product with only a family and no
  * typed option still sells at one price, so the four fields show again.
+ *
+ * With typed options the step is TWO screens inside one component (so no
+ * state is lost between them): **pick the choices** (Size: S, M, L), then
+ * **price and stock for each**. One long page with presets, options, a
+ * combinations grid and bulk tools was where sellers gave up.
  *
  * Nothing is written until Continue. Typed options go through the options
  * PUT (the server replaces the variant set in one transaction) and families
@@ -100,6 +106,8 @@ export function PricingStep({
   const [order, setOrder] = useState<string[]>(initial.order)
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null)
   const [confirmSingle, setConfirmSingle] = useState(false)
+  /** "choices" → "prices": the two screens of the options path. */
+  const [part, setPart] = useState<'choices' | 'prices'>('choices')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -215,7 +223,7 @@ export function PricingStep({
    */
   const validateOptions = (d: Draft, g: GroupDraft[]): string | null => {
     if (d.types.length === 0 && g.length === 0) {
-      return 'Add at least one option — Size, Colour, Weight… — or choose "One version".'
+      return 'Add at least one choice — Size, Colour, Weight… — or pick "No — one kind only".'
     }
     if (d.types.length > 0) {
       const result = draftToInput(d.types, d.rows)
@@ -335,7 +343,24 @@ export function PricingStep({
     }
   }
 
+  /**
+   * Choices screen → prices screen. Only the typed options are checked here
+   * (named, with values); prices are the next screen's job, and families are
+   * checked with everything else on the final Continue.
+   */
+  const toPrices = () => {
+    if (draft.types.length === 0) return setError('Add at least one choice, like Size or Colour.')
+    const unnamed = draft.types.find((t) => !t.name.trim())
+    if (unnamed) return setError('Give every choice a name, like “Size”.')
+    const empty = draft.types.find((t) => t.values.length === 0)
+    if (empty) return setError(`Add at least one option to “${empty.name.trim()}” — for example S, M, L.`)
+    setError(null)
+    setPart('prices')
+  }
+
   const next = () => {
+    // Typed options are priced on their own screen.
+    if (mode === 'options' && part === 'choices' && draft.types.length > 0) return toPrices()
     if (mode === 'single') {
       if (product.hasVariants || product.groups.length > 0) return setConfirmSingle(true)
       return void saveSingle()
@@ -350,7 +375,7 @@ export function PricingStep({
 
   const singleFields = (
     <div className="grid gap-4 sm:grid-cols-2">
-      <Field label="Selling price (₹)" hint="What the customer pays.">
+      <Field label="Selling price (₹)" hint="What the customer pays you.">
         <input
           value={price}
           onChange={(e) => setPrice(cleanAmount(e.target.value))}
@@ -360,9 +385,9 @@ export function PricingStep({
         />
       </Field>
       <Field
-        label="MRP (₹)"
+        label="Printed price / MRP (₹)"
         optional
-        hint="The printed price. Shown crossed out beside the selling price, with the % off."
+        hint="The price printed on the pack. Customers see it crossed out, with how much they save."
       >
         <input
           value={compareAt}
@@ -372,7 +397,7 @@ export function PricingStep({
           className={inputClass}
         />
       </Field>
-      <Field label="Stock" hint="How many you have. Customers see “only 2 left” when it runs low.">
+      <Field label="How many you have" hint="Customers see “only 2 left” when it runs low. Put 0 if it is sold out.">
         <input
           value={stock}
           onChange={(e) => setStock(cleanCount(e.target.value))}
@@ -382,16 +407,16 @@ export function PricingStep({
         />
       </Field>
       <Field
-        label="Item code (SKU)"
+        label="Product code"
         optional
-        hint="Your own reference, printed on order lines — e.g. SAR-PINK-01."
+        hint="Only if you use your own codes. Most sellers leave this empty."
       >
         <input
           value={sku}
           onChange={(e) => setSku(e.target.value)}
           maxLength={64}
           placeholder="e.g. SAR-PINK-01"
-          className={`${inputClass} font-mono`}
+          className={inputClass}
         />
       </Field>
     </div>
@@ -402,31 +427,63 @@ export function PricingStep({
 
   return (
     <StepShell
-      title="Price & choices"
-      lead="Does this product come in choices — sizes, colours, weights? Pick one, and the rest is a couple of numbers."
+      title={mode === 'options' && part === 'prices' ? 'Price for each choice' : 'Price'}
+      lead={
+        mode === 'options' && part === 'prices'
+          ? 'Type a price and how many you have for each one. Use “Same price for all” if most are the same.'
+          : 'Does this product come in different sizes, colours or weights?'
+      }
     >
-      <div className="grid gap-3 sm:grid-cols-2">
-        <ModeCard
-          active={mode === 'single'}
-          title="One version"
-          body="One price, one stock count. Most products."
-          onClick={() => setMode('single')}
-        />
-        <ModeCard
-          active={mode === 'options'}
-          title="Comes in choices"
-          body="Sizes, colours, weights… typed here as variants, or as other products of your store."
-          onClick={() => setMode('options')}
-        />
-      </div>
+      {/* Where the seller is on the two-screen path. */}
+      {mode === 'options' && draft.types.length > 0 && (
+        <ol className="flex gap-2" aria-label="Price step">
+          {(['choices', 'prices'] as const).map((p, i) => (
+            <li
+              key={p}
+              aria-current={part === p ? 'step' : undefined}
+              className={`flex flex-1 items-center gap-2 rounded-xl px-3 py-2 text-[14px] font-semibold ${
+                part === p ? 'bg-brand-soft text-brand' : 'bg-fg/5 text-muted'
+              }`}
+            >
+              <span
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-bold ${
+                  part === p ? 'bg-brand text-brand-contrast' : 'glass-inset'
+                }`}
+              >
+                {i + 1}
+              </span>
+              {p === 'choices' ? 'Choices' : 'Prices'}
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {part === 'choices' && (
+        <div role="radiogroup" aria-label="Does it come in choices?" className="grid gap-3 sm:grid-cols-2">
+          <ModeCard
+            active={mode === 'single'}
+            icon={TagIcon}
+            title="No — one kind only"
+            body="One price and one stock count. Most products."
+            onClick={() => setMode('single')}
+          />
+          <ModeCard
+            active={mode === 'options'}
+            icon={SlidersIcon}
+            title="Yes — sizes, colours or weights"
+            body="Customers pick a size, colour or weight before they buy."
+            onClick={() => setMode('options')}
+          />
+        </div>
+      )}
 
       {mode === 'single' ? (
         singleFields
-      ) : (
+      ) : part === 'choices' ? (
         <div className="space-y-5">
           {unusedPresets.length > 0 && (
             <div>
-              <p className="text-sm font-medium text-fg">Common choices for this category</p>
+              <p className="text-[15px] font-semibold text-fg">Tap to add a common choice</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {unusedPresets.map((preset) => (
                   <button
@@ -434,7 +491,7 @@ export function PricingStep({
                     type="button"
                     onClick={() => addPreset(preset)}
                     disabled={busy || cardCount >= 3}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-sm font-semibold text-fg transition hover:border-brand hover:text-brand disabled:opacity-50"
+                    className="inline-flex min-h-tap items-center gap-1.5 rounded-pill border border-line bg-surface px-4 text-[14px] font-semibold text-fg transition hover:border-brand hover:text-brand disabled:opacity-50"
                   >
                     <PlusIcon className="h-3.5 w-3.5" />
                     {preset.name}
@@ -449,8 +506,8 @@ export function PricingStep({
                 ))}
               </div>
               <Hint>
-                Tap one to add it with the usual values — remove any you don’t
-                stock, or add your own below.
+                It comes with the usual options filled in — remove any you
+                don’t sell, or add your own below.
               </Hint>
             </div>
           )}
@@ -464,55 +521,63 @@ export function PricingStep({
             disabled={busy}
           />
 
-          {draft.rows.length > 0 && (
-            <div>
-              <p className="text-sm font-medium text-fg">Each combination</p>
-              <Hint>
-                Use “Set every price” to fill the whole list with one number,
-                then change only the ones that differ. Take a combination off
-                the list if you don’t sell it.
-              </Hint>
-              <div className="mt-3">
-                <VariantMatrix
-                  types={draft.types}
-                  rows={draft.rows}
-                  media={images}
-                  onChange={(rows) => {
-                    setDraft({ ...draft, rows })
-                    setError(null)
-                  }}
-                  disabled={busy}
-                />
-              </div>
-            </div>
+          {draft.types.length > 0 && draft.rows.length > 0 && (
+            <p className="flex items-center gap-2 rounded-xl bg-success/10 px-3 py-2.5 text-hint font-medium text-fg">
+              <CheckIcon className="h-4 w-4 shrink-0 text-success" />
+              {draft.rows.filter((row) => !row.removed).length} choice
+              {draft.rows.filter((row) => !row.removed).length === 1 ? '' : 's'} to price.
+              Tap Continue to set the prices.
+            </p>
           )}
 
           {draft.types.length === 0 && groups.length > 0 && (
             <div>
-              <p className="text-sm font-medium text-fg">This product’s price</p>
+              <p className="text-[15px] font-semibold text-fg">This product’s price</p>
               <Hint>
-                The other products in the family carry their own — set each
-                one from its own wizard.
+                The linked products carry their own — set each one from its
+                own editor.
               </Hint>
               <div className="mt-3">{singleFields}</div>
             </div>
           )}
         </div>
+      ) : (
+        <VariantMatrix
+          types={draft.types}
+          rows={draft.rows}
+          media={images}
+          onChange={(rows) => {
+            setDraft({ ...draft, rows })
+            setError(null)
+          }}
+          disabled={busy}
+        />
       )}
 
       {error && <ErrorNote>{error}</ErrorNote>}
 
-      <StepButtons onBack={onBack} onNext={next} busy={busy} />
+      <StepButtons
+        onBack={
+          mode === 'options' && part === 'prices'
+            ? () => {
+                setError(null)
+                setPart('choices')
+              }
+            : onBack
+        }
+        onNext={next}
+        busy={busy}
+      />
 
       <ConfirmDialog
         open={pendingDrop !== null}
-        title="Remove these combinations?"
+        title="Stop selling these choices?"
         description={
           pendingDrop ? (
             <>
               {pendingDrop.dropped.length === 1
-                ? 'One saved combination'
-                : `${pendingDrop.dropped.length} saved combinations`}{' '}
+                ? 'One saved choice'
+                : `${pendingDrop.dropped.length} saved choices`}{' '}
               will be removed. Customers with one in their cart will see it as
               no longer available; past orders keep their details.
               <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm">
@@ -548,7 +613,7 @@ export function PricingStep({
 
       <ConfirmDialog
         open={confirmSingle}
-        title="Back to one version?"
+        title="Sell it as one kind only?"
         description={
           <>
             <span className="font-medium text-fg">{product.name}</span> will sell
@@ -556,20 +621,20 @@ export function PricingStep({
             {removedByVariants > 0 && (
               <>
                 {' '}
-                Its {removedByVariants} variant{removedByVariants === 1 ? '' : 's'} will be
+                Its {removedByVariants} choice{removedByVariants === 1 ? '' : 's'} will be
                 removed.
               </>
             )}
             {removedByGroups > 0 && (
               <>
                 {' '}
-                It will leave its {removedByGroups === 1 ? 'product family' : `${removedByGroups} product families`}
-                — the other products stay in your store.
+                It will stop being linked to {removedByGroups === 1 ? 'its other products' : `${removedByGroups} groups of products`}
+                — those products stay in your shop.
               </>
             )}
           </>
         }
-        confirmLabel="Yes, one version"
+        confirmLabel="Yes, one kind"
         busy={busy}
         onConfirm={async () => {
           setConfirmSingle(false)
@@ -581,13 +646,16 @@ export function PricingStep({
   )
 }
 
+/** One answer to "does it come in choices?" — a big card with a radio dot. */
 function ModeCard({
   active,
+  icon: Icon,
   title,
   body,
   onClick,
 }: {
   active: boolean
+  icon: (props: { className?: string }) => ReactNode
   title: string
   body: string
   onClick: () => void
@@ -595,16 +663,34 @@ function ModeCard({
   return (
     <button
       type="button"
+      role="radio"
+      aria-checked={active}
       onClick={onClick}
-      aria-pressed={active}
-      className={`rounded-lg border p-4 text-left transition ${
+      className={`flex min-h-[84px] items-start gap-3 rounded-2xl border p-4 text-left transition ${
         active
-          ? 'border-brand bg-brand/5 ring-2 ring-brand/30'
-          : 'border-line bg-surface hover:border-brand/60'
+          ? 'border-brand bg-brand-soft ring-2 ring-brand/25'
+          : 'border-line bg-surface/70 hover:border-brand/60'
       }`}
     >
-      <span className="block text-sm font-semibold text-fg">{title}</span>
-      <span className="mt-1 block text-xs text-muted">{body}</span>
+      <span
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+          active ? 'bg-brand-gradient text-brand-contrast' : 'bg-fg/5 text-muted'
+        }`}
+      >
+        <Icon className="h-5 w-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-bold text-fg">{title}</span>
+        <span className="mt-0.5 block text-hint text-muted">{body}</span>
+      </span>
+      <span
+        aria-hidden
+        className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+          active ? 'border-brand' : 'border-fg/25'
+        }`}
+      >
+        {active && <span className="h-2.5 w-2.5 rounded-full bg-brand" />}
+      </span>
     </button>
   )
 }

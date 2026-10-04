@@ -1,18 +1,23 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { toApiError } from '../../../../../shared/auth/http'
+import { useMediaQuery } from '../../../../../shared/useMediaQuery'
+import { Dialog } from '../../../../../shared/ui/Dialog'
 import { ErrorNote } from '../../../../../shared/ui/form'
 import { formatPrice, storeCatalogApi } from '../../../../features/stores/storesApi'
 import type {
   StoreCategory,
   StoreProduct,
 } from '../../../../features/stores/storesApi'
-import { BoxIcon, CheckIcon } from '../../../../layout/icons'
+import { BoxIcon, CheckIcon, ChevronDownIcon, CloseIcon } from '../../../../layout/icons'
 import { BasicsStep } from './BasicsStep'
 import { DeliveryStep } from './DeliveryStep'
 import { DetailsStep } from './DetailsStep'
 import { PhotosStep } from './PhotosStep'
 import { PricingStep } from './PricingStep'
 import { STEPS, StepButtons, StepShell, categoryOptions } from './shared'
+import { buttonClass } from '../../../../../shared/ui/Button'
 import type { StepKey } from './shared'
 import { MediaImg } from '../../../../../shared/media/MediaImg'
 
@@ -25,6 +30,13 @@ import { MediaImg } from '../../../../../shared/media/MediaImg'
  * lets the seller jump to any step, and the review step says what is still
  * missing before it can go live (a photo and a price — nothing else is
  * required).
+ *
+ * On a PHONE it takes the whole screen (portalled to <body>, so the glass
+ * panel it is opened from cannot trap it): a slim frosted header — close,
+ * the product, "Step 2 of 6 · Photos" (a button that lists every step), a
+ * segmented progress bar — over a scrolling step whose Continue bar is
+ * sticky. The old inline version wrapped its six-step rail onto three lines
+ * and pushed the first field below the fold. On a desktop it stays inline.
  */
 export function ProductWizard({
   storeId,
@@ -77,85 +89,66 @@ export function ProductWizard({
     review: product?.isActive ?? false,
   }
 
-  return (
-    <div className="mt-5 rounded-lg border border-line bg-surface-alt">
-      <header className="border-b border-line px-5 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-heading text-base font-semibold text-fg">
-            {product ? product.name : 'Add a product'}
-            {product?.isDraft && (
-              <span className="ml-2 rounded-sm bg-surface px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
-                Draft
+  const [stepsOpen, setStepsOpen] = useState(false)
+  const phone = !useMediaQuery('(min-width: 640px)')
+  const title = product ? product.name : 'Add a product'
+  const closeLabel = product ? 'Finish later' : 'Cancel'
+
+  const stepList = (onPick?: () => void) => (
+    <ol className="space-y-1">
+      {STEPS.map((s, i) => {
+        const current = i === index
+        const isDone = done[s.key]
+        const reachable = product !== null || i === 0
+        return (
+          <li key={s.key}>
+            <button
+              type="button"
+              onClick={() => {
+                if (!reachable) return
+                setStep(s.key)
+                onPick?.()
+              }}
+              disabled={!reachable}
+              aria-current={current ? 'step' : undefined}
+              className={`flex min-h-tap w-full items-center gap-3 rounded-xl px-2.5 text-left text-[15px] font-semibold transition disabled:cursor-default disabled:opacity-50 ${
+                current ? 'bg-brand-soft text-brand' : 'text-fg hover:bg-fg/5'
+              }`}
+            >
+              <span
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${
+                  current
+                    ? 'bg-brand-gradient text-brand-contrast'
+                    : isDone
+                      ? 'bg-success text-brand-contrast'
+                      : 'glass-inset text-muted'
+                }`}
+              >
+                {isDone && !current ? <CheckIcon className="h-4 w-4" /> : i + 1}
               </span>
-            )}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-sm font-semibold text-muted transition hover:text-fg"
-          >
-            {product ? 'Finish later' : 'Cancel'}
-          </button>
-        </div>
+              {s.label}
+            </button>
+          </li>
+        )
+      })}
+    </ol>
+  )
 
-        {/* Steps — clickable once the draft exists, so nothing forces a straight line. */}
-        <ol className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
-          {STEPS.map((s, i) => {
-            const current = i === index
-            const isDone = done[s.key]
-            const reachable = product !== null || i === 0
-            return (
-              <li key={s.key}>
-                <button
-                  type="button"
-                  onClick={() => reachable && setStep(s.key)}
-                  disabled={!reachable}
-                  aria-current={current ? 'step' : undefined}
-                  className={`flex items-center gap-2 text-xs font-semibold transition disabled:cursor-default ${
-                    current
-                      ? 'text-brand'
-                      : isDone
-                        ? 'text-fg hover:text-brand'
-                        : 'text-muted hover:text-fg'
-                  }`}
-                >
-                  <span
-                    className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] ${
-                      current
-                        ? 'bg-brand text-brand-contrast'
-                        : isDone
-                          ? 'bg-brand/15 text-brand'
-                          : 'bg-surface text-muted'
-                    }`}
-                  >
-                    {isDone ? <CheckIcon className="h-3.5 w-3.5" /> : i + 1}
-                  </span>
-                  {s.label}
-                </button>
-              </li>
-            )
-          })}
-        </ol>
+  const progress = (
+    <div className="flex gap-1" aria-hidden>
+      {STEPS.map((s, i) => (
+        <span
+          key={s.key}
+          className={`h-1.5 flex-1 rounded-full transition-colors ${
+            i === index ? 'bg-brand-gradient' : done[s.key] ? 'bg-success/70' : 'bg-fg/10'
+          }`}
+        />
+      ))}
+    </div>
+  )
 
-        {product && (
-          <div className="mt-3">
-            <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-muted">
-              <span>Product {product.completeness.percent}% complete</span>
-              <span>
-                Step {index + 1} of {STEPS.length}
-              </span>
-            </div>
-            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface">
-              <div
-                className="h-full rounded-full bg-brand transition-all"
-                style={{ width: `${product.completeness.percent}%` }}
-              />
-            </div>
-          </div>
-        )}
-      </header>
-
-      <div className="px-5 py-5">
+  const steps = (
+    <>
         {step === 'basics' && (
           <BasicsStep
             storeId={storeId}
@@ -217,8 +210,162 @@ export function ProductWizard({
             onDone={onClose}
           />
         )}
-      </div>
+
+    </>
+  )
+
+  const stepSheet = (
+    <Dialog open={stepsOpen} title="All steps" subtitle={title} onClose={() => setStepsOpen(false)}>
+      {stepList(() => setStepsOpen(false))}
+    </Dialog>
+  )
+
+  if (phone) {
+    return (
+      <FullScreen>
+        <header className="glass-strong shrink-0 rounded-none border-x-0 border-t-0 px-2 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2.5">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={product ? 'Close — your work is saved' : 'Cancel'}
+              className="flex size-tap shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-fg/5 hover:text-fg"
+            >
+              <CloseIcon className="h-5 w-5" />
+            </button>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[15px] font-bold text-fg">{title}</p>
+              <button
+                type="button"
+                onClick={() => setStepsOpen(true)}
+                aria-haspopup="dialog"
+                className="-ml-1 inline-flex min-h-8 items-center gap-1 rounded-lg px-1 text-[13px] font-semibold text-brand"
+              >
+                Step {index + 1} of {STEPS.length} · {STEPS[index]!.label}
+                <ChevronDownIcon className="h-4 w-4" />
+              </button>
+            </div>
+            {product && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="min-h-tap shrink-0 rounded-xl px-3 text-[14px] font-semibold text-muted transition hover:bg-fg/5 hover:text-fg"
+              >
+                {closeLabel}
+              </button>
+            )}
+          </div>
+          <div className="mt-2 px-1.5">{progress}</div>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          {steps}
+        </div>
+        {stepSheet}
+      </FullScreen>
+    )
+  }
+
+  return (
+    <div className="glass-card mt-5 rounded-glass">
+      <header className="border-b border-line px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex min-w-0 items-center gap-2 font-heading text-[18px] font-bold text-fg">
+            <span className="truncate">{title}</span>
+            {product?.isDraft && (
+              <span className="shrink-0 rounded-pill bg-fg/6 px-2.5 py-0.5 text-[12px] font-semibold text-muted">
+                Draft
+              </span>
+            )}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-tap rounded-xl px-3 text-[14px] font-semibold text-muted transition hover:bg-fg/5 hover:text-fg"
+          >
+            {closeLabel}
+          </button>
+        </div>
+
+        {/* Steps — clickable once the draft exists, so nothing forces a straight line. */}
+        <ol className="mt-3 flex flex-wrap gap-1">
+          {STEPS.map((s, i) => {
+            const current = i === index
+            const isDone = done[s.key]
+            const reachable = product !== null || i === 0
+            return (
+              <li key={s.key}>
+                <button
+                  type="button"
+                  onClick={() => reachable && setStep(s.key)}
+                  disabled={!reachable}
+                  aria-current={current ? 'step' : undefined}
+                  className={`flex min-h-tap items-center gap-2 rounded-xl px-2.5 text-[14px] font-semibold transition disabled:cursor-default ${
+                    current
+                      ? 'bg-brand-soft text-brand'
+                      : isDone
+                        ? 'text-fg hover:bg-fg/5'
+                        : 'text-muted hover:bg-fg/5 hover:text-fg'
+                  }`}
+                >
+                  <span
+                    className={`flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-bold ${
+                      current
+                        ? 'bg-brand-gradient text-brand-contrast'
+                        : isDone
+                          ? 'bg-success text-brand-contrast'
+                          : 'glass-inset text-muted'
+                    }`}
+                  >
+                    {isDone && !current ? <CheckIcon className="h-3.5 w-3.5" /> : i + 1}
+                  </span>
+                  {s.label}
+                </button>
+              </li>
+            )
+          })}
+        </ol>
+
+        {product && (
+          <div className="mt-3">
+            <div className="mb-1.5 flex items-center justify-between text-hint font-semibold text-muted">
+              <span>Product {product.completeness.percent}% complete</span>
+              <span>
+                Step {index + 1} of {STEPS.length}
+              </span>
+            </div>
+            {progress}
+          </div>
+        )}
+      </header>
+
+      <div className="px-5 py-5">{steps}</div>
+      {stepSheet}
     </div>
+  )
+}
+
+/**
+ * The phone frame: a full-screen layer on the seller canvas, portalled out of
+ * the glass panel, with the page behind it locked so only the step scrolls.
+ */
+function FullScreen({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previous
+    }
+  }, [])
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Product editor"
+      className="seller-canvas fixed inset-0 z-40 flex flex-col"
+    >
+      {children}
+    </div>,
+    document.body,
   )
 }
 
@@ -282,7 +429,7 @@ function ReviewStep({
     >
       <div className="grid gap-5 lg:grid-cols-[16rem_1fr]">
         {/* The storefront card, honestly. */}
-        <div className="overflow-hidden rounded-lg border border-line bg-surface">
+        <div className="overflow-hidden rounded-2xl border border-line bg-surface">
           <div className="flex aspect-square items-center justify-center bg-surface-alt">
             {cover ? (
               <MediaImg sizes="(min-width: 1024px) 256px, 100vw" src={cover} alt="" className="h-full w-full object-cover" />
@@ -291,9 +438,9 @@ function ReviewStep({
             )}
           </div>
           <div className="p-3">
-            <p className="truncate text-sm font-semibold text-fg">{product.name}</p>
-            <p className="mt-0.5 truncate text-xs text-muted">{category?.label ?? product.category.name}</p>
-            <p className="mt-1.5 text-sm font-bold text-brand">
+            <p className="truncate text-[15px] font-semibold text-fg">{product.name}</p>
+            <p className="mt-0.5 truncate text-hint text-muted">{category?.label ?? product.category.name}</p>
+            <p className="mt-1.5 text-[15px] font-bold text-brand">
               {product.price && Number(product.price) > 0
                 ? product.priceMax && product.priceMax !== product.price
                   ? `${formatPrice(product.price)} – ${formatPrice(product.priceMax)}`
@@ -301,32 +448,32 @@ function ReviewStep({
                 : 'No price yet'}
             </p>
             {product.hasVariants && (
-              <p className="mt-0.5 text-[11px] text-muted">
-                {product.variants.length} variant{product.variants.length === 1 ? '' : 's'}
+              <p className="mt-0.5 text-hint text-muted">
+                {product.variants.length} choice{product.variants.length === 1 ? '' : 's'}
               </p>
             )}
           </div>
         </div>
 
         <div>
-          <p className="text-sm font-medium text-fg">Checklist</p>
-          <ul className="mt-2 divide-y divide-line rounded-lg border border-line bg-surface">
+          <p className="text-[15px] font-semibold text-fg">Checklist</p>
+          <ul className="mt-2 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
             {CHECKS.map((check) => {
               const done = !missing.has(check.key)
               return (
-                <li key={check.key} className="flex items-center gap-3 px-3.5 py-2.5">
+                <li key={check.key} className="flex min-h-[56px] items-center gap-3 px-3.5 py-2">
                   <span
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] ${
-                      done ? 'bg-success/15 text-success' : 'bg-surface-alt text-muted'
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+                      done ? 'bg-success text-brand-contrast' : 'glass-inset text-muted'
                     }`}
                   >
-                    {done ? <CheckIcon className="h-3.5 w-3.5" /> : '·'}
+                    {done ? <CheckIcon className="h-4 w-4" /> : '·'}
                   </span>
-                  <span className={`flex-1 text-sm ${done ? 'text-fg' : 'text-muted'}`}>
+                  <span className={`min-w-0 flex-1 text-[15px] ${done ? 'text-fg' : 'text-muted'}`}>
                     {check.label}
                     {!done && (
-                      <span className="ml-1.5 text-xs">
-                        {check.required ? '— needed to publish' : '— optional'}
+                      <span className="block text-hint">
+                        {check.required ? 'Needed to publish' : 'Optional'}
                       </span>
                     )}
                   </span>
@@ -334,7 +481,11 @@ function ReviewStep({
                     <button
                       type="button"
                       onClick={() => onJump(check.step)}
-                      className="text-xs font-semibold text-brand hover:underline"
+                      className={buttonClass({
+                        variant: check.required ? 'rise' : 'ring',
+                        size: 'sm',
+                        className: 'min-h-tap px-4',
+                      })}
                     >
                       Add
                     </button>
@@ -343,7 +494,7 @@ function ReviewStep({
               )
             })}
           </ul>
-          <p className="mt-2 text-xs text-muted">
+          <p className="mt-2 text-hint text-muted">
             {product.completeness.percent}% complete. Products with photos, a
             description and specifications get noticed more — but only a photo
             and a price are needed to go live.
@@ -359,7 +510,7 @@ function ReviewStep({
         <StepButtons
           onBack={onBack}
           onNext={() => void publish()}
-          nextLabel="Publish to my store"
+          nextLabel="Publish to my shop"
           busy={busy}
           canNext={canPublish}
           skip={onDone}

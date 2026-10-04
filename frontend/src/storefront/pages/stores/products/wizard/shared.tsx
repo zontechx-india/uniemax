@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { StoreCategory } from '../../../../features/stores/storesApi'
-import { Button } from '../../../../../shared/ui/Button'
+import { Button, buttonClass } from '../../../../../shared/ui/Button'
 
 /**
  * The product wizard's steps, in order. Every step saves as it goes (the
@@ -18,12 +18,14 @@ export const STEPS = [
 
 export type StepKey = (typeof STEPS)[number]['key']
 
+// 48px tall (px, so the 90% root cannot shrink it); phones also get the
+// 16px input floor from index.css, so focusing never zooms the page.
 export const inputClass =
-  'h-11 w-full rounded-md border border-line bg-input px-3.5 text-sm text-fg outline-none transition placeholder:text-muted focus:border-accent disabled:opacity-60'
+  'h-field w-full rounded-md border border-line bg-input px-3.5 text-[15px] text-fg outline-none transition placeholder:text-muted focus:border-accent disabled:opacity-60'
 
 /** One line under a field, in plain words — why it matters, with an example. */
 export function Hint({ children }: { children: ReactNode }) {
-  return <p className="mt-1.5 text-xs leading-relaxed text-muted">{children}</p>
+  return <p className="mt-1.5 text-hint text-muted">{children}</p>
 }
 
 /** A labelled field with its hint, so every step reads the same way. */
@@ -40,7 +42,7 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-sm font-medium text-fg">
+      <span className="mb-1.5 block text-[15px] font-semibold text-fg">
         {label}
         {optional && (
           <span className="ml-1.5 font-normal text-muted">(optional)</span>
@@ -64,8 +66,8 @@ export function StepShell({
 }) {
   return (
     <div>
-      <h3 className="font-heading text-lg font-semibold text-fg">{title}</h3>
-      <p className="mt-1 text-sm text-muted">{lead}</p>
+      <h3 className="font-heading text-[22px] leading-tight font-bold text-fg">{title}</h3>
+      <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{lead}</p>
       <div className="mt-5 space-y-5">{children}</div>
     </div>
   )
@@ -90,27 +92,39 @@ export function StepButtons({
   /** Wording for `skip` where "skip" would be unclear (e.g. "Save as draft"). */
   skipLabel?: string
 }) {
+  // A sticky frosted bar on phones — Continue is always under the thumb,
+  // however long the step — and an ordinary row from `sm` up. "Skip" is a
+  // real 44px button, not a text link a thumb has to hunt for.
   return (
-    <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
-      {onBack && (
-        <button
+    <div className="sticky bottom-3 z-10 -mx-2 flex flex-col gap-2 rounded-glass p-2 max-sm:glass-strong sm:static sm:mx-0 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:rounded-none sm:border-t sm:border-line sm:p-0 sm:pt-4">
+      <div className="flex items-center gap-2 sm:contents">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            disabled={busy}
+            className={buttonClass({ variant: 'ring', size: 'lg', className: 'px-5' })}
+          >
+            Back
+          </button>
+        )}
+        <Button
           type="button"
-          onClick={onBack}
-          disabled={busy}
-          className="inline-flex h-11 items-center rounded-md border border-line bg-surface px-4 text-sm font-semibold text-fg transition hover:bg-surface-alt disabled:opacity-50"
+          size="lg"
+          onClick={onNext}
+          loading={busy}
+          disabled={!canNext}
+          className="min-w-0 flex-1 text-[15px] sm:flex-none sm:px-8"
         >
-          Back
-        </button>
-      )}
-      <Button type="button" size="md" onClick={onNext} loading={busy} disabled={!canNext}>
-        {busy ? 'Saving…' : nextLabel}
-      </Button>
+          {busy ? 'Saving…' : nextLabel}
+        </Button>
+      </div>
       {skip && (
         <button
           type="button"
           onClick={skip}
           disabled={busy}
-          className="text-sm font-semibold text-muted transition hover:text-fg"
+          className="min-h-tap rounded-md px-3 text-[15px] font-semibold text-muted transition hover:bg-fg/5 hover:text-fg"
         >
           {skipLabel ?? 'Skip for now'}
         </button>

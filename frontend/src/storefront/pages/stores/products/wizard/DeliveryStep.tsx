@@ -121,7 +121,7 @@ export function DeliveryStep({
             type="button"
             onClick={useStoreSettings}
             aria-pressed={!custom}
-            className={`h-9 rounded-md border px-3.5 text-sm font-semibold transition ${
+            className={`min-h-tap rounded-xl border px-4 text-[15px] font-semibold transition ${
               !custom
                 ? 'border-brand bg-brand/10 text-brand'
                 : 'border-line bg-surface text-fg hover:border-brand/60'
@@ -133,7 +133,7 @@ export function DeliveryStep({
             type="button"
             onClick={() => setCustom(true)}
             aria-pressed={custom}
-            className={`h-9 rounded-md border px-3.5 text-sm font-semibold transition ${
+            className={`min-h-tap rounded-xl border px-4 text-[15px] font-semibold transition ${
               custom
                 ? 'border-brand bg-brand/10 text-brand'
                 : 'border-line bg-surface text-fg hover:border-brand/60'
@@ -167,17 +167,17 @@ export function DeliveryStep({
             }}
             disabled={busy}
           />
-          <label className="flex cursor-pointer items-start gap-3">
+          <label className="flex min-h-tap cursor-pointer items-start gap-3 rounded-xl py-1">
             <input
               type="checkbox"
               checked={codAvailable}
               onChange={(e) => setCodAvailable(e.target.checked)}
               disabled={busy}
-              className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[var(--brand)]"
+              className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-[var(--brand)]"
             />
-            <span className="text-sm">
+            <span className="text-[15px]">
               <span className="font-medium text-fg">Cash on delivery for this product</span>
-              <span className="mt-0.5 block text-xs text-muted">
+              <span className="mt-0.5 block text-hint text-muted">
                 {store.payments.acceptCod
                   ? 'Untick for items you only sell prepaid.'
                   : 'Your store has cash on delivery switched off; this applies once you turn it on.'}

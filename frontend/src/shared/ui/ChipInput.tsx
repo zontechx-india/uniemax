@@ -19,6 +19,11 @@ export interface ChipItem {
  * variant that is Red, and only the key can say they are the same value.
  *
  * Renders no `<form>` so it can sit inside one; Enter is handled locally.
+ *
+ * Phones: an explicit **Add** button appears while something is typed (many
+ * on-screen keyboards make Enter hard to find, or show "Go"), and "S, M, L"
+ * typed in one go becomes three chips. Chips are 36px with a 44px remove
+ * target.
  */
 export function ChipInput({
   label,
@@ -57,23 +62,34 @@ export function ChipInput({
     )
 
   const commit = () => {
-    const value = draft.trim().replace(/,+$/, '').trim()
-    if (!value) return
-    if (exists(value)) {
-      setHint(`"${value}" is already added`)
-      return
+    // "S, M, L" in one go is three values.
+    const values = draft
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean)
+    if (values.length === 0) return
+    const seen = new Set(items.map((item) => item.value.toLowerCase()))
+    let room = maxItems === undefined ? Infinity : maxItems - items.length
+    let problem: string | null = null
+    for (const value of values) {
+      if (seen.has(value.toLowerCase())) {
+        problem = `"${value}" is already added`
+        continue
+      }
+      if (room <= 0) {
+        problem = `Up to ${maxItems} values`
+        break
+      }
+      onAdd(value)
+      seen.add(value.toLowerCase())
+      room -= 1
     }
-    if (full) {
-      setHint(`Up to ${maxItems} values`)
-      return
-    }
-    onAdd(value)
     setDraft('')
-    setHint(null)
+    setHint(problem)
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
+    if (e.key === 'Enter') {
       e.preventDefault()
       commit()
     } else if (e.key === 'Backspace' && draft === '' && items.length > 0) {
@@ -107,10 +123,10 @@ export function ChipInput({
   return (
     <div>
       {label && (
-        <span className="mb-2 block text-sm font-medium text-muted">{label}</span>
+        <span className="mb-2 block text-[14px] font-medium text-muted">{label}</span>
       )}
       <div
-        className={`flex min-h-12 w-full flex-wrap items-center gap-1.5 rounded-md border border-line bg-input px-2 py-1.5 text-sm transition-colors focus-within:border-accent ${
+        className={`flex min-h-field w-full flex-wrap items-center gap-1.5 rounded-md border border-line bg-input px-2 py-1.5 text-sm transition-colors focus-within:border-accent ${
           disabled ? 'opacity-60' : 'hover:border-fg/30'
         }`}
       >
@@ -132,13 +148,13 @@ export function ChipInput({
               maxLength={maxLength}
               autoFocus
               aria-label={`Rename ${item.value}`}
-              className="h-7 min-w-16 rounded-pill border border-accent bg-surface px-2.5 text-xs font-medium text-fg outline-none"
+              className="h-9 min-w-16 rounded-pill border border-accent bg-surface px-3 text-[14px] font-medium text-fg outline-none"
               style={{ width: `${Math.max(4, editDraft.length + 2)}ch` }}
             />
           ) : (
             <span
               key={item.key}
-              className="inline-flex h-7 items-center gap-1 rounded-pill bg-surface-alt pl-2.5 pr-1 text-xs font-medium text-fg"
+              className="inline-flex h-9 items-center gap-0.5 rounded-pill bg-brand-soft pl-3 text-[14px] font-semibold text-fg"
             >
               <button
                 type="button"
@@ -154,7 +170,8 @@ export function ChipInput({
                 onClick={() => onRemove(item.key)}
                 disabled={disabled}
                 aria-label={`Remove ${item.value}`}
-                className="flex h-5 w-5 items-center justify-center rounded-full text-muted transition hover:bg-danger/10 hover:text-danger disabled:cursor-default"
+                // 28px circle, 44px hit area (the `before:` inset).
+                className="relative flex h-7 w-7 items-center justify-center rounded-full text-[18px] leading-none text-muted transition before:absolute before:-inset-2 before:content-[''] hover:bg-danger/10 hover:text-danger disabled:cursor-default"
               >
                 ×
               </button>
@@ -173,10 +190,26 @@ export function ChipInput({
           maxLength={maxLength}
           disabled={disabled || full}
           aria-label={ariaLabel ?? (typeof label === 'string' ? label : 'Add a value')}
-          className="h-8 min-w-24 flex-1 bg-transparent px-1.5 text-sm text-fg outline-none placeholder:text-muted disabled:cursor-not-allowed"
+          className="h-9 min-w-24 flex-1 bg-transparent px-1.5 text-[15px] text-fg outline-none placeholder:text-muted disabled:cursor-not-allowed"
         />
+        {draft.trim() !== '' && (
+          <button
+            type="button"
+            // mousedown, not click: the input's blur would commit first and
+            // the button would vanish under the finger.
+            onMouseDown={(e) => {
+              e.preventDefault()
+              commit()
+            }}
+            onClick={commit}
+            disabled={disabled}
+            className="h-9 shrink-0 rounded-lg bg-brand px-4 text-[14px] font-bold text-brand-contrast transition hover:bg-brand-hover"
+          >
+            Add
+          </button>
+        )}
       </div>
-      {hint && <p className="mt-1.5 text-xs font-medium text-danger">{hint}</p>}
+      {hint && <p className="mt-1.5 text-hint font-medium text-danger">{hint}</p>}
     </div>
   )
 }

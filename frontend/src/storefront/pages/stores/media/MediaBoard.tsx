@@ -228,7 +228,7 @@ export function MediaBoard({
           </span>
           <span className="sr-only">(at least one photo required)</span>
         </span>
-        <span className="text-[11px] font-medium text-muted">
+        <span className="text-hint font-medium text-muted">
           {t.counter(photos.length, maxPhotos)}
         </span>
       </div>
@@ -289,7 +289,7 @@ export function MediaBoard({
         </div>
       ) : (
         <>
-          <p className="mb-2 text-[11px] font-medium text-muted">
+          <p className="mb-2 text-hint font-medium text-muted">
             {t.grid.tapHint}
           </p>
           <ul
@@ -342,7 +342,7 @@ export function MediaBoard({
             {Array.from({ length: preparing }, (_, i) => (
               <li
                 key={`preparing-${i}`}
-                className="flex aspect-square animate-pulse items-center justify-center rounded-md border border-line bg-surface-alt text-[10px] font-semibold text-muted"
+                className="flex aspect-square animate-pulse items-center justify-center rounded-xl border border-line bg-surface-alt px-1 text-center text-[12px] font-semibold text-muted"
               >
                 {t.grid.optimizing}
               </li>
@@ -354,33 +354,33 @@ export function MediaBoard({
                   type="button"
                   onClick={openGallery}
                   disabled={!config || disabled}
-                  className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-line text-muted transition hover:border-accent hover:text-fg disabled:cursor-not-allowed"
+                  className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-brand/40 text-brand transition hover:bg-brand-soft disabled:cursor-not-allowed"
                 >
-                  <PlusIcon className="h-4 w-4" />
-                  <span className="text-[10px] font-semibold">{t.add.more}</span>
+                  <PlusIcon className="h-6 w-6" />
+                  <span className="text-[13px] font-semibold">{t.add.more}</span>
                 </button>
                 {touch && (
                   <button
                     type="button"
                     onClick={openCamera}
                     disabled={!config || disabled}
-                    className="flex items-center justify-center gap-1 rounded-md border border-line bg-surface py-1 text-[10px] font-semibold text-muted transition hover:text-fg disabled:cursor-not-allowed"
+                    className="flex min-h-tap items-center justify-center gap-1.5 rounded-xl border border-line bg-surface text-[13px] font-semibold text-fg transition hover:bg-fg/5 disabled:cursor-not-allowed"
                   >
-                    <CameraIcon className="h-3 w-3" />
+                    <CameraIcon className="h-4 w-4" />
                     {t.add.camera}
                   </button>
                 )}
               </li>
             )}
           </ul>
-          <p className="mt-2 text-[11px] leading-relaxed text-muted">
+          <p className="mt-2 text-hint text-muted">
             {t.grid.coverExplainer} {t.add.hint}
           </p>
         </>
       )}
 
       {photos.length + preparing + queue.length === 0 && (
-        <p className="mt-2 text-[11px] leading-relaxed text-muted">
+        <p className="mt-2 text-hint text-muted">
           {t.add.hint}
         </p>
       )}
@@ -392,7 +392,7 @@ export function MediaBoard({
             {t.video.label}{' '}
             <span className="font-normal">({t.video.optional})</span>
           </span>
-          <span className="text-[11px] text-muted">{t.video.slot(video ? 1 : 0)}</span>
+          <span className="text-hint text-muted">{t.video.slot(video ? 1 : 0)}</span>
         </div>
 
         {video ? (
@@ -411,7 +411,7 @@ export function MediaBoard({
             )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-medium text-fg">{video.name}</p>
-              <p className="text-[11px] text-muted">
+              <p className="text-hint text-muted">
                 {video.status === 'sending'
                   ? t.video.sending
                   : (video.sizeLabel ?? t.video.hint)}
@@ -425,14 +425,14 @@ export function MediaBoard({
                 </div>
               )}
               {video.error && (
-                <p className="mt-1 text-[11px] text-danger">{video.error}</p>
+                <p className="mt-1 text-hint text-danger">{video.error}</p>
               )}
               <div className="mt-1.5 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => videoRef.current?.click()}
                   disabled={disabled}
-                  className="h-8 rounded-md border border-line bg-surface px-3 text-xs font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
+                  className="min-h-tap rounded-xl border border-line bg-surface px-4 text-[14px] font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
                 >
                   {t.video.replace}
                 </button>
@@ -440,7 +440,7 @@ export function MediaBoard({
                   type="button"
                   onClick={() => setRemoving({ kind: 'video', id: video.id })}
                   disabled={disabled}
-                  className="h-8 rounded-md px-2.5 text-xs font-semibold text-danger transition hover:bg-danger/10 disabled:cursor-not-allowed disabled:text-muted"
+                  className="min-h-tap rounded-xl px-3 text-[14px] font-semibold text-danger transition hover:bg-danger/10 disabled:cursor-not-allowed disabled:text-muted"
                 >
                   {t.video.remove}
                 </button>
@@ -458,7 +458,7 @@ export function MediaBoard({
               <VideoIcon className="h-4 w-4" />
               {t.video.add}
             </button>
-            <p className="mt-2 text-[11px] text-muted">{t.video.hint}</p>
+            <p className="mt-2 text-hint text-muted">{t.video.hint}</p>
           </>
         )}
       </div>
@@ -466,7 +466,7 @@ export function MediaBoard({
       {/* 5 — proof: the card this cover photo makes --------------------- */}
       {preview && ready[0]?.previewUrl && (
         <div className="mt-4">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+          <p className="mb-2 text-[14px] font-semibold text-fg">
             {t.preview.title}
           </p>
           <div className="w-40 overflow-hidden rounded-lg border border-line bg-surface shadow-floating">
@@ -642,21 +642,21 @@ function Tile({
 }) {
   if (photo.status === 'failed') {
     return (
-      <div className="flex aspect-square flex-col items-center justify-center gap-1 rounded-md border border-danger bg-danger/5 p-1.5 text-center">
-        <span className="text-[10px] font-bold uppercase tracking-wide text-danger">
-          {t.grid.failed}
-        </span>
+      // The tile is small, so its two actions split it top/bottom and each
+      // takes the full width — far bigger targets than the old 20px links.
+      <div className="flex aspect-square flex-col items-stretch justify-center gap-1 rounded-xl border-2 border-danger bg-danger/5 p-1 text-center">
+        <span className="text-[12px] font-bold text-danger">{t.grid.failed}</span>
         <button
           type="button"
           onClick={onRetry}
-          className="w-full rounded-sm bg-danger px-1 py-1 text-[10px] font-bold text-white transition hover:opacity-90"
+          className="min-h-9 w-full flex-1 rounded-lg bg-danger text-[13px] font-bold text-brand-contrast transition hover:opacity-90"
         >
           {t.grid.retry}
         </button>
         <button
           type="button"
           onClick={onDiscard}
-          className="text-[10px] font-semibold text-muted transition hover:text-fg"
+          className="min-h-8 w-full rounded-lg text-[12px] font-semibold text-muted transition hover:bg-fg/5 hover:text-fg"
         >
           {t.grid.discard}
         </button>
@@ -666,8 +666,8 @@ function Tile({
 
   if (photo.status === 'sending') {
     return (
-      <div className="flex aspect-square flex-col items-center justify-center gap-2 rounded-md border border-line bg-surface-alt p-2">
-        <span className="text-[10px] font-semibold text-muted">
+      <div className="flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border border-line bg-surface-alt p-2">
+        <span className="text-[12px] font-semibold text-muted">
           {t.grid.sending}
         </span>
         <div className="h-1 w-full overflow-hidden rounded-pill bg-line">
@@ -686,7 +686,7 @@ function Tile({
       onClick={onOpen}
       disabled={disabled}
       aria-label={t.sheet.photoLabel(index + 1)}
-      className="group relative block aspect-square w-full overflow-hidden rounded-md border border-line bg-surface transition hover:border-accent disabled:cursor-not-allowed"
+      className="group relative block aspect-square w-full overflow-hidden rounded-xl border border-line bg-surface transition hover:border-accent disabled:cursor-not-allowed"
     >
       {photo.previewUrl ? (
         // `contain`, not `cover`: the tile is a true preview of the file being
@@ -704,20 +704,20 @@ function Tile({
       )}
 
       {index === 0 && (
-        <span className="absolute left-1 top-1 flex items-center gap-1 rounded-sm bg-brand px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand-contrast">
-          <CheckIcon className="h-2.5 w-2.5" />
+        <span className="absolute top-1 left-1 flex items-center gap-1 rounded-md bg-brand px-1.5 py-0.5 text-[11px] font-bold text-brand-contrast">
+          <CheckIcon className="h-3 w-3" />
           {t.grid.cover}
         </span>
       )}
       {(photo.edited || photo.ratioLabel) && (
-        <span className="absolute bottom-1 left-1 rounded-sm bg-scrim px-1 py-0.5 text-[9px] font-semibold text-white">
+        <span className="absolute bottom-1 left-1 rounded-md bg-scrim px-1.5 py-0.5 text-[11px] font-semibold text-white">
           {photo.edited ? 'Edited' : photo.ratioLabel}
         </span>
       )}
       {/* A visible affordance that the tile is the way in — the sheet holds
           every action, so the tile needs no toolbar of its own. */}
-      <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-scrim text-white transition group-hover:bg-accent">
-        <PencilIcon className="h-3 w-3" />
+      <span className="absolute top-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-scrim text-white transition group-hover:bg-accent">
+        <PencilIcon className="h-4 w-4" />
       </span>
     </button>
   )

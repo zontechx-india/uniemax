@@ -19,18 +19,23 @@ const TONE: Record<StatusTone, { pill: string; dot: string }> = {
 export function StatusPill({
   tone = 'neutral',
   dot = true,
+  wrap = false,
   className = '',
   children,
 }: {
   tone?: StatusTone
   dot?: boolean
+  /** Let long text (a delivery rule) wrap onto more lines instead of one. */
+  wrap?: boolean
   className?: string
   children: ReactNode
 }) {
   const t = TONE[tone]
   return (
     <span
-      className={`inline-flex h-6 shrink-0 items-center gap-1.5 rounded-pill px-2.5 text-[12px] font-semibold whitespace-nowrap ${t.pill} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-pill px-2.5 text-[12px] font-semibold ${
+        wrap ? 'min-h-6 max-w-full py-0.5 whitespace-normal' : 'h-6 shrink-0 whitespace-nowrap'
+      } ${t.pill} ${className}`}
     >
       {dot && <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${t.dot}`} />}
       {children}
