@@ -25,7 +25,9 @@ import { EmptyState } from './ui/EmptyState'
 /**
  * Dashboard — the landing view of store management.
  *
- * It opens on a HERO that answers the only two questions a seller has when
+ * It opens on a HERO — a tinted glass card (`glass-tint`), not a solid block,
+ * so the one strong colour on it is the next-step button — that answers the
+ * only two questions a seller has when
  * they arrive: *how am I doing?* (today's orders, waiting orders, sales) and
  * *what should I do now?* — ONE next step with ONE button, picked from the
  * shop's state:
@@ -199,51 +201,53 @@ function Hero({
   const showStats = store.isPublished && stats !== undefined && stats.totalOrders > 0
 
   return (
-    <section className="relative overflow-hidden rounded-glass bg-brand-gradient p-5 text-brand-contrast shadow-[0_18px_40px_-18px_var(--cta-glow)] sm:p-6">
-      {/* Two soft lights for depth — decoration only. */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute -top-16 -right-10 h-48 w-48 rounded-full bg-brand-contrast/15 blur-2xl"
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute -bottom-20 -left-12 h-44 w-44 rounded-full bg-brand-contrast/10 blur-2xl"
-      />
+    <section className="glass-tint rounded-glass p-4 sm:p-6">
+      <p className="text-[14px] font-medium text-muted">{greeting(new Date().getHours())}</p>
+      <h2 className="mt-0.5 font-heading text-[24px] leading-tight font-bold break-words text-fg">
+        {store.name}
+      </h2>
 
-      <div className="relative">
-        <p className="text-[14px] font-medium opacity-90">{greeting(new Date().getHours())}</p>
-        <h2 className="mt-0.5 font-heading text-[24px] leading-tight font-bold break-words">
-          {store.name}
-        </h2>
+      {showStats && (
+        <dl className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+          <HeroStat label="Today" value={stats.today} />
+          <HeroStat
+            label="Waiting"
+            value={stats.pending}
+            dot={stats.pending > 0 ? 'bg-pending' : undefined}
+          />
+          <HeroStat label="Total sales" value={formatPrice(stats.revenue)} small />
+        </dl>
+      )}
 
-        {showStats && (
-          <dl className="mt-4 grid grid-cols-3 gap-2">
-            <HeroStat label="Today" value={stats.today} />
-            <HeroStat label="Waiting" value={stats.pending} />
-            <HeroStat label="Total sales" value={formatPrice(stats.revenue)} small />
-          </dl>
-        )}
-
-        <NextStep store={store} dashboard={dashboard} onStoreChange={onStoreChange} />
-      </div>
+      <NextStep store={store} dashboard={dashboard} onStoreChange={onStoreChange} />
     </section>
   )
 }
 
+/**
+ * One number in the hero: a frosted tile (a light pane, not a fill) so the
+ * numbers float on the glass. `dot` marks a number that wants attention.
+ */
 function HeroStat({
   label,
   value,
   small = false,
+  dot,
 }: {
   label: string
   value: ReactNode
   small?: boolean
+  /** A status dot before the label (e.g. pending orange when waiting > 0). */
+  dot?: string
 }) {
   return (
-    <div className="min-w-0 rounded-2xl bg-brand-contrast/15 px-3 py-2.5">
-      <dt className="text-[12px] font-semibold opacity-90">{label}</dt>
+    <div className="min-w-0 rounded-2xl border border-glass-border bg-surface/55 px-3 py-2.5 shadow-[inset_0_1px_0_var(--glass-border)]">
+      <dt className="flex items-center gap-1.5 text-[12px] font-semibold text-muted">
+        {dot && <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${dot}`} />}
+        {label}
+      </dt>
       <dd
-        className={`mt-0.5 truncate font-heading leading-tight font-bold ${
+        className={`mt-0.5 truncate font-heading leading-tight font-bold text-fg ${
           small ? 'text-[18px] sm:text-[22px]' : 'text-[24px]'
         }`}
       >
@@ -254,8 +258,9 @@ function HeroStat({
 }
 
 /**
- * The ONE thing to do next, on a solid card inside the hero so it reads as
- * the button on the page. See the component doc above for the order.
+ * The ONE thing to do next — a lighter pane inside the hero with an icon
+ * chip, so the button is the only solid colour on the card. See the
+ * component doc above for the order.
  */
 function NextStep({
   store,
@@ -336,9 +341,9 @@ function NextStep({
 
   const Icon = icon
   return (
-    <div className="mt-4 rounded-2xl bg-surface p-3.5 text-fg shadow-[0_8px_24px_-12px_rgba(0,0,0,0.35)]">
+    <div className="mt-4 rounded-2xl border border-glass-border bg-surface/70 p-3.5 shadow-[inset_0_1px_0_var(--glass-border)]">
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-gradient text-brand-contrast shadow-[0_6px_16px_-8px_var(--cta-glow)]">
           <Icon className="h-5 w-5" />
         </span>
         <div className="min-w-0">

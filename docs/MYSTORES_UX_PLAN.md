@@ -307,7 +307,7 @@ Each phase ships on its own and is approved before the next one starts.
 
 ### Phase 3 — Dashboard
 
-- [x] Hero: greeting, Today / Waiting / Total sales, and ONE next step (missing step → publish → waiting orders → WhatsApp share)
+- [x] Hero: greeting, Today / Waiting / Total sales, and ONE next step (missing step → publish → waiting orders → WhatsApp share). Revised on review: a tinted glass card (`glass-tint`) with frosted stat tiles instead of a solid purple block
 - [x] Setup checklist as a numbered vertical stepper (current step highlighted, one filled button), progress ring
 - [x] Order pipeline as scrollable glass chips with a fade-edge hint (grid from `sm`)
 - [x] Latest orders as tappable cards (`SellerOrderRow`: customer + total first, "25 min ago")

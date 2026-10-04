@@ -652,10 +652,13 @@ created/deleted, product enabled/disabled/deleted, product wizard closed) —
 card's "Before publishing, add…", is computed server-side from the catalog.
 It renders, top to bottom:
 
-- A **hero** (`bg-brand-gradient`, the one solid-colour block in the
-  workspace): a time-of-day greeting and the shop name; once a live shop has
-  orders, three stats — **Today** / **Waiting** / **Total sales**; and a white
-  **Next step** card with ONE action picked from the shop's state — the first
+- A **hero** — a tinted glass card (`glass-tint`: the glass fill with a soft
+  brand wash from the top-right and an accent wash from the bottom-left), so
+  the next-step button is the only solid colour on it: a time-of-day greeting
+  and the shop name; once a live shop has orders, three frosted stat tiles —
+  **Today** / **Waiting** (orange dot when > 0) / **Total sales**; and a lighter
+  **Next step** pane (gradient icon chip) with ONE action picked from the
+  shop's state — the first
   unfinished launch step (its `stepAction` button), **Publish my shop**
   (`sheen`) when ready, **See waiting orders** when orders are pending, else
   **Share on WhatsApp** ("Get your first order" / "All caught up").
@@ -2982,6 +2985,7 @@ JS mirror `glassByScheme` in `colors.ts`): `--glass-bg` (.70 white / .62 smoked)
 | `glass` | Cards and panels |
 | `glass-strong` | Chrome over moving content — top bar, tab bar, sticky bars, sheets, toasts |
 | `glass-inset` | Fields / wells inside glass (near-opaque, for legibility) |
+| `glass-tint` | The featured card (Dashboard hero): `glass-card` plus a 16% brand wash (top-right) and 10% accent wash (bottom-left) — muted text stays 4.8:1 at the brand corner. Colour utility `border-glass-border` for its inner panes. |
 | `glass-card` | A card INSIDE a glass panel: glass fill, edge, highlight and the glass-safe text steps, but **no** `backdrop-filter` (the panel already blurred the canvas) |
 | `seller-canvas` | On the workspace root: ONE fixed layer of radial brand light behind everything (painted once, no `filter: blur`) |
 | `animate-sheet-in` | 200ms rise for sheets, bars, toasts |

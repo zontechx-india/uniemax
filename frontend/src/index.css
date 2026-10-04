@@ -144,6 +144,7 @@
 
   /* Seller workspace — see the glass block in the palette below. */
   --color-scrim: var(--scrim);
+  --color-glass-border: var(--glass-border);
   --color-whatsapp: var(--whatsapp);
   --color-whatsapp-contrast: var(--whatsapp-contrast);
 }
@@ -892,6 +893,24 @@
 @utility glass-inset {
   background-color: var(--glass-inset);
   border: 1px solid var(--line);
+}
+
+/* The featured card (the Dashboard hero): `glass-card` with two soft washes
+ * of light — brand from the top-right, accent from the bottom-left — so it
+ * reads as the lead card without becoming a solid block of colour. Washes
+ * are capped at 16% / 10% so muted text keeps AA (4.8:1 at the brand
+ * corner). Gradients, not `filter: blur`, so it costs nothing extra. */
+@utility glass-tint {
+  --fg-muted: var(--glass-fg-muted);
+  --success: var(--glass-success);
+  --danger: var(--glass-danger);
+  --pending: var(--glass-pending);
+  background-color: var(--glass-bg);
+  background-image:
+    radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--brand) 16%, transparent) 0%, transparent 60%),
+    radial-gradient(90% 120% at 0% 100%, color-mix(in srgb, var(--accent) 10%, transparent) 0%, transparent 60%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), 0 10px 30px -14px color-mix(in srgb, var(--brand) 45%, transparent);
 }
 
 /* A card INSIDE a glass panel: the same frosted fill, edge and highlight,
