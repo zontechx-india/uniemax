@@ -1831,7 +1831,9 @@ is never shown a pickup-address item.
   **Choices** — the category's **suggested options** as one-tap 44px chips
   ("Tap to add a common choice") and the `OptionTypesEditor`; Continue
   checks every choice is named and has options, then **Prices** — the
-  `VariantMatrix`, whose bulk tools ("Same price for all…", MRP, stock,
+  `VariantMatrix` (a blank stock counts as 0, but ALL blank is refused —
+  `draftToInput` asks for counts and points at "Same stock for all"), whose
+  bulk tools ("Same price for all…", MRP, stock,
   Turn all on, "Same photo for every…") live in ONE sheet, and whose
   per-choice photo is picked by sight in a bottom sheet ("Main" = the first
   photo). Saved as one `PUT …/options`; dropped saved choices confirmed

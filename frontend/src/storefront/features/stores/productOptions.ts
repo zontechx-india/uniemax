@@ -387,6 +387,15 @@ export function draftToInput(
       error: `${missing} combination${missing === 1 ? ' still needs' : 's still need'} a price.`,
     }
   }
+  // A blank count is saved as 0, which is fine for one row — but when EVERY
+  // row is blank the seller simply skipped the column, and the product
+  // would go live completely sold out.
+  if (offered.every((row) => row.stock.trim() === '')) {
+    return {
+      error:
+        'Enter how many you have of each choice. To fill them all at once, tap “Same price for all…” and use “Same stock for all”.',
+    }
+  }
   const badStock = offered.find((row) => !isValidStock(row.stock))
   if (badStock) {
     return { error: `Stock for "${draftLabel(types, badStock)}" must be a whole number.` }
