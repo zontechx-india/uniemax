@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { toApiError } from '../../../../../shared/auth/http'
-import { ErrorNote } from '../../../../../shared/ui/form'
 import { storeCatalogApi } from '../../../../features/stores/storesApi'
 import type {
   ProductSpec,
@@ -8,7 +7,7 @@ import type {
   StoreProduct,
 } from '../../../../features/stores/storesApi'
 import { SpecificationsEditor, cleanSpecifications } from '../SpecificationsEditor'
-import { Field, StepButtons, StepShell } from './shared'
+import { Field, StepButtons, StepError, StepShell } from './shared'
 
 /**
  * Step 4 — optional words: a description and a few facts. The specification
@@ -87,7 +86,7 @@ export function DetailsStep({
 
       <SpecificationsEditor value={specs} onChange={setSpecs} disabled={busy} />
 
-      {error && <ErrorNote>{error}</ErrorNote>}
+      {error && <StepError>{error}</StepError>}
 
       <StepButtons onBack={onBack} onNext={() => void next()} busy={busy} skip={onNext} />
     </StepShell>

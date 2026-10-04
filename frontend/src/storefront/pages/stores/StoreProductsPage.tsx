@@ -15,8 +15,8 @@ import {
   BoxIcon,
   PencilIcon,
   PlusIcon,
+  RupeeIcon,
   SearchIcon,
-  ShareIcon,
   StarIcon,
   TagIcon,
   TrashIcon,
@@ -317,7 +317,7 @@ export function StoreProductsPage() {
             steps={[
               { icon: TagIcon, label: 'Name it' },
               { icon: CameraIcon, label: 'Add a photo' },
-              { icon: ShareIcon, label: 'Set a price' },
+              { icon: RupeeIcon, label: 'Set a price' },
             ]}
             action={
               <Button
@@ -558,7 +558,7 @@ const NEXT_STEP: Record<
   photo: { label: 'add a photo', step: 'photos' },
   price: { label: 'set a price', step: 'pricing' },
   description: { label: 'add a description', step: 'details' },
-  specifications: { label: 'add specifications', step: 'details' },
+  specifications: { label: 'add product facts', step: 'details' },
 }
 
 function ProductRow({

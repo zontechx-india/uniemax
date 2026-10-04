@@ -377,6 +377,8 @@ Each phase ships on its own and is approved before the next one starts.
 - [x] Builder section rows: `BigSwitch`, titles wrap instead of truncating
 - [x] Dark-mode, contrast, reduced-transparency and reduced-motion handled by the Phase 0 tokens and fallbacks
 
+- [x] Product wizard follow-ups: step errors scroll into view, stock starts empty (no accidental "sold out"), Delivery as two choice cards without a redundant Skip, Review lists what blocks Publish first on a phone, "specifications" → "product facts", rupee icon for "Set a price"
+
 > Deviation: `ActiveSwitch` is **kept** — the affiliate products tab, the
 > variant matrix's desktop table and the builder section editor still use it,
 > and its hit area was already raised to 44 px in Phase 4.

@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { toApiError } from '../../../../../shared/auth/http'
-import { ErrorNote } from '../../../../../shared/ui/form'
 import {
   deliveryRuleProblem,
   describeDeliveryRule,
@@ -20,7 +19,8 @@ import type {
 import { useManagedStore } from '../../../../features/stores/useManagedStore'
 import { ProductDeliveryField } from '../../DeliveryRuleEditor'
 import { ProductShippingField } from '../../ShippingRateEditor'
-import { Hint, StepButtons, StepShell } from './shared'
+import { SlidersIcon, TruckIcon } from '../../../../layout/icons'
+import { ChoiceCard, Hint, StepButtons, StepError, StepShell } from './shared'
 
 /**
  * Step 5 — delivery & payment, which almost every product inherits from the
@@ -98,11 +98,11 @@ export function DeliveryStep({
   return (
     <StepShell
       title="Delivery & payment"
-      lead="Most products simply follow your store settings. Change them here only if this product is different."
+      lead="Most products simply follow your shop's settings. Change them here only if this product is different."
     >
-      <div className="rounded-lg border border-line bg-surface p-4">
-        <p className="text-sm font-medium text-fg">Your store settings</p>
-        <ul className="mt-2 space-y-1 text-sm text-muted">
+      <div className="rounded-2xl border border-line bg-surface/70 p-4">
+        <p className="text-[15px] font-semibold text-fg">Your shop's settings</p>
+        <ul className="mt-2 space-y-1.5 text-[15px] text-muted">
           <li>
             Delivers to:{' '}
             <span className="text-fg">{describeDeliveryRule(store.shipping.deliveryRule)}</span>
@@ -116,35 +116,28 @@ export function DeliveryStep({
             <span className="text-fg">{store.payments.acceptCod ? 'accepted' : 'switched off'}</span>
           </li>
         </ul>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={useStoreSettings}
-            aria-pressed={!custom}
-            className={`min-h-tap rounded-xl border px-4 text-[15px] font-semibold transition ${
-              !custom
-                ? 'border-brand bg-brand/10 text-brand'
-                : 'border-line bg-surface text-fg hover:border-brand/60'
-            }`}
-          >
-            Same as the store
-          </button>
-          <button
-            type="button"
-            onClick={() => setCustom(true)}
-            aria-pressed={custom}
-            className={`min-h-tap rounded-xl border px-4 text-[15px] font-semibold transition ${
-              custom
-                ? 'border-brand bg-brand/10 text-brand'
-                : 'border-line bg-surface text-fg hover:border-brand/60'
-            }`}
-          >
-            Different for this product
-          </button>
-        </div>
-        {!custom && (
-          <Hint>Change the store settings any time under Shipping and Payments.</Hint>
-        )}
+        <Hint>Change your shop's settings any time under Delivery and Payments.</Hint>
+      </div>
+
+      <div
+        role="radiogroup"
+        aria-label="Delivery for this product"
+        className="grid gap-3 sm:grid-cols-2"
+      >
+        <ChoiceCard
+          active={!custom}
+          icon={TruckIcon}
+          title="Same as my shop"
+          body="Nothing to change. Most products."
+          onClick={useStoreSettings}
+        />
+        <ChoiceCard
+          active={custom}
+          icon={SlidersIcon}
+          title="Different for this product"
+          body="Its own delivery area or charge, or no cash on delivery."
+          onClick={() => setCustom(true)}
+        />
       </div>
 
       {custom && (
@@ -187,9 +180,9 @@ export function DeliveryStep({
         </div>
       )}
 
-      {error && <ErrorNote>{error}</ErrorNote>}
+      {error && <StepError>{error}</StepError>}
 
-      <StepButtons onBack={onBack} onNext={() => void next()} busy={busy} skip={onNext} />
+      <StepButtons onBack={onBack} onNext={() => void next()} busy={busy} />
     </StepShell>
   )
 }

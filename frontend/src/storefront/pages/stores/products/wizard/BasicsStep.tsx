@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { toApiError } from '../../../../../shared/auth/http'
-import { ErrorNote } from '../../../../../shared/ui/form'
 import { CheckIcon, PlusIcon, TagIcon } from '../../../../layout/icons'
 import { CategoryChooserSheet } from '../../ui/CategoryChooserSheet'
 import { showToast } from '../../ui/Toast'
@@ -10,11 +9,12 @@ import type {
   StoreProduct,
 } from '../../../../features/stores/storesApi'
 import {
-  Field,
-  StepButtons,
-  StepShell,
   categoryOptions,
+  Field,
   inputClass,
+  StepButtons,
+  StepError,
+  StepShell,
 } from './shared'
 
 /**
@@ -189,7 +189,7 @@ export function BasicsStep({
         onPick={(node) => void addCategory(node.id, node.name)}
       />
 
-      {error && <ErrorNote>{error}</ErrorNote>}
+      {error && <StepError>{error}</StepError>}
 
       <StepButtons
         onNext={() => void next()}

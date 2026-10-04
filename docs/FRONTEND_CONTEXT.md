@@ -1823,7 +1823,9 @@ is never shown a pickup-address item.
   keeps what was done) · **2 Photos** (the shared Media Board on
   `useLiveMedia`, uploading straight onto the draft) · **3 Price & choices**
   (two radio cards — **"No — one kind only"** = selling price, printed price /
-  MRP, how many you have, product code (optional); **"Yes — sizes, colours or
+  MRP, how many you have, product code (optional). "How many you have" starts
+  **empty** on a never-priced draft and is required — a prefilled 0 used to
+  be saved untouched and the product went live sold out; **"Yes — sizes, colours or
   weights"** = TWO screens inside one `PricingStep` (state survives between
   them; a "1 Choices · 2 Prices" strip shows where you are):
   **Choices** — the category's **suggested options** as one-tap 44px chips
@@ -1851,14 +1853,23 @@ is never shown a pickup-address item.
   (or the single price fields when the product has only a family) and, if
   changed, the family through `PUT …/groups`; the product list reloads
   because other members' rows changed) · **4
-  Tell customers more** (optional: description, specification rows
+  Tell customers more** (optional: description, "product facts" rows
   pre-filled from the category's suggested labels) · **5 Delivery &
-  payment** (one sentence naming the store settings and a "Different for
-  this product" switch that reveals `ProductDeliveryField`,
-  `ProductShippingField` and the COD checkbox) · **6 Review & publish** (the
-  storefront card as it will look, a checklist from the server's
+  payment** (the shop's settings in one card, then two `ChoiceCard`s —
+  **Same as my shop** / **Different for this product**, the second revealing
+  `ProductDeliveryField`, `ProductShippingField` and the COD checkbox; no
+  "Skip", since Continue with the defaults is the same thing) · **6 Review &
+  publish** (the storefront card as it will look — a compact row on a phone,
+  the square card from `lg` — a checklist from the server's
   `completeness`, and Publish — enabled once a photo and a price exist, the
-  only two requirements). The step header lets the seller jump anywhere
+  only two requirements. While either is missing the checklist moves **above**
+  the card on a phone, titled "Still needed before it can go live", so the
+  greyed-out Publish always has its reason in view). Step errors render
+  through `StepError` (`wizard/shared.tsx`), which scrolls each new message
+  to the middle of the screen — an error under the sticky buttons made
+  Continue look dead. `ChoiceCard` (same file) is the shared big
+  icon-sentence-radio card used by Price and Delivery. The phone header's
+  "Step n of 6 · name" is one truncated line. The step header lets the seller jump anywhere
   once the draft exists, and its ticks reflect the product's real state
   (photo, price, description, published) rather than position; a bar reads
   "Product N% complete". Every field

@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import type { ReactNode } from 'react'
 import { toApiError } from '../../../../../shared/auth/http'
 import { ConfirmDialog } from '../../../../../shared/ui/ConfirmDialog'
-import { ErrorNote } from '../../../../../shared/ui/form'
 import {
   groupsEqual,
   groupsToInput,
@@ -32,7 +30,7 @@ import { CheckIcon, PlusIcon, SlidersIcon, TagIcon } from '../../../../layout/ic
 import { OptionTypesEditor } from '../OptionTypesEditor'
 import type { OptionsDraft } from '../OptionTypesEditor'
 import { VariantMatrix } from '../VariantMatrix'
-import { Field, Hint, StepButtons, StepShell, inputClass } from './shared'
+import { Field, ChoiceCard, Hint, inputClass, StepButtons, StepError, StepShell } from './shared'
 import type { StepKey } from './shared'
 
 type Mode = 'single' | 'options'
@@ -91,7 +89,12 @@ export function PricingStep({
   const base = product.defaultVariant
   const [price, setPrice] = useState(base && Number(base.price) > 0 ? base.price : '')
   const [compareAt, setCompareAt] = useState(base?.compareAtPrice ?? '')
-  const [stock, setStock] = useState(base ? String(base.stockQuantity) : '')
+  // A draft that was never priced starts with an EMPTY count, not the
+  // server's 0: a prefilled 0 got saved untouched and the product went live
+  // as sold out.
+  const [stock, setStock] = useState(
+    base && Number(base.price) > 0 ? String(base.stockQuantity) : '',
+  )
   const [sku, setSku] = useState(base?.sku ?? '')
 
   // With choices — typed options (the matrix), families, and the order the
@@ -178,7 +181,10 @@ export function PricingStep({
     ) {
       return { error: 'MRP must be higher than the selling price.' }
     }
-    const stockValue = stock.trim() === '' ? 0 : Number(stock)
+    if (stock.trim() === '') {
+      return { error: 'Enter how many you have, e.g. 10. Put 0 if it is sold out.' }
+    }
+    const stockValue = Number(stock)
     if (!Number.isInteger(stockValue) || stockValue < 0) {
       return { error: 'Enter how many you have as a whole number, e.g. 10 (0 if sold out).' }
     }
@@ -460,14 +466,14 @@ export function PricingStep({
 
       {part === 'choices' && (
         <div role="radiogroup" aria-label="Does it come in choices?" className="grid gap-3 sm:grid-cols-2">
-          <ModeCard
+          <ChoiceCard
             active={mode === 'single'}
             icon={TagIcon}
             title="No — one kind only"
             body="One price and one stock count. Most products."
             onClick={() => setMode('single')}
           />
-          <ModeCard
+          <ChoiceCard
             active={mode === 'options'}
             icon={SlidersIcon}
             title="Yes — sizes, colours or weights"
@@ -554,7 +560,7 @@ export function PricingStep({
         />
       )}
 
-      {error && <ErrorNote>{error}</ErrorNote>}
+      {error && <StepError>{error}</StepError>}
 
       <StepButtons
         onBack={
@@ -643,54 +649,5 @@ export function PricingStep({
         onCancel={() => setConfirmSingle(false)}
       />
     </StepShell>
-  )
-}
-
-/** One answer to "does it come in choices?" — a big card with a radio dot. */
-function ModeCard({
-  active,
-  icon: Icon,
-  title,
-  body,
-  onClick,
-}: {
-  active: boolean
-  icon: (props: { className?: string }) => ReactNode
-  title: string
-  body: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={active}
-      onClick={onClick}
-      className={`flex min-h-[84px] items-start gap-3 rounded-2xl border p-4 text-left transition ${
-        active
-          ? 'border-brand bg-brand-soft ring-2 ring-brand/25'
-          : 'border-line bg-surface/70 hover:border-brand/60'
-      }`}
-    >
-      <span
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-          active ? 'bg-brand-gradient text-brand-contrast' : 'bg-fg/5 text-muted'
-        }`}
-      >
-        <Icon className="h-5 w-5" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-bold text-fg">{title}</span>
-        <span className="mt-0.5 block text-hint text-muted">{body}</span>
-      </span>
-      <span
-        aria-hidden
-        className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
-          active ? 'border-brand' : 'border-fg/25'
-        }`}
-      >
-        {active && <span className="h-2.5 w-2.5 rounded-full bg-brand" />}
-      </span>
-    </button>
   )
 }

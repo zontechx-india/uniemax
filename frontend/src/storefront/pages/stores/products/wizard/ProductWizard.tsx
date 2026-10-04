@@ -4,7 +4,6 @@ import { createPortal } from 'react-dom'
 import { toApiError } from '../../../../../shared/auth/http'
 import { useMediaQuery } from '../../../../../shared/useMediaQuery'
 import { Dialog } from '../../../../../shared/ui/Dialog'
-import { ErrorNote } from '../../../../../shared/ui/form'
 import { formatPrice, storeCatalogApi } from '../../../../features/stores/storesApi'
 import type {
   StoreCategory,
@@ -16,7 +15,7 @@ import { DeliveryStep } from './DeliveryStep'
 import { DetailsStep } from './DetailsStep'
 import { PhotosStep } from './PhotosStep'
 import { PricingStep } from './PricingStep'
-import { STEPS, StepButtons, StepShell, categoryOptions } from './shared'
+import { categoryOptions, StepButtons, StepError, STEPS, StepShell } from './shared'
 import { buttonClass } from '../../../../../shared/ui/Button'
 import type { StepKey } from './shared'
 import { MediaImg } from '../../../../../shared/media/MediaImg'
@@ -243,10 +242,14 @@ export function ProductWizard({
                 type="button"
                 onClick={() => setStepsOpen(true)}
                 aria-haspopup="dialog"
-                className="-ml-1 inline-flex min-h-8 items-center gap-1 rounded-lg px-1 text-[13px] font-semibold text-brand"
+                className="-ml-1 inline-flex min-h-8 max-w-full items-center gap-1 rounded-lg px-1 text-[13px] font-semibold text-brand"
               >
-                Step {index + 1} of {STEPS.length} · {STEPS[index]!.label}
-                <ChevronDownIcon className="h-4 w-4" />
+                {/* One line always — a wrapped step name pushed the chevron
+                    off on its own and doubled the header's height. */}
+                <span className="truncate">
+                  Step {index + 1} of {STEPS.length} · {STEPS[index]!.label}
+                </span>
+                <ChevronDownIcon className="h-4 w-4 shrink-0" />
               </button>
             </div>
             {product && (
@@ -377,7 +380,7 @@ const CHECKS: { key: StoreProduct['completeness']['missing'][number]; label: str
   { key: 'photo', label: 'At least one photo', step: 'photos', required: true },
   { key: 'price', label: 'A selling price', step: 'pricing', required: true },
   { key: 'description', label: 'A description', step: 'details', required: false },
-  { key: 'specifications', label: 'A few specifications', step: 'details', required: false },
+  { key: 'specifications', label: 'A few product facts', step: 'details', required: false },
 ]
 
 /**
@@ -432,16 +435,18 @@ function ReviewStep({
       }
     >
       <div className="grid gap-5 lg:grid-cols-[16rem_1fr]">
-        {/* The storefront card, honestly. */}
-        <div className="overflow-hidden rounded-2xl border border-line bg-surface">
-          <div className="flex aspect-square items-center justify-center bg-surface-alt">
+        {/* The storefront card, honestly. A compact row on a phone — a
+            full-width square (empty, before a photo) pushed the checklist
+            and the reason Publish is greyed out below the fold. */}
+        <div className="flex overflow-hidden rounded-2xl border border-line bg-surface lg:block">
+          <div className="flex aspect-square w-28 shrink-0 items-center justify-center bg-surface-alt lg:w-auto">
             {cover ? (
-              <MediaImg sizes="(min-width: 1024px) 256px, 100vw" src={cover} alt="" className="h-full w-full object-cover" />
+              <MediaImg sizes="(min-width: 1024px) 256px, 112px" src={cover} alt="" className="h-full w-full object-cover" />
             ) : (
-              <BoxIcon className="h-12 w-12 text-muted" />
+              <BoxIcon className="h-9 w-9 text-muted lg:h-12 lg:w-12" />
             )}
           </div>
-          <div className="p-3">
+          <div className="min-w-0 flex-1 self-center p-3">
             <p className="truncate text-[15px] font-semibold text-fg">{product.name}</p>
             <p className="mt-0.5 truncate text-hint text-muted">{category?.label ?? product.category.name}</p>
             <p className="mt-1.5 text-[15px] font-bold text-brand">
@@ -459,8 +464,12 @@ function ReviewStep({
           </div>
         </div>
 
-        <div>
-          <p className="text-[15px] font-semibold text-fg">Checklist</p>
+        {/* What still blocks publishing comes FIRST on a phone, so the
+            greyed-out Publish button always has its reason in view. */}
+        <div className={!canPublish && !product.isActive ? 'order-first lg:order-none' : ''}>
+          <p className="text-[15px] font-semibold text-fg">
+            {canPublish || product.isActive ? 'Checklist' : 'Still needed before it can go live'}
+          </p>
           <ul className="mt-2 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
             {CHECKS.map((check) => {
               const done = !missing.has(check.key)
@@ -500,13 +509,13 @@ function ReviewStep({
           </ul>
           <p className="mt-2 text-hint text-muted">
             {product.completeness.percent}% complete. Products with photos, a
-            description and specifications get noticed more — but only a photo
+            description and a few facts get noticed more — but only a photo
             and a price are needed to go live.
           </p>
         </div>
       </div>
 
-      {error && <ErrorNote>{error}</ErrorNote>}
+      {error && <StepError>{error}</StepError>}
 
       {product.isActive ? (
         <StepButtons onBack={onBack} onNext={onDone} nextLabel="Done" />

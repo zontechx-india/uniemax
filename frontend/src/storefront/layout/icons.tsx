@@ -578,3 +578,14 @@ export function InfoIcon({ className }: { className?: string }) {
     </Svg>
   )
 }
+
+/** Indian rupee sign — "set a price" without reading the word. */
+export function RupeeIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M7 4h11" />
+      <path d="M7 9h11" />
+      <path d="M7 4h3.5a4.5 4.5 0 0 1 0 9H7l8 7" />
+    </Svg>
+  )
+}

@@ -1,6 +1,8 @@
+import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import type { StoreCategory } from '../../../../features/stores/storesApi'
 import { Button, buttonClass } from '../../../../../shared/ui/Button'
+import { ErrorNote } from '../../../../../shared/ui/form'
 
 /**
  * The product wizard's steps, in order. Every step saves as it goes (the
@@ -69,6 +71,24 @@ export function StepShell({
       <h3 className="font-heading text-[22px] leading-tight font-bold text-fg">{title}</h3>
       <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{lead}</p>
       <div className="mt-5 space-y-5">{children}</div>
+    </div>
+  )
+}
+
+/**
+ * A step's error, brought into view. Steps are long and their buttons are
+ * sticky, so an error drawn at the bottom sat under the bar: the seller tapped
+ * Continue and nothing seemed to happen. Each new message scrolls itself to
+ * the middle of the screen.
+ */
+export function StepError({ children }: { children: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    ref.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [children])
+  return (
+    <div ref={ref}>
+      <ErrorNote>{children}</ErrorNote>
     </div>
   )
 }
@@ -148,4 +168,58 @@ export function categoryOptions(
         return [{ id: c.id, label: here.join(' › ') }, ...walk(c.id, here)]
       })
   return walk(null, [])
+}
+
+/**
+ * One answer to a two-way question ("does it come in choices?", "same as
+ * the shop?") — a big card with an icon, a sentence and a radio dot, so the
+ * choice reads without the seller knowing what a radio button is. Wrap the
+ * pair in a `role="radiogroup"`.
+ */
+export function ChoiceCard({
+  active,
+  icon: Icon,
+  title,
+  body,
+  onClick,
+}: {
+  active: boolean
+  icon: (props: { className?: string }) => ReactNode
+  title: string
+  body: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      onClick={onClick}
+      className={`flex min-h-[84px] items-start gap-3 rounded-2xl border p-4 text-left transition ${
+        active
+          ? 'border-brand bg-brand-soft ring-2 ring-brand/25'
+          : 'border-line bg-surface/70 hover:border-brand/60'
+      }`}
+    >
+      <span
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+          active ? 'bg-brand-gradient text-brand-contrast' : 'bg-fg/5 text-muted'
+        }`}
+      >
+        <Icon className="h-5 w-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-bold text-fg">{title}</span>
+        <span className="mt-0.5 block text-hint text-muted">{body}</span>
+      </span>
+      <span
+        aria-hidden
+        className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+          active ? 'border-brand' : 'border-fg/25'
+        }`}
+      >
+        {active && <span className="h-2.5 w-2.5 rounded-full bg-brand" />}
+      </span>
+    </button>
+  )
 }
