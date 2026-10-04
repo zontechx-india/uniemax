@@ -73,7 +73,7 @@ export function DetailsStep({
       <Field
         label="Description"
         optional
-        hint="Two or three lines are plenty: what it is, what it’s made of, who it’s for. One point per line becomes a bullet on the page."
+        hint="Two or three lines are plenty: what it is, what it is made of, who it is for. Each new line shows as a point on the page."
       >
         <textarea
           value={description}
@@ -81,7 +81,7 @@ export function DetailsStep({
           rows={4}
           maxLength={2000}
           placeholder={'Pure Banarasi silk with zari border\nComes with an unstitched blouse piece\nDry clean only'}
-          className="w-full rounded-md border border-line bg-input px-3.5 py-2.5 text-sm text-fg outline-none transition placeholder:text-muted focus:border-accent"
+          className="w-full rounded-md border border-line bg-input px-3.5 py-3 text-[15px] leading-relaxed text-fg outline-none transition placeholder:text-muted focus:border-accent"
         />
       </Field>
 

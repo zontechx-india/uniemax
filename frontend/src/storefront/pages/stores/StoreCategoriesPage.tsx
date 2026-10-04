@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
-import type { FormEvent, ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { Link } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
-import { CategoryPicker } from '../../../shared/categories/CategoryPicker'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { ErrorNote } from '../../../shared/ui/form'
 import { Button, buttonClass } from '../../../shared/ui/Button'
@@ -23,6 +22,7 @@ import {
 } from '../../layout/icons'
 import { MediaImg } from '../../../shared/media/MediaImg'
 import { BigSwitch } from './ui/BigSwitch'
+import { CategoryChooserSheet } from './ui/CategoryChooserSheet'
 import { EmptyState } from './ui/EmptyState'
 import { GlassCard } from './ui/GlassCard'
 import { PageHeader } from './ui/PageHeader'
@@ -55,7 +55,7 @@ export function StoreCategoriesPage() {
   const { store, refreshStore } = useManagedStore()
 
   const [categories, setCategories] = useState<StoreCategory[] | null>(null)
-  const [choice, setChoice] = useState<string | null>(null)
+  const [choosing, setChoosing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [toDelete, setToDelete] = useState<StoreCategory | null>(null)
@@ -118,10 +118,10 @@ export function StoreCategoriesPage() {
   const childrenOf = (parent: string | null) =>
     (categories ?? []).filter((c) => c.parentId === parent)
 
-  /** The shelf already standing for the picked category, if any. */
-  const alreadyAdded = choice
-    ? ((categories ?? []).find((c) => c.categoryId === choice) ?? null)
-    : null
+  /** Platform categories the shop already has — ticked in the chooser. */
+  const addedIds = new Set(
+    (categories ?? []).flatMap((c) => (c.categoryId ? [c.categoryId] : [])),
+  )
 
   const branches = (categories ?? []).filter(
     (c) => childrenOf(c.id).length > 0,
@@ -139,21 +139,20 @@ export function StoreCategoriesPage() {
       (list ?? []).map((c) => (c.id === updated.id ? updated : c)),
     )
 
-  const add = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!choice) return setError('Choose a category to add.')
-
+  /** Choosing IS adding — one tap in the chooser, no separate Add button. */
+  const add = async (categoryId: string, name: string) => {
     setError(null)
     setBusy(true)
     try {
       const category = await storeCatalogApi.createCategory(store.id, {
-        categoryId: choice,
+        categoryId,
       })
       // Refetch rather than append: picking a deep category creates its
       // ancestors too, and only the server knows which ones it did.
       const list = await reload()
       refreshStore?.()
-      setChoice(null)
+      setChoosing(false)
+      showToast(`${name} added`)
       // Reveal the new shelf instead of hiding it in collapsed ancestors.
       const next = new Set(expanded)
       let cursor = list.find((c) => c.id === category.parentId)
@@ -164,6 +163,8 @@ export function StoreCategoriesPage() {
       persistExpanded(next)
     } catch (err) {
       setError(toApiError(err).message)
+      // The chooser sheet is still open over the page — say it there too.
+      showToast(toApiError(err).message, 'danger')
     } finally {
       setBusy(false)
     }
@@ -343,39 +344,27 @@ export function StoreCategoriesPage() {
           so every shelf is findable across the whole platform. */}
       <GlassCard
         title="Add a category"
-        description="Search for what you sell, or browse the list. Picking a smaller one (like Sarees) adds the bigger ones above it too."
+        description="Type what you sell, or look through the groups. Picking a smaller one (like Sarees) adds the bigger ones above it too."
       >
-        <form onSubmit={add} noValidate>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <CategoryPicker
-              value={choice}
-              onChange={(id) => {
-                setChoice(id)
-                setError(null)
-              }}
-              label="Category"
-              placeholder="Search or browse categories…"
-              className="w-full"
-            />
-            <Button
-              type="submit"
-              size="lg"
-              loading={busy}
-              disabled={!choice || alreadyAdded !== null}
-              className="sm:px-6"
-            >
-              <PlusIcon className="h-5 w-5" />
-              {busy ? 'Adding…' : 'Add'}
-            </Button>
-          </div>
-          {alreadyAdded && (
-            <p className="mt-2 text-hint text-muted">
-              <span className="font-semibold text-fg">{alreadyAdded.name}</span> is
-              already in your categories.
-            </p>
-          )}
-        </form>
+        <Button
+          type="button"
+          size="lg"
+          full
+          onClick={() => setChoosing(true)}
+          className="sm:w-auto sm:px-8"
+        >
+          <PlusIcon className="h-5 w-5" />
+          {(categories?.length ?? 0) === 0 ? 'Choose what you sell' : 'Add a category'}
+        </Button>
       </GlassCard>
+
+      <CategoryChooserSheet
+        open={choosing}
+        onClose={() => setChoosing(false)}
+        addedIds={addedIds}
+        busy={busy}
+        onPick={(node) => void add(node.id, node.name)}
+      />
 
       {error && (
         <div className="max-w-md">
@@ -395,7 +384,13 @@ export function StoreCategoriesPage() {
           <EmptyState
             icon={TagIcon}
             title="No categories yet"
-            description="Add your first one above. Products can only be added once a category exists."
+            description="Categories are the sections of your shop, like Sarees or Kurtas. Add one, then you can add products to it."
+            action={
+              <Button type="button" size="lg" onClick={() => setChoosing(true)}>
+                <PlusIcon className="h-5 w-5" />
+                Choose what you sell
+              </Button>
+            }
           />
         </GlassCard>
       ) : (

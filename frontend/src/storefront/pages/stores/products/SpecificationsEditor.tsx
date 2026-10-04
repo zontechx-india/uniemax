@@ -35,19 +35,24 @@ export function SpecificationsEditor({
 
   return (
     <div>
-      <span className="mb-2 block text-sm font-medium text-muted">
-        Specifications{' '}
+      <span className="mb-2 block text-[15px] font-semibold text-fg">
+        Product facts{' '}
         <span className="font-normal text-muted">(optional)</span>
       </span>
 
       {value.length > 0 && (
         <ul className="space-y-2">
           {value.map((row, index) => (
-            <li key={index} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            // A bordered group on a phone, where the two fields stack; one
+            // line from `sm` up.
+            <li
+              key={index}
+              className="flex flex-col gap-2 rounded-2xl border border-line p-3 sm:flex-row sm:items-center sm:border-0 sm:p-0"
+            >
               <input
                 value={row.label}
                 onChange={(e) => set(index, { label: e.target.value })}
-                placeholder="Label — e.g. Material"
+                placeholder="What — e.g. Material"
                 maxLength={OPTION_LIMITS.specLabelLength}
                 disabled={disabled}
                 aria-label={`Specification ${index + 1} label`}
@@ -56,7 +61,7 @@ export function SpecificationsEditor({
               <input
                 value={row.value}
                 onChange={(e) => set(index, { value: e.target.value })}
-                placeholder="Value — e.g. Memory foam"
+                placeholder="Answer — e.g. Cotton"
                 maxLength={OPTION_LIMITS.specValueLength}
                 disabled={disabled}
                 aria-label={`Specification ${index + 1} value`}
@@ -104,12 +109,13 @@ export function SpecificationsEditor({
           value.length > 0 ? 'mt-2' : ''
         }`}
       >
-        <PlusIcon className="h-3.5 w-3.5" />
-        Add specification
+        <PlusIcon className="h-4 w-4" />
+        Add a fact
       </button>
       <p className="mt-2 text-hint text-muted">
-        Facts about the product, shown as a table on its page. Things customers
-        choose between (size, colour…) are options, not specifications.
+        Short facts shown as a table on the product page — like Material:
+        Cotton, or Weight: 500 g. Sizes and colours customers pick go in the
+        Price step instead.
       </p>
     </div>
   )

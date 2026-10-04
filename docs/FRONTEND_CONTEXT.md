@@ -1755,13 +1755,19 @@ is never shown a pickup-address item.
   platform's triage vocabulary — and replying picks the request up on its own
   so the Needs-reply tab can't quietly lie),
   `StoreCategoriesPage`
-  (add form of **one `CategoryPicker` and nothing else** — search or browse
-  the platform taxonomy to any depth. There is no name field: a seller
-  chooses a category and cannot type one, so no shop invents its own
-  vocabulary. Picking a deep category adds its ancestors too, making
-  "Fashion › Women › Sarees" one action; a category already added is named
-  as such and Add is disabled (the form sits in a "Add a category"
-  `GlassCard` under a `PageHeader`). Shelves that predate the rule keep their
+  (adding is **one button that opens `CategoryChooserSheet`**
+  (`pages/stores/ui/`) — the seller's own way into the platform taxonomy,
+  full-height with 60px rows. Unlike the shared `CategoryPicker` (admin
+  mapping screens), a tap does the obvious thing: a category with smaller
+  kinds inside OPENS ("Fashion" → Women, Men…, "3 kinds inside — tap to
+  look"), one with nothing inside CHOOSES; inside a level a dashed first row
+  offers "Choose all of Women"; a 48px search on top shows hits with their
+  full path; categories the shop already has are ticked "Added". **Choosing
+  is adding** — no separate Add button — with a toast ("Sarees added"), and a
+  failure toasts over the sheet. There is no name field: a seller chooses a
+  category and cannot type one, so no shop invents its own vocabulary.
+  Picking a deep category adds its ancestors too, making "Fashion › Women ›
+  Sarees" one action. Shelves that predate the rule keep their
   free-text names and read "Not on UnieMax category pages", the seller's cue
   that only support can link them. Plus a **collapsible nested list** of any
   depth in one `glass-card`: each row has a 44px expand button (branches
@@ -1781,7 +1787,9 @@ is never shown a pickup-address item.
   subcategory is added to it),
   and `StoreProductsPage`
   (**gated**: with zero categories it shows a "First, choose what you sell"
-  state linking to the Categories section — the category-first sequence;
+  state whose button opens the same `CategoryChooserSheet` right there —
+  choosing adds the category and **goes straight into the first product's
+  wizard**, so a new seller never has to find the Categories page first;
   the Categories page then leads with "Category added. Next: add your first
   product" + **Add a product** while the store still has no product;
   otherwise the **`ProductWizard`**
@@ -1794,7 +1802,11 @@ is never shown a pickup-address item.
   over a scrolling step whose Back / Continue bar (`StepButtons`) is sticky.
   From `sm` up it stays inline in a `glass-card` with a 44px clickable step
   row. Fields are 48px (`inputClass` = `h-field`), labels 15px, hints 13px.
-  **1 What is it?**
+  **1 What is it?** (the name, then the category as big tappable cards —
+  the shop's most specific categories first, each with "in {group}" under it
+  — instead of a dropdown of paths, plus **Add a new category**, which opens
+  `CategoryChooserSheet`, adds the pick, refreshes the page's list via
+  `onCategoriesChange` and selects it without leaving the product)
   (name + category; Continue creates the product as a **draft** on the
   server, so every later step saves on Continue and "Finish later" always
   keeps what was done) · **2 Photos** (the shared Media Board on
@@ -3094,6 +3106,7 @@ Rules that keep it legible and fast:
 | `EmptyState` | Gradient icon, title, one sentence, optional numbered picture `steps`, one action. |
 | `showToast()` / `ToastHost` | "Saved ✓" for instant saves. Module store (`useSyncExternalStore`), no provider; `ToastHost` is mounted once in `StoreManageLayout`. |
 | `HelpHint` | ⓘ (44px hit, inline in a label) → a sheet explaining a term in plain words. |
+| `CategoryChooserSheet` | The seller's category chooser (tap opens / tap chooses, search with paths, "Choose all of …", ticks for added). Used by Categories, the Products first-category gate and the product wizard. |
 
 `ActiveSwitch` keeps its compact visual for the rows not yet migrated, but its
 hit area is now 44px tall (`before:` inset).

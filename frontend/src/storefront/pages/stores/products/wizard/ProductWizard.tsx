@@ -45,6 +45,7 @@ export function ProductWizard({
   startAt = 'basics',
   onProductChange,
   onCatalogChanged,
+  onCategoriesChange,
   onClose,
 }: {
   storeId: string
@@ -55,6 +56,8 @@ export function ProductWizard({
   onProductChange: (product: StoreProduct) => void
   /** Other products changed server-side (a family was saved) — reload the list. */
   onCatalogChanged?: () => void
+  /** A category was added from inside the wizard. */
+  onCategoriesChange?: (categories: StoreCategory[]) => void
   onClose: () => void
 }) {
   const [product, setProduct] = useState<StoreProduct | null>(initial)
@@ -156,6 +159,7 @@ export function ProductWizard({
             product={product}
             onSaved={saved}
             onNext={() => go(1)}
+            onCategoriesChange={onCategoriesChange}
           />
         )}
         {product && step === 'photos' && (

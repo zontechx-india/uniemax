@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { ErrorNote } from '../../../shared/ui/form'
@@ -32,6 +31,7 @@ import { GlassCard } from './ui/GlassCard'
 import { PageHeader } from './ui/PageHeader'
 import { StatusPill } from './ui/StatusPill'
 import { showToast } from './ui/Toast'
+import { CategoryChooserSheet } from './ui/CategoryChooserSheet'
 import { ProductWizard } from './products/wizard/ProductWizard'
 import type { StepKey } from './products/wizard/shared'
 import { Button, buttonClass } from '../../../shared/ui/Button'
@@ -73,6 +73,9 @@ export function StoreProductsPage() {
   const [pendingFlag, setPendingFlag] = useState<PendingFlag | null>(null)
   const [savingFlag, setSavingFlag] = useState(false)
   const [query, setQuery] = useState('')
+  // First-category chooser for a shop with none yet (see the gate below).
+  const [choosingFirst, setChoosingFirst] = useState(false)
+  const [addingFirst, setAddingFirst] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
 
   useEffect(() => {
@@ -220,13 +223,36 @@ export function StoreProductsPage() {
             title="First, choose what you sell"
             description='Pick a category for your products — type what you sell, like "saree" or "atta". Then you can add products.'
             action={
-              <Link to="../categories" className={buttonClass({ size: 'lg' })}>
+              <Button type="button" size="lg" onClick={() => setChoosingFirst(true)}>
                 <PlusIcon className="h-5 w-5" />
-                Choose a category
-              </Link>
+                Choose what you sell
+              </Button>
             }
           />
         </GlassCard>
+        {/* Choose → the category is added → straight into the first product.
+            The seller never has to find the Categories page first. */}
+        <CategoryChooserSheet
+          open={choosingFirst}
+          onClose={() => setChoosingFirst(false)}
+          addedIds={new Set()}
+          busy={addingFirst}
+          onPick={(node) => {
+            setAddingFirst(true)
+            storeCatalogApi
+              .createCategory(store.id, { categoryId: node.id })
+              .then(() => storeCatalogApi.listCategories(store.id))
+              .then((list) => {
+                setCategories(list)
+                refreshStore?.()
+                setChoosingFirst(false)
+                showToast(`${node.name} added`)
+                setWizard({ product: null, startAt: 'basics' })
+              })
+              .catch((err) => showToast(toApiError(err).message, 'danger'))
+              .finally(() => setAddingFirst(false))
+          }}
+        />
       </div>
     )
   }
@@ -273,6 +299,10 @@ export function StoreProductsPage() {
           startAt={wizard.startAt}
           onProductChange={absorb}
           onCatalogChanged={reload}
+          onCategoriesChange={(list) => {
+            setCategories(list)
+            refreshStore?.()
+          }}
           onClose={() => {
             setWizard(null)
             refreshStore?.()
