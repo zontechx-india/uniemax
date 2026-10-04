@@ -2,22 +2,31 @@ import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
 import type { ListMeta } from '../../../shared/auth/http'
+import { buttonClass } from '../../../shared/ui/Button'
 import { ErrorNote } from '../../../shared/ui/form'
 import { sellerOrderApi } from '../../features/stores/storesApi'
 import type {
   OrderStatus,
   SellerOrderSummary,
+  StoreDashboard,
 } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import { CartIcon, SearchIcon } from '../../layout/icons'
 import { ORDER_STATUS_META, SellerOrderRow } from './orderMeta'
+import { EmptyState } from './ui/EmptyState'
+import { PageHeader } from './ui/PageHeader'
 
 /**
  * Orders section of Store Management — every order of the store, newest
- * first, filterable by lifecycle status (tabs, deep-linkable via ?status=
- * so the dashboard tiles can jump straight to a slice) and searchable by
- * order number / customer name / phone. Server-paginated with Load More;
- * a row opens the order's detail page where the status actions live.
+ * first, filterable by lifecycle status (chips, deep-linkable via ?status=
+ * so the dashboard can jump straight to a slice) and searchable by order
+ * number / customer name / phone. Server-paginated with Load More; a card
+ * opens the order's detail page where the status actions live.
+ *
+ * The status chips are 44px pills in one sideways-scrolling row (a fade on
+ * the right says there are more), carrying the counts the layout's
+ * dashboard fetch already knows — "Waiting 3" is the number a seller opens
+ * this page for.
  */
 
 const PAGE_SIZE = 20
@@ -30,12 +39,34 @@ const STATUS_TABS: { key: OrderStatus | 'ALL'; label: string }[] = [
   })),
 ]
 
+/** Counts the dashboard already has. Confirmed + Packed share one counter there. */
+function countFor(
+  key: OrderStatus | 'ALL',
+  stats: StoreDashboard['stats'] | undefined,
+): number | null {
+  if (!stats) return null
+  switch (key) {
+    case 'ALL':
+      return stats.totalOrders
+    case 'PENDING':
+      return stats.pending
+    case 'SHIPPED':
+      return stats.shipped
+    case 'DELIVERED':
+      return stats.completed
+    case 'CANCELLED':
+      return stats.cancelled
+    default:
+      return null
+  }
+}
+
 function isOrderStatus(value: string | null): value is OrderStatus {
   return value !== null && value in ORDER_STATUS_META
 }
 
 export function StoreOrdersPage() {
-  const { store } = useManagedStore()
+  const { store, dashboard } = useManagedStore()
   const [params, setParams] = useSearchParams()
   const statusParam = params.get('status')
   const status: OrderStatus | 'ALL' = isOrderStatus(statusParam)
@@ -112,74 +143,93 @@ export function StoreOrdersPage() {
     )
   }
 
-  return (
-    <div>
-      <h2 className="font-body text-xl font-semibold tracking-normal text-fg">
-        Orders
-      </h2>
-      <p className="mt-1 text-sm text-muted">
-        Confirm, pack, ship and complete your orders — open one to update its
-        status.
-      </p>
+  const filtered = q !== '' || status !== 'ALL'
 
-      {/* Status tabs + search */}
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <div className="-mx-1 flex flex-1 gap-1.5 overflow-x-auto px-1 py-1">
-          {STATUS_TABS.map(({ key, label }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setStatus(key)}
-              className={`shrink-0 rounded-pill px-3.5 py-1.5 text-xs font-semibold transition ${
-                status === key
-                  ? 'bg-brand/10 text-brand'
-                  : 'border border-line text-muted hover:bg-surface-alt hover:text-fg'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        icon={CartIcon}
+        title="Orders"
+        description="New orders show here. Open one to confirm it, then mark it packed and sent."
+      />
+
+      {/* Status chips — one row that scrolls sideways on a phone. */}
+      <div className="-mx-4 [mask-image:linear-gradient(to_right,#000_88%,transparent)] sm:mx-0 sm:[mask-image:none]">
+        <div
+          role="group"
+          aria-label="Show orders"
+          className="flex gap-2 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:flex-wrap sm:px-0"
+        >
+          {STATUS_TABS.map(({ key, label }) => {
+            const on = status === key
+            const count = countFor(key, dashboard?.stats)
+            return (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setStatus(key)}
+                className={`inline-flex min-h-tap shrink-0 items-center gap-1.5 rounded-pill border px-4 text-[14px] font-semibold transition ${
+                  on
+                    ? 'border-brand bg-brand text-brand-contrast'
+                    : 'border-line bg-surface/70 text-fg hover:border-brand/50'
+                }`}
+              >
+                {label}
+                {count !== null && count > 0 && (
+                  <span
+                    className={`rounded-pill px-1.5 text-[12px] font-bold ${
+                      on ? 'bg-brand-contrast/20' : key === 'PENDING' ? 'bg-pending text-brand-contrast' : 'bg-fg/8 text-muted'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
-        <label className="relative block w-full sm:w-64">
-          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Order no. / customer / phone"
-            className="h-10 w-full rounded-md border border-line bg-input pl-9 pr-3 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
-          />
-        </label>
       </div>
 
-      {error && (
-        <div className="mt-4">
-          <ErrorNote>{error}</ErrorNote>
-        </div>
-      )}
+      <label className="relative block">
+        <span className="sr-only">Search orders</span>
+        <SearchIcon className="pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-muted" />
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name, phone or order number"
+          className="glass-inset h-field w-full rounded-xl pr-4 pl-11 text-[15px] text-fg outline-none placeholder:text-muted focus:border-accent"
+        />
+      </label>
+
+      {error && <ErrorNote>{error}</ErrorNote>}
+
       {orders === null && !error && (
-        <p className="py-16 text-center text-sm text-muted">Loading orders…</p>
+        <div aria-busy="true" aria-label="Loading orders" className="space-y-2">
+          {[0, 1, 2].map((key) => (
+            <div key={key} className="glass-card h-[88px] animate-pulse rounded-2xl" />
+          ))}
+        </div>
       )}
 
       {orders !== null && orders.length === 0 && (
-        <div className="mt-4 flex flex-col items-center rounded-lg border border-line px-6 py-12 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-md bg-surface-alt text-muted">
-            <CartIcon className="h-6 w-6" />
-          </div>
-          <p className="mt-3 text-sm font-semibold text-fg">
-            {q || status !== 'ALL' ? 'No matching orders' : 'No orders yet'}
-          </p>
-          <p className="mt-1 max-w-sm text-sm text-muted">
-            {q || status !== 'ALL'
-              ? 'Try a different status or search term.'
-              : 'Share your store link — orders will show up here the moment customers place them.'}
-          </p>
+        <div className="glass-card rounded-glass">
+          <EmptyState
+            icon={CartIcon}
+            title={filtered ? 'No orders here' : 'No orders yet'}
+            description={
+              filtered
+                ? 'Try another status, or search for a different name or number.'
+                : 'Share your shop link. Orders show up here the moment customers place them.'
+            }
+          />
         </div>
       )}
 
       {orders !== null && orders.length > 0 && (
         <>
-          <ul className="mt-4 divide-y divide-line rounded-lg border border-line">
+          <ul className="glass-card divide-y divide-line overflow-hidden rounded-glass">
             {orders.map((order) => (
               <li key={order.id}>
                 <SellerOrderRow order={order} to={order.id} />
@@ -188,16 +238,16 @@ export function StoreOrdersPage() {
           </ul>
 
           {meta && meta.page < meta.totalPages && (
-            <div className="mt-4 flex justify-center">
+            <div className="flex justify-center">
               <button
                 type="button"
                 onClick={() => void loadMore()}
                 disabled={loadingMore}
-                className="rounded-md border border-line px-5 py-2.5 text-sm font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
+                className={buttonClass({ variant: 'ring', size: 'lg', className: 'w-full sm:w-auto' })}
               >
                 {loadingMore
                   ? 'Loading…'
-                  : `Load more (${meta.total - orders.length} left)`}
+                  : `Show more orders (${meta.total - orders.length} left)`}
               </button>
             </div>
           )}

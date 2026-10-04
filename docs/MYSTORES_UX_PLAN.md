@@ -21,7 +21,7 @@ English only for now, in plain words (i18n later).
 | 2 | My Stores list + Create Store wizard | ✅ Done (2026-10-04) |
 | 3 | Dashboard, setup checklist, publish card | ✅ Done (2026-10-04) |
 | 4 | Products, product wizard, categories, media | ✅ Done (2026-10-04) |
-| 5 | Orders list + order detail | ⬜ Not started |
+| 5 | Orders list + order detail | ✅ Done (2026-10-04) |
 | 6 | Settings pages (Business, Bank, Payments, Checkout, Shipping, Details, Footer, Banners) | ⬜ Not started |
 | 7 | Store Builder mobile pass | ⬜ Not started |
 | 8 | Support pages, skeletons, final polish | ⬜ Not started |
@@ -337,11 +337,12 @@ Each phase ships on its own and is approved before the next one starts.
 
 ### Phase 5 — Orders
 
-- [ ] Status filter: 40 px+ glass chips with counts and a scroll fade
-- [ ] Order cards: customer, amount, status pill, age ("2 h ago")
-- [ ] Detail: sticky next-action bar (Confirm order / Mark packed / Mark shipped)
-- [ ] Big **Call** and **WhatsApp customer** buttons
-- [ ] Timeline as a vertical stepper; Cancel in "⋯" with a reason sheet (16 px textarea)
+- [x] Status filter: 44 px glass chips with counts and a scroll fade
+- [x] Order cards: customer, amount, status pill, age ("2 h ago")
+- [x] Detail: sticky next-action bar (Confirm order / Mark as packed / Mark as sent)
+- [x] Big **Call** and **WhatsApp customer** buttons, plus **Copy address** for the courier
+- [x] Timeline as a vertical stepper; Cancel in "⋯" with a reason field (16 px textarea)
+- [x] Status words match the Dashboard (Waiting / Sent); "Waiting" readable in dark mode
 
 ### Phase 6 — Settings pages
 

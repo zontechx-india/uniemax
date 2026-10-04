@@ -682,27 +682,40 @@ count; a card skeleton shows while the layout's fetch is in flight.
 `orderMeta.tsx`) — the seller's order management over
 `/api/v1/stores/:id/orders`:
 
-- **List** — status tabs (All + the six statuses, deep-linkable via
-  `?status=` so dashboard tiles land pre-filtered), a debounced search
-  (order number / customer name / phone), newest first, server-paginated
-  with Load More; every row opens the detail page. Rows are the shared
+- **List** — `PageHeader`, then status chips (All + the six statuses in
+  plain words — Waiting · Confirmed · Packed · Sent · Delivered · Cancelled —
+  44px pills in one sideways-scrolling row with a right-edge fade,
+  deep-linkable via `?status=` so dashboard tiles land pre-filtered; counts
+  from the layout's dashboard stats where it has them: All, Waiting (orange
+  badge), Sent, Delivered, Cancelled), a 48px debounced search (order number
+  / customer name / phone), newest first, server-paginated with "Show more
+  orders"; card skeletons while loading, an `EmptyState` when empty. Status
+  pills are `OrderStatusChip` → `StatusPill` tones (Waiting = pending
+  orange, so it stays readable in dark mode). Rows are the shared
   `SellerOrderRow` (`orderMeta.tsx`, also the Dashboard's latest orders): the
   customer's name (or the order number) and the total lead at 15px bold, then
   `timeAgo()` ("25 min ago", "Yesterday", then the date) · items · order
   number, then the status and payment chips (12px); the whole ≥64px row is
   the tap target.
-- **Detail** — items with thumbnails + money summary, customer/delivery
-  snapshot (tel: link, pickup note for PICKUP orders), payment card
-  (flags dev-simulated payments), a **lifecycle timeline** (Placed →
-  Confirmed → Packed → Shipped → Delivered, driven by the order's
-  timestamps; pickup orders show "Picked up" and skip Shipped; a
-  cancelled order shows the stages it reached + Cancelled with the
-  seller's reason), and the **status actions**: one primary
-  next-step button (Confirm Order → Mark as Packed → Mark as Shipped →
-  Mark as Delivered; pickup goes Packed → Delivered) plus Cancel Order
-  while the order hasn't shipped. Every action confirms via
-  `ConfirmDialog` first (changes are customer-visible immediately; the
-  dismiss button reads "Go back", never "Cancel", beside Confirm Order); the
+- **Detail** — top to bottom: an at-a-glance `glass-tint` card (status
+  pill, "25 min ago · date", the total large, items · payment in words —
+  "Cash on delivery" / "Paid online" / "Cash received" — and the order
+  number; flags dev-simulated payments); the **customer** card first, with
+  big **Call** (`tel:`) and **WhatsApp** (`wa.me/91…` with a ready "Hello …,
+  this is {shop} about your order …" message; a bare 10-digit number gets
+  91) buttons and the delivery address with **Copy address** (name, address,
+  phone — for the courier slip) or the pickup note; the items with 56px
+  photos, choice name, "qty × price · Code …" and the money summary; and a
+  **timeline stepper** (Order placed → Confirmed → Packed → Sent →
+  Delivered, ticked with times; pickup shows "Picked up" and skips Sent; a
+  cancelled order shows the stages it reached + Cancelled). The **status
+  action** is a sticky `glass-strong` bar at the bottom (above the tab bar
+  via `--seller-dock`): one `sheen` button — Confirm order → Mark as packed
+  → Mark as sent → Mark as delivered (pickup: Packed → Mark as picked up) —
+  and a "⋯" holding **Cancel this order** while the order hasn't been sent.
+  Every action confirms via `ConfirmDialog` first and toasts on success
+  (changes are customer-visible immediately; the dismiss button reads "Go
+  back", never "Cancel", beside the confirm); the
   cancel dialog carries an optional reason field (shown to the buyer on
   their order page) and explains that stock
   is restored (and a paid order marked refunded). Conflicts (409 — e.g.
