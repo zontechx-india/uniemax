@@ -370,10 +370,16 @@ Each phase ships on its own and is approved before the next one starts.
 
 ### Phase 8 — Support pages & polish
 
-- [ ] Customer Support and UnieMax Support pages on the kit
-- [ ] Skeleton loaders replace "Loading…"
-- [ ] Final dark-mode, contrast, reduced-transparency and reduced-motion pass
-- [ ] Remove dead styles and the old `ActiveSwitch`
+- [x] Customer Support and UnieMax Support pages on the kit ("Customer messages", "Help from UnieMax")
+- [x] Seller nav rows in plain words (Shop name & logo · Design your shop · Bank account · Delivery …)
+- [x] Skeleton loader for the store shell (pages already had their own)
+- [x] 360 px sweep of all 18 seller pages: no overflow, no input under 16 px; header icon buttons, builder tabs, Footer/Banners leftovers raised to 44 px
+- [x] Builder section rows: `BigSwitch`, titles wrap instead of truncating
+- [x] Dark-mode, contrast, reduced-transparency and reduced-motion handled by the Phase 0 tokens and fallbacks
+
+> Deviation: `ActiveSwitch` is **kept** — the affiliate products tab, the
+> variant matrix's desktop table and the builder section editor still use it,
+> and its hit area was already raised to 44 px in Phase 4.
 
 ---
 

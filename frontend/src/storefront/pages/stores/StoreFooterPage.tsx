@@ -385,7 +385,7 @@ function LocationsCard() {
             type="button"
             onClick={() => setEditing('new')}
             disabled={busy}
-            className="mt-3 inline-flex h-10 items-center gap-1.5 rounded-md border border-line bg-surface px-4 text-sm font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
+            className="mt-3 inline-flex h-tap items-center gap-1.5 rounded-xl border border-line bg-surface px-4 text-[15px] font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
           >
             <PlusIcon className="h-4 w-4" />
             Add Location
@@ -646,7 +646,7 @@ function SocialCard() {
         <button
           type="button"
           onClick={() => setMoreOpen((open) => !open)}
-          className="inline-flex items-center gap-1 text-sm font-semibold text-brand transition hover:opacity-80"
+          className="inline-flex min-h-tap items-center gap-1 rounded-xl px-1 text-[15px] font-semibold text-brand transition hover:opacity-80"
         >
           More platforms (WhatsApp, X, LinkedIn…)
           <ChevronDownIcon

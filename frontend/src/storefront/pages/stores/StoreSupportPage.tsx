@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { PageHeader } from './ui/PageHeader'
 import { Link } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
 import { useCustomerSession } from '../../app/sessionContext'
@@ -8,7 +9,7 @@ import { TicketList } from '../../features/support/TicketList'
 import { SELLER_CATEGORIES, supportApi } from '../../features/support/supportApi'
 import type { SupportTicket } from '../../features/support/supportApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
-import { PlusIcon } from '../../layout/icons'
+import { LifebuoyIcon, PlusIcon } from '../../layout/icons'
 import { Button } from '../../../shared/ui/Button'
 
 /**
@@ -54,18 +55,19 @@ export function StoreSupportPage() {
 
   return (
     <div>
-      <h2 className="font-body text-xl font-semibold tracking-normal text-fg">
-        UnieMax Support
-      </h2>
-      <p className="mt-1 text-sm text-muted">
-        Reach the UnieMax team about this store — payouts, catalog, settings,
-        anything that looks broken. Messages from your own customers are in{' '}
+      <PageHeader
+        icon={LifebuoyIcon}
+        title="Help from UnieMax"
+        description="Talk to the UnieMax team about your shop — payments, products, settings, or anything that is not working."
+      />
+      <p className="mt-2 text-hint text-muted">
+        Messages from your own customers are in{' '}
         <Link
           to="../customer-support"
           relative="path"
-          className="font-medium text-brand hover:underline"
+          className="font-semibold text-brand hover:underline"
         >
-          Customer Support
+          Customer messages
         </Link>
         .
       </p>
@@ -75,13 +77,13 @@ export function StoreSupportPage() {
       </div>
 
       <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
-        <h3 className="font-body text-base font-semibold tracking-normal text-fg">
-          Store tickets
+        <h3 className="font-heading text-[18px] font-bold text-fg">
+          Your questions to UnieMax
         </h3>
         {!composing && (
-          <Button type="button" size="md" onClick={() => setComposing(true)}>
-            <PlusIcon className="h-4 w-4" />
-            New ticket
+          <Button type="button" size="lg" onClick={() => setComposing(true)}>
+            <PlusIcon className="h-5 w-5" />
+            Ask a question
           </Button>
         )}
       </div>

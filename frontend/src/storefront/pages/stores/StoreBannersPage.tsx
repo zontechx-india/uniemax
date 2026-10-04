@@ -399,7 +399,7 @@ function EmptyBanners({ onAdd }: { onAdd: () => void }) {
       <button
         type="button"
         onClick={onAdd}
-        className="mt-4 text-sm font-semibold text-brand hover:underline"
+        className="mt-4 inline-flex min-h-tap items-center rounded-xl px-3 text-[15px] font-semibold text-brand hover:bg-brand-soft"
       >
         Add your first banner
       </button>

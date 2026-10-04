@@ -11,7 +11,7 @@ import {
   PanelLeftIcon,
   PlusIcon,
 } from '../../../layout/icons'
-import { ActiveSwitch } from '../ActiveSwitch'
+import { BigSwitch } from '../ui/BigSwitch'
 import { BUILDER_SECTIONS } from './builderSections'
 
 /**
@@ -154,13 +154,13 @@ export function BuilderSectionList({
                     />
                     <span className="min-w-0 flex-1">
                       <span
-                        className={`block truncate text-sm font-semibold ${
+                        className={`block text-[15px] font-semibold leading-snug ${
                           section.enabled ? 'text-fg' : 'text-muted'
                         }`}
                       >
                         {meta.label}
                       </span>
-                      <span className="mt-0.5 block truncate text-xs text-muted">
+                      <span className="mt-0.5 line-clamp-2 block text-hint text-muted">
                         {section.enabled ? meta.hint : 'Hidden from your shop'}
                       </span>
                     </span>
@@ -181,10 +181,11 @@ export function BuilderSectionList({
                     />
                   </div>
 
-                  <ActiveSwitch
+                  <BigSwitch
                     checked={section.enabled}
                     disabled={busy}
                     label={`${section.enabled ? 'Hide' : 'Show'} ${meta.label}`}
+                    showState={false}
                     onChange={(next) => onToggle(section.key, next)}
                   />
                 </div>

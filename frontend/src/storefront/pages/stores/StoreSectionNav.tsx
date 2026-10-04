@@ -104,17 +104,17 @@ const SECTION_GROUPS: SectionGroup[] = [
     key: 'storefront',
     caption: 'Storefront',
     items: [
-      { label: 'Store Details', to: 'details', icon: StoreIcon },
+      { label: 'Shop name & logo', to: 'details', icon: StoreIcon },
       // Business identity sits beside Store Details rather than under
       // Payments: it is who the seller IS, which orders and invoices need
       // long before any payout does.
-      { label: 'Business Details', to: 'business', icon: ShieldCheckIcon },
+      { label: 'Business details', to: 'business', icon: ShieldCheckIcon },
       // ONE row where there were four. Appearance, Homepage, Banners and
       // Footer all described the same object — the shop — and splitting them
       // made a seller learn the platform's filing system before they could
       // move a heading. The builder is also the only one of the five that can
       // show them the result.
-      { label: 'Store Builder', to: 'builder', icon: PaletteIcon },
+      { label: 'Design your shop', to: 'builder', icon: PaletteIcon },
     ],
   },
   {
@@ -122,8 +122,8 @@ const SECTION_GROUPS: SectionGroup[] = [
     caption: 'Payments & Delivery',
     items: [
       { label: 'Payments', to: 'payments', icon: CardIcon },
-      { label: 'Bank Accounts', to: 'bank-accounts', icon: BankIcon },
-      { label: 'Shipping', to: 'shipping', icon: TruckIcon },
+      { label: 'Bank account', to: 'bank-accounts', icon: BankIcon },
+      { label: 'Delivery', to: 'shipping', icon: TruckIcon },
       { label: 'Checkout', to: 'checkout', icon: ClipboardIcon },
     ],
   },
@@ -136,8 +136,8 @@ const SECTION_GROUPS: SectionGroup[] = [
     key: 'help',
     caption: 'Help',
     items: [
-      { label: 'Customer Support', to: 'customer-support', icon: ChatIcon },
-      { label: 'UnieMax Support', to: 'support', icon: LifebuoyIcon },
+      { label: 'Customer messages', to: 'customer-support', icon: ChatIcon },
+      { label: 'Help from UnieMax', to: 'support', icon: LifebuoyIcon },
     ],
   },
 ]

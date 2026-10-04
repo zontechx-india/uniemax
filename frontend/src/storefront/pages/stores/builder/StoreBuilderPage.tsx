@@ -295,7 +295,7 @@ function Builder({
       {/* Two tabs, because there are exactly two kinds of decision here: what
           the shop is made of, and what colour it is. */}
       {target === null && (
-        <div className="shrink-0 border-b border-line px-3 pt-3 sm:px-4">
+        <div className="shrink-0 border-b border-line px-3 pt-1 sm:px-4">
           <div className="flex gap-1">
             <PanelTab
               active={tab === 'sections'}
@@ -446,7 +446,7 @@ function Builder({
               type="button"
               onClick={() => setMobileView(view)}
               aria-pressed={mobileView === view}
-              className={`h-10 flex-1 rounded-lg text-[14px] font-semibold transition-colors ${
+              className={`h-tap flex-1 rounded-lg text-[14px] font-semibold transition-colors ${
                 mobileView === view
                   ? 'bg-brand text-brand-contrast'
                   : 'text-muted hover:text-fg'
@@ -495,7 +495,7 @@ function PanelTab({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 pb-2.5 text-sm font-semibold transition-colors ${
+      className={`-mb-px flex min-h-tap items-center gap-1.5 border-b-2 px-3.5 text-[15px] font-semibold transition-colors ${
         active
           ? 'border-brand text-fg'
           : 'border-transparent text-muted hover:text-fg'
@@ -510,7 +510,7 @@ function PanelTab({
 /**
  * The header is fixed chrome — the same bar on every page of every shop — so
  * there is nothing to arrange. What it *shows* is the store's own identity,
- * which is edited on Store Details, and this says so rather than presenting an
+ * which is edited on Shop name & logo, and this says so rather than presenting an
  * empty panel.
  */
 function HeaderNotice({ storePath }: { storePath: string }) {

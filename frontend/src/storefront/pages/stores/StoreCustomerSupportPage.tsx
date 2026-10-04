@@ -8,6 +8,8 @@ import { CATEGORY_LABELS } from '../../features/support/supportApi'
 import { TicketStatusChip, formatTicketDateTime } from '../../features/support/ticketMeta'
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import { ChatIcon, ChevronRightIcon, LifebuoyIcon } from '../../layout/icons'
+import { PageHeader } from './ui/PageHeader'
+import { StatusPill } from './ui/StatusPill'
 
 /**
  * Customer Support section of Store Management — the shop's **inbox**:
@@ -71,25 +73,21 @@ export function StoreCustomerSupportPage() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="font-body text-xl font-semibold tracking-normal text-fg">
-            Customer Support
-          </h2>
-          <p className="mt-1 text-sm text-muted">
-            Requests your customers raised from your storefront's Help &amp;
-            Support. Answering one tells them straight away.
-          </p>
-        </div>
-        {openCount > 0 && (
-          <span className="rounded-pill bg-warning/10 px-3 py-1 text-xs font-semibold text-warning">
-            {openCount} awaiting reply
-          </span>
-        )}
-      </div>
+      <PageHeader
+        icon={ChatIcon}
+        title="Customer messages"
+        description="Questions your customers sent from your shop. When you answer, they are told straight away."
+        action={
+          openCount > 0 ? (
+            <div>
+              <StatusPill tone="pending">{openCount} waiting for your reply</StatusPill>
+            </div>
+          ) : undefined
+        }
+      />
 
       {/* Status tabs — one axis of choice, so they stay on one line. */}
-      <div className="mt-5 -mb-px flex gap-1 overflow-x-auto border-b border-line">
+      <div className="mt-4 -mb-px flex gap-1 overflow-x-auto border-b border-line [scrollbar-width:none]">
         {TABS.map((option) => {
           const active = option.value === tab
           return (
@@ -97,7 +95,7 @@ export function StoreCustomerSupportPage() {
               key={option.value || 'all'}
               type="button"
               onClick={() => setTab(option.value)}
-              className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+              className={`min-h-tap whitespace-nowrap border-b-2 px-3.5 text-[15px] font-semibold transition-colors ${
                 active
                   ? 'border-brand text-fg'
                   : 'border-transparent text-muted hover:text-fg'

@@ -560,9 +560,15 @@ once-ever setting look as important as a daily job:
 | ----- | -------- |
 | **Overview** | Dashboard · Orders *(pending-count badge)* |
 | **Catalog** | Categories · Products |
-| **Storefront** | Store Details · Business Details · **Store Builder** |
-| **Payments & Delivery** | Payments · Bank Accounts · Shipping · Checkout |
-| **Help** | Customer Support · UnieMax Support |
+| **Storefront** | Shop name & logo · Business details · **Design your shop** |
+| **Payments & Delivery** | Payments · Bank account · Delivery · Checkout |
+| **Help** | Customer messages · Help from UnieMax |
+
+Row labels are plain words a first-time seller would use (the routes keep
+their old names — `details`, `builder`, `bank-accounts`, `shipping`,
+`customer-support`, `support` — so links in the wild still resolve). The
+rest of this document still calls the pages by their component-era names
+(Store Details, Store Builder, Customer Support, UnieMax Support).
 
 One list, **three presentations**:
 
@@ -1551,7 +1557,9 @@ is never shown a pickup-address item.
   resolving.
 
   **Left: controls.** Two tabs. *Sections* is the storefront's structure —
-  every homepage section as a row with a drag handle, an `ActiveSwitch` and a
+  every homepage section as a row with a drag handle, a `BigSwitch` (no state
+  word — the row's own subtitle says "Hidden from your shop"; titles wrap
+  rather than truncate on a phone) and a
   click target, bracketed by pinned **Store header** and **Footer** rows (real
   parts of the shop, but never moved or switched off). Reordering is offered
   twice on purpose: native HTML5 drag for a mouse, 44px ▲/▼ buttons for
@@ -1733,7 +1741,8 @@ is never shown a pickup-address item.
   `PATCH /stores/:id/checkout`; a disabled field is hidden from customers
   and skipped in validation. Warns when a delivering store switches all
   address fields off),
-  `StoreSupportPage` (**UnieMax Support** — the two ways to reach the
+  `StoreSupportPage` (**UnieMax Support**, titled "Help from UnieMax" with a
+  `PageHeader` and an "Ask a question" button — the two ways to reach the
   platform team, in the order they are useful: direct contact, then a tracked
   ticket. The page itself is thin: everything visual comes from
   `features/support/` (see the Support feature above), and what it decides is
@@ -1742,7 +1751,9 @@ is never shown a pickup-address item.
   that would make the section ambiguous), `StoreSupportTicketPage` (one
   thread at `support/{ticketId}` — a back link around the shared
   `TicketThread`),
-  `StoreCustomerSupportPage` (**Customer Support** — the shop's own **inbox**:
+  `StoreCustomerSupportPage` (**Customer Support**, titled "Customer messages"
+  with a `PageHeader`, a "waiting for your reply" `StatusPill` and 44px tabs —
+  the shop's own **inbox**:
   what its buyers raised from the storefront. Opens on **Needs reply** (open
   + in progress) sorted oldest-activity-first, for the same reason the admin
   queue does — an inbox exists to show what is still owed, the opposite of

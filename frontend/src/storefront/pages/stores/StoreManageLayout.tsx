@@ -105,9 +105,14 @@ export function StoreManageLayout() {
   }, [refreshDashboard])
 
   if (store === undefined) {
+    // The shape of the page, not the word "Loading…".
     return (
-      <div className="flex h-64 items-center justify-center text-sm text-muted">
-        Loading…
+      <div aria-busy="true" aria-label="Loading your shop" className="mx-auto max-w-7xl space-y-3">
+        <div className="glass h-[68px] animate-pulse rounded-glass lg:hidden" />
+        <div className="items-start gap-3 lg:grid lg:grid-cols-[264px_1fr]">
+          <div className="glass hidden h-[520px] animate-pulse rounded-glass lg:block" />
+          <div className="glass h-[420px] animate-pulse rounded-glass" />
+        </div>
       </div>
     )
   }
