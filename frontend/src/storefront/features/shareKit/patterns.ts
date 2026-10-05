@@ -3,32 +3,38 @@
  * renderer as everything else, so the preview, the Instagram images and the
  * picker's own swatches are all one function (`drawPattern`).
  *
- * Rules every pattern follows, so none can cost the card its job:
+ * Rules every texture follows, so none can cost the card its job:
  *  - **One colour** — the card's own accent (on white cards) or the text
  *    colour (on the Brand card), never a new colour.
  *  - **Low contrast** — each pattern carries its own opacity, tuned so the
  *    shop name and caption stay readable on top of it.
  *  - **Never under the QR** — the code sits on its own opaque white plate
  *    (quiet zone included), so a pattern cannot reach a module.
- *  - Patterns that would sit behind text are fine-grained (dots, grid,
- *    waves); the bolder ones (Rings, Confetti) keep to the corners and edges.
+ *  - Patterns that would sit behind text are fine-grained (dots, stripes,
+ *    waves); the bolder Rings keep to the corners.
+ *
+ * The solid artwork (crystal, festive, gradient) is the exception to the
+ * first two rules — the card puts its content on a frosted panel for those.
  */
 
 import { drawCrystalArt } from './crystal'
 import type { CrystalArt } from './crystal'
 import { drawFestiveArt } from './festive'
 import type { FestiveArt } from './festive'
+import { drawGradientArt } from './gradients'
+import type { GradientArt } from './gradients'
 
 export type SharePattern =
   | 'none'
   | CrystalArt
   | FestiveArt
+  | GradientArt
   | 'dots'
-  | 'grid'
   | 'stripes'
   | 'waves'
   | 'rings'
-  | 'confetti'
+
+type ArtPattern = CrystalArt | FestiveArt | GradientArt
 
 /**
  * Bold crystal artwork (`crystal.ts`) rather than a faint texture — the card
@@ -42,9 +48,15 @@ export function isFestiveArt(pattern: SharePattern): pattern is FestiveArt {
   return pattern === 'lights' || pattern === 'pookalam'
 }
 
-/** Solid artwork (crystal or festive) — the content goes on a frosted panel. */
-export function isArtPattern(pattern: SharePattern): pattern is CrystalArt | FestiveArt {
-  return isCrystalArt(pattern) || isFestiveArt(pattern)
+export function isGradientArt(pattern: SharePattern): pattern is GradientArt {
+  return (
+    pattern === 'blend' || pattern === 'sunset' || pattern === 'ocean' || pattern === 'aurora' || pattern === 'rainbow'
+  )
+}
+
+/** Solid artwork (crystal, festive or gradient) — the content goes on a frosted panel. */
+export function isArtPattern(pattern: SharePattern): pattern is ArtPattern {
+  return isCrystalArt(pattern) || isFestiveArt(pattern) || isGradientArt(pattern)
 }
 
 export const PATTERNS: { value: SharePattern; label: string }[] = [
@@ -52,24 +64,25 @@ export const PATTERNS: { value: SharePattern; label: string }[] = [
   { value: 'liquid', label: 'Glass' },
   { value: 'prism', label: 'Prism' },
   { value: 'orbs', label: 'Orbs' },
+  { value: 'blend', label: 'Blend' },
+  { value: 'sunset', label: 'Sunset' },
+  { value: 'ocean', label: 'Ocean' },
+  { value: 'aurora', label: 'Aurora' },
+  { value: 'rainbow', label: 'Rainbow' },
   { value: 'lights', label: 'Lights' },
   { value: 'pookalam', label: 'Pookalam' },
   { value: 'dots', label: 'Dots' },
-  { value: 'grid', label: 'Grid' },
   { value: 'stripes', label: 'Stripes' },
   { value: 'waves', label: 'Waves' },
   { value: 'rings', label: 'Rings' },
-  { value: 'confetti', label: 'Confetti' },
 ]
 
 /** Opacity per pattern — denser patterns are fainter. */
-const ALPHA: Record<Exclude<SharePattern, 'none' | CrystalArt | FestiveArt>, number> = {
+const ALPHA: Record<Exclude<SharePattern, 'none' | ArtPattern>, number> = {
   dots: 0.2,
-  grid: 0.12,
   stripes: 0.08,
   waves: 0.16,
   rings: 0.16,
-  confetti: 0.45,
 }
 
 export interface PatternBox {
@@ -88,24 +101,12 @@ export interface PatternBox {
    * but vanishes in a thumbnail.
    */
   emphasis?: number
-  /** Seeds Confetti and the crystal art, so each shop gets its own (stable) layout. */
+  /** Seeds the solid artwork, so each shop gets its own (stable) layout. */
   seed: string
   /** The card's accent — what the crystal art is painted in. */
   accent: string
-  /** True on the Brand card, whose background is the accent. */
+  /** True on the Brand / Gradient cards, whose background is the accent. */
   onAccent: boolean
-}
-
-/** Tiny deterministic PRNG (mulberry32) — same seed, same pattern, every time. */
-function rng(seed: string): () => number {
-  let a = 0
-  for (const ch of seed) a = (Math.imul(a, 31) + ch.codePointAt(0)!) | 0
-  return () => {
-    a = (a + 0x6d2b79f5) | 0
-    let t = Math.imul(a ^ (a >>> 15), 1 | a)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
 }
 
 export function drawPattern(ctx: CanvasRenderingContext2D, pattern: SharePattern, box: PatternBox): void {
@@ -116,6 +117,10 @@ export function drawPattern(ctx: CanvasRenderingContext2D, pattern: SharePattern
   }
   if (isFestiveArt(pattern)) {
     drawFestiveArt(ctx, pattern, { ...box, radius: box.radius ?? 0 })
+    return
+  }
+  if (isGradientArt(pattern)) {
+    drawGradientArt(ctx, pattern, { ...box, radius: box.radius ?? 0 })
     return
   }
   const { x, y, w, h, unit: u, color } = box
@@ -142,21 +147,6 @@ export function drawPattern(ctx: CanvasRenderingContext2D, pattern: SharePattern
         }
       }
       ctx.fill()
-      break
-    }
-    case 'grid': {
-      const gap = 54 * u
-      ctx.lineWidth = 2 * u
-      ctx.beginPath()
-      for (let px = x + gap / 2; px < x + w; px += gap) {
-        ctx.moveTo(px, y)
-        ctx.lineTo(px, y + h)
-      }
-      for (let py = y + gap / 2; py < y + h; py += gap) {
-        ctx.moveTo(x, py)
-        ctx.lineTo(x + w, py)
-      }
-      ctx.stroke()
       break
     }
     case 'stripes': {
@@ -202,51 +192,6 @@ export function drawPattern(ctx: CanvasRenderingContext2D, pattern: SharePattern
           ctx.arc(cx, cy, r, 0, Math.PI * 2)
         }
         ctx.stroke()
-      }
-      break
-    }
-    case 'confetti': {
-      // Shapes scattered along the left and right edges and the top and
-      // bottom bands only — the middle column stays clear for the content.
-      const rand = rng(box.seed)
-      const count = Math.round((w * h) / (1080 * 1350) * 34) + 6
-      ctx.lineWidth = 5 * u
-      for (let i = 0; i < count; i++) {
-        let px: number
-        let py: number
-        if (i % 3 === 2) {
-          px = x + rand() * w
-          py = rand() < 0.5 ? y + rand() * h * 0.07 : y + h - rand() * h * 0.07
-        } else {
-          px = rand() < 0.5 ? x + w * (0.02 + rand() * 0.13) : x + w * (0.85 + rand() * 0.13)
-          py = y + rand() * h
-        }
-        const size = (10 + rand() * 14) * u
-        const kind = Math.floor(rand() * 4)
-        ctx.save()
-        ctx.translate(px, py)
-        ctx.rotate(rand() * Math.PI)
-        ctx.beginPath()
-        if (kind === 0) {
-          ctx.arc(0, 0, size * 0.6, 0, Math.PI * 2)
-          ctx.fill()
-        } else if (kind === 1) {
-          ctx.arc(0, 0, size, 0, Math.PI * 2)
-          ctx.stroke()
-        } else if (kind === 2) {
-          ctx.moveTo(-size, 0)
-          ctx.lineTo(size, 0)
-          ctx.moveTo(0, -size)
-          ctx.lineTo(0, size)
-          ctx.stroke()
-        } else {
-          ctx.moveTo(0, -size)
-          ctx.lineTo(size * 0.87, size * 0.5)
-          ctx.lineTo(-size * 0.87, size * 0.5)
-          ctx.closePath()
-          ctx.stroke()
-        }
-        ctx.restore()
       }
       break
     }

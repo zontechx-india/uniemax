@@ -20,7 +20,7 @@ import type { QrMatrix, QrStyle } from './qr'
  * code a little rather than pushing the URL off the bottom.
  */
 
-export type ShareTemplate = 'minimal' | 'brand' | 'product'
+export type ShareTemplate = 'minimal' | 'brand' | 'gradient' | 'product'
 export type ShareFormat = 'post' | 'story'
 
 type Img = CanvasImageSource & { width: number; height: number }
@@ -74,14 +74,33 @@ export interface ShareCardSpec {
   pattern: SharePattern
 }
 
+/** Templates whose background IS the colour (text drawn in `onAccent`). */
+export function isColourTemplate(template: ShareTemplate): boolean {
+  return template === 'brand' || template === 'gradient'
+}
+
 /**
- * The card's background and the colour its pattern is drawn in — shared with
+ * The card's background colour(s) — one stop for a flat card, several for
+ * the Gradient template — and the colour its pattern is drawn in. Shared with
  * the page's pattern swatches so a swatch is exactly what the card gets.
  */
-export function cardBackground(template: ShareTemplate, palette: CardPalette): { bg: string; ink: string } {
+export function cardBackground(template: ShareTemplate, palette: CardPalette): { stops: string[]; ink: string } {
+  if (template === 'gradient') return { stops: palette.gradient, ink: palette.onAccent }
   return template === 'brand'
-    ? { bg: palette.accent, ink: palette.onAccent }
-    : { bg: '#ffffff', ink: palette.accentOnWhite }
+    ? { stops: [palette.accent], ink: palette.onAccent }
+    : { stops: ['#ffffff'], ink: palette.accentOnWhite }
+}
+
+/** Fill a w×h card with its background (diagonal for the Gradient template). */
+export function fillCardBackground(ctx: CanvasRenderingContext2D, stops: string[], w: number, h: number): void {
+  if (stops.length === 1) {
+    ctx.fillStyle = stops[0]!
+  } else {
+    const g = ctx.createLinearGradient(0, 0, w, h)
+    stops.forEach((c, i) => g.addColorStop(i / (stops.length - 1), c))
+    ctx.fillStyle = g
+  }
+  ctx.fillRect(0, 0, w, h)
 }
 
 export interface ShareCardAssets {
@@ -257,8 +276,8 @@ function drawLogoTile(
   const x = cx - size / 2
   const radius = size * 0.24
   if (!logo) {
-    // On the Brand template the card IS the accent, so the tile turns white.
-    if (spec.template === 'brand') {
+    // On the Brand / Gradient templates the card IS the accent, so the tile turns white.
+    if (isColourTemplate(spec.template)) {
       drawLetterTile(ctx, spec.storeName, '#ffffff', spec.palette.accentOnWhite, x, y, size, radius)
     } else {
       drawLetterTile(ctx, spec.storeName, spec.palette.accent, spec.palette.onAccent, x, y, size, radius)
@@ -344,18 +363,17 @@ export function drawShareCard(ctx: CanvasRenderingContext2D, spec: ShareCardSpec
   const cx = W / 2
   const textWidth = W - f.safe.side * 2
   const p = spec.palette
-  const onBrand = spec.template === 'brand'
+  const onBrand = isColourTemplate(spec.template)
 
   // Colours by template.
-  const { bg, ink: patternInk } = cardBackground(spec.template, p)
+  const { stops, ink: patternInk } = cardBackground(spec.template, p)
   const titleColor = onBrand ? p.onAccent : p.ink
   const bodyColor = onBrand ? withAlpha(p.onAccent, 0.82) : p.muted
   const captionColor = onBrand ? p.onAccent : spec.template === 'minimal' ? p.accentOnWhite : p.ink
 
   ctx.save()
   ctx.clearRect(0, 0, W, H)
-  ctx.fillStyle = bg
-  ctx.fillRect(0, 0, W, H)
+  fillCardBackground(ctx, stops, W, H)
 
   // Pattern first, so everything else — photo, plates, text — sits on top.
   // On Minimal it stays inside the printed frame.

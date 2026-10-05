@@ -772,7 +772,10 @@ backend: it reads the managed store (name, `logoUrl`, `theme`,
 - **Layout.** From `lg` there are two columns: a sticky live preview on the
   left (with a Post 4:5 / Story 9:16 switch) and the controls on the right.
   On a phone the preview comes first. Controls: **Template** (Minimal /
-  Brand / Product, each with a small thumbnail drawn in the chosen colour),
+  Brand / Gradient / Product, each with a small thumbnail drawn in the chosen
+  colour; **Gradient** is Brand with a diagonal fade through the accent and
+  its hue neighbours, `palette.gradient` from `shiftHue`, each stop held to
+  the accent's own contrast with its text colour),
   **Product** (Product template only: "Logo only" plus each live, finished
   product that has a photo, with the first one picked by default),
   **Background** (see below), **QR style** (Classic / Brand / Rounded), **Colour**, **Caption** (four presets
@@ -828,8 +831,10 @@ backend: it reads the managed store (name, `logoUrl`, `theme`,
   Latin-only, so those scripts render in the device's own font
   (Noto / Nirmala UI and similar). Checked with Malayalam, Tamil and Hindi
   names and taglines.
-- **Colour is never free-picked.** You choose from the store's own colours:
-  the primary, the secondary when one is set, or black (`palette.ts`). QR
+- **Colour is never free-picked.** The store's own colours come first (the
+  primary, the secondary when one is set, as labelled chips), then eight fixed
+  presets (Rose, Pink, Orange, Gold, Green, Teal, Blue, Violet) and black as
+  round swatches (`palette.ts`; a preset equal to a shop colour is dropped). QR
   modules are darkened until they reach **7:1** against the white plate, and
   accent text until it reaches 4.5:1. The helpers for this are
   `readableOn` / `textOn` / `contrast`, exported from `storeTheme.ts`.
@@ -859,14 +864,19 @@ backend: it reads the managed store (name, `logoUrl`, `theme`,
     seeding as the glass art (`isArtPattern`), and the same tones, with
     deliberately no words in the artwork: the shop chooses what it
     celebrates in its caption.
-  - **Textures**: Dots, Grid, Stripes, Waves, Rings and Confetti. Each
+  - **Gradient art** (`gradients.ts`): **Blend** (the accent and its hue
+    neighbours), **Sunset**, **Ocean**, **Aurora** and **Rainbow** (fixed
+    multicolour palettes, the same for every shop). A diagonal base fade
+    with large soft colour pools seeded by the shop name, white light from
+    the top-left and a sheen. Same frosted panel as the other art.
+  - **Textures**: Dots, Stripes, Waves and Rings (Grid and Confetti were
+    retired; a saved choice of either falls back to the default). Each
     texture uses one colour, the card's own:
   the accent on the white cards (inside the frame on Minimal; below the
-  photo on Product) or the text colour on Brand. Each pattern has its own
-  low opacity, tuned so text stays readable. The bolder ones keep away from
-  the middle: Rings are arcs from two corners, and Confetti stays along the
-  edges, scattered from a seed of the shop name so each shop gets its own
-  stable layout. None can reach the QR, which sits on its opaque white plate.
+  photo on Product) or the text colour on Brand / Gradient. Each pattern has
+  its own low opacity, tuned so text stays readable. Rings, the boldest,
+  are arcs from two corners, away from the middle. None can reach the QR,
+  which sits on its opaque white plate.
   The picker's swatches are a scaled 1080×720 crop of the same
   `drawPattern` on the same background. They use larger elements and
   higher opacity (`emphasis`) so they stay readable at thumbnail size.
@@ -905,7 +915,10 @@ backend: it reads the managed store (name, `logoUrl`, `theme`,
   3 templates × 2 formats × 3 QR styles × 4 colours including pale yellow,
   each also JPEG q60 and preview size): 648 / 648. The festive art and the
   Indian-language names (2 festive × 3 × 2 × 3 QR styles × 4 colours, plus
-  Malayalam / Tamil / Hindi across 4 backgrounds) decoded 864 / 864.
+  Malayalam / Tamil / Hindi across 4 backgrounds) decoded 864 / 864. The
+  Gradient template and gradient art (4 templates × 9 backgrounds × 2
+  formats × Brand/Rounded × 5 colours incl. pale yellow and black, at
+  preview size) decoded 720 / 720.
 
 **Public storefront (multi-page)** — everything under `/store/…`, `/cart…`
 and `/checkout/…` is served **without sign-in**: `StorefrontApp` picks the

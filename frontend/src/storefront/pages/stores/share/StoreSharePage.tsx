@@ -9,7 +9,7 @@ import { MediaImg } from '../../../../shared/media/MediaImg'
 import { useMediaQuery } from '../../../../shared/useMediaQuery'
 import { useManagedStore } from '../../../features/stores/useManagedStore'
 import type { Store } from '../../../features/stores/storesApi'
-import { cardBackground } from '../../../features/shareKit/shareCard'
+import { cardBackground, fillCardBackground, isColourTemplate } from '../../../features/shareKit/shareCard'
 import type { ShareFormat, ShareTemplate } from '../../../features/shareKit/shareCard'
 import { PATTERNS, drawPattern } from '../../../features/shareKit/patterns'
 import type { SharePattern } from '../../../features/shareKit/patterns'
@@ -45,6 +45,7 @@ import { CAPTION_MAX, CAPTION_PRESETS, productCover, useShareKit } from './useSh
 const TEMPLATES: { value: ShareTemplate; label: string; hint: string }[] = [
   { value: 'minimal', label: 'Minimal', hint: 'Clean white card' },
   { value: 'brand', label: 'Brand', hint: 'In your shop colour' },
+  { value: 'gradient', label: 'Gradient', hint: 'Your colour, blended' },
   { value: 'product', label: 'Product', hint: 'Leads with a photo' },
 ]
 
@@ -69,8 +70,8 @@ export function StoreSharePage() {
 function ShareKit({ store }: { store: Store }) {
   const kit = useShareKit(store)
   const { choices } = kit
-  const accentColor =
-    (choices.accents.find((a) => a.key === choices.accentKey) ?? choices.accents[0])?.color ?? '#6c3ef4'
+  const shopColours = choices.accents.filter((a) => !a.preset)
+  const presetColours = choices.accents.filter((a) => a.preset)
 
   if (!kit.url || !kit.qrAvailable) {
     return (
@@ -120,7 +121,7 @@ function ShareKit({ store }: { store: Store }) {
         {/* ---- Controls ---- */}
         <div className="space-y-6">
           <Field label="Template">
-            <div role="radiogroup" aria-label="Template" className="grid grid-cols-3 gap-2">
+            <div role="radiogroup" aria-label="Template" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {TEMPLATES.map((t) => (
                 <OptionTile
                   key={t.value}
@@ -128,7 +129,7 @@ function ShareKit({ store }: { store: Store }) {
                   checked={choices.template === t.value}
                   onChange={() => choices.setTemplate(t.value)}
                 >
-                  <TemplateThumb template={t.value} accent={accentColor} />
+                  <TemplateThumb template={t.value} palette={kit.palette} />
                   <span className="mt-2 block text-sm font-semibold text-fg">{t.label}</span>
                   <span className="hidden text-caption leading-snug text-muted sm:block">{t.hint}</span>
                 </OptionTile>
@@ -171,10 +172,10 @@ function ShareKit({ store }: { store: Store }) {
 
           <Field
             label="Colour"
-            hint="From your shop’s colours. Dark enough to scan is checked for you."
+            hint="Your shop’s colours first, or pick another. Dark enough to scan is checked for you."
           >
-            <div role="radiogroup" aria-label="Colour" className="flex flex-wrap gap-2">
-              {choices.accents.map((a) => (
+            <div role="radiogroup" aria-label="Colour" className="flex flex-wrap items-center gap-2">
+              {shopColours.map((a) => (
                 <label key={a.key} className="cursor-pointer">
                   <input
                     type="radio"
@@ -190,6 +191,27 @@ function ShareKit({ store }: { store: Store }) {
                       style={{ backgroundColor: a.color }}
                     />
                     {a.label}
+                  </span>
+                </label>
+              ))}
+              {presetColours.map((a) => (
+                <label key={a.key} className="cursor-pointer" title={a.label}>
+                  <input
+                    type="radio"
+                    name="accent"
+                    aria-label={a.label}
+                    className="peer sr-only"
+                    checked={choices.accentKey === a.key}
+                    onChange={() => choices.setAccentKey(a.key)}
+                  />
+                  <span className="grid size-tap place-items-center rounded-full border-2 border-transparent transition-colors peer-checked:border-brand peer-focus-visible:ring-2 peer-focus-visible:ring-brand hover:border-fg/30">
+                    <span
+                      aria-hidden
+                      className="grid h-8 w-8 place-items-center rounded-full border border-fg/10 text-white"
+                      style={{ backgroundColor: a.color }}
+                    >
+                      {choices.accentKey === a.key && <CheckIcon className="h-4 w-4" />}
+                    </span>
                   </span>
                 </label>
               ))}
@@ -376,16 +398,18 @@ function OptionTile({
  * in the colour the card will actually use, so "Brand" previews the SHOP's
  * colour rather than UnieMax purple.
  */
-function TemplateThumb({ template, accent }: { template: ShareTemplate; accent: string }) {
-  const brand = template === 'brand'
+function TemplateThumb({ template, palette }: { template: ShareTemplate; palette: CardPalette }) {
+  const brand = isColourTemplate(template)
+  const accent = palette.accent
   return (
     <span
       aria-hidden
-      className={`flex h-20 w-full flex-col items-center justify-center gap-1 overflow-hidden rounded-md border sm:h-24 ${
+      className={`relative isolate flex h-20 w-full flex-col items-center justify-center gap-1 overflow-hidden rounded-md border sm:h-24 ${
         brand ? 'border-transparent' : 'border-line bg-white'
       }`}
-      style={brand ? { backgroundColor: accent } : undefined}
+      style={template === 'brand' ? { backgroundColor: accent } : undefined}
     >
+      {template === 'gradient' && <GradientFill stops={palette.gradient} />}
       {template === 'product' ? (
         <span className="h-[30%] w-full" style={{ backgroundColor: `${accent}22` }} />
       ) : (
@@ -400,9 +424,19 @@ function TemplateThumb({ template, accent }: { template: ShareTemplate; accent: 
   )
 }
 
+/** The Gradient template's background, painted by the card's own fill. */
+function GradientFill({ stops }: { stops: string[] }) {
+  const ref = useRef<HTMLCanvasElement>(null)
+  useEffect(() => {
+    const ctx = ref.current?.getContext('2d')
+    if (ctx) fillCardBackground(ctx, stops, 160, 120)
+  }, [stops])
+  return <canvas ref={ref} width={160} height={120} aria-hidden className="absolute inset-0 -z-10 h-full w-full" />
+}
+
 /**
  * A pattern swatch: a scaled-down 1080×720 crop of the real card background —
- * same `drawPattern`, same layout (so Rings and Confetti sit where they will
+ * same `drawPattern`, same layout (so Rings and the artwork sit where they will
  * on the card), with extra opacity so it still reads at thumbnail size.
  */
 function PatternSwatch({
@@ -421,13 +455,12 @@ function PatternSwatch({
     const canvas = ref.current
     const ctx = canvas?.getContext('2d')
     if (!canvas || !ctx) return
-    const { bg, ink } = cardBackground(template, palette)
+    const { stops, ink } = cardBackground(template, palette)
     const k = canvas.width / 1080
     ctx.setTransform(k, 0, 0, k, 0, 0)
-    ctx.fillStyle = bg
-    ctx.fillRect(0, 0, 1080, 720)
+    fillCardBackground(ctx, stops, 1080, 720)
     drawPattern(ctx, pattern, { x: 0, y: 0, w: 1080, h: 720, unit: 1.8, color: ink, seed, emphasis: 1.8,
-      accent: palette.accent, onAccent: template === 'brand' })
+      accent: palette.accent, onAccent: isColourTemplate(template) })
   }, [pattern, template, palette, seed])
   return (
     <canvas
