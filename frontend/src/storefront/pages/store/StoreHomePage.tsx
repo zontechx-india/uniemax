@@ -846,7 +846,9 @@ function Hero({
       className={`${SCROLL_UNDER_HEADER} relative overflow-hidden border-b last:border-b-0 ${skin.border} ${tone === 'alt' ? skin.surface : ''}`}
       {...builder}
     >
-      {cover && <HeroCover />}
+      <HeroPattern />
+      {/* The cover band's height — empty space the logo overlaps into. */}
+      {cover && <div aria-hidden className="h-28 sm:h-40 lg:h-44" />}
 
       <div
         className={`${STORE_CONTAINER} relative pb-7 sm:pb-10 ${cover ? '' : 'pt-6 sm:pt-10'}`}
@@ -960,67 +962,72 @@ function Hero({
 }
 
 /**
- * The cover band: the shop's colour as a gradient, with a quiet pattern on
- * top so it reads as designed rather than an empty wash — a fine dot grid
- * that fades out toward the logo, concentric rings on the right, and two soft
- * waves along the bottom edge. Every layer is drawn in `--brand` (SVG
+ * The hero's background, across the WHOLE section: the shop's colour as a
+ * wash (strongest at the top, still tinted at the bottom) with a pattern over
+ * it — a dot grid everywhere, concentric rings on the right and soft waves
+ * through the middle and along the bottom — so the hero reads as designed
+ * rather than an empty gradient. Every layer is drawn in `--brand` (SVG
  * `currentColor` under `text-brand`, or `color-mix`), so it follows each
- * shop's own colour in light and dark themes. Decorative only.
+ * shop's own colour in light and dark themes. The dots fade only partly
+ * toward the bottom-left, where the name and facts sit, to keep them easy to
+ * read. Decorative only; sits under the content (`pointer-events-none`).
  */
-function HeroCover() {
+function HeroPattern() {
   return (
-    <div aria-hidden className="relative h-28 overflow-hidden sm:h-40 lg:h-44">
+    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
       {/* Colour wash. */}
       <div
         className="absolute inset-0"
         style={{
           background: [
-            'radial-gradient(70% 130% at 0% 0%, color-mix(in oklab, var(--brand) 70%, transparent), transparent 70%)',
-            'radial-gradient(60% 120% at 100% 0%, color-mix(in oklab, var(--brand) 40%, transparent), transparent 75%)',
-            'linear-gradient(180deg, color-mix(in oklab, var(--brand) 30%, transparent), transparent)',
+            'radial-gradient(60% 55% at 0% 0%, color-mix(in oklab, var(--brand) 60%, transparent), transparent 75%)',
+            'radial-gradient(55% 60% at 100% 10%, color-mix(in oklab, var(--brand) 32%, transparent), transparent 75%)',
+            'radial-gradient(60% 50% at 100% 100%, color-mix(in oklab, var(--brand) 18%, transparent), transparent 75%)',
+            'linear-gradient(180deg, color-mix(in oklab, var(--brand) 22%, transparent), color-mix(in oklab, var(--brand) 6%, transparent))',
           ].join(', '),
         }}
       />
-      {/* Dot grid, strongest top-right and fading toward the logo. */}
+      {/* Dot grid over everything; lighter behind the text (bottom-left). */}
       <div
         className="absolute inset-0"
         style={{
           backgroundImage:
-            'radial-gradient(color-mix(in oklab, var(--brand) 55%, transparent) 1.2px, transparent 1.6px)',
+            'radial-gradient(color-mix(in oklab, var(--brand) 50%, transparent) 1.2px, transparent 1.6px)',
           backgroundSize: '16px 16px',
-          maskImage: 'radial-gradient(90% 120% at 100% 0%, #000 0%, transparent 75%)',
-          WebkitMaskImage: 'radial-gradient(90% 120% at 100% 0%, #000 0%, transparent 75%)',
+          maskImage:
+            'radial-gradient(130% 120% at 100% 0%, #000 25%, rgba(0,0,0,0.35) 100%)',
+          WebkitMaskImage:
+            'radial-gradient(130% 120% at 100% 0%, #000 25%, rgba(0,0,0,0.35) 100%)',
         }}
       />
-      {/* Concentric rings on the right. */}
+      {/* Concentric rings: the top-right corner on a phone (clear of the
+          text column), the right side spanning the height from sm. */}
       <svg
-        className="absolute -right-16 -top-24 h-72 w-72 text-brand opacity-30 sm:-right-10 sm:h-96 sm:w-96 lg:right-[8%]"
+        className="absolute -right-28 -top-24 h-80 w-80 text-brand opacity-25 sm:-right-16 sm:top-1/2 sm:h-[36rem] sm:w-[36rem] sm:-translate-y-1/2 lg:right-[6%]"
         viewBox="0 0 200 200"
         fill="none"
         stroke="currentColor"
       >
-        {[30, 48, 66, 84, 98].map((r, i) => (
-          <circle key={r} cx="100" cy="100" r={r} strokeWidth={i % 2 ? 0.8 : 1.4} />
+        {[22, 38, 54, 70, 84, 98].map((r, i) => (
+          <circle key={r} cx="100" cy="100" r={r} strokeWidth={i % 2 ? 0.6 : 1.1} />
         ))}
       </svg>
-      {/* Two soft waves along the bottom edge. */}
+      {/* Soft waves through the middle and along the bottom. */}
       <svg
-        className="absolute inset-x-0 bottom-0 h-10 w-full text-brand sm:h-14"
-        viewBox="0 0 1200 60"
+        className="absolute inset-0 h-full w-full text-brand"
+        // Faint where the name and facts sit (left), full on the right.
+        style={{
+          maskImage: 'linear-gradient(to right, rgba(0,0,0,0.25), #000 75%)',
+          WebkitMaskImage: 'linear-gradient(to right, rgba(0,0,0,0.25), #000 75%)',
+        }}
+        viewBox="0 0 1200 400"
         preserveAspectRatio="none"
         fill="none"
         stroke="currentColor"
       >
-        <path
-          d="M0 38 C 150 10, 300 60, 450 34 S 750 8, 900 32 S 1100 58, 1200 30"
-          strokeWidth="1.5"
-          opacity="0.35"
-        />
-        <path
-          d="M0 50 C 200 28, 350 64, 520 44 S 820 22, 980 44 S 1140 60, 1200 46"
-          strokeWidth="1"
-          opacity="0.22"
-        />
+        <path d="M0 150 C 150 110, 300 190, 450 146 S 750 104, 900 140 S 1100 186, 1200 132" strokeWidth="1.5" opacity="0.3" />
+        <path d="M0 172 C 200 140, 350 206, 520 170 S 820 134, 980 168 S 1140 196, 1200 164" strokeWidth="1" opacity="0.18" />
+        <path d="M0 360 C 180 330, 340 392, 520 358 S 860 320, 1020 352 S 1150 384, 1200 350" strokeWidth="1.2" opacity="0.22" />
       </svg>
     </div>
   )
