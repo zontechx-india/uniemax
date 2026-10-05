@@ -60,7 +60,7 @@ Printing" with nothing else becomes one level, "Printing".
 - "4 Variants Available" → "4 sizes" / "Choose size"; sold-out badge kept.
 - Quick **Add** button on simple products (no options) — one tap to cart.
 - ALL-CAPS names shown in Title Case (`displayName`), abbreviations kept.
-- *Not done:* quick **Add** on cards (cards stay one link; the listing payload has no variant id).
+- ☑ Quick **Add** on cards for products with nothing to choose (no API change — those add with no variant id); one-product showcase buys in place.
 
 ### Phase 2 — Adaptive home (shop-size modes) ☑
 - Showcase / Small / Full as in §3; dedupe rows; hide category UI below 2 categories; collapse single-child chains (shared helper used by home, category page, breadcrumbs, footer).
@@ -85,17 +85,18 @@ Printing" with nothing else becomes one level, "Printing".
 - Bigger option chips with price per choice; "Ask on WhatsApp about this" when the shop has a number.
 - Specifications: never list an option name as a spec; hide the table when empty.
 
-### Phase 6 — Contact, footer & trust ☐
-- "Call shop" / "WhatsApp shop" block on home and product pages when a number exists.
+### Phase 6 — Contact, footer & trust ☑
+- ☑ "Questions? Talk to {shop}" (WhatsApp + Call) ending the home page; "Ask the shop" on the product page with the product pre-typed. WhatsApp links now add India's 91 to ten-digit numbers (they were broken).
 - Footer collapses empty groups; shows delivery/payment summary and policies only when written.
-- Seller side (`/mystores`): a "Make your shop page trusted" nudge — add WhatsApp number, about line, banner — in the setup checklist.
+- ☑ Seller side: "Help customers trust your shop" on the dashboard (WhatsApp number, about line, logo — only the missing ones).
+- ☑ Footer: the empty strip above it removed.
 
 ### Phase 7 — Header & search ☐
 - Compact sticky header (logo + name, search icon that expands, cart with count badge, menu sheet); hides on scroll down, shows on scroll up.
 - Search suggestions from the shop's own products.
 
 ### Phase 8 — Speed, SEO, Store Builder alignment ☐
-- First product photo / banner as the LCP image (`fetchpriority`), skeletons shaped like the new cards, no layout shift.
+- ◐ First two home-grid photos and the showcase photo load eagerly (`fetchpriority="high"`); skeletons not yet reshaped.
 - Server page shell & structured data kept in step (`pageShell.service.ts`, `structuredData.ts`).
 - Store Builder sections and preview reflect the new compositions; defaults documented in `FRONTEND_CONTEXT.md`.
 

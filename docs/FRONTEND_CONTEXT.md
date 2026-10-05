@@ -864,7 +864,7 @@ full-bleed section bands instead.
 
   | Shop (`shopSize`) | Homepage |
   | ---------------- | -------- |
-  | `one` — 1 product | banners + hero, then **`ProductShowcase`**: that product as one large card (photo full-width on a phone, name, price and % off, stock, description, one button to the product page; side by side from `lg`). Nothing else. |
+  | `one` — 1 product | banners + hero, then **`ProductShowcase`**: that product as one large card (photo full-width on a phone, name, price and % off, stock, description; side by side from `lg`) carrying the real **`PurchaseActions`** (quantity, Add to Cart, Buy Now) when there is nothing to choose, else one button to the product page. Nothing else. |
   | `small` — ≤ 12 (`SMALL_SHOP_MAX`, the payload's section size) | every product **once** in All Products (uncapped grid, "N products", no "View all"); the curated rows and Category Highlights are dropped and the owner's Featured → Best Sellers → New Arrivals picks **lead** the grid instead |
   | `full` | every section below; All Products skips products a row **above** it already showed |
 
@@ -873,6 +873,12 @@ full-bleed section bands instead.
   down single-branch chains ("Fashion" holding only Men and Women offers Men
   and Women). The hero art only appears for `full` shops. `shapeHome()` does
   all of this on the payload without touching the owner's order or switches.
+  The page ends with **`ContactBand`** — "Questions? Talk to {shop}" with
+  WhatsApp and Call (`features/publicStore/ShopContact.tsx`), only when the
+  seller entered a number (Footer → Customer support, or the WhatsApp social
+  link). Every WhatsApp link goes through `contactLinks.ts`, which adds
+  India's 91 to a ten-digit number — `wa.me` needs the full international
+  number, and a bare one opened a chat with nobody.
   Otherwise: hero, Shop by Category, then the
   merchandising rows (Featured / New Arrivals / Best Sellers, then Category
   Highlights and All Products) from
@@ -1001,6 +1007,12 @@ full-bleed section bands instead.
     (`/shop?section=featured|newArrivals|bestSellers`). Rows are
     **strictly flag-driven** (a product shows only in the sections its owner
     ticked) and a row with nothing ticked is not rendered at all.
+- **Seller dashboard → `ShopTrustTips`** (`pages/stores/ShopTrustTips.tsx`, last on
+  `StoreDashboardPage`): "Help customers trust your shop" — only the missing
+  ones of a WhatsApp/phone number, an about line (both → Footer) and a logo (→
+  Shop name & logo), each with an Add button. These are exactly what the
+  storefront shows when present (contact buttons, hero line, logo); gone once
+  all are done.
 - **`StoreCategoryPage`** — breadcrumb, title, subcategory chips (hidden
   when the only subcategory holds every product here — one chip leading to the
   same products is not a choice), then the shared `ProductListing`.
@@ -1009,7 +1021,10 @@ full-bleed section bands instead.
   e.g. "Best Sellers"). One page, since they are the same listing at a
   different scope. Target of the header search, the Shop nav item and every
   "View all" link (which passes its section).
-- **`StoreProductPage`** — the **only** page that renders variants, laid out
+- **`StoreProductPage`** — under the buy buttons, "Have a question? Ask the
+  shop" (`ContactActions`, when the shop has a WhatsApp number) with the
+  first message pre-typed: the product name, the chosen option and its link.
+  The **only** page that renders variants, laid out
   as breadcrumb · gallery + purchase card · Product Highlights · Description ·
   Specifications (`SpecTable`: the product's real `specifications` rows when
   present, else the description-parsed ones, plus one row per option type —
@@ -1112,10 +1127,14 @@ full-bleed section bands instead.
   loaded page synchronously instead of refetching page 1, which — together
   with the `<ScrollRestoration/>` mounted at the public router's root
   (`publicRouter.tsx`) — restores the exact scroll position.
-- **`ProductCard`** — the **whole card is one link** to the product page; there
-  is no Add to Cart on a card. Buying happens on the product page, which keeps
-  every card the same shape whether or not the product has options, so a grid
-  of thousands stays uniform. Shows the **cover image**, the name through
+- **`ProductCard`** — the **whole card is one link** to the product page.
+  A product with nothing to choose (no options, priced, in stock —
+  `canQuickAdd`) also gets **`QuickAdd`** (`CartControls.tsx`): a 44px "Add"
+  pill laid OVER the card's bottom-right (a button inside the link would be
+  invalid), adding one to the cart with the product page's "Added to cart —
+  View cart" toast; the card's last row reserves its space. Products with
+  options keep the single link — choosing belongs on the product page. The
+  first two cards of the home grid load their photo eagerly (`eager`). Shows the **cover image**, the name through
   `displayName()` (2 lines; a name typed in ALL CAPITALS shows in Title Case,
   keeping abbreviations like LED / USB / XL and lower-casing "of", "for"…;
   display only), a **"From ₹X"** price in the brand color with the MRP struck

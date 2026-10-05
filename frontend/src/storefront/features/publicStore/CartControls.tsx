@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { cart, useCartQty } from '../cart/cart'
-import { cartUrl } from '../stores/storesApi'
+import { cartUrl, type PublicProduct, type PublicStore } from '../stores/storesApi'
 import { CartIcon, CheckIcon, MinusIcon, PlusIcon } from '../../layout/icons'
 import { Button } from '../../../shared/ui/Button'
 import { stockLevel } from './catalog'
@@ -210,6 +210,76 @@ export function QuantityStepper({
  * the cart. App-styled (not store-themed): like the draft banner, it is
  * chrome talking to the visitor, not part of the store's design.
  */
+/**
+ * One-tap **Add** on a listing card, for products with nothing to choose (no
+ * sizes or colours) — a customer who already knows what they want no longer
+ * has to open the product page for it. Products with options keep the card's
+ * single link: picking a size belongs on the product page.
+ *
+ * It sits OVER the card (the card itself is one link, and a button inside a
+ * link is invalid), at the card's bottom-right, 44px tall with a word on it.
+ * The same "Added to cart — View cart" toast as the product page confirms it.
+ */
+export function QuickAdd({
+  store,
+  product,
+}: {
+  store: PublicStore
+  product: PublicProduct
+}) {
+  const [added, setAdded] = useState(false)
+  const timer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+
+  if (!canQuickAdd(product)) return null
+
+  const add = () => {
+    cart.add(
+      {
+        productId: product.id,
+        productSlug: product.slug,
+        variantId: null,
+        storeSlug: store.slug,
+        storeName: store.name,
+        name: product.name,
+        variantName: null,
+        imageUrl: product.image?.url ?? null,
+        price: product.price!,
+        stockQuantity: product.stockQuantity,
+      },
+      1,
+    )
+    setAdded(true)
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => setAdded(false), TOAST_MS)
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={add}
+        aria-label={`Add ${product.name} to cart`}
+        className="absolute bottom-2.5 right-2.5 z-10 inline-flex h-11 items-center gap-1.5 rounded-pill px-3.5 text-sm font-bold shadow-floating transition btn-rise text-cta-contrast"
+      >
+        {added ? <CheckIcon className="h-4 w-4" /> : <CartIcon className="h-4 w-4" />}
+        {added ? 'Added' : 'Add'}
+      </button>
+      {added && <AddedToast name={product.name} storeSlug={store.slug} />}
+    </>
+  )
+}
+
+/** A product a card can add directly: one kind, priced, in stock. */
+export function canQuickAdd(product: PublicProduct): boolean {
+  return (
+    product.variantCount === 0 &&
+    product.price !== null &&
+    Number(product.price) > 0 &&
+    product.stockQuantity > 0
+  )
+}
+
 function AddedToast({ name, storeSlug }: { name: string; storeSlug: string }) {
   return (
     <div

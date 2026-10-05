@@ -60,6 +60,7 @@ import {
 import type { Skin } from '../../features/publicStore/storeTheme'
 import { MediaImg } from '../../../shared/media/MediaImg'
 import { displayName } from '../../features/publicStore/shopShape'
+import { ContactActions, shopContact } from '../../features/publicStore/ShopContact'
 
 /**
  * `/store/{storeSlug}/product/{productSlug}` — full product detail.
@@ -376,6 +377,24 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
           <div ref={buyCardRef} className="mt-6">
             <PurchaseActions target={target} skin={skin} />
           </div>
+
+          {/* Ask before buying — the way customers already talk to shops.
+              The first message is typed for them, naming this product and
+              linking it, so the seller knows exactly what they mean. */}
+          {shopContact(store).whatsapp && (
+            <div className="mt-4">
+              <p className={`mb-2 text-sm font-semibold ${skin.text}`}>
+                Have a question? Ask the shop
+              </p>
+              <ContactActions
+                store={store}
+                skin={skin}
+                message={`Hi, I have a question about "${product.name}"${
+                  variant?.name ? ` (${variant.name})` : ''
+                }: ${window.location.origin}${window.location.pathname}`}
+              />
+            </div>
+          )}
 
           {/* Does it reach the customer's pincode? Checked against their
               default address (or a pincode they typed) the moment the page

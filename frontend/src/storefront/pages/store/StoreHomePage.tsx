@@ -31,7 +31,12 @@ import {
   PriceLabel,
   ProductCard,
 } from '../../features/publicStore/ProductCard'
-import { StockBadge } from '../../features/publicStore/CartControls'
+import {
+  canQuickAdd,
+  PurchaseActions,
+  StockBadge,
+} from '../../features/publicStore/CartControls'
+import { ContactActions, shopContact } from '../../features/publicStore/ShopContact'
 import {
   browsableCategories,
   categoryPicture,
@@ -326,8 +331,9 @@ export function StoreHomePage() {
   // a few centimetres further down, so the art would only repeat them.
   const covers = size === 'full' ? heroCovers(home) : []
   const tones = bandTones(visible, shaped.home)
-  const showcaseTone: BandTone =
-    tones.length > 0 && tones[tones.length - 1] === 'alt' ? 'base' : 'alt'
+  const flip = (tone: BandTone | undefined): BandTone => (tone === 'alt' ? 'base' : 'alt')
+  const showcaseTone = flip(tones[tones.length - 1])
+  const contactTone = shaped.showcase ? flip(showcaseTone) : flip(tones[tones.length - 1])
 
   return (
     <>
@@ -355,7 +361,48 @@ export function StoreHomePage() {
           tone={showcaseTone}
         />
       )}
+      <ContactBand store={store} skin={skin} tone={contactTone} />
     </>
+  )
+}
+
+/**
+ * "Questions? Talk to the shop" — WhatsApp and Call, last on the page where a
+ * customer who scrolled everything and is still unsure ends up. Only when the
+ * seller entered a number; nothing is shown otherwise.
+ */
+function ContactBand({
+  store,
+  skin,
+  tone,
+}: {
+  store: PublicStore
+  skin: Skin
+  tone: BandTone
+}) {
+  const { whatsapp, phone, hours } = shopContact(store)
+  if (!whatsapp && !phone) return null
+  return (
+    <Band tone={tone} skin={skin}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h2 className={`font-heading text-xl font-bold sm:text-2xl ${skin.text}`}>
+            Questions? Talk to {store.name}
+          </h2>
+          <p className={`mt-1 text-[15px] ${skin.muted}`}>
+            {hours
+              ? `Available: ${hours}`
+              : 'Ask about sizes, colours, delivery — anything.'}
+          </p>
+        </div>
+        <ContactActions
+          store={store}
+          skin={skin}
+          message={`Hi ${store.name}, I saw your shop on UnieMax.`}
+          className="sm:shrink-0"
+        />
+      </div>
+    </Band>
   )
 }
 
@@ -1171,8 +1218,15 @@ function ProductSection({
       <Band id={id} tone={tone} skin={skin} builder={builder}>
         <SectionHeading title={title} eyebrow={eyebrow} skin={skin} />
         <ul className={`mt-5 ${PRODUCT_GRID}`}>
-          {products.map((product) => (
-            <ProductCard key={product.id} store={store} product={product} skin={skin} />
+          {products.map((product, index) => (
+            <ProductCard
+              key={product.id}
+              store={store}
+              product={product}
+              skin={skin}
+              // The first row is what a phone shows under the hero.
+              eager={index < 2}
+            />
           ))}
         </ul>
       </Band>
@@ -1567,7 +1621,8 @@ function categoryProductCount(
 /**
  * A one-product shop's homepage IS that product: one large card — the photo
  * across the full width of a phone, the name, price and saving, stock, the
- * seller's description and a single button — instead of a category picker,
+ * seller's description and the buying controls themselves when there is
+ * nothing to choose (else one button to the product page) — instead of a category picker,
  * a "collection" and an "All Products" grid each holding the same lone card.
  * Side by side from `lg`.
  */
@@ -1637,17 +1692,42 @@ function ProductShowcase({
               {product.description}
             </p>
           )}
-          <Link
-            to={to}
-            className={`mt-6 inline-flex h-12 w-full items-center justify-center gap-1.5 rounded-md px-8 text-base font-bold sm:w-auto sm:self-start ${skin.cta}`}
-          >
-            {soldOut
-              ? 'See details'
-              : product.variantCount > 0
-                ? 'Choose & buy'
-                : 'Buy now'}
-            <ChevronRightIcon className="h-4 w-4" />
-          </Link>
+          {canQuickAdd(product) ? (
+            // Nothing to choose: buy right here — quantity, Add to Cart and
+            // Buy Now, the same controls as the product page.
+            <div className="mt-6 lg:max-w-sm">
+              <PurchaseActions
+                skin={skin}
+                target={{
+                  storeSlug: store.slug,
+                  storeName: store.name,
+                  productId: product.id,
+                  productSlug: product.slug,
+                  variantId: null,
+                  name: product.name,
+                  variantName: null,
+                  imageUrl: product.image?.url ?? null,
+                  price: product.price!,
+                  stock: product.stockQuantity,
+                }}
+              />
+              <Link
+                to={to}
+                className="mt-3 inline-flex min-h-tap items-center gap-1 text-sm font-semibold text-brand hover:underline"
+              >
+                See all photos and details
+                <ChevronRightIcon className="h-4 w-4" />
+              </Link>
+            </div>
+          ) : (
+            <Link
+              to={to}
+              className={`mt-6 inline-flex h-12 w-full items-center justify-center gap-1.5 rounded-md px-8 text-base font-bold sm:w-auto sm:self-start ${skin.cta}`}
+            >
+              {soldOut ? 'See details' : 'Choose & buy'}
+              <ChevronRightIcon className="h-4 w-4" />
+            </Link>
+          )}
         </div>
       </article>
     </Band>

@@ -17,6 +17,7 @@ import {
   PhoneCallIcon,
   PlusIcon,
 } from '../../layout/icons'
+import { telLink, waLink } from '../../features/publicStore/contactLinks'
 
 /**
  * `/store/{storeSlug}/support` — Help & Support **for this shop**.
@@ -42,8 +43,6 @@ import {
  * how an in-dialog sign-in turns the guest panel into the request list.
  */
 
-const telLink = (number: string) => `tel:${number.replace(/[^\d+]/g, '')}`
-const waLink = (number: string) => `https://wa.me/${number.replace(/\D/g, '')}`
 
 export function StoreHelpPage() {
   const { store, skin } = usePublicStore()

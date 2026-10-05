@@ -26,6 +26,7 @@ import {
 } from '../../layout/icons'
 import type { Skin } from './storeTheme'
 import { MediaImg } from '../../../shared/media/MediaImg'
+import { telLink, waLink } from './contactLinks'
 
 /**
  * Storefront footer — renders the owner's Footer settings (locations, social
@@ -55,8 +56,6 @@ const POLICY_LABELS: Record<FooterPolicyKey, string> = {
 }
 
 /** wa.me links want digits only (keep a leading country code, drop the +). */
-const waLink = (number: string) => `https://wa.me/${number.replace(/\D/g, '')}`
-const telLink = (number: string) => `tel:${number.replace(/[^\d+]/g, '')}`
 
 /**
  * How many columns the block row takes on `lg`, so the brand block plus

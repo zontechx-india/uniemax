@@ -6,7 +6,7 @@ import {
   type PublicStore,
 } from '../stores/storesApi'
 import { ImageIcon } from '../../layout/icons'
-import { StockBadge } from './CartControls'
+import { canQuickAdd, QuickAdd, StockBadge } from './CartControls'
 import type { Skin } from './storeTheme'
 import { MediaImg } from '../../../shared/media/MediaImg'
 import { displayName } from './shopShape'
@@ -42,23 +42,27 @@ export function ProductCard({
   skin,
   size = 'md',
   className = '',
+  eager = false,
 }: {
   store: PublicStore
   product: PublicProduct
   skin: Skin
+  /** Above the fold on a phone — load the photo now, not lazily. */
+  eager?: boolean
   /** `lg` is the lead card of a spotlight section; `md` is every other slot. */
   size?: 'md' | 'lg'
   /** Extra classes for the `<li>` — per-row visibility caps, rail widths. */
   className?: string
 }) {
   const large = size === 'lg'
+  const quick = canQuickAdd(product)
   return (
-    <li className={`group ${className}`}>
+    <li className={`group relative ${className}`}>
       <Link
         to={storeProductUrl(store.slug, product.slug)}
         className={`flex h-full flex-col overflow-hidden rounded-lg border metal-lift ${skin.border} ${skin.surface}`}
       >
-        <ProductMedia product={product} skin={skin} large={large} />
+        <ProductMedia product={product} skin={skin} large={large} eager={eager} />
 
         <div
           // `lg:flex-none` so the lead card's spare height all goes to its
@@ -85,7 +89,11 @@ export function ProductCard({
 
           {/* Pushed to the bottom edge so the badge line sits level across a
               row whatever the name wrapped to. */}
-          <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-2">
+          <div
+            // With a quick Add, the row is as tall as the button and keeps
+            // its right side free for it.
+            className={`mt-auto flex flex-wrap items-center gap-1.5 pt-2 ${quick ? 'min-h-[3.25rem] pr-[5.5rem]' : ''}`}
+          >
             {/* Sold out is drawn over the cover instead — a chip here as well
                 would say the same thing twice. */}
             {product.stockQuantity > 0 && (
@@ -95,6 +103,7 @@ export function ProductCard({
           </div>
         </div>
       </Link>
+      <QuickAdd store={store} product={product} />
     </li>
   )
 }
@@ -108,10 +117,12 @@ function ProductMedia({
   product,
   skin,
   large,
+  eager,
 }: {
   product: PublicProduct
   skin: Skin
   large: boolean
+  eager: boolean
 }) {
   const off = discountPercent(product)
   const soldOut = product.stockQuantity <= 0
@@ -131,6 +142,7 @@ function ProductMedia({
     >
       {product.image?.url ? (
         <FillImage
+          eager={eager}
           src={product.image.url}
           alt={product.image.altText ?? product.name}
           sizes={large ? '(min-width: 1024px) 33vw, 100vw' : '(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw'}

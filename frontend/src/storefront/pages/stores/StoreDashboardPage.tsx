@@ -18,6 +18,7 @@ import {
 } from '../../layout/icons'
 import { SellerOrderRow } from './orderMeta'
 import { SetupChecklist } from './SetupChecklist'
+import { ShopTrustTips } from './ShopTrustTips'
 import { launchSteps, stepAction, stepMissing } from './setupSteps'
 import { usePublishActions, whatsAppShareUrl } from './usePublishActions'
 import { EmptyState } from './ui/EmptyState'
@@ -40,7 +41,9 @@ import { EmptyState } from './ui/EmptyState'
  *
  * Under it: the order pipeline as tappable chips (scrolling sideways on a
  * phone), the latest orders as cards, and the setup checklist — above the
- * numbers until the shop is live, below them once orders are coming in.
+ * numbers until the shop is live, below them once orders are coming in. Last,
+ * `ShopTrustTips`: what the shop page still lacks (WhatsApp number, about
+ * line, logo) for customers to trust it.
  */
 
 const PIPELINE: {
@@ -174,6 +177,10 @@ export function StoreDashboardPage() {
           />
         </div>
       )}
+
+      {/* What the shop page still lacks to win a stranger's first order —
+          contact number, an about line, a logo. Gone once all are done. */}
+      <ShopTrustTips store={store} />
     </div>
   )
 }
