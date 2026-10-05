@@ -91,12 +91,13 @@ Printing" with nothing else becomes one level, "Printing".
 - ☑ Seller side: "Help customers trust your shop" on the dashboard (WhatsApp number, about line, logo — only the missing ones).
 - ☑ Footer: the empty strip above it removed.
 
-### Phase 7 — Header & search ☐
-- Compact sticky header (logo + name, search icon that expands, cart with count badge, menu sheet); hides on scroll down, shows on scroll up.
-- Search suggestions from the shop's own products.
+### Phase 7 — Header & search ☑
+- ☑ One-row header for shops under 7 products (no search row — the home page shows everything); 44px menu / share / cart.
+- ☑ Search suggestions from the shop's own products (photo, name, price, "See all N results").
+- Not done: hide-on-scroll — with search gone for small shops the header is already one row.
 
 ### Phase 8 — Speed, SEO, Store Builder alignment ☐
-- ◐ First two home-grid photos and the showcase photo load eagerly (`fetchpriority="high"`); skeletons not yet reshaped.
+- ◐ First two home-grid photos and the showcase photo load eagerly (`fetchpriority="high"`); skeletons reshaped to the new card; the category page loads as a skeleton instead of "Loading…".
 - Server page shell & structured data kept in step (`pageShell.service.ts`, `structuredData.ts`).
 - Store Builder sections and preview reflect the new compositions; defaults documented in `FRONTEND_CONTEXT.md`.
 

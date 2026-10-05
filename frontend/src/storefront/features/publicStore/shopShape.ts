@@ -27,6 +27,17 @@ export const SMALL_SHOP_MAX = 12
 
 export type ShopSize = 'one' | 'small' | 'full'
 
+/**
+ * Below this many products the header has no search: the home page already
+ * shows every product, and on a phone the search row was a whole second
+ * header line spent on finding one of three things.
+ */
+export const SEARCH_MIN_PRODUCTS = 7
+
+export function shopHasSearch(store: PublicStore): boolean {
+  return shopProductCount(store) >= SEARCH_MIN_PRODUCTS
+}
+
 /** Visible products across the whole shop (a category counts its subtree). */
 export function shopProductCount(store: PublicStore): number {
   return store.categories.reduce((sum, category) => sum + category.productCount, 0)

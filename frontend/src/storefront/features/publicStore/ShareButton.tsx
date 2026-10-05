@@ -51,7 +51,7 @@ export function ShareButton({
         onClick={share}
         aria-label={copied ? 'Link copied' : (ariaLabel ?? `Share ${title}`)}
         title={copied ? 'Link copied!' : (ariaLabel ?? 'Share')}
-        className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border ${skin.border} ${skin.chip} transition hover:opacity-80`}
+        className={`relative flex size-tap shrink-0 items-center justify-center rounded-full border ${skin.border} ${skin.chip} transition hover:opacity-80`}
       >
         {copied ? (
           <CheckIcon className="h-5 w-5 text-success" />

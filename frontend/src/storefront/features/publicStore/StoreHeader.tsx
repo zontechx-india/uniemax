@@ -5,12 +5,16 @@ import type { SessionState } from '../../../shared/auth/useSession'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import {
   cartUrl,
+  formatPrice,
+  publicStoreApi,
   publicStoreUrl,
   storeCategoryUrl,
   storeHomeUrl,
+  storeProductUrl,
   storeShopUrl,
   storeSupportUrl,
   type PublicCategory,
+  type PublicProduct,
   type PublicStore,
 } from '../stores/storesApi'
 import { useCart } from '../cart/cart'
@@ -35,6 +39,7 @@ import {
 } from '../../layout/icons'
 import type { Skin } from './storeTheme'
 import { MediaImg } from '../../../shared/media/MediaImg'
+import { displayName, shopHasSearch } from './shopShape'
 
 /**
  * Storefront chrome: logo · Home · Shop · Categories ▾ · Help · search ·
@@ -105,6 +110,7 @@ function StoreHeaderBar({
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const location = useLocation()
+  const search = shopHasSearch(store)
 
   // Any navigation closes the mobile drawer.
   useEffect(() => {
@@ -126,7 +132,7 @@ function StoreHeaderBar({
           type="button"
           onClick={() => setDrawerOpen(true)}
           aria-label="Open menu"
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md border lg:hidden ${skin.border} ${skin.chip} ${skin.text}`}
+          className={`flex size-tap shrink-0 items-center justify-center rounded-md border lg:hidden ${skin.border} ${skin.chip} ${skin.text}`}
         >
           <MenuIcon className="h-5 w-5" />
         </button>
@@ -177,9 +183,13 @@ function StoreHeaderBar({
         {/* Search takes the slack between the nav and the actions — but only
             from `md`, where there is slack to take. Below that it gets its
             own row rather than a field too narrow to read a query in. */}
-        <div className="hidden min-w-0 flex-1 justify-end md:flex lg:pl-4">
-          <SearchBox store={store} skin={skin} className="max-w-xl" />
-        </div>
+        {search ? (
+          <div className="hidden min-w-0 flex-1 justify-end md:flex lg:pl-4">
+            <SearchBox store={store} skin={skin} className="max-w-xl" />
+          </div>
+        ) : (
+          <div className="hidden flex-1 md:block" />
+        )}
 
         <div className="ml-auto flex shrink-0 items-center gap-2 md:ml-0 md:pl-1">
           {/* Share this store (native sheet / copy link) */}
@@ -204,9 +214,11 @@ function StoreHeaderBar({
       {/* Second row, phones and small tablets only: search on its own line.
           Squeezing it into the bar beside five controls left a field barely
           wide enough for one word. */}
-      <div className={`${STORE_CONTAINER} pb-2.5 md:hidden`}>
-        <SearchBox store={store} skin={skin} />
-      </div>
+      {search && (
+        <div className={`${STORE_CONTAINER} pb-2.5 md:hidden`}>
+          <SearchBox store={store} skin={skin} />
+        </div>
+      )}
 
       {drawerOpen && (
         <MobileDrawer
@@ -505,6 +517,16 @@ function MobileDrawer({
 // Search + cart
 // ---------------------------------------------------------------------------
 
+/** How many matches the suggestion list shows before "See all results". */
+const SUGGESTION_COUNT = 5
+
+/**
+ * Search with **suggestions as you type**: after two letters (and a short
+ * pause) the shop's own matching products appear under the field — photo,
+ * name, price — so a customer on a phone taps the product instead of
+ * finishing the word, submitting and scanning a results page. Enter, or the
+ * last row, still opens the full results.
+ */
 function SearchBox({
   store,
   skin,
@@ -516,14 +538,50 @@ function SearchBox({
 }) {
   const navigate = useNavigate()
   const [value, setValue] = useState('')
+  const [open, setOpen] = useState(false)
+  const [results, setResults] = useState<{ q: string; items: PublicProduct[]; total: number } | null>(null)
+  const q = value.trim()
+
+  useEffect(() => {
+    if (q.length < 2) return
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      publicStoreApi
+        .listProducts(store.slug, { q, pageSize: SUGGESTION_COUNT })
+        .then(({ items, meta }) => {
+          if (!cancelled) setResults({ q, items, total: meta.total })
+        })
+        .catch(() => {
+          if (!cancelled) setResults(null)
+        })
+    }, 250)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [q, store.slug])
+
+  const shown = open && q.length >= 2 && results !== null && results.q === q
+  const go = (to: string) => {
+    setOpen(false)
+    setValue('')
+    navigate(to)
+  }
 
   return (
     <form
+      role="search"
       className={`relative w-full min-w-0 ${className}`}
       onSubmit={(e) => {
         e.preventDefault()
-        const q = value.trim()
-        if (q) navigate(storeShopUrl(store.slug, { q }))
+        if (q) go(storeShopUrl(store.slug, { q }))
+      }}
+      // Closing on blur waits a tick, so a tap on a suggestion lands first.
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false)
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') setOpen(false)
       }}
     >
       <SearchIcon
@@ -532,11 +590,73 @@ function SearchBox({
       <input
         type="search"
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => {
+          setValue(e.target.value)
+          setOpen(true)
+        }}
+        onFocus={() => setOpen(true)}
         placeholder="Search products…"
         aria-label="Search products"
-        className={`h-10 w-full rounded-full border ${skin.border} bg-surface-alt pl-10 pr-4 text-sm ${skin.text} outline-none transition-colors placeholder:text-muted focus:border-brand`}
+        aria-expanded={shown}
+        aria-controls="store-search-suggestions"
+        autoComplete="off"
+        className={`h-11 w-full rounded-full border ${skin.border} bg-surface-alt pl-10 pr-4 text-sm ${skin.text} outline-none transition-colors placeholder:text-muted focus:border-brand`}
       />
+
+      {shown && (
+        <div
+          id="store-search-suggestions"
+          className={`absolute inset-x-0 top-full z-40 mt-2 overflow-hidden rounded-xl border shadow-floating ${skin.border} ${skin.surface}`}
+        >
+          {results.items.length === 0 ? (
+            <p className={`px-4 py-4 text-sm ${skin.muted}`}>
+              Nothing matches “{q}”. Try a shorter word.
+            </p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {results.items.map((product) => (
+                <li key={product.id}>
+                  <button
+                    type="button"
+                    onClick={() => go(storeProductUrl(store.slug, product.slug))}
+                    className="flex min-h-[60px] w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-surface-alt"
+                  >
+                    <span className={`h-11 w-11 shrink-0 overflow-hidden rounded-md ${skin.well}`}>
+                      {product.image?.url && (
+                        <MediaImg
+                          sizes="44px"
+                          src={product.image.url}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className={`block truncate text-sm font-semibold ${skin.text}`}>
+                        {displayName(product.name)}
+                      </span>
+                      {product.price !== null && (
+                        <span className="block text-sm font-bold text-brand">
+                          {product.variantCount > 0 ? 'From ' : ''}
+                          {formatPrice(product.price)}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {results.total > 0 && (
+            <button
+              type="submit"
+              className={`flex min-h-tap w-full items-center justify-center border-t px-4 text-sm font-semibold text-brand transition-colors hover:bg-surface-alt ${skin.border}`}
+            >
+              See all {results.total} result{results.total === 1 ? '' : 's'} for “{q}”
+            </button>
+          )}
+        </div>
+      )}
     </form>
   )
 }
@@ -560,7 +680,7 @@ function CartButton({ skin, storeSlug }: { skin: Skin; storeSlug: string }) {
       // ?from= makes the cart continue THIS store's theme (see cartUrl).
       href={cartUrl(storeSlug)}
       aria-label={`Cart, ${count} item${count === 1 ? '' : 's'}`}
-      className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border ${skin.border} ${skin.chip} transition hover:opacity-80`}
+      className={`relative flex size-tap shrink-0 items-center justify-center rounded-full border ${skin.border} ${skin.chip} transition hover:opacity-80`}
     >
       <CartIcon className={`h-5 w-5 ${skin.text}`} />
       {count > 0 && (

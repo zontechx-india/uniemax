@@ -16,7 +16,7 @@ import {
   categoryTrail,
 } from '../../features/publicStore/structuredData'
 import { ProductListing } from '../../features/publicStore/ProductListing'
-import type { Crumb } from '../../features/publicStore/ListingControls'
+import { GridSkeleton, type Crumb } from '../../features/publicStore/ListingControls'
 import { findCategory } from '../../features/publicStore/shopShape'
 
 /**
@@ -84,7 +84,8 @@ export function StoreCategoryPage() {
   if (category === undefined) {
     return (
       <StorePageShell>
-        <p className={`py-16 text-center text-sm ${skin.muted}`}>Loading…</p>
+        <div className="mb-5 h-8 w-48 animate-pulse rounded-full bg-surface-alt" />
+        <GridSkeleton skin={skin} />
       </StorePageShell>
     )
   }

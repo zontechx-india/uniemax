@@ -263,11 +263,9 @@ export function GridSkeleton({ skin }: { skin: Skin }) {
           key={i}
           className={`overflow-hidden rounded-lg border ${skin.border} ${skin.surface}`}
         >
-          <div className="p-2 pb-0">
-            <div className={`aspect-square animate-pulse rounded-md ${skin.well}`} />
-          </div>
+          {/* Same shape as ProductCard: photo edge to edge, then name and price. */}
+          <div className={`aspect-square animate-pulse ${skin.well}`} />
           <div className="space-y-2 p-3">
-            <div className="h-2 w-1/3 animate-pulse rounded-full bg-surface-alt" />
             <div className="h-3.5 w-3/4 animate-pulse rounded-full bg-surface-alt" />
             <div className="h-3.5 w-1/2 animate-pulse rounded-full bg-surface-alt" />
           </div>

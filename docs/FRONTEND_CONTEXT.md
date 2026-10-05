@@ -833,7 +833,13 @@ full-bleed section bands instead.
   `[menu] [logo · store name] [share] [cart]` and search drops to a full-width
   row underneath, because squeezed in beside five controls at 360px it was
   barely wide enough for one word — and search is how anyone finds anything in
-  a large catalog. The store name now shows at every size: it *grows* into
+  a large catalog. **Search only exists from `SEARCH_MIN_PRODUCTS` (7)
+  products** (`shopHasSearch`): a smaller shop shows everything on its home
+  page, so it gets a one-row header instead. **`SearchBox` suggests as you
+  type** — after two letters and 250ms, up to five of the shop's matching
+  products (photo, name, price) under the field, plus "See all N results";
+  Enter still opens Shop with `?q=`. Menu, share and cart buttons are 44px
+  (`size-tap`). The store name now shows at every size: it *grows* into
   whatever the buttons leave and truncates there, so a long one never pushes
   the cart off a 320px screen. The resulting height is published as
   `--store-header` (see **Layout width**) rather than hardcoded anywhere. The share
