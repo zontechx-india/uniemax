@@ -118,7 +118,6 @@ export function ProductListing({
             loading={loading}
             remaining={total - products.length}
             onLoadMore={loadMore}
-            skin={skin}
           />
         </>
       )}

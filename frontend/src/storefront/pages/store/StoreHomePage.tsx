@@ -387,7 +387,7 @@ function ContactBand({
           <h2 className={`font-heading text-xl font-bold sm:text-2xl ${skin.text}`}>
             Questions? Talk to {store.name}
           </h2>
-          <p className={`mt-1 text-[15px] ${skin.muted}`}>
+          <p className={`mt-1 text-base ${skin.muted}`}>
             {hours
               ? `Available: ${hours}`
               : 'Ask about sizes, colours, delivery — anything.'}
@@ -886,7 +886,7 @@ function Hero({
 
             {intro && (
               <p
-                className={`mt-2 line-clamp-3 max-w-2xl text-[15px] leading-relaxed sm:line-clamp-none sm:text-base ${skin.muted}`}
+                className={`mt-2 line-clamp-3 max-w-2xl text-base leading-relaxed sm:line-clamp-none sm:text-base ${skin.muted}`}
               >
                 {intro}
               </p>
@@ -899,7 +899,7 @@ function Hero({
                   return (
                     <li
                       key={fact.key}
-                      className={`inline-flex items-center gap-2 text-[14px] font-semibold ${skin.text}`}
+                      className={`inline-flex items-center gap-2 text-sm font-semibold ${skin.text}`}
                     >
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
                         <Icon className="h-4 w-4" />
@@ -1122,7 +1122,7 @@ function CategoryStrip({
                     )}
                   </span>
                   <span
-                    className={`line-clamp-2 text-[13px] font-semibold leading-tight ${skin.text}`}
+                    className={`line-clamp-2 text-xs font-semibold leading-tight ${skin.text}`}
                   >
                     {category.name}
                   </span>
@@ -1181,7 +1181,7 @@ function CategoryTiles({
           <li key={category.id}>
             <Link
               to={storeCategoryUrl(store.slug, category.slug)}
-              className={`group flex h-full flex-col overflow-hidden rounded-lg border metal-lift ${skin.border} ${skin.surface}`}
+              className={`group flex h-full flex-col overflow-hidden rounded-lg border card-hover ${skin.border} ${skin.surface}`}
             >
               <span
                 className={`relative flex aspect-[4/3] items-center justify-center overflow-hidden ${skin.well}`}
@@ -1198,11 +1198,11 @@ function CategoryTiles({
               </span>
               <span className="min-w-0 p-3">
                 <span
-                  className={`block truncate text-[15px] font-semibold ${skin.text}`}
+                  className={`block truncate text-base font-semibold ${skin.text}`}
                 >
                   {category.name}
                 </span>
-                <span className={`mt-0.5 block text-[13px] ${skin.muted}`}>
+                <span className={`mt-0.5 block text-xs ${skin.muted}`}>
                   {category.productCount}{' '}
                   {category.productCount === 1 ? 'product' : 'products'}
                 </span>
@@ -1600,10 +1600,10 @@ function CategoryShelf({
       <div className="grid gap-3 sm:gap-4 lg:grid-cols-4">
         <Link
           to={to}
-          className={`group flex items-center justify-between gap-4 overflow-hidden rounded-lg border p-4 metal-lift sm:p-5 lg:flex-col lg:items-start lg:justify-between ${split.panel} ${skin.border} ${skin.surface}`}
+          className={`group flex items-center justify-between gap-4 overflow-hidden rounded-lg border p-4 card-hover sm:p-5 lg:flex-col lg:items-start lg:justify-between ${split.panel} ${skin.border} ${skin.surface}`}
         >
           <span className="min-w-0">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-brand">
+            <span className="text-xs font-semibold uppercase tracking-[0.25em] text-brand">
               Collection
             </span>
             <span
@@ -1707,14 +1707,14 @@ function ProductShowcase({
             <NoProductImage />
           )}
           {off !== null && !soldOut && (
-            <span className="absolute left-3 top-3 rounded-pill bg-brand px-2.5 py-1 text-[13px] font-bold text-brand-contrast">
+            <span className="absolute left-3 top-3 rounded-pill bg-brand px-2.5 py-1 text-xs font-bold text-brand-contrast">
               {off}% off
             </span>
           )}
         </Link>
 
         <div className="flex flex-col p-5 sm:p-7 lg:justify-center lg:p-10">
-          <p className={`text-[13px] font-semibold ${skin.muted}`}>
+          <p className={`text-xs font-semibold ${skin.muted}`}>
             {product.category.name}
           </p>
           <h2
@@ -1734,7 +1734,7 @@ function ProductShowcase({
           </div>
           {product.description && (
             <p
-              className={`mt-4 line-clamp-4 whitespace-pre-line text-[15px] leading-relaxed ${skin.muted}`}
+              className={`mt-4 line-clamp-4 whitespace-pre-line text-base leading-relaxed ${skin.muted}`}
             >
               {product.description}
             </p>

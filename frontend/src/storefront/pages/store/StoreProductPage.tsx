@@ -265,7 +265,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
       label: product.category.name,
       to: storeCategoryUrl(store.slug, product.category.slug),
     },
-    { label: product.name },
+    { label: displayName(product.name) },
   ]
 
   return (
@@ -318,7 +318,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
             </span>
             {compareAt && Number(compareAt) > Number(price) && (
               <>
-                <span className={`font-figure text-[15px] ${skin.muted}`}>
+                <span className={`font-figure text-base ${skin.muted}`}>
                   MRP <s>{formatPrice(compareAt)}</s>{' '}
                   <span className="ml-1 font-semibold text-brand">
                     {Math.round((1 - Number(price) / Number(compareAt)) * 100)}% off
@@ -334,7 +334,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
               </span>
             )}
             {sku && (
-              <span className={`font-mono text-[11px] ${skin.muted}`}>SKU {sku}</span>
+              <span className={`font-mono text-xs ${skin.muted}`}>SKU {sku}</span>
             )}
           </div>
 
@@ -788,7 +788,7 @@ function StickyBuyBar({
 }) {
   return (
     <div
-      className={`fixed inset-x-0 bottom-0 z-40 border-t px-4 py-3 backdrop-blur sm:px-6 lg:px-10 ${skin.border} bg-bg/95`}
+      className={`fixed inset-x-0 bottom-0 z-40 border-t px-4 py-3 sm:px-6 lg:px-10 ${skin.border} bg-bg`}
     >
       <div className="mx-auto flex w-full max-w-[1920px] items-center gap-3">
         <div
@@ -1019,7 +1019,7 @@ function MediaGallery({
             <GalleryArrow direction="prev" onClick={() => step(-1)} skin={skin} />
             <GalleryArrow direction="next" onClick={() => step(1)} skin={skin} />
             <span
-              className={`pointer-events-none absolute bottom-3 right-3 rounded-full px-2.5 py-1 text-[11px] font-semibold ${skin.surface} ${skin.muted}`}
+              className={`pointer-events-none absolute bottom-3 right-3 rounded-full px-2.5 py-1 text-xs font-semibold ${skin.surface} ${skin.muted}`}
             >
               {index + 1} / {media.length}
             </span>
@@ -1028,7 +1028,7 @@ function MediaGallery({
 
         {isImage && (
           <span
-            className={`pointer-events-none absolute bottom-3 left-3 hidden rounded-full px-2.5 py-1 text-[11px] font-semibold lg:block ${skin.surface} ${skin.muted} ${
+            className={`pointer-events-none absolute bottom-3 left-3 hidden rounded-full px-2.5 py-1 text-xs font-semibold lg:block ${skin.surface} ${skin.muted} ${
               zoom ? 'opacity-0' : 'opacity-100'
             } transition-opacity`}
           >

@@ -50,7 +50,7 @@ export function CartLine({ item }: { item: CartItem }) {
         </h4>
         <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted">
           {item.variantName && (
-            <span className="rounded-sm bg-surface-alt px-1.5 py-0.5 text-[11px] font-semibold text-muted">
+            <span className="rounded-sm bg-surface-alt px-1.5 py-0.5 text-xs font-semibold text-muted">
               {item.variantName}
             </span>
           )}

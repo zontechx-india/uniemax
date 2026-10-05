@@ -84,9 +84,24 @@ Also: 9 separate dialog implementations, 3 card styles, 13 corner radii,
   16px.
 - Budget after Phase 2: stray sizes 109, tiny text 74, raw buttons 257.
 
-## Phase 3 — Storefront (customers) ☐
-- Product card, product page, hero, category page, cart, checkout on the
-  scale; remove `metal-lift` / `metal-chip`; keep only the A4 banner.
+## Phase 3 — Storefront (customers) ☑
+- All 41 stray text sizes in the shop pages, product card/page, listings,
+  cart, checkout, banners and login moved onto the scale.
+- "Metal" effects removed: `metal-lift` → flat `card-hover` (border darkens +
+  one hover shadow, no lift or coloured halo); the login dialog's store mark
+  is a flat brand tile; `--brand-metal` / `--metal-glow` tokens deleted. The
+  A4 hero banner is the one decorative element left.
+- Sticky buy bar (product page) and checkout header: solid, no blur.
+- Hand-made buttons copying standard looks moved to `Button`: Filter, Load
+  more, Check (delivery), Sign in, New request / help actions, Share link,
+  Add a new address. Remaining raw buttons are icon buttons, steppers,
+  swatches, option chips, list rows and text links.
+- Delivery-check field uses `fieldClass`; product breadcrumb shows the
+  display name.
+- Checked: shop home, product page, shop listing and cart at 390px (no
+  sideways scroll) and the shop home at 1280px.
+- Budget after Phase 3: stray sizes 68, tiny text 46, ad-hoc effects 23,
+  raw buttons 248.
 
 ## Phase 4 — Marketplace, Sell page, auth, account ☐
 

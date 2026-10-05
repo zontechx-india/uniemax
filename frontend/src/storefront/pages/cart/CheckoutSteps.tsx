@@ -35,6 +35,7 @@ import {
   PlusIcon,
   TruckIcon,
 } from '../../layout/icons'
+import { Button } from '../../../shared/ui/Button'
 
 /**
  * The interactive checkout steps — Delivery Details → Choose Payment Method.
@@ -360,7 +361,7 @@ function StepHeading({
         {done ? <CheckIcon className="h-4.5 w-4.5" /> : icon}
       </span>
       <div className="min-w-0">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted">
           Step {step} of 2
         </p>
         <h2 className="font-body text-base font-semibold tracking-normal">
@@ -368,7 +369,7 @@ function StepHeading({
         </h2>
       </div>
       {done && (
-        <span className="ml-auto shrink-0 rounded-pill bg-success/10 px-2.5 py-0.5 text-[11px] font-semibold text-success">
+        <span className="ml-auto shrink-0 rounded-pill bg-success/10 px-2.5 py-0.5 text-xs font-semibold text-success">
           Done
         </span>
       )}
@@ -715,12 +716,12 @@ function SavedAddressPicker({
                     <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-fg">
                       {address.name}
                       {address.label && (
-                        <span className="rounded-pill bg-surface-alt px-2 py-0.5 text-[11px] font-semibold text-muted">
+                        <span className="rounded-pill bg-surface-alt px-2 py-0.5 text-xs font-semibold text-muted">
                           {address.label}
                         </span>
                       )}
                       {address.isPrimary && (
-                        <span className="rounded-pill bg-brand/10 px-2 py-0.5 text-[11px] font-semibold text-brand">
+                        <span className="rounded-pill bg-brand/10 px-2 py-0.5 text-xs font-semibold text-brand">
                           Primary
                         </span>
                       )}
@@ -773,14 +774,12 @@ function SavedAddressPicker({
         // Secondary on the left, primary anchored right (mobile stacks the
         // primary on top via flex-col-reverse).
         <div className="flex flex-col-reverse gap-2.5 pt-1 sm:flex-row sm:items-center sm:justify-between">
-          <button
-            type="button"
+          <Button variant="secondary"
             onClick={() => setAdding(true)}
-            className="flex h-11 items-center justify-center gap-1.5 rounded-md border border-line px-5 text-sm font-semibold text-fg transition hover:bg-surface-alt"
           >
             <PlusIcon className="h-4 w-4" />
             Add New Address
-          </button>
+          </Button>
           {addresses.length > 0 && (
             <button
               type="button"

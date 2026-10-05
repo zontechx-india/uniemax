@@ -117,7 +117,7 @@ export function OptionPicker({
                   ? variants.find((v) => v.optionValues[type.name] === value)
                   : undefined
                 const priceLine = single ? (
-                  <span className="block text-[11px] font-normal no-underline opacity-80">
+                  <span className="block text-xs font-normal no-underline opacity-80">
                     {!only || only.stockQuantity <= 0
                       ? 'Out of stock'
                       : formatPrice(only.price)}
@@ -162,7 +162,7 @@ export function OptionPicker({
                         )}
                       </span>
                       <span
-                        className={`block truncate px-1 py-1 text-[11px] font-semibold ${
+                        className={`block truncate px-1 py-1 text-xs font-semibold ${
                           selected ? 'text-brand' : skin.text
                         } ${!available && !selected ? 'line-through' : ''}`}
                       >

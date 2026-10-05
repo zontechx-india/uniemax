@@ -18,6 +18,7 @@ import {
   PlusIcon,
 } from '../../layout/icons'
 import { telLink, waLink } from '../../features/publicStore/contactLinks'
+import { Button } from '../../../shared/ui/Button'
 
 /**
  * `/store/{storeSlug}/support` — Help & Support **for this shop**.
@@ -149,14 +150,12 @@ export function StoreHelpPage() {
           Your requests
         </h2>
         {!guest && !composing && (
-          <button
-            type="button"
+          <Button variant="primary"
             onClick={() => setComposing(true)}
-            className={`inline-flex h-10 items-center gap-1.5 rounded-md px-4 text-sm font-semibold transition hover:opacity-90 ${skin.cta}`}
           >
             <PlusIcon className="h-4 w-4" />
             New request
-          </button>
+          </Button>
         )}
       </div>
 
@@ -172,13 +171,12 @@ export function StoreHelpPage() {
             A request is a tracked conversation, so it has to belong to an
             account. The contact details above need no sign-in.
           </p>
-          <button
-            type="button"
+          <Button variant="primary"
             onClick={() => openAuthDialog(storeAuthRequest(store))}
-            className={`mt-5 inline-flex h-10 items-center rounded-md px-5 text-sm font-semibold transition hover:opacity-90 ${skin.cta}`}
+            className="mt-5"
           >
             Sign in
-          </button>
+          </Button>
         </div>
       ) : (
         <>

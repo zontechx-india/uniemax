@@ -32,7 +32,7 @@ import { displayName } from './shopShape'
  * The body is name, price, and at most one status line. The category is NOT
  * repeated on every card (the page or section already says where you are).
  *
- * Hover lifts the card and paints an evenly-spread halo (`metal-lift`) while
+ * Hover lifts the card and paints an evenly-spread halo (`card-hover`) while
  * the cover scales inside its slot — the frame itself never moves, so a grid
  * stays still under the cursor.
  */
@@ -60,7 +60,7 @@ export function ProductCard({
     <li className={`group relative ${className}`}>
       <Link
         to={storeProductUrl(store.slug, product.slug)}
-        className={`flex h-full flex-col overflow-hidden rounded-lg border metal-lift ${skin.border} ${skin.surface}`}
+        className={`flex h-full flex-col overflow-hidden rounded-lg border card-hover ${skin.border} ${skin.surface}`}
       >
         <ProductMedia product={product} skin={skin} large={large} eager={eager} />
 
@@ -73,7 +73,7 @@ export function ProductCard({
               reads heavy at this size. Two lines, then ellipsis. */}
           <h3
             className={`line-clamp-2 font-display font-medium leading-tight transition-colors group-hover:text-brand ${
-              large ? 'text-lg sm:text-xl' : 'text-[15px] sm:text-base'
+              large ? 'text-lg sm:text-xl' : 'text-base sm:text-base'
             } ${skin.text}`}
           >
             {displayName(product.name)}
@@ -153,13 +153,13 @@ function ProductMedia({
       )}
 
       {soldOut && (
-        <span className="absolute inset-x-0 bottom-0 bg-[var(--overlay)] py-1 text-center text-[11px] font-bold uppercase tracking-wide text-white">
+        <span className="absolute inset-x-0 bottom-0 bg-[var(--overlay)] py-1 text-center text-xs font-bold uppercase tracking-wide text-white">
           Sold out
         </span>
       )}
 
       {off !== null && !soldOut && (
-        <span className="absolute left-2 top-2 rounded-pill bg-brand px-2 py-0.5 text-[11px] font-bold text-brand-contrast">
+        <span className="absolute left-2 top-2 rounded-pill bg-brand px-2 py-0.5 text-xs font-bold text-brand-contrast">
           {off}% off
         </span>
       )}
@@ -227,7 +227,7 @@ export function NoProductImage({ label = 'No image' }: { label?: string }) {
   return (
     <span className="flex h-full w-full flex-col items-center justify-center gap-1.5 text-muted">
       <ImageIcon className="h-7 w-7 opacity-45" />
-      <span className="text-[10px] font-semibold uppercase tracking-wide opacity-70">
+      <span className="text-xs font-semibold uppercase tracking-wide opacity-70">
         {label}
       </span>
     </span>
@@ -264,7 +264,7 @@ export function PriceLabel({
   return (
     <p className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5">
       {product.variantCount > 0 && (
-        <span className="text-[11px] font-semibold text-muted">From</span>
+        <span className="text-xs font-semibold text-muted">From</span>
       )}
       <span
         className={`font-figure font-bold text-brand ${

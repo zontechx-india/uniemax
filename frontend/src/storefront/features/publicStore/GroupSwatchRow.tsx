@@ -67,12 +67,12 @@ export function GroupSwatchRow({
                     )}
                   </span>
                   <span
-                    className={`block truncate px-1 py-1 text-[11px] font-semibold ${
+                    className={`block truncate px-1 py-1 text-xs font-semibold ${
                       member.isCurrent ? 'text-brand' : skin.text
                     }`}
                   >
                     {member.value}
-                    <span className="block text-[11px] font-normal opacity-80">
+                    <span className="block text-xs font-normal opacity-80">
                       {member.stockQuantity <= 0
                         ? 'Out of stock'
                         : member.price

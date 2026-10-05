@@ -11,13 +11,10 @@
  * owner-configurable. Neutrals are derived from the background's luminance so
  * light and dark store backgrounds both stay legible.
  *
- * **Metal accents are deliberately scarce.** Surfaces, bars, chips and wells
- * are FLAT — the metallic treatment (gradient + glow) is reserved for the
- * places that should shine: the three CTA fills (`btn-primary` / `btn-primary` /
- * `btn-secondary`) and the card hover elevation (`metal-lift`), all cut from the
- * owner's own colors via the `--cta-*` stops below. An earlier
- * iteration brushed every surface with gradients; it read as noise, so the
- * shine now marks importance instead of texture.
+ * Everything is FLAT (docs/DESIGN_GUIDELINES.md §6): the owner's primary
+ * fills the primary button (`--cta`, hover `--cta-pressed`, pressed `--cta-lo`)
+ * and tints brand text; there are no gradients or glows. (The old metallic
+ * button and card-glow treatment was removed in October 2026.)
  */
 
 type Rgb = [number, number, number]
@@ -96,9 +93,7 @@ export interface StoreThemeVars {
 
 /**
  * Map the owner's colors onto the design-system CSS variables for this
- * page's subtree, plus the metal-accent tokens (`--cta-*` stops for the three
- * button fills, `--brand-metal` for the brand mark, `--metal-glow` for hover
- * elevation).
+ * page's subtree, plus the `--cta-*` button stops.
  *
  * Roles: the **primary** color owns everything metallic (CTA chrome, hover
  * glow, brand-mark gradient); the optional **secondary** re-points the FLAT
@@ -158,15 +153,8 @@ export function storeVars(theme: StoreThemeVars): React.CSSProperties {
     '--cta-contrast': ctaText,
     '--accent': secondary,
 
-    // --- metal accents (CTAs + hover glow ONLY) ---------------------------
-    // Brand mark chrome cut from the owner's primary (`metal-text`,
-    // `metal-chip`). The BUTTONS no longer read this: they compose their own
-    // gradients from the `--cta-*` stops below, because each of the three
-    // variants needs a different pair of steps and a different angle.
-    '--brand-metal': `linear-gradient(180deg, ${lighten(primary, 0.28)} 0%, ${primary} 48%, ${darken(primary, 0.2)} 100%)`,
-
-    // CTA stops — consumed by `btn-primary` / `btn-primary` / `btn-secondary`. Same five
-    // derivations as the `index.css` fallbacks, cut from the owner's primary.
+    // Button stops — `btn-primary` reads --cta / --cta-pressed / --cta-lo;
+    // the rest remain for the seller workspace's frosted accents.
     '--cta': primary,
     '--cta-top': lighten(primary, 0.06),
     '--cta-bottom': darken(primary, 0.14),
@@ -178,11 +166,6 @@ export function storeVars(theme: StoreThemeVars): React.CSSProperties {
       : 'rgba(255,255,255,0.6)',
     // Glow COLOR only — each variant sets its own spread.
     '--cta-glow': rgba(primary, 0.65),
-
-    // Hover elevation. Zero x/y offset on purpose: the halo spreads EQUALLY
-    // on all four sides instead of pooling under the card (the same principle
-    // as the skill's `--shadow-floating`). Tinted with the owner's brand.
-    '--metal-glow': `0 0 30px 2px ${rgba(primary, darkBg ? 0.3 : 0.22)}, 0 0 0 1px ${rgba(primary, darkBg ? 0.35 : 0.25)}`,
   } as React.CSSProperties
 }
 

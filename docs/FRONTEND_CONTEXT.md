@@ -807,7 +807,7 @@ full-bleed section bands instead.
   is the wrong trade.
 - **`StoreFooter`** (`features/publicStore/StoreFooter.tsx`) — renders the
   owner's Footer settings from the shell (`store.footer`): brand block (logo +
-  metal-text name, about, "Since {year}", social icon chips — FB/IG/YT live,
+  name, about, "Since {year}", social icon chips — FB/IG/YT live,
   WhatsApp/X/LinkedIn/Telegram/Pinterest future-ready), Quick Links (custom
   links as router `Link`s for in-app paths / new-tab anchors for URLs, plus
   policy links), business locations (address, contact person, `tel:` phones,
@@ -1174,10 +1174,9 @@ full-bleed section bands instead.
     description, a `4/3` cover. Because that card is stretched to the height of
     the grid beside it, from `lg` its cover **absorbs the extra height**
     (`flex-1`, aspect dropped) instead of leaving the text floating above a void.
-  - Hover applies `metal-lift`: a small rise plus an **evenly-spread halo**
-    (zero-offset shadow, so it radiates equally on all four sides rather than
-    pooling underneath), the cover scales *inside* its slot so the frame never
-    moves, and the name shifts to the brand color. The shared `PRODUCT_GRID`
+  - Hover applies `card-hover`: the border darkens and `shadow-lifted`
+    appears (no movement, no coloured halo), the cover scales *inside* its
+    slot so the frame never moves, and the name shifts to the brand color. The shared `PRODUCT_GRID`
     ramp (exported here, also used by `GridSkeleton` and the homepage rows)
     runs 2 → 3 → 4 → **5 columns (xl)**.
 - **`FilterPanel`** — right slide-over on desktop, bottom sheet on mobile:
@@ -2905,8 +2904,8 @@ whole palette as CSS variables and maps them into Tailwind v4 via
 `hover:-translate-y-1` (4px lift) + `hover:shadow-lifted` (the deeper
 zero-offset halo token) + `group-hover:scale-105` on the image, over
 `duration-200` / `duration-500`. Store cards, product cards and the
-Recently-Viewed pills all share it. (Per-store pages keep `metal-lift`
-instead — that halo is tinted from the owner's own color.)
+Recently-Viewed pills all share it. (Per-store pages use the flat
+`card-hover` utility instead.)
 
 **`dark:` variant.** `index.css` declares
 `@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *))`,
@@ -3021,9 +3020,8 @@ derived from it, and the secondary text is lifted to `#9a9a9a` because
   rules predate the font swap and are kept for consistency.
   The storefront uses the heading face for store/product names (the
   prototype's brand look). The
-  storefront brand mark (store name in header/footer) uses `metal-text` —
-  gradient display text cut from the owner's primary (prototype's
-  `gold-text`).
+  storefront brand mark (store name in header/footer) is plain
+  `font-display` text in the page ink — no gradient.
 
 ### Per-store theming (`/store/{slug}`) + metal accents
 
@@ -3067,9 +3065,10 @@ No gradients, sweeps or glows. The primary fill is `--cta` (hover
 `--cta-pressed`, pressed `--cta-lo`), which `storeVars()` re-points to the
 shop owner's colour, so every storefront's buttons follow its brand and the
 owner's Button text colour (`--cta-contrast`). The older `btn-rise` /
-`btn-sheen` / `btn-ring` gradient fills and the `metal-text` gradient brand
-name were removed; `metal-lift` / `metal-chip` remain only until the Phase 2–3
-clean-up (docs/DESIGN_SYSTEM_PLAN.md).
+`btn-sheen` / `btn-ring` gradient fills and all the storefront "metal"
+effects (`metal-text`, `metal-lift`, `metal-chip`, `--brand-metal`,
+`--metal-glow`) were removed in October 2026; interactive cards use the flat
+`card-hover` utility (border darkens + `shadow-lifted`).
 
 The `SKIN` object in `storeTheme.ts` maps semantic slots (`surface`, `well`,
 `chip` — all flat — plus `cta` → `btn-primary` and `ctaSecondary` →

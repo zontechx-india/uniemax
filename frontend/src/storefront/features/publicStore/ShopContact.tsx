@@ -44,7 +44,7 @@ export function ContactActions({
           href={waLink(whatsapp, message)}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-md bg-whatsapp px-5 text-[15px] font-bold text-whatsapp-contrast transition hover:brightness-95 sm:flex-none"
+          className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-md bg-whatsapp px-5 text-base font-bold text-whatsapp-contrast transition hover:brightness-95 sm:flex-none"
         >
           <WhatsAppIcon className="h-5 w-5" />
           WhatsApp
@@ -53,7 +53,7 @@ export function ContactActions({
       {phone && (
         <a
           href={telLink(phone)}
-          className={`inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-md border px-5 text-[15px] font-bold transition-colors hover:border-brand sm:flex-none ${skin.border} ${skin.text} ${skin.surface}`}
+          className={`inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-md border px-5 text-base font-bold transition-colors hover:border-brand sm:flex-none ${skin.border} ${skin.text} ${skin.surface}`}
         >
           <PhoneCallIcon className="h-5 w-5 text-brand" />
           Call

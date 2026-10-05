@@ -40,6 +40,7 @@ import type { Skin } from './storeTheme'
 import { MediaImg } from '../../../shared/media/MediaImg'
 import { ModalClose, ModalShell } from '../../../shared/ui/ModalShell'
 import { displayName, shopHasSearch } from './shopShape'
+import { Button } from '../../../shared/ui/Button'
 
 /**
  * Storefront chrome: logo · Home · Shop · Categories ▾ · Help · search ·
@@ -310,7 +311,7 @@ function CategoriesMenu({ store, skin }: { store: PublicStore; skin: Skin }) {
                   className={`flex items-baseline gap-2 text-sm font-bold hover:text-brand ${skin.text}`}
                 >
                   {category.name}
-                  <span className={`text-[11px] font-semibold ${skin.muted}`}>
+                  <span className={`text-xs font-semibold ${skin.muted}`}>
                     {category.productCount}
                   </span>
                 </Link>
@@ -436,7 +437,7 @@ function MobileDrawer({
           </Link>
 
           <p
-            className={`mt-3 px-3 pb-1 text-[11px] font-bold uppercase tracking-wide ${skin.muted}`}
+            className={`mt-3 px-3 pb-1 text-xs font-bold uppercase tracking-wide ${skin.muted}`}
           >
             Categories
           </p>
@@ -454,7 +455,7 @@ function MobileDrawer({
                       className={`flex-1 rounded-md px-3 py-2.5 text-sm font-semibold ${skin.text}`}
                     >
                       {category.name}
-                      <span className={`ml-2 text-[11px] ${skin.muted}`}>
+                      <span className={`ml-2 text-xs ${skin.muted}`}>
                         {category.productCount}
                       </span>
                     </Link>
@@ -663,7 +664,7 @@ function CartButton({ skin, storeSlug }: { skin: Skin; storeSlug: string }) {
       <CartIcon className={`h-5 w-5 ${skin.text}`} />
       {count > 0 && (
         <span
-          className={`absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-bold ${skin.cta}`}
+          className={`absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold ${skin.cta}`}
         >
           {count > 99 ? '99+' : count}
         </span>
@@ -702,13 +703,12 @@ function AccountSlot({
 
   if (session.status === 'guest') {
     return (
-      <button
-        type="button"
+      <Button variant="primary" size="sm"
         onClick={() => openAuthDialog(storeAuthRequest(store))}
-        className={`flex h-10 shrink-0 items-center whitespace-nowrap rounded-md px-4 text-sm font-semibold ${skin.cta} transition hover:opacity-90`}
+        className="whitespace-nowrap"
       >
         Sign in
-      </button>
+      </Button>
     )
   }
 

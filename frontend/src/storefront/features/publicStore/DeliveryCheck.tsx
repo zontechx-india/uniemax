@@ -6,6 +6,8 @@ import type { PublicProductDetail, PublicStore } from '../stores/storesApi'
 import { CheckIcon, CloseIcon, MapPinIcon } from '../../layout/icons'
 import { useDeliveryPincode } from './deliveryPincode'
 import type { Skin } from './storeTheme'
+import { Button } from '../../../shared/ui/Button'
+import { fieldClass } from '../../../shared/ui/field'
 
 /**
  * "Does this product deliver to me?" — the product page's availability line.
@@ -126,14 +128,13 @@ export function DeliveryCheck({
             placeholder="6-digit pincode"
             aria-label="Pincode"
             autoFocus={editing}
-            className={`h-10 min-w-0 flex-1 rounded-md border bg-transparent px-3 text-sm outline-none transition focus:border-brand ${skin.border} ${skin.text}`}
+            className={fieldClass({ dense: true, className: 'min-w-0 flex-1' })}
           />
-          <button
+          <Button variant="primary"
             type="submit"
-            className={`h-10 shrink-0 rounded-md px-4 text-sm font-bold transition ${skin.cta}`}
           >
             Check
-          </button>
+          </Button>
           {editing && pincode && (
             <button
               type="button"

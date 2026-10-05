@@ -218,7 +218,7 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
       className="flex min-h-screen flex-col bg-bg text-fg"
       style={shell ? storeVars(shell.theme) : undefined}
     >
-      <header className="sticky top-0 z-40 border-b border-line bg-bg/95 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-line bg-bg">
         <div className="mx-auto flex max-w-[1920px] items-center gap-3 px-4 py-3 sm:px-6 lg:px-10">
           {/* Steps BACK (see useGoBack) — as a Link this pushed a second
               cart entry, leaving checkout ahead in the stack and trapping
@@ -264,7 +264,7 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
                 className="h-10 w-10"
               />
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted">
                   Ordering from
                 </p>
                 <h1 className="truncate font-body text-xl font-semibold tracking-normal sm:text-2xl">

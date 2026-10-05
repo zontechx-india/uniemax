@@ -146,7 +146,7 @@ export function StoreCategoryPage() {
                 className={`flex min-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 text-sm font-semibold transition-colors hover:border-brand ${skin.border} ${skin.chip} ${skin.text}`}
               >
                 {sub.name}
-                <span className={`text-[11px] font-bold ${skin.muted}`}>
+                <span className={`text-xs font-bold ${skin.muted}`}>
                   {sub.productCount}
                 </span>
               </Link>

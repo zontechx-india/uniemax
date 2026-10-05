@@ -110,7 +110,7 @@ export function FilterPanel({
               {['Brand', 'Rating', 'Discount'].map((label) => (
                 <li key={label} className="flex items-center justify-between">
                   <span>{label}</span>
-                  <span className="rounded-full bg-surface-alt px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                  <span className="rounded-full bg-surface-alt px-2 py-0.5 text-xs font-semibold uppercase tracking-wide">
                     Soon
                   </span>
                 </li>

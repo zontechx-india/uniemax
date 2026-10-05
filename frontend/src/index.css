@@ -328,7 +328,6 @@
    * known store). Mirrors the storeVars() derivation for #6c3ef4, so it does
    * NOT flip per scheme. Used by `.metal-text` and `.metal-chip` only — the
    * CTA fills are composed from the `--cta-*` stops below. */
-  --brand-metal: linear-gradient(180deg, #9574f7 0%, #6c3ef4 48%, #5632c3 100%);
 
   /* CTA stops. The three button fills (`btn-rise` / `btn-sheen` / `btn-ring`)
    * compose their own gradients from these rather than consuming a pre-baked
@@ -555,55 +554,26 @@
 }
 
 /* ------------------------------------------------------------------ *
- * Metal accents — public store page (/store/{slug}) ONLY.
- *
- * A deliberate, scoped deviation from the skill's "solid colors only"
- * rule, on the same precedent as the brand gradient above. Deliberately
- * SCARCE: page surfaces, bars, chips and wells are flat semantic colors;
- * the shine is reserved for primary CTAs and the card hover glow, so it
- * marks importance rather than texture. Nothing here hardcodes a color —
- * both tokens come from variables `storeTheme.ts#storeVars()` derives
- * from the STORE OWNER's own colors. The rest of both apps stays flat.
+ * Interaction helpers (docs/DESIGN_GUIDELINES.md §10, §13). Flat — no
+ * gradients, glows or lift; the old storefront "metal" effects are gone.
  * ------------------------------------------------------------------ */
 @layer utilities {
-  /* Interactive card lift. The hover shadow has NO x/y offset, so the halo
-   * spreads equally on all four sides rather than pooling underneath — the
-   * same principle as the skill's `--shadow-floating`. Motion is intentionally
-   * small; `prefers-reduced-motion` already neutralises the duration globally. */
-  .metal-lift {
+  /* Interactive card (a product, a category tile): on hover the border darkens
+   * and the one hover shadow appears — no movement, no coloured halo. */
+  .card-hover {
     transition:
-      box-shadow 240ms ease,
-      transform 240ms ease;
+      border-color 150ms ease,
+      box-shadow 150ms ease;
   }
-  .metal-lift:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--metal-glow);
+  .card-hover:hover {
+    border-color: color-mix(in oklab, var(--fg) 22%, transparent);
+    box-shadow: var(--shadow-lifted);
   }
 
   /* The heading face sits a touch tight wherever it is used as a utility —
-   * the same as the base h1–h3 rule. Declared after Tailwind's generated
-   * utilities so the two stay in step. */
+   * the same as the base h1–h3 rule. */
   .font-heading {
-    letter-spacing: -0.01em;
-  }
-
-  /* Brand-gradient display text (the prototype's `gold-text` slot), cut from
-   * the owner's primary color. Brand marks only — store name, logo text. */
-  .metal-text {
-    background-image: var(--brand-metal);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: transparent;
-  }
-
-  /* Static brand-filled square — store-avatar fallbacks (the auth dialog's
-   * store mark, the Appearance preview's). Shares the CTA's chrome so the
-   * mark matches the buttons, but has no interactive states: it is not a
-   * control and must not light up under the cursor. */
-  .metal-chip {
-    background-image: var(--brand-metal);
-    box-shadow: inset 0 1px 0 var(--cta-edge);
+    letter-spacing: -0.015em;
   }
 
   /* ---------------------------------------------------------------- *

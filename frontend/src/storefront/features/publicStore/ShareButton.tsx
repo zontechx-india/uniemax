@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { shareOrCopy } from '../../../shared/share'
 import { CheckIcon, ShareIcon } from '../../layout/icons'
 import type { Skin } from './storeTheme'
+import { Button } from '../../../shared/ui/Button'
 
 /**
  * Share control for the public storefront (store header + product page).
@@ -63,10 +64,8 @@ export function ShareButton({
   }
 
   return (
-    <button
-      type="button"
+    <Button variant="secondary" size="sm"
       onClick={share}
-      className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-md border px-3.5 text-xs font-semibold transition hover:opacity-80 ${skin.border} ${skin.chip} ${skin.text}`}
     >
       {copied ? (
         <>
@@ -79,6 +78,6 @@ export function ShareButton({
           {label}
         </>
       )}
-    </button>
+    </Button>
   )
 }

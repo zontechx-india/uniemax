@@ -11,6 +11,7 @@ import {
   SlidersIcon,
 } from '../../layout/icons'
 import type { Skin } from './storeTheme'
+import { Button } from '../../../shared/ui/Button'
 
 /** Sort options offered on every listing. */
 export const SORT_OPTIONS: { key: PublicSort; label: string }[] = [
@@ -78,21 +79,19 @@ export function SortFilterBar({
           />
         </div>
 
-        <button
-          type="button"
+        <Button variant="secondary" size="sm"
           onClick={onOpenFilters}
-          className={`flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition-colors hover:border-brand ${skin.border} ${skin.chip} ${skin.text}`}
         >
           <SlidersIcon className="h-4 w-4" />
           Filter
           {activeFilterCount > 0 && (
             <span
-              className={`flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold ${skin.cta}`}
+              className={`flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-xs font-bold ${skin.cta}`}
             >
               {activeFilterCount}
             </span>
           )}
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -214,13 +213,11 @@ export function LoadMore({
   loading,
   remaining,
   onLoadMore,
-  skin,
 }: {
   hasMore: boolean
   loading: boolean
   remaining: number
   onLoadMore: () => void
-  skin: Skin
 }) {
   const ref = useRef<HTMLDivElement>(null)
 
@@ -242,14 +239,12 @@ export function LoadMore({
 
   return (
     <div ref={ref} className="flex justify-center pt-8">
-      <button
-        type="button"
+      <Button variant="secondary"
         onClick={onLoadMore}
         disabled={loading}
-        className={`h-10 rounded-md border px-5 text-sm font-semibold transition hover:border-brand disabled:opacity-50 ${skin.border} ${skin.chip} ${skin.text}`}
       >
         {loading ? 'Loading…' : `Load More (${remaining})`}
-      </button>
+      </Button>
     </div>
   )
 }
@@ -297,13 +292,12 @@ export function NoResults({
         see everything.
       </p>
       {showClear && (
-        <button
-          type="button"
+        <Button variant="primary"
           onClick={onClear}
-          className={`mt-5 inline-flex h-10 items-center rounded-md px-5 text-sm font-bold transition ${skin.cta}`}
+          className="mt-5"
         >
           Clear filters
-        </button>
+        </Button>
       )}
     </div>
   )

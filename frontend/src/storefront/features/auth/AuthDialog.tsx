@@ -86,7 +86,7 @@ function OpenAuthDialog({ req }: { req: AuthDialogRequest }) {
   const themed = req.theme
     ? ({
         ...storeVars(req.theme),
-        '--brand-gradient': 'var(--brand-metal)',
+        '--brand-gradient': 'linear-gradient(var(--cta), var(--cta))',
         '--brand-contrast': 'var(--cta-contrast)',
       } as React.CSSProperties)
     : undefined
@@ -222,7 +222,7 @@ function StoreLogo({
     return <MediaImg sizes="96px" src={brand.logoUrl} alt="" className={`shrink-0 object-cover ${className}`} />
   }
   return (
-    <span className={`flex shrink-0 items-center justify-center metal-chip text-cta-contrast ${className}`}>
+    <span className={`flex shrink-0 items-center justify-center btn-primary ${className}`}>
       <StoreIcon className="h-1/2 w-1/2" />
     </span>
   )
