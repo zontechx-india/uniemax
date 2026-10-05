@@ -213,7 +213,7 @@ export function StoreOrderDetailPage() {
                 {timeAgo(order.placedAt)} · {formatOrderDateTime(order.placedAt)}
               </span>
             </div>
-            <h2 className="mt-2 font-heading text-[24px] leading-tight font-bold text-fg">
+            <h2 className="mt-2 font-figure text-[26px] leading-tight font-bold text-fg">
               {formatPrice(order.total)}
             </h2>
             <p className="mt-0.5 text-[15px] text-fg">

@@ -1062,6 +1062,19 @@
   }
 }
 
+/* Figures — prices, totals, counts. The body sans (Plus Jakarta Sans) with
+ * lining, equal-width digits and a slightly tight track: money reads like a
+ * bill or a banking app, columns of numbers line up, and nothing jumps when
+ * a count changes. The serif heading face is never used for numbers — its
+ * old-style shapes looked decorative on a price. Pair with a weight class
+ * (font-bold / font-semibold). */
+@utility font-figure {
+  font-family: var(--font-body);
+  font-variant-numeric: lining-nums tabular-nums;
+  font-feature-settings: 'lnum' 1, 'tnum' 1;
+  letter-spacing: -0.015em;
+}
+
 /* The italic accent face (Fraunces italic) — see --font-accent. */
 @utility font-accent {
   font-family: var(--font-accent);

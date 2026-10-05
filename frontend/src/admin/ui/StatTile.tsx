@@ -39,7 +39,7 @@ export function StatTile({
   const body = (
     <>
       <p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p>
-      <p className="mt-1.5 font-heading text-2xl font-semibold text-fg">{value}</p>
+      <p className="mt-1.5 font-figure text-2xl font-bold text-fg">{value}</p>
       {hint ? <p className="mt-0.5 text-xs text-muted">{hint}</p> : null}
       {trend && trend.length > 1 ? (
         <div className="mt-3">

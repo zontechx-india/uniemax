@@ -164,7 +164,7 @@ export function CartPage() {
                 <span className="text-sm font-semibold text-muted">
                   Total ({count} item{count === 1 ? '' : 's'})
                 </span>
-                <span className="text-lg font-bold">{formatPrice(total)}</span>
+                <span className="font-figure text-lg font-bold">{formatPrice(total)}</span>
               </div>
               {/* Orders are placed per store, so the total must say which
                   stores it covers — otherwise a scoped total reads as the

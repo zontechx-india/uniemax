@@ -471,7 +471,7 @@ function OrderTotals({
       </dl>
       <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
         <span className="text-sm font-semibold text-muted">Total</span>
-        <span className="text-lg font-bold">
+        <span className="font-figure text-lg font-bold">
           {quote ? formatPrice(quote.total) : loading ? '…' : '—'}
         </span>
       </div>

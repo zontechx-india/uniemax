@@ -313,14 +313,14 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <span className="font-heading text-3xl font-bold text-brand">
+            <span className="font-figure text-3xl font-extrabold text-brand">
               {formatPrice(price)}
             </span>
             {compareAt && Number(compareAt) > Number(price) && (
               <>
-                <span className={`text-sm ${skin.muted}`}>
-                  <s>{formatPrice(compareAt)}</s>{' '}
-                  <span className="font-semibold text-brand">
+                <span className={`font-figure text-[15px] ${skin.muted}`}>
+                  MRP <s>{formatPrice(compareAt)}</s>{' '}
+                  <span className="ml-1 font-semibold text-brand">
                     {Math.round((1 - Number(price) / Number(compareAt)) * 100)}% off
                   </span>
                 </span>
@@ -804,7 +804,7 @@ function StickyBuyBar({
           <p className={`truncate text-sm font-semibold ${skin.text}`}>
             {displayName(product.name)}
           </p>
-          <p className="font-heading text-base font-bold text-brand">
+          <p className="font-figure text-base font-bold text-brand">
             {formatPrice(price)}
             {target.variantName && (
               <span className={`ml-2 text-xs font-normal ${skin.muted}`}>

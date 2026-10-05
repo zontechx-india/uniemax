@@ -267,14 +267,14 @@ export function PriceLabel({
         <span className="text-[11px] font-semibold text-muted">From</span>
       )}
       <span
-        className={`font-heading font-bold text-brand ${
+        className={`font-figure font-bold text-brand ${
           size === 'lg' ? 'text-xl sm:text-2xl' : 'text-base sm:text-lg'
         }`}
       >
         {formatPrice(product.price)}
       </span>
       {product.compareAtPrice && (
-        <s className="text-xs font-normal text-muted">
+        <s className="font-figure text-xs font-normal text-muted">
           {formatPrice(product.compareAtPrice)}
         </s>
       )}

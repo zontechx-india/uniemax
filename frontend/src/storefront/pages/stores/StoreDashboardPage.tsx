@@ -117,7 +117,7 @@ export function StoreDashboardPage() {
                         <span aria-hidden className={`h-2 w-2 rounded-full ${dot}`} />
                         {label}
                       </span>
-                      <span className="mt-1 block font-heading text-[26px] leading-none font-bold text-fg">
+                      <span className="mt-1 block font-figure text-[26px] leading-none font-bold text-fg">
                         {dashboard.stats[key]}
                       </span>
                     </>
@@ -263,7 +263,7 @@ function HeroStat({
         {label}
       </dt>
       <dd
-        className={`mt-0.5 font-heading leading-tight font-bold text-fg ${
+        className={`mt-0.5 font-figure leading-tight font-bold text-fg ${
           small ? 'break-words text-[22px]' : 'truncate text-[24px]'
         }`}
       >

@@ -114,7 +114,7 @@ export function CartStorePage({ storeSlug }: { storeSlug: string }) {
                   <span className="text-sm font-semibold text-muted">
                     Subtotal
                   </span>
-                  <span className="text-lg font-bold">
+                  <span className="font-figure text-lg font-bold">
                     {formatPrice(group.subtotal)}
                   </span>
                 </div>

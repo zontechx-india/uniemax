@@ -12,6 +12,7 @@ Status: ☐ planned · ◐ in progress · ☑ done
 | ---- | ---- | ----- |
 | Headings, product names, prices | Fraunces (serif, optical size) | `font-heading`, `h1–h3` |
 | Everything you read and tap | Plus Jakarta Sans | `font-body` (default) |
+| Prices, totals, counts | Plus Jakarta Sans, equal-width digits | `font-figure` — product page, cards, cart, checkout, dashboards |
 | Small elegant touches | Fraunces italic 500 | `font-accent` — taglines, sub-lines, one word in a heading |
 
 ## Phase 1 — Foundation ☑
@@ -23,6 +24,11 @@ Status: ☐ planned · ◐ in progress · ☑ done
   amounts are not cut off by the bigger numerals.
 - Checked: 13 My Shops pages at 360px — no sideways scroll, no input under
   16px; shop page, marketplace home and dashboard screenshots.
+
+## Phase 1b — Professional numbers ☑
+- Prices and counts moved off the serif to `font-figure` (product page price
+  and MRP, product cards, cart / checkout / order totals, marketplace prices,
+  seller dashboard and order-detail totals, admin stat tiles).
 
 ## Phase 2 — Shop pages (customers) ☐
 - Hero: shop tagline in `font-accent`; type scale for hero, section headings,

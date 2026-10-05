@@ -568,7 +568,7 @@ function SearchResultsPanel({
               subtitle={`${product.categoryName} · ${product.store.name}`}
               trailing={
                 product.price !== null ? (
-                  <span className="text-sm font-semibold text-brand">
+                  <span className="font-figure text-sm font-semibold text-brand">
                     {formatPrice(product.price)}
                   </span>
                 ) : undefined
@@ -1354,7 +1354,7 @@ function ProductCard({ product }: { product: MarketProduct }) {
           {product.name}
         </p>
         {product.price !== null && (
-          <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-sm font-semibold text-brand">
+          <p className="mt-1.5 flex flex-wrap items-center gap-1.5 font-figure text-sm font-semibold text-brand">
             {formatPrice(product.price)}
             {product.compareAtPrice && (
               <>

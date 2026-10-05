@@ -2963,7 +2963,11 @@ derived from it, and the secondary text is lifted to `#9a9a9a` because
   Jakarta Sans**. The italic accent — `font-accent` utility / `--font-accent`,
   Fraunces italic 500 — is for small touches only (a shop tagline, a product
   sub-line, one word in a heading), never running text or anything a seller
-  must act on. Both SIL OFL, self-hosted in `public/fonts/` as variable woff2
+  must act on. **Numbers never use the serif**: prices, totals, MRP and
+  dashboard counts use the `font-figure` utility — Plus Jakarta Sans with
+  lining, equal-width digits (`tnum`/`lnum`) and −0.015em tracking — because
+  Fraunces' shapes looked decorative on money; columns line up and counts do
+  not jump. Both SIL OFL, self-hosted in `public/fonts/` as variable woff2
   split into **latin + latin-ext** files per style (`Fraunces-Latin`,
   `Fraunces-LatinExt`, `Fraunces-Italic-*`, `PlusJakartaSans-*`) with
   `unicode-range`, so a page downloads only what it uses; **₹ (U+20B9) is in

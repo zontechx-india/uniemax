@@ -434,7 +434,7 @@ export function OrderSuccessPage({
                 )}
                 <div className="flex items-center justify-between border-t border-line pt-2">
                   <dt className="text-sm font-semibold text-muted">Total</dt>
-                  <dd className="text-lg font-bold">{formatPrice(order.total)}</dd>
+                  <dd className="font-figure text-lg font-bold">{formatPrice(order.total)}</dd>
                 </div>
               </dl>
             </section>

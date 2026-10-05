@@ -317,7 +317,7 @@ function ProductCard({ product }: { product: MarketProduct }) {
           </h2>
           <div className="mt-auto flex items-baseline gap-2 pt-1.5">
             {product.price && (
-              <span className="font-semibold text-fg">
+              <span className="font-figure font-semibold text-fg">
                 {formatPrice(product.price)}
               </span>
             )}
