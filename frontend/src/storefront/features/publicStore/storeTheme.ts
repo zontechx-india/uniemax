@@ -13,8 +13,8 @@
  *
  * **Metal accents are deliberately scarce.** Surfaces, bars, chips and wells
  * are FLAT — the metallic treatment (gradient + glow) is reserved for the
- * places that should shine: the three CTA fills (`btn-rise` / `btn-sheen` /
- * `btn-ring`) and the card hover elevation (`metal-lift`), all cut from the
+ * places that should shine: the three CTA fills (`btn-primary` / `btn-primary` /
+ * `btn-secondary`) and the card hover elevation (`metal-lift`), all cut from the
  * owner's own colors via the `--cta-*` stops below. An earlier
  * iteration brushed every surface with gradients; it read as noise, so the
  * shine now marks importance instead of texture.
@@ -165,7 +165,7 @@ export function storeVars(theme: StoreThemeVars): React.CSSProperties {
     // variants needs a different pair of steps and a different angle.
     '--brand-metal': `linear-gradient(180deg, ${lighten(primary, 0.28)} 0%, ${primary} 48%, ${darken(primary, 0.2)} 100%)`,
 
-    // CTA stops — consumed by `btn-rise` / `btn-sheen` / `btn-ring`. Same five
+    // CTA stops — consumed by `btn-primary` / `btn-primary` / `btn-secondary`. Same five
     // derivations as the `index.css` fallbacks, cut from the owner's primary.
     '--cta': primary,
     '--cta-top': lighten(primary, 0.06),
@@ -201,16 +201,10 @@ export const SKIN = {
   well: 'bg-surface-alt text-muted',
   /** Secondary control: chips, selects, ghost buttons. */
   chip: 'bg-surface',
-  /** Primary call to action (Rise) — the default fill for any CTA that is
-   *  not the single committing action on the view. Text color contrasts the
-   *  CTA background (owner-overridable), NOT the flat brand. */
-  cta: 'btn-rise text-cta-contrast',
-  /** The ONE committing action on a view — Buy Now, Place Order (Sheen).
-   *  Max one per screen; past that the sweep reads as noise. */
-  ctaSheen: 'btn-sheen text-cta-contrast',
-  /** The secondary standing BESIDE a primary — Add to Cart next to Buy Now
-   *  (Ring). Same gradient family, no competing weight. */
-  ctaRing: 'btn-ring text-brand hover:text-cta-contrast',
+  /** Primary action — flat fill in the shop owner's colour (btn-primary). */
+  cta: 'btn-primary',
+  /** Supporting action beside a primary — outlined (btn-secondary). */
+  ctaSecondary: 'btn-secondary',
 } as const
 
 export type Skin = typeof SKIN

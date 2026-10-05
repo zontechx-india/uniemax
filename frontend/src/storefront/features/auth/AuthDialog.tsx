@@ -168,7 +168,7 @@ function OpenAuthDialog({ req }: { req: AuthDialogRequest }) {
               // introduces itself — compactly, above the title.
               <div className="mb-5 flex items-center gap-3 md:hidden">
                 <StoreLogo brand={brand} className="h-8 w-8 rounded-md" />
-                <span className="metal-text truncate font-heading text-base font-semibold">
+                <span className="truncate font-display text-fg text-base font-semibold">
                   {brand.name}
                 </span>
               </div>
@@ -252,7 +252,7 @@ function BrandPanel({
     <div className="hidden md:flex md:min-h-0 md:flex-col md:justify-between md:border-r md:border-line md:bg-bg md:p-8 lg:p-10">
       <div>
         <StoreLogo brand={brand} className="h-16 w-16 rounded-lg" />
-        <h2 className="metal-text mt-6 font-heading text-3xl font-bold">{brand.name}</h2>
+        <h2 className="mt-6 font-display text-fg text-3xl font-bold">{brand.name}</h2>
         <p className="mt-2 max-w-xs text-sm text-muted">
           Sign in with your UnieMax account to shop at {brand.name} — track
           orders, check out faster and message the store.

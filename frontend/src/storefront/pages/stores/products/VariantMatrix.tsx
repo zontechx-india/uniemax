@@ -109,7 +109,7 @@ export function VariantMatrix({
         onClick={() => setBulkOpen(true)}
         disabled={disabled}
         aria-haspopup="dialog"
-        className={buttonClass({ variant: 'ring', size: 'md', className: 'w-full sm:w-auto' })}
+        className={buttonClass({ variant: 'secondary', size: 'md', className: 'w-full sm:w-auto' })}
       >
         <SlidersIcon className="h-4 w-4" />
         Same price for all…

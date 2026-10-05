@@ -298,7 +298,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
                 {product.category.name}
               </Link>
               <h1
-                className={`mt-1 font-heading text-3xl font-semibold leading-tight sm:text-4xl ${skin.text}`}
+                className={`mt-1 font-display text-3xl font-semibold leading-tight ${skin.text}`}
               >
                 {displayName(product.name)}
               </h1>
@@ -313,7 +313,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <span className="font-figure text-3xl font-extrabold text-brand">
+            <span className="font-figure text-3xl font-bold text-brand">
               {formatPrice(price)}
             </span>
             {compareAt && Number(compareAt) > Number(price) && (

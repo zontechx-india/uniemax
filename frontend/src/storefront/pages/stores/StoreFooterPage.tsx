@@ -329,7 +329,7 @@ function LocationsCard() {
                       type="button"
                       onClick={() => setEditing(location.id)}
                       disabled={busy}
-                      className={buttonClass({ variant: 'ring', size: 'md', className: 'px-4' })}
+                      className={buttonClass({ variant: 'secondary', size: 'md', className: 'px-4' })}
                     >
                       <PencilIcon className="h-4 w-4" />
                       Edit
@@ -982,7 +982,7 @@ function LinksCard() {
             type="button"
             onClick={() => setRows((r) => [...r, { label: '', url: '' }])}
             disabled={busy}
-            className={buttonClass({ variant: 'ring', size: 'md' })}
+            className={buttonClass({ variant: 'secondary', size: 'md' })}
           >
             <PlusIcon className="h-4 w-4" />
             Add a link

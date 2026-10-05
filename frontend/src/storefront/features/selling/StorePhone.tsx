@@ -84,7 +84,7 @@ export function StorePhone({
             {store.banner.eyebrow}
           </p>
           {/* Narrow enough that no title reaches the emoji on the right. */}
-          <p className="relative mt-[4px] max-w-[138px] font-heading text-[17px] font-extrabold leading-[1.15]">
+          <p className="relative mt-[4px] max-w-[138px] font-heading text-[17px] font-bold leading-[1.15]">
             {store.banner.title}
           </p>
           <p className="relative mt-[4px] max-w-[138px] text-[10.5px] opacity-85">

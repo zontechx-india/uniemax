@@ -318,7 +318,7 @@ function NextStep({
           type="button"
           onClick={actions.publish}
           disabled={actions.busy || !store.readiness.gates.PUBLISH.allowed}
-          className={buttonClass({ variant: 'sheen', size: 'lg', full: true })}
+          className={buttonClass({ variant: 'primary', size: 'lg', full: true })}
         >
           {actions.busy ? 'Publishing…' : 'Publish my shop'}
         </button>

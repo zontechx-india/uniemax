@@ -35,3 +35,9 @@ jobs:
 
       - run: npm run build
         working-directory: frontend
+
+      # Design guidelines guard (docs/DESIGN_GUIDELINES.md): fails when new
+      # code adds stray text sizes, gradients, glass, ad-hoc effects or
+      # hand-made buttons beyond frontend/scripts/ui-budget.json.
+      - run: npm run check:ui
+        working-directory: frontend

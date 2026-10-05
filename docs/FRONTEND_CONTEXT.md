@@ -2837,6 +2837,19 @@ for the sellers and shoppers UnieMax serves; restoring 100% grew every
 rem-derived Tailwind size (text, spacing, heights) in both apps at once.
 Pixel values (borders, the 1920px shell cap) are unaffected.
 
+**Type scale and corners** (docs/DESIGN_GUIDELINES.md §4, §7). Seven text
+sizes — caption 13 · label 14 · body 16 · subtitle 18 · section 22 · title 28
+· display 40 (storefront hero only) — as `text-caption … text-display`, with
+Tailwind's own names remapped onto them in `@theme` (`text-xs` 13, `sm` 14,
+`base` 16, `lg` 18, `xl`/`2xl` 22, `3xl`/`4xl` 28, `5xl`/`6xl` 40). Four
+weights (400/500/600/700; `font-extrabold` is gone). Corners: 8px controls
+(`rounded-sm`/`md`), 12px cards (`rounded-lg`/`xl`, `rounded-glass`), 16px
+sheets (`rounded-2xl`/`3xl`, `rounded-sheet`), full for pills. Two shadows:
+`shadow-floating` (things that float) and `shadow-lifted` (hover).
+**`npm run check:ui`** (CI) counts stray `text-[Npx]` sizes, gradients,
+glass, ad-hoc effects and hand-made `<button>`s and fails if any count rises
+above `frontend/scripts/ui-budget.json`; each clean-up phase lowers the budget.
+
 **The touch-size tokens (px, not rem).** Added while the root was 90%,
 which put
 `text-sm` inputs at 12.6px (iOS zooms the page on focus under 16px) and
@@ -2868,7 +2881,7 @@ whole palette as CSS variables and maps them into Tailwind v4 via
 | `bg-brand-soft` | brand tint (Light Purple) | `logo-lockup` | the brand lockup (see *Brand art*) |
 | `text-danger` / `success` / `warning` | status | `shadow-floating` | elevation |
 | `text-pending` / `bg-pending-soft` | setup not finished (orange) | `bg-pending-gradient` | the animated pending mark |
-| `rounded-md` (4px) · `rounded-lg` (6px) · `rounded-pill` (50px) | radius | `font-heading` / `font-body` / `font-accent` | Fraunces / Plus Jakarta Sans / Fraunces italic |
+| `rounded-md` (4px) · `rounded-lg` (6px) · `rounded-pill` (50px) | radius | `font-heading` / `font-body` / `font-display` / `font-accent` / `font-figure` | Jakarta / Jakarta / Fraunces / Fraunces italic / Jakarta tabular |
 
 **Card hover language** (marketplace grids): `shadow-floating` at rest →
 `hover:-translate-y-1` (4px lift) + `hover:shadow-lifted` (the deeper
@@ -2955,12 +2968,13 @@ derived from it, and the secondary text is lifted to `#9a9a9a` because
   `main.tsx` before render (no flash). `ThemeProvider` exposes
   `useTheme() → { mode, setMode, toggle }`; `ThemeToggle` (sun/moon) sits in
   the storefront top bar. Both apps are wrapped in `ThemeProvider`.
-- **Fonts — "soft editorial"** (chosen October 2026 from six pairings,
-  replacing Manrope + Inter; a deliberate deviation from the skill's Times
-  New Roman / Noto Sans): headings, product names and prices use
-  **Fraunces**, a soft serif with an optical-size axis (`font-optical-sizing:
-  auto`), tracked −0.01em by the base `h1–h3` rule. Body/UI uses **Plus
-  Jakarta Sans**. The italic accent — `font-accent` utility / `--font-accent`,
+- **Fonts** (October 2026; a deliberate deviation from the skill's Times
+  New Roman / Noto Sans): the whole app interface — headings and body —
+  uses **Plus Jakarta Sans** (`--font-heading` = `--font-body`; `h1–h3`
+  tracked −0.015em). **Fraunces**, a soft serif with an optical-size axis, is
+  **storefront-only**: shop and product names via `font-display`
+  (`--font-display`; store hero, header, footer, product card and page,
+  showcase) and the italic accent. The italic accent — `font-accent` utility / `--font-accent`,
   Fraunces italic 500 — is for small touches only (a shop tagline, a product
   sub-line, one word in a heading), never running text or anything a seller
   must act on. **Numbers never use the serif**: prices, totals, MRP and
@@ -3018,67 +3032,30 @@ malformed optional colors as Auto) for any value failing
 (`bg-input`) inside a store page or the store-themed auth dialog sit on the
 owner's surface instead of keeping the app's white.
 
-**Metal accents — deliberately scarce.** Surfaces, bars, chips and wells are
-FLAT semantic colors; the shine is reserved for the places that should read as
-important. Six gradient utilities exist (`index.css`) — three CTA fills and
-three marks:
+**Buttons — four flat roles** (docs/DESIGN_GUIDELINES.md §9, since
+October 2026). `shared/ui/Button.tsx` / `buttonClass()` own height, radius
+(8px), padding and weight; a call site picks only `variant` + `size`
+(`sm` 36px dense rows only / `md` 44px / `lg` 48px). `loading` disables the
+button and shows an inline spinner.
 
-| Utility | Role |
-| ------- | ---- |
-| `btn-rise` | **default primary CTA.** Two stops in a ~20% lightness spread; glow on hover only |
-| `btn-sheen` | **the ONE committing action on a view** (Buy Now, Place Order). Flat at rest, a highlight sweeps across on hover |
-| `btn-ring` | **the secondary standing beside a primary** (Add to Cart next to Buy Now). Gradient border, fills on hover |
-| `metal-lift` | interactive card hover: small rise + evenly-spread brand halo |
-| `metal-text` | gradient display text for the store's brand mark (header/footer name) |
-| `metal-chip` | static brand-filled square for store-avatar fallbacks — no interactive states, since it is not a control |
+| Variant | CSS | Use for |
+| ------- | --- | ------- |
+| `primary` | `btn-primary` — flat `--cta` fill | the main action of the view (one per screen) |
+| `secondary` | `btn-secondary` — surface + 1px outline | a supporting action, e.g. Add to Cart beside Buy Now |
+| `ghost` | `btn-ghost` — text only | a low-priority action |
+| `danger` | `btn-danger` — flat red | a destructive action |
 
-All are tinted from the **owner's own colors** (never a fixed grey), so each
-store's shine matches its brand. `metal-lift`'s hover shadow (`--metal-glow`)
-deliberately has **zero x/y offset**, so the halo spreads equally on all four
-sides instead of pooling under the card — the same principle as the skill's
-`--shadow-floating`. (An earlier iteration brushed gradients over every
-surface — header, chips, wells, cards; it read as noise and was flattened, so
-the metal now marks importance rather than texture.)
-
-**Choosing a CTA fill is about importance, not looks.** `sheen` is capped at
-one per view — past that the sweep reads as noise, and it never fires on touch
-anyway, so its resting state has to carry the button alone. `ring` exists so a
-secondary can sit *beside* a primary in the same gradient family without
-competing for weight; its resting label is `text-brand` (it has no fill to
-contrast, so it takes the color that contrasts the surface) and flips to
-`text-cta-contrast` as the ring fills. Everything else is `rise`.
-
-**The stops, not a gradient string.** Each variant needs a different pair of
-steps and a different angle, so `storeVars()` emits *stops* — `--cta`,
-`--cta-top` / `--cta-bottom` (resting), `--cta-hi` / `--cta-lo` (hover and
-press), `--cta-pressed`, plus `--cta-edge` (inset top highlight, dimmer for a
-dark primary) and `--cta-glow` (a *color*; each variant sets its own spread).
-`--brand-metal` survives as a ready-made gradient for the two brand *marks*
-(`metal-text`, `metal-chip`), which do want one fixed chrome.
-
-**Sizing lives in `shared/ui/Button.tsx`, not at the call site.** Height,
-radius, padding and weight are fixed there behind `variant` + `size`
-(`sm` 36px / `md` 44px / `lg` 48px); `buttonClass()` returns the same string
-for the CTAs that are `<Link>` rather than `<button>`, and `loading` disables
-the button and shows an inline `currentColor` spinner. This replaced seven
-hand-sized CTAs that had drifted into four height systems, three font weights
-and two radii.
-
-> These gradients are a **deliberate, scoped deviation** from the skill's
-> "solid colors only" rule (same precedent as the brand gradient). They apply
-> to the store-themed shopping surfaces only — `/store/{slug}` plus the
-> cart/checkout pages' primary CTAs (Place Order, Deliver to This Address),
-> which follow the owner's palette; `index.css` carries neutral `--cta-*` and
-> `--brand-metal` fallbacks cut from the app purple so a `/cart` with no known
-> store still renders them. The rest of both apps stays flat and solid. The
-> `text-cta-contrast` that `Button` pairs with every filled variant is what
-> makes the owner's **Button text color** setting apply to these buttons
-> (`ring` at rest is the exception — with no fill to contrast it uses the flat
-> brand, and picks up `cta-contrast` once it fills).
+No gradients, sweeps or glows. The primary fill is `--cta` (hover
+`--cta-pressed`, pressed `--cta-lo`), which `storeVars()` re-points to the
+shop owner's colour, so every storefront's buttons follow its brand and the
+owner's Button text colour (`--cta-contrast`). The older `btn-rise` /
+`btn-sheen` / `btn-ring` gradient fills and the `metal-text` gradient brand
+name were removed; `metal-lift` / `metal-chip` remain only until the Phase 2–3
+clean-up (docs/DESIGN_SYSTEM_PLAN.md).
 
 The `SKIN` object in `storeTheme.ts` maps semantic slots (`surface`, `well`,
-`chip` — all flat — plus `cta` → `btn-rise`, `ctaSheen` → `btn-sheen` and
-`ctaRing` → `btn-ring`), so storefront components stay declarative. The Store
+`chip` — all flat — plus `cta` → `btn-primary` and `ctaSecondary` →
+`btn-secondary`), so storefront components stay declarative. The Store
 Builder's Design panel edits the colors and paints the draft straight into the
 live preview frame, so what is being judged is the shop itself rather than a
 miniature of it.

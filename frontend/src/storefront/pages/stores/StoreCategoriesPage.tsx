@@ -532,7 +532,7 @@ function CategoryEditPanel({
             type="button"
             onClick={onCancel}
             disabled={saving}
-            className={buttonClass({ variant: 'ring', size: 'lg' })}
+            className={buttonClass({ variant: 'secondary', size: 'lg' })}
           >
             Cancel
           </button>

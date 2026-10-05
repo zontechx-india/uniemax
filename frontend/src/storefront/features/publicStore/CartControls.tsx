@@ -109,11 +109,11 @@ export function PurchaseActions({
       <>
         {/* Add sits beside Buy Now, so it takes the Ring: same gradient
             family, no competing weight. Buy Now is the committing action. */}
-        <Button variant="ring" onClick={addToCart} className="flex-1">
+        <Button variant="secondary" onClick={addToCart} className="flex-1">
           <CartIcon className="h-4 w-4" />
           Add
         </Button>
-        <Button variant="sheen" onClick={buyNow} className="flex-1">
+        <Button variant="primary" onClick={buyNow} className="flex-1">
           Buy Now
         </Button>
         {added && <AddedToast name={target.name} storeSlug={target.storeSlug} />}
@@ -130,14 +130,14 @@ export function PurchaseActions({
           onChange={setQty}
           skin={skin}
         />
-        <Button variant="ring" onClick={addToCart} className="flex-1">
+        <Button variant="secondary" onClick={addToCart} className="flex-1">
           <CartIcon className="h-4 w-4" />
           Add to Cart
         </Button>
       </div>
 
       {/* The one committing action on the product page. */}
-      <Button variant="sheen" onClick={buyNow} full>
+      <Button variant="primary" onClick={buyNow} full>
         Buy Now
       </Button>
 
@@ -260,7 +260,7 @@ export function QuickAdd({
         type="button"
         onClick={add}
         aria-label={`Add ${product.name} to cart`}
-        className="absolute bottom-2.5 right-2.5 z-10 inline-flex h-11 items-center gap-1.5 rounded-pill px-3.5 text-sm font-bold shadow-floating transition btn-rise text-cta-contrast"
+        className="absolute bottom-2.5 right-2.5 z-10 inline-flex h-11 items-center gap-1.5 rounded-pill px-3.5 text-sm font-bold shadow-floating transition btn-primary"
       >
         {added ? <CheckIcon className="h-4 w-4" /> : <CartIcon className="h-4 w-4" />}
         {added ? 'Added' : 'Add'}

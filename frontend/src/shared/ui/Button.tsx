@@ -1,64 +1,51 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
 /**
- * The one button.
+ * The one button (docs/DESIGN_GUIDELINES.md section 9).
  *
  * Height, radius, padding and weight live HERE, so a call site can only
- * choose a variant and a size. Before this, every CTA was sized inline and
- * the storefront drifted into four height systems, three font weights and
- * two radii across seven files — that drift is no longer expressible.
+ * choose a role and a size; a hand-made `<button>` styled as a CTA is not
+ * allowed. Four roles, chosen by IMPORTANCE:
  *
- * ## Which variant
+ * | Variant     | Use for                                        | Per view |
+ * | ----------- | ---------------------------------------------- | -------- |
+ * | `primary`   | the main action — Save, Buy Now, Place Order   | one*     |
+ * | `secondary` | a supporting action — Cancel, Add to Cart      | any      |
+ * | `ghost`     | a low-priority action — Skip, Clear filters    | any      |
+ * | `danger`    | a destructive action — Delete, Cancel order    | rare     |
  *
- * The choice is about IMPORTANCE, not looks. In order of weight:
+ * (*) A list may repeat its row action, but a screen has one clear primary.
+ * Fills are FLAT (no gradients or glows); the primary takes `--cta`, which
+ * a storefront re-points to the shop owner's colour. Every state — hover,
+ * pressed, focus (global ring), disabled, loading — is handled here.
  *
- * | Variant  | Use for                                          | Per view |
- * | -------- | ------------------------------------------------ | -------- |
- * | `sheen`  | the ONE committing action — Buy Now, Place Order  | max 1    |
- * | `rise`   | every other primary — the default                | any      |
- * | `ring`   | the secondary standing BESIDE a primary          | any      |
- *
- * `sheen` sweeps a highlight across on hover; more than one per screen and
- * it reads as noise. `ring` is a gradient outline that fills on hover — it
- * belongs next to a `rise`/`sheen` (Add to Cart beside Buy Now), where a
- * second filled button would compete for the same attention.
- *
- * All three fills are cut from the STORE OWNER's primary color via the
- * `--cta-*` stops (`storeTheme.ts#storeVars()`), so they re-derive per store.
- * The fills themselves are in `index.css`; see docs/FRONTEND_CONTEXT.md.
- *
- * ## Links
- *
- * Several CTAs are `<Link>`, not `<button>`. Those use `buttonClass()`
- * directly rather than this component:
+ * Links that look like buttons use `buttonClass()`:
  *
  * ```tsx
- * <Link to={…} className={buttonClass({ variant: 'sheen' })}>Place Order</Link>
+ * <Link to={...} className={buttonClass({ variant: 'primary' })}>Place Order</Link>
  * ```
  */
 
-export type ButtonVariant = 'rise' | 'sheen' | 'ring'
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
 export type ButtonSize = 'sm' | 'md' | 'lg'
 
-// Heights in PX (36 / 44 / 48), not rem: the 90% root scale turned `h-11`
-// into 39.6px and `h-12` into 43.2px — under the 44px a thumb needs, and not
-// the sizes this file documents. `h-tap` / `h-field` are the px tokens.
+// Heights in px: sm 36 (dense rows only), md 44 (the tap minimum), lg 48.
 const SIZE: Record<ButtonSize, string> = {
-  sm: 'h-[36px] gap-1.5 px-3.5 text-xs',
+  sm: 'h-[36px] gap-1.5 px-3.5 text-sm',
   md: 'h-tap gap-2 px-5 text-sm',
-  lg: 'h-field gap-2 px-6 text-sm',
+  lg: 'h-field gap-2 px-6 text-base',
 }
 
 const VARIANT: Record<ButtonVariant, string> = {
-  rise: 'btn-rise text-cta-contrast',
-  sheen: 'btn-sheen text-cta-contrast',
-  // Label flips from the flat brand to the CTA contrast as the ring fills.
-  ring: 'btn-ring text-brand hover:text-cta-contrast',
+  primary: 'btn-primary',
+  secondary: 'btn-secondary',
+  ghost: 'btn-ghost',
+  danger: 'btn-danger',
 }
 
 const BASE =
-  'inline-flex shrink-0 items-center justify-center rounded-md font-bold ' +
-  'transition disabled:cursor-not-allowed disabled:opacity-45'
+  'inline-flex shrink-0 items-center justify-center rounded-md font-semibold ' +
+  'transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-45'
 
 export interface ButtonClassOptions {
   variant?: ButtonVariant
@@ -71,7 +58,7 @@ export interface ButtonClassOptions {
 
 /** The class string on its own — for `<Link>` and other non-`<button>` CTAs. */
 export function buttonClass({
-  variant = 'rise',
+  variant = 'primary',
   size = 'md',
   full = false,
   className = '',

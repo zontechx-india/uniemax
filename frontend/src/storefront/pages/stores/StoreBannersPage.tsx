@@ -245,7 +245,7 @@ export function StoreBannersPage({
           }}
         />
         <Button
-          variant="rise"
+          variant="primary"
           size="lg"
           disabled={busy || full}
           onClick={() => addInput.current?.click()}
@@ -545,7 +545,7 @@ function BannerCard({
           type="button"
           onClick={() => imageInput.current?.click()}
           disabled={busy}
-          className={buttonClass({ variant: 'ring', size: 'md', full: true })}
+          className={buttonClass({ variant: 'secondary', size: 'md', full: true })}
         >
           <ImageIcon className="h-4 w-4" />
           Change photo

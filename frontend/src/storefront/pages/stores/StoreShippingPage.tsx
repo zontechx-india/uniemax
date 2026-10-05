@@ -323,7 +323,7 @@ function ShippingCharges({
               setEditorKey((k) => k + 1)
               setError(null)
             }}
-            className={buttonClass({ variant: 'ring', size: 'lg' })}
+            className={buttonClass({ variant: 'secondary', size: 'lg' })}
           >
             Undo changes
           </button>
@@ -432,7 +432,7 @@ function DeliveryAreas({
               setDraft(saved)
               setError(null)
             }}
-            className={buttonClass({ variant: 'ring', size: 'lg' })}
+            className={buttonClass({ variant: 'secondary', size: 'lg' })}
           >
             Undo changes
           </button>

@@ -97,7 +97,7 @@ export function SellPage() {
                 </span>
                 Free to start · Made for Indian sellers
               </p>
-              <h1 className="mt-6 text-balance font-heading text-[2.6rem] font-extrabold leading-[1.04] tracking-tight text-fg sm:text-6xl lg:text-[4.4rem]">
+              <h1 className="mt-6 text-balance font-heading text-[2.6rem] font-bold leading-[1.04] tracking-tight text-fg sm:text-6xl lg:text-[4.4rem]">
                 Your own online store.
                 <span className="text-brand-gradient-on-dark block">Ready to take orders.</span>
               </h1>
@@ -111,7 +111,7 @@ export function SellPage() {
                   value={storeName}
                   onChange={setStoreName}
                   placement="sell_hero"
-                  variant="sheen"
+                  variant="primary"
                 />
               </div>
             </div>
@@ -231,7 +231,7 @@ export function SellPage() {
           <div aria-hidden="true" className="sell-glow absolute inset-0 -z-10" />
           <div className={`${CONTENT_COLUMN} py-20 sm:py-24 lg:py-28`}>
             <div className="mx-auto max-w-2xl text-center">
-              <h2 className="font-heading text-3xl font-extrabold leading-[1.1] tracking-tight text-fg sm:text-5xl">
+              <h2 className="font-heading text-3xl font-bold leading-[1.1] tracking-tight text-fg sm:text-5xl">
                 Ready to open your store?
               </h2>
               <p className="mt-4 text-base text-muted sm:text-lg">
@@ -244,7 +244,7 @@ export function SellPage() {
                 value={storeName}
                 onChange={setStoreName}
                 placement="sell_final"
-                variant="rise"
+                variant="primary"
               />
             </div>
           </div>
@@ -342,7 +342,7 @@ function SectionHeading({
   return (
     <div className={align === 'center' ? 'mx-auto max-w-2xl text-center' : 'max-w-xl'}>
       <p className="text-sm font-semibold text-brand">{eyebrow}</p>
-      <h2 className="mt-3 font-heading text-3xl font-extrabold leading-[1.1] tracking-tight text-fg sm:text-4xl lg:text-5xl">
+      <h2 className="mt-3 font-heading text-3xl font-bold leading-[1.1] tracking-tight text-fg sm:text-4xl lg:text-5xl">
         {title}
       </h2>
       {body && <p className="mt-4 text-base leading-relaxed text-muted sm:text-lg">{body}</p>}

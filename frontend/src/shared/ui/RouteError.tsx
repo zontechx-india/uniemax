@@ -72,7 +72,7 @@ export function ErrorScreen({ error, homeHref = '/' }: { error: unknown; homeHre
         {/* A full navigation, not a <Link>: home may live in another router. */}
         <a
           href={homeHref}
-          className={buttonClass({ variant: notFound ? 'rise' : 'ring', size: 'md' })}
+          className={buttonClass({ variant: notFound ? 'primary' : 'secondary', size: 'md' })}
         >
           Back to home
         </a>

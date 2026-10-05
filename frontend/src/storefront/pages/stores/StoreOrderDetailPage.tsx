@@ -256,7 +256,7 @@ export function StoreOrderDetailPage() {
                     <div className="grid grid-cols-2 gap-2">
                       <a
                         href={`tel:${order.customerPhone}`}
-                        className={buttonClass({ variant: 'ring', size: 'lg', full: true })}
+                        className={buttonClass({ variant: 'secondary', size: 'lg', full: true })}
                       >
                         <PhoneCallIcon className="h-5 w-5" />
                         Call
@@ -297,7 +297,7 @@ export function StoreOrderDetailPage() {
                           <button
                             type="button"
                             onClick={() => void copyAddress()}
-                            className={buttonClass({ variant: 'ring', size: 'md', className: 'mt-2.5' })}
+                            className={buttonClass({ variant: 'secondary', size: 'md', className: 'mt-2.5' })}
                           >
                             <ClipboardIcon className="h-4 w-4" />
                             Copy address
@@ -431,7 +431,7 @@ export function StoreOrderDetailPage() {
                   <Button
                     type="button"
                     size="lg"
-                    variant="sheen"
+                    variant="primary"
                     disabled={busy}
                     onClick={() => setConfirming('advance')}
                     className="min-w-0 flex-1 text-[15px]"

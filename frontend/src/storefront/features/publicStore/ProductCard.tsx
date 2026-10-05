@@ -72,7 +72,7 @@ export function ProductCard({
           {/* Product names carry the heading face at medium weight — bold
               reads heavy at this size. Two lines, then ellipsis. */}
           <h3
-            className={`line-clamp-2 font-heading font-medium leading-tight transition-colors group-hover:text-brand ${
+            className={`line-clamp-2 font-display font-medium leading-tight transition-colors group-hover:text-brand ${
               large ? 'text-lg sm:text-xl' : 'text-[15px] sm:text-base'
             } ${skin.text}`}
           >

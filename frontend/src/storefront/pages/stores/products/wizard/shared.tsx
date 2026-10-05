@@ -123,7 +123,7 @@ export function StepButtons({
             type="button"
             onClick={onBack}
             disabled={busy}
-            className={buttonClass({ variant: 'ring', size: 'lg', className: 'px-5' })}
+            className={buttonClass({ variant: 'secondary', size: 'lg', className: 'px-5' })}
           >
             Back
           </button>

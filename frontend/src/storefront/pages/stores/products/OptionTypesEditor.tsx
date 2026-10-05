@@ -329,7 +329,7 @@ export function OptionTypesEditor({
                     onClick={() => setPicking(key)}
                     disabled={disabled || !name}
                     title={name ? undefined : 'Name the choice first'}
-                    className={buttonClass({ variant: 'ring', size: 'md' })}
+                    className={buttonClass({ variant: 'secondary', size: 'md' })}
                   >
                     <PlusIcon className="h-4 w-4" />
                     Pick from my products
@@ -339,7 +339,7 @@ export function OptionTypesEditor({
                     onClick={() => setCreating(key)}
                     disabled={disabled || !name}
                     title={name ? undefined : 'Name the choice first'}
-                    className={buttonClass({ variant: 'ring', size: 'md' })}
+                    className={buttonClass({ variant: 'secondary', size: 'md' })}
                   >
                     <PlusIcon className="h-4 w-4" />
                     Make a new product for this
@@ -447,7 +447,7 @@ export function OptionTypesEditor({
                 addProducts()
               }}
               disabled={disabled || full}
-              className={buttonClass({ variant: 'ring', size: 'md', className: 'mt-3' })}
+              className={buttonClass({ variant: 'secondary', size: 'md', className: 'mt-3' })}
             >
               <PlusIcon className="h-4 w-4" />
               Link my other products

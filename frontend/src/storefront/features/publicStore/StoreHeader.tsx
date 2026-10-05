@@ -161,7 +161,7 @@ function StoreHeaderBar({
             </span>
           )}
           {/* Brand mark in gradient display text (prototype's gold-text). */}
-          <span className="metal-text truncate font-heading text-base font-semibold sm:text-lg lg:max-w-56">
+          <span className="truncate font-display text-fg text-base font-semibold sm:text-lg lg:max-w-56">
             {store.name}
           </span>
         </Link>
@@ -415,7 +415,7 @@ function MobileDrawer({
         <div
           className={`flex items-center justify-between border-b p-4 ${skin.border}`}
         >
-          <span className="metal-text font-heading text-lg font-semibold">
+          <span className="font-display text-fg text-lg font-semibold">
             {store.name}
           </span>
           <button

@@ -342,7 +342,7 @@ function AccountRow({
             type="button"
             onClick={onEdit}
             disabled={busy}
-            className={buttonClass({ variant: 'ring', size: 'md', className: 'px-4' })}
+            className={buttonClass({ variant: 'secondary', size: 'md', className: 'px-4' })}
           >
             <PencilIcon className="h-4 w-4" />
             Edit
@@ -599,7 +599,7 @@ function AccountForm({
               type="button"
               onClick={onCancel}
               disabled={busy}
-              className={buttonClass({ variant: 'ring', size: 'lg' })}
+              className={buttonClass({ variant: 'secondary', size: 'lg' })}
             >
               Cancel
             </button>

@@ -194,7 +194,7 @@ function GetLink({
           </option>
         ))}
       </select>
-      <Button size="sm" variant="ring" loading={busy} onClick={create}>
+      <Button size="sm" variant="secondary" loading={busy} onClick={create}>
         {label}
       </Button>
       {error && <span className="text-xs text-danger">{error}</span>}

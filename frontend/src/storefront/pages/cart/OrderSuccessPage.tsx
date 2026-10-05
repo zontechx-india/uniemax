@@ -491,7 +491,7 @@ export function OrderSuccessPage({
                 {sellerPhone && (
                   <a
                     href={`tel:+${sellerPhone.length === 10 ? `91${sellerPhone}` : sellerPhone}`}
-                    className={buttonClass({ variant: 'ring', className: 'sm:flex-1' })}
+                    className={buttonClass({ variant: 'secondary', className: 'sm:flex-1' })}
                   >
                     <PhoneCallIcon className="h-4 w-4" />
                     Call seller
@@ -504,7 +504,7 @@ export function OrderSuccessPage({
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={buttonClass({ variant: 'ring', className: 'sm:flex-1' })}
+                    className={buttonClass({ variant: 'secondary', className: 'sm:flex-1' })}
                   >
                     <ChatIcon className="h-4 w-4" />
                     WhatsApp seller
@@ -512,7 +512,7 @@ export function OrderSuccessPage({
                 )}
                 <Link
                   to={storeSupportUrl(order.storeSlug)}
-                  className={buttonClass({ variant: 'ring', className: 'sm:flex-1' })}
+                  className={buttonClass({ variant: 'secondary', className: 'sm:flex-1' })}
                 >
                   <LifebuoyIcon className="h-4 w-4" />
                   Send a message

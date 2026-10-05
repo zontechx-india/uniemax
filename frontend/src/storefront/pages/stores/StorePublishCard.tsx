@@ -74,7 +74,7 @@ function ShareActions({
       ) : (
         !store.isPublished && (
           <Button
-            variant="sheen"
+            variant="primary"
             size="lg"
             full
             loading={actions.busy}
@@ -112,7 +112,7 @@ function ShareActions({
           type="button"
           onClick={() => void actions.share()}
           className={buttonClass({
-            variant: 'ring',
+            variant: 'secondary',
             size: compact ? 'sm' : 'md',
             full: true,
             className: 'whitespace-nowrap',
@@ -126,7 +126,7 @@ function ShareActions({
           target="_blank"
           rel="noreferrer"
           className={buttonClass({
-            variant: 'ring',
+            variant: 'secondary',
             size: compact ? 'sm' : 'md',
             full: true,
             className: 'whitespace-nowrap',

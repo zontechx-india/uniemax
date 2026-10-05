@@ -100,24 +100,84 @@
 }
 
 /* Static (never-flipping) tokens → generate font/radius/shadow utilities. */
+/* ===================================================================
+ * DESIGN SYSTEM — docs/DESIGN_GUIDELINES.md is the rulebook; these tokens
+ * are its implementation. Use the scale; never invent a size.
+ * =================================================================== */
 @theme {
-  --font-heading: 'Fraunces', Georgia, 'Times New Roman', serif;
+  /* Fonts. App interface = one clean sans. The serif (Fraunces) is ONLY for
+   * the customer-facing storefront: shop and product names (font-display)
+   * and the italic accent (font-accent). Numbers use font-figure. */
+  --font-heading: 'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --font-body: 'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  /* The italic accent — a shop's tagline, a product's sub-line, one word in
-   * a heading. Never for running text or anything a seller must act on. */
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  /* The italic accent — a shop tagline, a product sub-line. Storefront
+   * only; never running text or anything a seller must act on. */
   --font-accent: 'Fraunces', Georgia, 'Times New Roman', serif;
 
-  --radius-xs: 2px;
-  --radius-sm: 3.2px;
-  --radius-md: 4px;
-  --radius-lg: 6px;
-  --radius-pill: 50px;
+  /* Type scale — SEVEN sizes, one per role. Tailwind's own names are mapped
+   * onto it so existing classes land on a step of the scale:
+   *   caption  13  helper text, meta, timestamps        (text-xs, text-caption)
+   *   label    14  labels, secondary text, small buttons (text-sm, text-label)
+   *   body     16  everything you read                   (text-base, text-body)
+   *   subtitle 18  card titles, subtitles                (text-lg, text-subtitle)
+   *   section  22  section titles                        (text-xl/2xl, text-section)
+   *   title    28  page titles                           (text-3xl/4xl, text-title)
+   *   display  40  storefront hero only                  (text-5xl/6xl, text-display)
+   * Weights: 400 body, 500 labels, 600 titles and buttons, 700 page titles
+   * and figures. */
+  --text-xs: 13px;
+  --text-xs--line-height: 1.45;
+  --text-sm: 14px;
+  --text-sm--line-height: 1.45;
+  --text-base: 16px;
+  --text-base--line-height: 1.55;
+  --text-lg: 18px;
+  --text-lg--line-height: 1.45;
+  --text-xl: 22px;
+  --text-xl--line-height: 1.3;
+  --text-2xl: 22px;
+  --text-2xl--line-height: 1.3;
+  --text-3xl: 28px;
+  --text-3xl--line-height: 1.2;
+  --text-4xl: 28px;
+  --text-4xl--line-height: 1.2;
+  --text-5xl: 40px;
+  --text-5xl--line-height: 1.1;
+  --text-6xl: 40px;
+  --text-6xl--line-height: 1.1;
+  --text-caption: 13px;
+  --text-caption--line-height: 1.45;
+  --text-label: 14px;
+  --text-label--line-height: 1.45;
+  --text-body: 16px;
+  --text-body--line-height: 1.55;
+  --text-subtitle: 18px;
+  --text-subtitle--line-height: 1.45;
+  --text-section: 22px;
+  --text-section--line-height: 1.3;
+  --text-title: 28px;
+  --text-title--line-height: 1.2;
+  --text-display: 40px;
+  --text-display--line-height: 1.1;
 
-  /* Soft, even elevation — no offset so it sits equally on all four sides. */
-  --shadow-floating: 0 0 12px 0 rgba(0, 0, 0, 0.06);
-  /* Hover elevation for interactive cards. Same zero-offset principle, just
-   * deeper and wider, so a lifted card gains weight rather than a drop shadow. */
-  --shadow-lifted: 0 0 24px 0 rgba(0, 0, 0, 0.13);
+  /* Corners — THREE: controls 8 (buttons, inputs), cards 12, sheets and
+   * dialogs 16; plus full for pills and avatars. Every Tailwind radius name
+   * maps onto one of them. */
+  --radius-xs: 8px;
+  --radius-sm: 8px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 16px;
+  --radius-pill: 9999px;
+
+  /* Elevation — ONE resting shadow for things that float (menus, sheets,
+   * toasts) and one for hover on interactive cards. Cards on the page use a
+   * border, not a shadow. */
+  --shadow-floating: 0 1px 2px rgba(16, 12, 30, 0.06), 0 4px 12px rgba(16, 12, 30, 0.06);
+  --shadow-lifted: 0 2px 4px rgba(16, 12, 30, 0.06), 0 8px 24px rgba(16, 12, 30, 0.1);
 
   /* Seller workspace (/mystores) sizes — in PX on purpose. The 90% root
    * below shrinks every rem, which left inputs at 12.6px (iOS zooms the page
@@ -134,8 +194,8 @@
   --text-field--line-height: 1.4;
   --text-hint: 13px;
   --text-hint--line-height: 1.45;
-  --radius-glass: 16px;
-  --radius-sheet: 22px;
+  --radius-glass: 12px;
+  --radius-sheet: 16px;
 
   /* Dialog entrance (the auth dialog): a short settle rather than a slide —
    * enters from below per the motion rules, ease-out, well under 300ms. The
@@ -547,100 +607,56 @@
   }
 
   /* ---------------------------------------------------------------- *
-   * CTA fills — three variants, one shape. `Button` (shared/ui) owns the
-   * shape (height, radius, weight); these own only the fill, so a variant
-   * can be swapped on a button without touching its sizing.
-   *
-   * Which to use — the rule is about IMPORTANCE, not looks:
-   *   btn-sheen  the ONE committing action on the view (Buy Now, Place
-   *              Order). Max one per screen, or the sweep becomes noise.
-   *   btn-rise   every other primary. The default.
-   *   btn-ring   the secondary standing BESIDE a primary (Add to Cart next
-   *              to Buy Now) — same gradient family, no competing weight.
-   *
-   * All three derive from the owner's primary via the `--cta-*` stops, so
-   * they re-cut themselves per store. See docs/FRONTEND_CONTEXT.md.
+   * Button roles (DESIGN_GUIDELINES section 9) — FLAT, no gradients, no glow.
+   * Button (shared/ui) owns the shape; these own only colour and states.
+   *   btn-primary    the main action of the view (brand fill)
+   *   btn-secondary  a supporting action (outlined)
+   *   btn-ghost      a low-priority action (text only)
+   *   btn-danger     a destructive action (red fill)
+   * The primary fill is --cta, which a storefront re-points to the shop
+   * owner colour (storeTheme.ts), so it follows every shop.
    * ---------------------------------------------------------------- */
-
-  /* Rise — two stops inside a ~20% lightness spread, so the fill reads
-   * identically at 36px and 48px (the old three-stop chrome put its 48%
-   * midpoint seam through the label on compact buttons). The glow is a
-   * HOVER state: a cart page with six CTAs shows six buttons, not six
-   * flares. Pressed inverts the gradient, so the button feels clickable. */
-  .btn-rise {
-    background-image: linear-gradient(180deg, var(--cta-top) 0%, var(--cta-bottom) 100%);
-    box-shadow: inset 0 1px 0 var(--cta-edge);
-  }
-  .btn-rise:hover:not(:disabled) {
-    background-image: linear-gradient(180deg, var(--cta-hi) 0%, var(--cta-pressed) 100%);
-    box-shadow:
-      inset 0 1px 0 var(--cta-edge),
-      0 5px 14px -7px var(--cta-glow);
-  }
-  .btn-rise:active:not(:disabled) {
-    background-image: linear-gradient(180deg, var(--cta-pressed) 0%, var(--cta-lo) 100%);
-    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.22);
-  }
-
-  /* Sheen — flat at rest; a highlight sweeps across once on hover. The
-   * resting state carries the button on its own, because the sweep never
-   * fires on touch, which is most of this storefront's traffic. */
-  .btn-sheen {
-    position: relative;
-    overflow: hidden;
-    isolation: isolate;
+  .btn-primary {
     background-color: var(--cta);
-    background-image: none;
-    box-shadow: inset 0 1px 0 var(--cta-edge);
+    color: var(--cta-contrast);
   }
-  .btn-sheen::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background-image: linear-gradient(
-      104deg,
-      transparent 34%,
-      rgb(255 255 255 / 0.3) 47%,
-      transparent 60%
-    );
-    transform: translateX(-62%);
-    transition: transform 620ms cubic-bezier(0.22, 0.61, 0.36, 1);
-  }
-  .btn-sheen:hover:not(:disabled)::after {
-    transform: translateX(62%);
-  }
-  .btn-sheen:hover:not(:disabled) {
-    box-shadow:
-      inset 0 1px 0 var(--cta-edge),
-      0 5px 16px -8px var(--cta-glow);
-  }
-  .btn-sheen:active:not(:disabled) {
+  .btn-primary:hover:not(:disabled) {
     background-color: var(--cta-pressed);
   }
-
-  /* Ring — gradient border, transparent centre, fills on hover. Two
-   * backgrounds: the padding box paints `--surface` (the STORE's surface, so
-   * the centre never punches a white hole in a dark storefront), the border
-   * box paints the gradient. The label color is set by the caller, since it
-   * flips from brand to CTA-contrast between rest and hover. */
-  .btn-ring {
-    border: 1.5px solid transparent;
-    background-image:
-      linear-gradient(var(--surface), var(--surface)),
-      linear-gradient(135deg, var(--cta-hi) 0%, var(--cta-lo) 100%);
-    background-origin: border-box;
-    background-clip: padding-box, border-box;
+  .btn-primary:active:not(:disabled) {
+    background-color: var(--cta-lo);
   }
-  .btn-ring:hover:not(:disabled) {
-    background-image:
-      linear-gradient(135deg, var(--cta-top) 0%, var(--cta-lo) 100%),
-      linear-gradient(135deg, var(--cta-hi) 0%, var(--cta-lo) 100%);
+  .btn-secondary {
+    background-color: var(--surface);
+    color: var(--fg);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--fg) 18%, transparent);
   }
-  .btn-ring:active:not(:disabled) {
-    background-image:
-      linear-gradient(135deg, var(--cta-pressed) 0%, var(--cta-lo) 100%),
-      linear-gradient(135deg, var(--cta-hi) 0%, var(--cta-lo) 100%);
+  .btn-secondary:hover:not(:disabled) {
+    background-color: var(--surface-alt);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--fg) 32%, transparent);
+  }
+  .btn-secondary:active:not(:disabled) {
+    background-color: color-mix(in oklab, var(--fg) 8%, var(--surface));
+  }
+  .btn-ghost {
+    background-color: transparent;
+    color: var(--fg);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background-color: var(--surface-alt);
+  }
+  .btn-ghost:active:not(:disabled) {
+    background-color: color-mix(in oklab, var(--fg) 10%, transparent);
+  }
+  .btn-danger {
+    background-color: var(--danger);
+    color: #ffffff;
+  }
+  .btn-danger:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--danger) 88%, black);
+  }
+  .btn-danger:active:not(:disabled) {
+    background-color: color-mix(in oklab, var(--danger) 78%, black);
   }
 }
 
@@ -668,14 +684,12 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Headings in Fraunces at its optical size, body/UI in Plus Jakarta
-   * Sans. Headings sit a touch tight. */
+  /* Headings: the interface sans, a touch tight. */
   h1,
   h2,
   h3 {
     font-family: var(--font-heading);
-    font-optical-sizing: auto;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
   }
 
   /* Accent focus ring for keyboard users (skill: blue #1863dc outline). */
@@ -1073,6 +1087,13 @@
   font-variant-numeric: lining-nums tabular-nums;
   font-feature-settings: 'lnum' 1, 'tnum' 1;
   letter-spacing: -0.015em;
+}
+
+/* The storefront display face (Fraunces) — shop and product names only. */
+@utility font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  letter-spacing: -0.01em;
 }
 
 /* The italic accent face (Fraunces italic) — see --font-accent. */

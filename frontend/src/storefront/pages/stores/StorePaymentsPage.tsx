@@ -145,11 +145,11 @@ export function StorePaymentsPage() {
                     First add: {onlineGate.blockers.join(', ')}
                   </p>
                   <div className="mt-2.5 flex flex-wrap gap-2">
-                    <Link to="../business" className={buttonClass({ variant: 'ring', size: 'md' })}>
+                    <Link to="../business" className={buttonClass({ variant: 'secondary', size: 'md' })}>
                       <ShieldCheckIcon className="h-4 w-4" />
                       Business details
                     </Link>
-                    <Link to="../bank-accounts" className={buttonClass({ variant: 'ring', size: 'md' })}>
+                    <Link to="../bank-accounts" className={buttonClass({ variant: 'secondary', size: 'md' })}>
                       <BankIcon className="h-4 w-4" />
                       Bank account
                     </Link>

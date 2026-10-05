@@ -72,7 +72,7 @@ export function ShopTrustTips({ store }: { store: Store }) {
               title={title}
               below={<span className="text-hint text-muted">{why}</span>}
               primary={
-                <Link to={to} className={buttonClass({ variant: 'ring', size: 'md' })}>
+                <Link to={to} className={buttonClass({ variant: 'secondary', size: 'md' })}>
                   Add
                 </Link>
               }

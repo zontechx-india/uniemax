@@ -72,7 +72,7 @@ export function SaveBar({
               {onDiscard && (
                 <Button
                   type="button"
-                  variant="ring"
+                  variant="secondary"
                   size="lg"
                   disabled={saving}
                   onClick={onDiscard}

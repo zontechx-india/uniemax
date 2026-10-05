@@ -93,10 +93,10 @@ export function GroupMemberPicker({
       onClose={onClose}
       footer={
         <>
-          <Button variant="ring" size="sm" onClick={onClose}>
+          <Button variant="secondary" size="sm" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="rise" size="sm" onClick={add} disabled={picked.size === 0}>
+          <Button variant="primary" size="sm" onClick={add} disabled={picked.size === 0}>
             {picked.size === 0 ? 'Add' : `Add ${picked.size}`}
           </Button>
         </>

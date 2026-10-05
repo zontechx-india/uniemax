@@ -204,7 +204,7 @@ export function StoreManageLayout() {
           onClick={() => setShareOpen(true)}
           aria-haspopup="dialog"
           className={buttonClass({
-            variant: store.isPublished ? 'ring' : 'rise',
+            variant: store.isPublished ? 'secondary' : 'primary',
             size: 'md',
             className: 'px-3.5',
           })}

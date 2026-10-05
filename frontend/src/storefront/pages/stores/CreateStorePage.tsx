@@ -326,7 +326,7 @@ function ResumePanel({
         <button
           type="button"
           onClick={onStartFresh}
-          className={buttonClass({ variant: 'ring', size: 'lg', full: true })}
+          className={buttonClass({ variant: 'secondary', size: 'lg', full: true })}
         >
           Start a new shop instead
         </button>
@@ -501,7 +501,7 @@ function StoreStep({
               onClick={() => inputRef.current?.click()}
               disabled={busy || !config}
               className={buttonClass({
-                variant: 'ring',
+                variant: 'secondary',
                 size: 'lg',
                 className: 'mt-4 w-full px-6 sm:w-auto',
               })}

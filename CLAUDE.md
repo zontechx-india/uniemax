@@ -20,7 +20,8 @@ one file (no duplication).
 | Prisma schema models/enums                       | [`docs/BACKEND_CONTEXT.md`](./docs/BACKEND_CONTEXT.md) (Data Model section) |
 | Frontend structure, shared UI, theme tokens, per-store theming | [`docs/FRONTEND_CONTEXT.md`](./docs/FRONTEND_CONTEXT.md) |
 | Affiliate system (programmes, invitations, links, attribution, commission, payouts) | [`docs/AFFILIATE.md`](./docs/AFFILIATE.md) |
-| Font roll-out phases (typography plan, per-phase status) | [`docs/TYPOGRAPHY_PLAN.md`](./docs/TYPOGRAPHY_PLAN.md) |
+| UI/UX rules (spacing, type, colour, components, states) | [`docs/DESIGN_GUIDELINES.md`](./docs/DESIGN_GUIDELINES.md) — **read before any UI work; it wins over older plans** |
+| Design-system clean-up phases and status | [`docs/DESIGN_SYSTEM_PLAN.md`](./docs/DESIGN_SYSTEM_PLAN.md) |
 | Anything SEO — head tags, structured data, `robots.txt`, sitemaps, page shells, indexing rules, `/c/` landing pages' SEO, the SEO roadmap | [`docs/SEO.md`](./docs/SEO.md) (rules tables, status, roadmap **and** change log) |
 
 Rules:
@@ -59,16 +60,21 @@ Rules:
 
 ## Frontend Conventions (summary — full detail in FRONTEND_CONTEXT.md)
 
-- **Never hand-size a button.** Every CTA comes from `shared/ui/Button.tsx` —
+- **Follow `docs/DESIGN_GUIDELINES.md`** for every UI change, and check it with
+  `npm run check:ui` (frontend) — the budget may only go down.
+- **Never hand-size a button.** Every button comes from `shared/ui/Button.tsx` —
   `<Button variant size>` for `<button>`, `buttonClass({…})` for a `<Link>`. Height,
   radius, padding and weight live there; a call site picks only variant + size
   (`sm` 36px / `md` 44px / `lg` 48px) and may add layout classes (`flex-1`, margins).
-- **Pick the variant by importance, not looks:**
-  `sheen` = the ONE committing action on the view (Buy Now, Place Order) — **max one
-  per screen**; `rise` = every other primary, the default; `ring` = a secondary sitting
-  *beside* a primary (Add to Cart next to Buy Now).
-- All three fills are cut from the **store owner's** primary via the `--cta-*` stops in
-  `storeVars()` — never hardcode a gradient or a brand color in a component.
+- **Pick the variant by importance:** `primary` = the main action (one per
+  screen) · `secondary` = supporting (Add to Cart beside Buy Now) · `ghost` = low
+  priority · `danger` = destructive. All flat — no gradients or glows; the primary
+  fill is `--cta`, re-pointed to the **store owner's** colour by `storeVars()`.
+- **Type and shape come from the scale:** text `caption 13 · label 14 · body 16 ·
+  subtitle 18 · section 22 · title 28 · display 40` (Tailwind's names map onto it),
+  never `text-[Npx]`; corners 8 / 12 / 16 / full. Interface font is Plus Jakarta Sans;
+  Fraunces (`font-display`, `font-accent`) only for storefront shop/product names;
+  prices use `font-figure`.
 - **Never a bare `<img>` for a stored image.** Product photos, logos and banners are drawn
   with `shared/media/MediaImg.tsx` — `<MediaImg src sizes>`, where `sizes` says how wide
   it is drawn (`"48px"`, `"(min-width: 1024px) 25vw, 50vw"`). It offers the server's

@@ -76,7 +76,7 @@ export function ProgramTab() {
         </div>
         <Button
           size="sm"
-          variant={enabled ? 'ring' : 'rise'}
+          variant={enabled ? 'secondary' : 'primary'}
           loading={busy}
           onClick={() => save({ enabled: !enabled })}
         >

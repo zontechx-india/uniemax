@@ -97,7 +97,7 @@ function LaunchCard({
           action={
             <Link
               to={`${storePath(store.slug)}/builder`}
-              className={buttonClass({ variant: 'ring', size: 'md' })}
+              className={buttonClass({ variant: 'secondary', size: 'md' })}
             >
               Open Design
             </Link>
@@ -124,7 +124,7 @@ function LaunchCard({
                 href={publicStoreUrl(store.slug)}
                 target="_blank"
                 rel="noreferrer"
-                className={buttonClass({ variant: 'ring', size: 'md' })}
+                className={buttonClass({ variant: 'secondary', size: 'md' })}
               >
                 <EyeIcon className="h-4 w-4" />
                 Preview
@@ -213,7 +213,7 @@ function StepRow({
         step.complete || hiddenSections.includes(step.href) ? null : (
           <Link
             to={action.to}
-            className={buttonClass({ variant: current ? 'rise' : 'ring', size: 'md' })}
+            className={buttonClass({ variant: current ? 'primary' : 'secondary', size: 'md' })}
           >
             {action.label}
           </Link>

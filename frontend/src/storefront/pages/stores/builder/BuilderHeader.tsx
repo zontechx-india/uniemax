@@ -176,7 +176,7 @@ export function BuilderHeader({
             </button>
           ) : (
             <Button
-              variant="rise"
+              variant="primary"
               size="md"
               onClick={togglePublished}
               disabled={busy || blocked}

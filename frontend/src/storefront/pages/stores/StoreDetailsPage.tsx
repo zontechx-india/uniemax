@@ -146,7 +146,7 @@ function LogoField() {
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={uploading || !config}
-            className={buttonClass({ variant: 'ring', size: 'lg', className: 'w-full px-6 sm:w-auto' })}
+            className={buttonClass({ variant: 'secondary', size: 'lg', className: 'w-full px-6 sm:w-auto' })}
           >
             <ImageIcon className="h-5 w-5" />
             {store.logoUrl ? 'Change logo' : 'Add a logo'}

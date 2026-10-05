@@ -49,7 +49,7 @@ export function ThemeShowcase() {
     <div className="grid gap-10 lg:grid-cols-2 lg:gap-x-16 lg:gap-y-8">
       <div className="lg:col-start-1 lg:row-start-1 lg:self-end">
         <p className="text-sm font-semibold text-brand">Make it yours</p>
-        <h2 className="mt-3 font-heading text-3xl font-extrabold leading-[1.1] tracking-tight text-fg sm:text-4xl lg:text-5xl">
+        <h2 className="mt-3 font-heading text-3xl font-bold leading-[1.1] tracking-tight text-fg sm:text-4xl lg:text-5xl">
           A store that looks like your brand
         </h2>
         <p className="mt-4 max-w-xl text-base leading-relaxed text-muted sm:text-lg">

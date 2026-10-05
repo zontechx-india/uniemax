@@ -183,7 +183,7 @@ function StoreCard({ store, onShare }: { store: Store; onShare: () => void }) {
           onClick={onShare}
           aria-haspopup="dialog"
           aria-label={store.isPublished ? `Share ${store.name}` : `Publish ${store.name}`}
-          className={buttonClass({ variant: 'ring', size: 'lg', className: 'px-4' })}
+          className={buttonClass({ variant: 'secondary', size: 'lg', className: 'px-4' })}
         >
           <ShareIcon className="h-4 w-4" />
           {store.isPublished ? 'Share' : 'Publish'}

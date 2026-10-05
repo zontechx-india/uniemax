@@ -243,7 +243,7 @@ export function StoreOrdersPage() {
                 type="button"
                 onClick={() => void loadMore()}
                 disabled={loadingMore}
-                className={buttonClass({ variant: 'ring', size: 'lg', className: 'w-full sm:w-auto' })}
+                className={buttonClass({ variant: 'secondary', size: 'lg', className: 'w-full sm:w-auto' })}
               >
                 {loadingMore
                   ? 'Loading…'

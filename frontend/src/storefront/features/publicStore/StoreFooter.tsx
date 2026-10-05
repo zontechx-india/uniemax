@@ -228,7 +228,7 @@ function BrandBlock({
             className="h-9 w-9 rounded-md object-cover"
           />
         )}
-        <span className="metal-text font-heading text-lg font-semibold">
+        <span className="font-display text-fg text-lg font-semibold">
           {store.name}
         </span>
       </Link>

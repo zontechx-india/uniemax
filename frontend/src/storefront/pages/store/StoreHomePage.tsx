@@ -832,7 +832,7 @@ function Hero({
   const { whatsapp } = shopContact(store)
   // The logo's ring is the band colour, so it reads as cut out of the cover.
   const ring = tone === 'alt' ? 'ring-surface' : 'ring-bg'
-  const pill = 'inline-flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-full px-5 sm:flex-none sm:px-7 text-[15px] font-bold transition'
+  const pill = 'inline-flex h-12 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-4 text-base font-semibold transition-colors sm:flex-none sm:px-7'
 
   return (
     <section
@@ -879,7 +879,7 @@ function Hero({
                 widening the band past the viewport. */}
             <div className="min-w-0 sm:pt-4">
             <h1
-              className={`mt-4 break-words sm:mt-0 font-heading text-[28px] font-bold leading-[1.1] tracking-tight sm:text-4xl lg:text-5xl ${skin.text}`}
+              className={`mt-4 break-words font-display text-3xl font-semibold sm:mt-0 lg:text-5xl ${skin.text}`}
             >
               {heading ?? store.name}
             </h1>
@@ -1718,7 +1718,7 @@ function ProductShowcase({
             {product.category.name}
           </p>
           <h2
-            className={`mt-1 font-heading text-2xl font-bold leading-tight sm:text-3xl ${skin.text}`}
+            className={`mt-1 font-display text-2xl font-semibold leading-tight sm:text-3xl ${skin.text}`}
           >
             {displayName(product.name)}
           </h2>

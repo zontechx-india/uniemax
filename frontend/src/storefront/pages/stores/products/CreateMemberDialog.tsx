@@ -53,11 +53,11 @@ export function CreateMemberDialog({
       onClose={onClose}
       footer={
         <>
-          <Button variant="ring" size="sm" onClick={onClose} disabled={busy}>
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
           <Button
-            variant="rise"
+            variant="primary"
             size="sm"
             onClick={() => onCreate(value.trim(), name.trim())}
             disabled={!canCreate}

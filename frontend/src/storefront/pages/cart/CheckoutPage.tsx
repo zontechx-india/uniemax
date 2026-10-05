@@ -381,7 +381,7 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
                   className={
                     ready && !placing
                       ? // The one committing action in checkout — Sheen.
-                        buttonClass({ variant: 'sheen', full: true, className: 'mt-4' })
+                        buttonClass({ variant: 'primary', full: true, className: 'mt-4' })
                       : 'mt-4 h-11 w-full cursor-not-allowed rounded-md bg-surface-alt text-sm font-bold text-muted'
                   }
                 >

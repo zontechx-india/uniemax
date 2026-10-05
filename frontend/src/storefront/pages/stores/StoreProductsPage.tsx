@@ -690,7 +690,7 @@ function ProductRow({
           type="button"
           onClick={() => onEdit('basics')}
           aria-label={`Edit ${product.name}`}
-          className={buttonClass({ variant: 'ring', size: 'md', className: 'px-4' })}
+          className={buttonClass({ variant: 'secondary', size: 'md', className: 'px-4' })}
         >
           <PencilIcon className="h-4 w-4" />
           Edit

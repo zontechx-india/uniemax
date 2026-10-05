@@ -37,7 +37,7 @@ const PAGES: Record<string, { title: string; body: ReactNode }> = {
           <Link to="/" className={buttonClass({ size: 'md' })}>
             Explore stores
           </Link>
-          <Link to="/mystores/new" className={buttonClass({ variant: 'ring', size: 'md' })}>
+          <Link to="/mystores/new" className={buttonClass({ variant: 'secondary', size: 'md' })}>
             Create your store
           </Link>
         </div>

@@ -495,7 +495,7 @@ function ReviewStep({
                       type="button"
                       onClick={() => onJump(check.step)}
                       className={buttonClass({
-                        variant: check.required ? 'rise' : 'ring',
+                        variant: check.required ? 'primary' : 'secondary',
                         size: 'sm',
                         className: 'min-h-tap px-4',
                       })}

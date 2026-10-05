@@ -180,7 +180,7 @@ export function BuilderDesignPanel({
           >
             Undo
           </button>
-          <Button variant="rise" size="md" onClick={onSave} disabled={busy}>
+          <Button variant="primary" size="md" onClick={onSave} disabled={busy}>
             {busy ? 'Saving…' : 'Save colours'}
           </Button>
         </div>
