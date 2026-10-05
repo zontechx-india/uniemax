@@ -846,19 +846,7 @@ function Hero({
       className={`${SCROLL_UNDER_HEADER} relative overflow-hidden border-b last:border-b-0 ${skin.border} ${tone === 'alt' ? skin.surface : ''}`}
       {...builder}
     >
-      {cover && (
-        <div
-          aria-hidden
-          className="h-28 sm:h-40 lg:h-44"
-          style={{
-            background: [
-              'radial-gradient(70% 130% at 0% 0%, color-mix(in oklab, var(--brand) 70%, transparent), transparent 70%)',
-              'radial-gradient(60% 120% at 100% 0%, color-mix(in oklab, var(--brand) 35%, transparent), transparent 75%)',
-              'linear-gradient(180deg, color-mix(in oklab, var(--brand) 30%, transparent), transparent)',
-            ].join(', '),
-          }}
-        />
-      )}
+      {cover && <HeroCover />}
 
       <div
         className={`${STORE_CONTAINER} relative pb-7 sm:pb-10 ${cover ? '' : 'pt-6 sm:pt-10'}`}
@@ -968,6 +956,73 @@ function Hero({
         </div>
       </div>
     </section>
+  )
+}
+
+/**
+ * The cover band: the shop's colour as a gradient, with a quiet pattern on
+ * top so it reads as designed rather than an empty wash — a fine dot grid
+ * that fades out toward the logo, concentric rings on the right, and two soft
+ * waves along the bottom edge. Every layer is drawn in `--brand` (SVG
+ * `currentColor` under `text-brand`, or `color-mix`), so it follows each
+ * shop's own colour in light and dark themes. Decorative only.
+ */
+function HeroCover() {
+  return (
+    <div aria-hidden className="relative h-28 overflow-hidden sm:h-40 lg:h-44">
+      {/* Colour wash. */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: [
+            'radial-gradient(70% 130% at 0% 0%, color-mix(in oklab, var(--brand) 70%, transparent), transparent 70%)',
+            'radial-gradient(60% 120% at 100% 0%, color-mix(in oklab, var(--brand) 40%, transparent), transparent 75%)',
+            'linear-gradient(180deg, color-mix(in oklab, var(--brand) 30%, transparent), transparent)',
+          ].join(', '),
+        }}
+      />
+      {/* Dot grid, strongest top-right and fading toward the logo. */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage:
+            'radial-gradient(color-mix(in oklab, var(--brand) 55%, transparent) 1.2px, transparent 1.6px)',
+          backgroundSize: '16px 16px',
+          maskImage: 'radial-gradient(90% 120% at 100% 0%, #000 0%, transparent 75%)',
+          WebkitMaskImage: 'radial-gradient(90% 120% at 100% 0%, #000 0%, transparent 75%)',
+        }}
+      />
+      {/* Concentric rings on the right. */}
+      <svg
+        className="absolute -right-16 -top-24 h-72 w-72 text-brand opacity-30 sm:-right-10 sm:h-96 sm:w-96 lg:right-[8%]"
+        viewBox="0 0 200 200"
+        fill="none"
+        stroke="currentColor"
+      >
+        {[30, 48, 66, 84, 98].map((r, i) => (
+          <circle key={r} cx="100" cy="100" r={r} strokeWidth={i % 2 ? 0.8 : 1.4} />
+        ))}
+      </svg>
+      {/* Two soft waves along the bottom edge. */}
+      <svg
+        className="absolute inset-x-0 bottom-0 h-10 w-full text-brand sm:h-14"
+        viewBox="0 0 1200 60"
+        preserveAspectRatio="none"
+        fill="none"
+        stroke="currentColor"
+      >
+        <path
+          d="M0 38 C 150 10, 300 60, 450 34 S 750 8, 900 32 S 1100 58, 1200 30"
+          strokeWidth="1.5"
+          opacity="0.35"
+        />
+        <path
+          d="M0 50 C 200 28, 350 64, 520 44 S 820 22, 980 44 S 1140 60, 1200 46"
+          strokeWidth="1"
+          opacity="0.22"
+        />
+      </svg>
+    </div>
   )
 }
 

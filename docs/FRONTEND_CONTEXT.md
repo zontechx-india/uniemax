@@ -982,8 +982,10 @@ full-bleed section bands instead.
     tab stops. A `URL` banner is a plain `<a target="_blank" rel="noopener">`;
     everything else routes through the SPA.
   - **Hero** — a **shop profile**, the shape shoppers know from Instagram /
-    WhatsApp Business shop pages: a **cover band** washed in the shop's own
-    `--brand` (`color-mix` gradients; skipped when the seller has banners —
+    WhatsApp Business shop pages: a **cover band** (`HeroCover`) washed in the
+    shop's own `--brand` (`color-mix` gradients) with a quiet pattern in the
+    same colour — a dot grid fading toward the logo, concentric rings on the
+    right, two soft waves on the bottom edge (skipped when the seller has banners —
     those already lead the page), the logo **88px / 112px, rounded, ringed in
     the band colour and overlapping the cover**, then the name, the owner's
     words if any (three lines on a phone), and **trust facts** (`trustFacts()`:
