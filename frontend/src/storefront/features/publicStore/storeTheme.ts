@@ -59,6 +59,41 @@ function rgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
+/** WCAG relative luminance (0 black … 1 white). */
+function luminance(hex: string): number {
+  const [r, g, b] = hexToRgb(hex).map((v) => {
+    const c = v / 255
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!
+}
+
+/** WCAG contrast ratio between two colours (1 … 21). */
+function contrast(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x)
+  return (hi! + 0.05) / (lo! + 0.05)
+}
+
+/** Black-ish or white text — whichever reads better on `bg` (WCAG). */
+function textOn(bg: string): string {
+  return contrast('#ffffff', bg) >= contrast('#101010', bg) ? '#ffffff' : '#101010'
+}
+
+/**
+ * The owner's colour, nudged just far enough to be READABLE as text on
+ * `against` (≥ 4.5:1, docs/DESIGN_GUIDELINES.md §12): darker on a light
+ * surface, lighter on a dark one. A colour that already passes is returned
+ * unchanged, so most shops see their exact brand.
+ */
+function readableOn(color: string, against: string, ratio = 4.5): string {
+  const towardDark = !isDarkColor(against)
+  let out = color
+  for (let step = 1; step <= 20 && contrast(out, against) < ratio; step++) {
+    out = towardDark ? darken(color, step * 0.05) : lighten(color, step * 0.05)
+  }
+  return out
+}
+
 /** Perceived-luminance check so text/surfaces stay readable on any theme. */
 function isDarkColor(hex: string): boolean {
   const [r, g, b] = hexToRgb(hex)
@@ -118,7 +153,10 @@ export function storeVars(theme: StoreThemeVars): React.CSSProperties {
         ? lighten(bg, 0.07)
         : '#ffffff'
   const darkSurface = isDarkColor(surface)
-  const onSecondary = isDarkColor(secondary) ? '#ffffff' : '#101010'
+  // Brand-coloured TEXT (prices, links, headings' accent) must read on the
+  // surface; a light owner colour (e.g. sky blue) is darkened just enough.
+  const brand = readableOn(secondary, surface)
+  const onSecondary = textOn(brand)
   // CTA text contrasts the CTA's own background (the PRIMARY color, which
   // paints the metal chrome) — deriving it from secondary painted dark text
   // onto dark buttons whenever the two colors diverged. The owner can also
@@ -126,9 +164,7 @@ export function storeVars(theme: StoreThemeVars): React.CSSProperties {
   const ctaText =
     theme.buttonTextColor && HEX6.test(theme.buttonTextColor)
       ? theme.buttonTextColor
-      : isDarkColor(primary)
-        ? '#ffffff'
-        : '#101010'
+      : textOn(primary)
 
   return {
     // --- design-system semantics (flat surfaces) --------------------------
@@ -147,24 +183,17 @@ export function storeVars(theme: StoreThemeVars): React.CSSProperties {
     // 0.72 keeps small muted text at AA contrast on dark owner themes
     // (0.62 was borderline against near-black backgrounds).
     '--fg-muted': darkBg ? 'rgba(255,255,255,0.72)' : '#5c5c5c',
-    '--brand': secondary,
+    '--brand': brand,
     '--brand-hover': lighten(secondary, 0.1),
     '--brand-contrast': onSecondary,
     '--cta-contrast': ctaText,
     '--accent': secondary,
 
-    // Button stops — `btn-primary` reads --cta / --cta-pressed / --cta-lo;
-    // the rest remain for the seller workspace's frosted accents.
+    // Primary button: fill, pressed, hover (`btn-primary`).
     '--cta': primary,
-    '--cta-top': lighten(primary, 0.06),
-    '--cta-bottom': darken(primary, 0.14),
-    '--cta-hi': lighten(primary, 0.18),
     '--cta-lo': darken(primary, 0.18),
     '--cta-pressed': darken(primary, 0.1),
-    '--cta-edge': isDarkColor(primary)
-      ? 'rgba(255,255,255,0.34)'
-      : 'rgba(255,255,255,0.6)',
-    // Glow COLOR only — each variant sets its own spread.
+    // Soft shadow colour used by the seller workspace's frosted accents.
     '--cta-glow': rgba(primary, 0.65),
   } as React.CSSProperties
 }

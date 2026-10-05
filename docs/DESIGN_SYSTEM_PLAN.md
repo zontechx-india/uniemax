@@ -139,6 +139,23 @@ Also: 9 separate dialog implementations, 3 card styles, 13 corner radii,
 - `shared/theme/colors.ts`, `shadows.ts`, `AuthDialog` comments mention the
   patterns (counted by the guard, not rendered).
 
-## Phase 6 — Quality pass ☐
-- §18 checklist on every page; delete dead CSS; budget for gradients, glass,
-  ad-hoc effects and tiny text at 0.
+## Phase 6 — Quality pass ☑
+- Browser QA (`qa` probe: console errors, sideways overflow, WCAG contrast of
+  every visible text node, visible focus while tabbing) on marketplace home,
+  Sell page, three shops, a shop listing, cart, My Shops (list, dashboard,
+  products, order detail, business) and profile — light and dark, 390px.
+- Fixed: **form fields had no focus ring** (only a 1px border change) — an
+  unlayered `:focus-visible` outline now covers every input/select/textarea.
+- Fixed: **light shop colours failed contrast** (print-xerox: prices and
+  white button text at 2.8:1). `storeVars()` now chooses button text by real
+  WCAG contrast and darkens/lightens brand text to ≥ 4.5:1 on the surface.
+- Result after fixes: 0 contrast failures, 0 invisible focus, 0 console
+  errors, no overflow on every page checked.
+- Dead CSS removed: `text-brand-gradient`, the gradient-button stops
+  (`--cta-top/-bottom/-hi/-edge`), plus earlier the metal utilities.
+- The remaining guard counts are the deliberate exceptions listed under
+  Phase 5; they are frozen, not driven to 0.
+
+## Done
+All six phases are shipped. New UI work follows `DESIGN_GUIDELINES.md`; the
+`check:ui` guard keeps the counts from rising.

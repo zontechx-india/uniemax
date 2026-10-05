@@ -2952,9 +2952,9 @@ derived from it, and the secondary text is lifted to `#9a9a9a` because
   `#6c3ef4`→`#5428d9` in light, its light steps in dark) is exposed as two
   utilities — `bg-brand-gradient` (since October 2026 **only inside the My
   Shops glass workspace**, e.g. icon chips and wizard progress — buttons,
-  avatars and marketplace surfaces are flat brand colour) and `text-brand-gradient` (gradient display text). Both
-  stops carry `--brand-contrast` at ≥ 4.5:1 in either scheme, which is what
-  lets one token serve as both a fill and a text color. A third,
+  avatars and marketplace surfaces are flat brand colour). Both stops carry
+  `--brand-contrast` at ≥ 4.5:1 in either scheme. (`text-brand-gradient` was
+  removed as unused in October 2026.) A second utility,
   **`text-brand-gradient-on-dark`** (`--brand-gradient-on-dark`: Light Purple
   → `#9574f7`, fixed), covers display text that sits on a dark photo in both
   schemes — the two auth heroes. Solid `bg-brand`/`text-brand` stays the
@@ -3070,6 +3070,23 @@ owner's Button text colour (`--cta-contrast`). The older `btn-rise` /
 effects (`metal-text`, `metal-lift`, `metal-chip`, `--brand-metal`,
 `--metal-glow`) were removed in October 2026; interactive cards use the flat
 `card-hover` utility (border darkens + `shadow-lifted`).
+
+**Readable shop colours** (docs/DESIGN_GUIDELINES.md §12). `storeVars()`
+picks text colours by real WCAG contrast, not a brightness guess:
+`--cta-contrast` (button text) and `--brand-contrast` are whichever of
+white / near-black reads better on the fill (`textOn()`), unless the owner
+set a Button text colour; and `--brand` — used for prices, links and brand
+accents on the page — is the owner's colour nudged darker (light shop) or
+lighter (dark shop) in 5% steps until it reaches 4.5:1 on the surface
+(`readableOn()`). Colours that already pass are untouched, so most shops see
+their exact brand; a light one (print-xerox's #08a0ff gave 2.8:1) gets
+darker price text and dark button text while buttons and the banner keep the
+owner's hue.
+
+**Focus** (§12): every control shows the accent outline on keyboard focus.
+Form fields get it from an unlayered rule in `index.css`
+(`input/select/textarea:focus-visible`), so a component's `outline-none`
+cannot hide it.
 
 The `SKIN` object in `storeTheme.ts` maps semantic slots (`surface`, `well`,
 `chip` — all flat — plus `cta` → `btn-primary` and `ctaSecondary` →

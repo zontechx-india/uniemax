@@ -306,8 +306,7 @@
   /* Light Purple — brand tint for selected rows, chips and soft wells. */
   --brand-soft: #f3f0ff;
   /* Signature brand gradient. Both stops are dark enough to carry white
-   * text, so it works as a CTA fill AND (via text-brand-gradient) as
-   * display text on the light canvas. */
+   * text. Used only inside the My Shops glass workspace. */
   --brand-gradient: linear-gradient(135deg, #6c3ef4 0%, #5428d9 100%);
 
   /* Lightened brand step — lighten(#6c3ef4, 0.28), the same derivation
@@ -322,27 +321,12 @@
   /* --- invariants (identical across themes) ------------------------- */
   --cta-contrast: #ffffff;
   --accent: #1863dc;
-  /* Brand-metal fallback cut from the app brand purple — store pages override
-   * it via storeVars() with the OWNER's colors; the fallback keeps the brand
-   * mark rendering on store-themed-but-neutral pages (e.g. a /cart with no
-   * known store). Mirrors the storeVars() derivation for #6c3ef4, so it does
-   * NOT flip per scheme. Used by `.metal-text` and `.metal-chip` only — the
-   * CTA fills are composed from the `--cta-*` stops below. */
-
-  /* CTA stops. The three button fills (`btn-rise` / `btn-sheen` / `btn-ring`)
-   * compose their own gradients from these rather than consuming a pre-baked
-   * gradient string, because each variant needs a different pair of steps and
-   * a different angle. All are derived from the primary — storeVars() emits
-   * the same five for the owner's color. Fallbacks mirror #6c3ef4 and do NOT
-   * flip per scheme: `--cta-contrast` (white) pairs with them in both. */
+  /* Primary-button stops (btn-primary): fill, hover, pressed. storeVars()
+   * re-cuts them from a shop owner's colour. Fallbacks mirror #6c3ef4 and do
+   * NOT flip per scheme; --cta-contrast (white) pairs with them in both. */
   --cta: #6c3ef4;
-  --cta-top: #7850f5; /* lighten(p, .06) — rise, resting top       */
-  --cta-bottom: #5d35d2; /* darken(p, .14)  — rise, resting bottom    */
-  --cta-hi: #8a66f6; /* lighten(p, .18) — hover top, ring's light */
-  --cta-lo: #5833c8; /* darken(p, .18)  — pressed / ring's deep   */
-  --cta-pressed: #6138dc; /* darken(p, .10)  — hover bottom, press top */
-  /* storeVars() picks the dimmer edge for a DARK primary. */
-  --cta-edge: rgba(255, 255, 255, 0.34);
+  --cta-lo: #5833c8; /* darken(p, .18) — pressed */
+  --cta-pressed: #6138dc; /* darken(p, .10) — hover */
   /* Glow COLOR (not a whole shadow) — each variant sets its own spread. */
   --cta-glow: rgba(108, 62, 244, 0.65);
 
@@ -496,13 +480,6 @@
 @layer utilities {
   .bg-brand-gradient {
     background-image: var(--brand-gradient);
-  }
-  .text-brand-gradient {
-    background-image: var(--brand-gradient);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: transparent;
   }
   /* Brand lockup (mark + "UnieMax"). Painted as a background so the
    * light/dark artwork swap is a variable — callers set the HEIGHT and the
@@ -1057,6 +1034,16 @@
   font-variant-numeric: lining-nums tabular-nums;
   font-feature-settings: 'lnum' 1, 'tnum' 1;
   letter-spacing: -0.015em;
+}
+
+/* Form controls show the same focus ring as every other control
+ * (docs/DESIGN_GUIDELINES.md §12). Unlayered on purpose: a component's
+ * `outline-none` (a utility) cannot hide it. */
+input:not([type='checkbox']):not([type='radio']):not([type='range']):focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 /* The storefront display face (Fraunces) — shop and product names only. */
