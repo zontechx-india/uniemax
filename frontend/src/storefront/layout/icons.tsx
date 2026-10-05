@@ -589,3 +589,25 @@ export function RupeeIcon({ className }: { className?: string }) {
     </Svg>
   )
 }
+
+/** A QR code — the Store Share Kit. */
+export function QrCodeIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1.2" />
+      <rect x="14" y="3.5" width="6.5" height="6.5" rx="1.2" />
+      <rect x="3.5" y="14" width="6.5" height="6.5" rx="1.2" />
+      <path d="M14 14h2.5v2.5H14zM18 18h2.5v2.5H18zM14 20.5h1.5M20.5 14v1.5" />
+    </Svg>
+  )
+}
+
+/** Down arrow into a tray — save a file. */
+export function DownloadIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M12 3.5v11M7.5 10l4.5 4.5 4.5-4.5" />
+      <path d="M4 15.5v2.5A2.5 2.5 0 0 0 6.5 20.5h11a2.5 2.5 0 0 0 2.5-2.5v-2.5" />
+    </Svg>
+  )
+}

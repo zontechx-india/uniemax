@@ -69,13 +69,13 @@ function luminance(hex: string): number {
 }
 
 /** WCAG contrast ratio between two colours (1 … 21). */
-function contrast(a: string, b: string): number {
+export function contrast(a: string, b: string): number {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x)
   return (hi! + 0.05) / (lo! + 0.05)
 }
 
 /** Black-ish or white text — whichever reads better on `bg` (WCAG). */
-function textOn(bg: string): string {
+export function textOn(bg: string): string {
   return contrast('#ffffff', bg) >= contrast('#101010', bg) ? '#ffffff' : '#101010'
 }
 
@@ -85,7 +85,7 @@ function textOn(bg: string): string {
  * surface, lighter on a dark one. A colour that already passes is returned
  * unchanged, so most shops see their exact brand.
  */
-function readableOn(color: string, against: string, ratio = 4.5): string {
+export function readableOn(color: string, against: string, ratio = 4.5): string {
   const towardDark = !isDarkColor(against)
   let out = color
   for (let step = 1; step <= 20 && contrast(out, against) < ratio; step++) {
@@ -111,7 +111,7 @@ const HEX6 = /^#[0-9a-fA-F]{6}$/
 const FALLBACK_BG = '#f9fafb'
 const FALLBACK_PRIMARY = '#6c3ef4'
 
-const safeHex = (hex: string, fallback: string) =>
+export const safeHex = (hex: string, fallback: string) =>
   HEX6.test(hex) ? hex : fallback
 
 /** The Appearance settings `storeVars` consumes (matches `StoreTheme`). */

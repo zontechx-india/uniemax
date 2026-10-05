@@ -16,6 +16,7 @@ import {
   LifebuoyIcon,
   MegaphoneIcon,
   PaletteIcon,
+  QrCodeIcon,
   StoreIcon,
   TagIcon,
   TruckIcon,
@@ -130,7 +131,13 @@ const SECTION_GROUPS: SectionGroup[] = [
   {
     key: 'marketing',
     caption: 'Marketing',
-    items: [{ label: 'Affiliate Marketing', to: 'affiliate', icon: MegaphoneIcon }],
+    items: [
+      // The store's own link in the forms people pass around — a QR card for
+      // Instagram, a WhatsApp message. First: every seller needs it, only
+      // some run an affiliate programme.
+      { label: 'Share your store', to: 'share', icon: QrCodeIcon },
+      { label: 'Affiliate Marketing', to: 'affiliate', icon: MegaphoneIcon },
+    ],
   },
   {
     key: 'help',

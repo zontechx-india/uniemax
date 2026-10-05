@@ -328,6 +328,13 @@ export const router = createBrowserRouter([
                         .StoreSupportTicketPage,
                     }),
                   },
+                  // Store Share Kit — QR share cards for Instagram, WhatsApp, copy link.
+                  {
+                    path: 'share',
+                    lazy: async () => ({
+                      Component: (await import('../pages/stores/share/StoreSharePage')).StoreSharePage,
+                    }),
+                  },
                   // Affiliate Marketing — programme, products, partners, commissions.
                   affiliateSellerRoutes,
                 ],

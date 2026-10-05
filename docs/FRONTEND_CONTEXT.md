@@ -562,6 +562,7 @@ once-ever setting look as important as a daily job:
 | **Catalog** | Categories · Products |
 | **Storefront** | Shop name & logo · Business details · **Design your shop** |
 | **Payments & Delivery** | Payments · Bank account · Delivery · Checkout |
+| **Marketing** | **Share your store** · Affiliate Marketing |
 | **Help** | Customer messages · Help from UnieMax |
 
 Row labels are plain words a first-time seller would use (the routes keep
@@ -757,6 +758,128 @@ Price/MRP fields in the product wizard and variant matrix drop "₹", "Rs",
 commas and spaces as they are typed (`cleanAmount`/`cleanCount` in
 `features/stores/productOptions.ts`), and their errors say what to type
 ("Enter the price in numbers only, e.g. 1299.").
+
+**Store Share Kit** (`StoreSharePage` at `/mystores/{slug}/share`, the
+**Share your store** row under Marketing; state in `share/useShareKit.ts`,
+drawing in `features/shareKit/`). It makes a QR share card for Instagram and
+shares the store link. **Seller-only:** the admin console hides the row
+(`ADMIN_STORE_SCOPE.hiddenSections`) and mounts no route for it. There is no
+backend: it reads the managed store (name, `logoUrl`, `theme`,
+`footer.info.about` as the tagline, `footer.social.instagram` as an
+`@handle`), takes the URL from `publicStoreUrl()`, and lists products with
+`storeCatalogApi.listProducts` only once the Product template is opened.
+
+- **Layout.** From `lg` there are two columns: a sticky live preview on the
+  left (with a Post 4:5 / Story 9:16 switch) and the controls on the right.
+  On a phone the preview comes first. Controls: **Template** (Minimal /
+  Brand / Product, each with a small thumbnail drawn in the chosen colour),
+  **Product** (Product template only: "Logo only" plus each live, finished
+  product that has a photo, with the first one picked by default),
+  **Background** (see below), **QR style** (Classic / Brand / Rounded), **Colour**, **Caption** (four presets
+  or your own, up to 24 characters) and a **Logo in the QR code** switch.
+  Then **Download**: Instagram Post / Instagram Story (the format being
+  previewed is the `primary` button), plus the QR alone as PNG or SVG. Last,
+  **Share your store link**: the URL, **Share on WhatsApp** (`wa.me/?text=`
+  with the plan's "🛍️ Shop from our online store…" message), **Share
+  store** (Web Share API, falling back to copying) and **Copy link**. Results
+  and failures show as toasts. Choice controls are native radio groups (arrow
+  keys work), not `<button>`s. An unpublished shop gets an info note that
+  scans only reach the shop once it is published.
+- **Share image (phones).** On a touch device (`(pointer: coarse)`) whose
+  browser can pass files to the share sheet (`canShareImages()`:
+  `navigator.canShare({ files })`, i.e. Android Chrome and iOS Safari), the
+  Download section becomes **Share or download**. **Share image** is the
+  `primary` button and sends the previewed card straight to Instagram,
+  WhatsApp and so on, without saving it to the gallery first. Both downloads
+  drop to `secondary`. Desktop and Firefox are unchanged.
+  - **Prepared in advance.** iOS Safari only opens the sheet when
+    `navigator.share` is called *within* the tap. Encoding a PNG first
+    gets a `NotAllowedError`. So after each preview draw, `prepareShare`
+    encodes the preview canvas (which is the full-size image) once changes
+    settle for 350 ms, and the tap shares that ready `File` synchronously.
+  - **Fallbacks.** A tap before the encode finishes builds the file on
+    demand (Chrome keeps the tap's permission across that). If Safari
+    refuses it, the file is kept and the seller sees "Your image is ready.
+    Tap Share image again", and the next tap is instant. Closing the sheet
+    (`AbortError`) is silent. Any other failure downloads the image
+    instead, with a toast saying so.
+  - **Share payload.** `files` plus `title`, and
+    `text`: "{shop} — shop online: {url}". There is **no `url` field**,
+    because some share targets drop the file when one is present.
+    WhatsApp uses the text as the caption.
+  - **Tested** in emulated mobile Chrome with a stubbed `navigator.share`.
+    A prepared tap shared in the same tick, and the file was the expected
+    PNG with a scannable QR. The fast-tap, NotAllowedError and AbortError
+    paths behaved as above, and desktop / unsupported browsers showed no
+    button. The real iOS and Android share sheets have not been tried on a
+    device.
+- **Colour is never free-picked.** You choose from the store's own colours:
+  the primary, the secondary when one is set, or black (`palette.ts`). QR
+  modules are darkened until they reach **7:1** against the white plate, and
+  accent text until it reaches 4.5:1. The helpers for this are
+  `readableOn` / `textOn` / `contrast`, exported from `storeTheme.ts`.
+- **Backgrounds** (`patterns.ts`), drawn by `drawPattern()` before
+  anything else on the card. There are two families:
+  - **Glass art** (`crystal.ts`): **Glass** (liquid blobs; value
+    `liquid`, the default), **Prism** (cut-glass shards) and **Orbs**
+    (glossy spheres). This is solid, abstract artwork painted in tints and
+    shades of the accent. Each shape has a gradient body, a specular streak
+    clipped to it, and a rim lit from the top-left, and long diagonal light
+    sweeps run across the card. Layouts are seeded by the shop name. Because
+    the artwork is bold, the content sits on a **frosted panel**
+    (`drawFrostedPanel`: translucent white, or accent on Brand, with a soft
+    shadow, a top sheen and a lit rim) so text keeps its contrast. On a Post
+    the QR is capped at 460 px and the stack box is inset, so the artwork
+    shows around the panel. On Product the panel starts 100 px below the
+    photo. These gradients are image artwork, not dashboard UI; the
+    dashboard stays flat per DESIGN_GUIDELINES. (Internal names avoid the
+    word "glass", which `check:ui` reserves for the retired glass CSS
+    classes.)
+  - **Textures**: Dots, Grid, Stripes, Waves, Rings and Confetti. Each
+    texture uses one colour, the card's own:
+  the accent on the white cards (inside the frame on Minimal; below the
+  photo on Product) or the text colour on Brand. Each pattern has its own
+  low opacity, tuned so text stays readable. The bolder ones keep away from
+  the middle: Rings are arcs from two corners, and Confetti stays along the
+  edges, scattered from a seed of the shop name so each shop gets its own
+  stable layout. None can reach the QR, which sits on its opaque white plate.
+  The picker's swatches are a scaled 1080×720 crop of the same
+  `drawPattern` on the same background. They use larger elements and
+  higher opacity (`emphasis`) so they stay readable at thumbnail size.
+- **One renderer.** `drawShareCard()` draws the whole card on a canvas at
+  full size. The preview is that same canvas scaled down with CSS, so the
+  preview is exactly the downloaded PNG. The card is a vertical stack centred
+  in a safe box. The QR is the one flexible row: it gets the height the text
+  leaves, within a minimum and maximum per format. The Story keeps clear of
+  the top ~270 px and bottom ~300 px, where Instagram draws its own controls.
+  Shop names use Fraunces and drop through font sizes before being cut with
+  "…" (2 lines on a Post, 3 on a Story). Long URLs break after a `-` or `/`.
+- **The QR** (`qr.ts`, encoded with `qrcode-generator`) always uses error
+  correction **H**. The centre logo covers about 22% of the side, with one
+  module of clearance, away from the finder patterns. A 4-module white quiet
+  zone is always included, and module sizes are snapped to whole pixels.
+  `qrShapes()` is a single geometry list drawn by both the canvas renderer and
+  `qrSvg()`. **Rounded** uses full-size modules that round only their outer
+  corners. Inset "dots" were tried, and failed decoding at full resolution
+  because they leave gaps between neighbouring modules. With no logo, the
+  initials tile from `initialsOf` is used in its place.
+- **Images on the canvas** (`shareAssets.ts`). S3 originals would taint the
+  canvas and make `toBlob()` throw, so the canvas draws the API's same-origin
+  sized copies (`/api/v1/public/images/w/{640|1280}/…`, the same ones used by
+  `srcset`). An image that cannot load is treated as missing: the card falls
+  back to the letter tile, or for the Product template, a brand-tinted panel
+  with the logo. Downloads are PNG so module edges stay sharp when Instagram
+  recompresses them.
+- **Verified** with jsQR at the time it shipped. All 3 templates × 2 formats
+  × 3 QR styles decoded, with and without a logo, with pale and dark brand
+  colours, with a long name and a version-9 URL. Each was also decoded after
+  JPEG q60 recompression and at preview size, plus the standalone PNG/SVG
+  (456 / 456). Files saved through the real download buttons scanned too. When
+  backgrounds were added, every pattern × template × format was re-run with
+  Brand and Rounded QR styles, pale and dark colours, JPEG q60 and preview
+  size: 504 / 504. The glass art was run the same way (3 art styles ×
+  3 templates × 2 formats × 3 QR styles × 4 colours including pale yellow,
+  each also JPEG q60 and preview size): 648 / 648.
 
 **Public storefront (multi-page)** — everything under `/store/…`, `/cart…`
 and `/checkout/…` is served **without sign-in**: `StorefrontApp` picks the
