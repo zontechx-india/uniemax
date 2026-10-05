@@ -2950,8 +2950,9 @@ derived from it, and the secondary text is lifted to `#9a9a9a` because
 
 - **Brand gradient.** The signature brand treatment (`--brand-gradient`:
   `#6c3ef4`→`#5428d9` in light, its light steps in dark) is exposed as two
-  utilities — `bg-brand-gradient` (hero surfaces, brand logo/avatar marks,
-  **primary CTAs**) and `text-brand-gradient` (gradient display text). Both
+  utilities — `bg-brand-gradient` (since October 2026 **only inside the My
+  Shops glass workspace**, e.g. icon chips and wizard progress — buttons,
+  avatars and marketplace surfaces are flat brand colour) and `text-brand-gradient` (gradient display text). Both
   stops carry `--brand-contrast` at ≥ 4.5:1 in either scheme, which is what
   lets one token serve as both a fill and a text color. A third,
   **`text-brand-gradient-on-dark`** (`--brand-gradient-on-dark`: Light Purple
