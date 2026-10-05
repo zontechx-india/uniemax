@@ -662,7 +662,8 @@ It renders, top to bottom:
   brand wash from the top-right and an accent wash from the bottom-left), so
   the next-step button is the only solid colour on it: a time-of-day greeting
   and the shop name; once a live shop has orders, three frosted stat tiles —
-  **Today** / **Waiting** (orange dot when > 0) / **Total sales**; and a lighter
+  **Today** / **Waiting** (orange dot when > 0) / **Total sales** (its own
+  full-width row on a phone, so the whole amount shows); and a lighter
   **Next step** pane (gradient icon chip) with ONE action picked from the
   shop's state — the first
   unfinished launch step (its `stepAction` button), **Publish my shop**
@@ -1295,7 +1296,7 @@ deliberately lives in the URL and **not in storage** (a sessionStorage
 part of browser history, so back/forward-cache restores, refreshes and
 multiple tabs all keep the right theme, where ambient tracking broke. All pages use
 the storefront treatment (full-width shell, flat surface+border cards,
-Manrope headings, sticky top bar) with an order-summary panel stuck beside
+Fraunces headings, sticky top bar) with an order-summary panel stuck beside
 the list on desktop.
 **Order summary — priced by the server.** `features/cart/useCheckoutQuote.ts`
 calls `POST …/orders/quote` whenever the lines or the current fulfilment
@@ -1318,7 +1319,7 @@ and the quote appear the moment the session flips, nothing reloads. A
 mid-checkout 401 on Place Order (cookie expired while filling the form) is
 refreshed and replayed by the http client; only if that fails does the
 dialog open, with the cart and the filled-in steps intact. For signed-in customers it
-renders an Inter-titled top bar with a secure-checkout
+renders a body-face-titled top bar with a secure-checkout
 cue, compact store identity row, the read-only item list (edit links back
 to the cart), the two interactive checkout steps (below), and an order
 summary whose **Place Order** button goes live once both steps are done.
@@ -2736,8 +2737,8 @@ apps must share under `src/shared/`. **`storefront/` must never import from
 The authoritative design system lives in the repo-root `skillui/` package
 (the **anydesk** system: dark-themed, cool palette, 4px grid). Its colors,
 spacing, radius and type scale are used as-is; the typefaces are the one
-deliberate deviation (Manrope + Inter instead of Times New Roman + Noto
-Sans, adopted from the approved UnieMax prototype — see below). **Read `skillui/SKILL.md` before building
+deliberate deviation (Fraunces + Plus Jakarta Sans instead of Times New
+Roman + Noto Sans — see below). **Read `skillui/SKILL.md` before building
 any UI.** Its tokens are materialized into reusable TypeScript constants
 under `src/shared/theme/` — the single source both apps import instead of
 hardcoding colors, fonts, spacing, radii, or shadows:
@@ -2829,14 +2830,15 @@ admin rail/drawer/mobile header, and the coming-soon page. Prose mentions
 
 ### Global scale
 
-The root font size is **90%** (`html { font-size: 90% }` in `index.css`) —
-an approved design decision matching 90% browser zoom. Every rem-derived
-Tailwind size (text, spacing, heights) scales with it across both apps;
-pixel values (borders, the 1920px shell cap) are unaffected. Don't
-compensate with larger per-component sizes — the compact scale is intended.
+The root font size is **100%** (`html { font-size: 100% }` in `index.css`),
+so body text is 16px. Until October 2026 it was 90% (a compact look matching
+90% browser zoom), which made body text 14.4px and small labels hard to read
+for the sellers and shoppers UnieMax serves; restoring 100% grew every
+rem-derived Tailwind size (text, spacing, heights) in both apps at once.
+Pixel values (borders, the 1920px shell cap) are unaffected.
 
-**The touch-size exception (px, not rem).** Three things must not shrink,
-because the scale pushed them under what a phone needs: the 90% root put
+**The touch-size tokens (px, not rem).** Added while the root was 90%,
+which put
 `text-sm` inputs at 12.6px (iOS zooms the page on focus under 16px) and
 `h-11` controls at 39.6px (under the 44px tap minimum). So:
 
@@ -2866,7 +2868,7 @@ whole palette as CSS variables and maps them into Tailwind v4 via
 | `bg-brand-soft` | brand tint (Light Purple) | `logo-lockup` | the brand lockup (see *Brand art*) |
 | `text-danger` / `success` / `warning` | status | `shadow-floating` | elevation |
 | `text-pending` / `bg-pending-soft` | setup not finished (orange) | `bg-pending-gradient` | the animated pending mark |
-| `rounded-md` (4px) · `rounded-lg` (6px) · `rounded-pill` (50px) | radius | `font-heading` / `font-body` | Manrope / Inter |
+| `rounded-md` (4px) · `rounded-lg` (6px) · `rounded-pill` (50px) | radius | `font-heading` / `font-body` / `font-accent` | Fraunces / Plus Jakarta Sans / Fraunces italic |
 
 **Card hover language** (marketplace grids): `shadow-floating` at rest →
 `hover:-translate-y-1` (4px lift) + `hover:shadow-lifted` (the deeper
@@ -2953,19 +2955,23 @@ derived from it, and the secondary text is lifted to `#9a9a9a` because
   `main.tsx` before render (no flash). `ThemeProvider` exposes
   `useTheme() → { mode, setMode, toggle }`; `ThemeToggle` (sun/moon) sits in
   the storefront top bar. Both apps are wrapped in `ThemeProvider`.
-- **Fonts** (a deliberate deviation from the skill's Times New Roman / Noto
-  Sans pairing): headings/display use **Manrope** — geometric and open, with
-  clean numerals for prices — carrying a constant **−0.01em tracking**
-  (applied by the base `h1–h3` rule and re-asserted by the `font-heading`
-  utility). Body/UI uses **Inter**. Both are SIL OFL and self-hosted as latin
-  variable files: `public/fonts/Manrope-Variable.woff2` (~25 KB, wght
-  200–800) and `public/fonts/Inter-Variable.woff2` (~73 KB, wght 100–900),
-  with Segoe UI / `system-ui` fallbacks. Only these two families are allowed.
-  Manrope replaced the prototype's condensed, uppercase-looking **Oswald** in
-  September 2026 — the store owner found it out of place on user-typed names
-  such as store titles; swapping it was one `@font-face`, the
-  `--font-heading` token and the `typography.ts` stack, which is the point of
-  routing every heading through the token.
+- **Fonts — "soft editorial"** (chosen October 2026 from six pairings,
+  replacing Manrope + Inter; a deliberate deviation from the skill's Times
+  New Roman / Noto Sans): headings, product names and prices use
+  **Fraunces**, a soft serif with an optical-size axis (`font-optical-sizing:
+  auto`), tracked −0.01em by the base `h1–h3` rule. Body/UI uses **Plus
+  Jakarta Sans**. The italic accent — `font-accent` utility / `--font-accent`,
+  Fraunces italic 500 — is for small touches only (a shop tagline, a product
+  sub-line, one word in a heading), never running text or anything a seller
+  must act on. Both SIL OFL, self-hosted in `public/fonts/` as variable woff2
+  split into **latin + latin-ext** files per style (`Fraunces-Latin`,
+  `Fraunces-LatinExt`, `Fraunces-Italic-*`, `PlusJakartaSans-*`) with
+  `unicode-range`, so a page downloads only what it uses; **₹ (U+20B9) is in
+  latin-ext** and was verified as a real glyph in all four. The two latin
+  normals are preloaded in `index.html` / `admin.html`. Fallbacks: Georgia /
+  serif for Fraunces, Segoe UI / `system-ui` for Jakarta. Only these two
+  families are allowed; swapping again is the `@font-face` blocks, the
+  `--font-heading/body/accent` tokens and `typography.ts`.
   Display conventions from the prototype: section headings `text-2xl
   sm:text-3xl` semibold, hero `text-4xl sm:text-6xl` bold `leading-none`,
   product-card names `text-lg` medium `leading-tight` — 700 is reserved for
@@ -2976,8 +2982,7 @@ derived from it, and the secondary text is lifted to `#9a9a9a` because
   section headings** (`/mystores/{slug}` — Store Details, Business Details,
   Categories, Products and their in-card subheads) use
   `font-body font-semibold tracking-normal`: they are workbench UI. Those
-  rules predate the font swap and are kept for consistency, not because
-  Manrope needs them.
+  rules predate the font swap and are kept for consistency.
   The storefront uses the heading face for store/product names (the
   prototype's brand look). The
   storefront brand mark (store name in header/footer) uses `metal-text` —

@@ -20,6 +20,7 @@ one file (no duplication).
 | Prisma schema models/enums                       | [`docs/BACKEND_CONTEXT.md`](./docs/BACKEND_CONTEXT.md) (Data Model section) |
 | Frontend structure, shared UI, theme tokens, per-store theming | [`docs/FRONTEND_CONTEXT.md`](./docs/FRONTEND_CONTEXT.md) |
 | Affiliate system (programmes, invitations, links, attribution, commission, payouts) | [`docs/AFFILIATE.md`](./docs/AFFILIATE.md) |
+| Font roll-out phases (typography plan, per-phase status) | [`docs/TYPOGRAPHY_PLAN.md`](./docs/TYPOGRAPHY_PLAN.md) |
 | Anything SEO — head tags, structured data, `robots.txt`, sitemaps, page shells, indexing rules, `/c/` landing pages' SEO, the SEO roadmap | [`docs/SEO.md`](./docs/SEO.md) (rules tables, status, roadmap **and** change log) |
 
 Rules:

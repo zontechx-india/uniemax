@@ -6,13 +6,13 @@
  * deviate from the skill by design decision, adopted from the approved
  * UnieMax prototype (`prototype/index.html`):
  *
- * - Manrope — headings, product names and prices (geometric, open, clean
- *   numerals; tracked −0.01em — see `index.css`). SIL OFL, self-hosted
- *   (`public/fonts/Manrope-Variable.woff2`, wght 200–800). Replaced the
- *   prototype's condensed Oswald in September 2026.
- * - Inter — body/UI text. SIL OFL, self-hosted
- *   (`public/fonts/Inter-Variable.woff2`, wght 100–900).
+ * - Fraunces — headings, product names, prices, and the italic accent
+ *   (`font-accent`). Soft editorial serif with an optical-size axis. SIL
+ *   OFL, self-hosted (`public/fonts/Fraunces-*.woff2`, wght 100–900).
+ * - Plus Jakarta Sans — body/UI text. SIL OFL, self-hosted
+ *   (`public/fonts/PlusJakartaSans-*.woff2`, wght 200–800).
  *
+ * Chosen in October 2026 ("soft editorial"), replacing Manrope + Inter.
  * Only these two families are allowed — never introduce a third typeface.
  * Keep these stacks in lockstep with the `--font-heading` / `--font-body`
  * tokens in `index.css`.
@@ -20,9 +20,11 @@
 
 export const fontFamily = {
   /** Headings / display. */
-  heading: '"Manrope", "Segoe UI", system-ui, sans-serif',
+  heading: '"Fraunces", Georgia, "Times New Roman", serif',
   /** Body / UI text. */
-  body: '"Inter", "Segoe UI", system-ui, -apple-system, sans-serif',
+  body: '"Plus Jakarta Sans", "Segoe UI", system-ui, -apple-system, sans-serif',
+  /** The italic accent (always italic). */
+  accent: '"Fraunces", Georgia, "Times New Roman", serif',
 } as const
 
 /** Weights from the DESIGN scale — both faces are variable fonts. */

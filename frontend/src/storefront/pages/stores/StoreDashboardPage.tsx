@@ -215,14 +215,21 @@ function Hero({
       </h2>
 
       {showStats && (
-        <dl className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+        <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+          {/* Phone: Today + Waiting side by side, sales on its own full row
+              so any amount fits; three across from sm. */}
           <HeroStat label="Today" value={stats.today} />
           <HeroStat
             label="Waiting"
             value={stats.pending}
             dot={stats.pending > 0 ? 'bg-pending' : undefined}
           />
-          <HeroStat label="Total sales" value={formatPrice(stats.revenue)} small />
+          <HeroStat
+            label="Total sales"
+            value={formatPrice(stats.revenue)}
+            small
+            className="col-span-2 sm:col-span-1"
+          />
         </dl>
       )}
 
@@ -240,22 +247,24 @@ function HeroStat({
   value,
   small = false,
   dot,
+  className = '',
 }: {
   label: string
   value: ReactNode
   small?: boolean
   /** A status dot before the label (e.g. pending orange when waiting > 0). */
   dot?: string
+  className?: string
 }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-glass-border bg-surface/55 px-3 py-2.5 shadow-[inset_0_1px_0_var(--glass-border)]">
+    <div className={`min-w-0 ${className} rounded-2xl border border-glass-border bg-surface/55 px-3 py-2.5 shadow-[inset_0_1px_0_var(--glass-border)]`}>
       <dt className="flex items-center gap-1.5 text-[12px] font-semibold text-muted">
         {dot && <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${dot}`} />}
         {label}
       </dt>
       <dd
-        className={`mt-0.5 truncate font-heading leading-tight font-bold text-fg ${
-          small ? 'text-[18px] sm:text-[22px]' : 'text-[24px]'
+        className={`mt-0.5 font-heading leading-tight font-bold text-fg ${
+          small ? 'break-words text-[22px]' : 'truncate text-[24px]'
         }`}
       >
         {value}
