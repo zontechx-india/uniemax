@@ -48,7 +48,7 @@ export function AdminLayout() {
         if (items.length === 0) return null
         return (
           <div key={group.title}>
-            <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted">
+            <p className="px-3 pb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
               {group.title}
             </p>
             <ul className="space-y-0.5">
@@ -99,7 +99,7 @@ export function AdminLayout() {
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r border-line bg-surface lg:flex">
         <div className="flex h-16 items-center gap-2 border-b border-line px-5">
           <AppLogoLockup className="h-7" />
-          <span className="rounded-pill bg-brand-soft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-fg">
+          <span className="rounded-pill bg-brand-soft px-2 py-0.5 text-xs font-semibold text-fg">
             Admin
           </span>
         </div>
@@ -129,7 +129,7 @@ export function AdminLayout() {
       </ModalShell>
 
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-10 flex h-16 items-center gap-2 border-b border-line bg-surface/95 px-4 backdrop-blur sm:px-6">
+        <header className="sticky top-0 z-10 flex h-16 items-center gap-2 border-b border-line bg-surface px-4 sm:px-6">
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}

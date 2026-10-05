@@ -118,8 +118,26 @@ Also: 9 separate dialog implementations, 3 card styles, 13 corner radii,
 - Budget after Phase 4: stray sizes 35, tiny text 29, gradients 28, ad-hoc
   effects 21.
 
-## Phase 5 — Admin ☐
-- Tables (column hierarchy, phone layout, row actions), forms, stat tiles.
+## Phase 5 — Admin ☑
+- Fixed: `DataTable` passed the old `hint` prop to the shared `EmptyState`,
+  so empty-table hints had been dropped since Phase 1 — now `description`.
+- `DataTable` phone cards are keyboard-operable like the desktop rows
+  (focusable, Enter opens); card labels 13px sentence case.
+- Header solid (no blur); nav captions, badges, banner overlays and the
+  notification count on the scale (count badge 20px).
+- Category tree expand button 20px → 32px.
+- Theme-template previews draw the CTA flat, matching the real shops.
+- Already in place from Phase 1: buttons, fields, cards, badges, states.
+
+### What is left after Phase 5 (all deliberate)
+- **My Shops glass** — kept by decision (glass budget frozen).
+- **Sell page illustrations** (`StorePhone`, `sellVisuals`, `ThemeShowcase`,
+  claim/chat cards): miniature UI with tiny text and soft shadows.
+- **Storefront A4 hero banner** — the one decorative element.
+- **Theme-template miniatures** (admin) — 9px text inside a thumbnail.
+- **Login hero photo fade** — text legibility over a photo.
+- `shared/theme/colors.ts`, `shadows.ts`, `AuthDialog` comments mention the
+  patterns (counted by the guard, not rendered).
 
 ## Phase 6 — Quality pass ☐
 - §18 checklist on every page; delete dead CSS; budget for gradients, glass,

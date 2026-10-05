@@ -404,15 +404,15 @@ function BannerCard({
           onPointerDown={() => setArmed(true)}
           onPointerUp={() => setArmed(false)}
           title="Drag to reorder"
-          className="absolute left-2 top-2 z-10 cursor-grab rounded-md bg-black/55 px-2 py-1 text-[11px] font-semibold text-white active:cursor-grabbing"
+          className="absolute left-2 top-2 z-10 cursor-grab rounded-md bg-black/55 px-2 py-1 text-xs font-semibold text-white active:cursor-grabbing"
         >
           Drag
         </span>
-        <span className="pointer-events-none absolute right-2 top-2 z-10 rounded-md bg-black/55 px-2 py-0.5 text-[11px] font-semibold text-white">
+        <span className="pointer-events-none absolute right-2 top-2 z-10 rounded-md bg-black/55 px-2 py-0.5 text-xs font-semibold text-white">
           {index + 1} of {total}
         </span>
         {!banner.isActive && (
-          <span className="pointer-events-none absolute bottom-2 left-2 z-10 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+          <span className="pointer-events-none absolute bottom-2 left-2 z-10 rounded bg-black/70 px-1.5 py-0.5 text-xs font-semibold text-white">
             Hidden
           </span>
         )}

@@ -94,7 +94,7 @@ export function NotificationBell() {
       >
         <BellIcon />
         {unread > 0 ? (
-          <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-pill bg-danger px-1 text-[10px] font-semibold text-white">
+          <span className="absolute right-0.5 top-0.5 flex h-5 min-w-5 items-center justify-center rounded-pill bg-danger px-1 text-xs font-semibold text-white">
             {unread > 9 ? '9+' : unread}
           </span>
         ) : null}
@@ -132,7 +132,7 @@ export function NotificationBell() {
                   >
                     <p className="text-sm font-medium text-fg">{notification.title}</p>
                     <p className="mt-0.5 line-clamp-2 text-xs text-muted">{notification.body}</p>
-                    <p className="mt-1 text-[11px] text-muted">
+                    <p className="mt-1 text-xs text-muted">
                       {formatRelative(notification.createdAt)}
                     </p>
                   </button>

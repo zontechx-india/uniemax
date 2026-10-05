@@ -417,14 +417,14 @@ function CategoryRow({
       // Indent by depth so the hierarchy is visible without a tree widget.
       style={showPath ? undefined : { paddingLeft: 16 + node.depth * 22 }}
     >
-      <div className="w-5 shrink-0">
+      <div className="w-8 shrink-0">
         {node.childCount > 0 && onToggleCollapse && (
           <button
             type="button"
             onClick={onToggleCollapse}
             aria-expanded={!collapsed}
             aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${node.name}`}
-            className="flex h-5 w-5 items-center justify-center rounded-sm text-muted transition-colors hover:text-fg"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-alt hover:text-fg"
           >
             <span className={collapsed ? '' : 'rotate-90'} style={{ display: 'inline-block' }}>
               ›

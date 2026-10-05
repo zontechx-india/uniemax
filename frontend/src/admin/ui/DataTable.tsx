@@ -52,7 +52,7 @@ export function DataTable<T>({
   if (error) return <ErrorState message={error} {...(onRetry ? { onRetry } : {})} />
   if (loading && rows.length === 0) return <Skeleton rows={6} className="p-4" />
   if (rows.length === 0) {
-    return <EmptyState title={empty?.title ?? 'Nothing here yet'} {...(empty?.hint ? { hint: empty.hint } : {})} />
+    return <EmptyState title={empty?.title ?? 'Nothing here yet'} {...(empty?.hint ? { description: empty.hint } : {})} />
   }
 
   const interactive = Boolean(onRowClick)
@@ -116,13 +116,22 @@ export function DataTable<T>({
             <li
               key={rowKey(row)}
               className={`px-4 py-3 ${interactive ? 'cursor-pointer active:bg-surface-alt' : ''}`}
-              {...(interactive ? { onClick: () => onRowClick?.(row) } : {})}
+              // Same keyboard behaviour as the desktop row: focusable, Enter opens.
+              {...(interactive
+                ? {
+                    onClick: () => onRowClick?.(row),
+                    tabIndex: 0,
+                    onKeyDown: (event: React.KeyboardEvent) => {
+                      if (event.key === 'Enter') onRowClick?.(row)
+                    },
+                  }
+                : {})}
             >
               {primary ? <div className="mb-2 text-sm font-medium text-fg">{primary.cell(row)}</div> : null}
               <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5">
                 {rest.map((column) => (
                   <div key={column.header} className="min-w-0">
-                    <dt className="text-[11px] uppercase tracking-wide text-muted">{column.header}</dt>
+                    <dt className="text-xs text-muted">{column.header}</dt>
                     <dd className="truncate text-sm text-fg">{column.cell(row)}</dd>
                   </div>
                 ))}

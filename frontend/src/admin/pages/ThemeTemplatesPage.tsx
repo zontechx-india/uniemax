@@ -548,7 +548,7 @@ function ThemeThumbnail({
           <span
             className="h-4 w-4 rounded"
             style={{
-              background: `linear-gradient(180deg, ${mix(primary, 255, 0.28)} 0%, ${primary} 48%, ${mix(primary, 0, 0.2)} 100%)`,
+              background: primary,
             }}
           />
           <span className="h-1.5 w-10 rounded-full" style={{ background: well }} />
@@ -582,7 +582,7 @@ function ThemeThumbnail({
         <div
           className="mt-2 flex h-6 items-center justify-center rounded text-[9px] font-bold"
           style={{
-            background: `linear-gradient(180deg, ${mix(primary, 255, 0.28)} 0%, ${primary} 48%, ${mix(primary, 0, 0.2)} 100%)`,
+            background: primary,
             color: ctaText,
           }}
         >
