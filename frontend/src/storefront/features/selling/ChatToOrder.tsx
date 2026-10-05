@@ -128,7 +128,7 @@ function Bubble({
         }`}
       >
         {children}
-        <span className="ml-2 align-bottom text-[10px] text-muted">{time}</span>
+        <span className="ml-2 align-bottom text-xs text-muted">{time}</span>
       </p>
     </div>
   )

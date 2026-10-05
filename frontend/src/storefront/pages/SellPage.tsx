@@ -189,7 +189,7 @@ export function SellPage() {
                 <li key={step.title}>
                   <Reveal delay={index * 100} className="h-full">
                     <div className="flex h-full flex-col rounded-2xl border border-line bg-surface p-6 sm:p-7">
-                      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-gradient font-heading text-base font-bold text-brand-contrast shadow-[0_8px_20px_-8px_rgb(108_62_244/0.7)]">
+                      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand text-base font-bold text-brand-contrast">
                         {index + 1}
                       </span>
                       <h3 className="mt-5 text-lg font-bold text-fg">{step.title}</h3>

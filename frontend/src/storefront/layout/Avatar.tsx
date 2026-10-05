@@ -30,7 +30,7 @@ export function Avatar({
 
   return (
     <div
-      className={`flex shrink-0 items-center justify-center rounded-full bg-brand-gradient text-sm font-semibold text-brand-contrast ${className}`}
+      className={`flex shrink-0 items-center justify-center rounded-full bg-brand text-sm font-semibold text-brand-contrast ${className}`}
     >
       {initial}
     </div>

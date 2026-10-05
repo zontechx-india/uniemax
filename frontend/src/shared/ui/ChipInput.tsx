@@ -123,7 +123,7 @@ export function ChipInput({
   return (
     <div>
       {label && (
-        <span className="mb-2 block text-[14px] font-medium text-muted">{label}</span>
+        <span className="mb-2 block text-sm font-medium text-muted">{label}</span>
       )}
       <div
         className={`flex min-h-field w-full flex-wrap items-center gap-1.5 rounded-md border border-line bg-input px-2 py-1.5 text-sm transition-colors focus-within:border-accent ${
@@ -148,13 +148,13 @@ export function ChipInput({
               maxLength={maxLength}
               autoFocus
               aria-label={`Rename ${item.value}`}
-              className="h-9 min-w-16 rounded-pill border border-accent bg-surface px-3 text-[14px] font-medium text-fg outline-none"
+              className="h-9 min-w-16 rounded-pill border border-accent bg-surface px-3 text-sm font-medium text-fg outline-none"
               style={{ width: `${Math.max(4, editDraft.length + 2)}ch` }}
             />
           ) : (
             <span
               key={item.key}
-              className="inline-flex h-9 items-center gap-0.5 rounded-pill bg-brand-soft pl-3 text-[14px] font-semibold text-fg"
+              className="inline-flex h-9 items-center gap-0.5 rounded-pill bg-brand-soft pl-3 text-sm font-semibold text-fg"
             >
               <button
                 type="button"
@@ -171,7 +171,7 @@ export function ChipInput({
                 disabled={disabled}
                 aria-label={`Remove ${item.value}`}
                 // 28px circle, 44px hit area (the `before:` inset).
-                className="relative flex h-7 w-7 items-center justify-center rounded-full text-[18px] leading-none text-muted transition before:absolute before:-inset-2 before:content-[''] hover:bg-danger/10 hover:text-danger disabled:cursor-default"
+                className="relative flex h-7 w-7 items-center justify-center rounded-full text-lg leading-none text-muted transition before:absolute before:-inset-2 before:content-[''] hover:bg-danger/10 hover:text-danger disabled:cursor-default"
               >
                 ×
               </button>
@@ -190,7 +190,7 @@ export function ChipInput({
           maxLength={maxLength}
           disabled={disabled || full}
           aria-label={ariaLabel ?? (typeof label === 'string' ? label : 'Add a value')}
-          className="h-9 min-w-24 flex-1 bg-transparent px-1.5 text-[15px] text-fg outline-none placeholder:text-muted disabled:cursor-not-allowed"
+          className="h-9 min-w-24 flex-1 bg-transparent px-1.5 text-base text-fg outline-none placeholder:text-muted disabled:cursor-not-allowed"
         />
         {draft.trim() !== '' && (
           <button
@@ -203,7 +203,7 @@ export function ChipInput({
             }}
             onClick={commit}
             disabled={disabled}
-            className="h-9 shrink-0 rounded-lg bg-brand px-4 text-[14px] font-bold text-brand-contrast transition hover:bg-brand-hover"
+            className="h-9 shrink-0 rounded-lg bg-brand px-4 text-sm font-bold text-brand-contrast transition hover:bg-brand-hover"
           >
             Add
           </button>

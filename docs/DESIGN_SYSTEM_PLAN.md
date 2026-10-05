@@ -103,7 +103,20 @@ Also: 9 separate dialog implementations, 3 card styles, 13 corner radii,
 - Budget after Phase 3: stray sizes 68, tiny text 46, ad-hoc effects 23,
   raw buttons 248.
 
-## Phase 4 — Marketplace, Sell page, auth, account ☐
+## Phase 4 — Marketplace, Sell page, auth, account ☑
+- 33 stray text sizes moved onto the scale (marketplace home, category
+  browse, profile, orders, addresses, support, Sell page forms, header
+  notifications, chip input, wizard, category picker).
+- Flat instead of gradient/blur: marketplace header (no blur), Sign in,
+  promo panel, image placeholder, avatars, Sell-page step numbers.
+- Kept on purpose: the dark fade over the login hero photo (text
+  legibility), the Sell page's floating phone/notification mock-ups and their
+  shadows (marketing illustrations, incl. their miniature text), the
+  `Wizard` progress gradient (My Shops glass identity).
+- Marketplace section errors use the shared `ErrorState`; Retry, Add new
+  address and profile actions use `Button`.
+- Budget after Phase 4: stray sizes 35, tiny text 29, gradients 28, ad-hoc
+  effects 21.
 
 ## Phase 5 — Admin ☐
 - Tables (column hierarchy, phone layout, row actions), forms, stat tiles.

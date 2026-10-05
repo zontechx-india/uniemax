@@ -321,7 +321,7 @@ function CategoryPanel({
               <span className="text-sm font-medium text-fg">
                 {node.name}
                 {!node.isActive && (
-                  <span className="ml-1.5 rounded-sm bg-surface-alt px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
+                  <span className="ml-1.5 rounded-sm bg-surface-alt px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-muted">
                     Disabled
                   </span>
                 )}
@@ -360,7 +360,7 @@ function BrowseRow({
         <span className="block truncate text-sm text-fg">
           {node.name}
           {!node.isActive && (
-            <span className="ml-1.5 rounded-sm bg-surface-alt px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
+            <span className="ml-1.5 rounded-sm bg-surface-alt px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-muted">
               Disabled
             </span>
           )}

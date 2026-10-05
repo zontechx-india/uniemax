@@ -49,6 +49,9 @@ import {
 } from '../layout/contentWidth'
 import { buttonClass } from '../../shared/ui/Button'
 import { MediaImg } from '../../shared/media/MediaImg'
+import { Button } from '../../shared/ui/Button'
+import { Card } from '../../shared/ui/Card'
+import { ErrorState } from '../../shared/ui/states'
 
 /**
  * Marketplace homepage (`/`) — the platform's public entry point. Not a
@@ -195,7 +198,7 @@ export function MarketHeader() {
   const cartCount = items.reduce((sum, item) => sum + item.qty, 0)
 
   return (
-    <header className="sticky top-0 z-20 border-b border-line bg-bg/90 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b border-line bg-bg">
       {/* Airy, but inside the same column as the page. Left full-width, the
           four zones (brand · search · sell · utilities) drifted apart until a
           2560 monitor put the logo and the account menu a screen apart with
@@ -231,7 +234,7 @@ export function MarketHeader() {
           >
             <CartIcon className="h-5 w-5" />
             {cartCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-pill bg-brand px-1 text-[10px] font-bold text-brand-contrast">
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-pill bg-brand px-1 text-xs font-bold text-brand-contrast">
                 {cartCount > 99 ? '99+' : cartCount}
               </span>
             )}
@@ -241,13 +244,12 @@ export function MarketHeader() {
             <div className="h-9 w-9 animate-pulse rounded-full bg-surface-alt sm:h-10 sm:w-10" />
           )}
           {state.status === 'guest' && (
-            <button
-              type="button"
+            <Button variant="primary" size="sm"
               onClick={() => openAuthDialog()}
-              className="shrink-0 rounded-md bg-brand-gradient px-3.5 py-2 text-sm font-semibold text-brand-contrast transition hover:opacity-90 sm:px-5 sm:py-2.5"
+              className="sm:h-tap sm:px-5"
             >
               Sign in
-            </button>
+            </Button>
           )}
           {state.status === 'authed' && (
             <SessionProvider customer={state.user} signOut={signOut}>
@@ -687,17 +689,9 @@ function Section({
 
 function SectionError({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="flex flex-col items-center rounded-lg border border-line bg-surface px-6 py-10 text-center shadow-floating">
-      <p className="text-sm font-medium text-fg">Something went wrong.</p>
-      <p className="mt-1 text-sm text-muted">Please try again.</p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="mt-4 rounded-md border border-line bg-surface-alt px-5 py-2 text-sm font-semibold text-fg transition-colors hover:border-accent"
-      >
-        Retry
-      </button>
-    </div>
+    <Card>
+      <ErrorState compact message="This section could not load. Check your connection and try again." onRetry={onRetry} />
+    </Card>
   )
 }
 
@@ -1021,7 +1015,7 @@ function StoreCard({ store }: { store: MarketStore }) {
       <div className="relative">
         <StorePreview images={store.previewImages} />
         {isNewlyOpened(store.publishedAt) && (
-          <span className="absolute left-2 top-2 rounded-pill bg-brand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-contrast shadow-floating">
+          <span className="absolute left-2 top-2 rounded-pill bg-brand px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-brand-contrast shadow-floating">
             New
           </span>
         )}
@@ -1041,7 +1035,7 @@ function StoreCard({ store }: { store: MarketStore }) {
             {/* Two lines, not an ellipsis. `truncate` fits a name to whatever
                 room is left, which on a narrow tile is about 130px — every
                 shop read as "Retail S…", "Abhi's O…". */}
-            <span className="line-clamp-2 block font-heading text-[15px] font-semibold leading-tight text-fg">
+            <span className="line-clamp-2 block font-heading text-base font-semibold leading-tight text-fg">
               {store.name}
             </span>
 
@@ -1099,7 +1093,7 @@ function StorePreview({ images }: { images: string[] }) {
         {shots.length === 0 ? (
           // A soft brand-tinted panel, not a grey glyph on grey. A shop with no
           // products yet is the one most in need of looking deliberate.
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-brand/12 to-surface-alt">
+          <div className="flex h-full w-full items-center justify-center bg-surface-alt">
             <StoreIcon className="h-9 w-9 text-brand opacity-40" />
           </div>
         ) : shots.length === 1 ? (
@@ -1216,7 +1210,7 @@ function MarketIdentityBar() {
           document read as ruled paper. */}
       <div className={`${CONTENT_COLUMN} py-3.5`}>
         <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-2">
-          <h1 className="text-sm font-semibold text-fg sm:text-[15px]">
+          <h1 className="text-sm font-semibold text-fg sm:text-base">
             UnieMax — shop directly from independent stores
           </h1>
           <ul className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
@@ -1361,7 +1355,7 @@ function ProductCard({ product }: { product: MarketProduct }) {
                 <s className="text-xs font-normal text-muted">
                   {formatPrice(product.compareAtPrice)}
                 </s>
-                <span className="rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-contrast">
+                <span className="rounded-full bg-brand px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide text-brand-contrast">
                   Sale
                 </span>
               </>
@@ -1449,7 +1443,7 @@ function MyStoresSection({ stores }: { stores: Store[] }) {
               {store.name}
             </span>
             <span
-              className={`shrink-0 rounded-pill px-2 py-0.5 text-[11px] font-semibold ${
+              className={`shrink-0 rounded-pill px-2 py-0.5 text-xs font-semibold ${
                 store.isPublished
                   ? 'bg-success/10 text-success'
                   : 'bg-warning/10 text-warning'
@@ -1494,7 +1488,7 @@ function BecomeSellerSection({ ownsStores }: { ownsStores: boolean }) {
   return (
     <section className="scroll-mt-20">
       <div className={`${CONTENT_COLUMN} ${SECTION_PADDING}`}>
-        <div className="overflow-hidden rounded-lg bg-brand-gradient text-brand-contrast shadow-floating">
+        <div className="overflow-hidden rounded-lg bg-brand text-brand-contrast">
           {/* Two real columns from `lg`, each `minmax(0,1fr)` — the old
               `1fr auto` sized the right column to three short numbers and left
               the middle of a 1400px panel empty. */}

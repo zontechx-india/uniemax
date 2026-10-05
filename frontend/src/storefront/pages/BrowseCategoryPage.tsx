@@ -309,7 +309,7 @@ function ProductCard({ product }: { product: MarketProduct }) {
           )}
         </div>
         <div className="flex flex-1 flex-col gap-1 p-3">
-          <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-muted">
+          <span className="truncate text-xs font-semibold uppercase tracking-wide text-muted">
             {product.store.name}
           </span>
           <h2 className="line-clamp-2 font-heading text-sm font-medium leading-tight text-fg transition-colors group-hover:text-brand sm:text-base">

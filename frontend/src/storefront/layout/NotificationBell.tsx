@@ -114,7 +114,7 @@ export function NotificationBell() {
           <path d="M13.7 20a2 2 0 0 1-3.4 0" />
         </svg>
         {unread > 0 ? (
-          <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-pill bg-danger px-1 text-[10px] font-semibold text-white">
+          <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-pill bg-danger px-1 text-xs font-semibold text-white">
             {unread > 9 ? '9+' : unread}
           </span>
         ) : null}
@@ -164,7 +164,7 @@ export function NotificationBell() {
                   >
                     <p className="text-sm font-medium text-fg">{notification.title}</p>
                     <p className="mt-0.5 line-clamp-2 text-xs text-muted">{notification.body}</p>
-                    <p className="mt-1 text-[11px] text-muted">{timeAgo(notification.createdAt)}</p>
+                    <p className="mt-1 text-xs text-muted">{timeAgo(notification.createdAt)}</p>
                   </button>
                 </li>
               ))
@@ -185,7 +185,7 @@ export function NotificationBell() {
                     ? 'Turn off push on this device'
                     : 'Get push alerts on this device'}
               </button>
-              {push.error ? <p className="mt-1 text-[11px] text-danger">{push.error}</p> : null}
+              {push.error ? <p className="mt-1 text-xs text-danger">{push.error}</p> : null}
             </div>
           ) : null}
         </div>

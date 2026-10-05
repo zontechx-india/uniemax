@@ -7,6 +7,7 @@ import { useCustomerSession } from '../app/sessionContext'
 import { useMarketSession } from '../app/marketSession'
 import { Avatar } from '../layout/Avatar'
 import { CheckIcon, MailIcon, PhoneCallIcon } from '../layout/icons'
+import { Button } from '../../shared/ui/Button'
 
 /**
  * My Profile (/profile) — the customer's own account details plus the
@@ -156,7 +157,7 @@ function IdentifierRow({
 
 function VerifiedChip() {
   return (
-    <span className="inline-flex items-center gap-1 rounded-pill bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
+    <span className="inline-flex items-center gap-1 rounded-pill bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
       <CheckIcon className="h-3 w-3" />
       Verified
     </span>
@@ -192,14 +193,13 @@ function LinkPhoneSection({ onLinked }: { onLinked: (customer: Customer) => void
               Link your number to also sign in with an SMS one-time code. A
               number can be linked to only one UnieMax account.
             </p>
-            <button
-              type="button"
+            <Button variant="secondary" size="sm"
               onClick={() => setStep('form')}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-line bg-surface-alt px-3 py-1.5 text-sm font-medium text-fg transition hover:border-brand hover:text-brand"
+              className="mt-3"
             >
               <PhoneIcon />
               Link mobile number
-            </button>
+            </Button>
           </>
         )}
 

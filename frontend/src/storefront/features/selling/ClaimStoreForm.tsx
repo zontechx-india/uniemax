@@ -59,7 +59,7 @@ export function ClaimStoreForm({
             autoComplete="organization"
             autoCapitalize="words"
             enterKeyHint="go"
-            className="h-12 w-full rounded-xl bg-transparent pl-12 pr-3 text-[16px] text-fg outline-none placeholder:text-muted"
+            className="h-12 w-full rounded-xl bg-transparent pl-12 pr-3 text-base text-fg outline-none placeholder:text-muted"
           />
         </div>
         <Button type="submit" variant={variant} size="lg" className="w-full sm:w-auto sm:px-7">

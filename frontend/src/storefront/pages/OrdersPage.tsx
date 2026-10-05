@@ -118,11 +118,11 @@ export function OrdersPage() {
                   </p>
                 </div>
                 <span
-                  className={`rounded-pill px-2.5 py-1 text-[11px] font-semibold ${TONE_CLASS[status.tone]}`}
+                  className={`rounded-pill px-2.5 py-1 text-xs font-semibold ${TONE_CLASS[status.tone]}`}
                 >
                   {status.label}
                 </span>
-                <span className="rounded-pill bg-surface-alt px-2.5 py-1 text-[11px] font-semibold text-muted">
+                <span className="rounded-pill bg-surface-alt px-2.5 py-1 text-xs font-semibold text-muted">
                   {order.paymentMethod === 'ONLINE'
                     ? order.paymentStatus === 'PAID'
                       ? 'Paid online'

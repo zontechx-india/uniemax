@@ -20,7 +20,7 @@ const STATUS_CHIP: Record<TicketStatus, string> = {
 export function TicketStatusChip({ status }: { status: TicketStatus }) {
   return (
     <span
-      className={`rounded-pill px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_CHIP[status]}`}
+      className={`rounded-pill px-2.5 py-0.5 text-xs font-semibold ${STATUS_CHIP[status]}`}
     >
       {STATUS_LABELS[status]}
     </span>

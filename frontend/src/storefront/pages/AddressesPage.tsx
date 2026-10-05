@@ -14,6 +14,7 @@ import {
   PlusIcon,
   TrashIcon,
 } from '../layout/icons'
+import { Button } from '../../shared/ui/Button'
 
 /**
  * Saved Addresses (/addresses) — the customer's address book. Up to 10
@@ -154,12 +155,12 @@ export function AddressesPage() {
                   <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-fg">
                     {address.name}
                     {address.label && (
-                      <span className="rounded-pill bg-surface-alt px-2 py-0.5 text-[11px] font-semibold text-muted">
+                      <span className="rounded-pill bg-surface-alt px-2 py-0.5 text-xs font-semibold text-muted">
                         {address.label}
                       </span>
                     )}
                     {address.isPrimary && (
-                      <span className="inline-flex items-center gap-1 rounded-pill bg-brand/10 px-2 py-0.5 text-[11px] font-semibold text-brand">
+                      <span className="inline-flex items-center gap-1 rounded-pill bg-brand/10 px-2 py-0.5 text-xs font-semibold text-brand">
                         <CheckIcon className="h-3 w-3" />
                         Primary
                       </span>
@@ -220,15 +221,13 @@ export function AddressesPage() {
         ) : (
           addresses !== null &&
           addresses.length < MAX_ADDRESSES && (
-            <button
-              type="button"
+            <Button variant="secondary"
               onClick={() => setEditing('new')}
               disabled={busy}
-              className="inline-flex h-10 items-center gap-1.5 rounded-md border border-line bg-surface px-4 text-sm font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
             >
               <PlusIcon className="h-4 w-4" />
               Add Address
-            </button>
+            </Button>
           )
         )}
 

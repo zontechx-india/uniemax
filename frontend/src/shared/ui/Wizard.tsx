@@ -71,7 +71,7 @@ export function Wizard({
             />
           ))}
         </div>
-        <p className="mt-2 text-[13px] font-semibold text-brand">
+        <p className="mt-2 text-xs font-semibold text-brand">
           Step {current + 1} of {steps.length}
         </p>
       </div>
@@ -97,7 +97,7 @@ export function Wizard({
                 }`}
               >
                 <span
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] font-bold transition ${
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition ${
                     done
                       ? 'bg-success text-brand-contrast'
                       : active
@@ -108,7 +108,7 @@ export function Wizard({
                   {done ? <TickIcon /> : i + 1}
                 </span>
                 <span
-                  className={`truncate text-[14px] font-semibold ${
+                  className={`truncate text-sm font-semibold ${
                     active ? 'text-fg' : 'text-muted'
                   }`}
                 >
@@ -132,11 +132,11 @@ export function Wizard({
       <div className="glass mt-3 rounded-glass p-5 sm:mt-6 sm:p-7">
         {step && (
           <header className="mb-6">
-            <h1 className="font-heading text-[24px] leading-tight font-bold text-fg">
+            <h1 className="font-heading text-2xl leading-tight font-bold text-fg">
               {step.title}
             </h1>
             {step.blurb && (
-              <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{step.blurb}</p>
+              <p className="mt-1.5 text-base leading-relaxed text-muted">{step.blurb}</p>
             )}
           </header>
         )}
@@ -185,7 +185,7 @@ export function WizardActions({
             type="button"
             onClick={onSkip}
             disabled={busy}
-            className="min-h-tap rounded-md px-3 text-[15px] font-semibold text-muted transition hover:bg-fg/5 hover:text-fg disabled:cursor-not-allowed"
+            className="min-h-tap rounded-md px-3 text-base font-semibold text-muted transition hover:bg-fg/5 hover:text-fg disabled:cursor-not-allowed"
           >
             Skip for now
           </button>
@@ -197,7 +197,7 @@ export function WizardActions({
         size="lg"
         loading={busy}
         disabled={disabled}
-        className="min-w-0 flex-1 px-6 text-[15px] sm:flex-none sm:px-8"
+        className="min-w-0 flex-1 px-6 text-base sm:flex-none sm:px-8"
       >
         {busy ? 'Saving…' : submitLabel}
       </Button>
