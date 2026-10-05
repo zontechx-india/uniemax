@@ -10,7 +10,7 @@ Status: ☐ planned · ◐ in progress · ☑ done
 
 | Role | Face | Where |
 | ---- | ---- | ----- |
-| Headings, product names, prices | Fraunces (serif, optical size) | `font-heading`, `h1–h3` |
+| Headings, product names | Fraunces (serif, optical size) | `font-heading`, `h1–h3` |
 | Everything you read and tap | Plus Jakarta Sans | `font-body` (default) |
 | Prices, totals, counts | Plus Jakarta Sans, equal-width digits | `font-figure` — product page, cards, cart, checkout, dashboards |
 | Small elegant touches | Fraunces italic 500 | `font-accent` — taglines, sub-lines, one word in a heading |
