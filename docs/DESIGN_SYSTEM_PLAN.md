@@ -54,7 +54,9 @@ Also: 9 separate dialog implementations, 3 card styles, 13 corner radii,
 - **`ModalShell`** — one modal base; `Dialog`, `ConfirmDialog`, the photo
   editor, describe and review sheets, storefront filters and menu drawer,
   admin menu drawer and the login dialog all use it (9 → 1). Overlays are
-  flat (no blur); every one closes with Escape and traps focus.
+  flat (no blur) and trap focus; all close on Escape except the photo editor
+  and the photo review sheet, which only close by their own buttons so a
+  stray key never discards work.
 - `Skeleton` / `PageSkeleton` / `EmptyState` / `ErrorState` shared; the
   bare "Loading…" screens replaced (route fallbacks, designer, affiliate
   pages, category picker, notification bells).
