@@ -46,12 +46,12 @@ function mix(hex: string, target: Rgb, t: number): string {
 const WHITE: Rgb = [255, 255, 255]
 const BLACK: Rgb = [0, 0, 0]
 
-function rgba(hex: string, a: number): string {
+export function rgba(hex: string, a: number): string {
   const [r, g, b] = rgb(hex)
   return `rgba(${r}, ${g}, ${b}, ${a})`
 }
 
-function rng(seed: string): () => number {
+export function rng(seed: string): () => number {
   let a = 0x9e3779b9
   for (const ch of seed) a = (Math.imul(a ^ ch.codePointAt(0)!, 0x85ebca6b) + 0x2545f491) | 0
   return () => {
@@ -63,7 +63,7 @@ function rng(seed: string): () => number {
 }
 
 /** The four tones a composition is painted in, plus its base. */
-function tones(accent: string, onAccent: boolean) {
+export function tones(accent: string, onAccent: boolean) {
   return onAccent
     ? {
         base: accent,

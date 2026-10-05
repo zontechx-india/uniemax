@@ -813,6 +813,21 @@ backend: it reads the managed store (name, `logoUrl`, `theme`,
     paths behaved as above, and desktop / unsupported browsers showed no
     button. The real iOS and Android share sheets have not been tried on a
     device.
+- **Remembered choices** (`share/shareKitPrefs.ts`): template, size, QR
+  style, colour, caption, background, logo switch and product are saved per
+  store on the device (`localStorage` `uniemax.shareKit.{storeId}`), so
+  reopening the page continues the last card. Each field is validated on
+  read, so an entry from an older build (a retired pattern, an over-long
+  caption, invalid JSON) falls back to that field's default. The page is
+  keyed on `store.id`, so switching shops on the same route starts from
+  that shop's own choices and products.
+- **Indian-language names.** Text is wrapped and cut with "…" by grapheme
+  (`Intl.Segmenter`), never by code point, so Malayalam, Tamil and
+  Devanagari conjuncts and vowel signs stay whole (splitting them draws
+  dotted circles). The card fonts (Fraunces, Plus Jakarta Sans) are
+  Latin-only, so those scripts render in the device's own font
+  (Noto / Nirmala UI and similar). Checked with Malayalam, Tamil and Hindi
+  names and taglines.
 - **Colour is never free-picked.** You choose from the store's own colours:
   the primary, the secondary when one is set, or black (`palette.ts`). QR
   modules are darkened until they reach **7:1** against the white plate, and
@@ -835,6 +850,15 @@ backend: it reads the managed store (name, `logoUrl`, `theme`,
     dashboard stays flat per DESIGN_GUIDELINES. (Internal names avoid the
     word "glass", which `check:ui` reserves for the retired glass CSS
     classes.)
+  - **Festive art** (`festive.ts`): **Lights** is a Diwali-style night of
+    glowing bokeh, two strings of fairy lights and sparkles, on the
+    deepest tone of the accent. **Pookalam** is Onam's flower carpet,
+    concentric petal rings from two corners plus small flowers along the
+    edges; small flowers get fewer and bigger petals, because dense rings
+    read as gears at that size. Both use the same frosted panel and
+    seeding as the glass art (`isArtPattern`), and the same tones, with
+    deliberately no words in the artwork: the shop chooses what it
+    celebrates in its caption.
   - **Textures**: Dots, Grid, Stripes, Waves, Rings and Confetti. Each
     texture uses one colour, the card's own:
   the accent on the white cards (inside the frame on Minimal; below the
@@ -879,7 +903,9 @@ backend: it reads the managed store (name, `logoUrl`, `theme`,
   Brand and Rounded QR styles, pale and dark colours, JPEG q60 and preview
   size: 504 / 504. The glass art was run the same way (3 art styles ×
   3 templates × 2 formats × 3 QR styles × 4 colours including pale yellow,
-  each also JPEG q60 and preview size): 648 / 648.
+  each also JPEG q60 and preview size): 648 / 648. The festive art and the
+  Indian-language names (2 festive × 3 × 2 × 3 QR styles × 4 colours, plus
+  Malayalam / Tamil / Hindi across 4 backgrounds) decoded 864 / 864.
 
 **Public storefront (multi-page)** — everything under `/store/…`, `/cart…`
 and `/checkout/…` is served **without sign-in**: `StorefrontApp` picks the

@@ -16,10 +16,13 @@
 
 import { drawCrystalArt } from './crystal'
 import type { CrystalArt } from './crystal'
+import { drawFestiveArt } from './festive'
+import type { FestiveArt } from './festive'
 
 export type SharePattern =
   | 'none'
   | CrystalArt
+  | FestiveArt
   | 'dots'
   | 'grid'
   | 'stripes'
@@ -35,11 +38,22 @@ export function isCrystalArt(pattern: SharePattern): pattern is CrystalArt {
   return pattern === 'liquid' || pattern === 'prism' || pattern === 'orbs'
 }
 
+export function isFestiveArt(pattern: SharePattern): pattern is FestiveArt {
+  return pattern === 'lights' || pattern === 'pookalam'
+}
+
+/** Solid artwork (crystal or festive) — the content goes on a frosted panel. */
+export function isArtPattern(pattern: SharePattern): pattern is CrystalArt | FestiveArt {
+  return isCrystalArt(pattern) || isFestiveArt(pattern)
+}
+
 export const PATTERNS: { value: SharePattern; label: string }[] = [
   { value: 'none', label: 'Plain' },
   { value: 'liquid', label: 'Glass' },
   { value: 'prism', label: 'Prism' },
   { value: 'orbs', label: 'Orbs' },
+  { value: 'lights', label: 'Lights' },
+  { value: 'pookalam', label: 'Pookalam' },
   { value: 'dots', label: 'Dots' },
   { value: 'grid', label: 'Grid' },
   { value: 'stripes', label: 'Stripes' },
@@ -49,7 +63,7 @@ export const PATTERNS: { value: SharePattern; label: string }[] = [
 ]
 
 /** Opacity per pattern — denser patterns are fainter. */
-const ALPHA: Record<Exclude<SharePattern, 'none' | CrystalArt>, number> = {
+const ALPHA: Record<Exclude<SharePattern, 'none' | CrystalArt | FestiveArt>, number> = {
   dots: 0.2,
   grid: 0.12,
   stripes: 0.08,
@@ -98,6 +112,10 @@ export function drawPattern(ctx: CanvasRenderingContext2D, pattern: SharePattern
   if (pattern === 'none') return
   if (isCrystalArt(pattern)) {
     drawCrystalArt(ctx, pattern, { ...box, radius: box.radius ?? 0 })
+    return
+  }
+  if (isFestiveArt(pattern)) {
+    drawFestiveArt(ctx, pattern, { ...box, radius: box.radius ?? 0 })
     return
   }
   const { x, y, w, h, unit: u, color } = box

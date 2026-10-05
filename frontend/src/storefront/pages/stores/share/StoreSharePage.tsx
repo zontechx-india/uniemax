@@ -8,6 +8,7 @@ import { ErrorState, Skeleton } from '../../../../shared/ui/states'
 import { MediaImg } from '../../../../shared/media/MediaImg'
 import { useMediaQuery } from '../../../../shared/useMediaQuery'
 import { useManagedStore } from '../../../features/stores/useManagedStore'
+import type { Store } from '../../../features/stores/storesApi'
 import { cardBackground } from '../../../features/shareKit/shareCard'
 import type { ShareFormat, ShareTemplate } from '../../../features/shareKit/shareCard'
 import { PATTERNS, drawPattern } from '../../../features/shareKit/patterns'
@@ -60,6 +61,12 @@ const FORMAT_TABS: { value: ShareFormat; label: string }[] = [
 
 export function StoreSharePage() {
   const { store } = useManagedStore()
+  // Keyed on the store: moving to another shop (same route, new slug) must
+  // start from THAT shop's saved choices and products, not this one's.
+  return <ShareKit key={store.id} store={store} />
+}
+
+function ShareKit({ store }: { store: Store }) {
   const kit = useShareKit(store)
   const { choices } = kit
   const accentColor =
@@ -132,7 +139,7 @@ export function StoreSharePage() {
           {choices.template === 'product' && <ProductPicker kit={kit} />}
 
           <Field label="Background">
-            <div role="radiogroup" aria-label="Background" className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+            <div role="radiogroup" aria-label="Background" className="grid grid-cols-4 gap-2">
               {PATTERNS.map((pattern) => (
                 <OptionTile
                   key={pattern.value}

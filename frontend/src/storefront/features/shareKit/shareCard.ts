@@ -1,7 +1,7 @@
 import { initialsOf } from '../../../shared/media/letterLogo'
 import type { CardPalette } from './palette'
 import { drawFrostedPanel } from './crystal'
-import { drawPattern, isCrystalArt } from './patterns'
+import { drawPattern, isArtPattern } from './patterns'
 import type { SharePattern } from './patterns'
 import { drawContained, drawQr } from './qr'
 import type { QrMatrix, QrStyle } from './qr'
@@ -110,7 +110,21 @@ export function loadShareFonts(): Promise<unknown> {
 // Text
 // ---------------------------------------------------------------------------
 
-/** Word-wrap `text` to `maxWidth`; a single over-long word is broken by letter. */
+/**
+ * The text as user-perceived characters (grapheme clusters). Malayalam,
+ * Tamil, Devanagari and emoji are built from several code points per visible
+ * letter; splitting between them (`Array.from`) strands a vowel sign and
+ * the browser draws it on a dotted circle. Falls back to code points where
+ * `Intl.Segmenter` is missing (very old browsers).
+ */
+const segmenter =
+  typeof Intl !== 'undefined' && 'Segmenter' in Intl ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : null
+
+function graphemes(text: string): string[] {
+  return segmenter ? Array.from(segmenter.segment(text), (s) => s.segment) : Array.from(text)
+}
+
+/** Word-wrap `text` to `maxWidth`; a single over-long word is broken between letters. */
 function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const lines: string[] = []
   let line = ''
@@ -129,7 +143,7 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): st
     // "-" or "/" when there is one in the back half, so a URL splits between
     // its words rather than through one.
     line = ''
-    for (const ch of Array.from(word)) {
+    for (const ch of graphemes(word)) {
       if (ctx.measureText(line + ch).width > maxWidth && line) {
         const cut = Math.max(line.lastIndexOf('-'), line.lastIndexOf('/'))
         if (cut >= line.length / 2) {
@@ -148,7 +162,7 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): st
 
 function ellipsize(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
   if (ctx.measureText(text).width <= maxWidth) return text
-  const chars = Array.from(text)
+  const chars = graphemes(text)
   while (chars.length > 1 && ctx.measureText(`${chars.join('').trimEnd()}…`).width > maxWidth) {
     chars.pop()
   }
@@ -382,7 +396,7 @@ export function drawShareCard(ctx: CanvasRenderingContext2D, spec: ShareCardSpec
       drawLogoTile(ctx, spec, assets.logo, cx, (photoH - tile) / 2 + (spec.format === 'story' ? f.safe.top / 3 : 0), tile, true)
     }
     // Over crystal art the frosted panel needs clear space under the photo.
-    contentTop = photoH + Math.round((isCrystalArt(spec.pattern) ? 100 : 56) * s)
+    contentTop = photoH + Math.round((isArtPattern(spec.pattern) ? 100 : 56) * s)
   }
 
   const rows: Row[] = []
@@ -460,12 +474,12 @@ export function drawShareCard(ctx: CanvasRenderingContext2D, spec: ShareCardSpec
       ? { min: f.qr.min * 0.85, max: f.qr.productMax }
       : // On a Post with crystal art the code stops at 460px (43% of the card,
         // far above scannable) so the artwork shows round the frosted panel.
-        isCrystalArt(spec.pattern) && spec.format === 'post'
+        isArtPattern(spec.pattern) && spec.format === 'post'
         ? { min: f.qr.min, max: 460 }
         : f.qr
   // Over crystal art the content sits on a frosted panel, so the text keeps
   // its contrast however bold the artwork behind it is.
-  const art = isCrystalArt(spec.pattern)
+  const art = isArtPattern(spec.pattern)
   // With art, the stack gets a slightly smaller box so the artwork shows
   // around the panel rather than as a sliver at the edge (the QR flexes down
   // a little, staying well above its scannable floor).

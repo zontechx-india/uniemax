@@ -24,6 +24,7 @@ import { displayUrl, instagramHandle, storeTagline } from '../../../features/sha
 import { drawQr } from '../../../features/shareKit/qr'
 import type { SharePattern } from '../../../features/shareKit/patterns'
 import { showToast } from '../ui/Toast'
+import { loadPrefs, savePrefs } from './shareKitPrefs'
 
 export const CAPTION_PRESETS = ['Scan to Shop', 'Visit Our Store', 'Shop Now', 'Explore Store'] as const
 
@@ -48,16 +49,25 @@ type Loadable<T> = { status: 'loading' } | { status: 'ready'; value: T } | { sta
  * needs a "Generate" step — the page redraws the canvas whenever it changes.
  */
 export function useShareKit(store: Store) {
-  const [template, setTemplate] = useState<ShareTemplate>('minimal')
-  const [format, setFormat] = useState<ShareFormat>('post')
-  const [qrStyle, setQrStyle] = useState<QrStyle>('brand')
-  const [accentKey, setAccentKey] = useState<AccentKey>('primary')
-  const [caption, setCaption] = useState<string>(CAPTION_PRESETS[0])
-  const [showLogoInQr, setShowLogoInQr] = useState(true)
+  // The last card this seller made for this shop, on this device.
+  const [saved] = useState(() => loadPrefs(store.id, CAPTION_MAX))
+  const [template, setTemplate] = useState<ShareTemplate>(saved.template ?? 'minimal')
+  const [format, setFormat] = useState<ShareFormat>(saved.format ?? 'post')
+  const [qrStyle, setQrStyle] = useState<QrStyle>(saved.qrStyle ?? 'brand')
+  const [accentKey, setAccentKey] = useState<AccentKey>(saved.accentKey ?? 'primary')
+  const [caption, setCaption] = useState<string>(saved.caption ?? CAPTION_PRESETS[0])
+  const [showLogoInQr, setShowLogoInQr] = useState(saved.showLogoInQr ?? true)
   // Glass by default: a flat card reads as unfinished in a busy feed.
-  const [pattern, setPattern] = useState<SharePattern>('liquid')
+  const [pattern, setPattern] = useState<SharePattern>(saved.pattern ?? 'liquid')
   /** `undefined` = not chosen yet (the first product is used); `null` = logo only. */
-  const [productId, setProductId] = useState<string | null | undefined>(undefined)
+  const [productId, setProductId] = useState<string | null | undefined>(saved.productId)
+
+  useEffect(() => {
+    savePrefs(store.id, {
+      template, format, qrStyle, accentKey, caption, showLogoInQr, pattern,
+      ...(productId !== undefined && { productId }),
+    })
+  }, [store.id, template, format, qrStyle, accentKey, caption, showLogoInQr, pattern, productId])
 
   const [fontsReady, setFontsReady] = useState(false)
   const [logo, setLogo] = useState<{ url: string | null; image: HTMLImageElement | null } | null>(null)

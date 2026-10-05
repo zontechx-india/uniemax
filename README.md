@@ -105,9 +105,9 @@ never ships to a shopper.
   owner can still preview an unpublished store; everyone else gets a 404.
 - **Store Share Kit** (`/mystores/:slug/share`): a QR code for the store with
   its logo in the middle, three share-card templates (Minimal / Brand /
-  Product), ten backgrounds in the shop's own colours (three glass-effect artworks
-  — Glass, Prism, Orbs — with the content on a frosted panel, plus six
-  subtle textures), a live
+  Product), twelve backgrounds in the shop's own colours (glass-effect Glass, Prism
+  and Orbs, festive Lights and Pookalam, all with the content on a frosted
+  panel, plus six subtle textures), choices remembered per store, a live
   preview, and on phones a **Share image** button that sends the card straight to
   Instagram or WhatsApp through the share sheet, downloads for an Instagram
   Post (1080×1350),
