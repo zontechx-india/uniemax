@@ -100,7 +100,6 @@ export function NewTicketForm({
           What is it about?
         </span>
         <Select
-          className="h-12"
           value={category}
           onChange={(event) => setCategory(event.target.value as TicketCategory)}
         >

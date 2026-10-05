@@ -6,6 +6,7 @@ import { sellerAffiliateApi } from '../../api'
 import type { CommissionType } from '../../api'
 import { Field, StatTile, inputClass, money, useLoad } from '../../ui'
 import { useSellerAffiliate } from './AffiliateLayout'
+import { Skeleton } from '../../../../shared/ui/states'
 
 export function ProgramTab() {
   const { storeId } = useSellerAffiliate()
@@ -56,7 +57,7 @@ export function ProgramTab() {
     })
   }
 
-  if (program.loading) return <p className="text-sm text-muted">Loading…</p>
+  if (program.loading) return <Skeleton rows={4} />
   if (program.error) return <ErrorNote>{program.error}</ErrorNote>
   if (!program.data) return null
   const enabled = program.data.enabled

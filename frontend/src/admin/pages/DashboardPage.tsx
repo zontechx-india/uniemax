@@ -227,7 +227,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2" padded={false}>
+        <Card className="lg:col-span-2" padding="none">
           <div className="p-4 sm:p-5">
             <CardHeader
               title="Latest orders"

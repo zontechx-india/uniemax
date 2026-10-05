@@ -154,7 +154,7 @@ export default function ThemeTemplatesPage() {
         <Card>
           <EmptyState
             title="No templates yet"
-            hint="Create one here, or run the backend's seed-theme-templates script to build the starter set from the palettes already live on the platform."
+            description="Create one here, or run the backend's seed-theme-templates script to build the starter set from the palettes already live on the platform."
           />
         </Card>
       ) : (
@@ -174,7 +174,7 @@ export default function ThemeTemplatesPage() {
               </li>
             ) : (
               <li key={template.id}>
-                <Card padded={false}>
+                <Card padding="none">
                   <div className="flex flex-wrap items-center gap-4 p-4">
                     <ThemeThumbnail theme={template.theme} />
                     <div className="min-w-0 flex-1">

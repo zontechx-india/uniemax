@@ -6,7 +6,8 @@ import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
 import { useAdminSession } from '../app/adminSession'
 import { NAV_GROUPS, titleForPath } from '../app/navigation'
 import { NotificationBell } from './NotificationBell'
-import { CloseIcon, LogoutIcon, MenuIcon } from './icons'
+import { ModalClose, ModalShell } from '../../shared/ui/ModalShell'
+import { LogoutIcon, MenuIcon } from './icons'
 
 /**
  * The console shell.
@@ -107,34 +108,25 @@ export function AdminLayout() {
       </aside>
 
       {/* Drawer — below lg. */}
-      {drawerOpen ? (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <button
-            type="button"
-            aria-label="Close menu"
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setDrawerOpen(false)}
-          />
-          <aside className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-surface shadow-lifted">
-            <div className="flex h-16 items-center justify-between border-b border-line px-4">
-              <div className="flex items-center gap-2">
-                <AppLogoLockup className="h-7" />
-                <span className="font-heading text-base font-semibold text-fg">Admin</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDrawerOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-md text-muted hover:bg-surface-alt"
-                aria-label="Close menu"
-              >
-                <CloseIcon />
-              </button>
-            </div>
-            {nav}
-            {identity}
-          </aside>
+      <ModalShell
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        placement="drawer-left"
+        label="Menu"
+        hideBelow="lg"
+        zIndex="z-40"
+        panelClassName="flex w-72 max-w-[85vw] flex-col"
+      >
+        <div className="flex h-16 items-center justify-between border-b border-line pr-2 pl-4">
+          <div className="flex items-center gap-2">
+            <AppLogoLockup className="h-7" />
+            <span className="text-base font-semibold text-fg">Admin</span>
+          </div>
+          <ModalClose onClick={() => setDrawerOpen(false)} label="Close menu" />
         </div>
-      ) : null}
+        {nav}
+        {identity}
+      </ModalShell>
 
       <div className="lg:pl-64">
         <header className="sticky top-0 z-10 flex h-16 items-center gap-2 border-b border-line bg-surface/95 px-4 backdrop-blur sm:px-6">

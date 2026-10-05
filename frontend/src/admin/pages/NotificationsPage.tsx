@@ -175,7 +175,7 @@ export default function NotificationsPage() {
           </Card>
         </div>
 
-        <Card className="lg:col-span-2" padded={false}>
+        <Card className="lg:col-span-2" padding="none">
           <div className="p-4 sm:p-5">
             <CardHeader
               title="Your notifications"

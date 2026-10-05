@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import Cropper from 'react-easy-crop'
 import type { Area } from 'react-easy-crop'
 import { MAX_EDGE, renderToWebp, webpName } from './cropImage'
+import { Button } from '../ui/Button'
+import { ModalShell } from '../ui/ModalShell'
 
 /**
  * Image editor: crop, rotate and zoom before uploading.
@@ -169,18 +171,19 @@ export function ImageEditDialog({
   const working = processing || busy
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
+    // A stray tap or Escape must not throw away the framing work — only
+    // Cancel closes it.
+    <ModalShell
+      onClose={onCancel}
+      placement="center"
+      closeOnBackdrop={false}
+      closeOnEscape={false}
+      label={title}
+      panelClassName="overflow-y-auto p-5"
     >
-      <div
-        className="max-h-[94vh] overflow-y-auto rounded-lg bg-surface p-5 shadow-floating"
-        style={{ width: panelWidth }}
-      >
-        <h3 className="text-base font-bold text-fg">{title}</h3>
-        <p className="mt-1 text-xs text-muted">
+      <div style={{ width: panelWidth, maxWidth: '100%' }}>
+        <h3 className="text-lg font-semibold text-fg">{title}</h3>
+        <p className="mt-1 text-sm text-muted">
           Drag to position, pinch or use the slider to zoom. Nothing outside
           the frame is uploaded.
         </p>
@@ -193,7 +196,7 @@ export function ImageEditDialog({
                 type="button"
                 onClick={() => setAspect(option.value)}
                 aria-pressed={aspect === option.value}
-                className={`h-8 rounded-md border px-3 text-xs font-semibold transition ${
+                className={`h-9 rounded-md border px-3 text-sm font-semibold transition-colors ${
                   aspect === option.value
                     ? 'border-accent bg-accent/10 text-fg'
                     : 'border-line bg-surface text-muted hover:text-fg'
@@ -229,7 +232,7 @@ export function ImageEditDialog({
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <label className="flex min-w-[180px] flex-1 items-center gap-3">
-            <span className="text-xs font-medium text-muted">Zoom</span>
+            <span className="text-sm font-medium text-muted">Zoom</span>
             <input
               type="range"
               min={1}
@@ -242,64 +245,50 @@ export function ImageEditDialog({
             />
           </label>
           <div className="flex items-center gap-1.5">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => setRotation((r) => (r + 270) % 360)}
               disabled={working}
-              className="h-8 rounded-md border border-line bg-surface px-2.5 text-xs font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
+              aria-label="Rotate left"
             >
               ⟲ Rotate
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => setRotation((r) => (r + 90) % 360)}
               disabled={working}
-              className="h-8 rounded-md border border-line bg-surface px-2.5 text-xs font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
+              aria-label="Rotate right"
             >
               ⟳ Rotate
-            </button>
-            <button
-              type="button"
-              onClick={reset}
-              disabled={working || !touched}
-              className="h-8 rounded-md px-2.5 text-xs font-semibold text-muted transition hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
-            >
+            </Button>
+            <Button variant="ghost" size="sm" onClick={reset} disabled={working || !touched}>
               Reset
-            </button>
+            </Button>
           </div>
         </div>
 
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
 
         <div className="mt-5 flex flex-wrap justify-end gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={working}
-            className="h-10 rounded-md border border-line bg-surface px-4 text-sm font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
-          >
+          <Button variant="secondary" onClick={onCancel} disabled={working}>
             Cancel
-          </button>
+          </Button>
           {allowOriginal && (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               onClick={() => void render({ area: null, rotation: 0 })}
               disabled={working}
-              className="h-10 rounded-md border border-line bg-surface px-4 text-sm font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
             >
               Use original
-            </button>
+            </Button>
           )}
-          <button
-            type="button"
-            onClick={() => void render({ area, rotation })}
-            disabled={working || !area}
-            className="h-10 rounded-md bg-brand-gradient px-5 text-sm font-semibold text-brand-contrast transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-none disabled:bg-line disabled:text-muted"
-          >
+          <Button onClick={() => void render({ area, rotation })} disabled={!area} loading={working}>
             {working ? 'Working…' : confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
-    </div>
+    </ModalShell>
   )
 }

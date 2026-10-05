@@ -6,6 +6,8 @@ import type {
   SelectHTMLAttributes,
 } from 'react'
 import { buttonClass } from './Button'
+import { Alert } from './Alert'
+import { FIELD_LABEL, fieldClass, fieldNoteClass } from './field'
 
 /**
  * Shared, brand-neutral auth primitives.
@@ -146,9 +148,7 @@ export function TextField({
   const note = error ?? hint
   return (
     <label className="block">
-      <span className="mb-2 block text-[14px] font-medium text-muted">
-        {label}
-      </span>
+      <span className={FIELD_LABEL}>{label}</span>
       <div className="group relative">
         {icon && (
           <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted transition-colors group-focus-within:text-fg">
@@ -158,9 +158,10 @@ export function TextField({
         <input
           aria-invalid={error ? true : undefined}
           aria-describedby={note ? noteId : undefined}
-          className={`h-field w-full rounded-md border bg-input text-sm text-fg outline-none transition-colors placeholder:text-muted placeholder:tracking-normal hover:border-fg/30 focus:border-accent ${
-            error ? 'border-danger' : 'border-line'
-          } ${icon ? 'pl-11' : 'pl-4'} ${trailing ? 'pr-11' : 'pr-4'} ${className}`}
+          className={fieldClass({
+            invalid: Boolean(error),
+            className: `${icon ? 'pl-11' : ''} ${trailing ? 'pr-11' : ''} ${className}`,
+          })}
           {...props}
         />
         {trailing && (
@@ -173,7 +174,7 @@ export function TextField({
         <span
           id={noteId}
           role={error ? 'alert' : undefined}
-          className={`mt-1.5 block text-hint ${error ? 'font-medium text-danger' : 'text-muted'}`}
+          className={fieldNoteClass(Boolean(error))}
         >
           {note}
         </span>
@@ -207,7 +208,7 @@ export function Select({
   return (
     <div className={`relative ${containerClassName}`}>
       <select
-        className={`w-full appearance-none rounded-md border border-line bg-input pl-3.5 pr-10 text-sm text-fg outline-none transition-colors hover:border-fg/30 focus:border-accent ${className}`}
+        className={fieldClass({ className: `appearance-none pr-10 ${className}` })}
         {...props}
       >
         {children}
@@ -217,34 +218,19 @@ export function Select({
   )
 }
 
-/** Inline form error message. */
+/** Inline form error — the shared `Alert` (danger). */
 export function ErrorNote({ children }: { children: ReactNode }) {
-  return (
-    <p
-      role="alert"
-      className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger"
-    >
-      {children}
-    </p>
-  )
+  return <Alert tone="danger">{children}</Alert>
 }
 
-/** Inline neutral/info message (dev hints, "code sent" confirmations). */
+/** Inline neutral/info message ("code sent" confirmations). */
 export function InfoNote({ children }: { children: ReactNode }) {
-  return (
-    <p className="rounded-md border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-accent">
-      {children}
-    </p>
-  )
+  return <Alert tone="info">{children}</Alert>
 }
 
 /** Inline success message. */
 export function SuccessNote({ children }: { children: ReactNode }) {
-  return (
-    <p className="rounded-md border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">
-      {children}
-    </p>
-  )
+  return <Alert tone="success">{children}</Alert>
 }
 
 /** Segmented control for switching sign-in methods. */
@@ -296,7 +282,7 @@ export function SecondaryButton({
 }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
-      className={`flex h-12 w-full items-center justify-center gap-2.5 rounded-md border border-line bg-surface px-4 text-sm font-semibold text-fg transition-colors hover:border-fg/30 hover:bg-surface-alt active:scale-[0.99] disabled:cursor-not-allowed disabled:text-muted ${className}`}
+      className={buttonClass({ variant: 'secondary', size: 'lg', full: true, className })}
       {...props}
     >
       {children}

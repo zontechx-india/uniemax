@@ -45,13 +45,24 @@ Also: 9 separate dialog implementations, 3 card styles, 13 corner radii,
 - (Carried over from the font work: self-hosted fonts, 16px root, ₹ verified,
   `font-figure` for prices.)
 
-## Phase 1 — Shared components ☐
-- Inputs / select / textarea / labels / helper / error on the scale
-  (`shared/ui/form.tsx`), all states.
-- One `Card`; one `Badge` (merge StatusPill, chips, admin badges); `Alert`;
-  `Toast`; `Tabs`.
-- ONE dialog/sheet base replacing the 9 implementations.
-- Shared empty, skeleton and error states; remove bare "Loading…".
+## Phase 1 — Shared components ☑
+- `shared/ui/field.ts`: one style for every input / select / textarea
+  (48px/16px, dense 44px/14px), label at full ink, hint/error lines; used by
+  `TextField`, `Select`, admin inputs and the photo/filter fields.
+- `Card`, `Badge` (seller `StatusPill` and admin `Chip` wrap it), `Alert`
+  (the old Error/Info/Success notes), shared `Toast`.
+- **`ModalShell`** — one modal base; `Dialog`, `ConfirmDialog`, the photo
+  editor, describe and review sheets, storefront filters and menu drawer,
+  admin menu drawer and the login dialog all use it (9 → 1). Overlays are
+  flat (no blur); every one closes with Escape and traps focus.
+- `Skeleton` / `PageSkeleton` / `EmptyState` / `ErrorState` shared; the
+  bare "Loading…" screens replaced (route fallbacks, designer, affiliate
+  pages, category picker, notification bells).
+- The admin console's duplicate kit now delegates to `shared/ui`.
+- Budget after Phase 1: stray sizes 331, tiny text 119, gradients 33,
+  glass 154, ad-hoc effects 33, hand-made buttons 272.
+- Not changed: underline tab rows stay page-local until their pages are
+  reworked in Phases 2–5 (`SegmentedTabs` is the shared segmented control).
 
 ## Phase 2 — My Shops (sellers) ☐
 - Remove glass (`glass*`, `seller-canvas`, tinted hero) → flat surfaces.

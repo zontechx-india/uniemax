@@ -1,15 +1,24 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { EyeIcon } from '../../shared/ui/form'
+import { Badge } from '../../shared/ui/Badge'
+import {
+  Button as SharedButton,
+  buttonClass as sharedButtonClass,
+  type ButtonVariant,
+} from '../../shared/ui/Button'
+import { FIELD_LABEL, fieldClass, fieldNoteClass } from '../../shared/ui/field'
+export { Card, CardHeader } from '../../shared/ui/Card'
+export { EmptyState, ErrorState, Skeleton } from '../../shared/ui/states'
+export type { ButtonVariant }
 
 /**
- * The admin console's own UI kit — deliberately ISOLATED from the storefront.
- *
- * The two apps ship as separate bundles and serve different people: a console
- * is dense, tabular and keyboard-driven, while the storefront is spacious and
- * promotional. Sharing components would force every change to satisfy both.
- * What IS shared is the token layer (`index.css`) — colors, type, radius —
- * so the two look like one product without being one codebase.
+ * The admin console's UI kit. Since the design-system clean-up
+ * (docs/DESIGN_SYSTEM_PLAN.md) it is a thin layer over `shared/ui` — Card,
+ * Badge, Button, field styles and the loading/empty/error states are the SAME
+ * components the storefront uses, in their dense sizes — so the two apps are
+ * one product (docs/DESIGN_GUIDELINES.md §7). Only console-specific shapes
+ * (PageHeader, Detail rows, the password field) live here.
  *
  * Everything here is presentational: no data fetching, no routing.
  */
@@ -17,44 +26,6 @@ import { EyeIcon } from '../../shared/ui/form'
 // ---------------------------------------------------------------------------
 // Surfaces
 // ---------------------------------------------------------------------------
-
-export function Card({
-  children,
-  className = '',
-  padded = true,
-}: {
-  children: ReactNode
-  className?: string
-  padded?: boolean
-}) {
-  return (
-    <section
-      className={`rounded-lg border border-line bg-surface ${padded ? 'p-4 sm:p-5' : ''} ${className}`}
-    >
-      {children}
-    </section>
-  )
-}
-
-export function CardHeader({
-  title,
-  subtitle,
-  action,
-}: {
-  title: string
-  subtitle?: ReactNode
-  action?: ReactNode
-}) {
-  return (
-    <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
-      <div className="min-w-0">
-        <h2 className="font-heading text-base font-semibold text-fg sm:text-lg">{title}</h2>
-        {subtitle ? <p className="mt-0.5 text-sm text-muted">{subtitle}</p> : null}
-      </div>
-      {action}
-    </header>
-  )
-}
 
 /** Page title row — every page opens with exactly one. */
 export function PageHeader({
@@ -69,7 +40,7 @@ export function PageHeader({
   return (
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <h1 className="font-heading text-xl font-semibold text-fg sm:text-2xl">{title}</h1>
+        <h1 className="text-2xl font-semibold text-fg">{title}</h1>
         {subtitle ? <p className="mt-1 text-sm text-muted">{subtitle}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
@@ -90,20 +61,6 @@ export type ChipTone =
   | 'brand'
   | 'pending'
 
-const CHIP_TONES: Record<ChipTone, string> = {
-  neutral: 'bg-surface-alt text-muted border-line',
-  success: 'bg-success/10 text-success border-success/30',
-  warning: 'bg-warning/10 text-warning border-warning/30',
-  danger: 'bg-danger/10 text-danger border-danger/30',
-  info: 'bg-accent/10 text-accent border-accent/30',
-  brand: 'bg-brand/15 text-fg border-brand/40',
-  // Setup that is unfinished — NOT a warning (nothing is wrong) and not
-  // danger (nothing is broken); the seller simply owes the platform
-  // something. Shares the storefront's `--pending` orange so a seller and an
-  // admin looking at the same store see the same color mean the same thing.
-  pending: 'bg-pending-soft text-pending border-pending/30',
-}
-
 /**
  * A status chip always carries its LABEL — color is a second signal, never
  * the only one, so the state survives a colorblind reader or a printout.
@@ -118,11 +75,9 @@ export function Chip({
   className?: string
 }) {
   return (
-    <span
-      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-pill border px-2 py-0.5 text-xs font-medium ${CHIP_TONES[tone]} ${className}`}
-    >
+    <Badge tone={tone} className={className}>
       {children}
-    </span>
+    </Badge>
   )
 }
 
@@ -130,47 +85,34 @@ export function Chip({
 // Buttons
 // ---------------------------------------------------------------------------
 
-const BUTTON_BASE =
-  'inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50'
-
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
-
-const BUTTON_TONES: Record<ButtonVariant, string> = {
-  primary: 'bg-brand text-brand-contrast hover:bg-brand-hover',
-  secondary: 'border border-line bg-surface text-fg hover:bg-surface-alt',
-  ghost: 'text-muted hover:bg-surface-alt hover:text-fg',
-  danger: 'border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20',
-}
-
 /**
- * The button's classes without the `<button>` — for the console's CTAs that
- * are really navigation and so must render as a `<Link>`/`<a>` (keyboard,
- * middle-click and "open in new tab" all come free from a real anchor).
- *
- * Sharing one source with `Button` is the point: a console where a link-shaped
- * action is 2px shorter than the button beside it looks broken, and sizing is
- * exactly the kind of thing that drifts when it is retyped at the call site.
+ * The console's buttons are the shared `Button` at its dense size (36px) by
+ * default — a console is scanned and clicked with a mouse, so rows of actions
+ * stay compact. Pass `size="md"` for a form's main action.
  */
 export function buttonClass({
   variant = 'secondary',
+  size = 'sm',
   className = '',
-}: { variant?: ButtonVariant; className?: string } = {}): string {
-  return `${BUTTON_BASE} ${BUTTON_TONES[variant]} ${className}`
+}: { variant?: ButtonVariant; size?: 'sm' | 'md'; className?: string } = {}): string {
+  return sharedButtonClass({ variant, size, className })
 }
 
 export function Button({
   children,
   variant = 'secondary',
+  size = 'sm',
   type = 'button',
   className = '',
   ...rest
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant
+  size?: 'sm' | 'md'
 }) {
   return (
-    <button type={type} className={buttonClass({ variant, className })} {...rest}>
+    <SharedButton type={type} variant={variant} size={size} className={className} {...rest}>
       {children}
-    </button>
+    </SharedButton>
   )
 }
 
@@ -178,8 +120,7 @@ export function Button({
 // Form controls (console-density versions of the shared auth fields)
 // ---------------------------------------------------------------------------
 
-const FIELD =
-  'w-full rounded-md border border-line bg-input px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-brand focus:outline-none'
+const FIELD = fieldClass({ dense: true })
 
 export function TextInput({
   label,
@@ -189,9 +130,9 @@ export function TextInput({
 }: React.InputHTMLAttributes<HTMLInputElement> & { label?: string; hint?: string }) {
   return (
     <label className={`block ${className}`}>
-      {label ? <span className="mb-1 block text-sm font-medium text-fg">{label}</span> : null}
+      {label ? <span className={FIELD_LABEL}>{label}</span> : null}
       <input className={FIELD} {...rest} />
-      {hint ? <span className="mt-1 block text-xs text-muted">{hint}</span> : null}
+      {hint ? <span className={fieldNoteClass()}>{hint}</span> : null}
     </label>
   )
 }
@@ -219,7 +160,7 @@ export function PasswordInput({
 
   return (
     <label className={`block ${className}`}>
-      {label ? <span className="mb-1 block text-sm font-medium text-fg">{label}</span> : null}
+      {label ? <span className={FIELD_LABEL}>{label}</span> : null}
       <div className="relative">
         {/* pr-11 keeps the text clear of the toggle at every width. */}
         <input type={visible ? 'text' : 'password'} className={`${FIELD} pr-11`} {...rest} />
@@ -233,7 +174,7 @@ export function PasswordInput({
           <EyeIcon off={visible} />
         </button>
       </div>
-      {hint ? <span className="mt-1 block text-xs text-muted">{hint}</span> : null}
+      {hint ? <span className={fieldNoteClass()}>{hint}</span> : null}
     </label>
   )
 }
@@ -246,9 +187,9 @@ export function TextArea({
 }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label?: string; hint?: string }) {
   return (
     <label className={`block ${className}`}>
-      {label ? <span className="mb-1 block text-sm font-medium text-fg">{label}</span> : null}
-      <textarea className={`${FIELD} min-h-20 resize-y`} {...rest} />
-      {hint ? <span className="mt-1 block text-xs text-muted">{hint}</span> : null}
+      {label ? <span className={FIELD_LABEL}>{label}</span> : null}
+      <textarea className={fieldClass({ dense: true, multiline: true, className: 'resize-y' })} {...rest} />
+      {hint ? <span className={fieldNoteClass()}>{hint}</span> : null}
     </label>
   )
 }
@@ -264,7 +205,7 @@ export function SelectInput({
 }) {
   return (
     <label className={`block ${className}`}>
-      {label ? <span className="mb-1 block text-sm font-medium text-fg">{label}</span> : null}
+      {label ? <span className={FIELD_LABEL}>{label}</span> : null}
       <select className={`${FIELD} appearance-none pr-8`} {...rest}>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -273,43 +214,6 @@ export function SelectInput({
         ))}
       </select>
     </label>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// States
-// ---------------------------------------------------------------------------
-
-export function EmptyState({ title, hint }: { title: string; hint?: string }) {
-  return (
-    <div className="px-4 py-12 text-center">
-      <p className="font-heading text-base font-medium text-fg">{title}</p>
-      {hint ? <p className="mx-auto mt-1 max-w-sm text-sm text-muted">{hint}</p> : null}
-    </div>
-  )
-}
-
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
-  return (
-    <div className="px-4 py-10 text-center">
-      <p className="text-sm text-danger">{message}</p>
-      {onRetry ? (
-        <div className="mt-3">
-          <Button onClick={onRetry}>Try again</Button>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-/** Shimmer placeholder. `rows` blocks at the given height. */
-export function Skeleton({ rows = 3, className = '' }: { rows?: number; className?: string }) {
-  return (
-    <div className={`space-y-2 ${className}`} aria-hidden>
-      {Array.from({ length: rows }, (_, index) => (
-        <div key={index} className="h-9 animate-pulse rounded-md bg-surface-alt" />
-      ))}
-    </div>
   )
 }
 

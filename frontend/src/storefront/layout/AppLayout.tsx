@@ -4,6 +4,7 @@ import { ThemeToggle } from '../../shared/theme'
 import { AppLogoLockup } from '../../shared/ui/AppLogo'
 import { AccountMenu } from './AccountMenu'
 import { NotificationBell } from './NotificationBell'
+import { PageSkeleton } from '../../shared/ui/states'
 
 /**
  * Authed storefront shell — a sticky top bar over the page, nothing more.
@@ -48,9 +49,7 @@ export function AppLayout() {
         <div className="mx-auto w-full max-w-[1920px]">
           <Suspense
             fallback={
-              <div className="flex h-64 items-center justify-center text-sm text-muted">
-                Loading…
-              </div>
+              <PageSkeleton />
             }
           >
             <Outlet />

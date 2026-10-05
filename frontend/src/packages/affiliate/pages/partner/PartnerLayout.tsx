@@ -3,6 +3,7 @@ import { ErrorNote } from '../../../../shared/ui/form'
 import { partnerApi } from '../../api'
 import type { Me } from '../../api'
 import { Empty, TabNav, useLoad } from '../../ui'
+import { Skeleton } from '../../../../shared/ui/states'
 
 export interface PartnerContext {
   me: Me
@@ -22,7 +23,7 @@ export function PartnerLayout() {
         Share products from the stores you partner with and earn a commission on every order.
       </p>
 
-      {me.loading && <p className="mt-6 text-sm text-muted">Loading…</p>}
+      {me.loading && <Skeleton rows={3} className="mt-6" />}
 
       {me.error && (
         <div className="mt-6">

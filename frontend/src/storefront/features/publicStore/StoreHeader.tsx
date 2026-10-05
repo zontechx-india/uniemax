@@ -31,7 +31,6 @@ import { builderSectionProps } from './builderBridge'
 import {
   CartIcon,
   ChevronDownIcon,
-  CloseIcon,
   LogoutIcon,
   MenuIcon,
   SearchIcon,
@@ -39,6 +38,7 @@ import {
 } from '../../layout/icons'
 import type { Skin } from './storeTheme'
 import { MediaImg } from '../../../shared/media/MediaImg'
+import { ModalClose, ModalShell } from '../../../shared/ui/ModalShell'
 import { displayName, shopHasSearch } from './shopShape'
 
 /**
@@ -393,39 +393,18 @@ function MobileDrawer({
 }) {
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   return (
-    <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
-      <button
-        type="button"
-        aria-label="Close menu"
-        onClick={onClose}
-        className="absolute inset-0 bg-[var(--overlay)]"
-      />
-      <div
-        className={`relative z-10 flex h-full w-[85%] max-w-sm flex-col border-r ${skin.border} ${skin.surface}`}
-      >
-        <div
-          className={`flex items-center justify-between border-b p-4 ${skin.border}`}
-        >
-          <span className="font-display text-fg text-lg font-semibold">
-            {store.name}
-          </span>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className={`flex h-8 w-8 items-center justify-center rounded-full ${skin.muted}`}
-          >
-            <CloseIcon className="h-4 w-4" />
-          </button>
+    <ModalShell
+      onClose={onClose}
+      placement="drawer-left"
+      label="Menu"
+      portal={false}
+      hideBelow="lg"
+      panelClassName="flex flex-col"
+    >
+        <div className="flex items-center justify-between border-b border-line py-2 pr-2 pl-4">
+          <span className="font-display text-lg font-semibold text-fg">{store.name}</span>
+          <ModalClose onClick={onClose} label="Close menu" />
         </div>
 
         <nav className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -508,8 +487,7 @@ function MobileDrawer({
             })}
           </ul>
         </nav>
-      </div>
-    </div>
+    </ModalShell>
   )
 }
 

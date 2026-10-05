@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { notificationsApi } from '../../shared/notifications/notificationsApi'
 import type { AppNotification } from '../../shared/notifications/notificationsApi'
 import { usePushSubscription } from '../../shared/push/usePushSubscription'
+import { Skeleton } from '../../shared/ui/states'
 
 /**
  * Notification bell for signed-in customers and sellers.
@@ -146,7 +147,7 @@ export function NotificationBell() {
 
           <ul className="max-h-80 divide-y divide-line overflow-y-auto">
             {items === null ? (
-              <li className="px-4 py-6 text-center text-sm text-muted">Loading…</li>
+              <li className="px-4 py-4"><Skeleton rows={3} /></li>
             ) : items.length === 0 ? (
               <li className="px-4 py-6 text-center text-sm text-muted">
                 Order updates will appear here.

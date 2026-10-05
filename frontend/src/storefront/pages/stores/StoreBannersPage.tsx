@@ -651,7 +651,6 @@ function LinkPicker({
       </span>
       <div className="mt-1.5 space-y-2">
         <Select
-          className="h-10"
           value={banner.linkType}
           disabled={busy}
           onChange={(e) => {
@@ -670,7 +669,6 @@ function LinkPicker({
 
         {banner.linkType === 'CATEGORY' && (
           <Select
-            className="h-10"
             value={banner.linkValue ?? ''}
             disabled={busy}
             onChange={(e) =>
@@ -688,7 +686,6 @@ function LinkPicker({
 
         {banner.linkType === 'PRODUCT' && (
           <Select
-            className="h-10"
             value={banner.linkValue ?? ''}
             disabled={busy}
             onChange={(e) =>

@@ -127,7 +127,7 @@ export default function StoresPage() {
     <>
       <PageHeader title="Stores & sellers" subtitle="Every store on the marketplace" />
 
-      <Card padded={false}>
+      <Card padding="none">
         <Tabs
           value={list.filters['status'] ?? ''}
           onChange={(value) => list.setFilter('status', value)}

@@ -215,7 +215,7 @@ export function StoreCustomerSupportTicketPage() {
             <label className="flex items-center gap-2 text-sm text-muted">
               Status
               <Select
-                className="h-11 w-40"
+                className="w-40"
                 value={ticket.status}
                 disabled={busy}
                 onChange={(event) => {

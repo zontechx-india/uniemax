@@ -137,7 +137,7 @@ export default function SupportPage() {
         }
       />
 
-      <Card padded={false}>
+      <Card padding="none">
         <Tabs value={tab} onChange={selectTab} options={[...TABS]} />
         <Toolbar>
           <SearchInput

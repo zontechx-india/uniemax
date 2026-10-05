@@ -30,6 +30,7 @@ import { BuilderSectionEditor } from './BuilderSectionEditor'
 import { BuilderSectionList } from './BuilderSectionList'
 import type { BuilderTarget } from './BuilderSectionList'
 import { BUILDER_SECTIONS } from './builderSections'
+import { PageSkeleton } from '../../../../shared/ui/states'
 
 /**
  * **Store Builder** — one workspace for everything a seller's storefront looks
@@ -77,9 +78,7 @@ export function StoreBuilderPage() {
 
   if (store === undefined) {
     return (
-      <div className="flex h-[60vh] items-center justify-center text-sm text-muted">
-        Loading…
-      </div>
+      <PageSkeleton label="Loading the designer" />
     )
   }
   // Unknown or foreign store — back to the list it would have been opened from.

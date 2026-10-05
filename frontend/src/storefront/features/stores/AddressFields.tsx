@@ -127,7 +127,6 @@ export function AddressFields({
             </span>
             <Select
               id={`${idPrefix}-state`}
-              className="h-12"
               value={address.state}
               onChange={(e) => set('state', e.target.value)}
               disabled={disabled}

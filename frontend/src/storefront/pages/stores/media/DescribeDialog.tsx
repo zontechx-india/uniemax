@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { media } from './strings'
 import type { BoardPhoto } from './types'
 import { Button } from '../../../../shared/ui/Button'
+import { ModalShell } from '../../../../shared/ui/ModalShell'
+import { fieldClass } from '../../../../shared/ui/field'
 
 /**
  * "Describe this photo" — what used to be an `Alt` button nobody pressed.
@@ -30,17 +32,17 @@ export function DescribeDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-[var(--overlay)] p-0 sm:items-center sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={media.describe.title}
+    <ModalShell
+      onClose={() => {
+        if (!busy) onClose()
+      }}
+      label={media.describe.title}
+      panelClassName="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:max-w-sm"
     >
-      <div className="w-full max-w-sm rounded-t-xl bg-surface p-5 shadow-floating sm:rounded-xl">
-        <h3 className="font-body text-lg font-semibold tracking-normal text-fg">
+        <h3 className="text-lg font-semibold text-fg">
           {media.describe.title}
         </h3>
-        <p className="mt-1 text-xs text-muted">{media.describe.help}</p>
+        <p className="mt-1 text-sm text-muted">{media.describe.help}</p>
 
         {photo.previewUrl && (
           <img
@@ -56,23 +58,17 @@ export function DescribeDialog({
           maxLength={200}
           placeholder={media.describe.placeholder}
           autoFocus
-          className="mt-3 h-11 w-full rounded-md border border-line bg-input px-3 text-sm text-fg outline-none transition placeholder:text-muted focus:border-accent"
+          className={fieldClass({ className: 'mt-3' })}
         />
 
         <div className="mt-4 flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={busy}
-            className="h-10 rounded-md border border-line bg-surface px-4 text-sm font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
-          >
+          <Button variant="secondary" onClick={onClose} disabled={busy}>
             {media.describe.cancel}
-          </button>
+          </Button>
           <Button type="button" size="md" onClick={() => void save()} loading={busy}>
             {busy ? media.describe.saving : media.describe.save}
           </Button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   )
 }

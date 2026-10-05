@@ -6,6 +6,7 @@ import { CHANNELS, partnerApi } from '../../api'
 import type { AffiliateLink, Channel, PartnerProduct, PartnerStore } from '../../api'
 import { CopyButton, Empty, Pager, StatusChip, inputClass, money, rateText, useLoad } from '../../ui'
 import { MediaImg } from '../../../../shared/media/MediaImg'
+import { Skeleton } from '../../../../shared/ui/states'
 
 /** Pick a store, browse what it lets you promote, get a link for it. */
 export function StoresPage() {
@@ -13,7 +14,7 @@ export function StoresPage() {
   const [selected, setSelected] = useState<PartnerStore | null>(null)
   const active = selected ?? stores.data?.[0] ?? null
 
-  if (stores.loading) return <p className="text-sm text-muted">Loading…</p>
+  if (stores.loading) return <Skeleton rows={4} />
   if (stores.error) return <ErrorNote>{stores.error}</ErrorNote>
   if (!stores.data?.length) return <Empty>No store partnerships yet.</Empty>
 

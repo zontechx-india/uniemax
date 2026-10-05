@@ -2038,19 +2038,37 @@ navigation and locks body scroll while open. Groups: Overview · Commerce
 Platform (Notifications, Activity log, Admin users — the last SUPER_ADMIN-only,
 and the API enforces that independently).
 
-### Isolated UI kit (`admin/ui/`)
+### Shared component kit (`shared/ui/`) and the admin layer (`admin/ui/`)
 
-A console is dense, tabular and keyboard-driven; the storefront is spacious
-and promotional. Sharing components would force every change to satisfy both,
-so the admin has its own kit — while sharing the **token layer**, so the two
-still look like one product.
+Since the design-system clean-up (docs/DESIGN_SYSTEM_PLAN.md Phase 1) both
+apps use ONE component kit (docs/DESIGN_GUIDELINES.md §7):
+
+| `shared/ui/` | What |
+| ------------ | ---- |
+| `Button.tsx` | primary / secondary / ghost / danger × sm 36 / md 44 / lg 48; `loading`; `buttonClass()` for links |
+| `field.ts` | `fieldClass({ dense, invalid, multiline })` — every input/select/textarea (48px/16px, dense 44px/14px), `FIELD_LABEL`, `fieldNoteClass(error)` |
+| `form.tsx` | `TextField` (label, hint, inline error), `Select`, `SegmentedTabs`; `ErrorNote`/`InfoNote`/`SuccessNote` are `Alert` |
+| `Alert.tsx` | Inline message, tone info / success / warning / danger, icon + words (never colour alone), optional title and action |
+| `Badge.tsx` | THE status badge (13px, pill, optional dot) — seller `StatusPill` and admin `Chip` wrap it |
+| `Card.tsx` | THE card (flat surface, 1px border, 12px corners, no shadow) + `CardHeader` |
+| `states.tsx` | `Skeleton`, `PageSkeleton`, `EmptyState` (flat icon chip, optional steps/action), `ErrorState` (message + Try again) — no bare "Loading…" |
+| `ModalShell.tsx` | THE modal base: portal (or `portal={false}` for storefront modals that must keep the shop's colours), flat `--overlay-soft`, Escape / backdrop close (switchable), scroll lock, focus trap + return, placements `sheet` · `center` · `drawer-left` · `drawer-right` · `fullscreen`; `ModalClose` (44px) |
+| `Dialog.tsx` / `ConfirmDialog.tsx` | Content dialog and two-button question, both on `ModalShell` |
+| `Toast.tsx` | `showToast()` + `ToastHost`, `TOAST_CLASS` (flat, bordered) |
+
+Every overlay in the app — product photo editor, describe/review photo
+sheets, storefront filters, store menu drawer, admin menu drawer, login
+dialog — is a `ModalShell`; there are no hand-built `fixed inset-0`
+overlays left (the product wizard's full-screen page is a page, not a modal).
+
+The admin console keeps a thin layer (`admin/ui/`) for console-only shapes and
+dense defaults:
 
 | File | What |
 | ---- | ---- |
-| `primitives.tsx` | Card/CardHeader/PageHeader, Chip (6 tones), Button, TextInput/TextArea/SelectInput, Empty/Error/Skeleton, Detail row |
+| `primitives.tsx` | Re-exports `Card`/`CardHeader`/`EmptyState`/`ErrorState`/`Skeleton`; `Chip` = `Badge`; `Button`/`buttonClass` = shared `Button` at `sm` by default; `TextInput`/`TextArea`/`SelectInput`/`PasswordInput` on `fieldClass({ dense: true })`; console `PageHeader`, `Detail` row |
 | `DataTable.tsx` | **The** table + `Pagination`. Below `md` each row re-renders as a stacked card (that's why every column declares a `header` string; one column may be `primary`, and `hideOnMobile` drops detail). One definition per page instead of a desktop table plus a drifting mobile list. |
 | `Toolbar.tsx` | Filter row: debounced `SearchInput`, `FilterSelect`, scrollable status `Tabs` |
-| `shared/ui/Dialog.tsx` | Content dialog — a record opened *in place* over the list that led to it (header, scrollable body, optional action footer; sheet on phones with a grab-handle, centred on desktop; `glass-strong` panel over `--overlay-soft`, 44px close, safe-area bottom padding; `flush` drops the body padding for edge-to-edge action rows). Distinct from the shared `ConfirmDialog`, which is a two-button question. Portalled to `<body>` for the same `backdrop-filter` reason. Lives in `shared/ui` because the seller's product wizard uses it too (`GroupMemberPicker`, `CreateMemberDialog`). |
 | `statusMeta.tsx` | One label + tone per domain state, defined once — so "Shipped" is the same word and color everywhere. Every chip carries its label; color is a second signal, never the only one. |
 | `charts.tsx` | `TrendChart` · `BarList` · `Donut` · `Sparkline` · `ChartFrame` (see below) |
 | `StatTile.tsx` | Headline number + optional sparkline; a `to` makes it a link |
@@ -2716,7 +2734,7 @@ frontend/
         │   ├── AdminLayout.tsx  # Rail (lg+) / drawer (below) + top bar
         │   ├── NotificationBell.tsx # Unread badge + feed dropdown
         │   └── icons.tsx        # Six inline shell glyphs
-        ├── ui/                  # ISOLATED console kit (see "Admin console")
+        ├── ui/                  # console layer over shared/ui (see "Admin console")
         │   ├── primitives.tsx · DataTable.tsx · Toolbar.tsx   (Dialog moved to shared/ui)
         │   ├── statusMeta.tsx · StatTile.tsx · charts.tsx · format.ts
         ├── features/
@@ -3170,8 +3188,8 @@ Rules that keep it legible and fast:
 | `RowMenu` | "⋯ More" (44px; word shown from `sm`) → bottom sheet of 56px rows with icon, label and note; `danger` rows forced last and red. |
 | `BigSwitch` | Successor to `ActiveSwitch` (same core props): 52×32 track, 44px hit area, the state *written* beside it (`onText` / `offText`, width reserved for the longer word so lists stay aligned). |
 | `ProgressRing` | "3 of 5" as a ring (brand → green when complete); optional "3/5" label. My shops cards, setup checklist. |
-| `StatusPill` | One badge (`wrap` lets a long one — a delivery rule — wrap): tone `success` / `pending` / `brand` / `danger` / `neutral`, dot + 12px text. |
-| `EmptyState` | Gradient icon, title, one sentence, optional numbered picture `steps`, one action. |
+| `StatusPill` | The shared `Badge` with a dot by default (`wrap` for a long one). |
+| `EmptyState` | Re-export of the shared `EmptyState` (flat icon chip, title, sentence, optional `steps`, one action). |
 | `showToast()` / `ToastHost` | "Saved ✓" for instant saves. Module store (`useSyncExternalStore`), no provider; `ToastHost` is mounted once in `StoreManageLayout`. |
 | `HelpHint` | ⓘ (44px hit, inline in a label) → a sheet explaining a term in plain words. |
 | `CategoryChooserSheet` | The seller's category chooser (tap opens / tap chooses, search with paths, "Choose all of …", ticks for added). Used by Categories, the Products first-category gate and the product wizard. |

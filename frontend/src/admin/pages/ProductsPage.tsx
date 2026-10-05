@@ -163,7 +163,7 @@ export default function ProductsPage() {
         </div>
       ) : null}
 
-      <Card padded={false}>
+      <Card padding="none">
         <Tabs
           value={list.filters['status'] ?? ''}
           onChange={(value) => list.setFilter('status', value)}

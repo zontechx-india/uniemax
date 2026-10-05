@@ -4,6 +4,7 @@ import { notificationsApi } from '../../shared/notifications/notificationsApi'
 import type { AppNotification } from '../../shared/notifications/notificationsApi'
 import { formatRelative } from '../ui/format'
 import { BellIcon } from './icons'
+import { Skeleton } from '../../shared/ui/states'
 
 /**
  * The bell: an unread badge plus a dropdown of the latest notifications.
@@ -116,7 +117,7 @@ export function NotificationBell() {
 
           <ul className="max-h-96 divide-y divide-line overflow-y-auto">
             {items === null ? (
-              <li className="px-4 py-6 text-center text-sm text-muted">Loading…</li>
+              <li className="px-4 py-4"><Skeleton rows={3} /></li>
             ) : items.length === 0 ? (
               <li className="px-4 py-6 text-center text-sm text-muted">You're all caught up.</li>
             ) : (

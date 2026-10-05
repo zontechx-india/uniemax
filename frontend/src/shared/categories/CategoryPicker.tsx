@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { taxonomyApi, formatPath, PATH_SEPARATOR } from './taxonomyApi'
 import type { CategoryNode } from './taxonomyApi'
+import { Skeleton } from '../ui/states'
 
 /**
  * Selects one node of the GLOBAL category taxonomy, by search or by browsing.
@@ -285,7 +286,7 @@ function CategoryPanel({
         {error ? (
           <p className="px-3 py-4 text-sm text-danger">{error}</p>
         ) : loading ? (
-          <p className="px-3 py-4 text-sm text-muted">Loading…</p>
+          <Skeleton rows={4} className="px-3 py-3" />
         ) : browsing ? (
           level.length === 0 ? (
             <p className="px-3 py-4 text-sm text-muted">

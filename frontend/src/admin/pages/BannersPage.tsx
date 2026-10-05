@@ -215,7 +215,7 @@ export default function BannersPage() {
       ) : banners.length === 0 ? (
         <EmptyState
           title="No banners yet"
-          hint={`Add a ${bannerSizeLabel()} image and it appears at the top of the marketplace homepage. Until then the homepage opens on Shop by Category.`}
+          description={`Add a ${bannerSizeLabel()} image and it appears at the top of the marketplace homepage. Until then the homepage opens on Shop by Category.`}
         />
       ) : (
         <ul

@@ -1,15 +1,15 @@
 import { useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
 import type { Customer } from '../../../shared/auth/authApi'
 import { AppLogoFull, AppLogoLockup } from '../../../shared/ui/AppLogo'
 import { useMarketSession } from '../../app/marketSession'
-import { CloseIcon, StoreIcon } from '../../layout/icons'
+import { StoreIcon } from '../../layout/icons'
 import { storeVars } from '../publicStore/storeTheme'
 import { closeAuthDialog, useAuthDialog } from './authDialogStore'
 import type { AuthDialogBrand, AuthDialogRequest, AuthIntent } from './authDialogStore'
 import { CustomerAuthPanel } from './CustomerAuthPanel'
 import { StorefrontHero } from './StorefrontHero'
 import { MediaImg } from '../../../shared/media/MediaImg'
+import { ModalClose, ModalShell } from '../../../shared/ui/ModalShell'
 
 /**
  * The in-place sign-in dialog — mounted ONCE in `StorefrontApp`, opened from
@@ -46,9 +46,6 @@ export function AuthDialog() {
   return <OpenAuthDialog key={req.id} req={req} />
 }
 
-const FOCUSABLE =
-  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-
 function OpenAuthDialog({ req }: { req: AuthDialogRequest }) {
   const { state, signedIn } = useMarketSession()
   const panelRef = useRef<HTMLDivElement>(null)
@@ -75,42 +72,6 @@ function OpenAuthDialog({ req }: { req: AuthDialogRequest }) {
     req.onSignedIn?.(state.user)
   }, [state, req])
 
-  // Lock the page behind the dialog — the form column scrolls, the page doesn't.
-  useEffect(() => {
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = previous
-    }
-  }, [])
-
-  // Escape closes; Tab cycles inside the panel (a modal must not leak focus
-  // to the page it covers). Focusables are read per keypress, so a view
-  // change inside the panel needs no bookkeeping.
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        closeAuthDialog()
-        return
-      }
-      if (event.key !== 'Tab' || !panelRef.current) return
-      const nodes = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE))
-      if (nodes.length === 0) return
-      const first = nodes[0]
-      const last = nodes[nodes.length - 1]
-      const active = document.activeElement
-      if (event.shiftKey && (active === first || !panelRef.current.contains(active))) {
-        event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && active === last) {
-        event.preventDefault()
-        first.focus()
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
-
   // Focus moves in on open (first field, else the panel) and back to the
   // opener on close — unless the opener has since unmounted (the mobile
   // drawer's button does), in which case there is nothing to return to.
@@ -130,31 +91,16 @@ function OpenAuthDialog({ req }: { req: AuthDialogRequest }) {
       } as React.CSSProperties)
     : undefined
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-stretch justify-center bg-[var(--overlay)] text-fg animate-dialog-backdrop sm:items-center sm:p-4"
-      style={themed}
-      // mousedown, not click: a drag that starts in a field and ends on the
-      // backdrop must not close the dialog (same reason as ConfirmDialog).
-      onMouseDown={closeAuthDialog}
+  return (
+    <ModalShell
+      onClose={closeAuthDialog}
+      placement="fullscreen"
+      labelledBy="auth-dialog-title"
+      overlayStyle={themed}
+      panelRef={panelRef}
+      panelClassName="flex flex-col overflow-hidden sm:h-[80vh] sm:max-h-[720px] sm:w-[80vw] sm:max-w-5xl sm:border sm:border-line md:grid md:grid-cols-[1.1fr_1fr]"
     >
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="auth-dialog-title"
-        tabIndex={-1}
-        className="relative flex h-full w-full flex-col overflow-hidden bg-surface shadow-lifted outline-none animate-dialog-in sm:h-[80vh] sm:max-h-[720px] sm:w-[80vw] sm:max-w-5xl sm:rounded-lg sm:border sm:border-line md:grid md:grid-cols-[1.1fr_1fr]"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <button
-          type="button"
-          onClick={closeAuthDialog}
-          aria-label="Close"
-          className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-alt hover:text-fg"
-        >
-          <CloseIcon className="h-4 w-4" />
-        </button>
+        <ModalClose onClick={closeAuthDialog} className="absolute right-2 top-2 z-10" />
 
         <BrandPanel brand={brand} intent={req.intent} />
 
@@ -222,9 +168,7 @@ function OpenAuthDialog({ req }: { req: AuthDialogRequest }) {
             )}
           </div>
         </div>
-      </div>
-    </div>,
-    document.body,
+    </ModalShell>
   )
 }
 

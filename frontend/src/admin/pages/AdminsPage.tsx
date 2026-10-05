@@ -140,7 +140,7 @@ export default function AdminsPage() {
         </Card>
       ) : null}
 
-      <Card padded={false}>
+      <Card padding="none">
         {loading && !admins ? (
           <Skeleton rows={4} className="p-4" />
         ) : (

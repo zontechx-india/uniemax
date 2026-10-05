@@ -89,7 +89,7 @@ export default function PaymentsPage() {
         subtitle="Settlement status for every order — online and cash on delivery"
       />
 
-      <Card padded={false}>
+      <Card padding="none">
         <Tabs
           value={list.filters['paymentStatus'] ?? ''}
           onChange={(value) => list.setFilter('paymentStatus', value)}

@@ -7,6 +7,7 @@ import {
 import { lazy, Suspense } from 'react'
 import { PublicStoreLayout } from '../features/publicStore/PublicStoreLayout'
 import { RouteError } from '../../shared/ui/RouteError'
+import { PageSkeleton } from '../../shared/ui/states'
 
 /**
  * Router for the **public** (no sign-in) shopping surface. Mounted by
@@ -76,7 +77,11 @@ const OrderSuccessPage = lazy(() =>
 )
 
 function Loading() {
-  return <p className="py-16 text-center text-sm text-muted">Loading…</p>
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+      <PageSkeleton />
+    </div>
+  )
 }
 
 const lazyRoute = (element: React.ReactNode) => (

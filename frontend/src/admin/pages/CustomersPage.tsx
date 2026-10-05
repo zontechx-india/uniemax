@@ -85,7 +85,7 @@ export default function CustomersPage() {
     <>
       <PageHeader title="Customers" subtitle="Everyone with a UnieMax account" />
 
-      <Card padded={false}>
+      <Card padding="none">
         <Tabs
           value={list.filters['filter'] ?? ''}
           onChange={(value) => list.setFilter('filter', value)}

@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 
 /**
  * The one button (docs/DESIGN_GUIDELINES.md section 9).
@@ -71,6 +71,8 @@ export interface ButtonProps
     ButtonClassOptions {
   /** Shows the spinner and disables the button. Swap the label yourself. */
   loading?: boolean
+  /** React 19: refs are plain props (ConfirmDialog focuses Cancel). */
+  ref?: Ref<HTMLButtonElement>
   children: ReactNode
 }
 
@@ -82,11 +84,13 @@ export function Button({
   className,
   disabled,
   children,
+  ref,
   ...rest
 }: ButtonProps) {
   return (
     <button
       {...rest}
+      ref={ref}
       disabled={disabled || loading}
       className={buttonClass({ variant, size, full, className })}
     >

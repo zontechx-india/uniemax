@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { CloseIcon } from '../../layout/icons'
+import { Button } from '../../../shared/ui/Button'
+import { ModalClose, ModalShell } from '../../../shared/ui/ModalShell'
+import { fieldClass } from '../../../shared/ui/field'
 import { activeFilterCount, NO_FILTERS, type CatalogFilters } from './catalog'
 import type { Skin } from './storeTheme'
 
@@ -31,15 +33,6 @@ export function FilterPanel({
     if (open) setDraft(filters)
   }, [open, filters])
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
-
   if (!open) return null
 
   const apply = () => {
@@ -53,43 +46,24 @@ export function FilterPanel({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-end sm:items-stretch"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Filters"
+    <ModalShell
+      onClose={onClose}
+      placement="drawer-right"
+      label="Filters"
+      portal={false}
+      panelClassName="flex flex-col overflow-hidden"
     >
-      <button
-        type="button"
-        aria-label="Close filters"
-        onClick={onClose}
-        className="absolute inset-0 bg-[var(--overlay)]"
-      />
-      <div
-        className={`relative z-10 flex max-h-[85vh] w-full flex-col overflow-hidden rounded-t-2xl border ${skin.border} ${skin.surface} shadow-floating sm:h-full sm:max-h-none sm:w-80 sm:rounded-none sm:border-y-0 sm:border-r-0`}
-      >
         {/* Header */}
-        <div
-          className={`flex items-center justify-between border-b ${skin.border} p-4`}
-        >
-          <h2 className={`font-heading text-base font-bold ${skin.text}`}>
-            Filters
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className={`flex h-8 w-8 items-center justify-center rounded-full transition hover:bg-surface-alt ${skin.muted}`}
-          >
-            <CloseIcon className="h-4 w-4" />
-          </button>
+        <div className="flex items-center justify-between border-b border-line py-2 pr-2 pl-4">
+          <h2 className="text-lg font-semibold text-fg">Filters</h2>
+          <ModalClose onClick={onClose} />
         </div>
 
         {/* Body */}
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4">
           {/* Availability */}
           <section>
-            <h3 className={`text-xs font-bold uppercase tracking-wide ${skin.muted}`}>
+            <h3 className={`text-sm font-semibold ${skin.text}`}>
               Availability
             </h3>
             <label className="mt-2.5 flex cursor-pointer items-center gap-2.5">
@@ -116,7 +90,6 @@ export function FilterPanel({
                 value={draft.minPrice}
                 placeholder="Min"
                 onChange={(v) => setDraft((d) => ({ ...d, minPrice: v }))}
-                skin={skin}
               />
               <span className={skin.muted}>–</span>
               <PriceInput
@@ -124,7 +97,6 @@ export function FilterPanel({
                 value={draft.maxPrice}
                 placeholder="Max"
                 onChange={(v) => setDraft((d) => ({ ...d, maxPrice: v }))}
-                skin={skin}
               />
             </div>
           </section>
@@ -148,25 +120,20 @@ export function FilterPanel({
         </div>
 
         {/* Footer actions */}
-        <div className={`flex items-center gap-3 border-t ${skin.border} p-4`}>
-          <button
-            type="button"
+        <div className="flex items-center gap-3 border-t border-line p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <Button
+            variant="secondary"
+            className="flex-1"
             onClick={clear}
             disabled={activeFilterCount(draft) === 0}
-            className={`h-10 flex-1 rounded-md border text-sm font-semibold transition disabled:opacity-40 ${skin.border} ${skin.chip} ${skin.text}`}
           >
             Clear all
-          </button>
-          <button
-            type="button"
-            onClick={apply}
-            className={`h-10 flex-1 rounded-md text-sm font-bold transition ${skin.cta}`}
-          >
+          </Button>
+          <Button className="flex-1" onClick={apply}>
             Apply
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   )
 }
 
@@ -175,13 +142,11 @@ function PriceInput({
   value,
   placeholder,
   onChange,
-  skin,
 }: {
   label: string
   value: number | null
   placeholder: string
   onChange: (value: number | null) => void
-  skin: Skin
 }) {
   return (
     <label className="min-w-0 flex-1">
@@ -196,7 +161,7 @@ function PriceInput({
           const raw = e.target.value.trim()
           onChange(raw === '' ? null : Math.max(0, Number(raw)))
         }}
-        className={`h-10 w-full rounded-md border px-3 text-sm outline-none transition-colors placeholder:text-muted focus:border-brand ${skin.border} bg-surface-alt ${skin.text}`}
+        className={fieldClass({ dense: true })}
       />
     </label>
   )

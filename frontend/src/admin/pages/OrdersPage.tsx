@@ -86,7 +86,7 @@ export default function OrdersPage() {
     <>
       <PageHeader title="Orders" subtitle="Every order placed across the platform" />
 
-      <Card padded={false}>
+      <Card padding="none">
         <Tabs
           value={list.filters['status'] ?? ''}
           onChange={(value) => list.setFilter('status', value)}

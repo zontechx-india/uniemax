@@ -104,7 +104,7 @@ export default function ActivityPage() {
         subtitle="Every change an admin has made — append-only, never edited"
       />
 
-      <Card padded={false}>
+      <Card padding="none">
         <Toolbar>
           <FilterSelect
             label="Action"

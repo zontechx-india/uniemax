@@ -1,6 +1,7 @@
 import { CheckIcon, CloseIcon, PencilIcon } from '../../../layout/icons'
 import { media } from './strings'
 import { Button } from '../../../../shared/ui/Button'
+import { ModalShell } from '../../../../shared/ui/ModalShell'
 
 /** One picked photo, already optimized, waiting for the seller's verdict. */
 export interface ReviewItem {
@@ -45,18 +46,20 @@ export function ReviewQueue({
   if (!item) return null
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-[var(--overlay)] p-0 sm:items-center sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={media.review.title}
+    // Every picked photo needs a verdict, so the sheet does not close on a
+    // stray tap or Escape — Skip is the explicit way out.
+    <ModalShell
+      onClose={() => {}}
+      closeOnBackdrop={false}
+      closeOnEscape={false}
+      label={media.review.title}
+      panelClassName="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:max-w-sm sm:p-5"
     >
-      <div className="w-full max-w-sm rounded-t-xl bg-surface p-4 shadow-floating sm:rounded-xl sm:p-5">
         <div className="flex items-baseline justify-between gap-3">
-          <h3 className="font-body text-lg font-semibold tracking-normal text-fg">
+          <h3 className="text-lg font-semibold text-fg">
             {media.review.title}
           </h3>
-          <span className="text-xs font-semibold text-muted">
+          <span className="text-sm font-semibold text-muted">
             {media.review.step(1, items.length)}
           </span>
         </div>
@@ -71,7 +74,7 @@ export function ReviewQueue({
           />
         </div>
 
-        <p className="mt-2 flex justify-between text-[11px] text-muted">
+        <p className="mt-2 flex justify-between text-xs text-muted">
           <span className="truncate">{item.original.name}</span>
           <span className="shrink-0 pl-2 font-medium">
             {[item.ratioLabel, item.sizeLabel].filter(Boolean).join(' · ')}
@@ -83,40 +86,27 @@ export function ReviewQueue({
             <CheckIcon className="h-4 w-4" />
             {media.review.use}
           </Button>
-          <button
-            type="button"
-            onClick={() => onEdit(item)}
-            className="flex h-12 items-center justify-center gap-2 rounded-md border border-line bg-surface text-sm font-semibold text-fg transition hover:bg-surface-alt"
-          >
+          <Button variant="secondary" size="lg" full onClick={() => onEdit(item)}>
             <PencilIcon className="h-4 w-4" />
             {media.review.edit}
-          </button>
+          </Button>
         </div>
 
-        <p className="mt-3 text-[11px] leading-relaxed text-muted">
+        <p className="mt-3 text-xs leading-relaxed text-muted">
           {media.review.hint}
         </p>
 
         <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
-          <button
-            type="button"
-            onClick={() => onSkip(item)}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted transition hover:text-danger"
-          >
-            <CloseIcon className="h-3 w-3" />
+          <Button variant="ghost" size="sm" onClick={() => onSkip(item)}>
+            <CloseIcon className="h-4 w-4" />
             {media.review.skip}
-          </button>
+          </Button>
           {items.length > 1 && (
-            <button
-              type="button"
-              onClick={onUseAll}
-              className="text-xs font-semibold text-accent transition hover:opacity-80"
-            >
+            <Button variant="ghost" size="sm" onClick={onUseAll}>
               {media.review.useAll(items.length)}
-            </button>
+            </Button>
           )}
         </div>
-      </div>
-    </div>
+    </ModalShell>
   )
 }

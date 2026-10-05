@@ -5,6 +5,7 @@ import { ErrorNote } from '../../../../shared/ui/form'
 import { partnerApi } from '../../api'
 import type { AffiliateLink } from '../../api'
 import { CopyButton, Empty, shortDate, useLoad } from '../../ui'
+import { Skeleton } from '../../../../shared/ui/states'
 
 export function LinksPage() {
   const links = useLoad(() => partnerApi.links(), [])
@@ -20,7 +21,7 @@ export function LinksPage() {
     }
   }
 
-  if (links.loading) return <p className="text-sm text-muted">Loading…</p>
+  if (links.loading) return <Skeleton rows={4} />
   if (links.error) return <ErrorNote>{links.error}</ErrorNote>
   if (!links.data?.length) {
     return (

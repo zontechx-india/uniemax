@@ -337,7 +337,7 @@ export default function CategoriesPage() {
       ) : tree.length === 0 ? (
         <EmptyState
           title="No categories yet"
-          hint="Seed the initial taxonomy with `npm run seed-categories`, or add the first one above."
+          description="Seed the initial taxonomy with `npm run seed-categories`, or add the first one above."
         />
       ) : (
         <Card>
