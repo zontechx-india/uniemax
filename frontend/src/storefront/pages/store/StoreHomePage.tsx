@@ -622,9 +622,6 @@ function HomeSection({
           covers={covers}
           facts={facts}
           cta={heroCta}
-          // A seller's banner is already a big picture at the top; the
-          // colour cover would stack a second one under it.
-          cover={home.banners.length === 0}
           heading={section.settings?.title ?? null}
           tagline={section.settings?.subtitle ?? null}
           ctaLabel={copy.ctaLabel}
@@ -782,8 +779,7 @@ const TRUST_ICONS: Record<TrustFact['key'], typeof TruckIcon> = {
  * The shop's profile — the shape shoppers know from Instagram and WhatsApp
  * Business shop pages, rather than a centred "welcome" slab:
  *
- *   - a COVER band washed in the shop's own colour (skipped when the seller
- *     has banners — those are already the big picture at the top),
+ *   - a BANNER band in the shop's own colours (`HeroBanner`: dots + arcs),
  *   - the logo large and rounded, overlapping the cover's edge,
  *   - the name, the seller's own line, and the trust facts as a quiet row of
  *     icon + words (not bordered pills),
@@ -800,7 +796,6 @@ function Hero({
   covers,
   facts,
   cta,
-  cover = true,
   heading = null,
   tagline = null,
   ctaLabel = null,
@@ -814,8 +809,6 @@ function Hero({
   /** Delivery / payment reassurance from this store's real settings. */
   facts: TrustFact[]
   cta: HeroCta
-  /** Draw the colour cover band (off when banners lead the page). */
-  cover?: boolean
   /** Owner's headline. Null = the store's own name. */
   heading?: string | null
   /** Owner's intro line. Null = their About text, else nothing. */
@@ -846,12 +839,10 @@ function Hero({
       className={`${SCROLL_UNDER_HEADER} relative overflow-hidden border-b last:border-b-0 ${skin.border} ${tone === 'alt' ? skin.surface : ''}`}
       {...builder}
     >
-      <HeroPattern />
-      {/* The cover band's height — empty space the logo overlaps into. */}
-      {cover && <div aria-hidden className="h-28 sm:h-40 lg:h-44" />}
+      <HeroBanner paper={tone === 'alt' ? 'var(--surface)' : 'var(--bg)'} />
 
       <div
-        className={`${STORE_CONTAINER} relative pb-7 sm:pb-10 ${cover ? '' : 'pt-6 sm:pt-10'}`}
+        className={`${STORE_CONTAINER} relative pb-7 sm:pb-10`}
       >
         <div
           className={
@@ -866,7 +857,7 @@ function Hero({
           >
             {/* Phone: stacked. From sm: a profile row — logo, then the words beside it. */}
             <div className="min-w-0 sm:flex sm:items-start sm:gap-6">
-            <div className={`shrink-0 ${cover ? '-mt-11 sm:-mt-16' : ''}`}>
+            <div className="-mt-11 shrink-0 sm:-mt-16">
               {store.logoUrl ? (
                 <MediaImg
                   sizes="112px"
@@ -962,72 +953,44 @@ function Hero({
 }
 
 /**
- * The hero's background, across the WHOLE section: the shop's colour as a
- * wash (strongest at the top, still tinted at the bottom) with a pattern over
- * it — a dot grid everywhere, concentric rings on the right and soft waves
- * through the middle and along the bottom — so the hero reads as designed
- * rather than an empty gradient. Every layer is drawn in `--brand` (SVG
- * `currentColor` under `text-brand`, or `color-mix`), so it follows each
- * shop's own colour in light and dark themes. The dots fade only partly
- * toward the bottom-left, where the name and facts sit, to keep them easy to
- * read. Decorative only; sits under the content (`pointer-events-none`).
+ * The hero's banner (style "A4", chosen by the owner of UnieMax from the
+ * pattern picker): a colour band with a fine dot grid, and thick arcs
+ * sweeping in from the top-right corner. Every tone is the shop's `--brand`
+ * MIXED with the band colour (`paper`), white or black — never the brand at
+ * full strength over text — so a near-black or yellow shop gets the same
+ * calm result as a blue one, and the name and facts below sit on the plain
+ * band background, always readable. The logo overlaps the banner's foot.
+ * Decorative only.
  */
-function HeroPattern() {
+function HeroBanner({ paper }: { paper: string }) {
+  const mix = (pct: number, base: string) => `color-mix(in oklab, var(--brand) ${pct}%, ${base})`
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      {/* Colour wash. */}
+    <div aria-hidden className="relative h-[136px] overflow-hidden sm:h-44 lg:h-52">
       <div
         className="absolute inset-0"
         style={{
-          background: [
-            'radial-gradient(60% 55% at 0% 0%, color-mix(in oklab, var(--brand) 60%, transparent), transparent 75%)',
-            'radial-gradient(55% 60% at 100% 10%, color-mix(in oklab, var(--brand) 32%, transparent), transparent 75%)',
-            'radial-gradient(60% 50% at 100% 100%, color-mix(in oklab, var(--brand) 18%, transparent), transparent 75%)',
-            'linear-gradient(180deg, color-mix(in oklab, var(--brand) 22%, transparent), color-mix(in oklab, var(--brand) 6%, transparent))',
-          ].join(', '),
+          background: `linear-gradient(135deg, ${mix(38, paper)}, ${mix(14, paper)})`,
         }}
       />
-      {/* Dot grid over everything; lighter behind the text (bottom-left). */}
       <div
         className="absolute inset-0"
         style={{
-          backgroundImage:
-            'radial-gradient(color-mix(in oklab, var(--brand) 50%, transparent) 1.2px, transparent 1.6px)',
-          backgroundSize: '16px 16px',
-          maskImage:
-            'radial-gradient(130% 120% at 100% 0%, #000 25%, rgba(0,0,0,0.35) 100%)',
-          WebkitMaskImage:
-            'radial-gradient(130% 120% at 100% 0%, #000 25%, rgba(0,0,0,0.35) 100%)',
+          backgroundImage: `radial-gradient(${mix(55, paper)} 1.3px, transparent 1.7px)`,
+          backgroundSize: '14px 14px',
         }}
       />
-      {/* Concentric rings: the top-right corner on a phone (clear of the
-          text column), the right side spanning the height from sm. */}
       <svg
-        className="absolute -right-28 -top-24 h-80 w-80 text-brand opacity-25 sm:-right-16 sm:top-1/2 sm:h-[36rem] sm:w-[36rem] sm:-translate-y-1/2 lg:right-[6%]"
-        viewBox="0 0 200 200"
+        className="absolute inset-0 h-full w-full"
+        viewBox="0 0 300 136"
+        preserveAspectRatio="xMaxYMid slice"
         fill="none"
-        stroke="currentColor"
       >
-        {[22, 38, 54, 70, 84, 98].map((r, i) => (
-          <circle key={r} cx="100" cy="100" r={r} strokeWidth={i % 2 ? 0.6 : 1.1} />
-        ))}
-      </svg>
-      {/* Soft waves through the middle and along the bottom. */}
-      <svg
-        className="absolute inset-0 h-full w-full text-brand"
-        // Faint where the name and facts sit (left), full on the right.
-        style={{
-          maskImage: 'linear-gradient(to right, rgba(0,0,0,0.25), #000 75%)',
-          WebkitMaskImage: 'linear-gradient(to right, rgba(0,0,0,0.25), #000 75%)',
-        }}
-        viewBox="0 0 1200 400"
-        preserveAspectRatio="none"
-        fill="none"
-        stroke="currentColor"
-      >
-        <path d="M0 150 C 150 110, 300 190, 450 146 S 750 104, 900 140 S 1100 186, 1200 132" strokeWidth="1.5" opacity="0.3" />
-        <path d="M0 172 C 200 140, 350 206, 520 170 S 820 134, 980 168 S 1140 196, 1200 164" strokeWidth="1" opacity="0.18" />
-        <path d="M0 360 C 180 330, 340 392, 520 358 S 860 320, 1020 352 S 1150 384, 1200 350" strokeWidth="1.2" opacity="0.22" />
+        <g transform="translate(300 0)">
+          <circle r="150" stroke={mix(28, 'white')} strokeWidth="22" />
+          <circle r="112" stroke={mix(55, 'white')} strokeWidth="18" />
+          <circle r="78" stroke={mix(85, 'black')} strokeWidth="14" />
+          <circle r="46" fill={mix(40, 'white')} />
+        </g>
       </svg>
     </div>
   )

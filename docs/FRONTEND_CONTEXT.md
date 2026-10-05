@@ -982,14 +982,15 @@ full-bleed section bands instead.
     tab stops. A `URL` banner is a plain `<a target="_blank" rel="noopener">`;
     everything else routes through the SPA.
   - **Hero** — a **shop profile**, the shape shoppers know from Instagram /
-    WhatsApp Business shop pages. **`HeroPattern` fills the whole section**:
-    the shop's `--brand` as a top-to-bottom wash, a dot grid everywhere (lighter
-    behind the text), concentric rings (top-right corner on a phone, right side
-    from `sm`) and soft waves faded toward the text column — all in the shop's
-    colour. Above the content is an empty **cover band** height the logo
-    overlaps into (skipped when the seller has banners —
-    those already lead the page), the logo **88px / 112px, rounded, ringed in
-    the band colour and overlapping the cover**, then the name, the owner's
+    WhatsApp Business shop pages. On top, **`HeroBanner`** (style "A4", picked
+    by the product owner from seven patterns × four abstract styles): a colour
+    band (136px phone → `lg:h-52`) with a fine dot grid and thick arcs sweeping
+    in from the top-right corner. Every tone is `--brand` **mixed** with the
+    band colour, white or black — never the brand at full strength — so a
+    near-black or yellow shop stays as calm as a blue one; the band shows on
+    every shop, banners or not. Everything below it sits on the plain band
+    background, so the text is always readable. The logo is **88px / 112px,
+    rounded, ringed in the band colour and overlapping the banner**, then the name, the owner's
     words if any (three lines on a phone), and **trust facts** (`trustFacts()`:
     delivery charge, Cash on delivery, UPI, pickup) as icon-in-a-circle + words.
     Actions are rounded 48px pills side by side, sharing the width on a phone:
