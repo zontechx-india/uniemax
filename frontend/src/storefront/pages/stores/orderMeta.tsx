@@ -90,10 +90,10 @@ export function SellerOrderRow({ order, to }: { order: SellerOrderSummary; to: s
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
-          <p className="min-w-0 truncate text-[15px] font-bold text-fg">
+          <p className="min-w-0 truncate text-base font-bold text-fg">
             {order.customerName ?? order.orderNumber}
           </p>
-          <span className="shrink-0 text-[15px] font-bold text-fg">{total}</span>
+          <span className="shrink-0 text-base font-bold text-fg">{total}</span>
         </div>
         <p className="mt-0.5 text-hint text-muted">
           {timeAgo(order.placedAt)} · {order.itemCount} item{order.itemCount === 1 ? '' : 's'}
@@ -102,7 +102,7 @@ export function SellerOrderRow({ order, to }: { order: SellerOrderSummary; to: s
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <OrderStatusChip status={order.status} />
-          <span className="inline-flex h-6 items-center rounded-pill bg-fg/6 px-2.5 text-[12px] font-semibold text-muted">
+          <span className="inline-flex h-6 items-center rounded-pill bg-fg/6 px-2.5 text-xs font-semibold text-muted">
             {paymentLabel(order.paymentMethod, order.paymentStatus)}
           </span>
         </div>

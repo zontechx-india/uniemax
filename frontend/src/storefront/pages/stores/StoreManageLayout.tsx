@@ -186,9 +186,9 @@ export function StoreManageLayout() {
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <p className="truncate font-heading text-[16px] font-bold text-fg">{store.name}</p>
+          <p className="truncate font-heading text-base font-bold text-fg">{store.name}</p>
           <span
-            className={`inline-flex items-center gap-1.5 text-[12px] font-semibold ${
+            className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
               store.isPublished ? 'text-success' : 'text-pending'
             }`}
           >

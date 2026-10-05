@@ -110,7 +110,7 @@ export function CategoryChooserSheet({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Type what you sell — e.g. saree, atta, mobile"
-            className="h-field w-full rounded-xl border border-line bg-input pr-4 pl-11 text-[15px] text-fg outline-none placeholder:text-muted focus:border-accent"
+            className="h-field w-full rounded-xl border border-line bg-input pr-4 pl-11 text-base text-fg outline-none placeholder:text-muted focus:border-accent"
           />
         </label>
         {browsing && parent && (
@@ -120,7 +120,7 @@ export function CategoryChooserSheet({
               const nextTrail = trail.slice(0, -1)
               loadLevel(nextTrail[nextTrail.length - 1] ?? null, nextTrail)
             }}
-            className="mt-2 inline-flex min-h-tap items-center gap-1.5 rounded-xl px-2 text-[15px] font-semibold text-brand transition hover:bg-brand-soft"
+            className="mt-2 inline-flex min-h-tap items-center gap-1.5 rounded-xl px-2 text-base font-semibold text-brand transition hover:bg-brand-soft"
           >
             <ArrowLeftIcon className="h-5 w-5" />
             Back
@@ -130,7 +130,7 @@ export function CategoryChooserSheet({
 
       <div className="pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {error ? (
-          <p className="px-4 py-6 text-[15px] text-danger">{error}</p>
+          <p className="px-4 py-6 text-base text-danger">{error}</p>
         ) : loading ? (
           <div aria-busy="true" aria-label="Loading" className="space-y-2 p-3">
             {[0, 1, 2, 3].map((key) => (
@@ -151,7 +151,7 @@ export function CategoryChooserSheet({
               </li>
             )}
             {level.length === 0 && (
-              <li className="px-4 py-6 text-[15px] text-muted">Nothing inside this group.</li>
+              <li className="px-4 py-6 text-base text-muted">Nothing inside this group.</li>
             )}
             {level.map((node) => (
               <li key={node.id}>
@@ -167,7 +167,7 @@ export function CategoryChooserSheet({
             ))}
           </ul>
         ) : results.length === 0 ? (
-          <p className="px-4 py-6 text-[15px] text-muted">
+          <p className="px-4 py-6 text-base text-muted">
             Nothing matches “{query.trim()}”. Try a shorter word, or clear the
             search and look through the groups.
           </p>
@@ -225,7 +225,7 @@ function Row({
         </span>
       )}
       <span className="min-w-0 flex-1">
-        <span className="block text-[16px] font-semibold text-fg">{node.name}</span>
+        <span className="block text-base font-semibold text-fg">{node.name}</span>
         <span className="block text-hint text-muted">
           {showPath
             ? formatPath(node)
@@ -235,14 +235,14 @@ function Row({
         </span>
       </span>
       {added ? (
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-pill bg-success/12 px-2.5 py-1 text-[12px] font-semibold text-success">
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-pill bg-success/12 px-2.5 py-1 text-xs font-semibold text-success">
           <CheckIcon className="h-3.5 w-3.5" />
           Added
         </span>
       ) : opens ? (
         <ChevronRightIcon className="h-5 w-5 shrink-0 text-muted" />
       ) : (
-        <span className="shrink-0 rounded-pill bg-brand px-3 py-1 text-[13px] font-bold text-brand-contrast">
+        <span className="shrink-0 rounded-pill bg-brand px-3 py-1 text-xs font-bold text-brand-contrast">
           Choose
         </span>
       )}
@@ -272,7 +272,7 @@ function PickButton({
       className="flex min-h-[56px] w-full items-center gap-3 rounded-2xl border-2 border-dashed border-brand/40 bg-brand-soft/60 px-4 text-left transition hover:bg-brand-soft disabled:cursor-default disabled:opacity-70"
     >
       <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-bold text-brand">
+        <span className="block text-base font-bold text-brand">
           {added ? `${node.name} is already in your shop` : label}
         </span>
         {!added && (

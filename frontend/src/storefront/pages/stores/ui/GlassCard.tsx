@@ -63,12 +63,12 @@ export function GlassCard({
           )}
           <div className="min-w-0 flex-1">
             {title !== undefined && (
-              <h3 className="font-heading text-[17px] font-semibold leading-snug text-fg">
+              <h3 className="font-heading text-base font-semibold leading-snug text-fg">
                 {title}
               </h3>
             )}
             {description && (
-              <p className="mt-0.5 text-[14px] leading-relaxed text-muted">{description}</p>
+              <p className="mt-0.5 text-sm leading-relaxed text-muted">{description}</p>
             )}
           </div>
           {aside && <div className="shrink-0">{aside}</div>}

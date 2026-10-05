@@ -447,12 +447,12 @@ export function PricingStep({
             <li
               key={p}
               aria-current={part === p ? 'step' : undefined}
-              className={`flex flex-1 items-center gap-2 rounded-xl px-3 py-2 text-[14px] font-semibold ${
+              className={`flex flex-1 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${
                 part === p ? 'bg-brand-soft text-brand' : 'bg-fg/5 text-muted'
               }`}
             >
               <span
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-bold ${
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                   part === p ? 'bg-brand text-brand-contrast' : 'glass-inset'
                 }`}
               >
@@ -489,7 +489,7 @@ export function PricingStep({
         <div className="space-y-5">
           {unusedPresets.length > 0 && (
             <div>
-              <p className="text-[15px] font-semibold text-fg">Tap to add a common choice</p>
+              <p className="text-base font-semibold text-fg">Tap to add a common choice</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {unusedPresets.map((preset) => (
                   <button
@@ -497,7 +497,7 @@ export function PricingStep({
                     type="button"
                     onClick={() => addPreset(preset)}
                     disabled={busy || cardCount >= 3}
-                    className="inline-flex min-h-tap items-center gap-1.5 rounded-pill border border-line bg-surface px-4 text-[14px] font-semibold text-fg transition hover:border-brand hover:text-brand disabled:opacity-50"
+                    className="inline-flex min-h-tap items-center gap-1.5 rounded-pill border border-line bg-surface px-4 text-sm font-semibold text-fg transition hover:border-brand hover:text-brand disabled:opacity-50"
                   >
                     <PlusIcon className="h-3.5 w-3.5" />
                     {preset.name}
@@ -538,7 +538,7 @@ export function PricingStep({
 
           {draft.types.length === 0 && groups.length > 0 && (
             <div>
-              <p className="text-[15px] font-semibold text-fg">This product’s price</p>
+              <p className="text-base font-semibold text-fg">This product’s price</p>
               <Hint>
                 The linked products carry their own — set each one from its
                 own editor.

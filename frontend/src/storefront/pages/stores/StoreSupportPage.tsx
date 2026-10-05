@@ -77,7 +77,7 @@ export function StoreSupportPage() {
       </div>
 
       <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
-        <h3 className="font-heading text-[18px] font-bold text-fg">
+        <h3 className="font-heading text-lg font-bold text-fg">
           Your questions to UnieMax
         </h3>
         {!composing && (

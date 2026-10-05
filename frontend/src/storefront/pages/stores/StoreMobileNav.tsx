@@ -70,7 +70,7 @@ export function StoreMobileNav({
               to={to}
               end={to === '.'}
               className={({ isActive }) =>
-                `group/tab flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-2xl text-[12px] font-semibold transition-colors ${
+                `group/tab flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-2xl text-xs font-semibold transition-colors ${
                   isActive ? 'text-brand' : 'text-muted hover:text-fg'
                 }`
               }
@@ -89,7 +89,7 @@ export function StoreMobileNav({
             type="button"
             onClick={() => setMoreOpen(true)}
             aria-haspopup="dialog"
-            className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-2xl text-[12px] font-semibold transition-colors ${
+            className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-2xl text-xs font-semibold transition-colors ${
               onMore ? 'text-brand' : 'text-muted hover:text-fg'
             }`}
           >
@@ -119,7 +119,7 @@ export function StoreMobileNav({
         <div className="border-t border-line px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <Link
             to={indexPath}
-            className="flex min-h-[52px] items-center gap-3 rounded-xl px-2.5 text-[15px] font-medium text-fg/80 transition-colors hover:bg-fg/5 hover:text-fg"
+            className="flex min-h-[52px] items-center gap-3 rounded-xl px-2.5 text-base font-medium text-fg/80 transition-colors hover:bg-fg/5 hover:text-fg"
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-fg/5">
               <StoreIcon className="h-[18px] w-[18px]" />

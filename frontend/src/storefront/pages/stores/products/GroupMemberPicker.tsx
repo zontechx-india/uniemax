@@ -163,7 +163,7 @@ export function GroupMemberPicker({
                     <span className="block truncate text-sm font-semibold text-fg">
                       {row.name}
                       {row.isDraft && (
-                        <span className="ml-1.5 rounded-sm bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+                        <span className="ml-1.5 rounded-sm bg-accent/15 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-accent">
                           Draft
                         </span>
                       )}

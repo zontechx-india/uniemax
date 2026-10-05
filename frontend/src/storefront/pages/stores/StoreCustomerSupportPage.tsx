@@ -95,7 +95,7 @@ export function StoreCustomerSupportPage() {
               key={option.value || 'all'}
               type="button"
               onClick={() => setTab(option.value)}
-              className={`min-h-tap whitespace-nowrap border-b-2 px-3.5 text-[15px] font-semibold transition-colors ${
+              className={`min-h-tap whitespace-nowrap border-b-2 px-3.5 text-base font-semibold transition-colors ${
                 active
                   ? 'border-brand text-fg'
                   : 'border-transparent text-muted hover:text-fg'

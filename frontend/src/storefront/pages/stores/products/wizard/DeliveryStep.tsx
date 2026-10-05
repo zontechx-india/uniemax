@@ -101,8 +101,8 @@ export function DeliveryStep({
       lead="Most products simply follow your shop's settings. Change them here only if this product is different."
     >
       <div className="rounded-2xl border border-line bg-surface/70 p-4">
-        <p className="text-[15px] font-semibold text-fg">Your shop's settings</p>
-        <ul className="mt-2 space-y-1.5 text-[15px] text-muted">
+        <p className="text-base font-semibold text-fg">Your shop's settings</p>
+        <ul className="mt-2 space-y-1.5 text-base text-muted">
           <li>
             Delivers to:{' '}
             <span className="text-fg">{describeDeliveryRule(store.shipping.deliveryRule)}</span>
@@ -168,7 +168,7 @@ export function DeliveryStep({
               disabled={busy}
               className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-[var(--brand)]"
             />
-            <span className="text-[15px]">
+            <span className="text-base">
               <span className="font-medium text-fg">Cash on delivery for this product</span>
               <span className="mt-0.5 block text-hint text-muted">
                 {store.payments.acceptCod

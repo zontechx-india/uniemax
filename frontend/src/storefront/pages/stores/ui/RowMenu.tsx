@@ -48,7 +48,7 @@ export function RowMenu({
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         aria-label={typeof title === 'string' ? `${triggerLabel} for ${title}` : triggerLabel}
-        className="inline-flex h-tap min-w-tap shrink-0 items-center justify-center gap-1.5 rounded-xl border border-line bg-surface/60 px-2.5 text-[14px] font-semibold text-fg transition-colors hover:bg-surface"
+        className="inline-flex h-tap min-w-tap shrink-0 items-center justify-center gap-1.5 rounded-xl border border-line bg-surface/60 px-2.5 text-sm font-semibold text-fg transition-colors hover:bg-surface"
       >
         <DotsIcon className="h-5 w-5" />
         <span className="hidden sm:inline">{triggerLabel}</span>
@@ -77,7 +77,7 @@ export function RowMenu({
                   <Icon className="h-[18px] w-[18px]" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] font-semibold">{label}</span>
+                  <span className="block text-base font-semibold">{label}</span>
                   {note && <span className="mt-0.5 block text-hint text-muted">{note}</span>}
                 </span>
               </button>

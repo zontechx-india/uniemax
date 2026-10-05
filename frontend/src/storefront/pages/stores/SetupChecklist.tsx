@@ -74,7 +74,7 @@ function LaunchCard({
       <header className="flex items-center gap-3.5 border-b border-line p-4 sm:p-5">
         <ProgressRing done={done} total={total} size={52} label />
         <div className="min-w-0">
-          <h3 className="font-heading text-[18px] font-bold text-fg">Get your shop live</h3>
+          <h3 className="font-heading text-lg font-bold text-fg">Get your shop live</h3>
           <p className="mt-0.5 text-hint text-muted">
             {done} of {total} steps done.{' '}
             {canPublish ? 'Only publishing is left.' : 'Do the steps below in order.'}
@@ -156,7 +156,7 @@ function OnlinePaymentsCard({ steps }: { steps: StepState[] }) {
   return (
     <section className="glass-card overflow-hidden rounded-glass">
       <header className="border-b border-line p-4 sm:p-5">
-        <h3 className="font-heading text-[18px] font-bold text-fg">
+        <h3 className="font-heading text-lg font-bold text-fg">
           Take online payments{' '}
           <span className="text-hint font-semibold text-muted">(optional)</span>
         </h3>
@@ -260,7 +260,7 @@ function Row({
       )}
       <span
         aria-hidden
-        className={`relative z-[1] flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[14px] font-bold ${
+        className={`relative z-[1] flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
           complete
             ? 'bg-success text-brand-contrast'
             : current
@@ -278,7 +278,7 @@ function Row({
           current ? '-my-1 bg-brand-soft/70 px-3 py-2.5' : ''
         }`}
       >
-        <p className={`text-[15px] font-semibold ${complete ? 'text-muted' : 'text-fg'}`}>
+        <p className={`text-base font-semibold ${complete ? 'text-muted' : 'text-fg'}`}>
           {title}
           {optional && <span className="ml-1.5 text-hint font-medium text-muted">(optional)</span>}
           {complete && <span className="sr-only"> — done</span>}

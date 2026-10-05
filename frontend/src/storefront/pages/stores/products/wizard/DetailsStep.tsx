@@ -80,7 +80,7 @@ export function DetailsStep({
           rows={4}
           maxLength={2000}
           placeholder={'Pure Banarasi silk with zari border\nComes with an unstitched blouse piece\nDry clean only'}
-          className="w-full rounded-md border border-line bg-input px-3.5 py-3 text-[15px] leading-relaxed text-fg outline-none transition placeholder:text-muted focus:border-accent"
+          className="w-full rounded-md border border-line bg-input px-3.5 py-3 text-base leading-relaxed text-fg outline-none transition placeholder:text-muted focus:border-accent"
         />
       </Field>
 

@@ -88,7 +88,7 @@ export function BuilderSectionList({
       />
 
       <div>
-        <p className="px-1 pb-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-muted">
+        <p className="px-1 pb-1.5 text-xs font-bold uppercase tracking-[0.08em] text-muted">
           Your storefront
         </p>
         <ul className="space-y-1.5">
@@ -154,7 +154,7 @@ export function BuilderSectionList({
                     />
                     <span className="min-w-0 flex-1">
                       <span
-                        className={`block text-[15px] font-semibold leading-snug ${
+                        className={`block text-base font-semibold leading-snug ${
                           section.enabled ? 'text-fg' : 'text-muted'
                         }`}
                       >
@@ -298,7 +298,7 @@ function PinnedRow({
     >
       <Icon className="h-[18px] w-[18px] shrink-0 text-muted" />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[15px] font-semibold text-fg">
+        <span className="block truncate text-base font-semibold text-fg">
           {label}
         </span>
         <span className="mt-0.5 block truncate text-hint text-muted">{hint}</span>

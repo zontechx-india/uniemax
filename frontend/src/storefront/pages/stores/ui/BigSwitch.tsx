@@ -55,7 +55,7 @@ export function BigSwitch({
         // Both words share one grid cell, the inactive one invisible, so the
         // label is always as wide as the LONGER word — switches in a list stay
         // aligned instead of nudging their neighbours as they flip.
-        <span aria-hidden className="grid text-left text-[14px] font-semibold">
+        <span aria-hidden className="grid text-left text-sm font-semibold">
           <span className={`[grid-area:1/1] ${checked ? 'text-success' : 'invisible'}`}>
             {onText}
           </span>

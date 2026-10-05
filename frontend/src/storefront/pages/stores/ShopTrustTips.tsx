@@ -54,7 +54,7 @@ export function ShopTrustTips({ store }: { store: Store }) {
 
   return (
     <section aria-labelledby="trust-heading">
-      <h3 id="trust-heading" className="mb-1 text-[15px] font-bold text-fg">
+      <h3 id="trust-heading" className="mb-1 text-base font-bold text-fg">
         Help customers trust your shop
       </h3>
       <p className="mb-2.5 text-hint text-muted">

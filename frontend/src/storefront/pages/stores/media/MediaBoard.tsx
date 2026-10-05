@@ -342,7 +342,7 @@ export function MediaBoard({
             {Array.from({ length: preparing }, (_, i) => (
               <li
                 key={`preparing-${i}`}
-                className="flex aspect-square animate-pulse items-center justify-center rounded-xl border border-line bg-surface-alt px-1 text-center text-[12px] font-semibold text-muted"
+                className="flex aspect-square animate-pulse items-center justify-center rounded-xl border border-line bg-surface-alt px-1 text-center text-xs font-semibold text-muted"
               >
                 {t.grid.optimizing}
               </li>
@@ -357,18 +357,19 @@ export function MediaBoard({
                   className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-brand/40 text-brand transition hover:bg-brand-soft disabled:cursor-not-allowed"
                 >
                   <PlusIcon className="h-6 w-6" />
-                  <span className="text-[13px] font-semibold">{t.add.more}</span>
+                  <span className="text-xs font-semibold">{t.add.more}</span>
                 </button>
                 {touch && (
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    className="px-2"
                     onClick={openCamera}
                     disabled={!config || disabled}
-                    className="flex min-h-tap items-center justify-center gap-1.5 rounded-xl border border-line bg-surface text-[13px] font-semibold text-fg transition hover:bg-fg/5 disabled:cursor-not-allowed"
                   >
                     <CameraIcon className="h-4 w-4" />
                     {t.add.camera}
-                  </button>
+                  </Button>
                 )}
               </li>
             )}
@@ -428,19 +429,18 @@ export function MediaBoard({
                 <p className="mt-1 text-hint text-danger">{video.error}</p>
               )}
               <div className="mt-1.5 flex flex-wrap gap-2">
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
                   onClick={() => videoRef.current?.click()}
                   disabled={disabled}
-                  className="min-h-tap rounded-xl border border-line bg-surface px-4 text-[14px] font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
                 >
                   {t.video.replace}
-                </button>
+                </Button>
                 <button
                   type="button"
                   onClick={() => setRemoving({ kind: 'video', id: video.id })}
                   disabled={disabled}
-                  className="min-h-tap rounded-xl px-3 text-[14px] font-semibold text-danger transition hover:bg-danger/10 disabled:cursor-not-allowed disabled:text-muted"
+                  className="min-h-tap rounded-xl px-3 text-sm font-semibold text-danger transition hover:bg-danger/10 disabled:cursor-not-allowed disabled:text-muted"
                 >
                   {t.video.remove}
                 </button>
@@ -466,7 +466,7 @@ export function MediaBoard({
       {/* 5 — proof: the card this cover photo makes --------------------- */}
       {preview && ready[0]?.previewUrl && (
         <div className="mt-4">
-          <p className="mb-2 text-[14px] font-semibold text-fg">
+          <p className="mb-2 text-sm font-semibold text-fg">
             {t.preview.title}
           </p>
           <div className="w-40 overflow-hidden rounded-lg border border-line bg-surface shadow-floating">
@@ -645,18 +645,14 @@ function Tile({
       // The tile is small, so its two actions split it top/bottom and each
       // takes the full width — far bigger targets than the old 20px links.
       <div className="flex aspect-square flex-col items-stretch justify-center gap-1 rounded-xl border-2 border-danger bg-danger/5 p-1 text-center">
-        <span className="text-[12px] font-bold text-danger">{t.grid.failed}</span>
-        <button
-          type="button"
-          onClick={onRetry}
-          className="min-h-9 w-full flex-1 rounded-lg bg-danger text-[13px] font-bold text-brand-contrast transition hover:opacity-90"
-        >
+        <span className="text-xs font-bold text-danger">{t.grid.failed}</span>
+        <Button variant="danger" size="sm" full className="flex-1 px-1" onClick={onRetry}>
           {t.grid.retry}
-        </button>
+        </Button>
         <button
           type="button"
           onClick={onDiscard}
-          className="min-h-8 w-full rounded-lg text-[12px] font-semibold text-muted transition hover:bg-fg/5 hover:text-fg"
+          className="min-h-8 w-full rounded-lg text-xs font-semibold text-muted transition hover:bg-fg/5 hover:text-fg"
         >
           {t.grid.discard}
         </button>
@@ -667,7 +663,7 @@ function Tile({
   if (photo.status === 'sending') {
     return (
       <div className="flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border border-line bg-surface-alt p-2">
-        <span className="text-[12px] font-semibold text-muted">
+        <span className="text-xs font-semibold text-muted">
           {t.grid.sending}
         </span>
         <div className="h-1 w-full overflow-hidden rounded-pill bg-line">
@@ -704,13 +700,13 @@ function Tile({
       )}
 
       {index === 0 && (
-        <span className="absolute top-1 left-1 flex items-center gap-1 rounded-md bg-brand px-1.5 py-0.5 text-[11px] font-bold text-brand-contrast">
+        <span className="absolute top-1 left-1 flex items-center gap-1 rounded-md bg-brand px-1.5 py-0.5 text-xs font-bold text-brand-contrast">
           <CheckIcon className="h-3 w-3" />
           {t.grid.cover}
         </span>
       )}
       {(photo.edited || photo.ratioLabel) && (
-        <span className="absolute bottom-1 left-1 rounded-md bg-scrim px-1.5 py-0.5 text-[11px] font-semibold text-white">
+        <span className="absolute bottom-1 left-1 rounded-md bg-scrim px-1.5 py-0.5 text-xs font-semibold text-white">
           {photo.edited ? 'Edited' : photo.ratioLabel}
         </span>
       )}

@@ -172,14 +172,13 @@ export function BuilderDesignPanel({
           <span className="min-w-0 flex-1 basis-40 text-hint font-medium text-fg">
             You changed the colours but have not saved them yet.
           </span>
-          <button
-            type="button"
+          <Button variant="secondary"
             onClick={onDiscard}
             disabled={busy}
-            className="min-h-tap shrink-0 rounded-xl border border-line px-4 text-[14px] font-semibold text-fg transition-colors hover:bg-fg/5 disabled:opacity-50"
+            className="shrink-0"
           >
             Undo
-          </button>
+          </Button>
           <Button variant="primary" size="md" onClick={onSave} disabled={busy}>
             {busy ? 'Saving…' : 'Save colours'}
           </Button>

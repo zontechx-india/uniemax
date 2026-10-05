@@ -128,7 +128,7 @@ function SectionCard({
 }) {
   return (
     <section className="glass-card rounded-glass p-4 sm:p-5">
-      <h3 className="font-heading text-[18px] font-bold text-fg">{title}</h3>
+      <h3 className="font-heading text-lg font-bold text-fg">{title}</h3>
       <p className="mt-0.5 text-hint text-muted">{description}</p>
       <div className="mt-4">{children}</div>
     </section>
@@ -143,9 +143,9 @@ function TextArea({
 }: TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-[14px] font-medium text-muted">{label}</span>
+      <span className="mb-2 block text-sm font-medium text-muted">{label}</span>
       <textarea
-        className={`w-full rounded-md border border-line bg-input px-4 py-3 text-[15px] text-fg outline-none transition-colors placeholder:text-muted hover:border-fg/30 focus:border-accent ${className}`}
+        className={`w-full rounded-md border border-line bg-input px-4 py-3 text-base text-fg outline-none transition-colors placeholder:text-muted hover:border-fg/30 focus:border-accent ${className}`}
         {...props}
       />
     </label>
@@ -381,15 +381,15 @@ function LocationsCard() {
         </div>
       ) : (
         locations.length < 10 && (
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            className="mt-3"
             onClick={() => setEditing('new')}
             disabled={busy}
-            className="mt-3 inline-flex h-tap items-center gap-1.5 rounded-xl border border-line bg-surface px-4 text-[15px] font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
           >
             <PlusIcon className="h-4 w-4" />
-            Add Location
-          </button>
+            Add location
+          </Button>
         )
       )}
 
@@ -547,14 +547,9 @@ function LocationForm({
         <Button type="submit" size="md" loading={busy}>
           {busy ? 'Saving…' : 'Save Location'}
         </Button>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={busy}
-          className="h-10 rounded-md border border-line bg-surface px-4 text-sm font-semibold text-fg transition hover:bg-surface-alt disabled:cursor-not-allowed disabled:text-muted"
-        >
+        <Button variant="secondary" onClick={onCancel} disabled={busy}>
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   )
@@ -646,7 +641,7 @@ function SocialCard() {
         <button
           type="button"
           onClick={() => setMoreOpen((open) => !open)}
-          className="inline-flex min-h-tap items-center gap-1 rounded-xl px-1 text-[15px] font-semibold text-brand transition hover:opacity-80"
+          className="inline-flex min-h-tap items-center gap-1 rounded-xl px-1 text-base font-semibold text-brand transition hover:opacity-80"
         >
           More platforms (WhatsApp, X, LinkedIn…)
           <ChevronDownIcon
@@ -969,7 +964,7 @@ function LinksCard() {
               onClick={() => setRows((r) => r.filter((_, i) => i !== index))}
               disabled={busy}
               aria-label="Remove link"
-              className="inline-flex min-h-tap items-center justify-center gap-1.5 rounded-xl px-3 text-[14px] font-semibold text-muted transition hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed sm:mb-0.5"
+              className="inline-flex min-h-tap items-center justify-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-muted transition hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed sm:mb-0.5"
             >
               <TrashIcon className="h-4 w-4" />
               <span className="sm:hidden">Remove this link</span>

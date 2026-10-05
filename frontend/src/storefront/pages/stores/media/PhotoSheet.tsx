@@ -172,7 +172,7 @@ function Row({
         {icon}
       </span>
       <span className="min-w-0 flex-1 text-left">
-        <span className="block text-[15px] font-semibold">{label}</span>
+        <span className="block text-base font-semibold">{label}</span>
         {note && (
           <span className="mt-0.5 block text-hint font-normal text-muted">
             {note}

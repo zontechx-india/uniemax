@@ -183,7 +183,7 @@ export function StoreBankPage() {
           is filled in. */}
       {addBlocked && accounts !== null && (
         <div className="rounded-glass bg-pending-soft p-4">
-          <p className="text-[15px] font-semibold text-fg">First, add your business details</p>
+          <p className="text-base font-semibold text-fg">First, add your business details</p>
           <p className="mt-0.5 text-hint text-muted">
             Before adding a bank account, add: {payoutGate.blockers.join(', ')}.
           </p>

@@ -55,7 +55,7 @@ export function ActionRow({
   const text = (
     <>
       <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="min-w-0 break-words text-[15px] font-semibold text-fg">{title}</span>
+        <span className="min-w-0 break-words text-base font-semibold text-fg">{title}</span>
         {status}
       </span>
       {meta && <span className="mt-1 block text-hint text-muted">{meta}</span>}

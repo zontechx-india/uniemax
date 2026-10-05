@@ -445,7 +445,7 @@ function Builder({
               type="button"
               onClick={() => setMobileView(view)}
               aria-pressed={mobileView === view}
-              className={`h-tap flex-1 rounded-lg text-[14px] font-semibold transition-colors ${
+              className={`h-tap flex-1 rounded-lg text-sm font-semibold transition-colors ${
                 mobileView === view
                   ? 'bg-brand text-brand-contrast'
                   : 'text-muted hover:text-fg'
@@ -494,7 +494,7 @@ function PanelTab({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`-mb-px flex min-h-tap items-center gap-1.5 border-b-2 px-3.5 text-[15px] font-semibold transition-colors ${
+      className={`-mb-px flex min-h-tap items-center gap-1.5 border-b-2 px-3.5 text-base font-semibold transition-colors ${
         active
           ? 'border-brand text-fg'
           : 'border-transparent text-muted hover:text-fg'

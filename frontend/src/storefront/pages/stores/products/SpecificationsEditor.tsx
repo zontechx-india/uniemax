@@ -31,11 +31,11 @@ export function SpecificationsEditor({
   }
 
   const inputClass =
-    'h-tap w-full rounded-md border border-line bg-input px-3 text-[15px] text-fg outline-none transition placeholder:text-muted focus:border-accent disabled:opacity-60'
+    'h-tap w-full rounded-md border border-line bg-input px-3 text-base text-fg outline-none transition placeholder:text-muted focus:border-accent disabled:opacity-60'
 
   return (
     <div>
-      <span className="mb-2 block text-[15px] font-semibold text-fg">
+      <span className="mb-2 block text-base font-semibold text-fg">
         Product facts{' '}
         <span className="font-normal text-muted">(optional)</span>
       </span>
@@ -105,7 +105,7 @@ export function SpecificationsEditor({
         type="button"
         onClick={() => onChange([...value, { label: '', value: '' }])}
         disabled={disabled || value.length >= OPTION_LIMITS.specs}
-        className={`inline-flex items-center gap-1.5 min-h-tap rounded-xl border-2 border-dashed border-brand/40 px-4 text-[14px] font-semibold text-brand transition hover:text-fg disabled:cursor-not-allowed disabled:opacity-50 ${
+        className={`inline-flex items-center gap-1.5 min-h-tap rounded-xl border-2 border-dashed border-brand/40 px-4 text-sm font-semibold text-brand transition hover:text-fg disabled:cursor-not-allowed disabled:opacity-50 ${
           value.length > 0 ? 'mt-2' : ''
         }`}
       >

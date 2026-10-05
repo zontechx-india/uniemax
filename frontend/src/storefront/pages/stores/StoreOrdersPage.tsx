@@ -169,7 +169,7 @@ export function StoreOrdersPage() {
                 type="button"
                 aria-pressed={on}
                 onClick={() => setStatus(key)}
-                className={`inline-flex min-h-tap shrink-0 items-center gap-1.5 rounded-pill border px-4 text-[14px] font-semibold transition ${
+                className={`inline-flex min-h-tap shrink-0 items-center gap-1.5 rounded-pill border px-4 text-sm font-semibold transition ${
                   on
                     ? 'border-brand bg-brand text-brand-contrast'
                     : 'border-line bg-surface/70 text-fg hover:border-brand/50'
@@ -178,7 +178,7 @@ export function StoreOrdersPage() {
                 {label}
                 {count !== null && count > 0 && (
                   <span
-                    className={`rounded-pill px-1.5 text-[12px] font-bold ${
+                    className={`rounded-pill px-1.5 text-xs font-bold ${
                       on ? 'bg-brand-contrast/20' : key === 'PENDING' ? 'bg-pending text-brand-contrast' : 'bg-fg/8 text-muted'
                     }`}
                   >
@@ -199,7 +199,7 @@ export function StoreOrdersPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name, phone or order number"
-          className="glass-inset h-field w-full rounded-xl pr-4 pl-11 text-[15px] text-fg outline-none placeholder:text-muted focus:border-accent"
+          className="glass-inset h-field w-full rounded-xl pr-4 pl-11 text-base text-fg outline-none placeholder:text-muted focus:border-accent"
         />
       </label>
 

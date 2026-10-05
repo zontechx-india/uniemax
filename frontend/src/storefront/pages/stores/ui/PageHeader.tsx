@@ -30,10 +30,10 @@ export function PageHeader({
           </span>
         )}
         <div className="min-w-0">
-          <h2 className="font-heading text-[22px] font-bold leading-tight text-fg">
+          <h2 className="font-heading text-xl font-bold leading-tight text-fg">
             {title}
           </h2>
-          <p className="mt-1 text-[14px] leading-relaxed text-muted">{description}</p>
+          <p className="mt-1 text-sm leading-relaxed text-muted">{description}</p>
         </div>
       </div>
       {action && <div className="flex shrink-0 [&>*]:w-full sm:[&>*]:w-auto">{action}</div>}

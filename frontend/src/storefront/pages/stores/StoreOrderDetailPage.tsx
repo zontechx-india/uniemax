@@ -189,7 +189,7 @@ export function StoreOrderDetailPage() {
       <Link
         to=".."
         relative="path"
-        className="-ml-2 inline-flex min-h-tap items-center gap-1.5 rounded-xl px-2 text-[15px] font-semibold text-muted transition hover:bg-fg/5 hover:text-fg"
+        className="-ml-2 inline-flex min-h-tap items-center gap-1.5 rounded-xl px-2 text-base font-semibold text-muted transition hover:bg-fg/5 hover:text-fg"
       >
         <ArrowLeftIcon className="h-5 w-5" />
         All orders
@@ -213,10 +213,10 @@ export function StoreOrderDetailPage() {
                 {timeAgo(order.placedAt)} · {formatOrderDateTime(order.placedAt)}
               </span>
             </div>
-            <h2 className="mt-2 font-figure text-[26px] leading-tight font-bold text-fg">
+            <h2 className="mt-2 font-figure text-3xl leading-tight font-bold text-fg">
               {formatPrice(order.total)}
             </h2>
-            <p className="mt-0.5 text-[15px] text-fg">
+            <p className="mt-0.5 text-base text-fg">
               {order.items.length} item{order.items.length === 1 ? '' : 's'} ·{' '}
               <span className="font-semibold">{paymentLabel(order.paymentMethod, order.paymentStatus)}</span>
               {order.fulfilment === 'PICKUP' && <> · Customer collects</>}
@@ -245,7 +245,7 @@ export function StoreOrderDetailPage() {
               <GlassCard icon={UserIcon} title={order.customerName ?? 'Customer'}>
                 <div className="space-y-3">
                   {(order.customerPhone || order.customerEmail) && (
-                    <p className="text-[15px] text-fg">
+                    <p className="text-base text-fg">
                       {order.customerPhone}
                       {order.customerEmail && (
                         <span className="block text-hint text-muted">{order.customerEmail}</span>
@@ -267,7 +267,7 @@ export function StoreOrderDetailPage() {
                         )}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex h-field w-full items-center justify-center gap-2 rounded-md bg-whatsapp text-[15px] font-bold text-whatsapp-contrast transition hover:opacity-90"
+                        className="flex h-field w-full items-center justify-center gap-2 rounded-md bg-whatsapp text-base font-bold text-whatsapp-contrast transition hover:opacity-90"
                       >
                         <ChatIcon className="h-5 w-5" />
                         WhatsApp
@@ -280,17 +280,17 @@ export function StoreOrderDetailPage() {
                   )}
 
                   <div className="border-t border-line pt-3">
-                    <p className="flex items-center gap-2 text-[14px] font-semibold text-fg">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-fg">
                       <MapPinIcon className="h-4 w-4 text-muted" />
                       {order.fulfilment === 'PICKUP' ? 'Customer collects' : 'Send to'}
                     </p>
                     {order.fulfilment === 'PICKUP' ? (
-                      <p className="mt-1 text-[15px] text-muted">
+                      <p className="mt-1 text-base text-muted">
                         The customer comes to your shop to collect this order.
                       </p>
                     ) : (
                       <>
-                        <p className="mt-1 text-[15px] leading-relaxed text-fg">
+                        <p className="mt-1 text-base leading-relaxed text-fg">
                           {address || 'No address was given.'}
                         </p>
                         {address && (
@@ -309,8 +309,8 @@ export function StoreOrderDetailPage() {
 
                   {order.billingAddress && (
                     <div className="border-t border-line pt-3">
-                      <p className="text-[14px] font-semibold text-fg">Bill to</p>
-                      <p className="mt-1 text-[15px] text-fg">{order.billingAddress.name}</p>
+                      <p className="text-sm font-semibold text-fg">Bill to</p>
+                      <p className="mt-1 text-base text-fg">{order.billingAddress.name}</p>
                       <p className="text-hint text-muted">
                         {[
                           order.billingAddress.addressLine,
@@ -351,7 +351,7 @@ export function StoreOrderDetailPage() {
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="text-[15px] leading-snug font-semibold break-words text-fg">
+                        <p className="text-base leading-snug font-semibold break-words text-fg">
                           {item.productName}
                         </p>
                         {item.variantName && (
@@ -363,13 +363,13 @@ export function StoreOrderDetailPage() {
                           {item.sku && <> · Code {item.sku}</>}
                         </p>
                       </div>
-                      <span className="shrink-0 text-[15px] font-bold text-fg">
+                      <span className="shrink-0 text-base font-bold text-fg">
                         {formatPrice(item.lineTotal)}
                       </span>
                     </li>
                   ))}
                 </ul>
-                <dl className="space-y-1.5 border-t border-line px-4 py-3 text-[15px] sm:px-5">
+                <dl className="space-y-1.5 border-t border-line px-4 py-3 text-base sm:px-5">
                   <Line label="Items" value={formatPrice(order.subtotal)} />
                   <Line
                     label="Delivery"
@@ -434,7 +434,7 @@ export function StoreOrderDetailPage() {
                     variant="primary"
                     disabled={busy}
                     onClick={() => setConfirming('advance')}
-                    className="min-w-0 flex-1 text-[15px]"
+                    className="min-w-0 flex-1 text-base"
                   >
                     <CheckIcon className="h-5 w-5" />
                     {action.label}
@@ -504,7 +504,7 @@ export function StoreOrderDetailPage() {
               maxLength={300}
               rows={2}
               placeholder="Why? The customer will see this (optional) — e.g. out of stock"
-              className="mt-3 w-full rounded-md border border-line bg-input px-3 py-2.5 text-[15px] text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+              className="mt-3 w-full rounded-md border border-line bg-input px-3 py-2.5 text-base text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
             />
           </>
         }
@@ -561,7 +561,7 @@ function TimelineRow({
         {at && (cancelled ? <CloseIcon className="h-4 w-4" /> : <CheckIcon className="h-4 w-4" />)}
       </span>
       <div className="min-w-0 pt-0.5">
-        <p className={`text-[15px] font-semibold ${at ? 'text-fg' : 'text-muted'}`}>{label}</p>
+        <p className={`text-base font-semibold ${at ? 'text-fg' : 'text-muted'}`}>{label}</p>
         <p className="text-hint text-muted">{at ? formatOrderDateTime(at) : 'Not yet'}</p>
       </div>
     </li>

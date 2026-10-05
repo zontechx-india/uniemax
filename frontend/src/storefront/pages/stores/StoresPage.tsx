@@ -135,7 +135,7 @@ function StoreCard({ store, onShare }: { store: Store; onShare: () => void }) {
         )}
         <div className="min-w-0 flex-1">
           {/* User-typed names render in the body face, two lines at most. */}
-          <h2 className="line-clamp-2 font-body text-[17px] leading-snug font-bold tracking-normal break-words text-fg">
+          <h2 className="line-clamp-2 font-body text-base leading-snug font-bold tracking-normal break-words text-fg">
             {store.name}
           </h2>
           <div className="mt-1.5">

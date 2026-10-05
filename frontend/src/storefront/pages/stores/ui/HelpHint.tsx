@@ -39,7 +39,7 @@ export function HelpHint({
         <InfoIcon className="h-5 w-5" />
       </button>
       <Dialog open={open} title={topic} onClose={() => setOpen(false)}>
-        <div className="space-y-3 text-[15px] leading-relaxed text-fg">{children}</div>
+        <div className="space-y-3 text-base leading-relaxed text-fg">{children}</div>
       </Dialog>
     </>
   )

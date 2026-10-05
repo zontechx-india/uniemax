@@ -97,7 +97,7 @@ function ChoiceCard({
         {selected && <CheckIcon className="h-3 w-3" />}
       </span>
       <span className="min-w-0">
-        <span className="block text-[15px] font-semibold text-fg">{title}</span>
+        <span className="block text-base font-semibold text-fg">{title}</span>
         <span className="mt-0.5 block text-hint text-muted">{detail}</span>
       </span>
     </button>

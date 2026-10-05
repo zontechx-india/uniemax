@@ -158,7 +158,7 @@ export function StoreShippingPage() {
                     <Icon className="h-5 w-5" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[16px] font-bold text-fg">
+                    <span className="block text-base font-bold text-fg">
                       {title}
                     </span>
                     <span className="mt-0.5 block text-hint text-muted">
@@ -265,7 +265,7 @@ function ShippingCharges({
 
   return (
     <section className="glass-card rounded-glass p-4 sm:p-5">
-      <h3 className="font-heading text-[18px] font-bold text-fg">
+      <h3 className="font-heading text-lg font-bold text-fg">
         Delivery charge
       </h3>
       <p className="mt-1 text-hint text-muted">
@@ -376,7 +376,7 @@ function DeliveryAreas({
 
   return (
     <section className="glass-card rounded-glass p-4 sm:p-5">
-      <h3 className="font-heading text-[18px] font-bold text-fg">
+      <h3 className="font-heading text-lg font-bold text-fg">
         Where you deliver
       </h3>
       <p className="mt-1 text-hint text-muted">

@@ -64,7 +64,7 @@ export function SaveBar({
           <div className="glass-strong flex animate-sheet-in flex-col gap-3 rounded-glass p-3 sm:flex-row sm:items-center sm:gap-4 sm:pl-5">
             <p
               aria-live="polite"
-              className={`min-w-0 flex-1 text-[14px] font-medium ${error ? 'text-danger' : 'text-fg'}`}
+              className={`min-w-0 flex-1 text-sm font-medium ${error ? 'text-danger' : 'text-fg'}`}
             >
               {error ?? (saving ? 'Saving your changes…' : message)}
             </p>

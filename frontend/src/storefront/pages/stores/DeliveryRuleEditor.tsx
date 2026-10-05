@@ -191,7 +191,7 @@ function PincodeListInput({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-3">
-        <span className="text-[14px] font-medium text-muted">{label}</span>
+        <span className="text-sm font-medium text-muted">{label}</span>
         <span className="flex items-center gap-1 text-hint text-muted">
           {pincodes.length} / {DELIVERY_RULE_LIMITS.pincodes}
           {pincodes.length > 0 && (
@@ -214,7 +214,7 @@ function PincodeListInput({
         {pincodes.map((pincode) => (
           <span
             key={pincode}
-            className="inline-flex h-9 items-center gap-0.5 rounded-pill bg-brand-soft pl-3 text-[14px] font-semibold tabular-nums text-fg"
+            className="inline-flex h-9 items-center gap-0.5 rounded-pill bg-brand-soft pl-3 text-sm font-semibold tabular-nums text-fg"
           >
             {pincode}
             <button
@@ -222,7 +222,7 @@ function PincodeListInput({
               onClick={() => onChange(pincodes.filter((p) => p !== pincode))}
               disabled={disabled}
               aria-label={`Remove ${pincode}`}
-              className="relative flex h-7 w-7 items-center justify-center rounded-full text-[18px] leading-none text-muted transition before:absolute before:-inset-2 before:content-[''] hover:bg-danger/10 hover:text-danger disabled:cursor-default"
+              className="relative flex h-7 w-7 items-center justify-center rounded-full text-lg leading-none text-muted transition before:absolute before:-inset-2 before:content-[''] hover:bg-danger/10 hover:text-danger disabled:cursor-default"
             >
               ×
             </button>
@@ -247,7 +247,7 @@ function PincodeListInput({
           inputMode="numeric"
           disabled={disabled || full}
           aria-label={label}
-          className="h-9 min-w-32 flex-1 bg-transparent px-1.5 text-[15px] text-fg outline-none placeholder:text-muted disabled:cursor-not-allowed"
+          className="h-9 min-w-32 flex-1 bg-transparent px-1.5 text-base text-fg outline-none placeholder:text-muted disabled:cursor-not-allowed"
         />
         {/* Many number keypads have no Enter or comma key — so a real button. */}
         {draft.trim() !== '' && (
@@ -261,7 +261,7 @@ function PincodeListInput({
               if (draft.trim()) addFrom(draft)
             }}
             disabled={disabled}
-            className="h-9 shrink-0 rounded-lg bg-brand px-4 text-[14px] font-bold text-brand-contrast transition hover:bg-brand-hover"
+            className="h-9 shrink-0 rounded-lg bg-brand px-4 text-sm font-bold text-brand-contrast transition hover:bg-brand-hover"
           >
             Add
           </button>
@@ -369,7 +369,7 @@ export function ProductDeliveryField({
                 {selected && <CheckIcon className="h-3 w-3" />}
               </span>
               <span className="min-w-0">
-                <span className="block text-[15px] font-semibold text-fg">
+                <span className="block text-base font-semibold text-fg">
                   {option.title}
                 </span>
                 <span className="mt-0.5 block text-hint text-muted">

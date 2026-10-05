@@ -149,25 +149,23 @@ export function CreateStorePage() {
   return (
     <div className="px-1 pb-10">
       <div className="mx-auto mb-2 flex w-full max-w-2xl items-center justify-between">
-        <button
-          type="button"
+        <Button variant="ghost"
           onClick={index === 0 ? goBack : back}
-          className="-ml-2 inline-flex min-h-tap items-center gap-1.5 rounded-xl px-2 text-[15px] font-semibold text-muted transition hover:bg-fg/5 hover:text-fg"
+          className="-ml-2 px-2"
         >
           <ArrowLeftIcon className="h-5 w-5" />
           Back
-        </button>
+        </Button>
 
         {/* An escape hatch on every step after the store exists. Leaving is
             not abandoning — the dashboard checklist carries the rest. */}
         {store && (
-          <button
-            type="button"
+          <Button variant="ghost"
             onClick={finishLater}
-            className="-mr-2 inline-flex min-h-tap items-center rounded-xl px-3 text-[15px] font-semibold text-muted transition hover:bg-fg/5 hover:text-fg"
+            className="-mr-2 px-3"
           >
             Finish later
-          </button>
+          </Button>
         )}
       </div>
 
@@ -272,10 +270,10 @@ function ResumePanel({
   const one = drafts.length === 1
   return (
     <div className="glass mx-auto w-full max-w-2xl rounded-glass p-5 sm:p-7">
-      <h2 className="font-heading text-[22px] leading-tight font-bold text-fg">
+      <h2 className="font-heading text-xl leading-tight font-bold text-fg">
         {one ? 'Pick up where you left off?' : 'You have unfinished shops'}
       </h2>
-      <p className="mt-1.5 text-[15px] leading-relaxed text-muted">
+      <p className="mt-1.5 text-base leading-relaxed text-muted">
         {one
           ? 'You started setting up a shop but didn’t finish. Continue it, or start a new one.'
           : 'You started these but didn’t finish. Continue one, or start a new one.'}
@@ -302,7 +300,7 @@ function ResumePanel({
                 </div>
               )}
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[15px] font-semibold text-fg">
+                <p className="truncate text-base font-semibold text-fg">
                   {draft.name}
                 </p>
                 <p className="truncate text-hint text-muted">
@@ -452,7 +450,7 @@ function StoreStep({
               <p className="text-hint font-semibold text-fg">Your shop link</p>
               {slug ? (
                 <>
-                  <p className="mt-0.5 text-[15px] font-medium break-words text-fg">
+                  <p className="mt-0.5 text-base font-medium break-words text-fg">
                     {window.location.host}/store/
                     <span className="text-brand">{slug}</span>
                   </p>
@@ -652,7 +650,7 @@ function BusinessStep({
       />
 
       <div className="glass-inset rounded-xl p-4">
-        <p className="text-[15px] font-semibold text-fg">How we reach you</p>
+        <p className="text-base font-semibold text-fg">How we reach you</p>
         <p className="mt-0.5 text-hint text-muted">
           New order alerts go here, and customers see them on your shop. They
           come from your account and are already verified.
@@ -696,7 +694,7 @@ function ContactRow({ label, value }: { label: string; value: string | null }) {
     <div>
       <p className="text-hint font-medium text-muted">{label}</p>
       <div className="mt-0.5 flex flex-wrap items-center gap-2">
-        <p className="min-w-0 truncate text-[15px] font-medium text-fg">{value ?? '—'}</p>
+        <p className="min-w-0 truncate text-base font-medium text-fg">{value ?? '—'}</p>
         {value && <StatusPill tone="success">Verified</StatusPill>}
       </div>
     </div>

@@ -19,6 +19,7 @@ import { categoryOptions, StepButtons, StepError, STEPS, StepShell } from './sha
 import { buttonClass } from '../../../../../shared/ui/Button'
 import type { StepKey } from './shared'
 import { MediaImg } from '../../../../../shared/media/MediaImg'
+import { Button } from '../../../../../shared/ui/Button'
 
 /**
  * Adding — or finishing — a product, one question at a time.
@@ -113,12 +114,12 @@ export function ProductWizard({
               }}
               disabled={!reachable}
               aria-current={current ? 'step' : undefined}
-              className={`flex min-h-tap w-full items-center gap-3 rounded-xl px-2.5 text-left text-[15px] font-semibold transition disabled:cursor-default disabled:opacity-50 ${
+              className={`flex min-h-tap w-full items-center gap-3 rounded-xl px-2.5 text-left text-base font-semibold transition disabled:cursor-default disabled:opacity-50 ${
                 current ? 'bg-brand-soft text-brand' : 'text-fg hover:bg-fg/5'
               }`}
             >
               <span
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                   current
                     ? 'bg-brand-gradient text-brand-contrast'
                     : isDone
@@ -237,12 +238,12 @@ export function ProductWizard({
               <CloseIcon className="h-5 w-5" />
             </button>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[15px] font-bold text-fg">{title}</p>
+              <p className="truncate text-base font-bold text-fg">{title}</p>
               <button
                 type="button"
                 onClick={() => setStepsOpen(true)}
                 aria-haspopup="dialog"
-                className="-ml-1 inline-flex min-h-8 max-w-full items-center gap-1 rounded-lg px-1 text-[13px] font-semibold text-brand"
+                className="-ml-1 inline-flex min-h-8 max-w-full items-center gap-1 rounded-lg px-1 text-xs font-semibold text-brand"
               >
                 {/* One line always — a wrapped step name pushed the chevron
                     off on its own and doubled the header's height. */}
@@ -253,13 +254,12 @@ export function ProductWizard({
               </button>
             </div>
             {product && (
-              <button
-                type="button"
+              <Button variant="ghost"
                 onClick={onClose}
-                className="min-h-tap shrink-0 rounded-xl px-3 text-[14px] font-semibold text-muted transition hover:bg-fg/5 hover:text-fg"
+                className="shrink-0 px-3"
               >
                 {closeLabel}
-              </button>
+              </Button>
             )}
           </div>
           <div className="mt-2 px-1.5">{progress}</div>
@@ -276,21 +276,20 @@ export function ProductWizard({
     <div className="glass-card mt-5 rounded-glass">
       <header className="border-b border-line px-5 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="flex min-w-0 items-center gap-2 font-heading text-[18px] font-bold text-fg">
+          <h2 className="flex min-w-0 items-center gap-2 font-heading text-lg font-bold text-fg">
             <span className="truncate">{title}</span>
             {product?.isDraft && (
-              <span className="shrink-0 rounded-pill bg-fg/6 px-2.5 py-0.5 text-[12px] font-semibold text-muted">
+              <span className="shrink-0 rounded-pill bg-fg/6 px-2.5 py-0.5 text-xs font-semibold text-muted">
                 Draft
               </span>
             )}
           </h2>
-          <button
-            type="button"
+          <Button variant="ghost"
             onClick={onClose}
-            className="min-h-tap rounded-xl px-3 text-[14px] font-semibold text-muted transition hover:bg-fg/5 hover:text-fg"
+            className="px-3"
           >
             {closeLabel}
-          </button>
+          </Button>
         </div>
 
         {/* Steps — clickable once the draft exists, so nothing forces a straight line. */}
@@ -306,7 +305,7 @@ export function ProductWizard({
                   onClick={() => reachable && setStep(s.key)}
                   disabled={!reachable}
                   aria-current={current ? 'step' : undefined}
-                  className={`flex min-h-tap items-center gap-2 rounded-xl px-2.5 text-[14px] font-semibold transition disabled:cursor-default ${
+                  className={`flex min-h-tap items-center gap-2 rounded-xl px-2.5 text-sm font-semibold transition disabled:cursor-default ${
                     current
                       ? 'bg-brand-soft text-brand'
                       : isDone
@@ -315,7 +314,7 @@ export function ProductWizard({
                   }`}
                 >
                   <span
-                    className={`flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-bold ${
+                    className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
                       current
                         ? 'bg-brand-gradient text-brand-contrast'
                         : isDone
@@ -447,9 +446,9 @@ function ReviewStep({
             )}
           </div>
           <div className="min-w-0 flex-1 self-center p-3">
-            <p className="truncate text-[15px] font-semibold text-fg">{product.name}</p>
+            <p className="truncate text-base font-semibold text-fg">{product.name}</p>
             <p className="mt-0.5 truncate text-hint text-muted">{category?.label ?? product.category.name}</p>
-            <p className="mt-1.5 text-[15px] font-bold text-brand">
+            <p className="mt-1.5 text-base font-bold text-brand">
               {product.price && Number(product.price) > 0
                 ? product.priceMax && product.priceMax !== product.price
                   ? `${formatPrice(product.price)} – ${formatPrice(product.priceMax)}`
@@ -467,7 +466,7 @@ function ReviewStep({
         {/* What still blocks publishing comes FIRST on a phone, so the
             greyed-out Publish button always has its reason in view. */}
         <div className={!canPublish && !product.isActive ? 'order-first lg:order-none' : ''}>
-          <p className="text-[15px] font-semibold text-fg">
+          <p className="text-base font-semibold text-fg">
             {canPublish || product.isActive ? 'Checklist' : 'Still needed before it can go live'}
           </p>
           <ul className="mt-2 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
@@ -482,7 +481,7 @@ function ReviewStep({
                   >
                     {done ? <CheckIcon className="h-4 w-4" /> : '·'}
                   </span>
-                  <span className={`min-w-0 flex-1 text-[15px] ${done ? 'text-fg' : 'text-muted'}`}>
+                  <span className={`min-w-0 flex-1 text-base ${done ? 'text-fg' : 'text-muted'}`}>
                     {check.label}
                     {!done && (
                       <span className="block text-hint">

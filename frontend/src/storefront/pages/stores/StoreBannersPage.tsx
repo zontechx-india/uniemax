@@ -370,7 +370,7 @@ export function StoreBannersPage({
 function SizeGuide() {
   return (
     <div className="mt-4 max-w-2xl rounded-lg border border-line bg-surface-alt px-4 py-3">
-      <p className="text-[14px] font-bold text-fg">
+      <p className="text-sm font-bold text-fg">
         Image size
       </p>
       <p className="mt-1.5 text-sm font-semibold text-fg">
@@ -399,7 +399,7 @@ function EmptyBanners({ onAdd }: { onAdd: () => void }) {
       <button
         type="button"
         onClick={onAdd}
-        className="mt-4 inline-flex min-h-tap items-center rounded-xl px-3 text-[15px] font-semibold text-brand hover:bg-brand-soft"
+        className="mt-4 inline-flex min-h-tap items-center rounded-xl px-3 text-base font-semibold text-brand hover:bg-brand-soft"
       >
         Add your first banner
       </button>
@@ -528,12 +528,12 @@ function BannerCard({
           <GripIcon className="h-5 w-5" />
         </span>
 
-        <span className="pointer-events-none absolute top-2 right-2 z-10 rounded-pill bg-scrim px-2.5 py-0.5 text-[12px] font-semibold text-white">
+        <span className="pointer-events-none absolute top-2 right-2 z-10 rounded-pill bg-scrim px-2.5 py-0.5 text-xs font-semibold text-white">
           {index + 1} of {total}
         </span>
 
         {!banner.isActive && (
-          <span className="pointer-events-none absolute bottom-2 left-2 z-10 rounded-md bg-scrim px-2 py-0.5 text-[12px] font-semibold text-white">
+          <span className="pointer-events-none absolute bottom-2 left-2 z-10 rounded-md bg-scrim px-2 py-0.5 text-xs font-semibold text-white">
             Hidden
           </span>
         )}
@@ -564,7 +564,7 @@ function BannerCard({
             type="button"
             onClick={onDelete}
             disabled={busy}
-            className="inline-flex min-h-tap items-center gap-1.5 rounded-xl px-3 text-[14px] font-semibold text-muted transition hover:bg-danger/10 hover:text-danger"
+            className="inline-flex min-h-tap items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-muted transition hover:bg-danger/10 hover:text-danger"
           >
             <TrashIcon className="h-4 w-4" />
             Delete
@@ -573,22 +573,20 @@ function BannerCard({
 
         {total > 1 && (
           <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
+            <Button variant="secondary"
               disabled={busy || index === 0}
               onClick={() => onMove(-1)}
-              className="inline-flex min-h-tap items-center justify-center gap-1 rounded-xl border border-line text-[14px] font-semibold text-fg transition hover:bg-fg/5 disabled:opacity-35"
+              className="gap-1 px-2"
             >
               ← Earlier
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button variant="secondary"
               disabled={busy || index === total - 1}
               onClick={() => onMove(1)}
-              className="inline-flex min-h-tap items-center justify-center gap-1 rounded-xl border border-line text-[14px] font-semibold text-fg transition hover:bg-fg/5 disabled:opacity-35"
+              className="gap-1 px-2"
             >
               Later →
-            </button>
+            </Button>
           </div>
         )}
 
@@ -646,7 +644,7 @@ function LinkPicker({
 }) {
   return (
     <div>
-      <span className="block text-[14px] font-semibold text-fg">
+      <span className="block text-sm font-semibold text-fg">
         When tapped, go to
       </span>
       <div className="mt-1.5 space-y-2">

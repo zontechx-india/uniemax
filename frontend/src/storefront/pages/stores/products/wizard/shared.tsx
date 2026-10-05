@@ -23,7 +23,7 @@ export type StepKey = (typeof STEPS)[number]['key']
 // 48px tall (px, so the 90% root cannot shrink it); phones also get the
 // 16px input floor from index.css, so focusing never zooms the page.
 export const inputClass =
-  'h-field w-full rounded-md border border-line bg-input px-3.5 text-[15px] text-fg outline-none transition placeholder:text-muted focus:border-accent disabled:opacity-60'
+  'h-field w-full rounded-md border border-line bg-input px-3.5 text-base text-fg outline-none transition placeholder:text-muted focus:border-accent disabled:opacity-60'
 
 /** One line under a field, in plain words — why it matters, with an example. */
 export function Hint({ children }: { children: ReactNode }) {
@@ -44,7 +44,7 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[15px] font-semibold text-fg">
+      <span className="mb-1.5 block text-base font-semibold text-fg">
         {label}
         {optional && (
           <span className="ml-1.5 font-normal text-muted">(optional)</span>
@@ -68,8 +68,8 @@ export function StepShell({
 }) {
   return (
     <div>
-      <h3 className="font-heading text-[22px] leading-tight font-bold text-fg">{title}</h3>
-      <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{lead}</p>
+      <h3 className="font-heading text-xl leading-tight font-bold text-fg">{title}</h3>
+      <p className="mt-1.5 text-base leading-relaxed text-muted">{lead}</p>
       <div className="mt-5 space-y-5">{children}</div>
     </div>
   )
@@ -134,20 +134,19 @@ export function StepButtons({
           onClick={onNext}
           loading={busy}
           disabled={!canNext}
-          className="min-w-0 flex-1 text-[15px] sm:flex-none sm:px-8"
+          className="min-w-0 flex-1 text-base sm:flex-none sm:px-8"
         >
           {busy ? 'Saving…' : nextLabel}
         </Button>
       </div>
       {skip && (
-        <button
-          type="button"
+        <Button variant="ghost"
           onClick={skip}
           disabled={busy}
-          className="min-h-tap rounded-md px-3 text-[15px] font-semibold text-muted transition hover:bg-fg/5 hover:text-fg"
+          className="px-3"
         >
           {skipLabel ?? 'Skip for now'}
-        </button>
+        </Button>
       )}
     </div>
   )
@@ -209,7 +208,7 @@ export function ChoiceCard({
         <Icon className="h-5 w-5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-bold text-fg">{title}</span>
+        <span className="block text-base font-bold text-fg">{title}</span>
         <span className="mt-0.5 block text-hint text-muted">{body}</span>
       </span>
       <span

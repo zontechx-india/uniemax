@@ -292,7 +292,7 @@ export function OrderBadge({ count, className = '' }: { count: number; className
       // Not aria-hidden: "3 orders waiting" is the whole point of the badge
       // for a screen-reader user too.
       aria-label={`${count} pending`}
-      className={`flex h-5 min-w-5 shrink-0 items-center justify-center rounded-pill bg-brand px-1.5 text-[11px] font-bold text-brand-contrast ${className}`}
+      className={`flex h-5 min-w-5 shrink-0 items-center justify-center rounded-pill bg-brand px-1.5 text-xs font-bold text-brand-contrast ${className}`}
     >
       {count > 99 ? '99+' : count}
     </span>
@@ -325,7 +325,7 @@ function SectionRow({
       // table-row highlight rather than "you are here".
       className={({ isActive }) =>
         `group/row flex items-center gap-3 rounded-xl transition-colors ${
-          large ? 'min-h-[52px] px-2.5 text-[15px]' : 'min-h-10 px-3 text-sm'
+          large ? 'min-h-[52px] px-2.5 text-base' : 'min-h-10 px-3 text-sm'
         } ${
           isActive
             ? 'bg-brand-soft font-semibold text-brand'
@@ -387,7 +387,7 @@ function SectionDisclosure({
             open ? '' : '-rotate-90'
           }`}
         />
-        <span className="min-w-0 flex-1 truncate text-[11px] font-bold tracking-[0.08em] uppercase">
+        <span className="min-w-0 flex-1 truncate text-xs font-bold tracking-[0.08em] uppercase">
           {group.caption}
         </span>
 
@@ -403,7 +403,7 @@ function SectionDisclosure({
               />
             )}
             {orders > 0 && <OrderBadge count={orders} />}
-            <span className="shrink-0 text-[11px] font-medium text-muted" aria-hidden>
+            <span className="shrink-0 text-xs font-medium text-muted" aria-hidden>
               {group.items.length}
             </span>
           </>
@@ -450,7 +450,7 @@ export function SectionSheetList({
         <section key={group.key} aria-labelledby={`sheet-group-${group.key}`}>
           <h3
             id={`sheet-group-${group.key}`}
-            className="px-2.5 pb-1 text-[12px] font-bold tracking-[0.06em] text-muted uppercase"
+            className="px-2.5 pb-1 text-xs font-bold tracking-[0.06em] text-muted uppercase"
           >
             {group.caption}
           </h3>

@@ -167,11 +167,11 @@ function TemplateCard({
               <span className={`h-9 w-9 shrink-0 rounded ${SKIN.well}`} />
               <span className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
                 <span className={`h-1.5 w-full rounded-full ${SKIN.well}`} />
-                <span className="text-[9px] font-bold text-brand">₹1,299</span>
+                <span className="text-xs font-bold text-brand">₹1,299</span>
               </span>
             </span>
             <span
-              className={`mt-2 flex h-6 items-center justify-center rounded text-[9px] font-bold ${SKIN.cta}`}
+              className={`mt-2 flex h-6 items-center justify-center rounded text-xs font-bold ${SKIN.cta}`}
             >
               Add to Cart
             </span>
@@ -189,7 +189,7 @@ function TemplateCard({
               )}
             </span>
             {description && (
-              <span className="mt-0.5 line-clamp-2 block text-[11px] leading-snug text-muted">
+              <span className="mt-0.5 line-clamp-2 block text-xs leading-snug text-muted">
                 {description}
               </span>
             )}

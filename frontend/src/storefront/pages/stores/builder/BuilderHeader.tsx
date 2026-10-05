@@ -111,7 +111,7 @@ export function BuilderHeader({
             </span>
           )}
           <span className="min-w-0">
-            <span className="block truncate text-[15px] font-semibold text-fg">
+            <span className="block truncate text-base font-semibold text-fg">
               Design your shop
             </span>
             <span className="block truncate text-hint text-muted">
@@ -154,7 +154,7 @@ export function BuilderHeader({
             href={publicStoreUrl(store.slug)}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-tap shrink-0 items-center gap-1.5 rounded-xl border border-line px-3 text-[14px] font-semibold text-fg transition-colors hover:bg-fg/5"
+            className="inline-flex h-tap shrink-0 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-semibold text-fg transition-colors hover:bg-fg/5"
           >
             <ExternalLinkIcon className="h-4 w-4" />
             <span className="hidden sm:inline">
@@ -165,15 +165,14 @@ export function BuilderHeader({
           {store.isPublished ? (
             // Says what it IS ("Live") and what tapping DOES ("Take
             // offline"), and asks before it does it.
-            <button
-              type="button"
+            <Button variant="secondary"
               onClick={() => setConfirmOffline(true)}
               disabled={busy}
-              className="inline-flex h-tap shrink-0 items-center gap-1.5 rounded-xl border border-line px-3 text-[14px] font-semibold text-fg transition-colors hover:bg-fg/5 disabled:opacity-50"
+              className="px-3"
             >
               <span className="h-2 w-2 rounded-full bg-success" aria-hidden />
               <span className="hidden sm:inline">Live ·</span> Take offline
-            </button>
+            </Button>
           ) : (
             <Button
               variant="primary"
@@ -242,7 +241,7 @@ function SaveStatus({
       <span
         role="status"
         title={error ?? undefined}
-        className="inline-flex max-w-[16rem] items-center gap-1 truncate rounded-pill bg-danger/10 px-2.5 py-1 text-[12px] font-semibold text-danger"
+        className="inline-flex max-w-[16rem] items-center gap-1 truncate rounded-pill bg-danger/10 px-2.5 py-1 text-xs font-semibold text-danger"
       >
         Not saved<span className="hidden sm:inline"> — {error}</span>
       </span>
@@ -250,7 +249,7 @@ function SaveStatus({
   }
   if (state === 'saving') {
     return (
-      <span role="status" className="rounded-pill bg-fg/5 px-2.5 py-1 text-[12px] font-semibold text-muted">
+      <span role="status" className="rounded-pill bg-fg/5 px-2.5 py-1 text-xs font-semibold text-muted">
         Saving…
       </span>
     )
@@ -259,7 +258,7 @@ function SaveStatus({
     return (
       <span
         role="status"
-        className="inline-flex items-center gap-1 rounded-pill bg-success/10 px-2.5 py-1 text-[12px] font-semibold text-success"
+        className="inline-flex items-center gap-1 rounded-pill bg-success/10 px-2.5 py-1 text-xs font-semibold text-success"
       >
         <CheckIcon className="h-3.5 w-3.5" />
         Saved

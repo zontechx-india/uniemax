@@ -10,7 +10,11 @@ this file tracks the work.
 Status: ☐ planned · ◐ in progress · ☑ done
 
 ## Decisions (October 2026, product owner)
-1. **Glassmorphism is removed** (§6, §10) — flat surfaces, borders over shadows.
+1. ~~Glassmorphism is removed~~ — **reversed by the product owner (October
+   2026): the My Shops glass and blur STAY** as a deliberate part of the seller
+   workspace's identity (§6 allows effects that "fit the product identity").
+   The `glass` budget in `check:ui` is therefore frozen, not driven to 0: the
+   existing glass may stay, new glass outside My Shops may not be added.
 2. **The storefront hero banner (A4 dots + arcs) stays** — the one decorative
    element, for shop identity. No other gradients.
 3. **Fonts:** Plus Jakarta Sans for all app interface; Fraunces only for
@@ -66,10 +70,19 @@ Also: 9 separate dialog implementations, 3 card styles, 13 corner radii,
 - Not changed: underline tab rows stay page-local until their pages are
   reworked in Phases 2–5 (`SegmentedTabs` is the shared segmented control).
 
-## Phase 2 — My Shops (sellers) ☐
-- Remove glass (`glass*`, `seller-canvas`, tinted hero) → flat surfaces.
-- One card style, no nested cards, one page-header pattern.
-- Replace hand-made buttons with `Button`; forms per §8 / §16.
+## Phase 2 — My Shops (sellers) ☑ (glass kept)
+- All 222 stray text sizes in `pages/stores` and `features/stores` moved onto
+  the scale (9–13px → caption 13, 14 → label, 15–17 → body 16, 18 → subtitle,
+  22–24 → section, 26 → title); nothing under 13px remains there.
+- Hand-made buttons that copied the standard looks moved to `Button`:
+  secondary (Replace video, Use camera, Add location, Cancel, Undo, Take
+  offline, Earlier/Later), ghost (Back, Finish later, Skip, wizard steps),
+  danger (Retry upload). The remaining raw buttons are deliberate patterns
+  — dashed "add" tiles, brand text links, "Remove" text buttons, list rows,
+  chips and icon buttons.
+- Checked: 18 seller pages at 360px — no sideways scroll, no input under
+  16px.
+- Budget after Phase 2: stray sizes 109, tiny text 74, raw buttons 257.
 
 ## Phase 3 — Storefront (customers) ☐
 - Product card, product page, hero, category page, cart, checkout on the

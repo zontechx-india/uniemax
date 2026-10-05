@@ -329,7 +329,7 @@ export function StoreCategoriesPage() {
       {(categories?.length ?? 0) > 0 &&
         store.readiness.gates.PUBLISH.blockerKeys.includes('catalog.product') && (
           <div className="flex flex-col gap-3 rounded-glass border border-success/30 bg-success/10 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-[15px] text-fg">
+            <p className="text-base text-fg">
               <span className="font-bold">Category added.</span> Next: add your
               first product.
             </p>
@@ -396,14 +396,14 @@ export function StoreCategoriesPage() {
       ) : (
         <section aria-labelledby="your-categories">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <h3 id="your-categories" className="text-[15px] font-bold text-fg">
+            <h3 id="your-categories" className="text-base font-bold text-fg">
               Your categories
             </h3>
             {branches.length > 0 && (
               <button
                 type="button"
                 onClick={toggleAll}
-                className="min-h-tap rounded-xl px-3 text-[14px] font-semibold text-brand transition hover:bg-brand-soft"
+                className="min-h-tap rounded-xl px-3 text-sm font-semibold text-brand transition hover:bg-brand-soft"
               >
                 {allExpanded ? 'Close all' : 'Open all'}
               </button>
@@ -418,7 +418,7 @@ export function StoreCategoriesPage() {
       {categories !== null && categories.length > 0 && (
         <Link
           to="../products"
-          className="inline-flex min-h-tap items-center gap-1.5 rounded-xl px-2 text-[15px] font-semibold text-brand transition hover:bg-brand-soft"
+          className="inline-flex min-h-tap items-center gap-1.5 rounded-xl px-2 text-base font-semibold text-brand transition hover:bg-brand-soft"
         >
           Ready to sell? Add products
           <ArrowRightIcon className="h-4 w-4" />
@@ -487,8 +487,8 @@ function CategoryEditPanel({
     <div className="border-t border-line bg-fg/[0.03] py-4 pr-4" style={indent(depth)}>
       <div className="max-w-2xl space-y-4 pl-2">
         <div>
-          <p className="text-[14px] font-semibold text-fg">Category</p>
-          <p className="mt-0.5 text-[15px] text-fg">
+          <p className="text-sm font-semibold text-fg">Category</p>
+          <p className="mt-0.5 text-base text-fg">
             {category.taxonomy?.pathLabel ?? category.name}
           </p>
           <p className="mt-0.5 text-hint text-muted">
@@ -499,14 +499,14 @@ function CategoryEditPanel({
         </div>
 
         <label className="block">
-          <span className="mb-1.5 block text-[15px] font-semibold text-fg">
+          <span className="mb-1.5 block text-base font-semibold text-fg">
             Picture link <span className="font-normal text-muted">(optional)</span>
           </span>
           <input
             value={imageUrl}
             onChange={(e) => setImageUrl(e.target.value)}
             placeholder="https://…"
-            className="h-field w-full rounded-md border border-line bg-input px-4 text-[15px] text-fg outline-none placeholder:text-muted focus:border-accent"
+            className="h-field w-full rounded-md border border-line bg-input px-4 text-base text-fg outline-none placeholder:text-muted focus:border-accent"
           />
           <span className="mt-1.5 block text-hint text-muted">
             Paste a web link to a picture for this category. Most shops leave
@@ -632,7 +632,7 @@ function CategoryRow({
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span
-              className={`min-w-0 text-[15px] font-semibold break-words ${
+              className={`min-w-0 text-base font-semibold break-words ${
                 category.isActive ? 'text-fg' : 'text-muted'
               }`}
             >

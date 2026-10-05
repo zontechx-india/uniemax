@@ -88,14 +88,14 @@ export function VariantMatrix({
 
   // 44px on phones (the card fields); the dense desktop table keeps 36px.
   const inputClass =
-    'h-tap w-full rounded-md border border-line bg-input px-3 text-[15px] text-fg outline-none transition placeholder:text-muted focus:border-accent disabled:opacity-60 sm:h-9 sm:px-2.5 sm:text-sm'
+    'h-tap w-full rounded-md border border-line bg-input px-3 text-base text-fg outline-none transition placeholder:text-muted focus:border-accent disabled:opacity-60 sm:h-9 sm:px-2.5 sm:text-sm'
   const helperButton =
-    'min-h-tap shrink-0 rounded-md border border-line bg-surface px-4 text-[14px] font-semibold text-fg transition hover:bg-surface-alt disabled:opacity-50'
-  const helperLabel = 'mb-1.5 block text-[14px] font-semibold text-fg'
+    'min-h-tap shrink-0 rounded-md border border-line bg-surface px-4 text-sm font-semibold text-fg transition hover:bg-surface-alt disabled:opacity-50'
+  const helperLabel = 'mb-1.5 block text-sm font-semibold text-fg'
 
   if (rows.length === 0) {
     return (
-      <p className="rounded-2xl border border-dashed border-line px-4 py-6 text-center text-[15px] text-muted">
+      <p className="rounded-2xl border border-dashed border-line px-4 py-6 text-center text-base text-muted">
         Go back and add an option to each choice — like S, M, L for Size.
       </p>
     )
@@ -237,7 +237,7 @@ export function VariantMatrix({
       {/* sm+: table */}
       <div className="hidden overflow-x-auto rounded-md border border-line sm:block">
         <table className="w-full text-sm">
-          <thead className="bg-fg/[0.04] text-left text-[12px] font-semibold text-muted">
+          <thead className="bg-fg/[0.04] text-left text-xs font-semibold text-muted">
             <tr>
               <th className="whitespace-nowrap px-3 py-2">Photo</th>
               {types.map((type) => (
@@ -365,7 +365,7 @@ export function VariantMatrix({
                   disabled={disabled}
                   label={`Photo for ${draftLabel(types, row)}`}
                 />
-                <p className="min-w-0 flex-1 text-[16px] leading-snug font-bold break-words text-fg">
+                <p className="min-w-0 flex-1 text-base leading-snug font-bold break-words text-fg">
                   {draftLabel(types, row)}
                 </p>
               </div>
@@ -438,7 +438,7 @@ export function VariantMatrix({
                   type="button"
                   onClick={() => patchRow(index, { removed: true })}
                   disabled={disabled || offered.length === 1}
-                  className="inline-flex min-h-tap items-center gap-1.5 rounded-xl px-3 text-[14px] font-semibold text-muted transition hover:bg-danger/10 hover:text-danger disabled:opacity-40"
+                  className="inline-flex min-h-tap items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-muted transition hover:bg-danger/10 hover:text-danger disabled:opacity-40"
                 >
                   <TrashIcon className="h-4 w-4" />
                   Don’t sell this
@@ -452,7 +452,7 @@ export function VariantMatrix({
       {/* Combinations the seller does not offer — one click brings any back. */}
       {removed.length > 0 && (
         <div className="rounded-2xl border border-dashed border-line px-3.5 py-3">
-          <p className="text-[14px] font-semibold text-fg">Not selling</p>
+          <p className="text-sm font-semibold text-fg">Not selling</p>
           <p className="text-hint text-muted">Tap one to sell it again.</p>
           <ul className="mt-1.5 flex flex-wrap gap-1.5">
             {rows.map((row, index) =>
@@ -462,7 +462,7 @@ export function VariantMatrix({
                     type="button"
                     onClick={() => patchRow(index, { removed: false })}
                     disabled={disabled}
-                    className="inline-flex min-h-tap items-center gap-2 rounded-pill border border-line bg-surface px-3.5 text-[14px] font-medium text-muted transition hover:border-brand hover:text-brand disabled:opacity-50"
+                    className="inline-flex min-h-tap items-center gap-2 rounded-pill border border-line bg-surface px-3.5 text-sm font-medium text-muted transition hover:border-brand hover:text-brand disabled:opacity-50"
                   >
                     <span className="line-through">{draftLabel(types, row)}</span>
                     <span className="font-semibold text-brand">Sell again</span>
@@ -539,10 +539,10 @@ function PhotoPicker({
           {shown?.url ? (
             <MediaImg sizes="48px" src={shown.url} alt="" className="h-full w-full object-cover" />
           ) : (
-            <span className="text-[11px] font-semibold text-muted">Photo</span>
+            <span className="text-xs font-semibold text-muted">Photo</span>
           )}
           {!chosen && shown?.url && (
-            <span className="absolute inset-x-0 bottom-0 bg-scrim text-center text-[10px] leading-4 font-semibold text-white">
+            <span className="absolute inset-x-0 bottom-0 bg-scrim text-center text-xs leading-4 font-semibold text-white">
               Main
             </span>
           )}
@@ -605,11 +605,11 @@ function PhotoTile({
       {url ? (
         <MediaImg sizes="96px" src={url} alt="" className="h-full w-full object-cover" />
       ) : (
-        <span className="flex h-full w-full items-center justify-center bg-surface-alt text-[12px] text-muted">
+        <span className="flex h-full w-full items-center justify-center bg-surface-alt text-xs text-muted">
           —
         </span>
       )}
-      <span className="absolute inset-x-0 bottom-0 bg-scrim text-center text-[12px] leading-5 font-semibold text-white">
+      <span className="absolute inset-x-0 bottom-0 bg-scrim text-center text-xs leading-5 font-semibold text-white">
         {caption}
       </span>
       {selected && (

@@ -130,7 +130,7 @@ export function BasicsStep({
       </Field>
 
       <div>
-        <p className="mb-1.5 text-[15px] font-semibold text-fg">Which category is it in?</p>
+        <p className="mb-1.5 text-base font-semibold text-fg">Which category is it in?</p>
         <div role="radiogroup" aria-label="Category" className="grid gap-2 sm:grid-cols-2">
           {options.map((option) => {
             const selected = option.id === categoryId
@@ -155,7 +155,7 @@ export function BasicsStep({
                   {selected ? <CheckIcon className="h-5 w-5" /> : <TagIcon className="h-5 w-5" />}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] font-semibold break-words text-fg">{option.name}</span>
+                  <span className="block text-base font-semibold break-words text-fg">{option.name}</span>
                   {option.group && (
                     <span className="block truncate text-hint text-muted">in {option.group}</span>
                   )}
@@ -166,7 +166,7 @@ export function BasicsStep({
           <button
             type="button"
             onClick={() => setChoosing(true)}
-            className="flex min-h-[60px] items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-brand/40 px-3.5 text-[15px] font-semibold text-brand transition hover:bg-brand-soft"
+            className="flex min-h-[60px] items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-brand/40 px-3.5 text-base font-semibold text-brand transition hover:bg-brand-soft"
           >
             <PlusIcon className="h-5 w-5" />
             Add a new category

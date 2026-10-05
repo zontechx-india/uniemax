@@ -1,10 +1,8 @@
 # `/mystores` Seller Workspace — UI/UX Redesign Plan
 
-> **Superseded in part (October 2026).** `docs/DESIGN_GUIDELINES.md` now rules
-> UI work. Its §6/§10 replace this plan's **glassmorphism** direction (glass
-> cards, blurred canvas, tinted gradient panels) with flat surfaces; the
-> removal is tracked in `docs/DESIGN_SYSTEM_PLAN.md` Phase 2. The plain-words,
-> tap-size and flow decisions below still stand.
+> **October 2026:** `docs/DESIGN_GUIDELINES.md` now rules UI work (type scale,
+> buttons, components). The **glassmorphism** direction below was kept by the
+> product owner's decision; see `docs/DESIGN_SYSTEM_PLAN.md`.
 
 The roadmap for redesigning the seller area (`/mystores/**`): the store list, Create
 Store, and every store-management section. It covers what is wrong today, the design

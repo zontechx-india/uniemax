@@ -103,7 +103,7 @@ export function StoreDashboardPage() {
       {dashboard && hasOrders && (
         <>
           <section aria-labelledby="pipeline-heading">
-            <h3 id="pipeline-heading" className="mb-2.5 text-[15px] font-bold text-fg">
+            <h3 id="pipeline-heading" className="mb-2.5 text-base font-bold text-fg">
               Your orders
             </h3>
             {/* Phone: one row that scrolls sideways (the fade on the right
@@ -117,7 +117,7 @@ export function StoreDashboardPage() {
                         <span aria-hidden className={`h-2 w-2 rounded-full ${dot}`} />
                         {label}
                       </span>
-                      <span className="mt-1 block font-figure text-[26px] leading-none font-bold text-fg">
+                      <span className="mt-1 block font-figure text-3xl leading-none font-bold text-fg">
                         {dashboard.stats[key]}
                       </span>
                     </>
@@ -140,12 +140,12 @@ export function StoreDashboardPage() {
 
           <section aria-labelledby="latest-heading">
             <div className="mb-2.5 flex items-center justify-between gap-3">
-              <h3 id="latest-heading" className="text-[15px] font-bold text-fg">
+              <h3 id="latest-heading" className="text-base font-bold text-fg">
                 Latest orders
               </h3>
               <Link
                 to="orders"
-                className="inline-flex min-h-tap items-center gap-1 rounded-xl px-2 text-[14px] font-semibold text-brand transition hover:bg-brand-soft"
+                className="inline-flex min-h-tap items-center gap-1 rounded-xl px-2 text-sm font-semibold text-brand transition hover:bg-brand-soft"
               >
                 See all
                 <ArrowRightIcon className="h-4 w-4" />
@@ -209,8 +209,8 @@ function Hero({
 
   return (
     <section className="glass-tint rounded-glass p-4 sm:p-6">
-      <p className="text-[14px] font-medium text-muted">{greeting(new Date().getHours())}</p>
-      <h2 className="mt-0.5 font-heading text-[24px] leading-tight font-bold break-words text-fg">
+      <p className="text-sm font-medium text-muted">{greeting(new Date().getHours())}</p>
+      <h2 className="mt-0.5 font-heading text-2xl leading-tight font-bold break-words text-fg">
         {store.name}
       </h2>
 
@@ -258,13 +258,13 @@ function HeroStat({
 }) {
   return (
     <div className={`min-w-0 ${className} rounded-2xl border border-glass-border bg-surface/55 px-3 py-2.5 shadow-[inset_0_1px_0_var(--glass-border)]`}>
-      <dt className="flex items-center gap-1.5 text-[12px] font-semibold text-muted">
+      <dt className="flex items-center gap-1.5 text-xs font-semibold text-muted">
         {dot && <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${dot}`} />}
         {label}
       </dt>
       <dd
         className={`mt-0.5 font-figure leading-tight font-bold text-fg ${
-          small ? 'break-words text-[22px]' : 'truncate text-[24px]'
+          small ? 'break-words text-xl' : 'truncate text-2xl'
         }`}
       >
         {value}
@@ -347,7 +347,7 @@ function NextStep({
         href={whatsAppShareUrl(store.name, url)}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex h-field w-full items-center justify-center gap-2 rounded-md bg-whatsapp text-[15px] font-bold text-whatsapp-contrast transition hover:opacity-90"
+        className="flex h-field w-full items-center justify-center gap-2 rounded-md bg-whatsapp text-base font-bold text-whatsapp-contrast transition hover:opacity-90"
       >
         <ChatIcon className="h-5 w-5" />
         Share on WhatsApp
@@ -363,8 +363,8 @@ function NextStep({
           <Icon className="h-5 w-5" />
         </span>
         <div className="min-w-0">
-          <p className="text-[12px] font-bold tracking-[0.06em] text-brand uppercase">Next step</p>
-          <p className="text-[16px] leading-snug font-bold text-fg">{title}</p>
+          <p className="text-xs font-bold tracking-[0.06em] text-brand uppercase">Next step</p>
+          <p className="text-base leading-snug font-bold text-fg">{title}</p>
           <p className="mt-0.5 text-hint text-muted">{detail}</p>
         </div>
       </div>

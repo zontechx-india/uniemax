@@ -64,7 +64,7 @@ function ShareActions({
       {/* Naming the blockers beats a disabled button with no explanation. */}
       {blocked ? (
         <div className="rounded-xl bg-pending-soft px-3 py-2.5">
-          <p className="mb-2 text-[14px] font-semibold text-fg">
+          <p className="mb-2 text-sm font-semibold text-fg">
             Before customers can see your shop, add:
           </p>
           <div onClick={onNavigate}>
@@ -90,7 +90,7 @@ function ShareActions({
           href={whatsAppShareUrl(store.name, shareUrl)}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex h-field w-full items-center justify-center gap-2 rounded-md bg-whatsapp text-[15px] font-bold text-whatsapp-contrast transition hover:opacity-90"
+          className="flex h-field w-full items-center justify-center gap-2 rounded-md bg-whatsapp text-base font-bold text-whatsapp-contrast transition hover:opacity-90"
         >
           <ChatIcon className="h-5 w-5" />
           Share on WhatsApp
@@ -147,7 +147,7 @@ function ShareActions({
         <button
           type="button"
           onClick={actions.askUnpublish}
-          className="flex min-h-tap w-full items-center justify-center rounded-md text-[14px] font-semibold text-muted transition hover:bg-fg/5 hover:text-danger"
+          className="flex min-h-tap w-full items-center justify-center rounded-md text-sm font-semibold text-muted transition hover:bg-fg/5 hover:text-danger"
         >
           Take shop offline
         </button>

@@ -166,7 +166,7 @@ export function StatusTag({
   }
 
   return (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-pill bg-pending-soft px-1.5 py-0.5 text-[10px] font-semibold text-pending">
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-pill bg-pending-soft px-1.5 py-0.5 text-xs font-semibold text-pending">
       <StatusMark complete={false} size="sm" label={null} />
       Pending
       <span className="sr-only">
@@ -198,7 +198,7 @@ export function StatusBadge({
 }) {
   if (dirty) {
     return (
-      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-pill bg-brand-soft px-2.5 py-1 text-[11px] font-semibold text-brand">
+      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-pill bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand">
         <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden />
         {statusText(status, true)}
       </span>
@@ -207,7 +207,7 @@ export function StatusBadge({
 
   if (status.complete) {
     return (
-      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-pill bg-success/10 px-2.5 py-1 text-[11px] font-semibold text-success">
+      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-pill bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
         <StatusMark complete size="sm" label={null} />
         {statusText(status, false)}
       </span>
@@ -218,14 +218,14 @@ export function StatusBadge({
   // simply not filled in yet says so in neutral.
   if (!status.blocksLaunch) {
     return (
-      <span className="inline-flex shrink-0 items-center rounded-pill bg-surface-alt px-2.5 py-1 text-[11px] font-semibold text-muted">
+      <span className="inline-flex shrink-0 items-center rounded-pill bg-surface-alt px-2.5 py-1 text-xs font-semibold text-muted">
         Optional
       </span>
     )
   }
 
   return (
-    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-pill bg-pending-soft px-2.5 py-1 text-[11px] font-semibold text-pending">
+    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-pill bg-pending-soft px-2.5 py-1 text-xs font-semibold text-pending">
       <StatusMark complete={false} size="sm" label={null} />
       {statusText(status, false)}
     </span>
@@ -323,13 +323,13 @@ export function SectionJumpBar({
             <span className="min-w-0 flex-1">
               {/* Wraps rather than truncating: "Business &…" would be worse
                   than two short lines, and equal columns give it the room. */}
-              <span className="block text-[11px] font-semibold leading-tight">
+              <span className="block text-xs font-semibold leading-tight">
                 {target.label}
               </span>
               {/* The count is the first thing to go when the tile is narrow —
                   the mark still carries the state, and the section's own
                   header repeats the number once the seller arrives. */}
-              <span className="mt-0.5 hidden text-[10px] leading-tight opacity-80 sm:block">
+              <span className="mt-0.5 hidden text-xs leading-tight opacity-80 sm:block">
                 {statusText(target.status, target.dirty ?? false)}
               </span>
               <span className="sr-only sm:hidden">

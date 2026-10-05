@@ -191,7 +191,7 @@ export function StoreBusinessPage() {
       <div className="glass-card mt-4 flex items-center gap-3 rounded-glass p-3.5">
         <ProgressRing done={met} total={total} size={44} label />
         <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-semibold text-fg">
+          <p className="text-base font-semibold text-fg">
             {met} of {total} details added
           </p>
           <div
@@ -275,7 +275,7 @@ function Card({
     >
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-heading text-[18px] font-bold text-fg">{title}</h3>
+          <h3 className="font-heading text-lg font-bold text-fg">{title}</h3>
           <p className="mt-1 text-hint text-muted">{description}</p>
         </div>
         <StatusBadge status={status} dirty={dirty} />
@@ -469,7 +469,7 @@ function ContactCard({
         </div>
 
         <div className="glass-inset rounded-xl p-4">
-          <p className="text-[15px] font-semibold text-fg">How we reach you</p>
+          <p className="text-base font-semibold text-fg">How we reach you</p>
           <p className="mt-0.5 text-hint text-muted">
             These come from your account and are already verified. To change
             them, go to{' '}
@@ -523,7 +523,7 @@ function VerifiedContact({
     <div>
       <p className="text-hint font-medium text-muted">{label}</p>
       <div className="mt-0.5 flex flex-wrap items-center gap-2">
-        <p className="min-w-0 truncate text-[15px] font-medium text-fg">{value ?? '—'}</p>
+        <p className="min-w-0 truncate text-base font-medium text-fg">{value ?? '—'}</p>
         {value && <StatusPill tone="success">Verified</StatusPill>}
       </div>
     </div>
@@ -746,7 +746,7 @@ function TaxCard({
             className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand)]"
           />
           <span className="min-w-0">
-            <span className="block text-[15px] font-semibold text-fg">
+            <span className="block text-base font-semibold text-fg">
               I'm not registered for GST
             </span>
             <span className="mt-0.5 block text-hint text-muted">

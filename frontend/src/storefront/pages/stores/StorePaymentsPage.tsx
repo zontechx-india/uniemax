@@ -122,7 +122,7 @@ export function StorePaymentsPage() {
                   <Icon className="h-5 w-5" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[16px] font-bold text-fg">{title}</p>
+                  <p className="text-base font-bold text-fg">{title}</p>
                   <p className="mt-0.5 text-hint text-muted">{description}</p>
                 </div>
               </div>
@@ -141,7 +141,7 @@ export function StorePaymentsPage() {
               {/* The switch is disabled; this says why, and where to fix it. */}
               {locked && (
                 <div className="mt-3 rounded-xl bg-pending-soft p-3">
-                  <p className="text-[14px] font-semibold text-fg">
+                  <p className="text-sm font-semibold text-fg">
                     First add: {onlineGate.blockers.join(', ')}
                   </p>
                   <div className="mt-2.5 flex flex-wrap gap-2">

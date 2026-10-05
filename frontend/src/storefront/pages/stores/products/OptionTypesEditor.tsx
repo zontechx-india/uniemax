@@ -19,6 +19,7 @@ import { buttonClass } from '../../../../shared/ui/Button'
 import { CreateMemberDialog } from './CreateMemberDialog'
 import { GroupMemberPicker } from './GroupMemberPicker'
 import { MediaImg } from '../../../../shared/media/MediaImg'
+import { Button } from '../../../../shared/ui/Button'
 
 /** Everything the editor edits, changed together so the cards stay one list. */
 export interface OptionsDraft {
@@ -223,7 +224,7 @@ export function OptionTypesEditor({
           <div key={key} className="rounded-2xl border border-brand/25 bg-surface/70 p-4">
             <div>
               <div className="space-y-4">
-                <p className="inline-flex items-center gap-1.5 rounded-pill bg-brand-soft px-2.5 py-1 text-[12px] font-semibold text-brand">
+                <p className="inline-flex items-center gap-1.5 rounded-pill bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand">
                   Linked products
                 </p>
                 <TextField
@@ -239,7 +240,7 @@ export function OptionTypesEditor({
                 />
 
                 <div>
-                  <span className="mb-2 block text-[14px] font-medium text-muted">
+                  <span className="mb-2 block text-sm font-medium text-muted">
                     {name ? `${name} products` : 'Products'}
                   </span>
                   <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line">
@@ -271,7 +272,7 @@ export function OptionTypesEditor({
                                 </span>
                               )}
                               {member.isDraft && !self && (
-                                <span className="ml-1.5 rounded-sm bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+                                <span className="ml-1.5 rounded-sm bg-accent/15 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-accent">
                                   Draft
                                 </span>
                               )}
@@ -298,7 +299,7 @@ export function OptionTypesEditor({
                             maxLength={OPTION_LIMITS.nameLength}
                             disabled={disabled}
                             aria-label={`${name || 'Value'} of ${member.name}`}
-                            className="h-tap w-full rounded-md border border-line bg-input px-3 text-[15px] text-fg outline-none transition placeholder:text-muted focus:border-accent disabled:opacity-60 sm:w-40"
+                            className="h-tap w-full rounded-md border border-line bg-input px-3 text-base text-fg outline-none transition placeholder:text-muted focus:border-accent disabled:opacity-60 sm:w-40"
                           />
                           {self ? (
                             <span className="hidden h-tap w-tap shrink-0 sm:block" aria-hidden />
@@ -410,7 +411,7 @@ export function OptionTypesEditor({
           type="button"
           onClick={addTyped}
           disabled={disabled || full}
-          className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-brand/40 px-4 text-[15px] font-semibold text-brand transition hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-brand/40 px-4 text-base font-semibold text-brand transition hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-50"
         >
           <PlusIcon className="h-5 w-5" />
           {cards.length === 0 ? 'Add a choice, like Size or Colour' : 'Add another choice'}
@@ -422,18 +423,17 @@ export function OptionTypesEditor({
 
         {/* The advanced path — linking separate products — stays out of the
             way until asked for. */}
-        <button
-          type="button"
+        <Button variant="ghost"
           onClick={() => setAdvanced((open) => !open)}
           aria-expanded={advanced}
-          className="inline-flex min-h-tap items-center gap-1.5 rounded-xl px-2 text-[14px] font-semibold text-muted transition hover:bg-fg/5 hover:text-fg"
+          className="px-2"
         >
           More ways to add choices
           <ChevronDownIcon className={`h-4 w-4 transition-transform ${advanced ? 'rotate-180' : ''}`} />
-        </button>
+        </Button>
         {advanced && (
           <div className="rounded-2xl bg-fg/[0.04] p-3.5">
-            <p className="text-[14px] font-semibold text-fg">
+            <p className="text-sm font-semibold text-fg">
               Link my other products (advanced)
             </p>
             <p className="mt-0.5 text-hint text-muted">
@@ -508,7 +508,7 @@ function RemoveButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl text-[14px] font-semibold text-muted transition hover:bg-danger/10 hover:text-danger disabled:opacity-40 ${
+      className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl text-sm font-semibold text-muted transition hover:bg-danger/10 hover:text-danger disabled:opacity-40 ${
         small ? 'size-tap' : 'min-h-tap px-3'
       }`}
     >

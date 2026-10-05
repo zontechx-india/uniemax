@@ -458,7 +458,7 @@ function ProductList({
               value={query}
               onChange={(e) => onQuery(e.target.value)}
               placeholder="Search your products"
-              className="glass-inset h-field w-full rounded-xl pr-4 pl-11 text-[15px] text-fg outline-none placeholder:text-muted focus:border-accent"
+              className="glass-inset h-field w-full rounded-xl pr-4 pl-11 text-base text-fg outline-none placeholder:text-muted focus:border-accent"
             />
           </label>
           <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]" role="group" aria-label="Show">
@@ -472,7 +472,7 @@ function ProductList({
                   type="button"
                   aria-pressed={on}
                   onClick={() => onFilter(key)}
-                  className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-pill border px-4 text-[14px] font-semibold transition ${
+                  className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-pill border px-4 text-sm font-semibold transition ${
                     on
                       ? 'border-brand bg-brand text-brand-contrast'
                       : 'border-line bg-surface/70 text-fg hover:border-brand/50'
@@ -495,7 +495,7 @@ function ProductList({
       )}
 
       {visible.length === 0 ? (
-        <p className="glass-card rounded-glass px-4 py-8 text-center text-[15px] text-muted">
+        <p className="glass-card rounded-glass px-4 py-8 text-center text-base text-muted">
           No products match. Try another word{filter !== 'all' ? ' or tap “All”' : ''}.
         </p>
       ) : (
@@ -819,7 +819,7 @@ function PlacementSheet({
           {MERCHANDISING.map(({ key, label, hint }) => (
             <li key={key} className="flex items-center gap-3 px-5 py-3">
               <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-semibold text-fg">{label}</span>
+                <span className="block text-base font-semibold text-fg">{label}</span>
                 <span className="block text-hint text-muted">{hint}</span>
               </span>
               <BigSwitch
