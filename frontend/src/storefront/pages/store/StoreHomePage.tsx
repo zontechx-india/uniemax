@@ -37,6 +37,8 @@ import {
   StockBadge,
 } from '../../features/publicStore/CartControls'
 import { ContactActions, shopContact } from '../../features/publicStore/ShopContact'
+import { waLink } from '../../features/publicStore/contactLinks'
+import { WhatsAppIcon } from '../../../shared/ui/socialIcons'
 import {
   browsableCategories,
   categoryPicture,
@@ -282,7 +284,6 @@ export function StoreHomePage() {
           store={store}
           skin={skin}
           covers={[]}
-          categoriesAnchor={false}
           facts={facts}
           cta={heroCta}
         />
@@ -300,7 +301,6 @@ export function StoreHomePage() {
           store={store}
           skin={skin}
           covers={[]}
-          categoriesAnchor={false}
           facts={facts}
           cta={heroCta}
         />
@@ -326,7 +326,6 @@ export function StoreHomePage() {
         shaped.showcase === null || section.key === 'banners' || section.key === 'hero',
     )
 
-  const showsCategories = visible.some((section) => section.key === 'categories')
   // Art beside the hero only for a big shop: a small one shows every product
   // a few centimetres further down, so the art would only repeat them.
   const covers = size === 'full' ? heroCovers(home) : []
@@ -346,7 +345,6 @@ export function StoreHomePage() {
           skin={skin}
           tone={tones[index]}
           covers={covers}
-          categoriesAnchor={showsCategories}
           facts={facts}
           heroCta={heroCta}
           catalogAll={shaped.catalogAll}
@@ -577,7 +575,6 @@ function HomeSection({
   skin,
   tone,
   covers,
-  categoriesAnchor,
   facts,
   heroCta,
   catalogAll,
@@ -589,7 +586,6 @@ function HomeSection({
   skin: Skin
   tone: BandTone
   covers: string[]
-  categoriesAnchor: boolean
   facts: TrustFact[]
   heroCta: HeroCta
   catalogAll: boolean
@@ -624,9 +620,11 @@ function HomeSection({
           skin={skin}
           tone={tone}
           covers={covers}
-          categoriesAnchor={categoriesAnchor}
           facts={facts}
           cta={heroCta}
+          // A seller's banner is already a big picture at the top; the
+          // colour cover would stack a second one under it.
+          cover={home.banners.length === 0}
           heading={section.settings?.title ?? null}
           tagline={section.settings?.subtitle ?? null}
           ctaLabel={copy.ctaLabel}
@@ -742,19 +740,15 @@ function Band({
   id?: string
   tone?: BandTone
   skin: Skin
-  /** `dense` = one row of controls, no heading. `hero` = the opening pitch. */
-  pad?: 'dense' | 'normal' | 'hero'
+  /** `dense` = one row of controls, no heading. */
+  pad?: 'dense' | 'normal'
   className?: string
   /** Store Builder hit-target; absent on the public storefront. */
   builder?: Record<string, string> | undefined
   children: React.ReactNode
 }) {
   const padding =
-    pad === 'dense'
-      ? 'py-3.5 sm:py-4'
-      : pad === 'hero'
-        ? 'py-8 sm:py-12 lg:py-16'
-        : 'py-8 sm:py-10'
+    pad === 'dense' ? 'py-3.5 sm:py-4' : 'py-8 sm:py-10'
   return (
     <section
       id={id}
@@ -771,21 +765,6 @@ function Band({
 // ---------------------------------------------------------------------------
 
 /**
- * Hero band — the store's own introduction.
- *
- * **Two shapes, and the empty one is deliberate.** With real product covers to
- * show it is a two-column composition: the pitch on the left, an editorial
- * mosaic of the shop's actual stock on the right (a triptych below `lg`, where
- * a column would be a stack of dead space). With fewer than two covers there
- * is no right-hand column at all — the copy centres instead of leaving half
- * the band empty, which is what a brand-new shop used to look like.
- *
- * The description is the owner's own "About" text from their Footer settings
- * when they wrote one, and a generated summary of the catalog when they did
- * not. The art is `alt=""` — it is decoration, and every product in it is
- * reachable from the rows below.
- */
-/**
  * Where the hero's button leads: the products just below (a small shop — they
  * are all on this page), the Shop page (a big one), or nowhere (a
  * one-product shop, whose product is the very next thing on the page).
@@ -799,14 +778,29 @@ const TRUST_ICONS: Record<TrustFact['key'], typeof TruckIcon> = {
   pickup: StoreIcon,
 }
 
+/**
+ * The shop's profile — the shape shoppers know from Instagram and WhatsApp
+ * Business shop pages, rather than a centred "welcome" slab:
+ *
+ *   - a COVER band washed in the shop's own colour (skipped when the seller
+ *     has banners — those are already the big picture at the top),
+ *   - the logo large and rounded, overlapping the cover's edge,
+ *   - the name, the seller's own line, and the trust facts as a quiet row of
+ *     icon + words (not bordered pills),
+ *   - rounded actions: the CTA where it helps, WhatsApp when the shop has a
+ *     number. (No "Shop by Category" button: the category row is right below.)
+ *
+ * Left-aligned on every screen — a phone reads down the left edge — with the
+ * product mosaic beside it from `lg` for a big shop.
+ */
 function Hero({
   store,
   skin,
   tone = 'alt',
   covers,
-  categoriesAnchor,
   facts,
   cta,
+  cover = true,
   heading = null,
   tagline = null,
   ctaLabel = null,
@@ -817,10 +811,11 @@ function Hero({
   skin: Skin
   tone?: BandTone
   covers: string[]
-  categoriesAnchor: boolean
   /** Delivery / payment reassurance from this store's real settings. */
   facts: TrustFact[]
   cta: HeroCta
+  /** Draw the colour cover band (off when banners lead the page). */
+  cover?: boolean
   /** Owner's headline. Null = the store's own name. */
   heading?: string | null
   /** Owner's intro line. Null = their About text, else nothing. */
@@ -829,9 +824,8 @@ function Hero({
   ctaLabel?: string | null
   /**
    * `split` shows the product mosaic when there is stock to show it with;
-   * `minimal` is the centred, art-free pitch — the shape a shop with strong
-   * words and weak photography should be able to choose deliberately, rather
-   * than only getting it by having too few covers.
+   * `minimal` is art-free — the shape a shop with strong words and weak
+   * photography should be able to choose deliberately.
    */
   layout?: 'split' | 'minimal'
   builder?: Record<string, string> | undefined
@@ -839,113 +833,141 @@ function Hero({
   const about = store.footer.info.about?.trim()
   const art = covers.slice(0, HERO_ART_SIZE)
   const hasArt = layout === 'split' && art.length >= 2
-  // Only words someone wrote. The old generated line ("4 products across 1
-  // category, delivered to your door") was catalogue arithmetic, not a reason
-  // to buy — the trust chips below say what a customer actually needs.
+  // Only words someone wrote — never generated catalogue arithmetic.
   const intro = tagline ?? about ?? null
   const label = ctaLabel ?? HERO_DEFAULT_CTA
-  const ctaClass = `inline-flex h-12 items-center gap-1.5 rounded-md px-6 text-[15px] font-bold transition ${skin.cta}`
-  const align = hasArt ? '' : 'justify-center'
+  const { whatsapp } = shopContact(store)
+  // The logo's ring is the band colour, so it reads as cut out of the cover.
+  const ring = tone === 'alt' ? 'ring-surface' : 'ring-bg'
+  const pill = 'inline-flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-full px-5 sm:flex-none sm:px-7 text-[15px] font-bold transition'
 
   return (
-    <Band
-      tone={tone}
-      skin={skin}
-      pad="hero"
-      className="relative overflow-hidden"
-      builder={builder}
+    <section
+      className={`${SCROLL_UNDER_HEADER} relative overflow-hidden border-b last:border-b-0 ${skin.border} ${tone === 'alt' ? skin.surface : ''}`}
+      {...builder}
     >
-      {/* Brand wash — keeps the hero from reading as an empty slab. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.07]"
-        style={{
-          background:
-            'radial-gradient(120% 120% at 85% 15%, var(--brand) 0%, transparent 60%)',
-        }}
-      />
-      <div
-        className={`relative ${hasArt ? 'grid items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.78fr)] lg:gap-14' : ''}`}
-      >
-        {/* Display copy is select-none: a stray drag otherwise highlights the
-            headline, which reads as glitchy. */}
+      {cover && (
         <div
-          className={`select-none ${hasArt ? '' : 'mx-auto max-w-2xl text-center'}`}
+          aria-hidden
+          className="h-28 sm:h-40 lg:h-44"
+          style={{
+            background: [
+              'radial-gradient(70% 130% at 0% 0%, color-mix(in oklab, var(--brand) 70%, transparent), transparent 70%)',
+              'radial-gradient(60% 120% at 100% 0%, color-mix(in oklab, var(--brand) 35%, transparent), transparent 75%)',
+              'linear-gradient(180deg, color-mix(in oklab, var(--brand) 30%, transparent), transparent)',
+            ].join(', '),
+          }}
+        />
+      )}
+
+      <div
+        className={`${STORE_CONTAINER} relative pb-7 sm:pb-10 ${cover ? '' : 'pt-6 sm:pt-10'}`}
+      >
+        <div
+          className={
+            hasArt
+              ? 'grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] lg:items-end lg:gap-14'
+              : ''
+          }
         >
-          {/* The shop's own mark, big enough to recognise — the old 44px logo
-              sat beside a "WELCOME TO" eyebrow that said nothing. */}
-          {store.logoUrl && (
-            <MediaImg
-              sizes="64px"
-              src={store.logoUrl}
-              alt=""
-              className={`h-16 w-16 rounded-xl border object-cover shadow-floating ${hasArt ? '' : 'mx-auto'} ${skin.border}`}
-            />
-          )}
-
-          {/* `break-words` so a long single-word shop name wraps instead of
-              widening the band past the viewport. */}
-          <h1
-            className={`mt-4 break-words font-heading text-3xl font-bold leading-[1.05] sm:text-4xl lg:text-5xl ${skin.text}`}
+          {/* select-none: a stray drag otherwise highlights the headline. */}
+          <div
+            className={`min-w-0 select-none ${hasArt ? '' : 'lg:flex lg:items-start lg:justify-between lg:gap-10'}`}
           >
-            {heading ?? store.name}
-          </h1>
-
-          {intro && (
-            <p
-              className={`mt-3 line-clamp-3 max-w-xl text-[15px] sm:line-clamp-none sm:text-base ${hasArt ? '' : 'mx-auto'} ${skin.muted}`}
-            >
-              {intro}
-            </p>
-          )}
-
-          {facts.length > 0 && (
-            <ul className={`mt-5 flex flex-wrap gap-2 ${align}`}>
-              {facts.map((fact) => {
-                const Icon = TRUST_ICONS[fact.key]
-                return (
-                  <li
-                    key={fact.key}
-                    className={`inline-flex items-center gap-1.5 rounded-pill border px-3 py-1.5 text-[13px] font-semibold ${skin.border} ${skin.text} ${tone === 'alt' ? 'bg-bg' : skin.surface}`}
-                  >
-                    <Icon className="h-4 w-4 shrink-0 text-brand" />
-                    {fact.label}
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-
-          {(cta !== 'none' || categoriesAnchor) && (
-            <div className={`mt-6 flex flex-wrap items-center gap-3 ${align}`}>
-              {cta === 'shop' && (
-                <Link to={storeShopUrl(store.slug)} className={ctaClass}>
-                  {label}
-                  <ChevronRightIcon className="h-4 w-4" />
-                </Link>
-              )}
-              {cta === 'products' && (
-                <a href="#shop-products" className={ctaClass}>
-                  {label}
-                  <ChevronRightIcon className="h-4 w-4" />
-                </a>
-              )}
-              {/* Only offered when the categories band is actually on the page. */}
-              {categoriesAnchor && (
-                <a
-                  href="#shop-by-category"
-                  className={`inline-flex h-12 items-center rounded-md border px-6 text-[15px] font-semibold transition-colors hover:border-brand ${skin.border} ${skin.text}`}
+            {/* Phone: stacked. From sm: a profile row — logo, then the words beside it. */}
+            <div className="min-w-0 sm:flex sm:items-start sm:gap-6">
+            <div className={`shrink-0 ${cover ? '-mt-11 sm:-mt-16' : ''}`}>
+              {store.logoUrl ? (
+                <MediaImg
+                  sizes="112px"
+                  src={store.logoUrl}
+                  alt=""
+                  className={`h-[88px] w-[88px] rounded-[22px] object-cover shadow-floating ring-4 sm:h-28 sm:w-28 sm:rounded-[28px] ${ring} ${skin.surface}`}
+                />
+              ) : (
+                <span
+                  aria-hidden
+                  className={`flex h-[88px] w-[88px] items-center justify-center rounded-[22px] font-heading text-4xl font-bold shadow-floating ring-4 sm:h-28 sm:w-28 sm:rounded-[28px] ${ring} ${skin.cta}`}
                 >
-                  Shop by Category
-                </a>
+                  {store.name.trim().charAt(0).toUpperCase()}
+                </span>
               )}
             </div>
-          )}
-        </div>
 
-        {hasArt && <HeroArt covers={art} skin={skin} />}
+            {/* `break-words` so a long single-word name wraps instead of
+                widening the band past the viewport. */}
+            <div className="min-w-0 sm:pt-4">
+            <h1
+              className={`mt-4 break-words sm:mt-0 font-heading text-[28px] font-bold leading-[1.1] tracking-tight sm:text-4xl lg:text-5xl ${skin.text}`}
+            >
+              {heading ?? store.name}
+            </h1>
+
+            {intro && (
+              <p
+                className={`mt-2 line-clamp-3 max-w-2xl text-[15px] leading-relaxed sm:line-clamp-none sm:text-base ${skin.muted}`}
+              >
+                {intro}
+              </p>
+            )}
+
+            {facts.length > 0 && (
+              <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2.5">
+                {facts.map((fact) => {
+                  const Icon = TRUST_ICONS[fact.key]
+                  return (
+                    <li
+                      key={fact.key}
+                      className={`inline-flex items-center gap-2 text-[14px] font-semibold ${skin.text}`}
+                    >
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      {fact.label}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+
+            </div>
+            </div>
+
+            {(cta !== 'none' || whatsapp) && (
+              // Side by side, sharing the width on a phone — never a third row;
+              // natural width beside the profile from lg.
+              <div className="mt-6 flex gap-3 sm:max-w-md lg:mt-4 lg:shrink-0">
+                {cta === 'shop' && (
+                  <Link to={storeShopUrl(store.slug)} className={`${pill} ${skin.cta}`}>
+                    {label}
+                    <ChevronRightIcon className="h-4 w-4" />
+                  </Link>
+                )}
+                {cta === 'products' && (
+                  <a href="#shop-products" className={`${pill} ${skin.cta}`}>
+                    {label}
+                    <ChevronRightIcon className="h-4 w-4" />
+                  </a>
+                )}
+                {whatsapp && (
+                  <a
+                    href={waLink(whatsapp, `Hi ${store.name}, I saw your shop on UnieMax.`)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${pill} bg-whatsapp text-whatsapp-contrast hover:brightness-95`}
+                  >
+                    <WhatsAppIcon className="h-5 w-5" />
+                    WhatsApp
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+
+          {hasArt && <HeroArt covers={art} skin={skin} />}
+        </div>
       </div>
-    </Band>
+    </section>
   )
 }
 

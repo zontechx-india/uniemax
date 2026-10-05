@@ -981,26 +981,28 @@ full-bleed section bands instead.
     from under a click; off-screen slides are `inert` so they are not invisible
     tab stops. A `URL` banner is a plain `<a target="_blank" rel="noopener">`;
     everything else routes through the SPA.
-  - **Hero** — the store's 64px logo, the store name (`text-3xl sm:text-4xl
-    lg:text-5xl`, `break-words`), the owner's words if any, **trust chips**
-    from the store's real settings (`trustFacts()`: "Free delivery" / "Free
-    delivery above ₹1,000" / "Delivery ₹200", "Cash on delivery", "Pay by UPI
-    or card", "Pick up from the shop"), then the CTA — which scrolls to
-    `#shop-products` for a small shop, opens Shop for a big one, and is absent
-    for a one-product shop (the product is next) — plus, only when the
-    categories band is on the page, a `#shop-by-category` button. No "Welcome
-    to" eyebrow. `hero` band padding is `py-8 sm:py-12 lg:py-16`, with the
-    radial brand wash.
-    - **Two shapes, and the empty one is deliberate.** With at least two real
-      product covers it is a two-column composition: the pitch on the left,
+  - **Hero** — a **shop profile**, the shape shoppers know from Instagram /
+    WhatsApp Business shop pages: a **cover band** washed in the shop's own
+    `--brand` (`color-mix` gradients; skipped when the seller has banners —
+    those already lead the page), the logo **88px / 112px, rounded, ringed in
+    the band colour and overlapping the cover**, then the name, the owner's
+    words if any (three lines on a phone), and **trust facts** (`trustFacts()`:
+    delivery charge, Cash on delivery, UPI, pickup) as icon-in-a-circle + words.
+    Actions are rounded 48px pills side by side, sharing the width on a phone:
+    the CTA (scrolls to `#shop-products` for a small shop, opens Shop for a big
+    one, absent for a one-product shop) and **WhatsApp** when the shop has a
+    number. No "Shop by Category" button — the category row is right below.
+    Stacked on a phone; from `sm` the words sit beside the logo; from `lg`
+    the actions move to the right. Left-aligned everywhere.
+    - **Big shops (`full`) add art.** With at least two real
+      product covers it is a two-column composition: the profile on the left,
       `HeroArt` on the right — one grid in two shapes, a triptych of squares
       below `lg` (a strip of life under the copy, costing almost no height)
       and a lead-plus-stack mosaic beside it from `lg`, where the lead takes
       its height from the two squares rather than an aspect ratio so the
       columns always end level. Covers are deduped from the merchandising rows
-      (max 3) and decorative (`alt=""`). **With fewer than two there is no
-      second column at all** — the copy centres instead of leaving half the
-      band empty, which is what a brand-new shop used to look like.
+      (max 3) and decorative (`alt=""`). With fewer than two there is no
+      second column.
     - The description is the owner's tagline or their **About** text (three
       lines on a phone), and **nothing** when they wrote neither — the old
       generated "4 products across 1 category, delivered to your door" was
