@@ -17,7 +17,6 @@ import type { CardPalette } from '../../../features/shareKit/palette'
 import type { QrStyle } from '../../../features/shareKit/qr'
 import { whatsAppStoreMessageUrl } from '../../../features/shareKit/share'
 import {
-  ChatIcon,
   CheckIcon,
   DownloadIcon,
   GlobeIcon,
@@ -28,6 +27,7 @@ import {
 } from '../../../layout/icons'
 import { BigSwitch } from '../ui/BigSwitch'
 import { PageHeader } from '../ui/PageHeader'
+import { WhatsAppShareLink } from '../ui/WhatsAppShareLink'
 import { CAPTION_MAX, CAPTION_PRESETS, productCover, useShareKit } from './useShareKit'
 
 /**
@@ -681,15 +681,7 @@ function ShareLinks({
         <GlobeIcon className="h-4 w-4 shrink-0" />
         <span className="min-w-0 truncate">{url.replace(/^https?:\/\//, '')}</span>
       </a>
-      <a
-        href={whatsAppStoreMessageUrl(url)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex h-field w-full items-center justify-center gap-2 rounded-md bg-whatsapp text-base font-bold text-whatsapp-contrast transition hover:opacity-90"
-      >
-        <ChatIcon className="h-5 w-5" />
-        Share on WhatsApp
-      </a>
+      <WhatsAppShareLink href={whatsAppStoreMessageUrl(url)} />
       <div className="grid grid-cols-2 gap-2">
         <Button variant="secondary" size="md" full onClick={() => void onShare()}>
           <ShareIcon className="h-4 w-4" />

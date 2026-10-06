@@ -11,7 +11,6 @@ import {
   ArrowRightIcon,
   BoxIcon,
   CartIcon,
-  ChatIcon,
   CheckIcon,
   ShareIcon,
   StoreIcon,
@@ -22,6 +21,7 @@ import { ShopTrustTips } from './ShopTrustTips'
 import { launchSteps, stepAction, stepMissing } from './setupSteps'
 import { usePublishActions, whatsAppShareUrl } from './usePublishActions'
 import { EmptyState } from './ui/EmptyState'
+import { WhatsAppShareLink } from './ui/WhatsAppShareLink'
 
 /**
  * Dashboard — the landing view of store management.
@@ -343,15 +343,7 @@ function NextStep({
       ? 'Send your shop link to your customers on WhatsApp.'
       : 'No orders are waiting. Share your shop to get more.'
     action = (
-      <a
-        href={whatsAppShareUrl(store.name, url)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex h-field w-full items-center justify-center gap-2 rounded-md bg-whatsapp text-base font-bold text-whatsapp-contrast transition hover:opacity-90"
-      >
-        <ChatIcon className="h-5 w-5" />
-        Share on WhatsApp
-      </a>
+      <WhatsAppShareLink href={whatsAppShareUrl(store.name, url)} />
     )
   }
 

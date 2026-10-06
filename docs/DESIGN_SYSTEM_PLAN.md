@@ -136,6 +136,14 @@ Also: 9 separate dialog implementations, 3 card styles, 13 corner radii,
 - **Storefront A4 hero banner** — the one decorative element.
 - **Theme-template miniatures** (admin) — 9px text inside a thumbnail.
 - **Login hero photo fade** — text legibility over a photo.
+- **"Share your store" button** (`.share-kit-cta`, publish & share panel) —
+  added October 2026 at the product owner's request: sunset glass
+  (orange → indigo) with a slow colour flow and an animated light sweep.
+  Brand purple and then emerald were tried first; emerald was rejected
+  because it read as a second WhatsApp button. It is the second sanctioned animated effect
+  after the pending sweep: one per screen, My Shops only, live shops only,
+  and off under reduced motion. Its CSS lives in `index.css`, so it is not
+  counted by `check:ui`; this entry is the record of it.
 - `shared/theme/colors.ts`, `shadows.ts`, `AuthDialog` comments mention the
   patterns (counted by the guard, not rendered).
 

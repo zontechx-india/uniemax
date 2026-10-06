@@ -1,0 +1,57 @@
+/*
+ * StarBorder — a light that travels round the button's stroke without stopping.
+ *
+ * The container is padded by `thickness` on every side; the inner content sits on
+ * top and covers everything except that ring. Behind it, an oversized square with
+ * a conic gradient (two comets, opposite each other) spins forever, so the only
+ * part of it you see is the ring — the stroke.
+ *
+ * In `@layer components` so Tailwind utilities on `className` / `contentClassName`
+ * override these defaults.
+ */
+@layer components {
+  .star-border-container {
+    display: inline-block;
+    position: relative;
+    border-radius: 20px;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .star-border-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    /* Big enough to cover the container's diagonal while it rotates. */
+    width: max(300%, 300px);
+    aspect-ratio: 1;
+    translate: -50% -50%;
+    animation: star-border-spin linear infinite;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .star-border-content {
+    position: relative;
+    border: 1px solid #222;
+    background: #000;
+    color: white;
+    font-size: 16px;
+    text-align: center;
+    padding: 16px 26px;
+    border-radius: inherit;
+    z-index: 1;
+  }
+}
+
+@keyframes star-border-spin {
+  to {
+    rotate: 1turn;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .star-border-spinner {
+    animation: none;
+  }
+}

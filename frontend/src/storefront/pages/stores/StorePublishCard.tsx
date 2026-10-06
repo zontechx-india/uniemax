@@ -1,14 +1,24 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
 import { Button, buttonClass } from '../../../shared/ui/Button'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { Dialog } from '../../../shared/ui/Dialog'
 import { storesApi } from '../../features/stores/storesApi'
 import type { Store } from '../../features/stores/storesApi'
-import { ChatIcon, CheckIcon, EyeIcon, GlobeIcon, ShareIcon } from '../../layout/icons'
+import {
+  ArrowRightIcon,
+  CheckIcon,
+  EyeIcon,
+  GlobeIcon,
+  QrCodeIcon,
+  ShareIcon,
+} from '../../layout/icons'
+import { useStoreManageScope } from '../../features/stores/storeManageScope'
 import { BlockerLinks, useGateBlockers } from './GateBlockers'
 import { usePublishActions, whatsAppShareUrl } from './usePublishActions'
 import { StatusPill } from './ui/StatusPill'
+import { WhatsAppShareLink } from './ui/WhatsAppShareLink'
 
 /**
  * Publish & share — in two frames over ONE body (`ShareActions`):
@@ -44,6 +54,7 @@ function ShareActions({
 }) {
   const actions = usePublishActions(store, onStoreChange)
   const blockers = useGateBlockers(store, 'PUBLISH')
+  const { storePath, hiddenSections } = useStoreManageScope()
   const { shareUrl, blocked, copied } = actions
 
   return (
@@ -86,15 +97,23 @@ function ShareActions({
       )}
 
       {store.isPublished && (
-        <a
-          href={whatsAppShareUrl(store.name, shareUrl)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex h-field w-full items-center justify-center gap-2 rounded-md bg-whatsapp text-base font-bold text-whatsapp-contrast transition hover:opacity-90"
+        <WhatsAppShareLink href={whatsAppShareUrl(store.name, shareUrl)} />
+      )}
+
+      {/* The Share Kit (QR cards for Instagram & WhatsApp). Absolute path:
+          this panel also opens from the My shops list, where a relative
+          link would resolve against /mystores. Live shops only — before
+          launch "Publish my shop" is the one thing to do here. */}
+      {store.isPublished && !hiddenSections.includes('share') && (
+        <Link
+          to={`${storePath(store.slug)}/share`}
+          onClick={onNavigate}
+          className="share-kit-cta flex h-field w-full items-center justify-center gap-2 rounded-md text-base font-bold"
         >
-          <ChatIcon className="h-5 w-5" />
-          Share on WhatsApp
-        </a>
+          <QrCodeIcon className="h-5 w-5" />
+          Share your store
+          <ArrowRightIcon className="h-4 w-4" />
+        </Link>
       )}
 
       <a

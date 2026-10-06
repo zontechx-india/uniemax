@@ -562,7 +562,7 @@ once-ever setting look as important as a daily job:
 | **Catalog** | Categories · Products |
 | **Storefront** | Shop name & logo · Business details · **Design your shop** |
 | **Payments & Delivery** | Payments · Bank account · Delivery · Checkout |
-| **Marketing** | **Share your store** · Affiliate Marketing |
+| **Marketing** | Affiliate Marketing |
 | **Help** | Customer messages · Help from UnieMax |
 
 Row labels are plain words a first-time seller would use (the routes keep
@@ -746,9 +746,23 @@ where available). Before publishing, the same URL works as a **private
 draft preview** for the signed-in owner (an amber hint says only they can
 open it), and a **Preview** button beside Share opens it in a new tab
 (labelled "View shop" once published). Once live, a full-width green
-**Share on WhatsApp** (`wa.me/?text=` with a ready "…is now online. See our
+**Share on WhatsApp** (`ui/WhatsAppShareLink`, a gold light lapping its edge; `wa.me/?text=` with a ready "…is now online. See our
 products and order here: {url}" message, `whatsAppShareUrl()` in
-`usePublishActions.ts`) leads the panel, and a quiet **Take shop offline**
+`usePublishActions.ts`) leads the panel. Directly under it is **Share your
+store**, the entry to the Share Kit: a sunset glass button
+(`.share-kit-cta` in `index.css`). Orange → magenta → fuchsia → violet →
+indigo (#c2410c, #d62976, #a21caf, #6d28d9, #4f46e5) flows slowly across
+it, and a warm light sweep crosses it about every 4 s, resting between
+passes. Warm on purpose: it sits under the green WhatsApp button, and
+green-family versions read as a second WhatsApp button (tried and
+rejected). The colours also suggest Instagram, the Share Kit's main
+output, without using any logo. Every stop carries white text at 4.7:1
+or more. It is shown only once the shop is live
+(before launch "Publish my shop" is the one action here), links to the
+scope's absolute `storePath(slug)/share` (the same sheet opens from the My
+shops list, where a relative link would land on `/mystores/share`), and is
+hidden where the scope hides `share` (the admin console). Reduced motion
+removes the sweep. A quiet **Take shop offline**
 closes it — behind a "Take your shop offline?" `ConfirmDialog` (it used to
 unpublish on one tap). Publish / offline confirm with a toast. While the shop is unpublished and has at least one live product, the
 Products section opens with `ShopNotLiveNudge` ("Customers can't see your
@@ -759,10 +773,12 @@ commas and spaces as they are typed (`cleanAmount`/`cleanCount` in
 `features/stores/productOptions.ts`), and their errors say what to type
 ("Enter the price in numbers only, e.g. 1299.").
 
-**Store Share Kit** (`StoreSharePage` at `/mystores/{slug}/share`, the
-**Share your store** row under Marketing; state in `share/useShareKit.ts`,
+**Store Share Kit** (`StoreSharePage` at `/mystores/{slug}/share`, reached
+from the shining **Share your store** button under Share on WhatsApp in the
+publish & share panel (see above), not from the section nav; state in
+`share/useShareKit.ts`,
 drawing in `features/shareKit/`). It makes a QR share card for Instagram and
-shares the store link. **Seller-only:** the admin console hides the row
+shares the store link. **Seller-only:** the admin console hides the button
 (`ADMIN_STORE_SCOPE.hiddenSections`) and mounts no route for it. There is no
 backend: it reads the managed store (name, `logoUrl`, `theme`,
 `footer.info.about` as the tagline, `footer.social.instagram` as an
@@ -2580,6 +2596,13 @@ frontend/
     │   │   ├── mode.ts           # dark/light controller (localStorage + <html data-theme>)
     │   │   ├── ThemeProvider.tsx # context: useTheme() → { mode, setMode, toggle }
     │   │   └── ThemeToggle.tsx   # sun/moon toggle button
+    │   ├── components/
+    │   │   └── StarBorder/       # StarBorder: a light that laps the stroke
+    │   │                         #   continuously (spinning conic gradient behind
+    │   │                         #   the content; `color`, `speed` = one lap,
+    │   │                         #   `thickness`, `as`, `contentClassName`); styles
+    │   │                         #   in @layer components so utilities override;
+    │   │                         #   still under reduced motion
     │   ├── ui/
     │   │   ├── form.tsx          # Auth primitives: AuthLayout (split screen), Hero,
     │   │   │                     #   AuthCard, TextField, Select (themed, custom
@@ -2882,7 +2905,8 @@ frontend/
     │           ├── ui/                  # Seller UI kit (glass) — GlassCard, PageHeader,
     │           │                        #   SaveBar + useUnsavedChangesGuard, ActionRow,
     │           │                        #   RowMenu, BigSwitch, StatusPill, EmptyState,
-    │           │                        #   Toast (showToast/ToastHost), HelpHint
+    │           │                        #   Toast (showToast/ToastHost), HelpHint,
+    │           │                        #   WhatsAppShareLink
     │           └── ActiveSwitch.tsx     # Compact enable/disable pill switch (44px hit area); successor: ui/BigSwitch
     └── admin/                   # Platform console — served at /admin
         ├── main.tsx             # Mounts <AdminApp/>
@@ -3368,6 +3392,7 @@ Rules that keep it legible and fast:
 | `BigSwitch` | Successor to `ActiveSwitch` (same core props): 52×32 track, 44px hit area, the state *written* beside it (`onText` / `offText`, width reserved for the longer word so lists stay aligned). |
 | `ProgressRing` | "3 of 5" as a ring (brand → green when complete); optional "3/5" label. My shops cards, setup checklist. |
 | `StatusPill` | The shared `Badge` with a dot by default (`wrap` for a long one). |
+| `WhatsAppShareLink` | THE green **Share on WhatsApp** link (`href` only), on `StarBorder`: a gold (`--whatsapp-glow`) light laps its edge continuously. Publish & share panel, dashboard next step, Share Kit page. |
 | `EmptyState` | Re-export of the shared `EmptyState` (flat icon chip, title, sentence, optional `steps`, one action). |
 | `showToast()` / `ToastHost` | "Saved ✓" for instant saves. Module store (`useSyncExternalStore`), no provider; `ToastHost` is mounted once in `StoreManageLayout`. |
 | `HelpHint` | ⓘ (44px hit, inline in a label) → a sheet explaining a term in plain words. |
