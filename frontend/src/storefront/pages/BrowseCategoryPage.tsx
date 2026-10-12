@@ -283,13 +283,18 @@ function Loaded({
  * A card links to the product **inside its store** — that is the product's
  * only address, and sending a shopper through the seller's storefront is what
  * makes the sale the seller's rather than an anonymous marketplace's.
+ *
+ * A plain `<a href>`, not a router `<Link>`: `/store/**` belongs to the
+ * public router, which is picked per page load. This page runs on the
+ * marketplace router, where a client-side hop to `/store/**` falls through to
+ * the `*` route and lands on `/`.
  */
 function ProductCard({ product }: { product: MarketProduct }) {
   const soldOut = product.stockQuantity <= 0
   return (
     <li className="group">
-      <Link
-        to={`/store/${product.store.slug}/product/${product.slug}`}
+      <a
+        href={`/store/${product.store.slug}/product/${product.slug}`}
         className="flex h-full flex-col overflow-hidden rounded-lg border border-line bg-surface transition-colors hover:border-accent"
       >
         <div className="flex aspect-square items-center justify-center overflow-hidden bg-bg">
@@ -329,7 +334,7 @@ function ProductCard({ product }: { product: MarketProduct }) {
           </div>
           {soldOut && <span className="text-xs text-muted">Sold out</span>}
         </div>
-      </Link>
+      </a>
     </li>
   )
 }
