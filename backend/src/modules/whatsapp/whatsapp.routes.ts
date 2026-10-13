@@ -70,5 +70,11 @@ export const adminWhatsAppRoutes: FastifyPluginAsync = async (app) => {
       controller.createCampaign,
     );
     enabled.get("/campaigns/:id", controller.getCampaign);
+    enabled.get("/stores/:id/reminders", controller.getSellerReminders);
+    enabled.post(
+      "/stores/:id/reminders",
+      { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+      controller.sendSellerReminder,
+    );
   });
 };

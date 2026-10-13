@@ -108,10 +108,20 @@ async function deliver(outbound: Outbound, log: FastifyBaseLogger) {
   }
 }
 
+export interface SendTemplateOptions {
+  campaignId?: string | null;
+  /**
+   * Values for the template's dynamic URL buttons, in button order — the part
+   * of the link after the template's fixed prefix. Server-built flows only;
+   * the console's send schema has no such field.
+   */
+  buttonParams?: string[];
+}
+
 export async function sendTemplate(
   input: SendTemplateInput,
   log: FastifyBaseLogger,
-  campaignId: string | null = null,
+  { campaignId = null, buttonParams = [] }: SendTemplateOptions = {},
 ) {
   const waId = normalizeWaId(input.to);
   assertAllowedRecipient(waId);
@@ -126,6 +136,7 @@ export async function sendTemplate(
       input.templateName,
       input.languageCode,
       input.bodyParams.length,
+      buttonParams.length,
     );
     if (problem) throw new HttpError(422, problem);
   }
@@ -137,14 +148,24 @@ export async function sendTemplate(
     name: input.templateName,
     language: { code: input.languageCode },
   };
+  const components: Record<string, unknown>[] = [];
   if (input.bodyParams.length > 0) {
-    template["components"] = [
-      {
-        type: "body",
-        parameters: input.bodyParams.map((text) => ({ type: "text", text })),
-      },
-    ];
+    components.push({
+      type: "body",
+      parameters: input.bodyParams.map((text) => ({ type: "text", text })),
+    });
   }
+  buttonParams.forEach((text, i) => {
+    components.push({
+      type: "button",
+      sub_type: "url",
+      // Meta wants the button's position among ALL the template's buttons.
+      // Without the template list, assume the URL buttons come first.
+      index: String(match?.urlButtons[i] ?? i),
+      parameters: [{ type: "text", text }],
+    });
+  });
+  if (components.length > 0) template["components"] = components;
 
   return deliver(
     {
@@ -344,7 +365,7 @@ async function runCampaign(
           bodyParams: recipient.bodyParams,
         },
         log,
-        campaignId,
+        { campaignId },
       );
       await repo.incrementCampaign(campaignId, "sent");
     } catch (error) {

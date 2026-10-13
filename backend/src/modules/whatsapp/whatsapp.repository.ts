@@ -217,6 +217,19 @@ export function saveOutboundMessage(data: {
   return prisma.waMessage.create({ data: { ...data, direction: "OUT" } });
 }
 
+/**
+ * The latest send of each of these templates to one number — what the seller
+ * reminders show ("sent 2h ago · delivered") and their cooldown reads.
+ */
+export function latestTemplateSends(waId: string, templateNames: string[]) {
+  return prisma.waMessage.findMany({
+    where: { waId, direction: "OUT", templateName: { in: templateNames } },
+    orderBy: { createdAt: "desc" },
+    distinct: ["templateName"],
+    select: { templateName: true, lastStatus: true, createdAt: true },
+  });
+}
+
 export async function listMessages(waId: string, page: number, pageSize: number) {
   const where = { waId };
   const [total, rows] = await Promise.all([

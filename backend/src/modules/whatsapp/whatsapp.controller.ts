@@ -4,6 +4,7 @@ import { HttpError } from "../../utils/httpError.js";
 import { list, ok } from "../../utils/response.js";
 import { recordAudit } from "../admin/adminAudit.js";
 import * as schema from "./whatsapp.schema.js";
+import * as reminders from "./whatsapp.sellerReminders.js";
 import * as service from "./whatsapp.service.js";
 import { normalizeWaId, verifySignature } from "./whatsapp.webhook.js";
 
@@ -136,4 +137,24 @@ export async function listCampaigns(request: FastifyRequest) {
 export async function listTemplates(request: FastifyRequest) {
   const { refresh } = schema.templatesQuery.parse(request.query);
   return ok(await service.getTemplates(refresh, request.log));
+}
+
+// ---- Seller reminders ---------------------------------------------------------
+
+export async function getSellerReminders(request: FastifyRequest) {
+  const { id } = schema.storeParamSchema.parse(request.params);
+  return ok(await reminders.getSellerReminders(id, request.log));
+}
+
+export async function sendSellerReminder(request: FastifyRequest) {
+  const { id } = schema.storeParamSchema.parse(request.params);
+  const { key } = schema.sendSellerReminderSchema.parse(request.body);
+  const result = await reminders.sendSellerReminder(id, key, request.log);
+  recordAudit(request, {
+    action: "whatsapp.seller_reminder",
+    entityType: "Store",
+    entityId: result.storeId,
+    meta: { key, templateName: result.templateName, wamid: result.wamid },
+  });
+  return ok(result.state);
 }

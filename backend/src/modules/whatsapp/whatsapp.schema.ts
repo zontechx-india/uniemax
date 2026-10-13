@@ -63,6 +63,18 @@ export const campaignListQuery = paginationQuery;
 
 export const templatesQuery = z.object({ refresh: boolQuery.default(false) });
 
+/**
+ * Seller reminders (`whatsapp.sellerReminders.ts`): `setup` = everything
+ * outstanding in one message, a step key = that step alone, `tip` = the
+ * marketing nudge.
+ */
+export const REMINDER_KEYS = ["setup", "catalog", "address", "tax", "payout", "tip"] as const;
+export type ReminderKey = (typeof REMINDER_KEYS)[number];
+
+export const storeParamSchema = z.object({ id: z.string().min(1) });
+
+export const sendSellerReminderSchema = z.object({ key: z.enum(REMINDER_KEYS) });
+
 export type SendTemplateInput = z.infer<typeof sendTemplateSchema>;
 export type SendTextInput = z.infer<typeof sendTextSchema>;
 export type CreateCampaignInput = z.infer<typeof createCampaignSchema>;

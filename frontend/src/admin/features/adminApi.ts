@@ -571,8 +571,35 @@ export interface WaTemplate {
   footer: string | null
   buttons: string[]
   paramCount: number
+  /** Positions of URL buttons whose link ends in a variable — server flows fill these. */
+  urlButtons: number[]
   sendable: boolean
   reason: string | null
+}
+
+/** setup = everything outstanding · a step key = that step alone · tip = marketing nudge. */
+export type SellerReminderKey = 'setup' | 'catalog' | 'address' | 'tax' | 'payout' | 'tip'
+
+export interface SellerReminder {
+  key: SellerReminderKey
+  /** The readiness step it chases; null for `setup` and `tip`. */
+  step: string | null
+  templateName: string
+  language: string
+  category: string | null
+  available: boolean
+  /** Why it can't be sent now — step complete, opted out, sent recently… */
+  reason: string | null
+  /** The message as the seller will read it; null if Meta's list is unavailable. */
+  preview: string | null
+  lastSent: { at: string; status: WaStatus | null } | null
+}
+
+export interface SellerReminders {
+  /** Store contact phone first, the owner's login phone as fallback. */
+  recipient: { phone: string; waId: string; source: 'business' | 'owner' } | null
+  optedOut: boolean
+  reminders: SellerReminder[]
 }
 
 export interface WaCampaignRow {
@@ -875,6 +902,13 @@ export const adminApi = {
     recipients: { to: string; bodyParams: string[] }[]
   }) {
     return call<{ campaignId: string }>(http.post(`${BASE}/whatsapp/campaigns`, body))
+  },
+  getSellerReminders(storeId: string) {
+    return call<SellerReminders>(http.get(`${BASE}/whatsapp/stores/${storeId}/reminders`))
+  },
+  /** Answers with the refreshed reminder state (new "last sent", cooldown). */
+  sendSellerReminder(storeId: string, key: SellerReminderKey) {
+    return call<SellerReminders>(http.post(`${BASE}/whatsapp/stores/${storeId}/reminders`, { key }))
   },
 
   // Broadcast (the feed itself lives in notificationsApi)

@@ -2316,6 +2316,16 @@ button** rather than in a toast, because there can be five of them in one card
 and the admin needs to know which one they just copied. Everything comes from
 `store.readiness` — the same registry the seller's own pages render and the
 publish endpoint enforces, so an admin is never quoting different rules.
+**WhatsApp reminders** sit on the same card (`useSellerReminders`, backed by
+`GET/POST /admin/whatsapp/stores/:id/reminders`): a **WhatsApp** button on each
+step that has its own template (products, address, tax, payout — store and
+business & contact are covered by the combined one), **Send reminder on
+WhatsApp** (the primary action; Copy message drops to secondary) and a ghost
+**Send a tip**. Every send goes through a confirm showing the number, the
+template and the message as the seller will read it. A disabled button carries
+the server's reason as its `title`; under each row "WhatsApp sent 2 hr ago" with
+the delivery chip; one note under the card names the recipient, or why there
+is none (no usable phone, opted out, integration off).
 
 `features/adminApi.ts` is the one place that knows the admin API's shape;
 `features/useAdminQuery.ts` holds the two data hooks — `useAdminQuery` (one

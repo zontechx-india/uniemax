@@ -701,6 +701,23 @@ Endpoints: `docs/API.md` → WhatsApp Cloud API; setup: `backend/README.md`.
   unconfigured server is explained rather than answered with 503.
 - **Admin-only sends**, mounted at `/admin/whatsapp` inside the `requireAdmin`
   subtree; each send and campaign is written to the audit trail.
+- **Dynamic URL buttons** are filled only by server flows: `sendTemplate`'s
+  `buttonParams` option (not in the console's send schema) adds a `button`
+  component per dynamic URL button, at that button's index from the template
+  list. In the console picker such templates stay "not sendable".
+- **Seller reminders** (`whatsapp.sellerReminders.ts`) — template sends to a
+  store's seller, chasing unfinished setup. The registry maps a key to an
+  approved template: `setup` → `seller_setup_pending` (name, store, % complete,
+  pending step titles), `catalog`/`address`/`tax`/`payout` →
+  `seller_setup_{products,address,tax,payout}` (name, store), `tip` →
+  `seller_motivation_tip` (marketing; name, store). Each button is
+  `https://uniemax.com/mystores/{{1}}`, filled with `<slug>` or `<slug>/<step href>`.
+  Values come from `evaluateReadiness`, never from the client, so a step
+  reminder is refused (422) once that step is complete. The recipient is the
+  store's contact phone, else the owner's login phone (Indian numbers
+  normalised to +91). The language is whichever the template was approved in.
+  The same template to the same number at most once per 24h unless the last
+  one failed (409). Renaming a template in WhatsApp Manager breaks its entry.
 
 ### Affiliate marketing — the `package/affiliate` sub-system
 

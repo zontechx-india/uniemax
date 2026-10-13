@@ -2604,10 +2604,40 @@ One contact plus `messageCount` and `windowClosesAt`. Unknown → `404`.
 ### `GET /api/v1/admin/whatsapp/templates?refresh=` 🔒 admin
 The WABA's templates from Meta (all statuses), cached 60 s; `refresh=true` skips the
 cache. Each: `name`, `language`, `status`, `category`, `header`, `body`, `footer`,
-`buttons` (labels), `paramCount` (highest `{{n}}` in the body), `sendable`, `reason`.
+`buttons` (labels), `paramCount` (highest `{{n}}` in the body), `urlButtons`
+(positions of URL buttons whose link ends in a variable), `sendable`, `reason`.
 Not sendable = not approved, named variables, a media header, a header variable or a
-dynamic URL button — the send endpoints fill numbered body variables only. Sendable
-first.
+dynamic URL button — the console's send endpoints fill numbered body variables only
+(dynamic URL templates are sent by the seller reminders below). Sendable first.
+
+### `GET /api/v1/admin/whatsapp/stores/:id/reminders` 🔒 admin
+Seller reminders for one store (`:id` = id or slug; unknown → `404`):
+```jsonc
+{
+  "recipient": { "phone": "+919876543210", "waId": "919876543210", "source": "business" }, // or "owner"; null = no usable phone
+  "optedOut": false,
+  "reminders": [{
+    "key": "setup",                    // setup | catalog | address | tax | payout | tip
+    "step": null,                      // readiness step key for the step reminders
+    "templateName": "seller_setup_pending",
+    "language": "en",                  // the template's approved language
+    "category": "UTILITY",             // null while Meta's list is unavailable
+    "available": true,
+    "reason": null,                    // why not: no phone, opted out, step complete, template problem, sent in the last 24h
+    "preview": "Hi Rahul, the setup for …", // filled body; null while Meta's list is unavailable
+    "lastSent": { "at": "…", "status": "delivered" } // latest send of this template to this number, or null
+  }]
+}
+```
+
+### `POST /api/v1/admin/whatsapp/stores/:id/reminders` 🔒 admin
+Body `{ "key": "setup" | "catalog" | "address" | "tax" | "payout" | "tip" }`. Sends that
+template to the store's recipient, filled from the store's live readiness (no values
+from the client), and answers with the refreshed state above. `409` = opted out or the
+same reminder was sent to this number in the last 24h (failed sends don't count);
+`422` = no phone, nothing outstanding / step already complete, or the template doesn't
+match (name, language, value or button count). Opt-out, dev allowlist (`403`) and Meta
+errors as for `send-template`. Rate limit 30/min. Audited as `whatsapp.seller_reminder`.
 
 ### `GET /api/v1/admin/whatsapp/campaigns?page=&pageSize=` 🔒 admin
 Campaigns newest first: the counters plus `finishedAt` (null while sending — or for good

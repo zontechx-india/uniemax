@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { adminApi } from '../features/adminApi'
-import type { BankAccount, BankVerificationStatus, StoreDetail } from '../features/adminApi'
+import type {
+  BankAccount,
+  BankVerificationStatus,
+  SellerReminder,
+  SellerReminders,
+  StoreDetail,
+} from '../features/adminApi'
 import { useAdminQuery } from '../features/useAdminQuery'
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
 import { copyToClipboard } from '../../shared/share'
+import { toApiError } from '../../shared/auth/http'
+import { WaStatusChip } from './whatsapp/whatsappUi'
 import { ActiveChip } from '../ui/statusMeta'
 import { formatPriceRange } from '../ui/format'
 import { ProductDetailDialog } from './products/ProductDetailDialog'
@@ -33,6 +41,7 @@ import {
   formatDateTime,
   formatMoney,
   formatMoneyExact,
+  formatRelative,
 } from '../ui/format'
 import { StoreAvatar } from './StoresPage'
 import { useAdminSession } from '../app/adminSession'
@@ -550,6 +559,14 @@ function SellerSetupCard({ store }: { store: StoreDetail }) {
   const pending = store.readiness.steps.filter(
     (step) => !step.complete && step.totalCount > 0,
   )
+  const wa = useSellerReminders(store.id)
+  const reminderFor = (key: string) =>
+    wa.state?.reminders.find((r) => r.key === key) ?? null
+  // Per-step buttons only when the number itself can be messaged — otherwise
+  // one note under the card says why, instead of a dead button on every row.
+  const canMessage = Boolean(wa.state?.recipient) && !wa.state?.optedOut
+  const setupReminder = canMessage ? reminderFor('setup') : null
+  const tipReminder = canMessage ? reminderFor('tip') : null
 
   // The seller's own management pages, absolute: this link is going into a
   // WhatsApp message or an email, where a bare path resolves to nothing.
@@ -594,9 +611,10 @@ function SellerSetupCard({ store }: { store: StoreDetail }) {
           Nothing outstanding — this seller is fully set up.
         </p>
       ) : (
-        <>
-          <ul className="divide-y divide-line">
-            {pending.map((step) => (
+        <ul className="divide-y divide-line">
+          {pending.map((step) => {
+            const reminder = canMessage ? reminderFor(step.key) : null
+            return (
               <li
                 key={step.key}
                 className="flex flex-wrap items-start justify-between gap-3 py-3"
@@ -619,26 +637,190 @@ function SellerSetupCard({ store }: { store: StoreDetail }) {
                   <p className="mt-1 truncate font-mono text-xs text-muted">
                     /mystores/{store.slug}/{step.href}
                   </p>
+                  {reminder ? <ReminderNote reminder={reminder} /> : null}
                 </div>
-                <CopyButton text={linkTo(step.href)} label="Copy link" />
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <CopyButton text={linkTo(step.href)} label="Copy link" />
+                  {/* Steps without their own template (store, business &
+                      contact) are covered by the combined reminder below. */}
+                  {reminder ? (
+                    <Button
+                      variant="secondary"
+                      disabled={!reminder.available}
+                      title={reminder.reason ?? undefined}
+                      onClick={() => wa.ask(reminder)}
+                    >
+                      WhatsApp
+                    </Button>
+                  ) : null}
+                </div>
               </li>
-            ))}
-          </ul>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <CopyButton
-              text={message}
-              label="Copy message for the seller"
-              variant="primary"
-            />
-            <p className="text-xs text-muted">
-              A ready-to-send note listing everything outstanding, with the links.
-            </p>
-          </div>
-        </>
+            )
+          })}
+        </ul>
       )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {setupReminder && pending.length > 0 ? (
+          <Button
+            variant="primary"
+            disabled={!setupReminder.available}
+            title={setupReminder.reason ?? undefined}
+            onClick={() => wa.ask(setupReminder)}
+          >
+            Send reminder on WhatsApp
+          </Button>
+        ) : null}
+        {pending.length > 0 ? (
+          <CopyButton
+            text={message}
+            label="Copy message for the seller"
+            variant={setupReminder ? 'secondary' : 'primary'}
+          />
+        ) : null}
+        {tipReminder ? (
+          <Button
+            variant="ghost"
+            disabled={!tipReminder.available}
+            title={tipReminder.reason ?? undefined}
+            onClick={() => wa.ask(tipReminder)}
+          >
+            Send a tip
+          </Button>
+        ) : null}
+      </div>
+      {setupReminder && pending.length > 0 ? (
+        <ReminderNote reminder={setupReminder} label="Reminder" />
+      ) : null}
+      {tipReminder ? <ReminderNote reminder={tipReminder} label="Tip" /> : null}
+      <WhatsAppRecipientNote wa={wa} />
+
+      <ConfirmDialog
+        open={wa.asking !== null}
+        title="Send on WhatsApp?"
+        tone="neutral"
+        confirmLabel="Send"
+        busy={wa.sending}
+        onCancel={wa.cancel}
+        onConfirm={wa.send}
+        description={
+          wa.asking && wa.state?.recipient ? (
+            <>
+              <p>
+                To <span className="font-medium text-fg">{wa.state.recipient.phone}</span>{' '}
+                ({wa.state.recipient.source === 'business'
+                  ? 'store contact phone'
+                  : "owner's login phone"}
+                ) · template{' '}
+                <span className="font-mono text-xs">{wa.asking.templateName}</span>
+                {wa.asking.category ? ` · ${wa.asking.category.toLowerCase()}` : ''}
+              </p>
+              {wa.asking.preview ? (
+                <p className="mt-3 whitespace-pre-wrap rounded-lg border border-line bg-surface-alt p-3 text-fg">
+                  {wa.asking.preview}
+                </p>
+              ) : null}
+              {wa.sendError ? (
+                <p className="mt-3 text-danger">{wa.sendError}</p>
+              ) : null}
+            </>
+          ) : null
+        }
+      />
     </Card>
   )
+}
+
+/**
+ * The store's WhatsApp reminder state, plus the one reminder being confirmed.
+ * A send answers with the refreshed state, so "sent just now" and the 24h
+ * cooldown show without a second request.
+ */
+function useSellerReminders(storeId: string) {
+  const query = useAdminQuery(() => adminApi.getSellerReminders(storeId), [storeId])
+  const [fresh, setFresh] = useState<SellerReminders | null>(null)
+  const [asking, setAsking] = useState<SellerReminder | null>(null)
+  const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
+
+  return {
+    state: fresh ?? query.data,
+    error: query.error,
+    loading: query.loading,
+    asking,
+    sending,
+    sendError,
+    ask(reminder: SellerReminder) {
+      setSendError(null)
+      setAsking(reminder)
+    },
+    cancel() {
+      setAsking(null)
+    },
+    async send() {
+      if (!asking) return
+      setSending(true)
+      setSendError(null)
+      try {
+        setFresh(await adminApi.sendSellerReminder(storeId, asking.key))
+        setAsking(null)
+      } catch (err) {
+        setSendError(toApiError(err).message)
+      } finally {
+        setSending(false)
+      }
+    },
+  }
+}
+
+/** "WhatsApp sent 2 hr ago · Delivered", or why this reminder can't go now. */
+function ReminderNote({
+  reminder,
+  label = 'WhatsApp',
+}: {
+  reminder: SellerReminder
+  label?: string
+}) {
+  const sent = reminder.lastSent
+  // Cooldown is already explained by "sent … ago"; any other reason is news.
+  const reason =
+    !reminder.available && !(sent && reminder.reason?.startsWith('Already sent'))
+      ? reminder.reason
+      : null
+  if (!sent && !reason) return null
+  return (
+    <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+      {sent ? (
+        <>
+          <span>
+            {label} sent {formatRelative(sent.at).toLowerCase()}
+          </span>
+          <WaStatusChip status={sent.status} />
+        </>
+      ) : null}
+      {reason ? (
+        <span>
+          {label}: {reason}
+        </span>
+      ) : null}
+    </p>
+  )
+}
+
+/** Who reminders go to — or why none can be sent from here. */
+function WhatsAppRecipientNote({ wa }: { wa: ReturnType<typeof useSellerReminders> }) {
+  if (wa.loading && !wa.state) return null
+  let text: string
+  if (wa.error || !wa.state) text = `WhatsApp reminders unavailable — ${wa.error ?? 'no data'}`
+  else if (!wa.state.recipient)
+    text = 'No WhatsApp reminders — neither the store contact nor the owner has a usable phone number.'
+  else if (wa.state.optedOut)
+    text = `${wa.state.recipient.phone} has opted out of WhatsApp messages (sent STOP).`
+  else
+    text = `WhatsApp reminders go to ${wa.state.recipient.phone} (${
+      wa.state.recipient.source === 'business' ? 'store contact phone' : "owner's login phone"
+    }).`
+  return <p className="mt-2 text-xs text-muted">{text}</p>
 }
 
 /**

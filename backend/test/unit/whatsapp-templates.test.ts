@@ -2,7 +2,7 @@
 // endpoints can actually fill, and how many {{n}} values each needs.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { countBodyParams, fillTemplateBody, summarizeTemplate, templateSendProblem } from "../../src/modules/whatsapp/whatsapp.templates.js";
+import { countBodyParams, DYNAMIC_URL_REASON, fillTemplateBody, summarizeTemplate, templateSendProblem } from "../../src/modules/whatsapp/whatsapp.templates.js";
 
 const approved = (components: unknown[], extra: Record<string, unknown> = {}) =>
   summarizeTemplate({ name: "t", language: "en", status: "APPROVED", category: "UTILITY", components, ...extra } as never);
@@ -41,6 +41,33 @@ test("summary: what the send endpoints cannot fill is listed but not sendable", 
     assert.ok(t.reason && t.reason.length > 10, label);
   }
   assert.equal(cases[2]![1].header, null);
+});
+
+test("summary: dynamic URL buttons are located by their position among all buttons", () => {
+  const t = approved([
+    { type: "BODY", text: "Hi {{1}}" },
+    { type: "BUTTONS", buttons: [{ type: "QUICK_REPLY", text: "Thanks" }, { type: "URL", text: "Open", url: "https://uniemax.com/mystores/{{1}}" }] },
+  ]);
+  assert.deepEqual(t.urlButtons, [1]);
+  assert.equal(t.sendable, false);
+  assert.equal(t.reason, DYNAMIC_URL_REASON);
+  // A harder blocker wins the reason, so button values can't unlock it.
+  const pending = summarizeTemplate({ name: "t", language: "en", status: "PENDING", components: [{ type: "BODY", text: "x" }, { type: "BUTTONS", buttons: [{ type: "URL", text: "Open", url: "https://x.test/{{1}}" }] }] });
+  assert.match(pending.reason!, /pending/);
+});
+
+test("templateSendProblem: a dynamic URL template needs exactly its button values", () => {
+  const templates = [
+    approved(
+      [{ type: "BODY", text: "Hi {{1}}, {{2}}" }, { type: "BUTTONS", buttons: [{ type: "URL", text: "Open", url: "https://uniemax.com/mystores/{{1}}" }] }],
+      { name: "seller_setup_products" },
+    ),
+  ];
+  assert.equal(templateSendProblem(templates, "seller_setup_products", "en", 2, 1), null);
+  assert.equal(templateSendProblem(templates, "seller_setup_products", "en", 2), DYNAMIC_URL_REASON);
+  assert.match(templateSendProblem(templates, "seller_setup_products", "en", 1, 1)!, /needs 2 values/);
+  const plain = [approved([{ type: "BODY", text: "Hi {{1}}" }], { name: "plain" })];
+  assert.match(templateSendProblem(plain, "plain", "en", 1, 1)!, /has 0 dynamic URL buttons, got 1 button value/);
 });
 
 test("fillTemplateBody: values land in their {{n}}; missing ones stay visible", () => {
