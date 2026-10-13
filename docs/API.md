@@ -2545,6 +2545,11 @@ write is idempotent — Meta's retries are no-ops. Not rate-limited.
 ```json
 { "to": "+919876543210", "templateName": "order_update", "languageCode": "en", "bodyParams": ["Asha", "UM-1042"] }
 ```
+Checked against the WABA's template list (cached 60 s) **before** calling Meta — no
+template with that name **and** language, a template the API can't fill, or a value count
+that differs from the body's `{{n}}` → `422` saying which (e.g. *Template
+"uniemax_address_update" has no "en" version — use "en_US"*). Skipped only when Meta
+can't list templates; Meta then decides.
 `bodyParams` fill the template body's `{{1}}…` in order (optional, ≤ 50). Saved as an
 outbound message with `lastStatus: "accepted"` and, as `body`, the template text with the
 values filled in (from the cached template list; just the values if it is unavailable).
@@ -2561,7 +2566,9 @@ contact's last inbound message — else `422 "24h window closed, use a template"
 { "name": "Diwali", "templateName": "festive_offer", "languageCode": "en",
   "recipients": [{ "to": "919876543210", "bodyParams": ["Asha"] }] }
 ```
-1–10 000 recipients. → `{ "data": { "campaignId": "…" } }` immediately; sends run in
+1–10 000 recipients. The template, language and every recipient's value count are checked
+once up front (same rules as send-template) → `422` before anything is created.
+→ `{ "data": { "campaignId": "…" } }` immediately; sends run in
 the background at `WA_SEND_RATE_PER_SEC`. Opted-out, dev-blocked and repeated numbers
 count as `skipped`. In-process — a restart stops a running campaign. 10/minute.
 
@@ -2569,7 +2576,8 @@ count as `skipped`. In-process — a restart stops a running campaign. 10/minute
 ```jsonc
 { "data": { "id", "name", "templateName", "languageCode", "createdAt", "finishedAt",
     "total": 500, "sent": 480, "skipped": 12, "failed": 9,
-    "statuses": { "accepted": 3, "sent": 40, "delivered": 300, "read": 137, "failed": 8 } } }
+    "statuses": { "accepted": 3, "sent": 40, "delivered": 300, "read": 137, "failed": 8 },
+    "failures": [{ "errorCode": 131042, "errorTitle": "Business eligibility payment issue", "count": 8 }] } }
 ```
 Counters: `sent` = accepted by Meta; `failed` = refused at send **or** reported failed
 later (so a message can count in both). `statuses` = each message's latest status.
@@ -2608,7 +2616,9 @@ if the server restarted mid-campaign).
 ### `GET /api/v1/admin/whatsapp/messages/:waId?page=&pageSize=` 🔒 admin
 The conversation, newest first, paginated (`list` envelope). Each row: `id`, `wamid`,
 `direction` (`IN`/`OUT`), `type`, `body`, `mediaId`, `templateName`, `lastStatus`,
-`campaignId`, `createdAt`. Unknown contact → `404`.
+`errorCode` / `errorTitle` / `errorDetails` (Meta's reason when `failed` — refused at
+send or failed later by webhook; otherwise null), `campaignId`, `createdAt`. Unknown
+contact → `404`.
 
 ---
 

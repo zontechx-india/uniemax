@@ -21,12 +21,30 @@ import type {
 /** A Graph API refusal, carrying Meta's own error code for the client. */
 export class WaApiError extends HttpError {
   readonly code: number | null;
+  /** Meta's own short title ("Template name does not exist…"), kept for the message record. */
+  readonly title: string | null;
+  /** Meta's error_data.details — usually the actionable part. */
+  readonly details: string | null;
 
-  constructor(statusCode: number, message: string, code: number | null) {
+  constructor(
+    statusCode: number,
+    message: string,
+    code: number | null,
+    meta: { title?: string | null; details?: string | null } = {},
+  ) {
     super(statusCode, message);
     this.code = code;
+    this.title = meta.title ?? null;
+    this.details = meta.details ?? null;
   }
 }
+
+/**
+ * Full request/response logging. Always on outside production; in production
+ * only with WA_LOG_PAYLOADS=true — a temporary switch for debugging a send,
+ * since it puts customer message text in the logs.
+ */
+const verbose = !isProduction || env.WA_LOG_PAYLOADS;
 
 /** Meta throttling codes — the caller should slow down, not fix the request. */
 const RATE_LIMIT_CODES = new Set([4, 80007, 130429, 131048, 131056]);
@@ -59,9 +77,19 @@ async function graphRequest<T>(
   payload?: Record<string, unknown>,
 ): Promise<T> {
   const url = `https://graph.facebook.com/${env.WA_GRAPH_VERSION}${path}`;
-  if (!isProduction) {
+  if (verbose) {
     log.info(
-      { wa: { method, url, authorization: `Bearer ${maskedToken()}`, request: payload } },
+      {
+        wa: {
+          method,
+          url,
+          headers: {
+            authorization: `Bearer ${maskedToken()}`,
+            ...(payload ? { "content-type": "application/json" } : {}),
+          },
+          request: payload,
+        },
+      },
       "whatsapp: graph request",
     );
   }
@@ -85,10 +113,12 @@ async function graphRequest<T>(
   }
 
   const body: unknown = await response.json().catch(() => null);
-  if (!isProduction) {
-    // Template lists are large and carry no customer data — status only.
+  if (verbose) {
+    // Successful template lists are large and carry no customer data — status
+    // only. Sends, and every error, are logged in full.
+    const full = method === "POST" || !response.ok;
     log.info(
-      { wa: { status: response.status, ...(method === "POST" ? { response: body } : {}) } },
+      { wa: { status: response.status, ...(full ? { response: body } : {}) } },
       "whatsapp: graph response",
     );
   }
@@ -106,7 +136,10 @@ async function graphRequest<T>(
       { wa: { status: response.status, code, fbtraceId: error?.fbtrace_id } },
       "whatsapp: graph refused request",
     );
-    throw new WaApiError(statusFor(response.status, code), message, code);
+    throw new WaApiError(statusFor(response.status, code), message, code, {
+      title: error?.message ?? null,
+      details: error?.error_data?.details ?? null,
+    });
   }
   return body as T;
 }

@@ -20,6 +20,7 @@ import {
 import { formatDateTime, formatRelative } from '../../ui/format'
 import { BackIcon } from '../../layout/icons'
 import {
+  FailureReason,
   TemplateFields,
   WindowChip,
   contactLabel,
@@ -203,6 +204,13 @@ function Bubble({ message }: { message: WaMessage }) {
           {formatDateTime(message.createdAt)}
           {out && message.lastStatus ? ` · ${waStatusLabel(message.lastStatus)}` : ''}
         </p>
+        {failed ? (
+          <FailureReason
+            code={message.errorCode}
+            title={message.errorTitle}
+            details={message.errorDetails}
+          />
+        ) : null}
       </div>
     </li>
   )

@@ -77,3 +77,31 @@ export function summarizeTemplate(template: GraphTemplate): TemplateSummary {
 export function fillTemplateBody(body: string, params: string[]): string {
   return body.replace(POSITIONAL, (match, n: string) => params[Number(n) - 1] ?? match);
 }
+
+/**
+ * Why a send with these values would fail at Meta, or null when it matches
+ * the template — checked before calling the Graph API, so a wrong language
+ * code or value count is a clear 422 here instead of an error code later.
+ * `templates` is the WABA's list; the match is by name AND language, because
+ * "en" and "en_US" are different templates to Meta.
+ */
+export function templateSendProblem(
+  templates: TemplateSummary[],
+  name: string,
+  language: string,
+  paramCount: number,
+): string | null {
+  const template = templates.find((t) => t.name === name && t.language === language);
+  if (!template) {
+    const languages = templates.filter((t) => t.name === name).map((t) => t.language);
+    return languages.length > 0
+      ? `Template "${name}" has no "${language}" version — use ${languages.map((l) => `"${l}"`).join(" or ")}`
+      : `No template named "${name}" on this WhatsApp account`;
+  }
+  if (!template.sendable) return template.reason;
+  if (template.paramCount !== paramCount) {
+    const n = template.paramCount;
+    return `Template "${name}" needs ${n} value${n === 1 ? "" : "s"}${n > 0 ? ` for {{1}}…{{${n}}}` : ""}, got ${paramCount}`;
+  }
+  return null;
+}

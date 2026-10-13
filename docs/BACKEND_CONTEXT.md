@@ -682,8 +682,16 @@ Endpoints: `docs/API.md` → WhatsApp Cloud API; setup: `backend/README.md`.
 - **Campaigns** run in-process after the `202`, paced at `WA_SEND_RATE_PER_SEC`.
   A restart stops one mid-way (counters show how far it got); a durable queue
   is the upgrade if campaigns grow past one process.
-- **Logging.** Non-production logs full Graph requests/responses (token masked)
-  and inbound bodies; production logs only ids, types and error codes.
+- **Logging.** Non-production logs full Graph requests/responses (URL, headers
+  with the token masked, body, Meta's response) and inbound bodies; production
+  logs only ids, types and error codes unless `WA_LOG_PAYLOADS=true` — a
+  temporary debugging switch, since it puts message text in the logs.
+- **Checked before Meta.** Template sends and campaigns are validated against
+  the cached template list (name + language, sendable, `{{n}}` count) and
+  refused with a 422 naming the problem, rather than failing later at Meta.
+- **Failures carry their reason.** A refused send stores Meta's code/title/
+  details on the WaMessage; a webhook `failed` status copies its error onto the
+  message too, so the console shows why without joining statuses.
 - **Templates** are read from Meta (`GET /{waba}/message_templates`), cached 60 s
   in-process. A template send stores the filled-in text as the message body so
   the console thread reads like the customer's phone; a failed list fetch backs
@@ -1461,7 +1469,8 @@ schema (not `BigInt`: it does not survive `JSON.stringify` into responses).
   `lastMessageAt` (either direction — orders the admin inbox; indexed).
 - **WaMessage** — `direction` (`WaDirection`: `IN | OUT`), `wamid` (unique; null
   only for a send Meta refused), `type`, `body`, `mediaId`, `templateName`,
-  `lastStatus` (`accepted → sent → delivered → read`, or `failed`), optional
+  `lastStatus` (`accepted → sent → delivered → read`, or `failed`),
+  `errorCode` / `errorTitle` / `errorDetails` (Meta's reason when failed), optional
   `campaignId` → **WaCampaign** (`SetNull` on delete).
 - **WaMessageStatus** — one row per `(wamid, status)` (unique — webhook retries
   are no-ops) with `recipientId`, `statusTimestamp` and Meta's error fields.

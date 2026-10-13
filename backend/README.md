@@ -123,6 +123,7 @@ Verify: `curl http://localhost:4000/health`
 | `WA_GRAPH_VERSION` | Graph API version (default `v21.0`) |
 | `WA_DEV_ALLOWED_RECIPIENTS` | **Non-production only:** comma-separated numbers sends are restricted to (anything else → 403; empty = nothing sends). Ignored in production |
 | `WA_SEND_RATE_PER_SEC` | Campaign send pace (default `20`) |
+| `WA_LOG_PAYLOADS` | Production only: `true` logs the full Graph request (URL, headers with the token masked, body) and Meta's full response, to debug a failing send. Puts message text in the logs — switch it back off. Non-production always logs in full (default `false`) |
 
 > All auth vars (`JWT_*`, `AUTH_COOKIE_*`, `OTP_*`, OAuth client ids) are read from the
 > same `.env` but validated **inside** the self-contained

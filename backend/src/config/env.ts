@@ -91,6 +91,12 @@ const envSchema = z.object({
   // Empty = nothing may be sent. Ignored in production.
   WA_DEV_ALLOWED_RECIPIENTS: z.string().default(""),
   WA_SEND_RATE_PER_SEC: z.coerce.number().int().min(1).max(1000).default(20),
+  // Production only: log the full Graph request/response (token masked) to
+  // debug a failing send. Puts message text in the logs — switch off after.
+  WA_LOG_PAYLOADS: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
 
   // NOTE: all auth config (JWT, cookies, OTP/verification codes, OAuth) lives
   // inside the self-contained auth package (src/package/auth/core/config/env.ts),

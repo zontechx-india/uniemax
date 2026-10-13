@@ -54,6 +54,11 @@ model WaMessage {
   templateName String?
   /// accepted → sent → delivered → read, or failed.
   lastStatus   String?
+  /// Why it failed — Meta's error, whether it refused the send outright or
+  /// reported the failure later by webhook. Null unless lastStatus = failed.
+  errorCode    Int?
+  errorTitle   String?
+  errorDetails String?
   campaignId   String?
   campaign     WaCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   createdAt    DateTime    @default(now())

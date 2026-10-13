@@ -90,9 +90,16 @@ export async function saveStatus(status: ParsedStatus): Promise<boolean> {
  * not overwrite "read"). Returns the message's campaign, or null when the
  * wamid is not ours (e.g. sent from the WhatsApp Manager UI).
  */
+export interface MessageError {
+  errorCode: number | null;
+  errorTitle: string | null;
+  errorDetails: string | null;
+}
+
 export async function advanceLastStatus(
   wamid: string,
   status: string,
+  error?: MessageError,
 ): Promise<{ campaignId: string | null } | null> {
   const message = await prisma.waMessage.findUnique({
     where: { wamid },
@@ -104,7 +111,9 @@ export async function advanceLastStatus(
   if (next > current) {
     await prisma.waMessage.update({
       where: { id: message.id },
-      data: { lastStatus: status },
+      // A failure carries its reason onto the message, so the console can say
+      // why without a second lookup.
+      data: { lastStatus: status, ...(status === "failed" && error ? error : {}) },
     });
   }
   return { campaignId: message.campaignId };
@@ -204,7 +213,7 @@ export function saveOutboundMessage(data: {
   templateName: string | null;
   lastStatus: string;
   campaignId: string | null;
-}) {
+} & Partial<MessageError>) {
   return prisma.waMessage.create({ data: { ...data, direction: "OUT" } });
 }
 
@@ -226,6 +235,9 @@ export async function listMessages(waId: string, page: number, pageSize: number)
         mediaId: true,
         templateName: true,
         lastStatus: true,
+        errorCode: true,
+        errorTitle: true,
+        errorDetails: true,
         campaignId: true,
         createdAt: true,
       },
@@ -272,17 +284,32 @@ export function incrementCampaign(
 }
 
 export async function getCampaignWithBreakdown(id: string) {
-  const [campaign, groups] = await Promise.all([
+  const [campaign, groups, failures] = await Promise.all([
     prisma.waCampaign.findUnique({ where: { id } }),
     prisma.waMessage.groupBy({
       by: ["lastStatus"],
       where: { campaignId: id },
       _count: { _all: true },
     }),
+    // Why the failed ones failed — one row per Meta error, biggest first.
+    prisma.waMessage.groupBy({
+      by: ["errorCode", "errorTitle"],
+      where: { campaignId: id, lastStatus: "failed" },
+      _count: { _all: true },
+      orderBy: { _count: { errorCode: "desc" } },
+    }),
   ]);
   if (!campaign) return null;
   const byStatus = Object.fromEntries(
     groups.map((g) => [g.lastStatus ?? "unknown", g._count._all]),
   );
-  return { campaign, byStatus };
+  return {
+    campaign,
+    byStatus,
+    failures: failures.map((f) => ({
+      errorCode: f.errorCode,
+      errorTitle: f.errorTitle,
+      count: f._count._all,
+    })),
+  };
 }

@@ -531,6 +531,10 @@ export interface WaMessage {
   mediaId: string | null
   templateName: string | null
   lastStatus: WaStatus | null
+  /** Meta's reason, when lastStatus is "failed" (refused at send or failed later). */
+  errorCode: number | null
+  errorTitle: string | null
+  errorDetails: string | null
   campaignId: string | null
   createdAt: string
 }
@@ -587,6 +591,8 @@ export interface WaCampaignRow {
 export interface WaCampaign extends WaCampaignRow {
   /** Latest status of each campaign message. */
   statuses: Record<WaStatus, number>
+  /** Failed messages grouped by Meta error, most common first. */
+  failures: { errorCode: number | null; errorTitle: string | null; count: number }[]
 }
 
 export interface WaSendResult {

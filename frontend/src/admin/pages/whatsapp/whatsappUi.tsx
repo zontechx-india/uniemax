@@ -155,6 +155,69 @@ export function CampaignStateChip({ finishedAt }: { finishedAt: string | null })
   return finishedAt ? <Chip tone="success">Finished</Chip> : <Chip tone="pending">Sending</Chip>
 }
 
+// ---- Failures ----------------------------------------------------------------
+
+/**
+ * Meta's error codes an operator actually meets, in words that say what to
+ * do. Anything else falls back to Meta's own title, so an unknown code is
+ * still explained — just less helpfully.
+ * https://developers.facebook.com/docs/whatsapp/cloud-api/support/error-codes
+ */
+const FAILURE_HINTS: Record<number, string> = {
+  131042: 'No working payment method on the WhatsApp Business account — add or fix one in Meta Business Settings → Billing & payments.',
+  131026: "This number can't receive the message — it may not be on WhatsApp, or is on an old app version.",
+  131047: 'More than 24 hours since they last wrote — only a template can be sent now.',
+  131049: 'WhatsApp held this marketing message back to limit how many the person gets. Try again later.',
+  131050: 'This person has stopped marketing messages from your business.',
+  131056: 'Too many messages to this number in a short time — wait before sending again.',
+  132000: "The number of values doesn't match the template's {{1}}… variables.",
+  132001: "The template doesn't exist in this language, or isn't approved.",
+  190: 'The WhatsApp access token is invalid or expired (WA_ACCESS_TOKEN on the server).',
+}
+
+export function failureSummary(code: number | null, title: string | null): string {
+  const hint = code !== null ? FAILURE_HINTS[code] : undefined
+  return hint ?? title ?? 'WhatsApp did not say why'
+}
+
+/** Why a message failed, inside its bubble: plain words, Meta's code, Meta's detail. */
+export function FailureReason({
+  code,
+  title,
+  details,
+}: {
+  code: number | null
+  title: string | null
+  details: string | null
+}) {
+  // Meta often embeds the fix-it page in the detail ("Visit https://… to
+  // resolve this issue") — lift it into a link rather than wrap a 200-char URL.
+  const url = details?.match(/https:\/\/\S+?(?=[\s,)]|\.?\s|$)/)?.[0] ?? null
+  const text = url
+    ? details!.replace(url, '').replace(/\s*Visit\s+to resolve this issue\.?/i, '').trim()
+    : details
+
+  return (
+    <div className="mt-2 border-t border-danger/25 pt-2 text-xs">
+      <p className="font-medium text-danger">
+        {failureSummary(code, title)}
+        {code !== null ? <span className="font-normal text-muted"> · error {code}</span> : null}
+      </p>
+      {text && text !== title ? <p className="mt-1 break-words text-muted">{text}</p> : null}
+      {url ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="mt-1 inline-block font-medium text-accent hover:underline"
+        >
+          Resolve in Meta ↗
+        </a>
+      ) : null}
+    </div>
+  )
+}
+
 // ---- Templates -------------------------------------------------------------
 
 export const templateKey = (t: Pick<WaTemplate, 'name' | 'language'>) => `${t.name}|${t.language}`

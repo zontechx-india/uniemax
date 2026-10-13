@@ -7,7 +7,7 @@ import { Card, CardHeader, Detail, ErrorState, PageHeader, Skeleton } from '../.
 import { StatTile } from '../../ui/StatTile'
 import { formatCount, formatDateTime } from '../../ui/format'
 import { BackIcon } from '../../layout/icons'
-import { CampaignStateChip, usePolling, useWhatsAppStatus } from './whatsappUi'
+import { CampaignStateChip, failureSummary, usePolling, useWhatsAppStatus } from './whatsappUi'
 
 /**
  * One campaign: send progress while it runs, then where each message ended
@@ -86,6 +86,7 @@ export default function WhatsAppCampaignPage() {
         <Card className="lg:col-span-2">
           {data.finishedAt ? null : <Progress done={processed} total={data.total} />}
           <Breakdown campaign={data} />
+          {data.failures.length > 0 ? <Failures failures={data.failures} /> : null}
         </Card>
 
         <Card>
@@ -176,6 +177,29 @@ function Breakdown({ campaign }: { campaign: WaCampaign }) {
           </dl>
         </>
       )}
+    </section>
+  )
+}
+
+/** Why the failed ones failed — grouped by Meta error, most common first. */
+function Failures({ failures }: { failures: WaCampaign['failures'] }) {
+  return (
+    <section className="mt-6 border-t border-line pt-5">
+      <h3 className="mb-3 text-sm font-semibold text-fg">Why messages failed</h3>
+      <ul className="space-y-2">
+        {failures.map((f) => (
+          <li
+            key={`${f.errorCode}-${f.errorTitle}`}
+            className="flex items-start justify-between gap-3 text-sm"
+          >
+            <span className="min-w-0 text-fg">
+              {failureSummary(f.errorCode, f.errorTitle)}
+              {f.errorCode !== null ? <span className="text-muted"> · error {f.errorCode}</span> : null}
+            </span>
+            <span className="shrink-0 font-figure font-medium text-danger">{formatCount(f.count)}</span>
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }

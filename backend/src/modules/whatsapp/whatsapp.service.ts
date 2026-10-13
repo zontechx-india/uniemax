@@ -16,7 +16,11 @@ import {
   parseAllowlist,
   parseWebhookPayload,
 } from "./whatsapp.webhook.js";
-import { fillTemplateBody, summarizeTemplate } from "./whatsapp.templates.js";
+import {
+  fillTemplateBody,
+  summarizeTemplate,
+  templateSendProblem,
+} from "./whatsapp.templates.js";
 import type { TemplateSummary } from "./whatsapp.templates.js";
 
 /**
@@ -91,7 +95,14 @@ async function deliver(outbound: Outbound, log: FastifyBaseLogger) {
     return response;
   } catch (error) {
     if (error instanceof WaApiError) {
-      await repo.saveOutboundMessage({ ...record, wamid: null, lastStatus: "failed" });
+      await repo.saveOutboundMessage({
+        ...record,
+        wamid: null,
+        lastStatus: "failed",
+        errorCode: error.code,
+        errorTitle: error.title ?? error.message,
+        errorDetails: error.details,
+      });
     }
     throw error;
   }
@@ -105,6 +116,22 @@ export async function sendTemplate(
   const waId = normalizeWaId(input.to);
   assertAllowedRecipient(waId);
   await assertNotOptedOut(waId);
+
+  // Same checks Meta would make, made first: language, value count, sendable.
+  // Skipped (Meta decides) only when the template list itself is unavailable.
+  const templates = await availableTemplates(log);
+  if (templates) {
+    const problem = templateSendProblem(
+      templates,
+      input.templateName,
+      input.languageCode,
+      input.bodyParams.length,
+    );
+    if (problem) throw new HttpError(422, problem);
+  }
+  const match = templates?.find(
+    (t) => t.name === input.templateName && t.language === input.languageCode,
+  );
 
   const template: Record<string, unknown> = {
     name: input.templateName,
@@ -123,7 +150,12 @@ export async function sendTemplate(
     {
       waId,
       type: "template",
-      body: await renderTemplate(input, log),
+      // What the recipient reads: the body with its values filled in.
+      body: match
+        ? fillTemplateBody(match.body, input.bodyParams)
+        : input.bodyParams.length > 0
+          ? input.bodyParams.join(" · ")
+          : null,
       templateName: input.templateName,
       campaignId,
       payload: {
@@ -139,22 +171,17 @@ export async function sendTemplate(
 }
 
 /**
- * The text the recipient actually reads, for the conversation view — the
- * template body with its values filled in. Best effort: if the template list
- * is unavailable the values alone are stored, and a send never waits on or
- * fails because of this lookup more than once a minute.
+ * The WABA's templates for pre-send checks and the stored message text, or
+ * null when Meta can't list them. After a failed fetch it backs off for a
+ * TTL, so sends never wait on a failing lookup more than once a minute.
  */
-async function renderTemplate(input: SendTemplateInput, log: FastifyBaseLogger) {
-  const fallback = input.bodyParams.length > 0 ? input.bodyParams.join(" · ") : null;
-  if (Date.now() - templateFailedAt < TEMPLATE_TTL_MS) return fallback;
+async function availableTemplates(log: FastifyBaseLogger): Promise<TemplateSummary[] | null> {
+  if (Date.now() - templateFailedAt < TEMPLATE_TTL_MS) return null;
   try {
-    const template = (await getTemplates(false, log)).find(
-      (t) => t.name === input.templateName && t.language === input.languageCode,
-    );
-    return template ? fillTemplateBody(template.body, input.bodyParams) : fallback;
+    return await getTemplates(false, log);
   } catch {
     templateFailedAt = Date.now();
-    return fallback;
+    return null;
   }
 }
 
@@ -230,7 +257,11 @@ export async function processWebhook(
   for (const status of statuses) {
     const fresh = await repo.saveStatus(status);
     if (!fresh) continue;
-    const message = await repo.advanceLastStatus(status.wamid, status.status);
+    const message = await repo.advanceLastStatus(status.wamid, status.status, {
+      errorCode: status.errorCode,
+      errorTitle: status.errorTitle,
+      errorDetails: status.errorDetails ?? status.errorMessage,
+    });
     if (status.status === "failed") {
       log.warn(
         {
@@ -264,6 +295,17 @@ export async function startCampaign(
   input: CreateCampaignInput,
   log: FastifyBaseLogger,
 ): Promise<{ campaignId: string }> {
+  // One check for the whole list, before anything is created or sent — a
+  // wrong language or value count would otherwise fail every recipient.
+  const templates = await availableTemplates(log);
+  if (templates) {
+    const counts = new Set(input.recipients.map((r) => r.bodyParams.length));
+    for (const count of counts) {
+      const problem = templateSendProblem(templates, input.templateName, input.languageCode, count);
+      if (problem) throw new HttpError(422, problem);
+    }
+  }
+
   const campaign = await repo.createCampaign({
     name: input.name,
     templateName: input.templateName,
@@ -327,7 +369,7 @@ async function runCampaign(
 export async function getCampaign(id: string) {
   const found = await repo.getCampaignWithBreakdown(id);
   if (!found) throw HttpError.notFound("Campaign not found");
-  const { campaign, byStatus } = found;
+  const { campaign, byStatus, failures } = found;
   return {
     ...campaign,
     // Latest status of each campaign message (failed includes both refused
@@ -339,6 +381,7 @@ export async function getCampaign(id: string) {
       read: byStatus["read"] ?? 0,
       failed: byStatus["failed"] ?? 0,
     },
+    failures,
   };
 }
 
