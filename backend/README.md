@@ -66,6 +66,7 @@ Verify: `curl http://localhost:4000/health`
 | `npm run audit-media` | Compare every S3 object against the media keys the current environment's DB references (`Store.logoKey`, `StoreProductMedia.key`, `OrderItem.imageKey`, plus bucket-hosted legacy URL columns). Writes `media-audit-<mode>.{json,md}` + CSVs to `backend/migration-backups/`. Both envs share one bucket, so run once per env and pass `-- --merge migration-backups/media-audit-<other>.json` on the second run to get true orphans (referenced by neither DB). Read-only unless `--delete-orphans --yes` is added to a merged run. |
 
 | `npm run optimize-media` | Bring stored images up to the server's upload rules (upright, size-capped WebP — what new uploads get) and render their missing derived images (sized `srcset` copies for every image, link previews for covers and logos — share images and store cards). **Dry run** unless `-- --apply`; `--only=products,logos,store-banners,marketplace-banners`, `--limit=N`. Runs against the current mode's DB — once per environment (`$env:APP_ENV="production"; npm run optimize-media -- --apply`). Re-runnable; never deletes (old objects stay for order snapshots — `audit-media` reports them). |
+| `npm run test:unit` | Unit tests for pure logic (`test/unit/*.test.ts`, `node:test` run through `tsx`) — no server, no database. Currently the WhatsApp webhook signature check and payload parsing |
 | `npm run test:api` | API regression suite (`test/*.test.mjs`, Node's built-in `node:test`, no extra deps) against a **running** backend. Env: `API_BASE`, `QA_EMAIL_A`/`QA_PASSWORD_A` (seller + buyer), `QA_EMAIL_B`/`QA_PASSWORD_B` (second customer), optional `QA_PHONE_A` (+ `QA_OTP_CODE`, default `123456`) so the test store can publish via the SMS OTP bypass. Creates a store, products and orders — local or dev only; refuses `*.uniemax.com`. |
 
 ## Environment (`.env`)
@@ -114,6 +115,14 @@ Verify: `curl http://localhost:4000/health`
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | Web Push key pair — generate once per environment with `npm run push-keys`. Both set → real browser push; unset → the console driver logs instead (the in-app feed still works). **Rotating the pair invalidates every existing subscription.** See [docs/PUSH_NOTIFICATIONS.md](../docs/PUSH_NOTIFICATIONS.md) |
 | `VAPID_SUBJECT` | Contact the push service can reach you on — `mailto:` or `https:` (default `mailto:connect@zontechx.com`) |
 | `PUSH_TTL_SECONDS` | How long a push service holds an undelivered message (default `86400`) |
+| `WA_ENABLED` | `true` turns on the WhatsApp Cloud API module (default `false` — every `/whatsapp` route answers 503). **`true` refuses to boot in any environment unless the five keys below are set** |
+| `WA_VERIFY_TOKEN` | Webhook handshake token — any random string, **different per environment**, entered in that environment's Meta app |
+| `WA_APP_SECRET` | App secret of the Meta app used in this environment — verifies `X-Hub-Signature-256` |
+| `WA_ACCESS_TOKEN` | System-user permanent token (Bearer for the Graph API). Never logged |
+| `WA_PHONE_NUMBER_ID` / `WA_WABA_ID` | Sender number id + WhatsApp Business Account id (prod `1297227253483920` / `946861481250667`; dev: the Meta test number's ids) |
+| `WA_GRAPH_VERSION` | Graph API version (default `v21.0`) |
+| `WA_DEV_ALLOWED_RECIPIENTS` | **Non-production only:** comma-separated numbers sends are restricted to (anything else → 403; empty = nothing sends). Ignored in production |
+| `WA_SEND_RATE_PER_SEC` | Campaign send pace (default `20`) |
 
 > All auth vars (`JWT_*`, `AUTH_COOKIE_*`, `OTP_*`, OAuth client ids) are read from the
 > same `.env` but validated **inside** the self-contained
@@ -122,6 +131,74 @@ Verify: `curl http://localhost:4000/health`
 > `AWS_*`, `MEDIA_*`) are likewise validated inside
 > `package/storage/config.ts`. The database stores only object keys — public
 > URLs are derived from this config, so buckets/CDNs can change freely.
+
+## WhatsApp Cloud API
+
+Module: `src/modules/whatsapp/`. Endpoint contracts: [`docs/API.md`](../docs/API.md#whatsapp-cloud-api);
+rules and data model: [`docs/BACKEND_CONTEXT.md`](../docs/BACKEND_CONTEXT.md). Day to day
+it is used from the admin console's **WhatsApp** page (`/admin/whatsapp` — inbox,
+campaigns, templates); the curl below is for testing and scripting. Dev and
+prod use **separate Meta apps**, so every credential differs per environment (see the
+per-mode blocks in `.env.example`).
+
+### Dev setup
+
+1. In the **dev** Meta app → WhatsApp → API Setup, use the Meta **test number**; add your
+   own phone as a test recipient. Put its ids, the app secret and a token in
+   `.env.development`, set `WA_ENABLED=true`, and list your phone in
+   `WA_DEV_ALLOWED_RECIPIENTS`.
+2. `npm run dev`, then expose it: `cloudflared tunnel --url http://localhost:4000`
+3. Dev Meta app → WhatsApp → Configuration → Webhook: callback URL
+   `https://<random>.trycloudflare.com/api/v1/whatsapp/webhook`, verify token =
+   `WA_VERIFY_TOKEN`. Subscribe to the **messages** field.
+
+The tunnel URL changes on every `cloudflared` run — update the callback each time.
+
+### Prod setup
+
+Prod Meta app → WhatsApp → Configuration → Webhook: callback URL
+`https://uniemax.com/api/v1/whatsapp/webhook` (nginx's existing `/api` proxy serves it),
+verify token = prod `WA_VERIFY_TOKEN`; subscribe to **messages**. Credentials go in the
+server's `.env.production`. The tables ship with the committed migration
+(`npm run db:deploy` — never `migrate dev` against prod).
+
+### curl
+
+```bash
+API=http://localhost:4000/api/v1
+# Admin bearer token (send/campaign/message routes live under /admin):
+TOKEN=$(curl -s $API/admin/auth/mobile/login -H 'content-type: application/json' \
+  -d '{"email":"you@example.com","password":"…"}' | jq -r .data.accessToken)
+
+# 1. Webhook handshake (what Meta does) → prints 12345
+curl "$API/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=$WA_VERIFY_TOKEN&hub.challenge=12345"
+
+# 2. Signed webhook event (simulating Meta)
+BODY='{"object":"whatsapp_business_account","entry":[{"changes":[{"field":"messages","value":{"contacts":[{"wa_id":"919876543210","profile":{"name":"Asha"}}],"messages":[{"id":"wamid.TEST1","from":"919876543210","timestamp":"1760000000","type":"text","text":{"body":"Hi"}}]}}]}]}'
+SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$WA_APP_SECRET" | sed 's/^.* //')
+curl -X POST $API/whatsapp/webhook -H 'content-type: application/json' \
+  -H "x-hub-signature-256: sha256=$SIG" -d "$BODY"
+
+# 3. Template
+curl -X POST $API/admin/whatsapp/send-template -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"to":"+919876543210","templateName":"hello_world","languageCode":"en_US","bodyParams":[]}'
+
+# 4. Free-form text (only within 24h of the contact's last message)
+curl -X POST $API/admin/whatsapp/send-text -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' -d '{"to":"919876543210","text":"Your order shipped!"}'
+
+# 5. Campaign → 202 { campaignId }
+curl -X POST $API/admin/whatsapp/campaigns -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"name":"Diwali","templateName":"festive_offer","languageCode":"en","recipients":[{"to":"919876543210","bodyParams":["Asha","20%"]}]}'
+
+# 6. Campaign progress
+curl $API/admin/whatsapp/campaigns/<campaignId> -H "authorization: Bearer $TOKEN"
+
+# 7. Conversation
+curl "$API/admin/whatsapp/messages/919876543210?page=1&pageSize=50" -H "authorization: Bearer $TOKEN"
+```
 
 ## Adding a feature module
 

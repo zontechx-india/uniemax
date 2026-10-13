@@ -52,6 +52,8 @@ export const NAV_GROUPS: NavGroup[] = [
     title: 'Platform',
     items: [
       { to: '/support', label: 'Support' },
+      // Customer conversations and template campaigns on the business number.
+      { to: '/whatsapp', label: 'WhatsApp' },
       // The marketplace homepage carousel — the platform's own storefront
       // content, so it sits with the other platform-wide settings.
       { to: '/banners', label: 'Homepage banners' },
@@ -73,6 +75,7 @@ const TITLES: [string, string][] = [
   ['/stores', 'Stores'],
   ['/customers', 'Customers'],
   ['/support', 'Support'],
+  ['/whatsapp', 'WhatsApp'],
   ['/theme-templates', 'Store themes'],
   ['/notifications', 'Notifications'],
   ['/activity', 'Activity log'],

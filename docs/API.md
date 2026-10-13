@@ -2508,6 +2508,110 @@ transactionally; pushes go out in batches afterwards.
 
 ---
 
+## WhatsApp Cloud API
+
+`/api/v1/whatsapp` (no auth — Meta's webhook) · `/api/v1/admin/whatsapp` 🔒 admin.
+Every route answers **`503`** while `WA_ENABLED=false` — except `GET /admin/whatsapp/status`. Setup and curl for each route:
+[`backend/README.md`](../backend/README.md#whatsapp-cloud-api).
+
+Numbers (`to`, `:waId`) accept any phone shape (`+91 98765-43210`) and are normalised
+to Meta's digits-only `wa_id`. **Outside production** a send to a number not in
+`WA_DEV_ALLOWED_RECIPIENTS` → `403`. A contact who sent STOP/UNSUBSCRIBE → `409`
+until they send START.
+
+**Graph API refusals** keep the envelope and add Meta's error `code`:
+```jsonc
+{ "success": false, "statusCode": 400, "error": "Bad Request",
+  "code": 132001, "message": "template name does not exist in the translation" }
+```
+`429` = Meta throttling (codes 4, 80007, 130429, 131048, 131056) · `502` = our token
+(190 — the message names `WA_ACCESS_TOKEN`) or Meta down/unreachable · `400` = any other Meta 4xx (bad template, params, number).
+
+### `GET /api/v1/whatsapp/webhook` (no auth)
+Meta's handshake. `hub.mode=subscribe` and `hub.verify_token` = `WA_VERIFY_TOKEN` →
+`200` with `hub.challenge` as `text/plain`; anything else → `403`.
+
+### `POST /api/v1/whatsapp/webhook` (no auth — HMAC-guarded)
+`X-Hub-Signature-256` must equal `sha256=` + hex HMAC-SHA256(`WA_APP_SECRET`, raw body)
+→ else `401`. Verified events get `200 { "received": true }` at once and are processed
+after the reply: the raw payload is stored, inbound `messages[]` upsert the contact
+(profile name, 24h window) and are saved (text, button/interactive reply title, media
+id + caption); a text of exactly STOP/UNSUBSCRIBE opts the contact out, START back in.
+`statuses[]` are stored once per (wamid, status), advance the message's `lastStatus`
+(never backwards) and, when `failed`, bump the campaign's `failed` counter. Every
+write is idempotent — Meta's retries are no-ops. Not rate-limited.
+
+### `POST /api/v1/admin/whatsapp/send-template` 🔒 admin
+```json
+{ "to": "+919876543210", "templateName": "order_update", "languageCode": "en", "bodyParams": ["Asha", "UM-1042"] }
+```
+`bodyParams` fill the template body's `{{1}}…` in order (optional, ≤ 50). Saved as an
+outbound message with `lastStatus: "accepted"` and, as `body`, the template text with the
+values filled in (from the cached template list; just the values if it is unavailable).
+→ `{ "data": <Meta's response> }`
+(`messages[0].id` is the wamid).
+
+### `POST /api/v1/admin/whatsapp/send-text` 🔒 admin
+`{ "to": "919876543210", "text": "…" }` (≤ 4096 chars). Only within **24h** of the
+contact's last inbound message — else `422 "24h window closed, use a template"`.
+→ Meta's response.
+
+### `POST /api/v1/admin/whatsapp/campaigns` 🔒 admin → `202`
+```json
+{ "name": "Diwali", "templateName": "festive_offer", "languageCode": "en",
+  "recipients": [{ "to": "919876543210", "bodyParams": ["Asha"] }] }
+```
+1–10 000 recipients. → `{ "data": { "campaignId": "…" } }` immediately; sends run in
+the background at `WA_SEND_RATE_PER_SEC`. Opted-out, dev-blocked and repeated numbers
+count as `skipped`. In-process — a restart stops a running campaign. 10/minute.
+
+### `GET /api/v1/admin/whatsapp/campaigns/:id` 🔒 admin
+```jsonc
+{ "data": { "id", "name", "templateName", "languageCode", "createdAt", "finishedAt",
+    "total": 500, "sent": 480, "skipped": 12, "failed": 9,
+    "statuses": { "accepted": 3, "sent": 40, "delivered": 300, "read": 137, "failed": 8 } } }
+```
+Counters: `sent` = accepted by Meta; `failed` = refused at send **or** reported failed
+later (so a message can count in both). `statuses` = each message's latest status.
+
+### `GET /api/v1/admin/whatsapp/status` 🔒 admin
+Answers even while disabled — the console's first call. No secrets:
+```jsonc
+{ "data": { "enabled": true, "production": false, "phoneNumberId": "…", "wabaId": "…",
+    "graphVersion": "v21.0", "sendRatePerSec": 20,
+    "allowlist": ["919876543210"],          // null in production
+    "lastWebhookAt": "2026-10-13T…" } }      // null = Meta has never reached us
+```
+
+### `GET /api/v1/admin/whatsapp/contacts?q=&filter=&page=&pageSize=` 🔒 admin
+The inbox, most recent conversation first (`lastMessageAt`). `q` matches name or number;
+`filter` = `window` (reply window open) · `optedOut`. Each row: `waId`, `name`,
+`optedOut`, `lastInboundAt`, `lastMessageAt`, `windowClosesAt` (null = closed) and
+`lastMessage` (`direction`, `type`, `body`, `templateName`, `lastStatus`, `createdAt`)
+or null.
+
+### `GET /api/v1/admin/whatsapp/contacts/:waId` 🔒 admin
+One contact plus `messageCount` and `windowClosesAt`. Unknown → `404`.
+
+### `GET /api/v1/admin/whatsapp/templates?refresh=` 🔒 admin
+The WABA's templates from Meta (all statuses), cached 60 s; `refresh=true` skips the
+cache. Each: `name`, `language`, `status`, `category`, `header`, `body`, `footer`,
+`buttons` (labels), `paramCount` (highest `{{n}}` in the body), `sendable`, `reason`.
+Not sendable = not approved, named variables, a media header, a header variable or a
+dynamic URL button — the send endpoints fill numbered body variables only. Sendable
+first.
+
+### `GET /api/v1/admin/whatsapp/campaigns?page=&pageSize=` 🔒 admin
+Campaigns newest first: the counters plus `finishedAt` (null while sending — or for good
+if the server restarted mid-campaign).
+
+### `GET /api/v1/admin/whatsapp/messages/:waId?page=&pageSize=` 🔒 admin
+The conversation, newest first, paginated (`list` envelope). Each row: `id`, `wamid`,
+`direction` (`IN`/`OUT`), `type`, `body`, `mediaId`, `templateName`, `lastStatus`,
+`campaignId`, `createdAt`. Unknown contact → `404`.
+
+---
+
 ## Affiliate Marketing — `/api/v1/affiliate`
 
 Served by `package/affiliate` (see `docs/BACKEND_CONTEXT.md` and

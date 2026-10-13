@@ -505,6 +505,94 @@ export interface Paged<T> {
 }
 
 /** Query params, with `undefined` entries dropped so URLs stay clean. */
+// ---- WhatsApp Cloud API ----------------------------------------------------
+
+/** accepted → sent → delivered → read, or failed. Null on inbound messages. */
+export type WaStatus = 'accepted' | 'sent' | 'delivered' | 'read' | 'failed'
+
+export interface WaIntegrationStatus {
+  enabled: boolean
+  production: boolean
+  phoneNumberId: string | null
+  wabaId: string | null
+  graphVersion: string
+  sendRatePerSec: number
+  /** Non-production only: the only numbers sends may go to. */
+  allowlist: string[] | null
+  lastWebhookAt: string | null
+}
+
+export interface WaMessage {
+  id: string
+  wamid: string | null
+  direction: 'IN' | 'OUT'
+  type: string
+  body: string | null
+  mediaId: string | null
+  templateName: string | null
+  lastStatus: WaStatus | null
+  campaignId: string | null
+  createdAt: string
+}
+
+export interface WaContactRow {
+  waId: string
+  name: string | null
+  optedOut: boolean
+  lastInboundAt: string | null
+  lastMessageAt: string | null
+  /** When free-form text stops being allowed; null = window closed. */
+  windowClosesAt: string | null
+  lastMessage: Pick<WaMessage, 'direction' | 'type' | 'body' | 'templateName' | 'lastStatus' | 'createdAt'> | null
+}
+
+export interface WaContact {
+  waId: string
+  name: string | null
+  optedOut: boolean
+  lastInboundAt: string | null
+  lastMessageAt: string | null
+  windowClosesAt: string | null
+  messageCount: number
+  createdAt: string
+}
+
+export interface WaTemplate {
+  name: string
+  language: string
+  status: string
+  category: string | null
+  header: string | null
+  body: string
+  footer: string | null
+  buttons: string[]
+  paramCount: number
+  sendable: boolean
+  reason: string | null
+}
+
+export interface WaCampaignRow {
+  id: string
+  name: string
+  templateName: string
+  languageCode: string
+  total: number
+  sent: number
+  skipped: number
+  failed: number
+  finishedAt: string | null
+  createdAt: string
+}
+
+export interface WaCampaign extends WaCampaignRow {
+  /** Latest status of each campaign message. */
+  statuses: Record<WaStatus, number>
+}
+
+export interface WaSendResult {
+  messages?: { id: string }[]
+}
+
 type Params = Record<string, string | number | boolean | undefined>
 
 const params = (input: Params) => ({
@@ -738,6 +826,49 @@ export const adminApi = {
   /** The COMPLETE id list in the wanted order — a partial order is ambiguous. */
   reorderBanners(bannerIds: string[]) {
     return call<BannerRow[]>(http.patch(`${BASE}/banners/order`, { bannerIds }))
+  },
+
+  // WhatsApp — `whatsappStatus` answers even while the integration is off;
+  // everything else 503s until WA_ENABLED=true.
+  whatsappStatus() {
+    return call<WaIntegrationStatus>(http.get(`${BASE}/whatsapp/status`))
+  },
+  listWaContacts(query: Params) {
+    return callList<WaContactRow>(http.get(`${BASE}/whatsapp/contacts`, params(query)))
+  },
+  getWaContact(waId: string) {
+    return call<WaContact>(http.get(`${BASE}/whatsapp/contacts/${encodeURIComponent(waId)}`))
+  },
+  /** Newest first — reverse for a chat thread. */
+  listWaMessages(waId: string, query: Params = {}) {
+    return callList<WaMessage>(
+      http.get(`${BASE}/whatsapp/messages/${encodeURIComponent(waId)}`, params(query)),
+    )
+  },
+  listWaTemplates(refresh = false) {
+    return call<WaTemplate[]>(
+      http.get(`${BASE}/whatsapp/templates`, params({ refresh: refresh || undefined })),
+    )
+  },
+  sendWaTemplate(body: { to: string; templateName: string; languageCode: string; bodyParams: string[] }) {
+    return call<WaSendResult>(http.post(`${BASE}/whatsapp/send-template`, body))
+  },
+  sendWaText(body: { to: string; text: string }) {
+    return call<WaSendResult>(http.post(`${BASE}/whatsapp/send-text`, body))
+  },
+  listWaCampaigns(query: Params) {
+    return callList<WaCampaignRow>(http.get(`${BASE}/whatsapp/campaigns`, params(query)))
+  },
+  getWaCampaign(id: string) {
+    return call<WaCampaign>(http.get(`${BASE}/whatsapp/campaigns/${id}`))
+  },
+  createWaCampaign(body: {
+    name: string
+    templateName: string
+    languageCode: string
+    recipients: { to: string; bodyParams: string[] }[]
+  }) {
+    return call<{ campaignId: string }>(http.post(`${BASE}/whatsapp/campaigns`, body))
   },
 
   // Broadcast (the feed itself lives in notificationsApi)

@@ -43,6 +43,10 @@ import {
   customerSupportRoutes,
   publicSupportRoutes,
 } from "./modules/support/support.routes.js";
+import {
+  adminWhatsAppRoutes,
+  publicWhatsAppRoutes,
+} from "./modules/whatsapp/whatsapp.routes.js";
 
 /**
  * Central route registrar.
@@ -105,6 +109,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       await api.register(publicBannerRoutes, { prefix: "/public/banners" });
       // Payment gateway callbacks (Cashfree webhook — signature-guarded).
       await api.register(paymentRoutes, { prefix: "/payments" });
+      // WhatsApp Cloud API webhook (Meta → us — signature-guarded).
+      await api.register(publicWhatsAppRoutes, { prefix: "/whatsapp" });
 
       // Upload rules (max sizes + allowed types) and where sized copies of
       // stored images are served — read by clients so their hints, pre-upload
@@ -147,6 +153,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
             // Marketplace homepage banners — the platform's own carousel,
             // distinct from the per-store banners sellers manage.
             await guarded.register(adminBannerRoutes, { prefix: "/banners" });
+            // WhatsApp sends, campaigns and conversations (Cloud API).
+            await guarded.register(adminWhatsAppRoutes, { prefix: "/whatsapp" });
             // Store appearance templates — the palettes sellers pick from.
             await guarded.register(adminThemeTemplateRoutes, {
               prefix: "/theme-templates",

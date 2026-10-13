@@ -72,6 +72,26 @@ const envSchema = z.object({
   // which is right on the server and locally after `npm run build`.
   WEB_SHELL_PATH: z.string().trim().min(1).optional(),
 
+  // WhatsApp Cloud API (modules/whatsapp). Off unless WA_ENABLED=true; when on,
+  // the credentials below are required in EVERY environment (checked after
+  // parsing). Dev and prod use different Meta apps, so all but the last two
+  // keys belong in the per-mode env files.
+  WA_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  WA_VERIFY_TOKEN: z.string().optional(),
+  WA_APP_SECRET: z.string().optional(),
+  // System-user permanent token. Never logged.
+  WA_ACCESS_TOKEN: z.string().optional(),
+  WA_PHONE_NUMBER_ID: z.string().optional(),
+  WA_WABA_ID: z.string().optional(),
+  WA_GRAPH_VERSION: z.string().regex(/^v\d+\.\d+$/).default("v21.0"),
+  // Non-production only: comma-separated numbers sends are restricted to.
+  // Empty = nothing may be sent. Ignored in production.
+  WA_DEV_ALLOWED_RECIPIENTS: z.string().default(""),
+  WA_SEND_RATE_PER_SEC: z.coerce.number().int().min(1).max(1000).default(20),
+
   // NOTE: all auth config (JWT, cookies, OTP/verification codes, OAuth) lives
   // inside the self-contained auth package (src/package/auth/core/config/env.ts),
   // not here.
@@ -147,6 +167,29 @@ if (env.NODE_ENV === "production") {
       // eslint-disable-next-line no-console
       console.error(`  - ${problem}`);
     }
+    process.exit(1);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// WhatsApp fail-fast — every environment. Enabled without credentials would
+// accept webhooks it cannot verify and sends it cannot make.
+// ---------------------------------------------------------------------------
+if (env.WA_ENABLED) {
+  const missing = (
+    [
+      "WA_VERIFY_TOKEN",
+      "WA_APP_SECRET",
+      "WA_ACCESS_TOKEN",
+      "WA_PHONE_NUMBER_ID",
+      "WA_WABA_ID",
+    ] as const
+  ).filter((key) => !env[key]?.trim());
+  if (missing.length > 0) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `❌ WA_ENABLED=true but these are unset: ${missing.join(", ")}`,
+    );
     process.exit(1);
   }
 }

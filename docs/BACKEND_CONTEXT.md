@@ -167,6 +167,10 @@ backend/
 │   │   │                      #   + payments.jobs.ts (10-min stranded-payment
 │   │   │                      #   sweep, settle-only)
 │   │   │                      #   (see docs/CASHFREE_PAYMENTS.md)
+│   │   ├── whatsapp/          # WhatsApp Cloud API: signed webhook in, template/
+│   │   │                      #   text sends + rate-paced campaigns out ·
+│   │   │                      #   repository (Prisma) · client (Graph API) ·
+│   │   │                      #   webhook.ts (pure, unit-tested)
 │   │   └── (shipping, inventory, settings, dashboard — planned)
 │   ├── scripts/
 │   │   ├── createAdmin.ts     # Bootstrap an admin (npm run create-admin)
@@ -647,6 +651,48 @@ Decisions worth keeping:
   subtree, so a ticket id from another shop is a 404.
 - **Sellers set status, never priority.** Priority is the platform's triage
   vocabulary; a shop's inbox is small enough to read without one.
+
+### WhatsApp Cloud API — `modules/whatsapp`
+
+Meta's webhook in, template/text sends and bulk template campaigns out.
+Endpoints: `docs/API.md` → WhatsApp Cloud API; setup: `backend/README.md`.
+
+- **Files.** The four standard ones plus `whatsapp.repository.ts` (every Prisma
+  call), `whatsapp.client.ts` (Graph API wrapper, `WaApiError`),
+  `whatsapp.types.ts` (wire shapes), and two pure files with **no env/Prisma
+  import**, so `test/unit/` covers them without a server: `whatsapp.webhook.ts`
+  (signature check, payload parsing) and `whatsapp.templates.ts` (which Meta
+  templates the send endpoints can fill, and the filled-in text).
+- **Off by default.** `WA_ENABLED=false` → every route 503. `true` without the
+  five credentials refuses to boot in **every** environment (`config/env.ts`).
+- **Raw body, one scope.** Like the Cashfree webhook, the public plugin swaps the
+  JSON parser for a raw Buffer so `X-Hub-Signature-256` (HMAC-SHA256 with the
+  app secret, `timingSafeEqual`) covers Meta's exact bytes. No guard, no rate
+  limit.
+- **Ack first, process after.** A verified webhook gets `200` before any DB work
+  (Meta retries slow answers); processing runs after the reply, logged on
+  failure. Idempotent throughout — inbound by unique `wamid`, statuses by unique
+  `(wamid, status)`, `lastStatus` only moves forward.
+- **Send rules** (service): opted-out → 409; free text only within 24h of the
+  last inbound → else 422; outside production, only `WA_DEV_ALLOWED_RECIPIENTS`
+  → else 403. Every attempt is stored, accepted or failed.
+- **Errors.** The admin plugin has a scoped error handler: `WaApiError` answers
+  with Meta's `code` beside the envelope; everything else falls through to the
+  central handler.
+- **Campaigns** run in-process after the `202`, paced at `WA_SEND_RATE_PER_SEC`.
+  A restart stops one mid-way (counters show how far it got); a durable queue
+  is the upgrade if campaigns grow past one process.
+- **Logging.** Non-production logs full Graph requests/responses (token masked)
+  and inbound bodies; production logs only ids, types and error codes.
+- **Templates** are read from Meta (`GET /{waba}/message_templates`), cached 60 s
+  in-process. A template send stores the filled-in text as the message body so
+  the console thread reads like the customer's phone; a failed list fetch backs
+  off for the same 60 s so sends never wait on it repeatedly.
+- **Console reads** (`status`, `contacts`, `templates`, `campaigns`) back the
+  admin console's WhatsApp pages; `status` sits outside the enabled check so an
+  unconfigured server is explained rather than answered with 503.
+- **Admin-only sends**, mounted at `/admin/whatsapp` inside the `requireAdmin`
+  subtree; each send and campaign is written to the audit trail.
 
 ### Affiliate marketing — the `package/affiliate` sub-system
 
@@ -1404,6 +1450,25 @@ display snapshot beside them):
 Core touch points: `Order.affiliateRef` (nullable opaque token from checkout)
 and `NotificationKind.AFFILIATE`.
 
+### WhatsApp (`prisma/schema/whatsapp.prisma`, `public` schema)
+
+Standalone — no relation to a core model. Ids are cuids like the rest of the
+schema (not `BigInt`: it does not survive `JSON.stringify` into responses).
+- **WaWebhookEvent** — every verified webhook body, verbatim (`payload` JSON) —
+  the replay source.
+- **WaContact** — keyed by Meta's digits-only `waId`; `name` (profile name),
+  `optedOut` (STOP/UNSUBSCRIBE ↔ START), `lastInboundAt` (opens the 24h window),
+  `lastMessageAt` (either direction — orders the admin inbox; indexed).
+- **WaMessage** — `direction` (`WaDirection`: `IN | OUT`), `wamid` (unique; null
+  only for a send Meta refused), `type`, `body`, `mediaId`, `templateName`,
+  `lastStatus` (`accepted → sent → delivered → read`, or `failed`), optional
+  `campaignId` → **WaCampaign** (`SetNull` on delete).
+- **WaMessageStatus** — one row per `(wamid, status)` (unique — webhook retries
+  are no-ops) with `recipientId`, `statusTimestamp` and Meta's error fields.
+- **WaCampaign** — `name`, `templateName`, `languageCode` and counters `total` ·
+  `sent` · `skipped` · `failed`, and `finishedAt` (set when the sender reaches the
+  last recipient; stays null if a restart killed it).
+
 ---
 
 ## Database & Prisma 7 Notes
@@ -1454,6 +1519,7 @@ and `NotificationKind.AFFILIATE`.
 | `npm run seed-categories` | Seed the global category taxonomy (29 top-level + 125 sub) from `scripts/data/globalCategories.ts` — upserts by slug, idempotent, never deletes; fills `optionTemplates`/`specTemplates` from `scripts/data/categoryPresets.ts` only where never set; `-- --dry-run` reports without writing |
 | `npm run audit-media` | List every S3 object and which DB rows reference it (logo/media/order-item keys + bucket-hosted legacy URLs); run per env, `-- --merge <other-env.json>` on the second run yields objects referenced by neither DB. Read-only unless `--delete-orphans --yes` on a merged run. Reports go to `migration-backups/` |
 | `npm run optimize-media` | Bring stored images up to the upload rules and render their missing derived images — sized copies for all, link previews for covers (share images) and logos (store cards) (see Media storage). Dry run unless `-- --apply`; `--only=products,logos,store-banners,marketplace-banners`, `--limit=N`. Per environment; never deletes |
+| `npm run test:unit` | Unit tests for pure logic (`test/unit/*.test.ts` via `tsx --test`) — no server or DB |
 | `npx prisma generate` | Regenerate client after schema edits            |
 
 **Environment files are layered, never edited to switch.** `config/loadEnv.ts`
@@ -1528,6 +1594,11 @@ commissions with delivery + hold-period approval, admin oversight) on its own
 `affiliate` Postgres schema, driven by the new `package/events` bus. Payout
 of `APPROVED` commissions waits for the platform ledger. See
 `docs/AFFILIATE.md`.
+
+Also done: **WhatsApp Cloud API** (`modules/whatsapp`) — HMAC-verified webhook
+(contacts, inbound messages, opt-out keywords, delivery statuses), admin
+template/text sends with the 24h window and a dev recipient allowlist, and
+rate-paced template campaigns with delivery breakdowns. Off unless `WA_ENABLED`.
 
 Also done: **marketplace discovery** (`modules/discovery` + the public store
 index in `modules/stores`) powering the marketplace homepage —

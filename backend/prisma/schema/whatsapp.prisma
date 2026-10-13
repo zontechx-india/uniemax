@@ -1,0 +1,104 @@
+// WhatsApp Cloud API — webhook audit log, contacts, the conversation, per-message
+// delivery statuses and bulk template campaigns. Standalone: no relation to a
+// core model (a contact is keyed by its WhatsApp id, not a Customer). See
+// docs/BACKEND_CONTEXT.md → "WhatsApp Cloud API".
+
+enum WaDirection {
+  IN
+  OUT
+
+  @@schema("public")
+}
+
+/// Every verified webhook delivery, stored verbatim before it is processed —
+/// the replay source if processing ever has a bug.
+model WaWebhookEvent {
+  id         String   @id @default(cuid())
+  receivedAt DateTime @default(now())
+  payload    Json
+
+  @@map("wa_webhook_events")
+  @@schema("public")
+}
+
+/// A WhatsApp user, keyed by Meta's `wa_id` (digits only, no "+").
+model WaContact {
+  waId          String      @id
+  name          String?
+  /// Sent STOP / UNSUBSCRIBE — template and text sends are refused (409).
+  optedOut      Boolean     @default(false)
+  /// Last message FROM the contact — opens the 24h free-form window.
+  lastInboundAt DateTime?
+  /// Latest message either way — orders the admin inbox.
+  lastMessageAt DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  messages      WaMessage[]
+
+  @@index([lastMessageAt])
+  @@map("wa_contacts")
+  @@schema("public")
+}
+
+model WaMessage {
+  id           String      @id @default(cuid())
+  /// Meta's message id. Null only for an outbound send Meta refused.
+  wamid        String?     @unique
+  waId         String
+  contact      WaContact   @relation(fields: [waId], references: [waId])
+  direction    WaDirection
+  /// text | template | button | interactive | image | document | …
+  type         String
+  body         String?
+  mediaId      String?
+  templateName String?
+  /// accepted → sent → delivered → read, or failed.
+  lastStatus   String?
+  campaignId   String?
+  campaign     WaCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  createdAt    DateTime    @default(now())
+
+  @@index([waId])
+  @@index([campaignId])
+  @@map("wa_messages")
+  @@schema("public")
+}
+
+/// One row per (message, status) — Meta retries webhooks, the unique pair
+/// makes a repeat a no-op.
+model WaMessageStatus {
+  id              String   @id @default(cuid())
+  wamid           String
+  status          String
+  recipientId     String
+  statusTimestamp DateTime
+  errorCode       Int?
+  errorTitle      String?
+  errorMessage    String?
+  errorDetails    String?
+  createdAt       DateTime @default(now())
+
+  @@unique([wamid, status])
+  @@index([wamid])
+  @@map("wa_message_statuses")
+  @@schema("public")
+}
+
+model WaCampaign {
+  id           String      @id @default(cuid())
+  name         String
+  templateName String
+  languageCode String
+  total        Int         @default(0)
+  sent         Int         @default(0)
+  skipped      Int         @default(0)
+  failed       Int         @default(0)
+  /// Set when the background sender reaches the last recipient. Null while
+  /// sending — or forever if the server restarted mid-campaign.
+  finishedAt   DateTime?
+  createdAt    DateTime    @default(now())
+  messages     WaMessage[]
+
+  @@map("wa_campaigns")
+  @@schema("public")
+}

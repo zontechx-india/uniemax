@@ -19,7 +19,8 @@
     "audit-media": "tsx src/scripts/auditMedia.ts",
     "optimize-media": "tsx src/scripts/optimizeMedia.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "test:api": "node --test --test-concurrency=1 \"test/**/*.test.mjs\""
+    "test:api": "node --test --test-concurrency=1 \"test/**/*.test.mjs\"",
+    "test:unit": "tsx --test \"test/unit/**/*.test.ts\""
   },
   "keywords": [],
   "author": "",
