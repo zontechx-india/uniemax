@@ -5,10 +5,14 @@ import { toApiError } from '../../../shared/auth/http'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { ErrorNote, InfoNote } from '../../../shared/ui/form'
 import { buttonClass } from '../../../shared/ui/Button'
+import { groupBySection } from '../../features/stores/gateBlockers'
+import type { BlockerGroup } from '../../features/stores/gateBlockers'
 import { storesApi } from '../../features/stores/storesApi'
 import type { StorePayments } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
-import { BankIcon, CardIcon, ShieldCheckIcon } from '../../layout/icons'
+import { BankIcon, CardIcon } from '../../layout/icons'
+import { useGateBlockers } from './GateBlockers'
+import { sectionItem } from './StoreSectionNav'
 import { BigSwitch } from './ui/BigSwitch'
 import { PageHeader } from './ui/PageHeader'
 import { showToast } from './ui/Toast'
@@ -26,6 +30,10 @@ import { showToast } from './ui/Toast'
  * have to exist first. The condition is read from `store.readiness` — the
  * same evaluation the endpoint enforces — so the switch is disabled for
  * exactly the reasons a save would be rejected, and the card says what to add.
+ * It lists the steps in order, each with a button to the screen that does it:
+ * the bank account can only be saved once the address and tax answers are in,
+ * so those come first (the server reports them as the account's
+ * prerequisites), and a step already done gets no button to a finished page.
  */
 
 const METHODS: {
@@ -70,6 +78,7 @@ export function StorePaymentsPage() {
   const [error, setError] = useState<string | null>(null)
 
   const onlineGate = store.readiness.gates.ONLINE_PAYMENT
+  const onlineSteps = groupBySection(useGateBlockers(store, 'ONLINE_PAYMENT'))
   // Only switching ON is gated. A seller who already has online payment on
   // must always be able to turn it off, whatever their profile looks like.
   const onlineBlocked = !payments.acceptOnlinePayment && !onlineGate.allowed
@@ -139,23 +148,7 @@ export function StorePaymentsPage() {
               </div>
 
               {/* The switch is disabled; this says why, and where to fix it. */}
-              {locked && (
-                <div className="mt-3 rounded-xl bg-pending-soft p-3">
-                  <p className="text-sm font-semibold text-fg">
-                    First add: {onlineGate.blockers.join(', ')}
-                  </p>
-                  <div className="mt-2.5 flex flex-wrap gap-2">
-                    <Link to="../business" className={buttonClass({ variant: 'secondary', size: 'md' })}>
-                      <ShieldCheckIcon className="h-4 w-4" />
-                      Business details
-                    </Link>
-                    <Link to="../bank-accounts" className={buttonClass({ variant: 'secondary', size: 'md' })}>
-                      <BankIcon className="h-4 w-4" />
-                      Bank account
-                    </Link>
-                  </div>
-                </div>
-              )}
+              {locked && <SetupSteps steps={onlineSteps} />}
             </li>
           )
         })}
@@ -183,6 +176,56 @@ export function StorePaymentsPage() {
         onConfirm={() => void confirmPending()}
         onCancel={() => setPending(null)}
       />
+    </div>
+  )
+}
+
+/**
+ * What to do before the switch unlocks: one numbered row per screen, in the
+ * order the server needs them, each naming what is missing there and opening
+ * that screen at the right card. A section this mode cannot open (an admin
+ * and Business details) is named without a button.
+ */
+function SetupSteps({ steps }: { steps: BlockerGroup[] }) {
+  return (
+    <div className="mt-3 rounded-xl bg-pending-soft p-3 sm:p-4">
+      <p className="text-sm font-semibold text-fg">To turn this on, first add:</p>
+      <ol className="mt-3 space-y-3">
+        {steps.map((step, index) => {
+          const section = step.section ? sectionItem(step.section) : undefined
+          return (
+            <li
+              key={step.section ?? index}
+              className="flex items-start gap-2.5 sm:items-center"
+            >
+              <span
+                aria-hidden
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface text-xs font-bold text-fg ring-1 ring-line"
+              >
+                {index + 1}
+              </span>
+              <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                <p className="min-w-0 text-sm text-fg">{step.labels.join(', ')}</p>
+                {step.to && section && (
+                  <Link
+                    to={step.to}
+                    className={buttonClass({
+                      variant: 'secondary',
+                      size: 'md',
+                      // Equal widths on desktop, so the right-aligned
+                      // buttons line up down the list.
+                      className: 'shrink-0 self-start sm:min-w-44 sm:self-auto',
+                    })}
+                  >
+                    <section.icon className="h-4 w-4" />
+                    {section.label}
+                  </Link>
+                )}
+              </div>
+            </li>
+          )
+        })}
+      </ol>
     </div>
   )
 }

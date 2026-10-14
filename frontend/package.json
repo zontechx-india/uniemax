@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "check:ui": "node scripts/check-ui.mjs"
+    "check:ui": "node scripts/check-ui.mjs",
+    "test:unit": "tsx --test \"test/**/*.test.ts\""
   },
   "dependencies": {
     "@cashfreepayments/cashfree-js": "^1.0.7",

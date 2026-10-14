@@ -376,7 +376,7 @@ on, so the two can never disagree.
 | --- | --- | --- |
 | `PUBLISH` | `PATCH …/publish` with `isPublished: true` | store name + logo · business name · seller name · contact phone · contact email · ≥ 1 category · ≥ 1 live product (drafts and disabled products don't count) |
 | `PAYOUT_SETUP` | `POST …/bank-accounts` (adding any payout account) | business address · PAN · GST registration status (a GSTIN or the not-registered declaration) |
-| `ONLINE_PAYMENT` | `PATCH …/payments` turning `acceptOnlinePayment` **on** | PAN · a primary payout bank account |
+| `ONLINE_PAYMENT` | `PATCH …/payments` turning `acceptOnlinePayment` **on** | PAN · a primary payout bank account (until one exists, whatever `PAYOUT_SETUP` still lacks is listed first — see **Prerequisites**) |
 | `PICKUP` | `PATCH …/shipping` with mode `PICKUP` / `BOTH` | the business address |
 
 The address and tax details are **not** needed to publish — a cash-on-delivery
@@ -385,6 +385,15 @@ point at which the platform has to know who it is paying and where.
 
 A blocked request returns `400` naming every missing requirement at once, e.g.
 `"Before you can publish your store, please add: Business address, At least one live product."`
+
+**Prerequisites.** A requirement that can only be met once another gate opens
+lists that gate's blockers too. Today that is the bank account: it cannot be
+saved until `PAYOUT_SETUP` passes, so while the store has no primary account,
+`ONLINE_PAYMENT`'s `blockers` / `blockerKeys` also carry `PAYOUT_SETUP`'s unmet
+requirements — in journey order, each once — e.g.
+`["GST registration status", "Primary payout bank account"]`. `allowed` is
+unaffected (it is false exactly when something blocks directly), and once the
+account exists `ONLINE_PAYMENT` asks only for the PAN again.
 
 Requirements that do not apply are omitted rather than reported unmet — a
 delivery-only store has no pickup-address requirement at all. Turning a
@@ -784,6 +793,8 @@ store.
 
 Turning `acceptOnlinePayment` **on** is gated by `ONLINE_PAYMENT` (PAN + a
 primary payout account) — see **Store readiness**. Turning it off never is.
+Without an account the `400` also names what adding one needs, e.g.
+`"Before you can accept online payments, please add: GST registration status, Primary payout bank account."`
 
 ### `PATCH /api/v1/stores/:id/shipping`
 ```jsonc

@@ -145,6 +145,16 @@ const SECTION_GROUPS: SectionGroup[] = [
 ]
 
 /**
+ * A section's nav row — label and icon — so a button elsewhere that opens
+ * it reads exactly as the nav does.
+ */
+export function sectionItem(to: string): SectionItem | undefined {
+  return SECTION_GROUPS.flatMap((group) => group.items).find(
+    (item) => item.to === to,
+  )
+}
+
+/**
  * The sections THIS mode may open.
  *
  * Admins render the same nav as sellers minus the rows their mount does not

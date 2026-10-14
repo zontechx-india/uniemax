@@ -540,6 +540,16 @@ no endpoint, no UI and no migration change.
 - `appliesWhen` makes a requirement conditional — for a field that only
   matters once the seller switches a capability on. Inapplicable requirements
   are dropped from the evaluation, never reported unmet.
+- `after: Gate` marks a requirement that can only be met once another gate
+  opens — `payout.bankAccount` has `after: "PAYOUT_SETUP"` (an account can't
+  be saved before the address, PAN and GST answer). While it is unmet and
+  that gate is blocked, every gate it blocks also lists the prerequisite's
+  blockers, in registry order, each once — so `ONLINE_PAYMENT` reads "GST
+  registration status, Primary payout bank account", not just the account the
+  bank page would refuse. `allowed` never changes (prerequisites only join a
+  direct blocker), and the registry keeps prerequisites before the
+  requirement waiting on them — `test/unit/store-readiness.test.ts` asserts
+  both.
 - `evaluateReadiness(ctx)` is pure. The context's three counts (categories,
   **active** products, primary bank account) are loaded by
   `loadReadinessCounts` — only `isActive` products count toward

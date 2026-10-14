@@ -28,6 +28,7 @@ import { PageHeader } from './ui/PageHeader'
 import { StatusPill } from './ui/StatusPill'
 import type { StatusTone } from './ui/StatusPill'
 import { showToast } from './ui/Toast'
+import { useGateBlockers } from './GateBlockers'
 
 /**
  * Bank Accounts section of Store Management — the seller's payout accounts.
@@ -148,6 +149,8 @@ export function StoreBankPage() {
 
   const payoutGate = store.readiness.gates.PAYOUT_SETUP
   const addBlocked = !payoutGate.allowed
+  // Straight to the first card still missing something, not the page top.
+  const fixFirst = useGateBlockers(store, 'PAYOUT_SETUP')[0]?.to ?? '../business'
 
   return (
     <div className="space-y-4">
@@ -187,7 +190,7 @@ export function StoreBankPage() {
           <p className="mt-0.5 text-hint text-muted">
             Before adding a bank account, add: {payoutGate.blockers.join(', ')}.
           </p>
-          <Link to="../business" className={buttonClass({ size: 'md', className: 'mt-3' })}>
+          <Link to={fixFirst} className={buttonClass({ size: 'md', className: 'mt-3' })}>
             <ShieldCheckIcon className="h-4 w-4" />
             Go to Business details
           </Link>

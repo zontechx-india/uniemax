@@ -737,8 +737,12 @@ get WhatsApp sharing, which the old one-row phone version lacked. It shows a
 Live / Not live yet pill, then **Publish my shop** (`sheen`;
 `PATCH /stores/:id/publish`) when nothing blocks it, or the publish blockers as
 **links to the section that fixes each** (`GateBlockers.tsx` —
-`useGateBlockers(store, gate)` maps `blockerKeys` → owning step → `href`,
-honouring the manage scope's hidden sections; the Store Builder header and
+`useGateBlockers(store, gate)` wraps the pure `gateBlockers()` in
+`features/stores/gateBlockers.ts`, which maps `blockerKeys` → owning step →
+`href`, adds `#setup-<step>` when that page holds several steps (Business
+details) so the link opens on the card that needs work, and honours the
+manage scope's hidden sections; `groupBySection()` folds the list into one
+entry per screen; the Store Builder header and
 `ShopNotLiveNudge` use the same helper), and a **Copy link**
 button that copies the store's public URL (`{origin}/store/{slug}`,
 built by `publicStoreUrl()` in `storesApi.ts`; uses the native share sheet
@@ -1767,7 +1771,17 @@ is never shown a pickup-address item.
   Address and Tax cards, needed only for payouts, read "Optional" with a
   neutral "For online payments, add: …" line, neither pin the jump bar nor
   turn its tiles orange, and the header bar turns green once nothing on the
-  page blocks publishing. Above them a
+  page blocks publishing. While online payment is off and blocked, the Tax
+  card swaps that line for a note naming what this page still needs and
+  linking the step after it ("…add GST registration status on this page,
+  then: *Primary payout bank account*"), or — once this page is done — a
+  neutral "Your details here are done … add next: …". Its GST hint tells a
+  seller who leaves the number empty to tick "I'm not registered for GST":
+  an empty box is not an answer, and it blocks the bank account. Each card's
+  id is `setupAnchor(step)` (`setup-business` / `setup-address` /
+  `setup-tax`); a link carrying one as its hash (Payments, Bank account, the
+  publish checklist) lands on that card — the router scrolls to it, the page
+  focuses and rings it. Above them a
   `SectionJumpBar` repeats all three as **equal-width tiles**
   (`flex-1 basis-0`, so the columns come from the count and not from label
   length) that scroll to their card (`scroll-mt-28` clears both sticky bars,
@@ -1928,7 +1942,8 @@ is never shown a pickup-address item.
   `store.readiness.gates.PAYOUT_SETUP` is blocked — the business address,
   PAN and GST status moved out of the signup wizard and this is where they
   become mandatory — with a note naming the missing pieces and linking to
-  Business Details; editing, re-prioritising and deleting are never gated),
+  the first Business Details card that lacks one; editing, re-prioritising
+  and deleting are never gated),
   `StorePaymentsPage` (**Payments** — how customers PAY: one glass card per
   method — **Cash on delivery** and **Online payment (UPI, cards)** (paid
   out to the main bank account) — each with an icon, one sentence and a
@@ -1938,8 +1953,16 @@ is never shown a pickup-address item.
   for off) spells out the effect and nothing is written until accepted →
   `PATCH /stores/:id/payments`; an all-off state warns that customers
   can't order. The **online-payment switch is disabled** while
-  `store.readiness.gates.ONLINE_PAYMENT` is blocked, with an orange "First
-  add: …" box and two buttons to Business details / Bank account — this
+  `store.readiness.gates.ONLINE_PAYMENT` is blocked, with an orange "To turn
+  this on, first add:" box listing the steps **in order**, one numbered row
+  per screen (`groupBySection`), each naming what is missing there with a
+  button — labelled and iconned as its nav row (`sectionItem`) — that opens
+  that screen at the right card. The gate reports the bank account's own
+  prerequisites first, so a seller with no GST answer sees "1 GST
+  registration status · Business details, 2 Primary payout bank account ·
+  Bank account" instead of being sent to a bank page that refuses them; a
+  screen with nothing missing gets no button, and sections an admin cannot
+  open are listed without one. This
   replaced a bank-account lookup the page used to run for itself, which
   only ever produced a hint. The checkout's payment step offers exactly the
   accepted methods from the public shell's `payments`),
@@ -3063,6 +3086,9 @@ sheets (`rounded-2xl`/`3xl`, `rounded-sheet`), full for pills. Two shadows:
 **`npm run check:ui`** (CI) counts stray `text-[Npx]` sizes, gradients,
 glass, ad-hoc effects and hand-made `<button>`s and fails if any count rises
 above `frontend/scripts/ui-budget.json`; each clean-up phase lowers the budget.
+**`npm run test:unit`** runs the frontend's pure-logic unit tests
+(`frontend/test/*.test.ts`, `node:test` through `tsx` from the workspace
+root — no browser), currently the gate-blocker links (`gateBlockers.ts`).
 
 **The touch-size tokens (px, not rem).** Added while the root was 90%,
 which put

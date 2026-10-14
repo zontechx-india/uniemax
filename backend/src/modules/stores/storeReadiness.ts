@@ -183,6 +183,15 @@ export interface Requirement {
    * capability on — without the evaluator knowing why.
    */
   appliesWhen?: (ctx: ReadinessContext) => boolean;
+  /**
+   * A gate that must be open before this requirement CAN be met — a payout
+   * bank account cannot be saved until `PAYOUT_SETUP` passes. While that gate
+   * is still blocked, every gate this requirement blocks reports the
+   * prerequisite's blockers too, so a seller is never sent to a step that
+   * will only refuse them. It never changes `allowed`: prerequisites are
+   * listed only beside the unmet requirement waiting on them.
+   */
+  after?: Gate;
 }
 
 const filled = (value: string | null | undefined): boolean =>
@@ -295,6 +304,10 @@ export const REQUIREMENTS: Requirement[] = [
     label: "Primary payout bank account",
     step: "payout",
     gates: ["ONLINE_PAYMENT"],
+    // Adding the account is itself gated (address, PAN, GST status), so a
+    // seller told only "add a bank account" would be refused at the bank
+    // page for something the Payments page never mentioned.
+    after: "PAYOUT_SETUP",
     isMet: (ctx) => ctx.hasPrimaryBankAccount,
   },
 ];
@@ -324,7 +337,11 @@ export interface StepState extends StepDefinition {
 export interface GateState {
   gate: Gate;
   allowed: boolean;
-  /** Labels of the unmet requirements, ready to render in a sentence. */
+  /**
+   * Labels of everything still to do before the gate opens — its own unmet
+   * requirements plus any prerequisite they wait on (`Requirement.after`),
+   * in the order to do them. Ready to render in a sentence.
+   */
   blockers: string[];
   /** Requirement keys, for a client that wants to deep-link to a step. */
   blockerKeys: string[];
@@ -373,9 +390,32 @@ export function evaluateReadiness(ctx: ReadinessContext): Readiness {
     };
   });
 
+  const afterOf = new Map(applicable.map((req) => [req.key, req.after]));
+
+  // A gate's unmet requirements, then — for any that can only be met once
+  // another gate opens — that gate's own, recursively. `seen` stops a cycle.
+  const blockingKeys = (gate: Gate, seen: Set<Gate>): Set<string> => {
+    seen.add(gate);
+    const keys = new Set<string>();
+    for (const r of states) {
+      if (r.met || !r.gates.includes(gate)) continue;
+      keys.add(r.key);
+      const after = afterOf.get(r.key);
+      if (after && !seen.has(after)) {
+        for (const key of blockingKeys(after, seen)) keys.add(key);
+      }
+    }
+    return keys;
+  };
+
   const gates = Object.fromEntries(
     GATES.map((gate) => {
-      const blocking = states.filter((r) => !r.met && r.gates.includes(gate));
+      const keys = blockingKeys(gate, new Set());
+      // Registry order is the seller's journey (address → tax → payout), so a
+      // prerequisite always reads before the requirement waiting on it.
+      // `allowed` is unaffected: prerequisites only ever join a direct
+      // blocker, so the list is empty exactly when nothing blocks directly.
+      const blocking = states.filter((r) => keys.has(r.key));
       return [
         gate,
         {

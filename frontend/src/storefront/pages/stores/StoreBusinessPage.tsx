@@ -5,7 +5,7 @@ import { ProgressRing } from './ui/ProgressRing'
 import { StatusPill } from './ui/StatusPill'
 import { showToast } from './ui/Toast'
 import type { FormEvent, ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
 import { VerifyPhoneForm } from '../../../shared/auth/VerifyPhoneForm'
 import type { Customer } from '../../../shared/auth/authApi'
@@ -34,6 +34,8 @@ import type {
   StoreProfilePatch,
 } from '../../features/stores/storeProfile'
 import { useManagedStore } from '../../features/stores/useManagedStore'
+import { setupAnchor } from '../../features/stores/gateBlockers'
+import { BlockerLinks, useGateBlockers } from './GateBlockers'
 import {
   SectionJumpBar,
   StatusBadge,
@@ -61,7 +63,9 @@ import type { SectionStatus } from './SetupStatus'
  */
 
 /**
- * The three cards, in page order. Each maps to one readiness step.
+ * The three cards, in page order. Each maps to one readiness step, and its
+ * DOM id is that step's `setupAnchor` — what links from other pages put
+ * after `#` to land on the card that needs work (see `gateBlockers.ts`).
  *
  * The heading lives HERE rather than inside each card because two things
  * render it — the card's own header and its chip in the jump bar — and a chip
@@ -75,20 +79,20 @@ const SECTIONS: {
   step: StepKey
 }[] = [
   {
-    id: 'business-contact',
+    id: setupAnchor('business'),
     title: 'Business & contact',
     description: 'The trading entity and the person we reach about orders.',
     step: 'business',
   },
   {
-    id: 'business-address',
+    id: setupAnchor('address'),
     title: 'Address',
     description:
       'Where your business operates from. Optional for Cash on Delivery — needed before you add a bank account or offer store pickup.',
     step: 'address',
   },
   {
-    id: 'business-tax',
+    id: setupAnchor('tax'),
     title: 'Tax & compliance',
     description:
       'PAN and GST status. Optional for Cash on Delivery — needed before you add a bank account and accept online payments.',
@@ -146,6 +150,20 @@ export function StoreBusinessPage() {
     setFlash({ id })
   }, [])
 
+  // A link to one card (`…/business#setup-tax`, from Payments, Bank account
+  // or the publish checklist) lands on THAT card, ringed as if its chip were
+  // tapped — the bare page opens on the first card, which may be complete
+  // and read as "nothing to do here".
+  const { hash } = useLocation()
+  useEffect(() => {
+    const id = hash.slice(1)
+    if (!SECTIONS.some((section) => section.id === id)) return
+    // Next frame: the card is laid out and the router's own hash scroll has
+    // run, so this only adds the focus and the ring.
+    const frame = requestAnimationFrame(() => jump(id))
+    return () => cancelAnimationFrame(frame)
+  }, [hash, jump])
+
   const status = (step: StepKey): SectionStatus =>
     sectionStatus(stepsByKey(store.readiness, [step]))
 
@@ -164,8 +182,9 @@ export function StoreBusinessPage() {
   const allComplete = statuses.every((s) => !s.status.blocksLaunch)
   const percent = total ? Math.round((met / total) * 100) : 100
 
-  const cardProps = (id: string): CardStatusProps => {
-    const section = statuses.find((s) => s.id === id)!
+  const cardProps = (step: StepKey): CardStatusProps => {
+    const section = statuses.find((s) => s.step === step)!
+    const { id } = section
     return {
       id,
       title: section.title,
@@ -220,17 +239,17 @@ export function StoreBusinessPage() {
 
       <div className="mt-5 space-y-5">
         <ContactCard
-          {...cardProps('business-contact')}
+          {...cardProps('business')}
           store={store}
           onStoreChange={onStoreChange}
         />
         <AddressCard
-          {...cardProps('business-address')}
+          {...cardProps('address')}
           store={store}
           onStoreChange={onStoreChange}
         />
         <TaxCard
-          {...cardProps('business-tax')}
+          {...cardProps('tax')}
           store={store}
           onStoreChange={onStoreChange}
         />
@@ -262,8 +281,13 @@ function Card({
   status,
   dirty,
   flashing,
+  hideMissing = false,
   children,
-}: Omit<CardStatusProps, 'onDirtyChange'> & { children: ReactNode }) {
+}: Omit<CardStatusProps, 'onDirtyChange'> & {
+  /** The card says what is missing itself, in a note of its own. */
+  hideMissing?: boolean
+  children: ReactNode
+}) {
   return (
     <section
       id={id}
@@ -285,7 +309,7 @@ function Card({
           leaves the seller hunting the form for which two. Hidden while there
           are unsaved edits, because it would then be describing the state the
           seller is in the middle of leaving. */}
-      {!dirty && !status.complete && status.missing.length > 0 && (
+      {!dirty && !hideMissing && !status.complete && status.missing.length > 0 && (
         // Orange means "blocks your store going live"; an optional card's
         // gaps are listed in neutral so they don't read as a to-do.
         <p
@@ -620,7 +644,13 @@ function TaxCard({
       ? !gstinContainsPan(gstin, pan)
       : false
 
-  const onlineBlocked = !store.readiness.gates.ONLINE_PAYMENT.allowed
+  // What still stands between the seller and online payment, split into what
+  // this page fills in and what comes after it (the bank account). Only while
+  // online payment is off — the same moment the Payments switch is locked.
+  const onlineBlockers = useGateBlockers(store, 'ONLINE_PAYMENT')
+  const onlineNote = !store.payments.acceptOnlinePayment && onlineBlockers.length > 0
+  const onThisPage = onlineBlockers.filter((b) => b.section === 'business')
+  const afterThisPage = onlineBlockers.filter((b) => b.section !== 'business')
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -646,12 +676,37 @@ function TaxCard({
   }
 
   return (
-    <Card {...card}>
+    // The note names this card's missing pieces itself, in order with the
+    // step after them, so the card's generic "add: …" line would repeat it.
+    <Card {...card} hideMissing={onlineNote}>
       <form onSubmit={submit} className="space-y-4" noValidate>
-        {onlineBlocked && (
-          <p className="rounded-xl bg-pending-soft px-3.5 py-3 text-hint text-fg">
-            <span className="font-semibold">Only needed for online payments.</span>{' '}
-            To turn them on, add: {store.readiness.gates.ONLINE_PAYMENT.blockers.join(', ')}.
+        {onlineNote && (
+          // Orange while something here is still missing; neutral once the
+          // only thing left is on another page — a pointer, not a to-do.
+          <p
+            className={`rounded-xl px-3.5 py-3 text-hint leading-relaxed ${
+              onThisPage.length > 0 ? 'bg-pending-soft text-fg' : 'bg-fg/5 text-muted'
+            }`}
+          >
+            {onThisPage.length > 0 ? (
+              <>
+                <span className="font-semibold">Only needed for online payments.</span>{' '}
+                To turn them on, add {onThisPage.map((b) => b.label).join(', ')} on this page
+                {afterThisPage.length > 0 ? (
+                  <>
+                    , then: <BlockerLinks blockers={afterThisPage} className="align-middle" />
+                  </>
+                ) : (
+                  '.'
+                )}
+              </>
+            ) : (
+              <>
+                <span className="font-semibold text-fg">Your details here are done.</span>{' '}
+                To turn on online payments, add next:{' '}
+                <BlockerLinks blockers={afterThisPage} className="align-middle" />
+              </>
+            )}
           </p>
         )}
 
@@ -729,7 +784,11 @@ function TaxCard({
                 ? "This GST number doesn't match the PAN above."
                 : gstState
                   ? `Registered in ${gstState}.`
-                  : 'Leave empty if you are not registered for GST.'}
+                  : gstExempt
+                    ? 'Not needed — you are not registered for GST.'
+                    : // An empty box is not an answer — sellers who only
+                      // left it blank were stuck without a bank account.
+                      'Not registered? Leave this empty and tick the box below.'}
           </p>
         </div>
 
