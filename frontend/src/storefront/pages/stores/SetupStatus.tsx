@@ -131,9 +131,18 @@ export function StatusMark({
   )
 }
 
+/**
+ * A section none of whose fields are required (Tax & compliance: PAN and
+ * GSTIN). "Complete" would claim an empty card is done; it is optional.
+ */
+function nothingRequired(status: SectionStatus): boolean {
+  return status.total === 0
+}
+
 /** The one sentence a status is worth, shared by the badge and the chips. */
 function statusText(status: SectionStatus, dirty: boolean): string {
   if (dirty) return 'Unsaved changes'
+  if (nothingRequired(status)) return 'Optional'
   if (status.complete) return 'Complete'
   if (!status.blocksLaunch) return 'Optional'
   return `${status.met} of ${status.total} done`
@@ -205,7 +214,7 @@ export function StatusBadge({
     )
   }
 
-  if (status.complete) {
+  if (status.complete && !nothingRequired(status)) {
     return (
       <span className="inline-flex shrink-0 items-center gap-1.5 rounded-pill bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
         <StatusMark complete size="sm" label={null} />
@@ -215,7 +224,8 @@ export function StatusBadge({
   }
 
   // Orange is reserved for "blocks publishing"; an optional section that is
-  // simply not filled in yet says so in neutral.
+  // simply not filled in yet — or has nothing required at all — says so in
+  // neutral.
   if (!status.blocksLaunch) {
     return (
       <span className="inline-flex shrink-0 items-center rounded-pill bg-surface-alt px-2.5 py-1 text-xs font-semibold text-muted">
@@ -303,7 +313,9 @@ export function SectionJumpBar({
                   : 'border-line bg-surface text-muted hover:bg-surface-alt hover:text-fg'
             }`}
           >
-            {target.dirty || !(target.status.complete || needsWork(target)) ? (
+            {target.dirty ||
+            nothingRequired(target.status) ||
+            !(target.status.complete || needsWork(target)) ? (
               <span
                 aria-hidden
                 className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${

@@ -23,7 +23,9 @@ const REQUIREMENTS: Record<StepKey, [key: string, label: string][]> = {
   ],
   catalog: [['catalog.product', 'At least one live product']],
   address: [['address.business', 'Business address']],
-  tax: [['tax.pan', 'PAN'], ['tax.gst', 'GST registration status']],
+  // PAN and GSTIN are optional: the step exists (its card does) but
+  // requires nothing.
+  tax: [],
   payout: [['payout.bankAccount', 'Primary payout bank account']],
 }
 const HREFS: Record<StepKey, string> = {
@@ -75,18 +77,12 @@ function readiness(blocking: Partial<Record<Gate, string[]>>): Readiness {
 
 const OWNER = '/mystores/zonemax'
 
-test('online payment: GST links to the Tax card, the bank account to its page', () => {
-  // The production report: the server lists the GST answer the bank
-  // account is waiting on, ahead of the account itself.
-  const r = readiness({ ONLINE_PAYMENT: ['tax.gst', 'payout.bankAccount'] })
+test('online payment: the bank account links straight to its page', () => {
+  // What the server reports today: online payment waits on the bank account
+  // alone (PAN and GST are optional; the bank page asks for the address).
+  const r = readiness({ ONLINE_PAYMENT: ['payout.bankAccount'] })
 
   assert.deepEqual(gateBlockers(r, 'ONLINE_PAYMENT', OWNER, []), [
-    {
-      key: 'tax.gst',
-      label: 'GST registration status',
-      section: 'business',
-      to: `${OWNER}/business#setup-tax`,
-    },
     {
       key: 'payout.bankAccount',
       label: 'Primary payout bank account',
@@ -99,21 +95,27 @@ test('online payment: GST links to the Tax card, the bank account to its page', 
 
 test('one button per screen, in order, opening on the first card to fill', () => {
   const r = readiness({
-    ONLINE_PAYMENT: ['address.business', 'tax.pan', 'tax.gst', 'payout.bankAccount'],
+    PUBLISH: ['business.name', 'business.phone', 'catalog.product'],
+    PICKUP: ['address.business'],
   })
 
-  assert.deepEqual(groupBySection(gateBlockers(r, 'ONLINE_PAYMENT', OWNER, [])), [
+  assert.deepEqual(groupBySection(gateBlockers(r, 'PUBLISH', OWNER, [])), [
     {
       section: 'business',
-      to: `${OWNER}/business#setup-address`,
-      labels: ['Business address', 'PAN', 'GST registration status'],
+      to: `${OWNER}/business#setup-business`,
+      labels: ['Business name', 'Contact phone number'],
     },
     {
-      section: 'bank-accounts',
-      to: `${OWNER}/bank-accounts`,
-      labels: ['Primary payout bank account'],
+      section: 'products',
+      to: `${OWNER}/products`,
+      labels: ['At least one live product'],
     },
   ])
+  // The address card is its own anchor on the same page.
+  assert.equal(
+    gateBlockers(r, 'PICKUP', OWNER, [])[0]?.to,
+    `${OWNER}/business#setup-address`,
+  )
 })
 
 test('only the screens that still need something get a button', () => {
@@ -127,20 +129,18 @@ test('only the screens that still need something get a button', () => {
 })
 
 test('admin scope: sections it cannot open come back unlinked', () => {
-  const r = readiness({ ONLINE_PAYMENT: ['tax.gst', 'payout.bankAccount'] })
-  const blockers = gateBlockers(r, 'ONLINE_PAYMENT', '/stores/zonemax/manage', [
-    'bank-accounts',
-    'business',
-  ])
+  const r = readiness({ PUBLISH: ['business.phone', 'catalog.product'], ONLINE_PAYMENT: ['payout.bankAccount'] })
+  const hidden = ['bank-accounts', 'business']
+  const base = '/stores/zonemax/manage'
 
   assert.deepEqual(
-    blockers.map((b) => b.to),
-    [null, null],
+    gateBlockers(r, 'PUBLISH', base, hidden).map((b) => b.to),
+    [null, `${base}/products`],
   )
-  // Still grouped by section, so the admin sees what the seller must do.
+  // Still named, so the admin sees what the seller must do.
   assert.deepEqual(
-    groupBySection(blockers).map((g) => g.labels),
-    [['GST registration status'], ['Primary payout bank account']],
+    groupBySection(gateBlockers(r, 'ONLINE_PAYMENT', base, hidden)),
+    [{ section: 'bank-accounts', to: null, labels: ['Primary payout bank account'] }],
   )
 })
 

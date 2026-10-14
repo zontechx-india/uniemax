@@ -4,15 +4,25 @@ import { Link } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { ErrorNote, InfoNote, TextField } from '../../../shared/ui/form'
-import { storeBankApi } from '../../features/stores/storesApi'
+import {
+  AddressFields,
+  validateAddress,
+} from '../../features/stores/AddressFields'
+import type { AddressErrors } from '../../features/stores/AddressFields'
+import { EMPTY_ADDRESS } from '../../features/stores/storeProfile'
+import type { StoreAddress } from '../../features/stores/storeProfile'
+import { storeBankApi, storesApi } from '../../features/stores/storesApi'
 import type {
   BankAccountDetails,
+  Store,
   StoreBankAccount,
 } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import {
   BankIcon,
+  CardIcon,
   CheckIcon,
+  MapPinIcon,
   PencilIcon,
   PlusIcon,
   ShieldCheckIcon,
@@ -40,14 +50,17 @@ import { useGateBlockers } from './GateBlockers'
  * fields are provisioned now). Editing a verified account's bank details
  * resets it to pending.
  *
- * **Adding an account is gated.** The business address and tax details are
- * no longer asked for at signup — they were the two steps sellers abandoned
- * the wizard on — so this is where they become mandatory: a payout account
- * is the first thing that needs to know who is being paid and where. The
- * condition is `store.readiness.gates.PAYOUT_SETUP`, the same evaluation
- * `POST /bank-accounts` enforces, so the button is hidden for exactly the
- * reasons a save would be rejected. Editing, re-prioritising and deleting
- * existing accounts are never gated.
+ * **Adding an account needs the business address** — it is no longer asked
+ * for at signup (sellers abandoned the wizard on it), and a payout account
+ * is the first thing that needs to know where the business being paid is.
+ * It is asked for **right here**, as step 1 of adding the account, so a
+ * seller who came to add a bank account is never sent to another page (PAN
+ * and GSTIN are optional and not asked). The condition is
+ * `store.readiness.gates.PAYOUT_SETUP`, the same evaluation
+ * `POST /bank-accounts` enforces; anything it ever needs that this page
+ * cannot ask for falls back to a link. Editing, re-prioritising and deleting
+ * existing accounts are never gated. Every change re-fetches the store, so
+ * the Payments switch unlocks the moment a main account exists.
  *
  * The form asks in the order a seller holds the information — the name on
  * the account, then the **IFSC**, which looks the branch up
@@ -58,8 +71,11 @@ import { useGateBlockers } from './GateBlockers'
 
 const MAX_ACCOUNTS = 5
 
+/** The one payout requirement this page collects itself. */
+const ADDRESS_KEY = 'address.business'
+
 export function StoreBankPage() {
-  const { store } = useManagedStore()
+  const { store, onStoreChange, refreshStore } = useManagedStore()
 
   const [accounts, setAccounts] = useState<StoreBankAccount[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -103,6 +119,9 @@ export function StoreBankPage() {
     }
   }
 
+  // The store's readiness counts the main account (online payment needs
+  // one), so every change that can move it re-fetches the store — otherwise
+  // the Payments switch would stay locked until a reload.
   const create = (input: BankAccountDetails) =>
     run(async () => {
       const account = await storeBankApi.create(store.id, input)
@@ -113,6 +132,7 @@ export function StoreBankPage() {
         account,
       ])
       setEditing(null)
+      refreshStore?.()
     })
 
   const update = (accountId: string, input: BankAccountDetails) =>
@@ -132,6 +152,7 @@ export function StoreBankPage() {
           row.id === account.id ? account : { ...row, isPrimary: false },
         ),
       )
+      refreshStore?.()
     })
 
   const remove = async () => {
@@ -140,17 +161,21 @@ export function StoreBankPage() {
     const ok = await run(async () => {
       await storeBankApi.remove(store.id, target.id)
       setAccounts((rows) => (rows ?? []).filter((row) => row.id !== target.id))
+      refreshStore?.()
     })
     if (ok) setConfirmDelete(null)
   }
 
   const noPrimary =
     accounts !== null && accounts.length > 0 && !accounts.some((a) => a.isPrimary)
+  const hasPrimary = (accounts ?? []).some((a) => a.isPrimary)
 
-  const payoutGate = store.readiness.gates.PAYOUT_SETUP
-  const addBlocked = !payoutGate.allowed
-  // Straight to the first card still missing something, not the page top.
-  const fixFirst = useGateBlockers(store, 'PAYOUT_SETUP')[0]?.to ?? '../business'
+  // The address is asked for in the add flow itself (`AddressStep`); only a
+  // requirement this page cannot ask for withholds adding and links out.
+  const payoutBlockers = useGateBlockers(store, 'PAYOUT_SETUP')
+  const needsAddress = payoutBlockers.some((b) => b.key === ADDRESS_KEY)
+  const elsewhere = payoutBlockers.filter((b) => b.key !== ADDRESS_KEY)
+  const addBlocked = elsewhere.length > 0
 
   return (
     <div className="space-y-4">
@@ -182,15 +207,18 @@ export function StoreBankPage() {
       )}
       {loadError && <ErrorNote>{loadError}</ErrorNote>}
 
-      {/* Adding is withheld; this says why, and where every missing piece
-          is filled in. */}
+      {/* Adding is withheld by something this page cannot ask for; this says
+          what, and links to where it is filled in. */}
       {addBlocked && accounts !== null && (
         <div className="rounded-glass bg-pending-soft p-4">
           <p className="text-base font-semibold text-fg">First, add your business details</p>
           <p className="mt-0.5 text-hint text-muted">
-            Before adding a bank account, add: {payoutGate.blockers.join(', ')}.
+            Before adding a bank account, add: {elsewhere.map((b) => b.label).join(', ')}.
           </p>
-          <Link to={fixFirst} className={buttonClass({ size: 'md', className: 'mt-3' })}>
+          <Link
+            to={elsewhere[0]?.to ?? '../business'}
+            className={buttonClass({ size: 'md', className: 'mt-3' })}
+          >
             <ShieldCheckIcon className="h-4 w-4" />
             Go to Business details
           </Link>
@@ -231,6 +259,28 @@ export function StoreBankPage() {
         </InfoNote>
       )}
 
+      {/* The step after this one: a seller who added an account to take
+          online payments is one tap from the switch, not left to find it. */}
+      {hasPrimary && !store.payments.acceptOnlinePayment && editing === null && (
+        <div className="flex flex-col gap-3 rounded-xl bg-brand-soft p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-fg">
+            <span className="font-semibold">Your main account is ready.</span>{' '}
+            Turn on online payments so customers can pay by UPI or card.
+          </p>
+          <Link
+            to="../payments"
+            className={buttonClass({
+              variant: 'secondary',
+              size: 'md',
+              className: 'shrink-0 self-start sm:self-auto',
+            })}
+          >
+            <CardIcon className="h-4 w-4" />
+            Go to Payments
+          </Link>
+        </div>
+      )}
+
       {(accounts ?? []).length > 0 && (
         <ul className="glass-card divide-y divide-line overflow-hidden rounded-glass">
           {(accounts ?? []).map((account) =>
@@ -257,13 +307,22 @@ export function StoreBankPage() {
         </ul>
       )}
 
-      {editing === 'new' && (
-        <AccountForm
-          busy={busy}
-          onCancel={() => setEditing(null)}
-          onSubmit={(input) => void create(input)}
-        />
-      )}
+      {/* No address yet → it is step 1 of adding the account; saving it
+          lifts the gate and this swaps to the account form by itself. */}
+      {editing === 'new' &&
+        (needsAddress ? (
+          <AddressStep
+            store={store}
+            onSaved={onStoreChange}
+            onCancel={() => setEditing(null)}
+          />
+        ) : (
+          <AccountForm
+            busy={busy}
+            onCancel={() => setEditing(null)}
+            onSubmit={(input) => void create(input)}
+          />
+        ))}
 
       {actionError && <ErrorNote>{actionError}</ErrorNote>}
 
@@ -373,6 +432,86 @@ function AccountRow({
         ]}
       />
     </li>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Step 1 of adding, when the store has no business address yet
+// ---------------------------------------------------------------------------
+
+/**
+ * The business address, asked for in place: it is the one detail the server
+ * needs before a payout account, and sending the seller to Business details
+ * for it — then expecting them to find their way back — is the detour this
+ * page exists to avoid. It saves to the same profile field that page edits.
+ */
+function AddressStep({
+  store,
+  onSaved,
+  onCancel,
+}: {
+  store: Store
+  onSaved: (store: Store) => void
+  onCancel: () => void
+}) {
+  const [address, setAddress] = useState<StoreAddress>(EMPTY_ADDRESS)
+  const [errors, setErrors] = useState<AddressErrors>({})
+  const [busy, setBusy] = useState(false)
+  const [problem, setProblem] = useState<string | null>(null)
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    const found = validateAddress(address)
+    setErrors(found)
+    if (Object.keys(found).length > 0) {
+      return setProblem('Please complete the highlighted fields.')
+    }
+    setProblem(null)
+    setBusy(true)
+    try {
+      // The fresh store lifts the gate, which swaps this step for the
+      // account form — no extra navigation.
+      onSaved(await storesApi.updateProfile(store.id, { address }))
+      showToast('Address saved')
+    } catch (err) {
+      setProblem(toApiError(err).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={submit} noValidate>
+      <GlassCard
+        icon={MapPinIcon}
+        title="Your business address"
+        description="Needed once, before your first bank account."
+        aside={
+          <StatusPill tone="brand" dot={false}>
+            Step 1 of 2
+          </StatusPill>
+        }
+      >
+        <div className="space-y-4">
+          <AddressFields
+            value={address}
+            onChange={setAddress}
+            errors={errors}
+            disabled={busy}
+            idPrefix="payout-address"
+          />
+          {problem && <ErrorNote>{problem}</ErrorNote>}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row">
+            <Button type="button" variant="secondary" size="lg" onClick={onCancel} disabled={busy}>
+              Cancel
+            </Button>
+            <Button type="submit" size="lg" loading={busy} className="sm:px-8">
+              {busy ? 'Saving…' : 'Save and continue'}
+            </Button>
+          </div>
+        </div>
+      </GlassCard>
+    </form>
   )
 }
 

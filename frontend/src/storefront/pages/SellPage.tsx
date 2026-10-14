@@ -283,7 +283,7 @@ const FEATURES: Feature[] = [
   {
     icon: CardIcon,
     title: 'Cash on Delivery and online payments',
-    body: 'Take Cash on Delivery from day one. Add your PAN and bank account to accept secure online payments too — and turn COD off for any product.',
+    body: 'Take Cash on Delivery from day one. Add your bank account to accept secure online payments too — and turn COD off for any product.',
     visual: <PaymentChoiceVisual />,
     wide: true,
   },

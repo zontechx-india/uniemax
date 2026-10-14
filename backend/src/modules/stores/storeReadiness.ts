@@ -28,11 +28,12 @@ import type { StoreProfile } from "./storeProfile.schema.js";
 
 /**
  * `PUBLISH` — make the storefront publicly reachable.
- * `PAYOUT_SETUP` — save a payout bank account. This is where the address and
- *   tax identity are collected: they are the KYC behind a payout, and asking
- *   for them at signup instead was costing sellers before they had a store.
- * `ONLINE_PAYMENT` — accept platform-processed payment (money moves, so the
- *   payout identity has to be real).
+ * `PAYOUT_SETUP` — save a payout bank account. This is where the business
+ *   address is collected — the bank page asks for it itself when it is
+ *   missing — because asking for it at signup was costing sellers before
+ *   they had a store.
+ * `ONLINE_PAYMENT` — accept platform-processed payment (money moves, so
+ *   there has to be an account to pay it out to).
  * `PICKUP` — offer collection from a physical location, which is meaningless
  *   without an address to collect from.
  */
@@ -73,9 +74,10 @@ export function gateBlockedMessage(gate: Gate, state: GateState): string {
  *
  * The wizard is deliberately two steps. It used to be four — address and tax
  * were steps 3 and 4 — and sellers were leaving before finishing it. Neither
- * is needed to open a shop: they become mandatory the moment the seller adds
- * a payout bank account (`PAYOUT_SETUP`), which is the first time the
- * platform actually needs to know who it is paying and where they are.
+ * is needed to open a shop. The address becomes mandatory the moment the
+ * seller adds a payout bank account (`PAYOUT_SETUP`), the first time the
+ * platform needs to know where the business it pays is; the tax step holds
+ * only optional fields (PAN, GSTIN) and gates nothing.
  *
  * Step order is the seller's journey: open the shop (store, business,
  * catalog), then get paid (address, tax, payout).
@@ -135,7 +137,7 @@ export const STEPS: StepDefinition[] = [
   {
     key: "tax",
     title: "Tax details",
-    blurb: "PAN and GST status. Needed before you add a bank account.",
+    blurb: "PAN and GST number. Both optional.",
     wizard: false,
     href: "business",
   },
@@ -183,15 +185,6 @@ export interface Requirement {
    * capability on — without the evaluator knowing why.
    */
   appliesWhen?: (ctx: ReadinessContext) => boolean;
-  /**
-   * A gate that must be open before this requirement CAN be met — a payout
-   * bank account cannot be saved until `PAYOUT_SETUP` passes. While that gate
-   * is still blocked, every gate this requirement blocks reports the
-   * prerequisite's blockers too, so a seller is never sent to a step that
-   * will only refuse them. It never changes `allowed`: prerequisites are
-   * listed only beside the unmet requirement waiting on them.
-   */
-  after?: Gate;
 }
 
 const filled = (value: string | null | undefined): boolean =>
@@ -267,36 +260,20 @@ export const REQUIREMENTS: Requirement[] = [
     step: "address",
     // Not a publish blocker: a COD shop can open without it. It is the one
     // address the platform holds, so two things read it — the payout KYC
-    // (a bank account is added against a real place of business) and store
-    // pickup, where customers must be told where to collect.
+    // (a bank account is added against a real place of business; the bank
+    // page asks for it in place, so the seller is never sent elsewhere) and
+    // store pickup, where customers must be told where to collect.
     gates: ["PAYOUT_SETUP", "PICKUP"],
     isMet: (ctx) => ctx.profile.address !== null,
   },
 
   // --- Tax ----------------------------------------------------------------
-  {
-    key: "tax.pan",
-    label: "PAN",
-    step: "tax",
-    // Not a publish blocker: a COD-only store never needs one. It gates the
-    // moment the platform starts handling money on the seller's behalf —
-    // without a PAN, 194-O TDS is withheld at 5% instead of 1% (206AA).
-    // Collected when the bank account is added, and re-checked when online
-    // payment is switched on in case it was cleared in between.
-    gates: ["PAYOUT_SETUP", "ONLINE_PAYMENT"],
-    isMet: (ctx) => filled(ctx.profile.tax.pan),
-  },
-  {
-    key: "tax.gst",
-    label: "GST registration status",
-    step: "tax",
-    // Small sellers supplying within one state may trade on a marketplace
-    // unregistered, so this asks for an ANSWER, not a number — a GSTIN or
-    // the "not registered" declaration. Either is enough to add a bank
-    // account; the platform just needs to know which it is before paying out.
-    gates: ["PAYOUT_SETUP"],
-    isMet: (ctx) => filled(ctx.profile.tax.gstin) || ctx.profile.tax.gstExempt,
-  },
+  // Deliberately nothing: PAN and GSTIN are optional, as the form says.
+  // Without a PAN, 194-O TDS on online sales is withheld at 5% instead of 1%
+  // (206AA) — a cost the PAN field explains, not a reason to stop a seller
+  // getting paid. GSTIN was never mandatory (small sellers inside one state
+  // may trade unregistered). Requiring either sent sellers back and forth
+  // between Bank account and Business details for fields marked optional.
 
   // --- Payout -------------------------------------------------------------
   {
@@ -304,10 +281,6 @@ export const REQUIREMENTS: Requirement[] = [
     label: "Primary payout bank account",
     step: "payout",
     gates: ["ONLINE_PAYMENT"],
-    // Adding the account is itself gated (address, PAN, GST status), so a
-    // seller told only "add a bank account" would be refused at the bank
-    // page for something the Payments page never mentioned.
-    after: "PAYOUT_SETUP",
     isMet: (ctx) => ctx.hasPrimaryBankAccount,
   },
 ];
@@ -337,11 +310,7 @@ export interface StepState extends StepDefinition {
 export interface GateState {
   gate: Gate;
   allowed: boolean;
-  /**
-   * Labels of everything still to do before the gate opens — its own unmet
-   * requirements plus any prerequisite they wait on (`Requirement.after`),
-   * in the order to do them. Ready to render in a sentence.
-   */
+  /** Labels of the unmet requirements, ready to render in a sentence. */
   blockers: string[];
   /** Requirement keys, for a client that wants to deep-link to a step. */
   blockerKeys: string[];
@@ -390,32 +359,9 @@ export function evaluateReadiness(ctx: ReadinessContext): Readiness {
     };
   });
 
-  const afterOf = new Map(applicable.map((req) => [req.key, req.after]));
-
-  // A gate's unmet requirements, then — for any that can only be met once
-  // another gate opens — that gate's own, recursively. `seen` stops a cycle.
-  const blockingKeys = (gate: Gate, seen: Set<Gate>): Set<string> => {
-    seen.add(gate);
-    const keys = new Set<string>();
-    for (const r of states) {
-      if (r.met || !r.gates.includes(gate)) continue;
-      keys.add(r.key);
-      const after = afterOf.get(r.key);
-      if (after && !seen.has(after)) {
-        for (const key of blockingKeys(after, seen)) keys.add(key);
-      }
-    }
-    return keys;
-  };
-
   const gates = Object.fromEntries(
     GATES.map((gate) => {
-      const keys = blockingKeys(gate, new Set());
-      // Registry order is the seller's journey (address → tax → payout), so a
-      // prerequisite always reads before the requirement waiting on it.
-      // `allowed` is unaffected: prerequisites only ever join a direct
-      // blocker, so the list is empty exactly when nothing blocks directly.
-      const blocking = states.filter((r) => keys.has(r.key));
+      const blocking = states.filter((r) => !r.met && r.gates.includes(gate));
       return [
         gate,
         {

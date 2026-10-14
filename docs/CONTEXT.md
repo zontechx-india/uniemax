@@ -73,11 +73,12 @@ A single account can own multiple stores and switch between them.
   The wizard used to have two more steps — **Address** and **Tax details** —
   and sellers were leaving before the end. Neither is needed to open a shop
   (a cash-on-delivery store never touches them), so they moved out of the
-  wizard and into Business Details, where they become **mandatory the moment
-  the seller adds a payout bank account**: the address (street, PIN code,
-  city, state — the one address the platform holds), the PAN, and the GST
-  status (a GSTIN or a "not registered for GST" declaration). Until then they
-  are optional and the checklist marks them "to get paid".
+  wizard and into Business Details. The **address becomes mandatory the
+  moment the seller adds a payout bank account** (street, PIN code, city,
+  state — the one address the platform holds); the bank page asks for it
+  right there if it is missing, so the seller is never sent elsewhere. Until
+  then it is optional and the checklist marks it "to get paid". The **PAN
+  and GSTIN stay optional** throughout.
 
   Two rules keep it fast. **The store is created at the end of step 1**, so
   onboarding is resumable: a seller who leaves on step 2 still owns a store,
@@ -117,18 +118,19 @@ A single account can own multiple stores and switch between them.
   without filling anything in; requirements attach to *capabilities*, not to
   screens:
   - **Publishing** needs the store name and logo, business name, seller name,
-    contact phone and email, a business address, and at least one category
-    and one product. An empty or anonymous storefront never reaches the
-    marketplace.
-  - **Online payments** need a **PAN** and a primary payout bank account —
-    the point at which UnieMax starts collecting and paying out money (and
-    without a PAN, TDS is withheld at 5% instead of 1%). A cash-on-delivery
-    store never needs either.
+    contact phone and email, and at least one category and one product. An
+    empty or anonymous storefront never reaches the marketplace.
+  - **Online payments** need a primary payout bank account — the point at
+    which UnieMax starts collecting and paying out money. Adding the account
+    needs the business address, which the bank page asks for itself. A
+    cash-on-delivery store never needs either.
   - **Store pickup** needs the business address, so customers know where to
     collect.
-  - **GSTIN is never mandatory** — small sellers supplying within their own
-    state may trade on a marketplace unregistered, so the form asks them to
-    say which they are rather than demanding a number.
+  - **PAN and GSTIN are never mandatory.** A PAN only lowers the tax held
+    back from online sales (TDS at 1% instead of 5%); small sellers supplying
+    within their own state may trade unregistered for GST. Requiring either
+    sent sellers back and forth between Bank account and Business details
+    for fields the form calls optional.
 
   Blocked actions say exactly what is missing, all of it at once, and the
   control that is disabled explains itself where it sits. Turning a
@@ -142,9 +144,9 @@ A single account can own multiple stores and switch between them.
 - **Business Details** — the permanent home of what the wizard collects and
   what it deliberately leaves for later: three independently-saved cards for
   **Business & contact**, **Address** and **Tax & compliance** (PAN, GSTIN,
-  registration number). Address and tax are required before a bank account
-  can be added. Correcting a phone number never means re-validating an
-  address.
+  registration number — all optional). The address is required before a bank
+  account can be added. Correcting a phone number never means re-validating
+  an address.
 - **Seller dashboard** — the management page's landing view: **Today's
   Orders**, Total Orders and Revenue up top, then the order pipeline —
   **Pending / Processing / Shipped / Completed / Cancelled / Refunded** —
@@ -227,7 +229,9 @@ A single account can own multiple stores and switch between them.
   UnieMax pays their sales earnings into (used when customers pay through
   the platform; the payments module itself is a later release). Up to 5
   accounts, each with account holder name, account number (entered twice to
-  confirm), IFSC, bank name, branch and an optional UPI ID. Exactly **one
+  confirm), IFSC, bank name, branch and an optional UPI ID. Adding the first
+  account needs the business address — asked for on the same page, as step 1,
+  when it is missing. Exactly **one
   account is primary** — only it receives payouts; deleting the primary
   never silently retargets payouts (they hold until the seller explicitly
   picks another). Every account carries a **verification status** (pending
@@ -243,9 +247,10 @@ A single account can own multiple stores and switch between them.
   **confirmation** (a dialog spelling out the effect) before saving. The
   checkout shows customers which methods a store accepts. Turning
   everything off warns the seller that customers can't order. **Online
-  payment cannot be switched on** until the store has a PAN and a primary
-  payout account; the switch is disabled and names both, linking to Business
-  Details and Bank Accounts. Switching it off is never blocked.
+  payment cannot be switched on** until the store has a primary payout
+  account; the switch is disabled and says so, with a button to Bank account
+  (which leads back here once the account is saved). Switching it off is
+  never blocked.
 - **Shipping settings** — how customers **receive** orders: the seller
   chooses **Delivery**, **Store Pickup**, or **Both** (default Delivery).
   Selecting a different option asks for **confirmation** before saving,

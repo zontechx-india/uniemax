@@ -46,10 +46,10 @@ import { MediaImg } from '../../../shared/media/MediaImg'
  * **Only what a shop needs to open is asked.** This used to be four steps —
  * address and tax details were steps 3 and 4 — and sellers were leaving
  * before the end. Neither is needed to sell: a cash-on-delivery shop never
- * touches them. They are collected later, in Business Details, and become
- * mandatory only when the seller adds a payout bank account — the first time
- * the platform actually has to know who it is paying and where they are.
- * The backend `PAYOUT_SETUP` gate enforces that; nothing here has to.
+ * touches them. They are collected later, in Business Details; the address
+ * becomes mandatory only when the seller adds a payout bank account (the bank
+ * page asks for it right there), and PAN and GSTIN stay optional. The backend
+ * `PAYOUT_SETUP` gate enforces that; nothing here has to.
  *
  * **The store is created at the end of step 1, not at the end of step 2.**
  * Onboarding is therefore RESUMABLE: a seller who closes the tab on step 2

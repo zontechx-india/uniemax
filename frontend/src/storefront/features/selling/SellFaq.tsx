@@ -4,8 +4,9 @@ import { ChevronDownIcon } from '../../layout/icons'
  * The questions that stop a seller starting — each answer is what the
  * platform does today, not what it plans to. The requirement answers mirror
  * the backend's capability registry (`storeReadiness.ts`): what publishing
- * needs, what online payment needs, and that GSTIN is never mandatory. When a
- * rule there changes, the matching answer here has to change with it.
+ * needs, what online payment needs (a bank account, which needs the business
+ * address), and that PAN and GSTIN are never mandatory. When a rule there
+ * changes, the matching answer here has to change with it.
  */
 const FAQS = [
   {
@@ -14,11 +15,11 @@ const FAQS = [
   },
   {
     q: 'Do I need a GST number?',
-    a: 'No — GSTIN is optional on UnieMax; add it if you have one. You need a PAN only if you want to accept online payments.',
+    a: 'No — GSTIN is optional on UnieMax; add it if you have one. A PAN is optional too: with one, less tax is held back from your online sales.',
   },
   {
     q: 'How do I get paid?',
-    a: 'Cash on Delivery orders are paid to you by your customer when you deliver. To accept online payments, add your PAN and a bank account: UnieMax collects the payment and pays it out to your verified account.',
+    a: 'Cash on Delivery orders are paid to you by your customer when you deliver. To accept online payments, add your bank account and business address: UnieMax collects the payment and pays it out to your verified account.',
   },
   {
     q: 'How do I deliver orders?',
@@ -26,7 +27,7 @@ const FAQS = [
   },
   {
     q: 'What do I need before my store goes live?',
-    a: 'Your store name and logo, your business and seller name, a contact phone and email, your business address, and at least one product. Your dashboard keeps a checklist of exactly what’s left.',
+    a: 'Your store name and logo, your business and seller name, a contact phone and email, and at least one product in a category. Your dashboard keeps a checklist of exactly what’s left.',
   },
   {
     q: 'Can I run it all from my phone?',

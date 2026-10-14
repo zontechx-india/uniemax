@@ -512,8 +512,8 @@ endpoint (which checked nothing), the payments page (a hint that enforced
 nothing) and the seller's guesswork. It is now declared once:
 
 ```ts
-{ key: "tax.pan", label: "PAN", step: "tax",
-  gates: ["ONLINE_PAYMENT"], isMet: (ctx) => filled(ctx.profile.tax.pan) }
+{ key: "payout.bankAccount", label: "Primary payout bank account", step: "payout",
+  gates: ["ONLINE_PAYMENT"], isMet: (ctx) => ctx.hasPrimaryBankAccount }
 ```
 
 Everything derives from `REQUIREMENTS`: the server enforces gates
@@ -533,23 +533,18 @@ no endpoint, no UI and no migration change.
   `wizard: true` steps are the numbered pages of Create Store — only
   `store` and `business`; the rest are checklist-only (you cannot add a
   product from a signup wizard). Address and tax were wizard steps until
-  sellers kept abandoning the flow on them; they now gate `PAYOUT_SETUP`
-  instead of `PUBLISH`, so a COD shop opens without them and they become
-  mandatory the moment a bank account is added. Step order follows the
-  seller's journey: store · business · catalog, then address · tax · payout.
+  sellers kept abandoning the flow on them. The address now gates
+  `PAYOUT_SETUP` instead of `PUBLISH` — a COD shop opens without it, and the
+  bank page asks for it in place when the first account is added. The tax
+  step requires **nothing**: PAN and GSTIN are optional (without a PAN, TDS
+  on online sales is withheld at 5% instead of 1%), so `ONLINE_PAYMENT` needs
+  only the primary bank account. Requiring them sent sellers back and forth
+  between Bank account and Business details for fields the form calls
+  optional. Step order follows the seller's journey: store · business ·
+  catalog, then address · tax · payout.
 - `appliesWhen` makes a requirement conditional — for a field that only
   matters once the seller switches a capability on. Inapplicable requirements
   are dropped from the evaluation, never reported unmet.
-- `after: Gate` marks a requirement that can only be met once another gate
-  opens — `payout.bankAccount` has `after: "PAYOUT_SETUP"` (an account can't
-  be saved before the address, PAN and GST answer). While it is unmet and
-  that gate is blocked, every gate it blocks also lists the prerequisite's
-  blockers, in registry order, each once — so `ONLINE_PAYMENT` reads "GST
-  registration status, Primary payout bank account", not just the account the
-  bank page would refuse. `allowed` never changes (prerequisites only join a
-  direct blocker), and the registry keeps prerequisites before the
-  requirement waiting on them — `test/unit/store-readiness.test.ts` asserts
-  both.
 - `evaluateReadiness(ctx)` is pure. The context's three counts (categories,
   **active** products, primary bank account) are loaded by
   `loadReadinessCounts` — only `isActive` products count toward
@@ -990,7 +985,9 @@ White-label design — one codebase, any business:
   checkout knows what a store offers/asks. A `profile` JSON column holds the
   **business identity** — `businessName`, `sellerName`, contact `phone` /
   `email`, a structured `address`, and `tax`
-  (`pan`, `gstin`, `gstExempt`, `registrationNumber`) — updated via
+  (`pan`, `gstin`, `gstExempt`, `registrationNumber` — all optional;
+  `gstExempt` is the old "not registered for GST" declaration, no longer
+  asked for and kept as stored) — updated via
   `PATCH /stores/:id/profile` and normalised by `resolveProfile`
   **field-by-field**, so one unparseable value costs that field rather than
   the seller's whole profile. It is deliberately distinct from `footer`:

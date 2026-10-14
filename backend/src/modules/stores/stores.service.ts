@@ -609,9 +609,9 @@ export async function updateStorePayments(
   const store = await assertOwnedStore(actor, storeRef); // ownership check
 
   // Turning online payment ON means UnieMax starts collecting money for this
-  // seller and paying it out, so the payout identity has to be real first:
-  // a primary bank account and a PAN (without which 194-O TDS is withheld at
-  // 5% rather than 1%). Turning it OFF is never gated.
+  // seller and paying it out, so there has to be a primary bank account to
+  // pay it into. A PAN is optional (without one, 194-O TDS is withheld at 5%
+  // rather than 1%). Turning it OFF is never gated.
   if (patch.acceptOnlinePayment && !store.payments.acceptOnlinePayment) {
     await assertGate(store, "ONLINE_PAYMENT");
   }

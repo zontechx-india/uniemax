@@ -359,14 +359,15 @@ on, so the two can never disagree.
                         "blockers": ["Contact phone number", "At least one live product"],
                         "blockerKeys": ["business.phone", "catalog.product"] },
     "PAYOUT_SETUP":   { "gate": "PAYOUT_SETUP", "allowed": false,
-                        "blockers": ["Business address", "PAN"],
-                        "blockerKeys": ["address.business", "tax.pan"] },
+                        "blockers": ["Business address"],
+                        "blockerKeys": ["address.business"] },
     "ONLINE_PAYMENT": { "gate": "ONLINE_PAYMENT", "allowed": false,
-                        "blockers": ["PAN"], "blockerKeys": ["tax.pan"] },
+                        "blockers": ["Primary payout bank account"],
+                        "blockerKeys": ["payout.bankAccount"] },
     "PICKUP":         { "gate": "PICKUP", "allowed": false,
                         "blockers": ["Business address"], "blockerKeys": ["address.business"] }
   },
-  "complete": false, "metCount": 8, "totalCount": 12
+  "complete": false, "metCount": 6, "totalCount": 10
 }
 ```
 
@@ -375,25 +376,19 @@ on, so the two can never disagree.
 | Gate | Blocks | Requirements |
 | --- | --- | --- |
 | `PUBLISH` | `PATCH …/publish` with `isPublished: true` | store name + logo · business name · seller name · contact phone · contact email · ≥ 1 category · ≥ 1 live product (drafts and disabled products don't count) |
-| `PAYOUT_SETUP` | `POST …/bank-accounts` (adding any payout account) | business address · PAN · GST registration status (a GSTIN or the not-registered declaration) |
-| `ONLINE_PAYMENT` | `PATCH …/payments` turning `acceptOnlinePayment` **on** | PAN · a primary payout bank account (until one exists, whatever `PAYOUT_SETUP` still lacks is listed first — see **Prerequisites**) |
+| `PAYOUT_SETUP` | `POST …/bank-accounts` (adding any payout account) | the business address |
+| `ONLINE_PAYMENT` | `PATCH …/payments` turning `acceptOnlinePayment` **on** | a primary payout bank account |
 | `PICKUP` | `PATCH …/shipping` with mode `PICKUP` / `BOTH` | the business address |
 
-The address and tax details are **not** needed to publish — a cash-on-delivery
-shop can open without them. They become mandatory at `PAYOUT_SETUP`, the first
-point at which the platform has to know who it is paying and where.
+The address is **not** needed to publish — a cash-on-delivery shop can open
+without it. It becomes mandatory at `PAYOUT_SETUP`, the first point at which the
+platform has to know where the business it pays is (the seller's bank page asks
+for it in place). **PAN and GSTIN are never required**: without a PAN, TDS on
+online sales is withheld at 5% instead of 1%, and GSTIN is only for registered
+sellers. No requirement reads the `tax` profile fields.
 
 A blocked request returns `400` naming every missing requirement at once, e.g.
-`"Before you can publish your store, please add: Business address, At least one live product."`
-
-**Prerequisites.** A requirement that can only be met once another gate opens
-lists that gate's blockers too. Today that is the bank account: it cannot be
-saved until `PAYOUT_SETUP` passes, so while the store has no primary account,
-`ONLINE_PAYMENT`'s `blockers` / `blockerKeys` also carry `PAYOUT_SETUP`'s unmet
-requirements — in journey order, each once — e.g.
-`["GST registration status", "Primary payout bank account"]`. `allowed` is
-unaffected (it is false exactly when something blocks directly), and once the
-account exists `ONLINE_PAYMENT` asks only for the PAN again.
+`"Before you can publish your store, please add: Contact phone number, At least one live product."`
 
 Requirements that do not apply are omitted rather than reported unmet — a
 delivery-only store has no pickup-address requirement at all. Turning a
@@ -791,10 +786,8 @@ module), `acceptCod` = cash on delivery. Every store response returns
 it too, so the checkout can show what the store accepts. Returns the full
 store.
 
-Turning `acceptOnlinePayment` **on** is gated by `ONLINE_PAYMENT` (PAN + a
-primary payout account) — see **Store readiness**. Turning it off never is.
-Without an account the `400` also names what adding one needs, e.g.
-`"Before you can accept online payments, please add: GST registration status, Primary payout bank account."`
+Turning `acceptOnlinePayment` **on** is gated by `ONLINE_PAYMENT` (a primary
+payout account) — see **Store readiness**. Turning it off never is.
 
 ### `PATCH /api/v1/stores/:id/shipping`
 ```jsonc
@@ -901,8 +894,8 @@ first. Each:
 }
 ```
 `400` while the `PAYOUT_SETUP` gate is blocked (see *Store readiness*) —
-the business address, PAN and GST registration status must be in first; the
-message names every missing one. `409` on the 6th account or when the same
+the business address must be in first (the seller's bank page asks for it in
+place); the message names every missing one. `409` on the 6th account or when the same
 `accountNumber` + `ifsc` is already saved for this store. Created `PENDING`.
 
 **`PATCH /api/v1/stores/:id/bank-accounts/:accountId`** — partial update
@@ -2823,7 +2816,7 @@ under `/mystores/{slug}` that finishes it, so the console can hand the seller
 a direct link.
 
 `setup` is **independent of `status`** — a published store can still be
-missing its PAN. Filtering by it evaluates the matching set and pages in
+missing its business address. Filtering by it evaluates the matching set and pages in
 memory: readiness is computed from the profile plus three aggregate counts,
 never stored, so it cannot be a `WHERE` clause. The cost scales with the
 seller count, not the order or product count.
@@ -2835,7 +2828,7 @@ checkout — the same effective values the storefront sees), `bankAccounts`
 (**account numbers masked to the last 4**), `orderStatus` counts, `theme`,
 `footer`, the 10 latest orders, and `readiness` — the **full** evaluation
 (every step with its individual requirements), not just the `setup` summary,
-so the console can name what is missing ("Contact email", "PAN") in the
+so the console can name what is missing ("Contact email", "Business address") in the
 message an admin sends the seller.
 
 ### `PATCH /api/v1/admin/stores/:id/suspend`

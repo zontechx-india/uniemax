@@ -1760,24 +1760,22 @@ is never shown a pickup-address item.
   immediately** rather than leaving it behind a second Save, and a link to
   Profile),
   **Address** (the business address via `AddressFields` — the one address the
-  platform holds) and **Tax & compliance** (PAN,
-  GSTIN, a not-registered declaration, registration number, with live format
-  hints, the GSTIN's state code decoded, and a PAN-inside-GSTIN cross-check).
+  platform holds) and **Tax & compliance** (PAN and
+  GSTIN — both labelled "(optional)", nothing requires them — and a
+  registration number, with live format hints, the GSTIN's state code
+  decoded, and a PAN-inside-GSTIN cross-check; there is no "not registered
+  for GST" box any more, an empty GSTIN says it).
   Because the three save independently, each carries its **own status** in
   its header (`StatusBadge`: Complete / *n* of *m* done / Unsaved changes /
   **Optional**) plus, when incomplete, the missing requirements named in a
   line — "2 of 4" alone still leaves the seller hunting the form. Orange is
   reserved for what blocks publishing (`SectionStatus.blocksLaunch`): the
-  Address and Tax cards, needed only for payouts, read "Optional" with a
-  neutral "For online payments, add: …" line, neither pin the jump bar nor
-  turn its tiles orange, and the header bar turns green once nothing on the
-  page blocks publishing. While online payment is off and blocked, the Tax
-  card swaps that line for a note naming what this page still needs and
-  linking the step after it ("…add GST registration status on this page,
-  then: *Primary payout bank account*"), or — once this page is done — a
-  neutral "Your details here are done … add next: …". Its GST hint tells a
-  seller who leaves the number empty to tick "I'm not registered for GST":
-  an empty box is not an answer, and it blocks the bank account. Each card's
+  Address card, needed only for payouts and pickup, reads "Optional" with a
+  neutral "For online payments, add: …" line, neither pins the jump bar nor
+  turns its tile orange, and the header bar turns green once nothing on the
+  page blocks publishing. The Tax card has no requirements at all, so it
+  always reads "Optional" — a section with nothing required never claims
+  "Complete" (`SetupStatus.tsx`, `total === 0`). Each card's
   id is `setupAnchor(step)` (`setup-business` / `setup-address` /
   `setup-tax`); a link carrying one as its hash (Payments, Bank account, the
   publish checklist) lands on that card — the router scrolls to it, the page
@@ -1938,12 +1936,19 @@ is never shown a pickup-address item.
   field that flags a mismatch as you type, and an optional UPI ID with its
   own ⓘ sheet. Errors are plain sentences ("The two account numbers are not
   the same"). A banner flags "no primary selected" whenever accounts exist
-  without one. **Add Bank Account is withheld** while
-  `store.readiness.gates.PAYOUT_SETUP` is blocked — the business address,
-  PAN and GST status moved out of the signup wizard and this is where they
-  become mandatory — with a note naming the missing pieces and linking to
-  the first Business Details card that lacks one; editing, re-prioritising
-  and deleting are never gated),
+  without one. Adding needs the **business address**
+  (`store.readiness.gates.PAYOUT_SETUP`), which moved out of the signup
+  wizard — and it is asked for **on this page**: with no address on file,
+  Add bank account opens an `AddressStep` first ("Your business address",
+  *Step 1 of 2*, `AddressFields` saved to the profile), which swaps itself
+  for the account form once saved, so the seller is never sent to another
+  page. PAN and GSTIN are optional and not asked. Only a requirement this
+  page cannot ask for would withhold adding, behind a link to where it is
+  filled in. Every add / make-main / delete re-fetches the store
+  (`refreshStore`), so the Payments switch unlocks at once, and once a main
+  account exists while online payment is off, a "Your main account is
+  ready … **Go to Payments**" note leads to the switch; editing,
+  re-prioritising and deleting are never gated),
   `StorePaymentsPage` (**Payments** — how customers PAY: one glass card per
   method — **Cash on delivery** and **Online payment (UPI, cards)** (paid
   out to the main bank account) — each with an icon, one sentence and a
@@ -1954,15 +1959,13 @@ is never shown a pickup-address item.
   `PATCH /stores/:id/payments`; an all-off state warns that customers
   can't order. The **online-payment switch is disabled** while
   `store.readiness.gates.ONLINE_PAYMENT` is blocked, with an orange "To turn
-  this on, first add:" box listing the steps **in order**, one numbered row
-  per screen (`groupBySection`), each naming what is missing there with a
-  button — labelled and iconned as its nav row (`sectionItem`) — that opens
-  that screen at the right card. The gate reports the bank account's own
-  prerequisites first, so a seller with no GST answer sees "1 GST
-  registration status · Business details, 2 Primary payout bank account ·
-  Bank account" instead of being sent to a bank page that refuses them; a
-  screen with nothing missing gets no button, and sections an admin cannot
-  open are listed without one. This
+  this on, first add:" box — one row per screen that still needs something
+  (`groupBySection`; numbered only when there are several), each with a
+  button labelled and iconned as its nav row (`sectionItem`) that opens
+  that screen. Today that is the bank account alone: PAN and GST are
+  optional and the bank page asks for the address itself, so the seller has
+  one place to go. Sections an admin cannot open are listed without a
+  button. This
   replaced a bank-account lookup the page used to run for itself, which
   only ever produced a hint. The checkout's payment step offers exactly the
   accepted methods from the public shell's `payments`),
@@ -3482,7 +3485,7 @@ mount.
 
 `SetupChecklist` reads the same list: a readiness step pointing at a hidden
 section (three of them point at `business`, one at `bank-accounts`) still
-**shows** — "this shop has no PAN" is exactly what support needs in order to
+**shows** — "this shop has no business address" is exactly what support needs in order to
 explain a block — but drops its **Add** button, which would otherwise
 dead-end on an unrouted section.
 

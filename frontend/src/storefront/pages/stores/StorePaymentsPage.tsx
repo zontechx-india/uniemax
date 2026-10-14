@@ -30,10 +30,11 @@ import { showToast } from './ui/Toast'
  * have to exist first. The condition is read from `store.readiness` — the
  * same evaluation the endpoint enforces — so the switch is disabled for
  * exactly the reasons a save would be rejected, and the card says what to add.
- * It lists the steps in order, each with a button to the screen that does it:
- * the bank account can only be saved once the address and tax answers are in,
- * so those come first (the server reports them as the account's
- * prerequisites), and a step already done gets no button to a finished page.
+ * It lists what is missing, one row per screen with a button that opens it,
+ * and a step already done gets no button to a finished page. Today that is
+ * the bank account alone — PAN and GST are optional, and the bank page asks
+ * for the business address itself — so the seller has exactly one place to
+ * go.
  */
 
 const METHODS: {
@@ -181,12 +182,14 @@ export function StorePaymentsPage() {
 }
 
 /**
- * What to do before the switch unlocks: one numbered row per screen, in the
- * order the server needs them, each naming what is missing there and opening
- * that screen at the right card. A section this mode cannot open (an admin
- * and Business details) is named without a button.
+ * What to do before the switch unlocks: one row per screen, in the order the
+ * server lists them, each naming what is missing there and opening that
+ * screen at the right card. Rows are numbered only when there is more than
+ * one — a lone "1" reads like the start of a longer list. A section this
+ * mode cannot open (an admin and Bank account) is named without a button.
  */
 function SetupSteps({ steps }: { steps: BlockerGroup[] }) {
+  const numbered = steps.length > 1
   return (
     <div className="mt-3 rounded-xl bg-pending-soft p-3 sm:p-4">
       <p className="text-sm font-semibold text-fg">To turn this on, first add:</p>
@@ -198,12 +201,14 @@ function SetupSteps({ steps }: { steps: BlockerGroup[] }) {
               key={step.section ?? index}
               className="flex items-start gap-2.5 sm:items-center"
             >
-              <span
-                aria-hidden
-                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface text-xs font-bold text-fg ring-1 ring-line"
-              >
-                {index + 1}
-              </span>
+              {numbered && (
+                <span
+                  aria-hidden
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface text-xs font-bold text-fg ring-1 ring-line"
+                >
+                  {index + 1}
+                </span>
+              )}
               <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                 <p className="min-w-0 text-sm text-fg">{step.labels.join(', ')}</p>
                 {step.to && section && (

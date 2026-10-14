@@ -69,9 +69,10 @@ never ships to a shopper.
 - Create multiple stores through a **two-step guided wizard** (store → business
   & contact), pre-filled from the account and resumable: the store is created
   at step 1, so leaving midway loses nothing and a dashboard checklist shows
-  exactly what's left. Address and tax details are collected later and become
-  mandatory only when a payout bank account is added. Each store gets a stable
-  slug that survives renames.
+  exactly what's left. The address is collected later and becomes mandatory
+  only when a payout bank account is added (asked for on the bank page
+  itself); PAN and GSTIN are optional. Each store gets a stable slug that
+  survives renames.
 - Business identity kept separately from storefront presentation: legal name,
   accountable seller, contact details, a structured business address,
   PAN / GSTIN.
@@ -117,9 +118,9 @@ never ships to a shopper.
   new API.
 - Capability gates rather than upfront forms: a seller builds their whole
   catalog with nothing filled in, and requirements attach to what they're
-  trying to *do* — publishing needs contact details, an address and a product;
-  online payment needs a PAN and a payout account; pickup needs an address to
-  collect from. One server-side registry decides all of it.
+  trying to *do* — publishing needs contact details and a product; online
+  payment needs a payout account (which needs an address); pickup needs an
+  address to collect from. One server-side registry decides all of it.
 
 ### For platform staff (`/admin`)
 

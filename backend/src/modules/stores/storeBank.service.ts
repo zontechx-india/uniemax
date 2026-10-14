@@ -15,10 +15,11 @@ import type {
  * (a foreign store ref 404s via `getMyStore`). Rules:
  *
  *  - adding the FIRST or any later account is gated by `PAYOUT_SETUP`
- *    (`storeReadiness.ts`): the business address and tax details are not
- *    asked for at signup, so this is where they become mandatory — a payout
- *    account is the first thing that needs to know who is being paid and
- *    where. Editing, re-prioritising and deleting are never gated;
+ *    (`storeReadiness.ts`): the business address is not asked for at signup,
+ *    so this is where it becomes mandatory — a payout account is the first
+ *    thing that needs to know where the business being paid is (the bank
+ *    page asks for it in place). PAN and GSTIN stay optional. Editing,
+ *    re-prioritising and deleting are never gated;
  *  - at most MAX_ACCOUNTS saved accounts per store;
  *  - exactly one account may be `isPrimary` — the payout target. The first
  *    saved account becomes primary automatically. Deleting the primary does

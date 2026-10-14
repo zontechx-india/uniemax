@@ -35,7 +35,6 @@ import type {
 } from '../../features/stores/storeProfile'
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import { setupAnchor } from '../../features/stores/gateBlockers'
-import { BlockerLinks, useGateBlockers } from './GateBlockers'
 import {
   SectionJumpBar,
   StatusBadge,
@@ -95,7 +94,7 @@ const SECTIONS: {
     id: setupAnchor('tax'),
     title: 'Tax & compliance',
     description:
-      'PAN and GST status. Optional for Cash on Delivery — needed before you add a bank account and accept online payments.',
+      'Optional. Add your PAN so less tax is held back from online sales, and your GST number if you have one.',
     step: 'tax',
   },
 ]
@@ -201,7 +200,7 @@ export function StoreBusinessPage() {
       <PageHeader
         icon={ShieldCheckIcon}
         title="Business details"
-        description={`Who is behind ${store.name}. Your address and tax numbers are only needed when you want to be paid online.`}
+        description={`Who is behind ${store.name}. Your address is needed to get paid online or offer pickup; tax numbers are optional.`}
       />
 
       {/* The one number that survives a phone screen. The bar carries the
@@ -281,13 +280,8 @@ function Card({
   status,
   dirty,
   flashing,
-  hideMissing = false,
   children,
-}: Omit<CardStatusProps, 'onDirtyChange'> & {
-  /** The card says what is missing itself, in a note of its own. */
-  hideMissing?: boolean
-  children: ReactNode
-}) {
+}: Omit<CardStatusProps, 'onDirtyChange'> & { children: ReactNode }) {
   return (
     <section
       id={id}
@@ -309,7 +303,7 @@ function Card({
           leaves the seller hunting the form for which two. Hidden while there
           are unsaved edits, because it would then be describing the state the
           seller is in the middle of leaving. */}
-      {!dirty && !hideMissing && !status.complete && status.missing.length > 0 && (
+      {!dirty && !status.complete && status.missing.length > 0 && (
         // Orange means "blocks your store going live"; an optional card's
         // gaps are listed in neutral so they don't read as a to-do.
         <p
@@ -631,7 +625,6 @@ function TaxCard({
   )
   const [pan, setPan] = useState(tax.pan ?? '')
   const [gstin, setGstin] = useState(tax.gstin ?? '')
-  const [gstExempt, setGstExempt] = useState(tax.gstExempt)
   const [registrationNumber, setRegistrationNumber] = useState(
     tax.registrationNumber ?? '',
   )
@@ -643,14 +636,6 @@ function TaxCard({
     gstinValid && gstin !== '' && panValid && pan !== ''
       ? !gstinContainsPan(gstin, pan)
       : false
-
-  // What still stands between the seller and online payment, split into what
-  // this page fills in and what comes after it (the bank account). Only while
-  // online payment is off — the same moment the Payments switch is locked.
-  const onlineBlockers = useGateBlockers(store, 'ONLINE_PAYMENT')
-  const onlineNote = !store.payments.acceptOnlinePayment && onlineBlockers.length > 0
-  const onThisPage = onlineBlockers.filter((b) => b.section === 'business')
-  const afterThisPage = onlineBlockers.filter((b) => b.section !== 'business')
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -669,52 +654,22 @@ function TaxCard({
       tax: {
         pan: pan || null,
         gstin: gstin || null,
-        gstExempt: gstin ? false : gstExempt,
+        // GST is optional, so there is no "not registered" box any more: an
+        // empty GSTIN says it. A declaration saved before then is kept as is.
+        gstExempt: gstin ? false : tax.gstExempt,
         registrationNumber: registrationNumber.trim() || null,
       },
     })
   }
 
   return (
-    // The note names this card's missing pieces itself, in order with the
-    // step after them, so the card's generic "add: …" line would repeat it.
-    <Card {...card} hideMissing={onlineNote}>
+    <Card {...card}>
       <form onSubmit={submit} className="space-y-4" noValidate>
-        {onlineNote && (
-          // Orange while something here is still missing; neutral once the
-          // only thing left is on another page — a pointer, not a to-do.
-          <p
-            className={`rounded-xl px-3.5 py-3 text-hint leading-relaxed ${
-              onThisPage.length > 0 ? 'bg-pending-soft text-fg' : 'bg-fg/5 text-muted'
-            }`}
-          >
-            {onThisPage.length > 0 ? (
-              <>
-                <span className="font-semibold">Only needed for online payments.</span>{' '}
-                To turn them on, add {onThisPage.map((b) => b.label).join(', ')} on this page
-                {afterThisPage.length > 0 ? (
-                  <>
-                    , then: <BlockerLinks blockers={afterThisPage} className="align-middle" />
-                  </>
-                ) : (
-                  '.'
-                )}
-              </>
-            ) : (
-              <>
-                <span className="font-semibold text-fg">Your details here are done.</span>{' '}
-                To turn on online payments, add next:{' '}
-                <BlockerLinks blockers={afterThisPage} className="align-middle" />
-              </>
-            )}
-          </p>
-        )}
-
         <div>
           <TextField
             label={
               <>
-                PAN card number{' '}
+                PAN card number (optional){' '}
                 <HelpHint topic="PAN card number">
                   <p>
                     PAN is the 10-letter number printed on your PAN card, from
@@ -723,8 +678,8 @@ function TaxCard({
                     letters, 4 numbers, then 1 letter.
                   </p>
                   <p>
-                    It is optional for a cash-on-delivery shop. With it, less
-                    tax is held back from your online sales.
+                    It is optional. With it, less tax is held back from your
+                    online sales — 1% instead of 5%.
                   </p>
                 </HelpHint>
               </>
@@ -741,7 +696,7 @@ function TaxCard({
             className={`mt-1.5 text-hint ${panValid ? 'text-muted' : 'font-medium text-danger'}`}
           >
             {panValid
-              ? 'Optional. With a PAN, less tax is held back from online sales (1% instead of 5%).'
+              ? 'With a PAN, less tax is held back from online sales (1% instead of 5%).'
               : 'A PAN looks like ABCDE1234F — 5 letters, 4 numbers, 1 letter.'}
           </p>
         </div>
@@ -750,7 +705,7 @@ function TaxCard({
           <TextField
             label={
               <>
-                GST number{' '}
+                GST number (optional){' '}
                 <HelpHint topic="GST number (GSTIN)">
                   <p>
                     Only if your business is registered for GST. It is the
@@ -759,7 +714,7 @@ function TaxCard({
                   </p>
                   <p>
                     Most small sellers selling inside their own state do not
-                    need one — tick “I’m not registered for GST” below.
+                    need one — just leave it empty.
                   </p>
                 </HelpHint>
               </>
@@ -770,8 +725,7 @@ function TaxCard({
               markEdited()
               setGstin(e.target.value.toUpperCase().slice(0, 15))
             }}
-            disabled={busy || gstExempt}
-            className={gstExempt ? 'opacity-60' : ''}
+            disabled={busy}
           />
           <p
             className={`mt-1.5 text-hint ${
@@ -784,35 +738,9 @@ function TaxCard({
                 ? "This GST number doesn't match the PAN above."
                 : gstState
                   ? `Registered in ${gstState}.`
-                  : gstExempt
-                    ? 'Not needed — you are not registered for GST.'
-                    : // An empty box is not an answer — sellers who only
-                      // left it blank were stuck without a bank account.
-                      'Not registered? Leave this empty and tick the box below.'}
+                  : 'Leave empty if you are not registered for GST.'}
           </p>
         </div>
-
-        <label className="glass-inset flex min-h-tap cursor-pointer items-start gap-3 rounded-xl p-3.5">
-          <input
-            type="checkbox"
-            checked={gstExempt}
-            onChange={(e) => {
-              markEdited()
-              setGstExempt(e.target.checked)
-              if (e.target.checked) setGstin('')
-            }}
-            disabled={busy}
-            className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand)]"
-          />
-          <span className="min-w-0">
-            <span className="block text-base font-semibold text-fg">
-              I'm not registered for GST
-            </span>
-            <span className="mt-0.5 block text-hint text-muted">
-              Fine for small sellers supplying within their own state.
-            </span>
-          </span>
-        </label>
 
         <TextField
           label="Business registration number (optional)"
