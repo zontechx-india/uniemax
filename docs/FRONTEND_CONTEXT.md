@@ -1053,22 +1053,32 @@ full-bleed section bands instead.
 
   | Shop (`shopSize`) | Homepage |
   | ---------------- | -------- |
-  | `one` — 1 product | banners + hero, then **`ProductShowcase`**: that product as one large card (photo full-width on a phone, name, price and % off, stock, description; side by side from `lg`) carrying the real **`PurchaseActions`** (quantity, Add to Cart, Buy Now) when there is nothing to choose, else one button to the product page. Nothing else. |
+  | `one` — 1 product | banners, then **`ProductShowcase`**: that product as one large card (photo full-width on a phone, name, price and % off, stock, description; side by side from `lg`) carrying the real **`PurchaseActions`** (quantity, Add to Cart, Buy Now) when there is nothing to choose, else one button to the product page. Nothing else. |
   | `small` — ≤ 12 (`SMALL_SHOP_MAX`, the payload's section size) | every product **once** in All Products (uncapped grid, "N products", no "View all"); the curated rows and Category Highlights are dropped and the owner's Featured → Best Sellers → New Arrivals picks **lead** the grid instead |
   | `full` | every section below; All Products skips products a row **above** it already showed |
+  | **no products** (no categories in the shell) | laid out like any other shop — header, banners and footer render as their switches say — and only the **product area** becomes the **"Products coming soon"** card (`EmptyCatalog`, in its own band after the sections, before `ContactBand` and the footer), shown straight away even while `/home` loads. A Banners section that is on but has nothing uploaded shows **one slide in the shop's colour (`--cta`) with its name**. Stocked shops still hide an empty Banners section. |
 
-  Category pickers (the strip, the hero's "Shop by Category" button) only
+  Category pickers (the strip) only
   appear with **two or more categories after `browsableCategories`** walks
   down single-branch chains ("Fashion" holding only Men and Women offers Men
-  and Women). The hero art only appears for `full` shops. `shapeHome()` does
+  and Women). `shapeHome()` does
   all of this on the payload without touching the owner's order or switches.
+  The page is `StoreHomePage` (the `/home` fetch) around **`StoreHomeView`**
+  (rendering from `store` + payload alone), which is what the Store Builder's
+  preview frame shows too and what the render test drives. The page's one
+  `<h1>` is the store name, visually hidden (it is already in the header).
+  **The Welcome Hero is gone** (removed 15 Oct 2026, with its Store Builder
+  entry, its `split`/`minimal` layouts, the `ctaLabel` setting and
+  `trustFacts()`; a stored `hero` entry is dropped on read). Any banner
+  whose image is missing renders as the shop-colour slide
+  (`BannerCarousel`'s `fallbackLabel`) instead of an empty frame.
   The page ends with **`ContactBand`** — "Questions? Talk to {shop}" with
   WhatsApp and Call (`features/publicStore/ShopContact.tsx`), only when the
   seller entered a number (Footer → Customer support, or the WhatsApp social
   link). Every WhatsApp link goes through `contactLinks.ts`, which adds
   India's 91 to a ten-digit number — `wa.me` needs the full international
   number, and a bare one opened a chat with nobody.
-  Otherwise: hero, Shop by Category, then the
+  Otherwise: banners, Shop by Category, then the
   merchandising rows (Featured / New Arrivals / Best Sellers, then Category
   Highlights and All Products) from
   `GET …/home`. Sections render in the **owner-arranged order** (the payload's
@@ -1129,9 +1139,8 @@ full-bleed section bands instead.
     (`SHELF_SPLIT`): a two-product shelf fills its band instead of leaving a
     card-shaped hole, and the cards stay the width they are everywhere else.
     A one-product shelf drops the panel entirely — a "collection" of one is
-    theatre. `catalog` is also the hero art's last cover source, so an
-    uncurated shop still gets art.
-  - **Banners** — the owner's promo carousel, above the hero by default and
+    theatre.
+  - **Banners** — the owner's promo carousel, first on the page by default and
     reorderable like any other section. The carousel itself is
     `features/banners/BannerCarousel`, **shared with the marketplace
     homepage** — different owners and different link targets, but the same
@@ -1149,8 +1158,8 @@ full-bleed section bands instead.
     rendered height is exactly `width x 5/16` of the space it is given (1920px
     → 600px, 1440 → 450, 768 → 240, 390 → 122) and the whole artwork stays
     visible on a phone exactly as on a monitor. A ratio that followed each upload would make
-    the page jump as the carousel advanced and shove the hero down after the
-    first load; a height cap would crop a correctly-sized image on a wide
+    the page jump as the carousel advanced and shove everything below it down
+    after the first load; a height cap would crop a correctly-sized image on a wide
     monitor. `bannerSpec` is also what the admin screen quotes to sellers, so
     the promised size and the rendered size cannot drift.
 
@@ -1164,37 +1173,6 @@ full-bleed section bands instead.
     from under a click; off-screen slides are `inert` so they are not invisible
     tab stops. A `URL` banner is a plain `<a target="_blank" rel="noopener">`;
     everything else routes through the SPA.
-  - **Hero** — a **shop profile**, the shape shoppers know from Instagram /
-    WhatsApp Business shop pages. On top, **`HeroBanner`** (style "A4", picked
-    by the product owner from seven patterns × four abstract styles): a colour
-    band (136px phone → `lg:h-52`) with a fine dot grid and thick arcs sweeping
-    in from the top-right corner. Every tone is `--brand` **mixed** with the
-    band colour, white or black — never the brand at full strength — so a
-    near-black or yellow shop stays as calm as a blue one; the band shows on
-    every shop, banners or not. Everything below it sits on the plain band
-    background, so the text is always readable. The logo is **88px / 112px,
-    rounded, ringed in the band colour and overlapping the banner**, then the name, the owner's
-    words if any (three lines on a phone), and **trust facts** (`trustFacts()`:
-    delivery charge, Cash on delivery, UPI, pickup) as icon-in-a-circle + words.
-    Actions are rounded 48px pills side by side, sharing the width on a phone:
-    the CTA (scrolls to `#shop-products` for a small shop, opens Shop for a big
-    one, absent for a one-product shop) and **WhatsApp** when the shop has a
-    number. No "Shop by Category" button — the category row is right below.
-    Stacked on a phone; from `sm` the words sit beside the logo; from `lg`
-    the actions move to the right. Left-aligned everywhere.
-    - **Big shops (`full`) add art.** With at least two real
-      product covers it is a two-column composition: the profile on the left,
-      `HeroArt` on the right — one grid in two shapes, a triptych of squares
-      below `lg` (a strip of life under the copy, costing almost no height)
-      and a lead-plus-stack mosaic beside it from `lg`, where the lead takes
-      its height from the two squares rather than an aspect ratio so the
-      columns always end level. Covers are deduped from the merchandising rows
-      (max 3) and decorative (`alt=""`). With fewer than two there is no
-      second column.
-    - The description is the owner's tagline or their **About** text (three
-      lines on a phone), and **nothing** when they wrote neither — the old
-      generated "4 products across 1 category, delivered to your door" was
-      catalogue arithmetic, not a reason to buy.
   - **Shop by Category** — see the composition table above.
   - **Capped product rows** — `ROW_SIZE = 5` shown, with `ROW_VISIBILITY`
     hiding the surplus per breakpoint (`hidden md:list-item` …) so **every**
@@ -1207,7 +1185,7 @@ full-bleed section bands instead.
   `StoreDashboardPage`): "Help customers trust your shop" — only the missing
   ones of a WhatsApp/phone number, an about line (both → Footer) and a logo (→
   Shop name & logo), each with an Add button. These are exactly what the
-  storefront shows when present (contact buttons, hero line, logo); gone once
+  storefront shows when present (contact buttons, footer about line, logo); gone once
   all are done.
 - **`StoreCategoryPage`** — breadcrumb, title, subcategory chips (hidden
   when the only subcategory holds every product here — one chip leading to the
@@ -1858,8 +1836,8 @@ is never shown a pickup-address item.
   hint, the fields the section offers and its layout choices with a line of
   copy each. Its layout ids are checked against `HOMEPAGE_SECTION_LAYOUTS` at
   module load in dev, so a section can never be offered a shape the storefront
-  cannot draw. Layout and title are on screen; the strapline, the hero's button
-  label and *reset to defaults* sit under **More options**. Banners and Footer
+  cannot draw. Layout and title are on screen; the strapline and
+  *reset to defaults* sit under **More options**. Banners and Footer
   keep their own full editors, embedded — `StoreBannersPage embedded` and
   `StoreFooterPage embedded` rendered inside a `ManagedStoreProvider`, which is
   why `useManagedStore` now reads a context *or* the outlet: one implementation
@@ -2842,7 +2820,7 @@ frontend/
     │       ├── SupportTicketPage.tsx # /support/:ticketId — one ticket thread
     │       ├── OrdersPage.tsx    # /orders — the customer's order history
     │       ├── store/            # Public storefront pages (no sign-in)
-    │       │   ├── StoreHomePage.tsx     # Banners, hero, category strip, rails/spotlight/shelves
+    │       │   ├── StoreHomePage.tsx     # Banners, category strip, rails/spotlight/shelves
     │       │   ├── StoreCategoryPage.tsx # Breadcrumb, subcategory chips, listing
     │       │   ├── StoreProductPage.tsx  # Gallery (zoom/swipe) + purchase card +
     │       │   │                         #   highlights/description/specs + sticky bar
@@ -3079,7 +3057,7 @@ Pixel values (borders, the 1920px shell cap) are unaffected.
 
 **Type scale and corners** (docs/DESIGN_GUIDELINES.md §4, §7). Seven text
 sizes — caption 13 · label 14 · body 16 · subtitle 18 · section 22 · title 28
-· display 40 (storefront hero only) — as `text-caption … text-display`, with
+· display 40 (largest headlines only) — as `text-caption … text-display`, with
 Tailwind's own names remapped onto them in `@theme` (`text-xs` 13, `sm` 14,
 `base` 16, `lg` 18, `xl`/`2xl` 22, `3xl`/`4xl` 28, `5xl`/`6xl` 40). Four
 weights (400/500/600/700; `font-extrabold` is gone). Corners: 8px controls
@@ -3089,9 +3067,17 @@ sheets (`rounded-2xl`/`3xl`, `rounded-sheet`), full for pills. Two shadows:
 **`npm run check:ui`** (CI) counts stray `text-[Npx]` sizes, gradients,
 glass, ad-hoc effects and hand-made `<button>`s and fails if any count rises
 above `frontend/scripts/ui-budget.json`; each clean-up phase lowers the budget.
-**`npm run test:unit`** runs the frontend's pure-logic unit tests
+**`npm run test:unit`** runs the frontend's unit tests
 (`frontend/test/*.test.ts`, `node:test` through `tsx` from the workspace
-root — no browser), currently the gate-blocker links (`gateBlockers.ts`).
+root — no browser): the gate-blocker links (`gateBlockers.ts`), and
+`storeHomeEmpty.test.ts`, which **server-renders the real storefront
+components** through Vite's `ssrLoadModule` (it supplies the JSX transform
+and `import.meta.env`; the test gives `shared/seo.ts` an empty
+`document.head` while modules load) — a store with no products shows
+banner, "Products coming soon" and footer, in that order, and that the retired
+Welcome Hero stays gone.
+`MediaImg` withholds `src` until the media config loads, so tests
+recognise images by their frame, not their URL.
 
 **The touch-size tokens (px, not rem).** Added while the root was 90%,
 which put
@@ -3217,7 +3203,7 @@ derived from it, and the secondary text is lifted to `#9a9a9a` because
   uses **Plus Jakarta Sans** (`--font-heading` = `--font-body`; `h1–h3`
   tracked −0.015em). **Fraunces**, a soft serif with an optical-size axis, is
   **storefront-only**: shop and product names via `font-display`
-  (`--font-display`; store hero, header, footer, product card and page,
+  (`--font-display`; store header, footer, product card and page,
   showcase) and the italic accent. The italic accent — `font-accent` utility / `--font-accent`,
   Fraunces italic 500 — is for small touches only (a shop tagline, a product
   sub-line, one word in a heading), never running text or anything a seller

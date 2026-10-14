@@ -1,5 +1,4 @@
 import {
-  formatPrice,
   type PublicCategory,
   type PublicProduct,
   type PublicStore,
@@ -134,33 +133,4 @@ export function displayName(name: string): string {
     if (offset > 0 && CONNECTORS.has(word)) return word.toLowerCase()
     return word.charAt(0) + word.slice(1).toLowerCase()
   })
-}
-
-export interface TrustFact {
-  key: 'cod' | 'delivery' | 'pickup' | 'online'
-  label: string
-}
-
-/**
- * Reassurance a customer needs before buying from a shop they do not know —
- * each one read from a real setting of THIS store, never a generic claim.
- */
-export function trustFacts(store: PublicStore): TrustFact[] {
-  const facts: TrustFact[] = []
-  const { mode, rate } = store.shipping
-  if (mode !== 'PICKUP') {
-    facts.push({
-      key: 'delivery',
-      label:
-        rate.type === 'FREE'
-          ? 'Free delivery'
-          : rate.freeAbove !== null
-            ? `Free delivery above ${formatPrice(rate.freeAbove)}`
-            : `Delivery ${formatPrice(rate.amount)}`,
-    })
-  }
-  if (store.payments.acceptCod) facts.push({ key: 'cod', label: 'Cash on delivery' })
-  if (store.payments.acceptOnlinePayment) facts.push({ key: 'online', label: 'Pay by UPI or card' })
-  if (mode !== 'DELIVERY') facts.push({ key: 'pickup', label: 'Pick up from the shop' })
-  return facts
 }

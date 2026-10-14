@@ -37,31 +37,20 @@ import {
   StockBadge,
 } from '../../features/publicStore/CartControls'
 import { ContactActions, shopContact } from '../../features/publicStore/ShopContact'
-import { waLink } from '../../features/publicStore/contactLinks'
-import { WhatsAppIcon } from '../../../shared/ui/socialIcons'
 import {
   browsableCategories,
   categoryPicture,
   displayName,
   shopProductCount,
   shopSize,
-  trustFacts,
   type ShopSize,
-  type TrustFact,
 } from '../../features/publicStore/shopShape'
 import {
   EmptyCatalog,
   GridSkeleton,
   SectionHeading,
 } from '../../features/publicStore/ListingControls'
-import {
-  CardIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  RupeeIcon,
-  StoreIcon,
-  TruckIcon,
-} from '../../layout/icons'
+import { ChevronLeftIcon, ChevronRightIcon } from '../../layout/icons'
 import type { Skin } from '../../features/publicStore/storeTheme'
 import { BannerCarousel } from '../../features/banners/BannerCarousel'
 import {
@@ -70,7 +59,6 @@ import {
 } from '../../features/publicStore/builderBridge'
 import {
   defaultLayout,
-  HERO_DEFAULT_CTA,
   sectionCopy,
 } from '../../features/publicStore/sectionCopy'
 import { MediaImg } from '../../../shared/media/MediaImg'
@@ -111,9 +99,6 @@ const SPOTLIGHT_MIN = 7
 /** Supporting cards beside a spotlight's lead — 2 × 3 or 3 × 2, always full. */
 const SPOTLIGHT_SUPPORT = 6
 
-/** Covers used by the hero art. */
-const HERO_ART_SIZE = 3
-
 /** Products shown beside a category shelf panel — one full row at every size. */
 const SHELF_ROW_SIZE = 3
 
@@ -144,7 +129,7 @@ type HomeSectionEntry = PublicStoreHome['sections'][number]
  * `/store/{storeSlug}` — the storefront homepage.
  *
  * It *introduces* the store rather than dumping a filtered product grid:
- * hero, Shop by Category, then the owner's merchandising sections. Browsing
+ * banners, Shop by Category, then the owner's merchandising sections. Browsing
  * happens on the category pages; discovery happens here and through search.
  *
  * **Layout** — sections render as full-bleed **bands** (alternating surface
@@ -160,7 +145,6 @@ type HomeSectionEntry = PublicStoreHome['sections'][number]
  * | Section                | Composition                                      |
  * | ---------------------- | ------------------------------------------------ |
  * | Banners                | the owner's carousel                             |
- * | Hero                   | store identity + pitch, with real product art     |
  * | Shop by Category       | one scrolling row of chips — wayfinding, not a section |
  * | Featured Products      | spotlight: one large lead card + six supporting   |
  * | New Arrivals / Best Sellers | horizontal rails — more stock than a row holds |
@@ -174,7 +158,7 @@ type HomeSectionEntry = PublicStoreHome['sections'][number]
  *
  * Those are the **defaults**, not the only shapes. The owner picks another
  * composition for a section in the Store Builder (Featured can be a rail, New
- * Arrivals a plain row, the hero art-free, the categories a block of cards)
+ * Arrivals a plain row, the categories a block of cards)
  * and renames any heading, all through the optional `settings` each section
  * carries — see `sectionCopy`. A section with none, which is every section of
  * every store that has never been customised, renders exactly as it always
@@ -186,7 +170,7 @@ type HomeSectionEntry = PublicStoreHome['sections'][number]
  *
  * | Shop          | Homepage                                                   |
  * | ------------- | ---------------------------------------------------------- |
- * | one product   | banners + hero, then that product as a big showcase card    |
+ * | one product   | banners, then that product as a big showcase card           |
  * | ≤ 12 products | every product ONCE in "All Products", the owner's Featured / Best / New picks first (no curated rows or per-category shelves, which would repeat them) |
  * | bigger        | everything below; "All Products" skips what earlier rows showed |
  *
@@ -195,7 +179,7 @@ type HomeSectionEntry = PublicStoreHome['sections'][number]
  *
  * The three curated rows are strictly flag-driven — one with nothing flagged
  * renders nothing (there is deliberately no fallback). What keeps an uncurated
- * shop from being a hero over empty space is the two rows below them, which
+ * shop from being banners over empty space is the two rows below them, which
  * need no flags: **Category Highlights** (one shelf per category, "View all"
  * into that category's own page) and **All Products** (newest, "View all" into
  * Shop). Both are ordinary sections the owner can reorder or hide.
@@ -265,50 +249,56 @@ export function StoreHomePage() {
     }
   }, [store.slug, reload])
 
-  if (store.categories.length === 0) {
-    return (
-      <StorePageShell>
-        <EmptyCatalog storeName={store.name} skin={skin} />
-      </StorePageShell>
-    )
-  }
+  return <StoreHomeView store={store} skin={skin} home={home} />
+}
 
+/**
+ * The homepage for a given payload — `undefined` while it loads, `null` when
+ * it failed. Split from the fetch so the page renders (and is tested) from
+ * data alone; the public storefront and the Store Builder's preview frame
+ * both render exactly this.
+ *
+ * **A shop with no products yet** is laid out like any other: its banners,
+ * header and footer render as their switches say, and only the product area
+ * becomes a "Products coming soon" card, before the footer. It used to be that card alone on an otherwise empty page, which
+ * looked like a broken shop to visitors and showed a seller in the builder
+ * none of what they were designing.
+ */
+export function StoreHomeView({
+  store,
+  skin,
+  home,
+}: {
+  store: PublicStore
+  skin: Skin
+  home: PublicStoreHome | null | undefined
+}) {
+  // The shell's category tree only holds categories with something to buy,
+  // so no categories means nothing to sell yet.
+  const empty = store.categories.length === 0
   const size = shopSize(store)
-  const facts = trustFacts(store)
-  const heroCta = HERO_CTA[size]
+  // The page's one heading. The store's name is already on screen in the
+  // header, so it is for search engines and screen readers only.
+  const heading = <h1 className="sr-only">{store.name}</h1>
 
-  if (home === undefined) {
+  if (home === undefined || home === null) {
     return (
       <>
-        <Hero
-          store={store}
-          skin={skin}
-          covers={[]}
-          facts={facts}
-          cta={heroCta}
-        />
-        <StorePageShell>
-          <GridSkeleton skin={skin} />
-        </StorePageShell>
-      </>
-    )
-  }
-
-  if (home === null) {
-    return (
-      <>
-        <Hero
-          store={store}
-          skin={skin}
-          covers={[]}
-          facts={facts}
-          cta={heroCta}
-        />
-        <StorePageShell>
-          <p className={`py-10 text-center text-sm ${skin.muted}`}>
-            Could not load this store's products. Please refresh.
-          </p>
-        </StorePageShell>
+        {heading}
+        {empty ? (
+          // Nothing is loading that could change this — say it straight away.
+          <ComingSoonBand store={store} skin={skin} tone="base" />
+        ) : (
+          <StorePageShell>
+            {home === undefined ? (
+              <GridSkeleton skin={skin} />
+            ) : (
+              <p className={`py-10 text-center text-sm ${skin.muted}`}>
+                Could not load this store's products. Please refresh.
+              </p>
+            )}
+          </StorePageShell>
+        )}
       </>
     )
   }
@@ -319,23 +309,20 @@ export function StoreHomePage() {
   const shaped = shapeHome(home, size)
   const visible = shaped.home.sections
     .filter((section) => section.enabled)
-    .filter((section) => hasContent(section.key, shaped.home))
-    // A one-product shop shows its identity and then the product itself.
-    .filter(
-      (section) =>
-        shaped.showcase === null || section.key === 'banners' || section.key === 'hero',
-    )
+    .filter((section) => hasContent(section.key, shaped.home, empty))
+    // A one-product shop shows its banners and then the product itself.
+    .filter((section) => shaped.showcase === null || section.key === 'banners')
 
-  // Art beside the hero only for a big shop: a small one shows every product
-  // a few centimetres further down, so the art would only repeat them.
-  const covers = size === 'full' ? heroCovers(home) : []
   const tones = bandTones(visible, shaped.home)
   const flip = (tone: BandTone | undefined): BandTone => (tone === 'alt' ? 'base' : 'alt')
-  const showcaseTone = flip(tones[tones.length - 1])
-  const contactTone = shaped.showcase ? flip(showcaseTone) : flip(tones[tones.length - 1])
+  // The one-product showcase or the coming-soon card: the product area.
+  const productTone = flip(tones[tones.length - 1])
+  const contactTone =
+    shaped.showcase || empty ? flip(productTone) : flip(tones[tones.length - 1])
 
   return (
     <>
+      {heading}
       {visible.map((section, index) => (
         <HomeSection
           key={section.key}
@@ -344,9 +331,6 @@ export function StoreHomePage() {
           home={shaped.home}
           skin={skin}
           tone={tones[index]}
-          covers={covers}
-          facts={facts}
-          heroCta={heroCta}
           catalogAll={shaped.catalogAll}
           pictures={shaped.pictures}
         />
@@ -356,12 +340,42 @@ export function StoreHomePage() {
           store={store}
           product={shaped.showcase}
           skin={skin}
-          tone={showcaseTone}
+          tone={productTone}
         />
       )}
+      {empty && <ComingSoonBand store={store} skin={skin} tone={productTone} />}
       <ContactBand store={store} skin={skin} tone={contactTone} />
     </>
   )
+}
+
+/**
+ * The product area of a shop with nothing to sell yet: where its products
+ * will appear, so the rest of the page can be exactly what shoppers will see.
+ */
+function ComingSoonBand({
+  store,
+  skin,
+  tone,
+}: {
+  store: PublicStore
+  skin: Skin
+  tone: BandTone
+}) {
+  return (
+    <Band id="shop-products" tone={tone} skin={skin}>
+      <EmptyCatalog storeName={store.name} skin={skin} />
+    </Band>
+  )
+}
+
+/** A banners section with nothing uploaded yet — see `HomeSection`. */
+const PLACEHOLDER_BANNER = {
+  id: 'placeholder',
+  title: null,
+  imageUrl: null,
+  href: null,
+  external: false,
 }
 
 /**
@@ -402,13 +416,6 @@ function ContactBand({
       </div>
     </Band>
   )
-}
-
-/** Where the hero's button goes, by shop size — see `Hero`. */
-const HERO_CTA: Record<ShopSize, HeroCta> = {
-  one: 'none',
-  small: 'products',
-  full: 'shop',
 }
 
 interface ShapedHome {
@@ -500,13 +507,18 @@ function shapeHome(home: PublicStoreHome, size: ShopSize): ShapedHome {
   }
 }
 
-/** Does this section have anything to render? Drives band alternation. */
-function hasContent(key: HomeSectionKey, home: PublicStoreHome): boolean {
+/**
+ * Does this section have anything to render? Drives band alternation.
+ *
+ * A shop with no products (`empty`) still shows its banners section when it
+ * is switched on, uploads or not — the page would otherwise be little more
+ * than a header and footer, and the builder preview would hide the very
+ * section the seller is editing. Stocked shops keep hiding an empty one.
+ */
+function hasContent(key: HomeSectionKey, home: PublicStoreHome, empty: boolean): boolean {
   switch (key) {
     case 'banners':
-      return home.banners.length > 0
-    case 'hero':
-      return true
+      return home.banners.length > 0 || empty
     case 'categories':
       return home.featuredCategories.length > 0
     case 'featured':
@@ -544,21 +556,6 @@ function bandTones(
   })
 }
 
-/** Real product covers for the hero art — deduped, newest rows first. */
-function heroCovers(home: PublicStoreHome): string[] {
-  // `catalog` last: it is the fallback that gives an uncurated shop art at
-  // all, but a curated row's covers are the ones the owner chose.
-  const urls = [
-    ...home.newArrivals,
-    ...home.featured,
-    ...home.bestSellers,
-    ...home.catalog,
-  ]
-    .map((product) => product.image?.url)
-    .filter((url): url is string => Boolean(url))
-  return [...new Set(urls)].slice(0, HERO_ART_SIZE)
-}
-
 /**
  * Renders one homepage section, in the shape the owner asked for.
  *
@@ -574,9 +571,6 @@ function HomeSection({
   home,
   skin,
   tone,
-  covers,
-  facts,
-  heroCta,
   catalogAll,
   pictures,
 }: {
@@ -585,9 +579,6 @@ function HomeSection({
   home: PublicStoreHome
   skin: Skin
   tone: BandTone
-  covers: string[]
-  facts: TrustFact[]
-  heroCta: HeroCta
   catalogAll: boolean
   pictures: PublicProduct[]
 }) {
@@ -602,7 +593,10 @@ function HomeSection({
     case 'banners':
       return (
         <BannerCarousel
-          banners={home.banners}
+          // Only a shop with no products reaches here without banners
+          // (`hasContent`): one slide in the shop's colour with its name.
+          banners={home.banners.length > 0 ? home.banners : [PLACEHOLDER_BANNER]}
+          fallbackLabel={store.name}
           id="shop-banners"
           className={`border-b ${skin.border} ${tone === 'alt' ? skin.surface : ''}`}
           // Artwork stays inside the same column as everything else: left
@@ -611,22 +605,6 @@ function HomeSection({
           frameClassName={`overflow-hidden rounded-lg border ${skin.border}`}
           wellClassName={skin.well}
           {...builder}
-        />
-      )
-    case 'hero':
-      return (
-        <Hero
-          store={store}
-          skin={skin}
-          tone={tone}
-          covers={covers}
-          facts={facts}
-          cta={heroCta}
-          heading={section.settings?.title ?? null}
-          tagline={section.settings?.subtitle ?? null}
-          ctaLabel={copy.ctaLabel}
-          layout={layout === 'minimal' ? 'minimal' : 'split'}
-          builder={builder}
         />
       )
     case 'categories':
@@ -754,277 +732,6 @@ function Band({
     >
       <div className={`${STORE_CONTAINER} ${padding}`}>{children}</div>
     </section>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Hero
-// ---------------------------------------------------------------------------
-
-/**
- * Where the hero's button leads: the products just below (a small shop — they
- * are all on this page), the Shop page (a big one), or nowhere (a
- * one-product shop, whose product is the very next thing on the page).
- */
-type HeroCta = 'products' | 'shop' | 'none'
-
-const TRUST_ICONS: Record<TrustFact['key'], typeof TruckIcon> = {
-  delivery: TruckIcon,
-  cod: RupeeIcon,
-  online: CardIcon,
-  pickup: StoreIcon,
-}
-
-/**
- * The shop's profile — the shape shoppers know from Instagram and WhatsApp
- * Business shop pages, rather than a centred "welcome" slab:
- *
- *   - a BANNER band in the shop's own colours (`HeroBanner`: dots + arcs),
- *   - the logo large and rounded, overlapping the cover's edge,
- *   - the name, the seller's own line, and the trust facts as a quiet row of
- *     icon + words (not bordered pills),
- *   - rounded actions: the CTA where it helps, WhatsApp when the shop has a
- *     number. (No "Shop by Category" button: the category row is right below.)
- *
- * Left-aligned on every screen — a phone reads down the left edge — with the
- * product mosaic beside it from `lg` for a big shop.
- */
-function Hero({
-  store,
-  skin,
-  tone = 'alt',
-  covers,
-  facts,
-  cta,
-  heading = null,
-  tagline = null,
-  ctaLabel = null,
-  layout = 'split',
-  builder,
-}: {
-  store: PublicStore
-  skin: Skin
-  tone?: BandTone
-  covers: string[]
-  /** Delivery / payment reassurance from this store's real settings. */
-  facts: TrustFact[]
-  cta: HeroCta
-  /** Owner's headline. Null = the store's own name. */
-  heading?: string | null
-  /** Owner's intro line. Null = their About text, else nothing. */
-  tagline?: string | null
-  /** Owner's button label. Null = "Start Shopping". */
-  ctaLabel?: string | null
-  /**
-   * `split` shows the product mosaic when there is stock to show it with;
-   * `minimal` is art-free — the shape a shop with strong words and weak
-   * photography should be able to choose deliberately.
-   */
-  layout?: 'split' | 'minimal'
-  builder?: Record<string, string> | undefined
-}) {
-  const about = store.footer.info.about?.trim()
-  const art = covers.slice(0, HERO_ART_SIZE)
-  const hasArt = layout === 'split' && art.length >= 2
-  // Only words someone wrote — never generated catalogue arithmetic.
-  const intro = tagline ?? about ?? null
-  const label = ctaLabel ?? HERO_DEFAULT_CTA
-  const { whatsapp } = shopContact(store)
-  // The logo's ring is the band colour, so it reads as cut out of the cover.
-  const ring = tone === 'alt' ? 'ring-surface' : 'ring-bg'
-  const pill = 'inline-flex h-12 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-4 text-base font-semibold transition-colors sm:flex-none sm:px-7'
-
-  return (
-    <section
-      className={`${SCROLL_UNDER_HEADER} relative overflow-hidden border-b last:border-b-0 ${skin.border} ${tone === 'alt' ? skin.surface : ''}`}
-      {...builder}
-    >
-      <HeroBanner paper={tone === 'alt' ? 'var(--surface)' : 'var(--bg)'} />
-
-      <div
-        className={`${STORE_CONTAINER} relative pb-7 sm:pb-10`}
-      >
-        <div
-          className={
-            hasArt
-              ? 'grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] lg:items-end lg:gap-14'
-              : ''
-          }
-        >
-          {/* select-none: a stray drag otherwise highlights the headline. */}
-          <div
-            className={`min-w-0 select-none ${hasArt ? '' : 'lg:flex lg:items-start lg:justify-between lg:gap-10'}`}
-          >
-            {/* Phone: stacked. From sm: a profile row — logo, then the words beside it. */}
-            <div className="min-w-0 sm:flex sm:items-start sm:gap-6">
-            <div className="-mt-11 shrink-0 sm:-mt-16">
-              {store.logoUrl ? (
-                <MediaImg
-                  sizes="112px"
-                  src={store.logoUrl}
-                  alt=""
-                  className={`h-[88px] w-[88px] rounded-[22px] object-cover shadow-floating ring-4 sm:h-28 sm:w-28 sm:rounded-[28px] ${ring} ${skin.surface}`}
-                />
-              ) : (
-                <span
-                  aria-hidden
-                  className={`flex h-[88px] w-[88px] items-center justify-center rounded-[22px] font-heading text-4xl font-bold shadow-floating ring-4 sm:h-28 sm:w-28 sm:rounded-[28px] ${ring} ${skin.cta}`}
-                >
-                  {store.name.trim().charAt(0).toUpperCase()}
-                </span>
-              )}
-            </div>
-
-            {/* `break-words` so a long single-word name wraps instead of
-                widening the band past the viewport. */}
-            <div className="min-w-0 sm:pt-4">
-            <h1
-              className={`mt-4 break-words font-display text-3xl font-semibold sm:mt-0 lg:text-5xl ${skin.text}`}
-            >
-              {heading ?? store.name}
-            </h1>
-
-            {intro && (
-              <p
-                className={`mt-2 line-clamp-3 max-w-2xl text-base leading-relaxed sm:line-clamp-none sm:text-base ${skin.muted}`}
-              >
-                {intro}
-              </p>
-            )}
-
-            {facts.length > 0 && (
-              <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2.5">
-                {facts.map((fact) => {
-                  const Icon = TRUST_ICONS[fact.key]
-                  return (
-                    <li
-                      key={fact.key}
-                      className={`inline-flex items-center gap-2 text-sm font-semibold ${skin.text}`}
-                    >
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
-                        <Icon className="h-4 w-4" />
-                      </span>
-                      {fact.label}
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-
-            </div>
-            </div>
-
-            {(cta !== 'none' || whatsapp) && (
-              // Side by side, sharing the width on a phone — never a third row;
-              // natural width beside the profile from lg.
-              <div className="mt-6 flex gap-3 sm:max-w-md lg:mt-4 lg:shrink-0">
-                {cta === 'shop' && (
-                  <Link to={storeShopUrl(store.slug)} className={`${pill} ${skin.cta}`}>
-                    {label}
-                    <ChevronRightIcon className="h-4 w-4" />
-                  </Link>
-                )}
-                {cta === 'products' && (
-                  <a href="#shop-products" className={`${pill} ${skin.cta}`}>
-                    {label}
-                    <ChevronRightIcon className="h-4 w-4" />
-                  </a>
-                )}
-                {whatsapp && (
-                  <a
-                    href={waLink(whatsapp, `Hi ${store.name}, I saw your shop on UnieMax.`)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`${pill} bg-whatsapp text-whatsapp-contrast hover:brightness-95`}
-                  >
-                    <WhatsAppIcon className="h-5 w-5" />
-                    WhatsApp
-                  </a>
-                )}
-              </div>
-            )}
-          </div>
-
-          {hasArt && <HeroArt covers={art} skin={skin} />}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-/**
- * The hero's banner (style "A4", chosen by the owner of UnieMax from the
- * pattern picker): a colour band with a fine dot grid, and thick arcs
- * sweeping in from the top-right corner. Every tone is the shop's `--brand`
- * MIXED with the band colour (`paper`), white or black — never the brand at
- * full strength over text — so a near-black or yellow shop gets the same
- * calm result as a blue one, and the name and facts below sit on the plain
- * band background, always readable. The logo overlaps the banner's foot.
- * Decorative only.
- */
-function HeroBanner({ paper }: { paper: string }) {
-  const mix = (pct: number, base: string) => `color-mix(in oklab, var(--brand) ${pct}%, ${base})`
-  return (
-    <div aria-hidden className="relative h-[136px] overflow-hidden sm:h-44 lg:h-52">
-      <div
-        className="absolute inset-0"
-        style={{
-          background: `linear-gradient(135deg, ${mix(38, paper)}, ${mix(14, paper)})`,
-        }}
-      />
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundImage: `radial-gradient(${mix(55, paper)} 1.3px, transparent 1.7px)`,
-          backgroundSize: '14px 14px',
-        }}
-      />
-      <svg
-        className="absolute inset-0 h-full w-full"
-        viewBox="0 0 300 136"
-        preserveAspectRatio="xMaxYMid slice"
-        fill="none"
-      >
-        <g transform="translate(300 0)">
-          <circle r="150" stroke={mix(28, 'white')} strokeWidth="22" />
-          <circle r="112" stroke={mix(55, 'white')} strokeWidth="18" />
-          <circle r="78" stroke={mix(85, 'black')} strokeWidth="14" />
-          <circle r="46" fill={mix(40, 'white')} />
-        </g>
-      </svg>
-    </div>
-  )
-}
-
-/**
- * The shop's own stock as hero art. One grid, two shapes: a triptych of
- * squares below `lg` (a strip of life under the copy, costing almost no
- * height) and a lead-plus-stack mosaic beside it from `lg`, where the lead
- * takes its height from the two squares rather than an aspect ratio, so the
- * two columns always end level.
- */
-function HeroArt({ covers, skin }: { covers: string[]; skin: Skin }) {
-  const trio = covers.length >= 3
-  return (
-    <div
-      className={`grid select-none gap-3 lg:gap-4 ${trio ? 'grid-cols-3 lg:grid-cols-2' : 'grid-cols-2'}`}
-    >
-      {covers.map((url, index) => (
-        <MediaImg
-          sizes="(min-width: 1024px) 320px, 50vw"
-          key={url}
-          src={url}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          className={`w-full rounded-lg border object-cover shadow-floating ${skin.border} ${
-            trio && index === 0
-              ? 'aspect-square lg:aspect-auto lg:row-span-2 lg:h-full'
-              : 'aspect-square'
-          }`}
-        />
-      ))}
-    </div>
   )
 }
 
@@ -1241,7 +948,7 @@ function ProductSection({
   tone,
   builder,
 }: {
-  /** Anchor the hero's button scrolls to. */
+  /** Anchor for in-page links to the shop's products. */
   id?: string
   store: PublicStore
   title: string
@@ -1271,7 +978,7 @@ function ProductSection({
               store={store}
               product={product}
               skin={skin}
-              // The first row is what a phone shows under the hero.
+              // The first row is what a phone shows near the top.
               eager={index < 2}
             />
           ))}

@@ -910,7 +910,7 @@ White-label design — one codebase, any business:
   the colors were **copied** from and what the seller named their customised
   palette) so customization evolves without migrations, a `homepage` JSON column holding
   the storefront sections as an **ordered** `{ key, enabled }[]` (`banners`,
-  `hero`, `categories`, `featured`, `newArrivals`, `bestSellers`,
+  `categories`, `featured`, `newArrivals`, `bestSellers`,
   `categoryRows`, `catalog`; default order, all enabled — the owner drags to
   reorder and toggles each). The last two are **flag-free**: they merchandise
   the catalog as it stands (a product row per category, and the newest
@@ -918,13 +918,13 @@ White-label design — one codebase, any business:
   has a stocked homepage. They sit below the curated rows, so flagging always
   outranks them.
   Each entry may also carry an optional `settings` object — `title`,
-  `subtitle`, `layout` and (hero only) `ctaLabel` — which is what the Store
+  `subtitle` and `layout` — which is what the Store
   Builder writes when a seller renames a heading or picks another
   composition. All of it is optional and **absent means "platform default"**,
   so a store that has never been customised stores the same bare
   `{ key, enabled }` rows it always did. `layout` is validated against
   `HOMEPAGE_SECTION_LAYOUTS`, which lists per key the compositions the
-  storefront can actually draw (`hero`: split·minimal; `categories`:
+  storefront can actually draw (`categories`:
   chips·tiles; `featured`: spotlight·rail·grid; `newArrivals`/`bestSellers`:
   rail·grid; `catalog`: grid·rail; `banners`/`categoryRows`: none) — a value
   that section has no shape for is a `422`, so the column can never name a
@@ -932,9 +932,13 @@ White-label design — one codebase, any business:
   `resolveHomepage` normalises it on read, tolerating null, the legacy
   boolean-map shape, and back-filling any newly-added section key so old
   stores get it without a migration — at its **canonical position** in
-  `HOMEPAGE_SECTION_KEYS`, not appended, so a section defined above the hero
-  (`banners`) reaches existing stores above the hero rather than demoted to
-  last. `resolveSectionSettings` does the same job one level down: blank
+  `HOMEPAGE_SECTION_KEYS`, not appended, so a section defined first
+  (`banners`) reaches existing stores at the top rather than demoted to
+  last. A **retired** key is dropped on read like any unknown one: the
+  Welcome Hero (`hero`, with its `split`/`minimal` layouts and the hero-only
+  `ctaLabel` setting) was removed on 15 Oct 2026 and data migration
+  `20261015120000_remove_welcome_hero` stripped it from every stored row.
+  `resolveSectionSettings` does the same job one level down: blank
   strings, nulls, unknown fields and retired layouts are dropped, and a
   section left with nothing stores no `settings` key at all. A `footer` JSON column (same evolve-without-migration pattern)
   holds the owner-managed storefront footer: `locations[]` (max 10 —

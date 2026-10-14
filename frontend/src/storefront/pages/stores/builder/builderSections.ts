@@ -6,7 +6,6 @@ import {
   ImageIcon,
   SlidersIcon,
   StarIcon,
-  StoreIcon,
   TagIcon,
   TruckIcon,
 } from '../../../layout/icons'
@@ -46,8 +45,6 @@ export interface BuilderSectionMeta {
   title: boolean
   /** Offer the small line beside the heading? */
   subtitle: boolean
-  /** Offer a button-label field? Hero only — it is the only one with a button. */
-  ctaLabel?: boolean
   /** Presentation choices, in the order they are offered. */
   layouts: LayoutOption[]
   /**
@@ -61,28 +58,6 @@ export interface BuilderSectionMeta {
 }
 
 export const BUILDER_SECTIONS: Record<HomepageSectionKey, BuilderSectionMeta> = {
-  hero: {
-    label: 'Welcome Hero',
-    hint: 'Your shop name, intro line and main button',
-    icon: StoreIcon,
-    about:
-      'The opening of your storefront. Leave the fields blank and it uses your store name and your About text — write something here to say it your own way.',
-    title: true,
-    subtitle: true,
-    ctaLabel: true,
-    layouts: [
-      {
-        id: 'split',
-        label: 'Text + Images',
-        hint: 'Your words on the left, pictures of your products on the right',
-      },
-      {
-        id: 'minimal',
-        label: 'Text only',
-        hint: 'A centred introduction with no pictures',
-      },
-    ],
-  },
   banners: {
     label: 'Banners',
     hint: 'Your promotional images',

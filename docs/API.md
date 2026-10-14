@@ -305,7 +305,7 @@ follows primary, surface derives from the background, button text is
 white/black by the primary's luminance).
 `homepage` is the
 storefront section list — an **ordered** array of `{ key, enabled }` over
-`banners`, `hero`, `categories`, `featured`, `newArrivals`, `bestSellers`,
+`banners`, `categories`, `featured`, `newArrivals`, `bestSellers`,
 `categoryRows`, `catalog` (default: that order, all enabled). `slug` is auto-generated from the name
 (unique, stable across renames) and forms the store's public URL;
 `isPublished` (default `false`) gates the public page. `footer` is the
@@ -535,8 +535,6 @@ Appearance screen rendered by the console.
   { "key": "newArrivals",  "enabled": true,
     "settings": { "title": "Just landed", "layout": "grid" } },
   { "key": "banners",      "enabled": true },
-  { "key": "hero",         "enabled": true,
-    "settings": { "layout": "minimal", "ctaLabel": "Browse the range" } },
   { "key": "featured",     "enabled": false },
   { "key": "categories",   "enabled": true },
   { "key": "bestSellers",  "enabled": true },
@@ -547,9 +545,12 @@ Appearance screen rendered by the console.
 Set the storefront homepage section **order**, per-section visibility and
 per-section presentation in one write — a reorder, a toggle and a renamed
 heading are the same operation. `sections` must be a complete permutation of
-every known key (`banners`, `hero`, `categories`, `featured`, `newArrivals`,
+every known key (`banners`, `categories`, `featured`, `newArrivals`,
 `bestSellers`, `categoryRows`, `catalog`), each with an `enabled` flag; a
-missing, duplicate or unknown key is a `422`. Returns the full store (with
+missing, duplicate or unknown key is a `422` — including `hero`, the retired
+Welcome Hero (removed 15 Oct 2026: migration
+`20261015120000_remove_welcome_hero` stripped it from stored rows, and on read
+it is dropped like any unknown key). Returns the full store (with
 `homepage` normalised to the ordered list).
 
 **`settings` is optional and every field in it is optional.** Absent means
@@ -561,14 +562,12 @@ nothing and renders exactly as it always has.
 | `title`    | 60  | every section with a heading | the platform's own name for the row |
 | `subtitle` | 120 | the same                 | the platform's own strapline, or none |
 | `layout`   | 20  | sections with more than one shape | the section's default composition |
-| `ctaLabel` | 30  | `hero` only              | "Start Shopping"                    |
 
 `layout` is validated **against the section it is on** — a value that section
 has no composition for is a `422`:
 
 | Section        | Layouts                             |
 | -------------- | ----------------------------------- |
-| `hero`         | `split` (default) · `minimal`        |
 | `categories`   | `chips` (default) · `tiles`          |
 | `featured`     | `spotlight` (default) · `rail` · `grid` |
 | `newArrivals`  | `rail` (default) · `grid`            |
@@ -590,13 +589,13 @@ Enabling a section can only ever *reveal* it — it never forces an empty row to
 appear, since a merchandising row still needs products flagged for it. Disabled
 sections are not queried at all. Adding a new section key later makes it appear
 for existing stores automatically — enabled, and at its **canonical position**
-in the key list rather than appended, so a section the platform defines above
-the hero (like `banners`) arrives above the hero. No migration.
+in the key list rather than appended (`banners`, defined first, arrives at the
+top). No migration.
 
 ### Storefront banners
 
 The owner-managed promo carousel rendered as the `banners` homepage section
-(above the hero by default). Stored in the **`store_banners` table**, not a
+(first on the page by default). Stored in the **`store_banners` table**, not a
 JSON column — a banner owns uploaded files, and object keys need a lifecycle.
 
 **One image per banner, always 16:5.** The storefront scales it by width at
@@ -1542,7 +1541,7 @@ per-store equivalent is `/stores/:id/banners`.
 ### `GET /api/v1/public/stores/:slug/home`
 Homepage merchandising payload — each product section capped at 12.
 ```jsonc
-{ "sections": [ { "key": "hero", "enabled": true }, … ],  // ORDERED
+{ "sections": [ { "key": "banners", "enabled": true }, … ],  // ORDERED
   "banners": [                  // active only, in the owner's order
     { "id": "cmu0…", "title": "Festive sale",
       "imageUrl": "https://…",
@@ -1559,8 +1558,7 @@ Homepage merchandising payload — each product section capped at 12.
 **both** what the storefront renders and in what order — each entry carrying
 its optional `settings` (heading, strapline, layout) exactly as stored. A
 section switched **off** comes back with its data array empty and is never
-queried; `hero` carries no data, so the client reads its `enabled` flag
-directly.
+queried.
 `banners` is the shopper-facing half of the banner endpoints above: **inactive
 rows never leave the server**, and a link whose target has been deleted or
 switched off arrives as `href: null` so the banner renders as a plain image

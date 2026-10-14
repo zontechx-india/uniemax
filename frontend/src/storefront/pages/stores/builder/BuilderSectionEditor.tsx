@@ -7,7 +7,6 @@ import type {
 } from '../../../features/stores/storesApi'
 import {
   defaultLayout,
-  HERO_DEFAULT_CTA,
   SECTION_DEFAULT_COPY,
 } from '../../../features/publicStore/sectionCopy'
 import { ChevronDownIcon, ChevronRightIcon } from '../../../layout/icons'
@@ -18,8 +17,8 @@ import { BUILDER_SECTIONS } from './builderSections'
  * One section's settings — the **Quick Customize** panel.
  *
  * What is on screen is what most sellers change: how the section looks, and
- * what it is called. Everything rarer (the small line beside the heading, the
- * hero's button label, putting it all back) sits under *More options*, closed.
+ * what it is called. Everything rarer (the small line beside the heading,
+ * putting it all back) sits under *More options*, closed.
  * The point of the split is not to hide capability, it is that a panel of four
  * controls gets used and a panel of twelve gets abandoned.
  *
@@ -53,7 +52,7 @@ export function BuilderSectionEditor({
   const settings = section.settings ?? {}
   const [more, setMore] = useState(false)
 
-  const hasMore = meta.subtitle || meta.ctaLabel
+  const hasMore = meta.subtitle
   const customised = Object.keys(settings).length > 0
 
   const set = (patch: HomepageSectionSettings) =>
@@ -139,15 +138,9 @@ export function BuilderSectionEditor({
 
       {meta.title && (
         <SettingField
-          label={section.key === 'hero' ? 'Heading' : 'Title'}
-          hint={
-            section.key === 'hero'
-              ? 'Leave blank to use your store name.'
-              : 'Leave blank to use the default.'
-          }
-          placeholder={
-            section.key === 'hero' ? 'Your store name' : defaults.title
-          }
+          label="Title"
+          hint="Leave blank to use the default."
+          placeholder={defaults.title}
           value={settings.title ?? ''}
           maxLength={60}
           disabled={busy}
@@ -188,33 +181,13 @@ export function BuilderSectionEditor({
             <div className="mt-3 space-y-4">
               {meta.subtitle && (
                 <SettingField
-                  label={section.key === 'hero' ? 'Intro line' : 'Small line'}
-                  hint={
-                    section.key === 'hero'
-                      ? 'Leave blank to use the About text from your footer settings.'
-                      : 'The short line beside the title. Leave blank for the default.'
-                  }
-                  placeholder={
-                    section.key === 'hero'
-                      ? 'Your About text'
-                      : (defaults.subtitle ?? 'None')
-                  }
+                  label="Small line"
+                  hint="The short line beside the title. Leave blank for the default."
+                  placeholder={defaults.subtitle ?? 'None'}
                   value={settings.subtitle ?? ''}
                   maxLength={120}
                   disabled={busy}
                   onChange={(value) => set({ subtitle: value || null })}
-                />
-              )}
-
-              {meta.ctaLabel && (
-                <SettingField
-                  label="Button label"
-                  hint="The button that takes shoppers into your catalogue."
-                  placeholder={HERO_DEFAULT_CTA}
-                  value={settings.ctaLabel ?? ''}
-                  maxLength={30}
-                  disabled={busy}
-                  onChange={(value) => set({ ctaLabel: value || null })}
                 />
               )}
 

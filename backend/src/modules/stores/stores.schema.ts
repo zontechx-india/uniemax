@@ -78,12 +78,11 @@ export const storeThemeUpdateSchema = storeThemeSchema.partial();
  *
  * The last two are **flag-free**: `categoryRows` and `catalog` merchandise the
  * catalog as it stands, so a seller who has ticked nothing still gets a
- * stocked homepage instead of a hero over empty space. They sit below the
+ * stocked homepage instead of an empty one. They sit below the
  * curated rows, so ticking flags always outranks them.
  */
 export const HOMEPAGE_SECTION_KEYS = [
   "banners",
-  "hero",
   "categories",
   "featured",
   "newArrivals",
@@ -110,7 +109,6 @@ export type HomepageSectionKey = (typeof HOMEPAGE_SECTION_KEYS)[number];
  */
 export const HOMEPAGE_SECTION_LAYOUTS = {
   banners: [],
-  hero: ["split", "minimal"],
   categories: ["chips", "tiles"],
   featured: ["spotlight", "rail", "grid"],
   newArrivals: ["rail", "grid"],
@@ -135,8 +133,6 @@ export interface HomepageSectionSettings {
   subtitle?: string | null;
   /** One of `HOMEPAGE_SECTION_LAYOUTS[key]`. */
   layout?: string | null;
-  /** **Hero only** — the label on its primary button ("Start Shopping"). */
-  ctaLabel?: string | null;
 }
 
 export interface HomepageSection {
@@ -182,11 +178,6 @@ export function resolveSectionSettings(
   if (subtitle) out.subtitle = subtitle;
   const layout = cleanText(obj.layout, 20);
   if (layout && allowed.includes(layout)) out.layout = layout;
-  // Only the hero has a button, so a stray label on any other row is noise.
-  if (key === "hero") {
-    const ctaLabel = cleanText(obj.ctaLabel, 30);
-    if (ctaLabel) out.ctaLabel = ctaLabel;
-  }
 
   return Object.keys(out).length > 0 ? out : undefined;
 }
@@ -201,7 +192,6 @@ const homepageSectionSettingsSchema = z.object({
   title: z.string().trim().min(1).max(60).nullish(),
   subtitle: z.string().trim().min(1).max(120).nullish(),
   layout: z.string().trim().min(1).max(20).nullish(),
-  ctaLabel: z.string().trim().min(1).max(30).nullish(),
 });
 
 export const storeHomepageSchema = z
@@ -264,7 +254,7 @@ export const storeHomepageSchema = z
  *                             section's optional `settings` sanitised by
  *                             `resolveSectionSettings`
  *   - legacy boolean map    → canonical order with the stored enabled flags,
- *     `{ hero: true, … }`     so the format change loses nothing
+ *     `{ featured: true, … }` so the format change loses nothing
  */
 export function resolveHomepage(raw: unknown): HomepageSection[] {
   if (raw && typeof raw === "object" && !Array.isArray(raw)) {
@@ -295,8 +285,9 @@ export function resolveHomepage(raw: unknown): HomepageSection[] {
       }
       // A section added since this store last saved lands where the platform
       // put it in HOMEPAGE_SECTION_KEYS, not at the bottom: "banners" is
-      // defined above the hero, so an existing store gets it above the hero
-      // too. Appending would have quietly demoted every new section to last.
+      // defined first, so an existing store gets it at the top too.
+      // Appending would have quietly demoted every new section to last.
+      // A retired key (the old "hero") is simply dropped above.
       for (const key of HOMEPAGE_SECTION_KEYS) {
         if (seen.has(key)) continue;
         const canonical = HOMEPAGE_SECTION_KEYS.indexOf(key);

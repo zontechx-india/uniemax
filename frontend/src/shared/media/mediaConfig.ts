@@ -78,7 +78,9 @@ function subscribe(notify: () => void) {
  * components mounted later never render a loading pass.
  */
 export function useMediaConfig(): MediaConfig | null {
-  return useSyncExternalStore(subscribe, () => loaded)
+  // The same snapshot serves a server render (the storefront's render tests);
+  // the app itself never hydrates, so the browser behaves as before.
+  return useSyncExternalStore(subscribe, () => loaded, () => loaded)
 }
 
 /** Pre-upload validation — returns a user-facing error message, or null. */

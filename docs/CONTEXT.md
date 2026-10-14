@@ -178,13 +178,13 @@ A single account can own multiple stores and switch between them.
   which is the shortest path between "I don't like that bit" and changing it.
 
   **Nothing has to be built.** A new store already has a complete, professional
-  homepage — Welcome Hero, Banners, Shop by Category, Featured Products, New
-  Arrivals, Best Sellers, Category Highlights, All Products, in that order, all
-  switched on. A seller can publish without ever opening the builder.
+  homepage — Banners, Shop by Category, Featured Products, New Arrivals, Best
+  Sellers, Category Highlights, All Products, in that order, all switched on.
+  (The Welcome Hero section was removed on 15 Oct 2026.) A seller can publish without ever opening the builder.
 
   Per section the seller can change **what it is called**, its **small line**,
-  and **how it is laid out** where there is a genuine choice: the hero with or
-  without product pictures; categories as a compact row or a block of cards;
+  and **how it is laid out** where there is a genuine choice: categories as a
+  compact row or a block of cards;
   Featured Products as a spotlight, a sliding row or a simple row; New Arrivals
   and Best Sellers as a sliding or simple row. Those are the shapes the
   storefront can actually draw — no setting here promises something it cannot
@@ -413,7 +413,7 @@ A single account can own multiple stores and switch between them.
   directly, no account needed.
 
   **Homepage** (`/store/{slug}`) — introduces the store rather than dumping a
-  grid: hero banner, **Shop by Category**, then the owner's
+  grid: the owner's banners, **Shop by Category**, then the owner's
   merchandising rows — **Featured Products**, **New Arrivals**, **Best
   Sellers**. Every section is an edge-to-edge **band** on alternating
   backgrounds with its content held to a centred column, so the page reads as
@@ -421,11 +421,7 @@ A single account can own multiple stores and switch between them.
   stretch into a wall of tiny cards on a very wide monitor.
 
   **Each section is shaped for what it is for**, so the page has a rhythm
-  instead of repeating one grid: the **hero** introduces the store (logo, name,
-  the owner's own About text or a summary of the catalog, a Start Shopping
-  button and a jump to the categories) with a mosaic of the store's real
-  product photos beside it — and when there are no photos yet it centres
-  itself rather than leaving half the band empty; **Shop by Category** is a
+  instead of repeating one grid: **Shop by Category** is a
   single sideways-scrolling row of category chips with counts, so one category
   and thirty both look right; **Featured Products** leads with one large card
   beside a block of smaller ones; **New Arrivals** and **Best Sellers** are
@@ -437,8 +433,8 @@ A single account can own multiple stores and switch between them.
   Each merchandising row shows **only** the products the owner ticked for it,
   and a row with nothing ticked is simply not shown. Plain rows are capped at
   one full row of cards (as many as the screen fits) with a "View all" link. The
-  owner controls both the **order** of these homepage sections (including the
-  hero) and whether each shows, by drag-and-drop in the store's Homepage
+  owner controls both the **order** of these homepage sections and whether
+  each shows, by drag-and-drop in the store's Homepage
   section — see Store Management.
 
   **Category page** (`/store/{slug}/category/{category}`) — breadcrumb,

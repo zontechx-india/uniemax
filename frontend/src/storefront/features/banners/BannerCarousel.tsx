@@ -64,9 +64,15 @@ export function BannerCarousel({
   containerClassName = '',
   frameClassName = '',
   wellClassName = 'bg-surface-alt',
+  fallbackLabel,
   ...rest
 }: {
   banners: CarouselBanner[]
+  /**
+   * Shown on the brand colour in place of a banner that has no image — the
+   * store's name on a storefront. Without it the banner's own title is used.
+   */
+  fallbackLabel?: string
   id?: string
   /** Section chrome — divider and band tone, from the caller's palette. */
   className?: string
@@ -140,6 +146,7 @@ export function BannerCarousel({
                 key={banner.id}
                 banner={banner}
                 wellClassName={wellClassName}
+                fallbackLabel={fallbackLabel}
                 // Only the visible slide is reachable; the rest would otherwise
                 // be invisible tab stops.
                 hidden={i !== safeIndex}
@@ -180,18 +187,20 @@ export function BannerCarousel({
 function BannerSlide({
   banner,
   wellClassName,
+  fallbackLabel,
   hidden,
   eager,
 }: {
   banner: CarouselBanner
   wellClassName: string
+  fallbackLabel: string | undefined
   hidden: boolean
   eager: boolean
 }) {
-  const image = (
+  const image = banner.imageUrl ? (
     <MediaImg
       sizes="100vw"
-      src={banner.imageUrl ?? ''}
+      src={banner.imageUrl}
       alt={banner.title ?? ''}
       // The first banner is above the fold on every screen — lazy-loading it
       // would guarantee a blank strip on arrival.
@@ -199,6 +208,19 @@ function BannerSlide({
       decoding="async"
       className="h-full w-full object-cover"
     />
+  ) : (
+    // No image to show: the brand colour with a name on it, never an empty
+    // frame or a broken-image icon. `--cta` is the owner's own colour on a
+    // storefront (storeTheme.ts) and the platform's on the marketplace.
+    <span className="flex h-full w-full items-center justify-center bg-[var(--cta)] px-6 text-center">
+      <span
+        className={`line-clamp-2 break-words text-2xl font-semibold text-cta-contrast sm:text-4xl lg:text-5xl ${
+          fallbackLabel ? 'font-display' : 'font-heading'
+        }`}
+      >
+        {fallbackLabel ?? banner.title}
+      </span>
+    </span>
   )
 
   return (

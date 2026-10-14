@@ -22,7 +22,6 @@ export const SECTION_DEFAULT_COPY: Record<
   { title: string; subtitle?: string }
 > = {
   banners: { title: 'Banners' },
-  hero: { title: 'Welcome Hero' },
   categories: { title: 'Shop by Category' },
   featured: {
     title: SECTION_TITLES.featured,
@@ -42,9 +41,6 @@ export const SECTION_DEFAULT_COPY: Record<
     subtitle: 'The newest across the whole shop',
   },
 }
-
-/** The hero's button when its owner has not renamed it. */
-export const HERO_DEFAULT_CTA = 'Start Shopping'
 
 /**
  * The composition a section uses when its owner has not chosen one — **the
@@ -75,6 +71,5 @@ export function sectionCopy(section: HomepageSection) {
     title: settings?.title ?? fallback.title,
     subtitle: settings?.subtitle ?? fallback.subtitle,
     layout: settings?.layout ?? null,
-    ctaLabel: settings?.ctaLabel ?? null,
   }
 }

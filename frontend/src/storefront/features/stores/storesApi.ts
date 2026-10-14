@@ -82,7 +82,6 @@ export function sameColors(a: StoreThemeColors, b: StoreThemeColors): boolean {
  */
 export const HOMEPAGE_SECTION_KEYS = [
   'banners',
-  'hero',
   'categories',
   'featured',
   'newArrivals',
@@ -111,7 +110,6 @@ export type HomepageSectionKey = (typeof HOMEPAGE_SECTION_KEYS)[number]
  */
 export const HOMEPAGE_SECTION_LAYOUTS = {
   banners: [],
-  hero: ['split', 'minimal'],
   categories: ['chips', 'tiles'],
   featured: ['spotlight', 'rail', 'grid'],
   newArrivals: ['rail', 'grid'],
@@ -132,8 +130,6 @@ export interface HomepageSectionSettings {
   subtitle?: string | null
   /** One of `HOMEPAGE_SECTION_LAYOUTS[key]`. */
   layout?: string | null
-  /** **Hero only** — the label on its primary button. */
-  ctaLabel?: string | null
 }
 
 export interface HomepageSection {
@@ -179,10 +175,6 @@ export function resolveSectionSettings(
   if (subtitle) out.subtitle = subtitle
   const layout = cleanSectionText(obj.layout, 20)
   if (layout && allowed.includes(layout)) out.layout = layout
-  if (key === 'hero') {
-    const ctaLabel = cleanSectionText(obj.ctaLabel, 30)
-    if (ctaLabel) out.ctaLabel = ctaLabel
-  }
 
   return Object.keys(out).length > 0 ? out : undefined
 }
@@ -717,7 +709,7 @@ export interface PublicCategoryDetail {
 }
 
 /**
- * Storefront banners — the owner's promo carousel above the hero.
+ * Storefront banners — the owner's promo carousel at the top of the homepage.
  *
  * Two shapes, deliberately different: the OWNER list carries everything the
  * admin screen edits (including inactive rows and a resolved link label), the
