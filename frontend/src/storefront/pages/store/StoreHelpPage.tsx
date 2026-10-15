@@ -9,7 +9,6 @@ import { NewTicketForm } from '../../features/support/NewTicketForm'
 import { TicketList } from '../../features/support/TicketList'
 import { STORE_CATEGORIES, storeSupportApi } from '../../features/support/supportApi'
 import type { SupportTicket } from '../../features/support/supportApi'
-import { SOCIAL_META } from '../../../shared/ui/socialIcons'
 import {
   ClockIcon,
   LifebuoyIcon,
@@ -17,7 +16,8 @@ import {
   PhoneCallIcon,
   PlusIcon,
 } from '../../layout/icons'
-import { telLink, waLink } from '../../features/publicStore/contactLinks'
+import { telLink } from '../../features/publicStore/contactLinks'
+import { ContactActions } from '../../features/publicStore/ShopContact'
 import { Button } from '../../../shared/ui/Button'
 
 /**
@@ -88,7 +88,7 @@ export function StoreHelpPage() {
 
   return (
     <StorePageShell className="max-w-3xl">
-      <h1 className={`font-heading text-2xl font-bold ${skin.text}`}>
+      <h1 className={`font-heading text-2xl font-semibold sm:text-3xl ${skin.text}`}>
         Help &amp; Support
       </h1>
       <p className={`mt-1 text-sm ${skin.muted}`}>
@@ -98,30 +98,23 @@ export function StoreHelpPage() {
 
       {/* ---- The shop's own contact details --------------------------- */}
       {hasContact && (
-        <div className={`mt-6 rounded-lg border p-4 ${skin.border} ${skin.surface}`}>
-          <h2 className={`text-sm font-semibold ${skin.text}`}>
+        <div className={`mt-6 rounded-lg border p-4 sm:p-5 ${skin.border} ${skin.surface}`}>
+          <h2 className={`text-base font-semibold ${skin.text}`}>
             Contact {store.name}
           </h2>
-          <ul className="mt-3 space-y-2.5 text-sm">
+          {/* The fastest routes as real buttons — WhatsApp filled only when
+              the seller gave a WhatsApp number, Call outlined beside it. */}
+          <ContactActions
+            store={store}
+            skin={skin}
+            message={`Hi ${store.name}, I need help with`}
+            className="mt-4"
+          />
+          <ul className="mt-4 space-y-2.5 text-sm">
             {support.phone && (
               <ContactRow icon={<PhoneCallIcon className="h-4 w-4" />} skin={skin}>
                 <a href={telLink(support.phone)} className="hover:text-brand">
                   {support.phone}
-                </a>
-              </ContactRow>
-            )}
-            {support.whatsapp && (
-              <ContactRow
-                icon={<SOCIAL_META.whatsapp.Icon className="h-4 w-4" />}
-                skin={skin}
-              >
-                <a
-                  href={waLink(support.whatsapp)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="hover:text-brand"
-                >
-                  WhatsApp: {support.whatsapp}
                 </a>
               </ContactRow>
             )}
@@ -161,15 +154,15 @@ export function StoreHelpPage() {
 
       {guest ? (
         <div
-          className={`mt-4 rounded-lg border border-dashed px-4 py-10 text-center ${skin.border}`}
+          className={`mt-4 rounded-lg border px-4 py-10 text-center ${skin.border} ${skin.surface}`}
         >
           <LifebuoyIcon className={`mx-auto h-7 w-7 ${skin.muted}`} />
           <p className={`mt-2 text-sm font-medium ${skin.text}`}>
             Sign in to message this store
           </p>
           <p className={`mx-auto mt-1 max-w-sm text-sm ${skin.muted}`}>
-            A request is a tracked conversation, so it has to belong to an
-            account. The contact details above need no sign-in.
+            Sign in to send a message and follow the shop’s reply here. Calling
+            or WhatsApp above needs no account.
           </p>
           <Button variant="primary"
             onClick={() => openAuthDialog(storeAuthRequest(store))}
@@ -219,8 +212,7 @@ export function StoreHelpPage() {
       )}
 
       <p className={`mt-8 text-xs ${skin.muted}`}>
-        Need UnieMax rather than this store — a shop that isn't replying, or a
-        problem with the platform itself?{' '}
+        Shop not replying, or a problem with UnieMax itself?{' '}
         {/* Plain <a> for the same cross-router reason as the sign-in link. */}
         <a href="/support" className="font-semibold underline underline-offset-2">
           Contact UnieMax support

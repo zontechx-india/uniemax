@@ -118,16 +118,41 @@ const ACRONYMS = new Set([
 const CONNECTORS = new Set(['AN', 'AND', 'THE', 'FOR', 'OF', 'WITH', 'IN', 'ON', 'TO', 'BY', 'OR'])
 
 /**
+ * A name that starts with an all-lowercase word ("winter jacket for men")
+ * gets a capital first letter, as a sentence would. A word with a capital
+ * inside it ("iPhone", "eSIM") is deliberate styling and is left alone.
+ */
+function capitalFirst(name: string): string {
+  return name.replace(
+    /^(\s*)([a-z])(?=[a-z]*(?:[^A-Za-z]|$))/,
+    (_, space: string, letter: string) => space + letter.toUpperCase(),
+  )
+}
+
+/**
+ * Seller text pasted from "fancy font" generators uses the Unicode
+ * Mathematical Alphanumeric Symbols (𝐊𝐞𝐞𝐩 𝐲𝐨𝐮𝐫 …) instead of real letters —
+ * they render in a heavy fallback font and screen readers spell them out.
+ * Shown as the plain letters they stand for. Display only.
+ */
+export function plainLetters(text: string): string {
+  return text.replace(/[\u{1D400}-\u{1D7FF}]/gu, (ch) => ch.normalize('NFKC'))
+}
+
+/**
  * A product name as a customer should read it. Many sellers type names in
  * capitals ("GLEN FOOD CONTAINER"), which reads as shouting and is harder to
  * scan; a name with NO lowercase letter at all is shown in Title Case
  * ("Glen Food Container"), keeping abbreviations ("LED TV 32 INCH" → "LED TV
  * 32 Inch"). Any name with a lowercase letter is the seller's deliberate
- * styling and is shown exactly as typed. Display only — the stored name, URLs
- * and search are untouched.
+ * styling and is shown as typed — except that an all-lowercase first word
+ * gets its capital (`capitalFirst`). "Fancy font" letters are shown plain
+ * (`plainLetters`). Display only — the stored name, URLs and search are
+ * untouched.
  */
-export function displayName(name: string): string {
-  if (/[a-z]/.test(name) || !/[A-Z]{2}/.test(name)) return name
+export function displayName(raw: string): string {
+  const name = plainLetters(raw)
+  if (/[a-z]/.test(name) || !/[A-Z]{2}/.test(name)) return capitalFirst(name)
   return name.replace(/[A-Z][A-Z'’]*/g, (word, offset: number) => {
     if (ACRONYMS.has(word) || !/[AEIOUY]/.test(word)) return word
     if (offset > 0 && CONNECTORS.has(word)) return word.toLowerCase()

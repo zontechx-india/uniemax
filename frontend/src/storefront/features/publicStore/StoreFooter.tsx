@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { googleMapsLink } from '../../../shared/maps/googleMaps'
 import { SOCIAL_META } from '../../../shared/ui/socialIcons'
@@ -27,6 +28,8 @@ import {
 import type { Skin } from './storeTheme'
 import { MediaImg } from '../../../shared/media/MediaImg'
 import { telLink, waLink } from './contactLinks'
+import { plainLetters } from './shopShape'
+import { Button } from '../../../shared/ui/Button'
 
 /**
  * Storefront footer — renders the owner's Footer settings (locations, social
@@ -245,11 +248,7 @@ function BrandBlock({
           Serving you since {footer.info.establishedYear}
         </p>
       )}
-      {footer.info.about && (
-        <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted">
-          {footer.info.about}
-        </p>
-      )}
+      {footer.info.about && <AboutText text={footer.info.about} />}
       {socials.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2">
           {socials.map((key) => {
@@ -271,6 +270,39 @@ function BrandBlock({
             )
           })}
         </div>
+      )}
+    </div>
+  )
+}
+
+/** Past this many characters the About text folds to three lines. */
+const ABOUT_FOLD = 160
+
+/**
+ * The seller's About text. A long one (a paragraph of nine lines on a phone)
+ * folds to three with **Read more**, so the footer stays a footer.
+ */
+function AboutText({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+  const long = text.length > ABOUT_FOLD
+  return (
+    <div className="mt-3 max-w-sm">
+      <p
+        className={`text-sm leading-relaxed text-muted ${long && !open ? 'line-clamp-3' : ''}`}
+      >
+        {plainLetters(text)}
+      </p>
+      {long && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          // Pulled left by its own padding so the words align with the text.
+          className="-ml-3.5 mt-1"
+        >
+          {open ? 'Show less' : 'Read more'}
+        </Button>
       )}
     </div>
   )

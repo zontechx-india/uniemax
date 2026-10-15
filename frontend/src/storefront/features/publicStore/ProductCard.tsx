@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   formatPrice,
@@ -10,7 +11,7 @@ import { CardAction } from './CartControls'
 import { stockLevel } from './catalog'
 import type { Skin } from './storeTheme'
 import { MediaImg } from '../../../shared/media/MediaImg'
-import { displayName } from './shopShape'
+import { displayName, plainLetters } from './shopShape'
 
 /**
  * Product listing card — used by every grid, rail and spotlight on the
@@ -29,13 +30,13 @@ import { displayName } from './shopShape'
  * stretches, and the action is pushed to the card's foot, so a one-line name
  * beside a two-line one never leaves the buttons staggered.
  *
- * **Neutral photo tile** (`CARD_PHOTO`). The whole product stays visible
- * (`object-contain` — nothing cropped off a scanner's cable or a
- * banner-shaped upload), inset on the recessed neutral well so it never
- * touches the tile's edge. On a light shop the photo is multiplied onto the
- * well (`--media-blend`, set by `storeVars`), so a packshot's white
- * background melts into the tile instead of drawing a white box inside a grey
- * one. The category is NOT repeated on every card.
+ * **4:5 photo tile, framed by the photo's own shape.** A photo close to the
+ * frame's shape (a model shot) fills it (`CARD_PHOTO_FILL`); anything else —
+ * a square packshot, a banner-shaped upload — stays whole (`CARD_PHOTO`,
+ * `object-contain`), inset on the recessed neutral well. On a light shop that
+ * photo is multiplied onto the well (`--media-blend`, set by `storeVars`), so
+ * a packshot's white background melts into the tile instead of drawing a
+ * white box inside a grey one. The category is NOT repeated on every card.
  *
  * **Classic, not boxed.** There is no card frame: the photo sits in its own
  * rounded tile and the words sit on the page beneath it. A saving is said in
@@ -92,7 +93,7 @@ export function ProductCard({
 
           {large && product.description && (
             <p className={`line-clamp-2 text-sm ${skin.muted}`}>
-              {product.description}
+              {plainLetters(product.description)}
             </p>
           )}
 
@@ -120,9 +121,41 @@ export const CARD_PHOTO =
   'h-full w-full object-contain p-2 sm:p-3 [mix-blend-mode:var(--media-blend,normal)]'
 
 /**
- * The cover slot: the whole photo on the neutral well, and a sold-out label
- * over its top-left corner — the one status worth putting on the picture,
- * because it decides whether the card is worth opening at all.
+ * A photo already close to its frame's shape — a model shot in a portrait
+ * frame — fills it edge to edge; a few percent off the top and bottom is
+ * the whole cost, and it stops a fashion catalogue reading as small photos
+ * in grey boxes. The focus sits a little above centre, where faces are.
+ */
+export const CARD_PHOTO_FILL = 'h-full w-full object-cover object-[center_30%]'
+
+/**
+ * Should a photo of `width × height` fill a frame of `frame` (width / height)
+ * rather than sit whole inside it? Only when the two shapes are close: within
+ * ~22% narrower or ~15% wider. A square packshot in a 4:5 frame, a wide
+ * banner or a tall phone screenshot stays whole (`CARD_PHOTO`) — cropping
+ * those would cut off the product or its words.
+ */
+export function photoFillsFrame(width: number, height: number, frame: number): boolean {
+  if (!width || !height) return false
+  const r = width / height / frame
+  return r >= 0.78 && r <= 1.15
+}
+
+/** Card frame shape (width / height): 4:5, or 4:3 for a spotlight's lead. */
+const CARD_FRAME = 4 / 5
+const LEAD_FRAME = 4 / 3
+
+/**
+ * The cover slot: the photo on the neutral well — filling the 4:5 frame
+ * when its own shape is close (`photoFillsFrame`), whole and inset otherwise
+ * — and a sold-out label over its top-left corner, the one status worth
+ * putting on the picture, because it decides whether the card is worth
+ * opening at all.
+ *
+ * 4:5 because the catalogues on the platform are mostly clothing, sarees and
+ * people photographed upright; a square packshot still sits whole inside it.
+ * The fit is decided once the photo loads (the API sends no dimensions), so
+ * every photo starts whole and a portrait one settles into the frame.
  */
 function ProductMedia({
   product,
@@ -136,6 +169,7 @@ function ProductMedia({
   eager: boolean
 }) {
   const soldOut = product.stockQuantity <= 0
+  const [fill, setFill] = useState(false)
   return (
     // A spotlight's lead card is stretched to the height of the grid beside
     // it, so from `lg` its cover **absorbs that extra height** instead of
@@ -147,7 +181,7 @@ function ProductMedia({
         // where a square slot would make it top-heavy.
         large
           ? 'aspect-[4/3] lg:aspect-auto lg:min-h-0 lg:flex-1'
-          : 'aspect-square'
+          : 'aspect-[4/5]'
       } rounded-lg ${skin.well}`}
     >
       {product.image?.url ? (
@@ -158,7 +192,16 @@ function ProductMedia({
           loading={eager ? 'eager' : 'lazy'}
           fetchPriority={eager ? 'high' : undefined}
           decoding="async"
-          className={`${CARD_PHOTO} transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none ${soldOut ? 'opacity-60' : ''}`}
+          onLoad={(e) =>
+            setFill(
+              photoFillsFrame(
+                e.currentTarget.naturalWidth,
+                e.currentTarget.naturalHeight,
+                large ? LEAD_FRAME : CARD_FRAME,
+              ),
+            )
+          }
+          className={`${fill ? CARD_PHOTO_FILL : CARD_PHOTO} transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none ${soldOut ? 'opacity-60' : ''}`}
         />
       ) : (
         <Monogram name={product.name} large={large} />
@@ -192,18 +235,17 @@ function Monogram({ name, large }: { name: string; large: boolean }) {
 }
 
 /**
- * The card's one status line: low stock (in words, in the warning colour —
- * not a chip) and how many options there are. Nothing when there is no news.
+ * The card's one status line: low stock, in words, in the warning colour —
+ * not a chip. Nothing when there is no news. (How many options a product has
+ * is not repeated here: the card's "View Options" button already says it.)
  */
 function CardNote({ product }: { product: PublicProduct }) {
   const low =
     product.stockQuantity > 0 && stockLevel(product.stockQuantity) === 'low'
-  if (!low && product.variantCount === 0) return null
+  if (!low) return null
   return (
-    <p className="mt-auto flex flex-wrap items-center gap-x-2 pt-1 text-xs text-muted">
-      {low && <span className="font-semibold text-warning">Only a few left</span>}
-      {low && product.variantCount > 0 && <span aria-hidden>·</span>}
-      <VariantCount count={product.variantCount} />
+    <p className="mt-auto pt-1 text-xs font-semibold text-warning">
+      Only a few left
     </p>
   )
 }
@@ -326,16 +368,6 @@ export function PriceLabel({
         </>
       )}
     </p>
-  )
-}
-
-/** Muted "N options" line — never the options themselves. */
-export function VariantCount({ count }: { count: number }) {
-  if (count === 0) return null
-  return (
-    <span className="text-xs text-muted">
-      {count} option{count === 1 ? '' : 's'}
-    </span>
   )
 }
 

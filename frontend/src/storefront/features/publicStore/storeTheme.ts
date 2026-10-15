@@ -80,6 +80,18 @@ export function textOn(bg: string): string {
 }
 
 /**
+ * Text on a FILLED BUTTON in `bg`: white whenever white reads at ≥ 3:1 —
+ * the WCAG level for bold UI text — else whichever of black / white reads
+ * better. `textOn` alone picked near-black on a pure red (#ff0000: black
+ * 5.3, white 4.0), which looked like an error state, not a shop's button;
+ * shops expect white on a saturated brand colour. A light colour (yellow,
+ * sky) still gets dark text.
+ */
+export function ctaTextOn(bg: string): string {
+  return contrast('#ffffff', bg) >= 3 ? '#ffffff' : textOn(bg)
+}
+
+/**
  * The owner's colour, nudged just far enough to be READABLE as text on
  * `against` (≥ 4.5:1, docs/DESIGN_GUIDELINES.md §12): darker on a light
  * surface, lighter on a dark one. A colour that already passes is returned
@@ -164,7 +176,7 @@ export function storeVars(theme: StoreThemeVars): React.CSSProperties {
   const ctaText =
     theme.buttonTextColor && HEX6.test(theme.buttonTextColor)
       ? theme.buttonTextColor
-      : textOn(primary)
+      : ctaTextOn(primary)
 
   return {
     // --- design-system semantics (flat surfaces) --------------------------

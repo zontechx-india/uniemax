@@ -1,5 +1,12 @@
-import { useState } from 'react'
-import type { PublicSection, PublicSort, PublicStore } from '../stores/storesApi'
+import { useEffect, useState } from 'react'
+import {
+  publicStoreApi,
+  storeShopUrl,
+  type PublicProduct,
+  type PublicSection,
+  type PublicSort,
+  type PublicStore,
+} from '../stores/storesApi'
 import { ProductGrid } from './ProductCard'
 import { FilterPanel } from './FilterPanel'
 import { NO_FILTERS, activeFilterCount, type CatalogFilters } from './catalog'
@@ -8,9 +15,14 @@ import {
   GridSkeleton,
   LoadMore,
   NoResults,
+  SectionHeading,
   SortFilterBar,
   type Crumb,
 } from './ListingControls'
+import { SEARCH_MIN_PRODUCTS, shopProductCount } from './shopShape'
+
+/** Products suggested under a search that found nothing. */
+const SUGGESTED_COUNT = 4
 import { useProductQuery } from './useProductQuery'
 import { StorePageShell } from './PublicStoreLayout'
 import type { Skin } from './storeTheme'
@@ -63,6 +75,35 @@ export function ProductListing({
     })
 
   const filterCount = activeFilterCount(filters)
+  const nothing = !initialLoading && !error && products.length === 0
+
+  // A search that finds nothing still shows the shop's newest few, so the
+  // page offers somewhere to go instead of ending at "no results".
+  const [suggested, setSuggested] = useState<PublicProduct[]>([])
+  const suggest = nothing && Boolean(q) && filterCount === 0
+  useEffect(() => {
+    if (!suggest) return
+    let cancelled = false
+    publicStoreApi
+      .listProducts(store.slug, { pageSize: SUGGESTED_COUNT })
+      .then(({ items }) => {
+        if (!cancelled) setSuggested(items)
+      })
+      .catch(() => {
+        // Suggestions are a nicety; the no-results card stands on its own.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [suggest, store.slug])
+
+  // Sort and filter earn their bar on a catalogue big enough to need them.
+  // A shop smaller than that (most of them) — or a search with nothing in it
+  // — gets a quiet count instead, unless a filter is already applied (the
+  // bar is how it gets cleared).
+  const showBar =
+    filterCount > 0 ||
+    (shopProductCount(store) >= SEARCH_MIN_PRODUCTS && !nothing)
 
   const clearAll = () => {
     setFilters(NO_FILTERS)
@@ -89,14 +130,23 @@ export function ProductListing({
 
       {/* No wrapper: a sticky element can only travel inside its parent's
           box, and a div sized to the bar itself let it scroll straight away. */}
-      <SortFilterBar
-        total={total}
-        sort={sort}
-        onSort={setSort}
-        activeFilterCount={filterCount}
-        onOpenFilters={() => setFiltersOpen(true)}
-        skin={skin}
-      />
+      {showBar ? (
+        <SortFilterBar
+          total={total}
+          sort={sort}
+          onSort={setSort}
+          activeFilterCount={filterCount}
+          onOpenFilters={() => setFiltersOpen(true)}
+          skin={skin}
+        />
+      ) : (
+        !initialLoading &&
+        !nothing && (
+          <p className={`mb-5 mt-1 text-sm ${skin.muted}`}>
+            {total} {total === 1 ? 'product' : 'products'}
+          </p>
+        )
+      )}
 
       {error ? (
         <p className="rounded-lg border border-line p-6 text-center text-sm text-danger">
@@ -105,11 +155,23 @@ export function ProductListing({
       ) : initialLoading ? (
         <GridSkeleton skin={skin} />
       ) : products.length === 0 ? (
-        <NoResults
-          onClear={clearAll}
-          showClear={filterCount > 0 || sort !== 'newest'}
-          skin={skin}
-        />
+        <div className={showBar ? '' : 'mt-6'}>
+          <NoResults
+            onClear={clearAll}
+            showClear={filterCount > 0 || sort !== 'newest'}
+            query={q}
+            clearSearchTo={q ? storeShopUrl(store.slug) : undefined}
+            skin={skin}
+          />
+          {suggest && suggested.length > 0 && (
+            <section className="mt-10">
+              <SectionHeading title="You might like" skin={skin} />
+              <div className="mt-4">
+                <ProductGrid store={store} products={suggested} skin={skin} />
+              </div>
+            </section>
+          )}
+        </div>
       ) : (
         <>
           <ProductGrid store={store} products={products} skin={skin} />

@@ -25,7 +25,6 @@ import { ProductGrid } from '../../features/publicStore/ProductCard'
 import { ShareButton } from '../../features/publicStore/ShareButton'
 import {
   PurchaseActions,
-  SaleTag,
   StockBadge,
   type PurchaseTarget,
 } from '../../features/publicStore/CartControls'
@@ -59,7 +58,7 @@ import {
 } from '../../layout/icons'
 import type { Skin } from '../../features/publicStore/storeTheme'
 import { MediaImg } from '../../../shared/media/MediaImg'
-import { displayName } from '../../features/publicStore/shopShape'
+import { displayName, plainLetters } from '../../features/publicStore/shopShape'
 import { ContactActions, shopContact } from '../../features/publicStore/ShopContact'
 
 /**
@@ -316,23 +315,19 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
             <span className={`font-figure text-3xl font-semibold ${skin.text}`}>
               {formatPrice(price)}
             </span>
+            {/* MRP struck through and the saving in words — the same voice
+                as every product card (a "Sale" pill beside "29% off" said it
+                twice). The chosen option is named by its picker below, so it
+                is not repeated here either. */}
             {compareAt && Number(compareAt) > Number(price) && (
-              <>
-                <span className={`font-figure text-base ${skin.muted}`}>
-                  MRP <s>{formatPrice(compareAt)}</s>{' '}
-                  <span className="ml-1 font-semibold text-brand">
-                    {Math.round((1 - Number(price) / Number(compareAt)) * 100)}% off
-                  </span>
+              <span className={`font-figure text-base ${skin.muted}`}>
+                MRP <s>{formatPrice(compareAt)}</s>{' '}
+                <span className="ml-1 font-semibold text-success">
+                  {Math.round((1 - Number(price) / Number(compareAt)) * 100)}% off
                 </span>
-                <SaleTag />
-              </>
-            )}
-            <StockBadge stock={stock} />
-            {variant && (
-              <span className={`text-xs font-semibold ${skin.muted}`}>
-                {variant.name}
               </span>
             )}
+            <StockBadge stock={stock} />
             {sku && (
               <span className={`font-mono text-xs ${skin.muted}`}>SKU {sku}</span>
             )}
@@ -345,7 +340,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
               {content.highlights.slice(0, CARD_HIGHLIGHTS).map((line, i) => (
                 <li key={i} className={`flex gap-2 text-sm ${skin.muted}`}>
                   <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
-                  <span>{line}</span>
+                  <span>{plainLetters(line)}</span>
                 </li>
               ))}
             </ul>
@@ -402,8 +397,16 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
               it to the cart. */}
           <DeliveryCheck store={store} product={product} skin={skin} />
 
-          <DeliveryInfo store={store} product={product} skin={skin} />
-          <TrustBadges store={store} skin={skin} />
+          {/* Delivery, payment and trust as ONE quiet panel — three blocks
+              in three different styles (box, icon list, badge row) read as
+              clutter beside the buy buttons. */}
+          <section
+            aria-label="Delivery and payment"
+            className={`mt-5 rounded-lg border px-4 py-4 sm:px-5 ${skin.border}`}
+          >
+            <DeliveryInfo store={store} product={product} skin={skin} />
+            <TrustBadges store={store} skin={skin} />
+          </section>
         </div>
       </div>
 
@@ -418,7 +421,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
                 className={`flex gap-2.5 rounded-lg border p-3 text-sm ${skin.border} ${skin.surface} ${skin.text}`}
               >
                 <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
-                <span>{line}</span>
+                <span>{plainLetters(line)}</span>
               </li>
             ))}
           </ul>
@@ -432,7 +435,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
           >
             {content.paragraphs.map((paragraph, i) => (
               <p key={i} className="whitespace-pre-line">
-                {paragraph}
+                {plainLetters(paragraph)}
               </p>
             ))}
           </div>
@@ -515,7 +518,7 @@ function DeliveryInfo({
   const policies = store.footer.policies
 
   return (
-    <ul className={`mt-6 space-y-3 border-t pt-5 text-sm ${skin.border}`}>
+    <ul className="space-y-3 text-sm">
       {delivers && (
         <InfoRow
           icon={<TruckIcon className="h-5 w-5" />}
@@ -676,7 +679,7 @@ function TrustBadges({ store, skin }: { store: PublicStore; skin: Skin }) {
   }
 
   return (
-    <ul className={`mt-5 grid grid-cols-2 gap-2 border-t pt-4 ${skin.border}`}>
+    <ul className={`mt-4 grid grid-cols-2 gap-2 border-t pt-4 ${skin.border}`}>
       {badges.map((badge) => (
         <li
           key={badge.label}
@@ -740,16 +743,19 @@ function SpecTable({
 
   return (
     // Hairline rows, no box and no zebra — a printed spec sheet, not a grid.
-    <div className={`border-t ${skin.border}`}>
+    // Capped at a reading width: full-bleed on a 1440px screen put each
+    // value 600px away from its label.
+    <div className={`max-w-3xl border-t ${skin.border}`}>
       <table className="w-full text-sm">
         <tbody>
           {rows.map((row, i) => (
             <tr key={`${row.label}-${i}`} className={`border-b ${skin.border}`}>
               <th
                 scope="row"
-                className={`w-2/5 break-words py-3.5 pr-4 text-left align-top font-normal ${skin.muted}`}
+                className={`w-2/5 break-words py-3.5 pr-4 text-left align-top font-normal sm:w-1/3 ${skin.muted}`}
               >
-                {row.label}
+                {/* A label typed in capitals ("SIZE") reads as shouting. */}
+                {displayName(row.label)}
               </th>
               <td className={`break-words py-3.5 align-top font-medium ${skin.text}`}>
                 {row.value}

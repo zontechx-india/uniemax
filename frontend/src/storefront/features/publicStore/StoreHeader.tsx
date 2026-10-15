@@ -26,6 +26,7 @@ import { Avatar } from '../../layout/Avatar'
 import { useSignOutConfirm } from '../../layout/useSignOutConfirm'
 import { openAuthDialog, storeAuthRequest } from '../auth/authDialogStore'
 import { ShareButton } from './ShareButton'
+import { ContactActions, shopContact } from './ShopContact'
 import { HEADER_ICON_BUTTON, STORE_CONTAINER } from './storeLayout'
 import { builderSectionProps } from './builderBridge'
 import {
@@ -406,8 +407,20 @@ function MobileDrawer({
       hideBelow="lg"
       panelClassName="flex flex-col"
     >
-        <div className="flex items-center justify-between border-b border-line py-2 pr-2 pl-4">
-          <span className="font-display text-lg font-semibold text-fg">{store.name}</span>
+        <div className="flex items-center justify-between gap-3 border-b border-line py-2 pr-2 pl-4">
+          <span className="flex min-w-0 items-center gap-2.5">
+            {store.logoUrl && (
+              <MediaImg
+                sizes="32px"
+                src={store.logoUrl}
+                alt=""
+                className="size-8 shrink-0 rounded-md object-cover"
+              />
+            )}
+            <span className="truncate font-display text-lg font-semibold text-fg">
+              {store.name}
+            </span>
+          </span>
           <ModalClose onClick={onClose} label="Close menu" />
         </div>
 
@@ -439,9 +452,7 @@ function MobileDrawer({
             Help &amp; Support
           </Link>
 
-          <p
-            className={`mt-3 px-3 pb-1 text-xs font-bold uppercase tracking-wide ${skin.muted}`}
-          >
+          <p className={`mt-4 px-3 pb-1 text-sm font-semibold ${skin.muted}`}>
             Categories
           </p>
 
@@ -491,6 +502,18 @@ function MobileDrawer({
             })}
           </ul>
         </nav>
+
+        {/* The shop's own WhatsApp / Call, one thumb away wherever the
+            visitor is — only when the seller gave a number. */}
+        {(shopContact(store).whatsapp || shopContact(store).phone) && (
+          <div className="border-t border-line p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <ContactActions
+              store={store}
+              skin={skin}
+              message={`Hi ${store.name}, I saw your shop on UnieMax.`}
+            />
+          </div>
+        )}
     </ModalShell>
   )
 }

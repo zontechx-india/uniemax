@@ -32,7 +32,8 @@ interface PickerSkin {
  * under it, the way a shopper expects to choose a colour. A type whose values
  * have no photos stays a row of text chips.
  *
- * With a single option type each chip also shows its price — with two or
+ * With a single option type each chip also shows its price when the prices
+ * differ (one shared price is said once, at the top) — with two or
  * more types a chip's price depends on the other choices, so only the
  * selected combination's price is shown, at the top of the card.
  */
@@ -54,6 +55,9 @@ export function OptionPicker({
 }) {
   if (optionTypes.length === 0) return null
   const single = optionTypes.length === 1
+  // Every option the same price → the chips say nothing new by repeating it
+  // ("SM ₹1,499 · ME ₹1,499 …"); only "Out of stock" is still worth a line.
+  const onePrice = variants.every((v) => v.price === variants[0]?.price)
 
   /**
    * The photo that stands for `value`: from a variant with that value which
@@ -116,13 +120,13 @@ export function OptionPicker({
                 const only = single
                   ? variants.find((v) => v.optionValues[type.name] === value)
                   : undefined
-                const priceLine = single ? (
-                  <span className="block text-xs font-normal no-underline opacity-80">
-                    {!only || only.stockQuantity <= 0
-                      ? 'Out of stock'
-                      : formatPrice(only.price)}
-                  </span>
-                ) : null
+                const soldOut = !only || only.stockQuantity <= 0
+                const priceLine =
+                  single && (soldOut || !onePrice) ? (
+                    <span className="block text-xs font-normal no-underline opacity-80">
+                      {soldOut ? 'Out of stock' : formatPrice(only.price)}
+                    </span>
+                  ) : null
                 const common = {
                   type: 'button' as const,
                   role: 'radio',

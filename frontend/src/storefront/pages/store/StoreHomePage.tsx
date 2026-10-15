@@ -25,8 +25,10 @@ import { useSeo } from '../../../shared/seo'
 import { storeJsonLd } from '../../features/publicStore/structuredData'
 import {
   CARD_PHOTO,
+  CARD_PHOTO_FILL,
   FillImage,
   NoProductImage,
+  photoFillsFrame,
   PRODUCT_GRID,
   PriceLabel,
   ProductCard,
@@ -41,6 +43,7 @@ import {
   browsableCategories,
   categoryPicture,
   displayName,
+  plainLetters,
   shopProductCount,
   shopSize,
   type ShopSize,
@@ -50,7 +53,7 @@ import {
   GridSkeleton,
   SectionHeading,
 } from '../../features/publicStore/ListingControls'
-import { ChevronLeftIcon, ChevronRightIcon } from '../../layout/icons'
+import { CheckIcon, ChevronLeftIcon, ChevronRightIcon } from '../../layout/icons'
 import type { Skin } from '../../features/publicStore/storeTheme'
 import { BannerCarousel } from '../../features/banners/BannerCarousel'
 import {
@@ -314,6 +317,11 @@ export function StoreHomeView({
     // A one-product shop shows its banners and then the product itself.
     .filter((section) => shaped.showcase === null || section.key === 'banners')
 
+  // No banner on screen → the page opens on an introduction instead of
+  // straight into a product grid: who the shop is, in its own words, and
+  // what it offers. With a banner, the banner is the introduction.
+  const intro = !visible.some((section) => section.key === 'banners')
+
   const tones = bandTones(visible, shaped.home)
   const flip = (tone: BandTone | undefined): BandTone => (tone === 'alt' ? 'base' : 'alt')
   // The one-product showcase or the coming-soon card: the product area.
@@ -323,7 +331,7 @@ export function StoreHomeView({
 
   return (
     <>
-      {heading}
+      {intro ? <StoreIntro store={store} skin={skin} /> : heading}
       {visible.map((section, index) => (
         <HomeSection
           key={section.key}
@@ -348,6 +356,84 @@ export function StoreHomeView({
       <ContactBand store={store} skin={skin} tone={contactTone} />
     </>
   )
+}
+
+/**
+ * The shop's introduction, for a homepage with no banner on screen: logo,
+ * name (the page's visible `<h1>`), the seller's About line, and a row of
+ * facts. Every fact is a setting the seller made, phrased to be true for the
+ * whole shop — products can override delivery charges and cash on delivery,
+ * so it says "Home delivery" rather than "Free delivery", and "Cash on
+ * delivery available" rather than promising it on everything. Nothing is
+ * shown that the seller did not set.
+ */
+function StoreIntro({ store, skin }: { store: PublicStore; skin: Skin }) {
+  const facts = storeFacts(store)
+  const about = store.footer.info.about
+  return (
+    <section className={STORE_CONTAINER}>
+      <div className="py-6 sm:py-10">
+        <div className="flex items-center gap-4 sm:gap-5">
+          {store.logoUrl ? (
+            <MediaImg
+              sizes="80px"
+              src={store.logoUrl}
+              alt=""
+              className="size-16 shrink-0 rounded-lg object-cover sm:size-20"
+            />
+          ) : (
+            <span
+              aria-hidden
+              className={`flex size-16 shrink-0 items-center justify-center rounded-lg text-2xl font-semibold sm:size-20 ${skin.cta}`}
+            >
+              {store.name.trim().charAt(0).toUpperCase()}
+            </span>
+          )}
+          <div className="min-w-0">
+            <h1
+              className={`font-display text-2xl font-semibold leading-tight sm:text-3xl ${skin.text}`}
+            >
+              {store.name}
+            </h1>
+            {about && (
+              <p
+                className={`mt-1 line-clamp-2 max-w-2xl text-sm sm:text-base ${skin.muted}`}
+              >
+                {plainLetters(about)}
+              </p>
+            )}
+          </div>
+        </div>
+        {facts.length > 0 && (
+          <ul className="mt-5 flex flex-wrap gap-2">
+            {facts.map((fact) => (
+              <li
+                key={fact}
+                className="inline-flex items-center gap-1.5 rounded-full bg-surface-alt px-3 py-1.5 text-xs font-medium text-fg"
+              >
+                <CheckIcon className="h-3.5 w-3.5 text-success" />
+                {fact}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  )
+}
+
+/** The shop-wide facts `StoreIntro` may state — all from seller settings. */
+function storeFacts(store: PublicStore): string[] {
+  const facts: string[] = []
+  const { mode } = store.shipping
+  if (mode === 'DELIVERY' || mode === 'BOTH') facts.push('Home delivery')
+  if (mode === 'PICKUP' || mode === 'BOTH') facts.push('Store pickup')
+  if (store.payments.acceptCod) facts.push('Cash on delivery available')
+  if (store.payments.acceptOnlinePayment) facts.push('UPI & cards')
+  if (store.footer.info.establishedYear) {
+    facts.push(`Since ${store.footer.info.establishedYear}`)
+  }
+  return facts
 }
 
 /**
@@ -621,7 +707,16 @@ function HomeSection({
           categories={home.featuredCategories}
           products={pictures}
           title={copy.title}
-          layout={layout === 'tiles' ? 'tiles' : 'chips'}
+          // A shop with only a few shelves gets them as big picture tiles —
+          // two 80px chips left a desktop row almost empty. The owner's own
+          // choice in the Store Builder still wins.
+          layout={
+            layout === 'tiles' ||
+            (copy.layout === null &&
+              home.featuredCategories.length <= FEW_CATEGORIES)
+              ? 'tiles'
+              : 'chips'
+          }
           skin={skin}
           tone={tone}
           builder={builder}
@@ -879,12 +974,19 @@ function CategoryInitial({ name }: { name: string }) {
 /** How many tiles a band shows before the rest live on the Shop page. */
 const CATEGORY_TILE_CAP = 12
 
+/** Up to this many categories, the strip defaults to big picture tiles. */
+const FEW_CATEGORIES = 4
+
 /**
  * Categories as cards — a picture, the name and the count. The picture is the
  * shelf's own artwork, else a cover of one of its products already on the
  * page (`categoryPicture`), else the name's first letter: always something
  * real. Two across on a phone and up to six on a wide monitor, so a tile
  * never stretches into a billboard on a 2560px screen.
+ *
+ * **A few categories** (≤ `FEW_CATEGORIES`) get bigger, portrait tiles —
+ * three across for exactly three, else two; four across from `lg` — framed
+ * like the product cards (`FewCategoryTile`).
  */
 function CategoryTiles({
   store,
@@ -897,6 +999,25 @@ function CategoryTiles({
   products: PublicProduct[]
   skin: Skin
 }) {
+  if (categories.length <= FEW_CATEGORIES) {
+    return (
+      <ul
+        className={`mt-4 grid gap-x-3 gap-y-5 sm:mt-6 sm:gap-x-5 lg:grid-cols-4 ${
+          categories.length === 3 ? 'grid-cols-3' : 'grid-cols-2'
+        }`}
+      >
+        {categories.map((category) => (
+          <FewCategoryTile
+            key={category.id}
+            store={store}
+            category={category}
+            picture={categoryPicture(category, products)}
+            skin={skin}
+          />
+        ))}
+      </ul>
+    )
+  }
   return (
     <ul className="mt-6 grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-6">
       {categories.slice(0, CATEGORY_TILE_CAP).map((category) => {
@@ -939,6 +1060,70 @@ function CategoryTiles({
         )
       })}
     </ul>
+  )
+}
+
+/**
+ * One of a few big category tiles: a 4:5 picture framed by its own shape
+ * (`photoFillsFrame` — a model shot fills the tile, a packshot sits whole on
+ * the well), then the name and the count.
+ */
+function FewCategoryTile({
+  store,
+  category,
+  picture,
+  skin,
+}: {
+  store: PublicStore
+  category: PublicCategory
+  picture: string | null
+  skin: Skin
+}) {
+  const [fill, setFill] = useState(false)
+  return (
+    <li>
+      <Link
+        to={storeCategoryUrl(store.slug, category.slug)}
+        className="group flex h-full flex-col rounded-lg"
+      >
+        <span
+          className={`relative flex aspect-[4/5] items-center justify-center overflow-hidden rounded-lg ${skin.well}`}
+        >
+          {picture ? (
+            <MediaImg
+              src={picture}
+              alt=""
+              sizes="(min-width: 1024px) 25vw, 50vw"
+              loading="lazy"
+              decoding="async"
+              onLoad={(e) =>
+                setFill(
+                  photoFillsFrame(
+                    e.currentTarget.naturalWidth,
+                    e.currentTarget.naturalHeight,
+                    4 / 5,
+                  ),
+                )
+              }
+              className={`${fill ? CARD_PHOTO_FILL : CARD_PHOTO} transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none`}
+            />
+          ) : (
+            <CategoryInitial name={category.name} />
+          )}
+        </span>
+        <span className="min-w-0 pt-3">
+          <span
+            className={`line-clamp-2 font-display text-sm font-semibold decoration-1 underline-offset-4 group-hover:underline sm:text-base ${skin.text}`}
+          >
+            {category.name}
+          </span>
+          <span className={`mt-0.5 block text-xs ${skin.muted}`}>
+            {category.productCount}{' '}
+            {category.productCount === 1 ? 'product' : 'products'}
+          </span>
+        </span>
+      </Link>
+    </li>
   )
 }
 
@@ -1416,11 +1601,13 @@ function ProductShowcase({
   return (
     <Band id="shop-products" tone={tone} skin={skin}>
       <article
-        className={`overflow-hidden rounded-xl border ${skin.border} ${skin.surface} lg:grid lg:grid-cols-2`}
+        // Unboxed, like the product page: the photo is its own rounded tile
+        // and the words sit beside it — a frame round it read as a form.
+        className="lg:grid lg:grid-cols-2 lg:items-center lg:gap-14"
       >
         <Link
           to={to}
-          className={`relative block aspect-square overflow-hidden ${skin.well}`}
+          className={`relative block aspect-square overflow-hidden rounded-lg ${skin.well}`}
         >
           {product.image?.url ? (
             <FillImage
@@ -1434,8 +1621,8 @@ function ProductShowcase({
           )}
         </Link>
 
-        <div className="flex flex-col p-5 sm:p-7 lg:justify-center lg:p-10">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">
+        <div className="flex flex-col pt-6 sm:pt-8 lg:pt-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
             {product.category.name}
           </p>
           <h2
@@ -1457,7 +1644,7 @@ function ProductShowcase({
             <p
               className={`mt-4 line-clamp-4 whitespace-pre-line text-base leading-relaxed ${skin.muted}`}
             >
-              {product.description}
+              {plainLetters(product.description)}
             </p>
           )}
           {canQuickAdd(product) ? (

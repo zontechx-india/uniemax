@@ -976,7 +976,9 @@ full-bleed section bands instead.
 - **Help & Support entry points** — a shopper reaches the shop from the
   **top bar** (a `Help` nav item beside Categories, and a row in the mobile
   drawer) and from the **footer** (first row of Customer Support). On the
-  page itself (`StoreHelpPage`) a guest's "Sign in to message this store"
+  page itself (`StoreHelpPage`) the contact card leads with the shop's
+  **WhatsApp / Call buttons** (`ContactActions`), then the phone and email
+  rows; a guest's "Sign in to message this store"
   panel opens the store-themed auth dialog; the ticket load is keyed on the
   session status, so after signing in the request list appears in place. Two
   placements because the two reading patterns are different: someone hunting
@@ -1000,7 +1002,8 @@ full-bleed section bands instead.
   when there are more — the store's own navigation, repeated for anyone who
   read to the bottom instead of scanning the toolbar) and Customer Support. So
   a store that filled nothing in gets brand + Shop + Support, never a wall of
-  empty headings. Bottom bar: owner's `copyrightText` (default
+  empty headings. An About text longer than 160 characters folds to three
+  lines with **Read more** (`AboutText`). Bottom bar: owner's `copyrightText` (default
   "© {year} {store name}. All Rights Reserved."), GST/registration small
   print, "Powered by UnieMax". Responsive: a 2-column grid from the smallest
   phone — the short link lists (Shop, Quick Links) pair up side by side while
@@ -1012,7 +1015,10 @@ full-bleed section bands instead.
 
 - **`StoreHeader`** — logo · store name · Home · Shop · **Categories ▾** ·
   Help · search · **share** · cart · **account**. Hover
-  dropdown on desktop, hamburger drawer with an accordion below `lg`. The menu
+  dropdown on desktop, hamburger drawer with an accordion below `lg` — the
+  drawer's header carries the store logo with the name, and when the seller
+  gave a number its foot carries the shop's **WhatsApp / Call** buttons
+  (`ContactActions`). The menu
   lists **categories and subcategories only, never products**.
   **Two rows on a phone, one from `md`**: the bar is
   `[menu] [logo · store name] [share] [cart]` and search drops to a full-width
@@ -1058,7 +1064,7 @@ full-bleed section bands instead.
 
   | Shop (`shopSize`) | Homepage |
   | ---------------- | -------- |
-  | `one` — 1 product | banners, then **`ProductShowcase`**: that product as one large card (photo full-width on a phone, name, price and % off, stock, description; side by side from `lg`) carrying the real **`PurchaseActions`** (quantity, Add to Cart, Buy Now) when there is nothing to choose, else one button to the product page. Nothing else. |
+  | `one` — 1 product | banners (or `StoreIntro`), then **`ProductShowcase`**: that product unboxed — photo tile and words beside it, like the product page (photo full-width on a phone, name, price and % off, stock, description; side by side from `lg`) carrying the real **`PurchaseActions`** (quantity, Add to Cart, Buy Now) when there is nothing to choose, else one button to the product page. Nothing else. |
   | `small` — ≤ 12 (`SMALL_SHOP_MAX`, the payload's section size) | every product **once** in All Products (uncapped grid, "N products", no "View all"); the curated rows and Category Highlights are dropped and the owner's Featured → Best Sellers → New Arrivals picks **lead** the grid instead |
   | `full` | every section below; All Products skips products a row **above** it already showed |
   | **no products** (no categories in the shell) | laid out like any other shop — header, banners and footer render as their switches say — and only the **product area** becomes the **"Products coming soon"** card (`EmptyCatalog`, in its own band after the sections, before `ContactBand` and the footer), shown straight away even while `/home` loads. A Banners section that is on but has nothing uploaded shows **one slide in the shop's colour (`--cta`) with its name**. Stocked shops still hide an empty Banners section. |
@@ -1136,6 +1142,19 @@ full-bleed section bands instead.
     `imageUrl` (seller's, else the taxonomy's — from the public shell), else
     the cover of one of its products already on the page, else the first
     letter. The `tiles` layout uses the same picture as a 4:3 `FillImage`.
+    **A shop with ≤ 4 categories** (`FEW_CATEGORIES`) gets tiles by default
+    — unless the owner chose a layout in the Store Builder — as big **4:5
+    picture tiles** (`FewCategoryTile`, framed like the product cards with
+    `photoFillsFrame`): two across (three for exactly three), four from
+    `lg`, name and count under each. Two 80px chips had left a desktop row
+    almost empty.
+  - **`StoreIntro`** — when no banner is on screen, the homepage opens on
+    the shop's introduction instead of straight into a grid: logo (or its
+    initial on the shop colour), the name as the visible `<h1>`, the About
+    line (2 lines), and fact chips built only from seller settings and
+    phrased to hold shop-wide (products may override delivery charges and
+    COD): Home delivery · Store pickup · Cash on delivery available · UPI &
+    cards · Since {year}.
   - **Category Highlights / All Products** — the two sections that need no
     merchandising flags, and what a shop shows before its owner has curated
     anything. All Products is the plain capped row (newest shop-wide, "View
@@ -1223,9 +1242,10 @@ full-bleed section bands instead.
     an `n / total` counter. The gallery is `lg:sticky` so it stays in view
     while the long right column scrolls.
   - **Purchase card** — everything about buying inside one bordered card:
-    category eyebrow → name → price (MRP struck through, % off and a "Sale"
-    tag when the selected variant's MRP is above its price) → stock badge
-    (Low / Out only) → the first few highlights →
+    category eyebrow → name → price (MRP struck through and "N% off" in the
+    success colour when the selected variant's MRP is above its price — no
+    "Sale" pill and no repeat of the chosen option's name; the picker says
+    that) → stock badge (Low / Out only) → the first few highlights →
     **`OptionPicker`** (`features/publicStore/OptionPicker.tsx` — one
     radiogroup per option type; the selection is a `Record<type, value>`
     resolved to a variant by `findVariant`; a value is greyed via
@@ -1235,15 +1255,22 @@ full-bleed section bands instead.
     (the picture with the name under it, resolved through the gallery's
     `mediaId` and preferring the variant that matches the other choices),
     while a type with no photos stays text chips; with
-    a single type each chip shows its price / "Out of stock" as before; an
+    a single type each chip shows its price only when the options' prices
+    differ (one shared price is said once, above), and "Out of stock"
+    always; an
     unmatched combination shows "This combination isn't available" and
     disables purchase through stock 0) →
     **quantity selector + Add to Cart + Buy Now** (`PurchaseActions`; Buy Now
     adds the line — or, if it is already in the cart, SETS it to the chosen
     quantity, so a second Buy Now never orders two — then goes straight to
-    `/checkout/{storeSlug}`) → the
-    delivery block → trust badges. The **share button** sits in the card
-    header beside the name.
+    `/checkout/{storeSlug}`) → the delivery check → ONE bordered
+    "Delivery and payment" panel holding the delivery rows and the trust
+    badges (three blocks in three styles read as clutter). The spec table is
+    capped at `max-w-3xl` with a 1/3 label column, and labels typed in
+    capitals ("SIZE") go through `displayName()`. Seller text pasted in
+    Unicode "fancy" letters is shown as plain letters (`plainLetters`,
+    display only). The **share button** sits in the card header beside the
+    name.
   - **Delivery check** (`features/publicStore/DeliveryCheck.tsx`, right
     under the purchase buttons) — does this product reach the customer's
     pincode? Unrestricted products (`product.delivery.restricted` false)
@@ -1330,22 +1357,28 @@ full-bleed section bands instead.
   **"From ₹X"** price (16px semibold, text colour), the MRP smaller and muted,
   struck through, and **"N% off"** in the success colour beside it — in
   words, and only when `discountPercent` finds a real saving; then one quiet
-  line — "Only a few left" in the warning colour when stock is low, and
-  **"N options"** (never the options themselves). No category
+  line — "Only a few left" in the warning colour when stock is low (the
+  option count is not repeated: "View Options" already says it). No category
   label — the page or section already says where you are.
   - **Classic, not boxed** (15 Oct 2026): there is **no card frame**. The
     photo is its own rounded tile and the name and price sit on the page
     beneath it; `PRODUCT_GRID` spaces rows a little further apart than
     columns (`gap-y-6/8`). Category tiles follow the same shape.
-  - **The cover slot is always a fixed ratio** (square; `4/3` for a
-    spotlight's lead): the neutral well with the photo drawn by
-    **`CARD_PHOTO`** — `object-contain`, inset `p-2/3`, and
-    `mix-blend-mode: var(--media-blend)`, which `storeVars()` sets to
-    `multiply` on a light shop (a packshot's white background melts into the
-    well instead of drawing a white box in a grey one) and `normal` on a dark
-    one. Nothing is cropped. **`FillImage`** (contain over a blurred copy of
-    itself) is no longer used by cards; the category `tiles` layout, the
-    one-product showcase and the product page's main gallery image keep it.
+  - **The cover slot is always a fixed ratio** — **4:5** (the platform's
+    catalogues are mostly clothing and people photographed upright; `4/3`
+    for a spotlight's lead) — and **the photo's own shape decides the fit**,
+    once it loads (the API sends no dimensions): `photoFillsFrame(w, h,
+    frame)` is true when the photo is within ~22% narrower / ~15% wider than
+    the frame, and such a photo (a model shot) **fills** it
+    (`CARD_PHOTO_FILL`, `object-cover`, focus a little above centre). Any
+    other shape — a square packshot, a banner-shaped upload, a tall
+    screenshot — stays **whole** (`CARD_PHOTO`: `object-contain`, inset
+    `p-2/3`, `mix-blend-mode: var(--media-blend)`, which `storeVars()` sets
+    to `multiply` on a light shop so a packshot's white background melts into
+    the well, `normal` on a dark one). **`FillImage`** (contain over a
+    blurred copy of itself) is not used by cards; the many-category `tiles`
+    layout, the one-product showcase and the product page's main gallery
+    image keep it.
   - Over that slot, top-left, one small tag only when stock is zero:
     **"Sold out"** (ink on page colour). The saving is never a sticker on the
     photo — it is said beside the price.
@@ -1363,7 +1396,14 @@ full-bleed section bands instead.
     a breakpoint uses `hidden md:flex`, not `list-item` — the card is a flex
     column so its action sits at its foot.
 - **`FilterPanel`** — right slide-over on desktop, bottom sheet on mobile:
-  Availability + Price Range live; Brand/Rating/Discount shown "Soon".
+  Availability + Price range. Nothing that does not work yet is shown (the
+  "Soon" Brand / Rating / Discount rows were removed 15 Oct 2026).
+- **`ProductListing`** shows the sort & filter bar only on a shop of
+  `SEARCH_MIN_PRODUCTS` (7) or more products — or whenever a filter is
+  applied, since the bar is how it is cleared — and never over zero results;
+  otherwise a quiet "N products" line. A **search that finds nothing** says
+  "Nothing found for “q”", offers **Clear search** (the shop without `?q=`)
+  and lists the shop's newest four under **You might like**.
 
 Empty results show a **No products found** state with **Clear filters**; a
 store with no shoppable catalog shows products-coming-soon. The store's theme
@@ -1479,7 +1519,9 @@ part of browser history, so back/forward-cache restores, refreshes and
 multiple tabs all keep the right theme, where ambient tracking broke. All pages use
 the storefront treatment (full-width shell, flat surface+border cards,
 sans headings, sticky top bar) with an order-summary panel stuck beside
-the list on desktop.
+the list on desktop. Opened from a store (`?from=`), the cart's top bar
+shows that store's logo and name, and an empty cart offers **Continue
+shopping at {store}** rather than "Open a store link".
 **Order summary — priced by the server.** `features/cart/useCheckoutQuote.ts`
 calls `POST …/orders/quote` whenever the lines or the current fulfilment
 choice change and the page renders exactly what comes back (`OrderTotals`
@@ -3311,9 +3353,11 @@ effects (`metal-text`, `metal-lift`, `metal-chip`, `--brand-metal`,
 
 **Readable shop colours** (docs/DESIGN_GUIDELINES.md §12). `storeVars()`
 picks text colours by real WCAG contrast, not a brightness guess:
-`--cta-contrast` (button text) and `--brand-contrast` are whichever of
-white / near-black reads better on the fill (`textOn()`), unless the owner
-set a Button text colour; and `--brand` — used for prices, links and brand
+`--cta-contrast` (button text) is **white whenever white reads at ≥ 3:1**
+(bold UI text) on the primary fill, else whichever of white / near-black
+reads better (`ctaTextOn()` — `textOn()` alone put near-black on a pure
+red Buy Now), unless the owner set a Button text colour; `--brand-contrast`
+is whichever reads better (`textOn()`); and `--brand` — used for prices, links and brand
 accents on the page — is the owner's colour nudged darker (light shop) or
 lighter (dark shop) in 5% steps until it reaches 4.5:1 on the surface
 (`readableOn()`). Colours that already pass are untouched, so most shops see

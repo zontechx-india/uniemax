@@ -8,8 +8,8 @@ import type { Skin } from './storeTheme'
 /**
  * Filter panel — a right slide-over on desktop, a bottom sheet on mobile.
  * Live filters (Availability, Price Range) are derived from the catalog we
- * already have; Brand / Rating / Discount are future filters, shown disabled so
- * the layout is ready for them without a redesign. Edits are held in a draft
+ * already have. Nothing is shown that does not work yet — placeholder "Soon"
+ * filters (Brand / Rating / Discount) were removed. Edits are held in a draft
  * and committed on Apply (or Clear), so partial price typing never thrashes the
  * grid.
  */
@@ -81,8 +81,8 @@ export function FilterPanel({
 
           {/* Price range */}
           <section>
-            <h3 className={`text-xs font-bold uppercase tracking-wide ${skin.muted}`}>
-              Price Range
+            <h3 className={`text-sm font-semibold ${skin.text}`}>
+              Price range
             </h3>
             <div className="mt-2.5 flex items-center gap-2">
               <PriceInput
@@ -99,23 +99,6 @@ export function FilterPanel({
                 onChange={(v) => setDraft((d) => ({ ...d, maxPrice: v }))}
               />
             </div>
-          </section>
-
-          {/* Future filters — wired-ready, disabled for now */}
-          <section>
-            <h3 className={`text-xs font-bold uppercase tracking-wide ${skin.muted}`}>
-              More filters
-            </h3>
-            <ul className={`mt-2.5 space-y-2 text-sm ${skin.muted}`}>
-              {['Brand', 'Rating', 'Discount'].map((label) => (
-                <li key={label} className="flex items-center justify-between">
-                  <span>{label}</span>
-                  <span className="rounded-full bg-surface-alt px-2 py-0.5 text-xs font-semibold uppercase tracking-wide">
-                    Soon
-                  </span>
-                </li>
-              ))}
-            </ul>
           </section>
         </div>
 

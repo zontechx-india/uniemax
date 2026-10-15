@@ -11,7 +11,7 @@ import {
   SlidersIcon,
 } from '../../layout/icons'
 import type { Skin } from './storeTheme'
-import { Button } from '../../../shared/ui/Button'
+import { Button, buttonClass } from '../../../shared/ui/Button'
 
 /** Sort options offered on every listing. */
 export const SORT_OPTIONS: { key: PublicSort; label: string }[] = [
@@ -265,7 +265,7 @@ export function GridSkeleton({ skin }: { skin: Skin }) {
         <li key={i} aria-hidden>
           {/* Same shape as ProductCard: photo tile, two name lines, price,
               then the action row — so nothing jumps when the grid lands. */}
-          <div className={`aspect-square animate-pulse rounded-lg ${skin.well}`} />
+          <div className={`aspect-[4/5] animate-pulse rounded-lg ${skin.well}`} />
           <div className="space-y-2 pt-3">
             <div className="h-3.5 w-11/12 animate-pulse rounded-full bg-surface-alt" />
             <div className="h-3.5 w-2/3 animate-pulse rounded-full bg-surface-alt" />
@@ -278,34 +278,55 @@ export function GridSkeleton({ skin }: { skin: Skin }) {
   )
 }
 
+/**
+ * Nothing matched — never a dead end. A search gets **Clear search** (back to
+ * the whole shop), applied filters get **Clear filters**, and the copy says
+ * which of the two is in the way.
+ */
 export function NoResults({
   onClear,
   showClear,
+  query,
+  clearSearchTo,
   skin,
 }: {
   onClear: () => void
   showClear: boolean
+  /** The search that found nothing, if this is a search. */
+  query?: string
+  /** Where "Clear search" goes — the shop without `?q=`. */
+  clearSearchTo?: string
   skin: Skin
 }) {
   return (
     <div
-      className={`flex flex-col items-center rounded-xl border px-6 py-14 text-center ${skin.border} ${skin.surface}`}
+      className={`flex flex-col items-center rounded-xl border px-6 py-12 text-center ${skin.border} ${skin.surface}`}
     >
       <SearchIcon className={`h-8 w-8 ${skin.muted}`} />
-      <h2 className={`mt-3 text-base font-bold ${skin.text}`}>
-        No products found
+      <h2 className={`mt-3 text-base font-semibold ${skin.text}`}>
+        {query ? `Nothing found for “${query}”` : 'No products found'}
       </h2>
       <p className={`mt-1 max-w-sm text-sm ${skin.muted}`}>
-        Nothing matches your current search and filters. Try clearing them to
-        see everything.
+        {query
+          ? 'Check the spelling, try a shorter word, or browse everything in the shop.'
+          : 'Nothing matches these filters. Clear them to see everything.'}
       </p>
-      {showClear && (
-        <Button variant="primary"
-          onClick={onClear}
-          className="mt-5"
-        >
-          Clear filters
-        </Button>
+      {(showClear || clearSearchTo) && (
+        <div className="mt-5 flex flex-wrap justify-center gap-3">
+          {clearSearchTo && (
+            <Link
+              to={clearSearchTo}
+              className={buttonClass({ variant: showClear ? 'secondary' : 'primary' })}
+            >
+              Clear search
+            </Link>
+          )}
+          {showClear && (
+            <Button variant="primary" onClick={onClear}>
+              Clear filters
+            </Button>
+          )}
+        </div>
       )}
     </div>
   )

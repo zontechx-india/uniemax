@@ -103,7 +103,7 @@ export function CartPage() {
       className="flex min-h-screen flex-col bg-bg text-fg"
       style={themeShell ? storeVars(themeShell.theme) : undefined}
     >
-      <CartTopBar />
+      <CartTopBar store={themeShell ?? undefined} />
 
       <main className="mx-auto w-full max-w-[1920px] flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
         <h1 className="font-heading text-2xl font-semibold sm:text-3xl">
@@ -119,7 +119,7 @@ export function CartPage() {
         <RevalidationNote {...revalidation} />
 
         {groups.length === 0 ? (
-          <EmptyCart />
+          <EmptyCart store={themeShell ?? undefined} />
         ) : (
           <div className="mt-6 items-start gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_360px]">
             <div className="space-y-5">
@@ -201,8 +201,12 @@ export function CartPage() {
   )
 }
 
-/** Sticky chrome matching the storefront shell (app palette, flat). */
-function CartTopBar() {
+/**
+ * Sticky chrome matching the storefront shell (flat). Arriving from a store
+ * it carries that store's logo and name beside "Cart", so the page reads as
+ * part of the shop the visitor came from rather than a generic screen.
+ */
+function CartTopBar({ store }: { store: PublicStore | undefined }) {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-bg">
       <div className="mx-auto flex max-w-[1920px] items-center gap-3 px-4 py-3 sm:px-6 lg:px-10">
@@ -218,10 +222,25 @@ function CartTopBar() {
         >
           <ArrowLeftIcon className="h-5 w-5" />
         </button>
-        <span className="flex items-center gap-2 font-heading text-lg font-semibold">
-          <CartIcon className="h-5 w-5" />
-          Cart
-        </span>
+        {store ? (
+          <Link
+            to={storeHomeUrl(store.slug)}
+            className="flex min-w-0 items-center gap-2.5"
+          >
+            <StoreLogo shell={store} name={store.name} />
+            <span className="min-w-0">
+              <span className="block truncate font-heading text-base font-semibold">
+                {store.name}
+              </span>
+              <span className="block text-xs text-muted">Cart</span>
+            </span>
+          </Link>
+        ) : (
+          <span className="flex items-center gap-2 font-heading text-lg font-semibold">
+            <CartIcon className="h-5 w-5" />
+            Cart
+          </span>
+        )}
       </div>
     </header>
   )
@@ -329,7 +348,12 @@ function StoreGroupCard({
   )
 }
 
-function EmptyCart() {
+/**
+ * Nothing in the cart. Arriving from a store (`?from=`), the way forward is
+ * back into THAT store — "Open a store link" made no sense to someone who
+ * had just come from one.
+ */
+function EmptyCart({ store }: { store: PublicStore | undefined }) {
   return (
     <div className="mt-6 flex flex-col items-center rounded-xl border border-line bg-surface px-6 py-16 text-center">
       <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-surface-alt text-muted">
@@ -339,9 +363,18 @@ function EmptyCart() {
         Your cart is empty
       </h2>
       <p className="mt-1.5 max-w-sm text-sm text-muted">
-        Open a store link and add products — they'll show up here, grouped
-        by store.
+        {store
+          ? `Products you add at ${store.name} will show up here.`
+          : "Open a store link and add products — they'll show up here, grouped by store."}
       </p>
+      {store && (
+        <Link
+          to={storeHomeUrl(store.slug)}
+          className={buttonClass({ variant: 'primary', className: 'mt-6' })}
+        >
+          Continue shopping at {store.name}
+        </Link>
+      )}
     </div>
   )
 }
