@@ -1,11 +1,13 @@
-// Template summaries for the console's picker: which templates the send
-// endpoints can actually fill, and how many {{n}} values each needs.
+// Template summaries: what a send must supply (body values, button values,
+// media header) and which templates can't be sent at all.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { countBodyParams, DYNAMIC_URL_REASON, fillTemplateBody, summarizeTemplate, templateSendProblem } from "../../src/modules/whatsapp/whatsapp.templates.js";
+import { countBodyParams, fillTemplateBody, summarizeTemplate, templateSendProblem } from "../../src/modules/whatsapp/whatsapp.templates.js";
 
 const approved = (components: unknown[], extra: Record<string, unknown> = {}) =>
   summarizeTemplate({ name: "t", language: "en", status: "APPROVED", category: "UTILITY", components, ...extra } as never);
+
+const shape = (params: number, buttons = 0, headerMedia = false) => ({ params, buttons, headerMedia });
 
 test("countBodyParams: highest {{n}}, spacing tolerated", () => {
   assert.equal(countBodyParams("Hi {{1}}, order {{2}} ships {{ 3 }}"), 3);
@@ -24,50 +26,35 @@ test("summary: a plain approved body template is sendable", () => {
   assert.equal(t.reason, null);
   assert.equal(t.paramCount, 2);
   assert.equal(t.header, "Order update");
+  assert.equal(t.headerMedia, null);
   assert.equal(t.footer, "UnieMax");
   assert.deepEqual(t.buttons, ["Thanks", "Track"]);
+  assert.deepEqual(t.urlButtons, []); // a fixed URL needs no value
 });
 
-test("summary: what the send endpoints cannot fill is listed but not sendable", () => {
+test("summary: media headers and dynamic URL buttons are sendable, with what they need", () => {
+  const t = approved([
+    { type: "HEADER", format: "IMAGE" },
+    { type: "BODY", text: "Hi {{1}}" },
+    { type: "BUTTONS", buttons: [{ type: "QUICK_REPLY", text: "Stop" }, { type: "URL", text: "Open", url: "https://uniemax.com/mystores/{{1}}" }] },
+  ]);
+  assert.equal(t.sendable, true);
+  assert.equal(t.headerMedia, "image");
+  assert.equal(t.header, null);
+  assert.deepEqual(t.urlButtons, [{ index: 1, text: "Open", url: "https://uniemax.com/mystores/{{1}}" }]);
+});
+
+test("summary: what can't be filled is listed but not sendable", () => {
   const cases: [string, ReturnType<typeof approved>][] = [
     ["pending", summarizeTemplate({ name: "t", language: "en", status: "PENDING", components: [{ type: "BODY", text: "x" }] })],
     ["named", approved([{ type: "BODY", text: "Hi {{name}}" }], { parameter_format: "NAMED" })],
-    ["image header", approved([{ type: "HEADER", format: "IMAGE" }, { type: "BODY", text: "x" }])],
+    ["location header", approved([{ type: "HEADER", format: "LOCATION" }, { type: "BODY", text: "x" }])],
     ["header variable", approved([{ type: "HEADER", format: "TEXT", text: "Hi {{1}}" }, { type: "BODY", text: "x" }])],
-    ["dynamic url", approved([{ type: "BODY", text: "x" }, { type: "BUTTONS", buttons: [{ type: "URL", text: "Open", url: "https://x.test/{{1}}" }] }])],
   ];
   for (const [label, t] of cases) {
     assert.equal(t.sendable, false, label);
     assert.ok(t.reason && t.reason.length > 10, label);
   }
-  assert.equal(cases[2]![1].header, null);
-});
-
-test("summary: dynamic URL buttons are located by their position among all buttons", () => {
-  const t = approved([
-    { type: "BODY", text: "Hi {{1}}" },
-    { type: "BUTTONS", buttons: [{ type: "QUICK_REPLY", text: "Thanks" }, { type: "URL", text: "Open", url: "https://uniemax.com/mystores/{{1}}" }] },
-  ]);
-  assert.deepEqual(t.urlButtons, [1]);
-  assert.equal(t.sendable, false);
-  assert.equal(t.reason, DYNAMIC_URL_REASON);
-  // A harder blocker wins the reason, so button values can't unlock it.
-  const pending = summarizeTemplate({ name: "t", language: "en", status: "PENDING", components: [{ type: "BODY", text: "x" }, { type: "BUTTONS", buttons: [{ type: "URL", text: "Open", url: "https://x.test/{{1}}" }] }] });
-  assert.match(pending.reason!, /pending/);
-});
-
-test("templateSendProblem: a dynamic URL template needs exactly its button values", () => {
-  const templates = [
-    approved(
-      [{ type: "BODY", text: "Hi {{1}}, {{2}}" }, { type: "BUTTONS", buttons: [{ type: "URL", text: "Open", url: "https://uniemax.com/mystores/{{1}}" }] }],
-      { name: "seller_setup_products" },
-    ),
-  ];
-  assert.equal(templateSendProblem(templates, "seller_setup_products", "en", 2, 1), null);
-  assert.equal(templateSendProblem(templates, "seller_setup_products", "en", 2), DYNAMIC_URL_REASON);
-  assert.match(templateSendProblem(templates, "seller_setup_products", "en", 1, 1)!, /needs 2 values/);
-  const plain = [approved([{ type: "BODY", text: "Hi {{1}}" }], { name: "plain" })];
-  assert.match(templateSendProblem(plain, "plain", "en", 1, 1)!, /has 0 dynamic URL buttons, got 1 button value/);
 });
 
 test("fillTemplateBody: values land in their {{n}}; missing ones stay visible", () => {
@@ -75,14 +62,26 @@ test("fillTemplateBody: values land in their {{n}}; missing ones stay visible", 
   assert.equal(fillTemplateBody("Hi {{1}} {{2}}", ["Asha"]), "Hi Asha {{2}}");
 });
 
-test("templateSendProblem: language, value count and sendability are checked before Meta", () => {
+test("templateSendProblem: language, counts, buttons and media header are checked before Meta", () => {
   const templates = [
     approved([{ type: "BODY", text: "Hi {{1}}, address {{2}}, contact {{3}}" }], { name: "uniemax_address_update", language: "en_US" }),
-    approved([{ type: "HEADER", format: "IMAGE" }, { type: "BODY", text: "x" }], { name: "promo", language: "en" }),
+    approved(
+      [{ type: "BODY", text: "Hi {{1}}, {{2}}" }, { type: "BUTTONS", buttons: [{ type: "URL", text: "Open", url: "https://uniemax.com/mystores/{{1}}" }] }],
+      { name: "seller_setup_products" },
+    ),
+    approved([{ type: "HEADER", format: "IMAGE" }, { type: "BODY", text: "Sale!" }], { name: "promo" }),
+    approved([{ type: "HEADER", format: "LOCATION" }, { type: "BODY", text: "x" }], { name: "where" }),
   ];
-  assert.equal(templateSendProblem(templates, "uniemax_address_update", "en_US", 3), null);
-  assert.match(templateSendProblem(templates, "uniemax_address_update", "en", 3)!, /no "en" version — use "en_US"/);
-  assert.match(templateSendProblem(templates, "uniemax_address_update", "en_US", 2)!, /needs 3 values for \{\{1\}\}…\{\{3\}\}, got 2/);
-  assert.match(templateSendProblem(templates, "missing", "en", 0)!, /No template named "missing"/);
-  assert.match(templateSendProblem(templates, "promo", "en", 0)!, /image header/);
+  assert.equal(templateSendProblem(templates, "uniemax_address_update", "en_US", shape(3)), null);
+  assert.match(templateSendProblem(templates, "uniemax_address_update", "en", shape(3))!, /no "en" version — use "en_US"/);
+  assert.match(templateSendProblem(templates, "uniemax_address_update", "en_US", shape(2))!, /needs 3 values for \{\{1\}\}…\{\{3\}\}, got 2/);
+  assert.match(templateSendProblem(templates, "missing", "en", shape(0))!, /No template named "missing"/);
+
+  assert.equal(templateSendProblem(templates, "seller_setup_products", "en", shape(2, 1)), null);
+  assert.match(templateSendProblem(templates, "seller_setup_products", "en", shape(2))!, /1 link button to fill, got 0/);
+
+  assert.equal(templateSendProblem(templates, "promo", "en", shape(0, 0, true)), null);
+  assert.match(templateSendProblem(templates, "promo", "en", shape(0))!, /image header — add the image/);
+  assert.match(templateSendProblem(templates, "uniemax_address_update", "en_US", shape(3, 0, true))!, /no media header/);
+  assert.match(templateSendProblem(templates, "where", "en", shape(0))!, /location header/);
 });

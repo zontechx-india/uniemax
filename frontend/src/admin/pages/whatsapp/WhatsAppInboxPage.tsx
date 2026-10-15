@@ -4,35 +4,44 @@ import { Dialog } from '../../../shared/ui/Dialog'
 import { showToast } from '../../../shared/ui/Toast'
 import { adminApi } from '../../features/adminApi'
 import type { WaContactRow, WaIntegrationStatus } from '../../features/adminApi'
-import { useAdminList } from '../../features/useAdminQuery'
+import { useAdminList, useAdminQuery } from '../../features/useAdminQuery'
 import { Button, Chip, ErrorState, Skeleton, TextInput } from '../../ui/primitives'
 import { DataTable, Pagination } from '../../ui/DataTable'
 import type { Column } from '../../ui/DataTable'
 import { FilterSelect, SearchInput, Toolbar } from '../../ui/Toolbar'
 import {
+  DirectTemplateFields,
   LastSeen,
-  TemplateFields,
+  TemplatePicker,
   WaStatusChip,
   WhatsAppShell,
   WindowChip,
   contactLabel,
+  directSendBody,
+  directValuesReady,
+  emptyDirectValues,
   formatWaId,
   templateKey,
   useWaTemplates,
 } from './whatsappUi'
+import type { DirectValues } from './whatsappUi'
 
 /**
  * Inbox — every number the business has talked to, the most recent
  * conversation first.
  *
- * "Awaiting reply" is derived, not stored: the last message came FROM the
- * contact. That is the question an operator scans the list for, and it can
- * never drift out of sync with the thread the way a read flag would.
+ * Triage is two signals: **unread** (inbound messages nobody has opened yet,
+ * cleared when the thread is opened) and **open / done** (an operator closes
+ * a conversation when it is handled; the contact writing again reopens it).
  */
 
 const FILTERS = [
   { value: '', label: 'All conversations' },
+  { value: 'unread', label: 'Unread' },
+  { value: 'open', label: 'Open' },
+  { value: 'done', label: 'Done' },
   { value: 'window', label: 'Reply window open' },
+  { value: 'optedIn', label: 'Marketing consent' },
   { value: 'optedOut', label: 'Opted out' },
 ]
 
@@ -47,17 +56,27 @@ export default function WhatsAppInboxPage() {
   const navigate = useNavigate()
   const [composing, setComposing] = useState(false)
   const list = useAdminList<WaContactRow>((query) => adminApi.listWaContacts(query), {
-    keys: ['q', 'filter'],
+    keys: ['q', 'filter', 'tag'],
   })
+  const tags = useAdminQuery(() => adminApi.listWaTags(), [])
 
   const columns: Column<WaContactRow>[] = [
     {
       header: 'Contact',
       primary: true,
       cell: (row) => (
-        <div className="min-w-0">
-          <p className="truncate font-medium text-fg">{contactLabel(row)}</p>
-          {row.name ? <p className="truncate text-xs text-muted">{formatWaId(row.waId)}</p> : null}
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="min-w-0">
+            <p className={`truncate text-fg ${row.unreadCount > 0 ? 'font-semibold' : 'font-medium'}`}>
+              {contactLabel(row)}
+            </p>
+            {row.name ? <p className="truncate text-xs text-muted">{formatWaId(row.waId)}</p> : null}
+          </div>
+          {row.unreadCount > 0 ? (
+            <Chip tone="brand">
+              {row.unreadCount} new
+            </Chip>
+          ) : null}
         </div>
       ),
     },
@@ -74,6 +93,8 @@ export default function WhatsAppInboxPage() {
       cell: (row) =>
         row.optedOut ? (
           <Chip tone="danger">Opted out</Chip>
+        ) : row.inboxState === 'DONE' ? (
+          <Chip tone="neutral">Done</Chip>
         ) : row.lastMessage?.direction === 'IN' ? (
           <Chip tone="warning">Awaiting reply</Chip>
         ) : (
@@ -92,6 +113,8 @@ export default function WhatsAppInboxPage() {
     },
     { header: 'Last activity', cell: (row) => <LastSeen at={row.lastMessageAt} /> },
   ]
+
+  const filtered = Boolean(list.filters['q'] || list.filters['filter'] || list.filters['tag'])
 
   return (
     <WhatsAppShell
@@ -115,6 +138,17 @@ export default function WhatsAppInboxPage() {
               onChange={(value) => list.setFilter('filter', value)}
               options={FILTERS}
             />
+            {tags.data && tags.data.length > 0 ? (
+              <FilterSelect
+                label="Tag"
+                value={list.filters['tag'] ?? ''}
+                onChange={(value) => list.setFilter('tag', value)}
+                options={[
+                  { value: '', label: 'Any tag' },
+                  ...tags.data.map((t) => ({ value: t.tag, label: `${t.tag} (${t.count})` })),
+                ]}
+              />
+            ) : null}
           </Toolbar>
           <DataTable
             rows={list.rows}
@@ -125,11 +159,11 @@ export default function WhatsAppInboxPage() {
             onRetry={list.refresh}
             onRowClick={(row) => navigate(`/whatsapp/chats/${row.waId}`)}
             empty={
-              list.filters['q'] || list.filters['filter']
-                ? { title: 'No conversations match', hint: 'Clear the search or filter to see everyone.' }
+              filtered
+                ? { title: 'No conversations match', hint: 'Clear the search or filters to see everyone.' }
                 : {
                     title: 'No conversations yet',
-                    hint: 'Messages customers send to the business number appear here. Use New message to start one with a template.',
+                    hint: 'Messages people send to the business number appear here. Use New message to start one with a template.',
                   }
             }
           />
@@ -171,26 +205,21 @@ function NewMessageDialog({
   const templates = useWaTemplates()
   const [to, setTo] = useState('')
   const [key, setKey] = useState('')
-  const [params, setParams] = useState<string[]>([])
+  const [values, setValues] = useState<DirectValues>(emptyDirectValues(null))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const template = templates.data?.find((t) => templateKey(t) === key) ?? null
   const digits = to.replace(/\D/g, '')
   const numberOk = /^\d{7,15}$/.test(digits)
-  const ready = numberOk && template && params.every((p) => p.trim())
+  const ready = numberOk && directValuesReady(template, values)
 
   const send = async () => {
     if (!template) return
     setBusy(true)
     setError(null)
     try {
-      await adminApi.sendWaTemplate({
-        to,
-        templateName: template.name,
-        languageCode: template.language,
-        bodyParams: params.map((p) => p.trim()),
-      })
+      await adminApi.sendWaTemplate(directSendBody(to, template, values))
       showToast('Message sent')
       onClose()
       onSent(digits)
@@ -234,13 +263,19 @@ function NewMessageDialog({
         ) : !templates.data ? (
           <Skeleton rows={3} />
         ) : (
-          <TemplateFields
-            templates={templates.data}
-            value={key}
-            onChange={setKey}
-            params={params}
-            onParamsChange={setParams}
-          />
+          <>
+            <TemplatePicker
+              templates={templates.data}
+              value={key}
+              onChange={(next) => {
+                setKey(next)
+                setValues(emptyDirectValues(templates.data?.find((t) => templateKey(t) === next) ?? null))
+              }}
+            />
+            {template ? (
+              <DirectTemplateFields template={template} values={values} onChange={setValues} />
+            ) : null}
+          </>
         )}
         {error ? <p className="text-sm text-danger">{error}</p> : null}
       </div>

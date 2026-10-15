@@ -539,42 +539,204 @@ export interface WaMessage {
   createdAt: string
 }
 
-export interface WaContactRow {
+interface WaContactBase {
   waId: string
   name: string | null
   optedOut: boolean
+  /** Marketing consent on record; null = none. */
+  marketingOptInAt: string | null
+  /** import | admin | start */
+  marketingOptInSource: string | null
+  tags: string[]
+  unreadCount: number
+  inboxState: 'OPEN' | 'DONE'
   lastInboundAt: string | null
   lastMessageAt: string | null
   /** When free-form text stops being allowed; null = window closed. */
   windowClosesAt: string | null
+}
+
+export interface WaContactRow extends WaContactBase {
   lastMessage: Pick<WaMessage, 'direction' | 'type' | 'body' | 'templateName' | 'lastStatus' | 'createdAt'> | null
 }
 
-export interface WaContact {
-  waId: string
-  name: string | null
-  optedOut: boolean
-  lastInboundAt: string | null
-  lastMessageAt: string | null
-  windowClosesAt: string | null
+export interface WaContact extends WaContactBase {
   messageCount: number
   createdAt: string
+  /** Who this number is on the platform (matched by phone). */
+  profiles: {
+    stores: { id: string; name: string; slug: string; isPublished: boolean; suspendedAt: string | null }[]
+    customers: { id: string; name: string | null; email: string | null; orderCount: number }[]
+  }
 }
+
+export type WaContactFilter = 'window' | 'optedOut' | 'optedIn' | 'unread' | 'open' | 'done'
+
+export type WaHeaderMediaType = 'image' | 'video' | 'document'
 
 export interface WaTemplate {
   name: string
   language: string
   status: string
   category: string | null
+  /** Text header. */
   header: string | null
+  /** A media header every send must supply. */
+  headerMedia: WaHeaderMediaType | null
   body: string
   footer: string | null
   buttons: string[]
   paramCount: number
-  /** Positions of URL buttons whose link ends in a variable — server flows fill these. */
-  urlButtons: number[]
+  /** Link buttons whose URL ends in {{1}} — one value each, in order. */
+  urlButtons: { index: number; text: string; url: string }[]
   sendable: boolean
   reason: string | null
+}
+
+/** One template slot: text with {field} placeholders, and what to use if a field is empty. */
+export interface WaValueSource {
+  value: string
+  fallback?: string
+}
+
+export interface WaMapping {
+  body: WaValueSource[]
+  /** `track`: value is the destination URL; the button gets a click-counting code. */
+  buttons: (WaValueSource & { track: boolean })[]
+  header: { type: WaHeaderMediaType; link: string } | null
+}
+
+export interface WaField {
+  key: string
+  label: string
+  example: string
+}
+
+export type WaFieldKind = 'sellers' | 'contacts' | 'list' | 'sellerOrders'
+
+export interface WaFieldCatalogue {
+  sellers: WaField[]
+  contacts: WaField[]
+  orders: WaField[]
+}
+
+export interface WaSellerFilters {
+  setup?: 'complete' | 'incomplete'
+  setupBelow?: number
+  published?: boolean
+  hasProducts?: boolean
+  orders?: 'none' | 'any'
+  noOrdersInDays?: number
+  joinedWithinDays?: number
+  state?: string
+  storeIds?: string[]
+}
+
+export interface WaContactFilters {
+  tags?: string[]
+  optedIn?: boolean
+}
+
+export type WaSegmentDefinition =
+  | { kind: 'sellers'; filters: WaSellerFilters }
+  | { kind: 'contacts'; filters: WaContactFilters }
+
+export type WaRetargetFilter =
+  | 'failed'
+  | 'not_delivered'
+  | 'not_read'
+  | 'read'
+  | 'clicked'
+  | 'not_clicked'
+  | 'replied'
+  | 'not_replied'
+
+export type WaAudience =
+  | WaSegmentDefinition
+  | { kind: 'segment'; segmentId: string }
+  | { kind: 'campaign'; campaignId: string; filter: WaRetargetFilter }
+  | { kind: 'list'; rows: { phone: string; fields: Record<string, string> }[] }
+
+export interface WaAudiencePreview {
+  total: number
+  invalid: number
+  duplicates: number
+  optedOut: number
+  optedIn: number
+  fieldKind: 'sellers' | 'contacts' | 'list'
+  sample: { waId: string; name: string | null; storeId: string | null; fields: Record<string, string> }[]
+}
+
+export interface WaSegment {
+  id: string
+  name: string
+  definition: WaSegmentDefinition
+  createdAt: string
+  updatedAt: string
+  /** Current size; null if it couldn't be resolved. */
+  count: number | null
+}
+
+export interface WaOverview {
+  since: string
+  phone: {
+    number: string | null
+    name: string | null
+    qualityRating: string | null
+    messagingLimit: string | null
+    nameStatus: string | null
+    status: string | null
+  } | null
+  phoneError: string | null
+  messages: {
+    sent: number
+    delivered: number
+    read: number
+    failed: number
+    received: number
+    fromAutomations: number
+    clicks: number
+  }
+  contacts: { total: number; optedIn: number; optedOut: number }
+  activeCampaigns: number
+  daily: { day: string; direction: 'IN' | 'OUT'; count: number }[]
+  recentCampaigns: Pick<
+    WaCampaignRow,
+    'id' | 'name' | 'status' | 'total' | 'sent' | 'failed' | 'createdAt' | 'scheduledAt'
+  >[]
+}
+
+export interface WaQuickReply {
+  id: string
+  title: string
+  body: string
+}
+
+export interface WaAutomation {
+  key: string
+  title: string
+  description: string
+  fieldKind: 'sellers' | 'sellerOrders'
+  configFields: { key: string; label: string; hint: string; kind: 'dayList' | 'days' }[]
+  enabled: boolean
+  enabledAt: string | null
+  templateName: string | null
+  languageCode: string | null
+  mapping: WaMapping
+  config: Record<string, unknown>
+  last7Days: { sent: number; skipped: number; failed: number }
+  lastRunAt: string | null
+}
+
+export interface WaAutomationRun {
+  id: string
+  refKey: string
+  waId: string | null
+  storeId: string | null
+  storeName: string | null
+  status: 'PENDING' | 'SENT' | 'SKIPPED' | 'FAILED'
+  note: string | null
+  createdAt: string
 }
 
 /** setup = everything outstanding · a step key = that step alone · tip = marketing nudge. */
@@ -607,6 +769,10 @@ export interface WaCampaignRow {
   name: string
   templateName: string
   languageCode: string
+  category: string | null
+  status: WaCampaignStatus
+  scheduledAt: string | null
+  startedAt: string | null
   total: number
   sent: number
   skipped: number
@@ -615,11 +781,70 @@ export interface WaCampaignRow {
   createdAt: string
 }
 
+export type WaCampaignStatus = 'SCHEDULED' | 'SENDING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED'
+
 export interface WaCampaign extends WaCampaignRow {
+  /** The audience kind (a pasted list reports only its size). */
+  audience: { kind: string; rows?: number; filter?: WaRetargetFilter; campaignId?: string } | null
+  mapping: WaMapping | null
+  requireOptIn: boolean
+  frequencyCapHours: number
   /** Latest status of each campaign message. */
   statuses: Record<WaStatus, number>
+  queue: { pending: number; sent: number; skipped: number; failed: number }
+  engagement: { clicks: number | null; clickers: number | null; replied: number }
+  skipReasons: { reason: string; count: number }[]
   /** Failed messages grouped by Meta error, most common first. */
   failures: { errorCode: number | null; errorTitle: string | null; count: number }[]
+}
+
+export type WaRecipientFilter =
+  | 'pending'
+  | 'skipped'
+  | 'failed'
+  | 'sent'
+  | 'delivered'
+  | 'read'
+  | 'clicked'
+  | 'replied'
+
+export interface WaRecipient {
+  id: string
+  waId: string
+  name: string | null
+  status: 'PENDING' | 'SENDING' | 'SENT' | 'SKIPPED' | 'FAILED'
+  note: string | null
+  processedAt: string | null
+  lastStatus: WaStatus | null
+  errorCode: number | null
+  errorTitle: string | null
+  clicked: boolean
+}
+
+export interface WaCampaignDraft {
+  name: string
+  templateName: string
+  languageCode: string
+  audience: WaAudience
+  mapping: WaMapping
+  requireOptIn: boolean
+  frequencyCapHours: number
+  scheduledAt: string | null
+}
+
+export interface WaCampaignPreview {
+  total: number
+  eligible: number
+  skipped: Record<string, number>
+  invalid: number
+  duplicates: number
+  category: string | null
+  sample: {
+    waId: string
+    name: string | null
+    body: string
+    buttons: { text: string; url: string }[]
+  }[]
 }
 
 export interface WaSendResult {
@@ -866,11 +1091,36 @@ export const adminApi = {
   whatsappStatus() {
     return call<WaIntegrationStatus>(http.get(`${BASE}/whatsapp/status`))
   },
+  waOverview() {
+    return call<WaOverview>(http.get(`${BASE}/whatsapp/overview`))
+  },
   listWaContacts(query: Params) {
     return callList<WaContactRow>(http.get(`${BASE}/whatsapp/contacts`, params(query)))
   },
   getWaContact(waId: string) {
     return call<WaContact>(http.get(`${BASE}/whatsapp/contacts/${encodeURIComponent(waId)}`))
+  },
+  updateWaContact(
+    waId: string,
+    body: { inboxState?: 'OPEN' | 'DONE'; tags?: string[]; marketingOptIn?: boolean },
+  ) {
+    return call<WaContact>(http.patch(`${BASE}/whatsapp/contacts/${encodeURIComponent(waId)}`, body))
+  },
+  markWaRead(waId: string) {
+    return call<{ read: boolean }>(
+      http.post(`${BASE}/whatsapp/contacts/${encodeURIComponent(waId)}/read`),
+    )
+  },
+  importWaContacts(body: {
+    rows: { phone: string; name?: string; tags: string[]; optIn: boolean }[]
+    tags: string[]
+  }) {
+    return call<{ created: number; updated: number; invalid: string[]; invalidCount: number }>(
+      http.post(`${BASE}/whatsapp/contacts/import`, body),
+    )
+  },
+  listWaTags() {
+    return call<{ tag: string; count: number }[]>(http.get(`${BASE}/whatsapp/tags`))
   },
   /** Newest first — reverse for a chat thread. */
   listWaMessages(waId: string, query: Params = {}) {
@@ -883,25 +1133,126 @@ export const adminApi = {
       http.get(`${BASE}/whatsapp/templates`, params({ refresh: refresh || undefined })),
     )
   },
-  sendWaTemplate(body: { to: string; templateName: string; languageCode: string; bodyParams: string[] }) {
+  sendWaTemplate(body: {
+    to: string
+    templateName: string
+    languageCode: string
+    bodyParams: string[]
+    buttonParams: string[]
+    header: { type: WaHeaderMediaType; link: string } | null
+  }) {
     return call<WaSendResult>(http.post(`${BASE}/whatsapp/send-template`, body))
   },
   sendWaText(body: { to: string; text: string }) {
     return call<WaSendResult>(http.post(`${BASE}/whatsapp/send-text`, body))
   },
+  sendWaMedia(body: { to: string; type: WaHeaderMediaType; link: string; caption?: string }) {
+    return call<WaSendResult>(http.post(`${BASE}/whatsapp/send-media`, body))
+  },
+  /** Upload a JPEG/PNG/MP4; answers the public URL a message or header links to. */
+  uploadWaMedia(file: Blob, filename: string, onProgress?: (fraction: number) => void) {
+    const form = new FormData()
+    form.append('file', file, filename)
+    return call<{ url: string; type: 'image' | 'video' }>(
+      http.post(`${BASE}/whatsapp/media`, form, {
+        onUploadProgress: (e) => {
+          if (onProgress && e.total) onProgress(e.loaded / e.total)
+        },
+      }),
+    )
+  },
+  listWaQuickReplies() {
+    return call<WaQuickReply[]>(http.get(`${BASE}/whatsapp/quick-replies`))
+  },
+  createWaQuickReply(body: { title: string; body: string }) {
+    return call<WaQuickReply>(http.post(`${BASE}/whatsapp/quick-replies`, body))
+  },
+  updateWaQuickReply(id: string, body: { title: string; body: string }) {
+    return call<WaQuickReply>(http.put(`${BASE}/whatsapp/quick-replies/${id}`, body))
+  },
+  deleteWaQuickReply(id: string) {
+    return call<{ deleted: boolean }>(http.delete(`${BASE}/whatsapp/quick-replies/${id}`))
+  },
+
+  // WhatsApp audiences
+  waFields() {
+    return call<WaFieldCatalogue>(http.get(`${BASE}/whatsapp/fields`))
+  },
+  previewWaAudience(audience: WaAudience) {
+    return call<WaAudiencePreview>(http.post(`${BASE}/whatsapp/audiences/preview`, { audience }))
+  },
+  listWaSegments() {
+    return call<WaSegment[]>(http.get(`${BASE}/whatsapp/segments`))
+  },
+  createWaSegment(body: { name: string; definition: WaSegmentDefinition }) {
+    return call<WaSegment>(http.post(`${BASE}/whatsapp/segments`, body))
+  },
+  updateWaSegment(id: string, body: { name: string; definition: WaSegmentDefinition }) {
+    return call<WaSegment>(http.put(`${BASE}/whatsapp/segments/${id}`, body))
+  },
+  deleteWaSegment(id: string) {
+    return call<{ deleted: boolean }>(http.delete(`${BASE}/whatsapp/segments/${id}`))
+  },
+  searchWaStores(q: string) {
+    return call<{ id: string; name: string; slug: string; isPublished: boolean }[]>(
+      http.get(`${BASE}/whatsapp/stores/search`, params({ q })),
+    )
+  },
+
+  // WhatsApp campaigns
   listWaCampaigns(query: Params) {
     return callList<WaCampaignRow>(http.get(`${BASE}/whatsapp/campaigns`, params(query)))
   },
   getWaCampaign(id: string) {
     return call<WaCampaign>(http.get(`${BASE}/whatsapp/campaigns/${id}`))
   },
-  createWaCampaign(body: {
-    name: string
-    templateName: string
-    languageCode: string
-    recipients: { to: string; bodyParams: string[] }[]
-  }) {
-    return call<{ campaignId: string }>(http.post(`${BASE}/whatsapp/campaigns`, body))
+  previewWaCampaign(body: WaCampaignDraft) {
+    return call<WaCampaignPreview>(http.post(`${BASE}/whatsapp/campaigns/preview`, body))
+  },
+  testWaCampaign(body: WaCampaignDraft & { to: string }) {
+    return call<{ usedValuesOf: string }>(http.post(`${BASE}/whatsapp/campaigns/test`, body))
+  },
+  createWaCampaign(body: WaCampaignDraft) {
+    return call<{ campaignId: string; eligible: number; skipped: number }>(
+      http.post(`${BASE}/whatsapp/campaigns`, body),
+    )
+  },
+  controlWaCampaign(id: string, action: 'pause' | 'resume' | 'cancel') {
+    return call<WaCampaign>(http.post(`${BASE}/whatsapp/campaigns/${id}/control`, { action }))
+  },
+  listWaRecipients(id: string, query: Params) {
+    return callList<WaRecipient>(
+      http.get(`${BASE}/whatsapp/campaigns/${id}/recipients`, params(query)),
+    )
+  },
+  /** The recipients CSV as a Blob (the request carries the admin session). */
+  async exportWaRecipients(id: string): Promise<Blob> {
+    const response = await http.get(`${BASE}/whatsapp/campaigns/${id}/recipients.csv`, {
+      responseType: 'blob',
+    })
+    return response.data as Blob
+  },
+
+  // WhatsApp automations
+  listWaAutomations() {
+    return call<WaAutomation[]>(http.get(`${BASE}/whatsapp/automations`))
+  },
+  updateWaAutomation(
+    key: string,
+    body: {
+      enabled: boolean
+      templateName: string | null
+      languageCode: string | null
+      mapping: WaMapping
+      config: Record<string, unknown>
+    },
+  ) {
+    return call<WaAutomation>(http.put(`${BASE}/whatsapp/automations/${key}`, body))
+  },
+  listWaAutomationRuns(key: string, query: Params) {
+    return callList<WaAutomationRun>(
+      http.get(`${BASE}/whatsapp/automations/${key}/runs`, params(query)),
+    )
   },
   getSellerReminders(storeId: string) {
     return call<SellerReminders>(http.get(`${BASE}/whatsapp/stores/${storeId}/reminders`))

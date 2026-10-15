@@ -45,6 +45,7 @@ import {
 } from "./modules/support/support.routes.js";
 import {
   adminWhatsAppRoutes,
+  publicWaLinkRoutes,
   publicWhatsAppRoutes,
 } from "./modules/whatsapp/whatsapp.routes.js";
 
@@ -111,6 +112,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       await api.register(paymentRoutes, { prefix: "/payments" });
       // WhatsApp Cloud API webhook (Meta → us — signature-guarded).
       await api.register(publicWhatsAppRoutes, { prefix: "/whatsapp" });
+      // Tracked WhatsApp campaign links — count the click, redirect.
+      await api.register(publicWaLinkRoutes, { prefix: "/r" });
 
       // Upload rules (max sizes + allowed types) and where sized copies of
       // stored images are served — read by clients so their hints, pre-upload

@@ -138,3 +138,18 @@ export function parseAllowlist(raw: string): Set<string> {
       .filter(Boolean),
   );
 }
+
+/**
+ * Any common spelling of a number → Meta's wa_id. A bare 10-digit Indian
+ * mobile gets 91; anything else must already carry its country code.
+ */
+export function toWaId(raw: string): string | null {
+  let digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.length === 11 && digits.startsWith("0")) digits = digits.slice(1);
+  if (digits.length === 10) {
+    // Ten digits is an Indian mobile without its code — or ambiguous.
+    return /^[6-9]/.test(digits) ? `91${digits}` : null;
+  }
+  return /^\d{8,15}$/.test(digits) ? digits : null;
+}

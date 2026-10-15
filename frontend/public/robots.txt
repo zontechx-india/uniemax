@@ -27,6 +27,8 @@ Disallow: /admin
 # Affiliate short links are tracked redirects, not content.
 Disallow: /a/
 Disallow: /affiliate
+# So are the click-counting links in WhatsApp campaign buttons.
+Disallow: /api/v1/r/
 
 # In-store search results list products the category pages already link,
 # so they add duplicates without adding a single new destination.

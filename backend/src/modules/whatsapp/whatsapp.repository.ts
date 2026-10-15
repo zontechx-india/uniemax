@@ -32,25 +32,33 @@ export function saveWebhookEvent(payload: unknown) {
 
 /**
  * The sender of an inbound message: create on first contact, refresh the
- * name and the 24h window. `optedOut` is only written when the message was
- * STOP/START.
+ * name and the 24h window, count it unread and reopen the conversation.
+ * STOP opts out and clears marketing consent; START opts back in and records
+ * consent (they asked for messages).
  */
 export function upsertInboundContact(
   waId: string,
   name: string | null,
   at: Date,
-  optedOut: boolean | undefined,
+  intent: "in" | "out" | null,
 ) {
+  const consent =
+    intent === "out"
+      ? { optedOut: true, marketingOptInAt: null, marketingOptInSource: null }
+      : intent === "in"
+        ? { optedOut: false, marketingOptInAt: at, marketingOptInSource: "start" }
+        : {};
   const changes = {
     lastInboundAt: at,
     lastMessageAt: at,
+    inboxState: "OPEN" as const,
     ...(name ? { name } : {}),
-    ...(optedOut !== undefined ? { optedOut } : {}),
+    ...consent,
   };
   return prisma.waContact.upsert({
     where: { waId },
-    create: { waId, ...changes },
-    update: changes,
+    create: { waId, ...changes, unreadCount: 1 },
+    update: { ...changes, unreadCount: { increment: 1 } },
   });
 }
 
@@ -151,15 +159,26 @@ const lastMessageSelect = {
  * The inbox: contacts with their latest message, most recent conversation
  * first. `q` matches the number or the profile name.
  */
+export type ContactFilter = "window" | "optedOut" | "optedIn" | "unread" | "open" | "done";
+
 export async function listContacts(query: {
   q?: string | undefined;
-  filter?: "window" | "optedOut" | undefined;
+  filter?: ContactFilter | undefined;
+  tag?: string | undefined;
   windowSince: Date;
   page: number;
   pageSize: number;
 }) {
   const q = query.q?.trim();
   const digits = q?.replace(/\D/g, "");
+  const byFilter: Record<ContactFilter, Prisma.WaContactWhereInput> = {
+    window: { lastInboundAt: { gte: query.windowSince } },
+    optedOut: { optedOut: true },
+    optedIn: { marketingOptInAt: { not: null }, optedOut: false },
+    unread: { unreadCount: { gt: 0 } },
+    open: { inboxState: "OPEN" },
+    done: { inboxState: "DONE" },
+  };
   const where: Prisma.WaContactWhereInput = {
     ...(q
       ? {
@@ -169,8 +188,8 @@ export async function listContacts(query: {
           ],
         }
       : {}),
-    ...(query.filter === "window" ? { lastInboundAt: { gte: query.windowSince } } : {}),
-    ...(query.filter === "optedOut" ? { optedOut: true } : {}),
+    ...(query.filter ? byFilter[query.filter] : {}),
+    ...(query.tag ? { tags: { has: query.tag } } : {}),
   };
   const [total, rows] = await Promise.all([
     prisma.waContact.count({ where }),
@@ -210,11 +229,152 @@ export function saveOutboundMessage(data: {
   waId: string;
   type: string;
   body: string | null;
+  mediaId?: string | null;
   templateName: string | null;
   lastStatus: string;
   campaignId: string | null;
+  automationKey: string | null;
 } & Partial<MessageError>) {
-  return prisma.waMessage.create({ data: { ...data, direction: "OUT" } });
+  return prisma.waMessage.create({
+    data: { ...data, direction: "OUT" },
+    select: { id: true },
+  });
+}
+
+/** Admin edits from the thread: triage state, tags, marketing consent. */
+export function updateContact(
+  waId: string,
+  data: {
+    inboxState?: "OPEN" | "DONE";
+    tags?: string[];
+    marketingOptInAt?: Date | null;
+    marketingOptInSource?: string | null;
+  },
+) {
+  return prisma.waContact.update({ where: { waId }, data });
+}
+
+export function markContactRead(waId: string) {
+  return prisma.waContact.updateMany({
+    where: { waId, unreadCount: { gt: 0 } },
+    data: { unreadCount: 0 },
+  });
+}
+
+/** Every tag in use, most used first — the audience and inbox filters offer these. */
+export async function tagCounts(): Promise<{ tag: string; count: number }[]> {
+  const rows = await prisma.$queryRaw<{ tag: string; count: bigint }[]>`
+    SELECT t AS tag, COUNT(*) AS count
+    FROM "wa_contacts", unnest("tags") AS t
+    GROUP BY t ORDER BY count DESC, t ASC LIMIT 200`;
+  return rows.map((r) => ({ tag: r.tag, count: Number(r.count) }));
+}
+
+/**
+ * Upsert contacts from an import: create new numbers, merge tags into
+ * existing ones, and record consent only when the row grants it (an import
+ * never REMOVES consent — that takes STOP or an admin).
+ */
+export async function importContacts(
+  rows: { waId: string; name: string | null; tags: string[]; optIn: boolean }[],
+  at: Date,
+): Promise<{ created: number; updated: number }> {
+  const existing = new Map(
+    (
+      await prisma.waContact.findMany({
+        where: { waId: { in: rows.map((r) => r.waId) } },
+        select: { waId: true, tags: true, name: true, marketingOptInAt: true },
+      })
+    ).map((c) => [c.waId, c]),
+  );
+  let created = 0;
+  let updated = 0;
+  // Sequential in one transaction: imports are capped (5 000 rows) and
+  // each row is a single small write.
+  await prisma.$transaction(
+    rows.map((row) => {
+      const current = existing.get(row.waId);
+      const consent =
+        row.optIn && !current?.marketingOptInAt
+          ? { marketingOptInAt: at, marketingOptInSource: "import" }
+          : {};
+      if (!current) {
+        created += 1;
+        return prisma.waContact.create({
+          data: { waId: row.waId, name: row.name, tags: row.tags, ...consent },
+        });
+      }
+      updated += 1;
+      return prisma.waContact.update({
+        where: { waId: row.waId },
+        data: {
+          tags: [...new Set([...current.tags, ...row.tags])],
+          ...(row.name && !current.name ? { name: row.name } : {}),
+          ...consent,
+        },
+      });
+    }),
+  );
+  return { created, updated };
+}
+
+// ---- Quick replies -----------------------------------------------------------
+
+export function listQuickReplies() {
+  return prisma.waQuickReply.findMany({ orderBy: { title: "asc" } });
+}
+
+export function createQuickReply(data: { title: string; body: string }) {
+  return prisma.waQuickReply.create({ data });
+}
+
+export function updateQuickReply(id: string, data: { title: string; body: string }) {
+  return prisma.waQuickReply.update({ where: { id }, data });
+}
+
+export function deleteQuickReply(id: string) {
+  return prisma.waQuickReply.delete({ where: { id } });
+}
+
+// ---- Overview ----------------------------------------------------------------
+
+/** Numbers for the Overview tab over the last `since` → now. */
+export async function overviewStats(since: Date) {
+  const [byStatus, inbound, contacts, optedOut, optedIn, daily, clicks, automationSends, active] =
+    await Promise.all([
+      prisma.waMessage.groupBy({
+        by: ["lastStatus"],
+        where: { direction: "OUT", createdAt: { gte: since } },
+        _count: { _all: true },
+      }),
+      prisma.waMessage.count({ where: { direction: "IN", createdAt: { gte: since } } }),
+      prisma.waContact.count(),
+      prisma.waContact.count({ where: { optedOut: true } }),
+      prisma.waContact.count({ where: { optedOut: false, marketingOptInAt: { not: null } } }),
+      // Days in India time, so "today" is the operator's today.
+      prisma.$queryRaw<{ day: Date; direction: "IN" | "OUT"; count: bigint }[]>`
+        SELECT date_trunc('day', "createdAt" AT TIME ZONE 'Asia/Kolkata') AS day,
+               "direction", COUNT(*) AS count
+        FROM "wa_messages"
+        WHERE "createdAt" >= ${since}
+        GROUP BY 1, 2 ORDER BY 1`,
+      prisma.waLink.aggregate({ where: { createdAt: { gte: since } }, _sum: { clicks: true } }),
+      prisma.waMessage.count({
+        where: { direction: "OUT", automationKey: { not: null }, createdAt: { gte: since } },
+      }),
+      prisma.waCampaign.count({ where: { status: { in: ["SCHEDULED", "SENDING", "PAUSED"] } } }),
+    ]);
+  return {
+    byStatus: Object.fromEntries(byStatus.map((g) => [g.lastStatus ?? "unknown", g._count._all])),
+    inbound,
+    contacts,
+    optedOut,
+    optedIn,
+    daily: daily.map((d) => ({ day: d.day, direction: d.direction, count: Number(d.count) })),
+    clicks: clicks._sum.clicks ?? 0,
+    automationSends,
+    activeCampaigns: active,
+  };
 }
 
 /**
@@ -260,31 +420,8 @@ export async function listMessages(waId: string, page: number, pageSize: number)
 }
 
 // ---- Campaigns -------------------------------------------------------------
-
-export function createCampaign(data: {
-  name: string;
-  templateName: string;
-  languageCode: string;
-  total: number;
-}) {
-  return prisma.waCampaign.create({ data });
-}
-
-export function finishCampaign(id: string) {
-  return prisma.waCampaign.update({ where: { id }, data: { finishedAt: new Date() } });
-}
-
-export async function listCampaigns(page: number, pageSize: number) {
-  const [total, rows] = await Promise.all([
-    prisma.waCampaign.count(),
-    prisma.waCampaign.findMany({
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    }),
-  ]);
-  return { total, rows };
-}
+// The campaign queue lives in whatsapp.campaigns.ts; the webhook only needs
+// to count a late failure.
 
 export function incrementCampaign(
   id: string,
@@ -294,35 +431,4 @@ export function incrementCampaign(
     where: { id },
     data: { [counter]: { increment: 1 } },
   });
-}
-
-export async function getCampaignWithBreakdown(id: string) {
-  const [campaign, groups, failures] = await Promise.all([
-    prisma.waCampaign.findUnique({ where: { id } }),
-    prisma.waMessage.groupBy({
-      by: ["lastStatus"],
-      where: { campaignId: id },
-      _count: { _all: true },
-    }),
-    // Why the failed ones failed — one row per Meta error, biggest first.
-    prisma.waMessage.groupBy({
-      by: ["errorCode", "errorTitle"],
-      where: { campaignId: id, lastStatus: "failed" },
-      _count: { _all: true },
-      orderBy: { _count: { errorCode: "desc" } },
-    }),
-  ]);
-  if (!campaign) return null;
-  const byStatus = Object.fromEntries(
-    groups.map((g) => [g.lastStatus ?? "unknown", g._count._all]),
-  );
-  return {
-    campaign,
-    byStatus,
-    failures: failures.map((f) => ({
-      errorCode: f.errorCode,
-      errorTitle: f.errorTitle,
-      count: f._count._all,
-    })),
-  };
 }

@@ -1,6 +1,7 @@
 // WhatsApp Cloud API — webhook audit log, contacts, the conversation, per-message
-// delivery statuses and bulk template campaigns. Standalone: no relation to a
-// core model (a contact is keyed by its WhatsApp id, not a Customer). See
+// delivery statuses, campaigns (with their recipient queue and tracked links),
+// saved audiences, automations and inbox quick replies. Standalone: no relation
+// to a core model (a contact is keyed by its WhatsApp id, not a Customer). See
 // docs/BACKEND_CONTEXT.md → "WhatsApp Cloud API".
 
 enum WaDirection {
@@ -21,50 +22,74 @@ model WaWebhookEvent {
   @@schema("public")
 }
 
+enum WaInboxState {
+  OPEN
+  DONE
+
+  @@schema("public")
+}
+
 /// A WhatsApp user, keyed by Meta's `wa_id` (digits only, no "+").
 model WaContact {
-  waId          String      @id
-  name          String?
+  waId                 String       @id
+  name                 String?
   /// Sent STOP / UNSUBSCRIBE — template and text sends are refused (409).
-  optedOut      Boolean     @default(false)
+  optedOut             Boolean      @default(false)
+  /// Marketing consent on record (Meta requires it for marketing templates).
+  /// Null = none recorded. Set by import, by an admin, or by the contact
+  /// sending START; cleared by STOP.
+  marketingOptInAt     DateTime?
+  /// import | admin | start — how the consent was recorded.
+  marketingOptInSource String?
+  /// Free labels for audiences ("diwali-2026", "vip").
+  tags                 String[]     @default([])
+  /// Inbound messages since an admin last opened the thread.
+  unreadCount          Int          @default(0)
+  /// Inbox triage. A new inbound message reopens a DONE conversation.
+  inboxState           WaInboxState @default(OPEN)
   /// Last message FROM the contact — opens the 24h free-form window.
-  lastInboundAt DateTime?
+  lastInboundAt        DateTime?
   /// Latest message either way — orders the admin inbox.
-  lastMessageAt DateTime?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  messages      WaMessage[]
+  lastMessageAt        DateTime?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  messages             WaMessage[]
 
   @@index([lastMessageAt])
+  @@index([tags], type: Gin)
   @@map("wa_contacts")
   @@schema("public")
 }
 
 model WaMessage {
-  id           String      @id @default(cuid())
+  id            String               @id @default(cuid())
   /// Meta's message id. Null only for an outbound send Meta refused.
-  wamid        String?     @unique
-  waId         String
-  contact      WaContact   @relation(fields: [waId], references: [waId])
-  direction    WaDirection
+  wamid         String?              @unique
+  waId          String
+  contact       WaContact            @relation(fields: [waId], references: [waId])
+  direction     WaDirection
   /// text | template | button | interactive | image | document | …
-  type         String
-  body         String?
-  mediaId      String?
-  templateName String?
+  type          String
+  body          String?
+  mediaId       String?
+  templateName  String?
   /// accepted → sent → delivered → read, or failed.
-  lastStatus   String?
+  lastStatus    String?
   /// Why it failed — Meta's error, whether it refused the send outright or
   /// reported the failure later by webhook. Null unless lastStatus = failed.
-  errorCode    Int?
-  errorTitle   String?
-  errorDetails String?
-  campaignId   String?
-  campaign     WaCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  createdAt    DateTime    @default(now())
+  errorCode     Int?
+  errorTitle    String?
+  errorDetails  String?
+  campaignId    String?
+  campaign      WaCampaign?          @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  /// Set when an automation sent it.
+  automationKey String?
+  recipient     WaCampaignRecipient?
+  createdAt     DateTime             @default(now())
 
   @@index([waId])
   @@index([campaignId])
+  @@index([direction, createdAt])
   @@map("wa_messages")
   @@schema("public")
 }
@@ -89,21 +114,167 @@ model WaMessageStatus {
   @@schema("public")
 }
 
-model WaCampaign {
-  id           String      @id @default(cuid())
-  name         String
-  templateName String
-  languageCode String
-  total        Int         @default(0)
-  sent         Int         @default(0)
-  skipped      Int         @default(0)
-  failed       Int         @default(0)
-  /// Set when the background sender reaches the last recipient. Null while
-  /// sending — or forever if the server restarted mid-campaign.
-  finishedAt   DateTime?
-  createdAt    DateTime    @default(now())
-  messages     WaMessage[]
+enum WaCampaignStatus {
+  /// Waiting for `scheduledAt`.
+  SCHEDULED
+  SENDING
+  PAUSED
+  COMPLETED
+  CANCELLED
 
+  @@schema("public")
+}
+
+enum WaRecipientStatus {
+  PENDING
+  /// Claimed by the sender — a row left here by a restart is marked FAILED.
+  SENDING
+  SENT
+  SKIPPED
+  FAILED
+
+  @@schema("public")
+}
+
+model WaCampaign {
+  id                String                @id @default(cuid())
+  name              String
+  templateName      String
+  languageCode      String
+  /// MARKETING | UTILITY | AUTHENTICATION, from Meta at creation.
+  category          String?
+  status            WaCampaignStatus      @default(SENDING)
+  /// The audience definition it was built from — shown, and reused by retargeting.
+  audience          Json?
+  /// How each {{n}}, URL button and media header is filled (whatsapp.fields.ts).
+  mapping           Json?
+  requireOptIn      Boolean               @default(false)
+  /// Skip anyone sent any campaign message in the last N hours (0 = off).
+  frequencyCapHours Int                   @default(0)
+  scheduledAt       DateTime?
+  startedAt         DateTime?
+  createdBy         String?
+  total             Int                   @default(0)
+  sent              Int                   @default(0)
+  skipped           Int                   @default(0)
+  failed            Int                   @default(0)
+  /// Set when the last recipient is processed (or on cancel).
+  finishedAt        DateTime?
+  createdAt         DateTime              @default(now())
+  messages          WaMessage[]
+  recipients        WaCampaignRecipient[]
+  links             WaLink[]
+
+  @@index([status, scheduledAt])
   @@map("wa_campaigns")
+  @@schema("public")
+}
+
+/// One row per number in a campaign — the durable queue the sender works
+/// through, so a restart resumes rather than loses the campaign.
+model WaCampaignRecipient {
+  id           String            @id @default(cuid())
+  campaignId   String
+  campaign     WaCampaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  waId         String
+  name         String?
+  /// string[] — filled values for {{1}}…
+  bodyParams   Json
+  /// string[] — one per dynamic URL button.
+  buttonParams Json
+  status       WaRecipientStatus @default(PENDING)
+  /// Why it was skipped, or the error it failed with.
+  note         String?
+  messageId    String?           @unique
+  message      WaMessage?        @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  processedAt  DateTime?
+  createdAt    DateTime          @default(now())
+
+  @@unique([campaignId, waId])
+  @@index([campaignId, status])
+  @@map("wa_campaign_recipients")
+  @@schema("public")
+}
+
+/// A tracked link: a template button pointing at /api/v1/r/{code} redirects
+/// here and counts the click.
+model WaLink {
+  code           String      @id
+  url            String
+  campaignId     String?
+  campaign       WaCampaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  waId           String?
+  clicks         Int         @default(0)
+  firstClickedAt DateTime?
+  lastClickedAt  DateTime?
+  createdAt      DateTime    @default(now())
+
+  @@index([campaignId])
+  @@map("wa_links")
+  @@schema("public")
+}
+
+/// A saved audience — a filter definition, resolved when used.
+model WaSegment {
+  id         String   @id @default(cuid())
+  name       String
+  /// { kind: "sellers" | "contacts", filters } — see whatsapp.audiences.ts.
+  definition Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("wa_segments")
+  @@schema("public")
+}
+
+/// An event-triggered message. `key` names an entry in the automation
+/// registry (whatsapp.automations.ts); this row holds its settings.
+model WaAutomation {
+  key          String    @id
+  enabled      Boolean   @default(false)
+  /// Events before this are never sent for — switching on doesn't blast a backlog.
+  enabledAt    DateTime?
+  templateName String?
+  languageCode String?
+  mapping      Json?
+  /// Per-automation settings, e.g. { days: [1, 3, 7] }.
+  config       Json?
+  updatedBy    String?
+  updatedAt    DateTime  @updatedAt
+
+  @@map("wa_automations")
+  @@schema("public")
+}
+
+/// What an automation did for one event — the unique pair makes each event
+/// fire once however often the scanner runs.
+model WaAutomationRun {
+  id            String   @id @default(cuid())
+  automationKey String
+  /// The event, e.g. "<storeId>:d3" or "<orderId>".
+  refKey        String
+  waId          String?
+  storeId       String?
+  /// SENT | SKIPPED | FAILED
+  status        String
+  note          String?
+  messageId     String?
+  createdAt     DateTime @default(now())
+
+  @@unique([automationKey, refKey])
+  @@index([automationKey, createdAt])
+  @@map("wa_automation_runs")
+  @@schema("public")
+}
+
+/// Saved replies for the inbox composer.
+model WaQuickReply {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("wa_quick_replies")
   @@schema("public")
 }

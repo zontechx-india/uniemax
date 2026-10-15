@@ -124,6 +124,18 @@ export interface GraphTemplate {
   components?: GraphTemplateComponent[];
 }
 
+export interface GraphPhoneNumber {
+  id?: string;
+  display_phone_number?: string;
+  verified_name?: string;
+  /** GREEN | YELLOW | RED | UNKNOWN */
+  quality_rating?: string;
+  /** TIER_250 | TIER_1K | TIER_10K | TIER_100K | TIER_UNLIMITED */
+  messaging_limit_tier?: string;
+  name_status?: string;
+  status?: string;
+}
+
 export interface GraphTemplateList {
   data?: GraphTemplate[];
   paging?: { cursors?: { before?: string; after?: string }; next?: string };

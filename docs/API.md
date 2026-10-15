@@ -2512,9 +2512,10 @@ transactionally; pushes go out in batches afterwards.
 
 ## WhatsApp Cloud API
 
-`/api/v1/whatsapp` (no auth — Meta's webhook) · `/api/v1/admin/whatsapp` 🔒 admin.
-Every route answers **`503`** while `WA_ENABLED=false` — except `GET /admin/whatsapp/status`. Setup and curl for each route:
-[`backend/README.md`](../backend/README.md#whatsapp-cloud-api).
+`/api/v1/whatsapp` (no auth — Meta's webhook) · `/api/v1/r` (no auth — tracked links) ·
+`/api/v1/admin/whatsapp` 🔒 admin. Every route answers **`503`** while
+`WA_ENABLED=false` — except `GET /admin/whatsapp/status` and the link redirect. Setup and
+curl for each route: [`backend/README.md`](../backend/README.md#whatsapp-cloud-api).
 
 Numbers (`to`, `:waId`) accept any phone shape (`+91 98765-43210`) and are normalised
 to Meta's digits-only `wa_id`. **Outside production** a send to a number not in
@@ -2529,6 +2530,19 @@ until they send START.
 `429` = Meta throttling (codes 4, 80007, 130429, 131048, 131056) · `502` = our token
 (190 — the message names `WA_ACCESS_TOKEN`) or Meta down/unreachable · `400` = any other Meta 4xx (bad template, params, number).
 
+**Mappings.** Campaigns and automations fill a template per person with a `mapping`:
+```jsonc
+{ "body":    [{ "value": "{seller_name}", "fallback": "there" }, { "value": "{store_name}" }],
+  "buttons": [{ "value": "{store_slug}/products", "track": false },
+              { "value": "https://uniemax.com/store/{store_slug}", "track": true }],
+  "header":  { "type": "image", "link": "https://…/banner.jpg" } }   // or null
+```
+One `body` entry per `{{n}}`, one `buttons` entry per dynamic URL button, `header` when
+the template has a media header. `{field}` placeholders come from the audience
+(`GET /fields`); a `fallback` covers an empty field, and with none that person is
+skipped. `track: true` (campaigns only) makes `value` the destination and fills the
+button with a click-counting code — the template's link must end in `/api/v1/r/{{1}}`.
+
 ### `GET /api/v1/whatsapp/webhook` (no auth)
 Meta's handshake. `hub.mode=subscribe` and `hub.verify_token` = `WA_VERIFY_TOKEN` →
 `200` with `hub.challenge` as `text/plain`; anything else → `403`.
@@ -2536,53 +2550,18 @@ Meta's handshake. `hub.mode=subscribe` and `hub.verify_token` = `WA_VERIFY_TOKEN
 ### `POST /api/v1/whatsapp/webhook` (no auth — HMAC-guarded)
 `X-Hub-Signature-256` must equal `sha256=` + hex HMAC-SHA256(`WA_APP_SECRET`, raw body)
 → else `401`. Verified events get `200 { "received": true }` at once and are processed
-after the reply: the raw payload is stored, inbound `messages[]` upsert the contact
-(profile name, 24h window) and are saved (text, button/interactive reply title, media
-id + caption); a text of exactly STOP/UNSUBSCRIBE opts the contact out, START back in.
-`statuses[]` are stored once per (wamid, status), advance the message's `lastStatus`
-(never backwards) and, when `failed`, bump the campaign's `failed` counter. Every
-write is idempotent — Meta's retries are no-ops. Not rate-limited.
+after the reply: the raw payload is stored; each new inbound message is saved (text,
+button/interactive reply title, media id + caption) and updates its contact (profile
+name, 24h window, `unreadCount` + 1, conversation reopened). A text of exactly
+STOP/UNSUBSCRIBE opts the contact out and clears marketing consent; START opts back in
+and records consent (`source: "start"`). `statuses[]` are stored once per (wamid,
+status), advance the message's `lastStatus` (never backwards) and, when `failed`, bump
+the campaign's `failed` counter. Idempotent — Meta's retries are no-ops. Not rate-limited.
 
-### `POST /api/v1/admin/whatsapp/send-template` 🔒 admin
-```json
-{ "to": "+919876543210", "templateName": "order_update", "languageCode": "en", "bodyParams": ["Asha", "UM-1042"] }
-```
-Checked against the WABA's template list (cached 60 s) **before** calling Meta — no
-template with that name **and** language, a template the API can't fill, or a value count
-that differs from the body's `{{n}}` → `422` saying which (e.g. *Template
-"uniemax_address_update" has no "en" version — use "en_US"*). Skipped only when Meta
-can't list templates; Meta then decides.
-`bodyParams` fill the template body's `{{1}}…` in order (optional, ≤ 50). Saved as an
-outbound message with `lastStatus: "accepted"` and, as `body`, the template text with the
-values filled in (from the cached template list; just the values if it is unavailable).
-→ `{ "data": <Meta's response> }`
-(`messages[0].id` is the wamid).
-
-### `POST /api/v1/admin/whatsapp/send-text` 🔒 admin
-`{ "to": "919876543210", "text": "…" }` (≤ 4096 chars). Only within **24h** of the
-contact's last inbound message — else `422 "24h window closed, use a template"`.
-→ Meta's response.
-
-### `POST /api/v1/admin/whatsapp/campaigns` 🔒 admin → `202`
-```json
-{ "name": "Diwali", "templateName": "festive_offer", "languageCode": "en",
-  "recipients": [{ "to": "919876543210", "bodyParams": ["Asha"] }] }
-```
-1–10 000 recipients. The template, language and every recipient's value count are checked
-once up front (same rules as send-template) → `422` before anything is created.
-→ `{ "data": { "campaignId": "…" } }` immediately; sends run in
-the background at `WA_SEND_RATE_PER_SEC`. Opted-out, dev-blocked and repeated numbers
-count as `skipped`. In-process — a restart stops a running campaign. 10/minute.
-
-### `GET /api/v1/admin/whatsapp/campaigns/:id` 🔒 admin
-```jsonc
-{ "data": { "id", "name", "templateName", "languageCode", "createdAt", "finishedAt",
-    "total": 500, "sent": 480, "skipped": 12, "failed": 9,
-    "statuses": { "accepted": 3, "sent": 40, "delivered": 300, "read": 137, "failed": 8 },
-    "failures": [{ "errorCode": 131042, "errorTitle": "Business eligibility payment issue", "count": 8 }] } }
-```
-Counters: `sent` = accepted by Meta; `failed` = refused at send **or** reported failed
-later (so a message can count in both). `statuses` = each message's latest status.
+### `GET /api/v1/r/:code` (no auth)
+A tracked campaign button. Counts the click (`clicks`, first/last time) and `302`s to the
+destination; an unknown code goes to the site's home page. `Cache-Control: no-store`.
+Works even while WhatsApp is switched off.
 
 ### `GET /api/v1/admin/whatsapp/status` 🔒 admin
 Answers even while disabled — the console's first call. No secrets:
@@ -2593,26 +2572,246 @@ Answers even while disabled — the console's first call. No secrets:
     "lastWebhookAt": "2026-10-13T…" } }      // null = Meta has never reached us
 ```
 
-### `GET /api/v1/admin/whatsapp/contacts?q=&filter=&page=&pageSize=` 🔒 admin
-The inbox, most recent conversation first (`lastMessageAt`). `q` matches name or number;
-`filter` = `window` (reply window open) · `optedOut`. Each row: `waId`, `name`,
-`optedOut`, `lastInboundAt`, `lastMessageAt`, `windowClosesAt` (null = closed) and
-`lastMessage` (`direction`, `type`, `body`, `templateName`, `lastStatus`, `createdAt`)
-or null.
+### `GET /api/v1/admin/whatsapp/overview` 🔒 admin
+The last 30 days plus the number's health from Meta (cached 5 min):
+```jsonc
+{ "data": { "since": "…",
+    "phone": { "number": "+91 …", "name": "UnieMax", "qualityRating": "GREEN",   // GREEN | YELLOW | RED | UNKNOWN
+               "messagingLimit": "TIER_1K", "nameStatus": "APPROVED", "status": "CONNECTED" },
+    "phoneError": null,                     // set (and phone null) when Meta can't be read
+    "messages": { "sent", "delivered", "read", "failed", "received", "fromAutomations", "clicks" },
+    "contacts": { "total", "optedIn", "optedOut" },
+    "activeCampaigns": 1,                   // scheduled + sending + paused
+    "daily": [{ "day": "2026-10-13T00:00:00.000Z", "direction": "OUT", "count": 42 }],  // India-time days
+    "recentCampaigns": [{ "id", "name", "status", "total", "sent", "failed", "createdAt", "scheduledAt" }] } }
+```
 
-### `GET /api/v1/admin/whatsapp/contacts/:waId` 🔒 admin
-One contact plus `messageCount` and `windowClosesAt`. Unknown → `404`.
+### Sending
 
-### `GET /api/v1/admin/whatsapp/templates?refresh=` 🔒 admin
+#### `POST /api/v1/admin/whatsapp/send-template` 🔒 admin
+```jsonc
+{ "to": "+919876543210", "templateName": "order_update", "languageCode": "en",
+  "bodyParams": ["Asha", "UM-1042"],          // {{1}}… in order (≤ 50)
+  "buttonParams": ["sabse-kart/products"],    // one per dynamic URL button — the part after its fixed prefix
+  "header": { "type": "image", "link": "https://…" } }   // required iff the template has a media header; else null
+```
+Checked against the WABA's template list (cached 60 s) **before** calling Meta — no
+template with that name **and** language, a template that can't be sent, or a value /
+button count / media header that doesn't match → `422` saying which (e.g. *Template
+"uniemax_address_update" has no "en" version — use "en_US"*). Skipped only when Meta
+can't list templates; Meta then decides. Saved as an outbound message with
+`lastStatus: "accepted"` and, as `body`, the template text with the values filled in.
+→ `{ "data": <Meta's response + "recordId"> }` (`messages[0].id` is the wamid).
+
+#### `POST /api/v1/admin/whatsapp/send-text` 🔒 admin
+`{ "to": "919876543210", "text": "…" }` (≤ 4096 chars). Only within **24h** of the
+contact's last inbound message — else `422 "24h window closed, use a template"`.
+
+#### `POST /api/v1/admin/whatsapp/send-media` 🔒 admin
+`{ "to", "type": "image" | "video" | "document", "link": "https://…", "caption"?, "filename"? }`.
+Same 24h rule as send-text. Meta fetches `link`, so it must be public.
+
+#### `POST /api/v1/admin/whatsapp/media` 🔒 admin (multipart)
+One file (`file`): JPEG or PNG photo, or MP4 video (else `400`), stored in the media
+bucket under `whatsapp/`. → `{ "url": "<public URL>", "type": "image" | "video" }` — for
+send-media or a template's media header. 30/min.
+
+#### `GET /api/v1/admin/whatsapp/templates?refresh=` 🔒 admin
 The WABA's templates from Meta (all statuses), cached 60 s; `refresh=true` skips the
-cache. Each: `name`, `language`, `status`, `category`, `header`, `body`, `footer`,
-`buttons` (labels), `paramCount` (highest `{{n}}` in the body), `urlButtons`
-(positions of URL buttons whose link ends in a variable), `sendable`, `reason`.
-Not sendable = not approved, named variables, a media header, a header variable or a
-dynamic URL button — the console's send endpoints fill numbered body variables only
-(dynamic URL templates are sent by the seller reminders below). Sendable first.
+cache. Each: `name`, `language`, `status`, `category`, `header` (text header),
+`headerMedia` (`image` | `video` | `document` | null — must be supplied on send), `body`,
+`footer`, `buttons` (labels), `paramCount` (highest `{{n}}`), `urlButtons`
+(`[{ index, text, url }]` — link buttons ending in `{{1}}`, one value each), `sendable`,
+`reason`. Not sendable = not approved, named variables, a header text variable or a
+location header. Sendable first.
 
-### `GET /api/v1/admin/whatsapp/stores/:id/reminders` 🔒 admin
+### Inbox
+
+#### `GET /api/v1/admin/whatsapp/contacts?q=&filter=&tag=&page=&pageSize=` 🔒 admin
+The inbox, most recent conversation first. `q` matches name or number; `filter` =
+`unread` · `open` · `done` · `window` (reply window open) · `optedIn` (marketing consent)
+· `optedOut`; `tag` = has that tag. Each row: `waId`, `name`, `optedOut`,
+`marketingOptInAt`, `marketingOptInSource`, `tags`, `unreadCount`, `inboxState`
+(`OPEN`/`DONE`), `lastInboundAt`, `lastMessageAt`, `windowClosesAt` (null = closed) and
+`lastMessage` (`direction`, `type`, `body`, `templateName`, `lastStatus`, `createdAt`) or null.
+
+#### `GET /api/v1/admin/whatsapp/contacts/:waId` 🔒 admin
+One contact (the row fields above) plus `messageCount`, `createdAt` and `profiles` — who
+the number is on the platform, matched on its last 10 digits:
+`{ "stores": [{ id, name, slug, isPublished, suspendedAt }], "customers": [{ id, name, email, orderCount }] }`.
+Unknown → `404`.
+
+#### `PATCH /api/v1/admin/whatsapp/contacts/:waId` 🔒 admin
+`{ "inboxState"?: "OPEN" | "DONE", "tags"?: ["vip"], "marketingOptIn"?: true | false }` →
+the contact as above. Tags are lower-case letters, digits, space, `-`, `_` (≤ 40 chars,
+≤ 20). `marketingOptIn: true` records consent (`source: "admin"`) — refused `409` for a
+contact who sent STOP; `false` clears it. Consent changes are audited.
+
+#### `POST /api/v1/admin/whatsapp/contacts/:waId/read` 🔒 admin
+Clears `unreadCount`. → `{ "read": true }`.
+
+#### `POST /api/v1/admin/whatsapp/contacts/import` 🔒 admin
+```jsonc
+{ "rows": [{ "phone": "98765 43210", "name": "Asha", "tags": ["vip"], "optIn": true }],  // ≤ 5 000
+  "tags": ["expo-2026"] }   // added to every row
+```
+Creates new contacts, merges tags into existing ones, fills a missing name, and records
+consent (`source: "import"`) where `optIn` — an import never removes consent. Numbers
+are normalised (a bare 10-digit Indian mobile gets 91). Nothing is sent.
+→ `{ "created", "updated", "invalid": ["…"], "invalidCount" }`. 10/min; audited.
+
+#### `GET /api/v1/admin/whatsapp/tags` 🔒 admin
+`[{ "tag": "vip", "count": 12 }]`, most used first (≤ 200).
+
+#### `GET /api/v1/admin/whatsapp/messages/:waId?page=&pageSize=` 🔒 admin
+The conversation, newest first, paginated (`list` envelope). Each row: `id`, `wamid`,
+`direction` (`IN`/`OUT`), `type`, `body`, `mediaId`, `templateName`, `lastStatus`,
+`errorCode` / `errorTitle` / `errorDetails` (Meta's reason when `failed` — refused at
+send or failed later by webhook; otherwise null), `campaignId`, `createdAt`. Unknown
+contact → `404`.
+
+#### Quick replies 🔒 admin
+`GET /quick-replies` → `[{ id, title, body }]` by title · `POST /quick-replies`
+`{ "title" (≤ 60), "body" (≤ 4096) }` → `201` · `PUT /quick-replies/:id` (same body) ·
+`DELETE /quick-replies/:id` → `{ "deleted": true }`. Unknown id → `404`.
+
+### Audiences
+
+An **audience** is one of:
+```jsonc
+{ "kind": "sellers", "filters": {
+    "setup": "incomplete",          // or "complete"
+    "setupBelow": 50,               // setup % under this
+    "published": true, "hasProducts": false,
+    "orders": "none",               // or "any"
+    "noOrdersInDays": 14, "joinedWithinDays": 30, "state": "Kerala",
+    "storeIds": ["…"] } }           // all optional; suspended stores never included
+{ "kind": "contacts", "filters": { "tags": ["vip"], "optedIn": true } }   // tags = any of
+{ "kind": "segment", "segmentId": "…" }
+{ "kind": "campaign", "campaignId": "…", "filter": "not_read" }   // retarget: failed | not_delivered | not_read | read | clicked | not_clicked | replied | not_replied
+{ "kind": "list", "rows": [{ "phone": "919876543210", "fields": { "name": "Asha", "city": "Kochi" } }] }   // ≤ 10 000
+```
+Resolved when used, from live data. A seller is reached on the store's contact phone,
+else the owner's login phone; one number appears once (the first store). Seller fields:
+`seller_name`, `store_name`, `store_slug`, `store_url`, `dashboard_url`, `setup_percent`,
+`pending_steps`, `product_count`, `order_count`, `city`, `state`, `phone`. Contacts:
+`name`, `phone`. A list: its columns plus `phone`. A retarget re-resolves the original
+audience (fresh field values) and keeps the people matching `filter`; "replied" = an
+inbound message within 7 days of theirs.
+
+#### `GET /api/v1/admin/whatsapp/fields` 🔒 admin
+The field catalogue: `{ "sellers": [{ key, label, example }], "contacts": […], "orders": […] }`.
+
+#### `POST /api/v1/admin/whatsapp/audiences/preview` 🔒 admin
+`{ "audience": <audience> }` →
+`{ "total", "invalid", "duplicates", "optedOut", "optedIn", "fieldKind": "sellers" | "contacts" | "list", "sample": [{ waId, name, storeId, fields }] }`
+(sample ≤ 20).
+
+#### Segments 🔒 admin
+`GET /segments` → each `{ id, name, definition, createdAt, updatedAt, count }` (`count` =
+current size, null if it can't be resolved) · `POST /segments`
+`{ "name", "definition": <sellers or contacts audience> }` → `201` · `PUT /segments/:id` ·
+`DELETE /segments/:id` → `{ "deleted": true }`.
+
+#### `GET /api/v1/admin/whatsapp/stores/search?q=` 🔒 admin
+Up to 20 live stores by name or slug — `[{ id, name, slug, isPublished }]` — for picking
+`storeIds`.
+
+### Campaigns
+
+A **draft**:
+```jsonc
+{ "name": "Finish your store", "templateName": "seller_setup_pending", "languageCode": "en",
+  "audience": <audience>, "mapping": <mapping>,
+  "requireOptIn": false,          // only people with marketing consent
+  "frequencyCapHours": 48,        // skip anyone sent any campaign message in the last N h (0 = off, ≤ 720)
+  "scheduledAt": null }           // ISO time to start; null or past = now
+```
+Checks (`422`): the template exists in that language and can be sent; the mapping has one
+entry per `{{n}}` and per dynamic URL button and a header iff the template has a media
+header (of the same type); a tracked button's template link ends in `/api/v1/r/{{1}}`.
+`503` while Meta's template list can't be read. Per person, the reason they are skipped:
+*Not on the test allowlist* (non-production) · *Opted out (STOP)* · *No marketing
+consent* · *Messaged in the last Nh* · *Missing value for {{2}}*.
+
+#### `POST /api/v1/admin/whatsapp/campaigns/preview` 🔒 admin
+A draft → what would happen, nothing sent:
+`{ "total", "eligible", "skipped": { "<reason>": n }, "invalid", "duplicates", "category", "sample": [{ waId, name, body, buttons: [{ text, url }] }] }`
+(sample ≤ 5 filled-in messages).
+
+#### `POST /api/v1/admin/whatsapp/campaigns/test` 🔒 admin
+A draft plus `"to"` → sends the template to that number with the **first eligible
+person's** values (tracked links work). → `{ "usedValuesOf": "Rahul" }`. 10/min; audited.
+
+#### `POST /api/v1/admin/whatsapp/campaigns` 🔒 admin → `202`
+A draft → resolves the audience **once** into recipient rows (PENDING, or SKIPPED with the
+reason), creates the tracked-link codes, and returns
+`{ "campaignId", "eligible", "skipped" }`. `422` when no one is eligible. Status
+`SCHEDULED` (when `scheduledAt` is > 30 s away) or `SENDING`. A background sender works
+through PENDING rows at `WA_SEND_RATE_PER_SEC`, re-checking opt-out and the frequency
+cap at send time; it survives restarts (a row caught mid-send becomes FAILED, never
+resent) and backs off a minute on Meta throttling. 10/min; audited.
+
+#### `POST /api/v1/admin/whatsapp/campaigns/:id/control` 🔒 admin
+`{ "action": "pause" | "resume" | "cancel" }` → the campaign (as GET). Pause: SENDING or
+SCHEDULED → PAUSED. Resume: PAUSED → SCHEDULED (time still ahead) or SENDING. Cancel:
+remaining PENDING rows become SKIPPED ("Cancelled"), status CANCELLED. Otherwise `409`.
+
+#### `GET /api/v1/admin/whatsapp/campaigns?page=&pageSize=` 🔒 admin
+Newest first: `id`, `name`, `templateName`, `languageCode`, `category`, `status`
+(`SCHEDULED` · `SENDING` · `PAUSED` · `COMPLETED` · `CANCELLED`), `scheduledAt`,
+`startedAt`, `finishedAt`, `total`, `sent`, `skipped`, `failed`, `createdAt`.
+
+#### `GET /api/v1/admin/whatsapp/campaigns/:id` 🔒 admin
+```jsonc
+{ "data": { …the row, "audience": { "kind": "sellers", … },   // a list reports { kind, rows: <count> }
+    "mapping": <mapping>, "requireOptIn": true, "frequencyCapHours": 48,
+    "statuses": { "accepted": 3, "sent": 40, "delivered": 300, "read": 137, "failed": 8 },
+    "queue": { "pending": 0, "sent": 480, "skipped": 12, "failed": 1 },
+    "engagement": { "clicks": 95, "clickers": 80, "replied": 14 },   // clicks/clickers null without a tracked button
+    "skipReasons": [{ "reason": "No marketing consent", "count": 10 }],
+    "failures": [{ "errorCode": 131042, "errorTitle": "Business eligibility payment issue", "count": 8 }] } }
+```
+Counters: `sent` = accepted by Meta; `failed` = refused at send **or** reported failed
+later (so a message can count in both). `statuses` = each message's latest status.
+
+#### `GET /api/v1/admin/whatsapp/campaigns/:id/recipients?status=&page=&pageSize=` 🔒 admin
+`status` = `pending` · `skipped` · `failed` · `sent` · `delivered` · `read` · `clicked` ·
+`replied`. Each: `id`, `waId`, `name`, `status` (queue), `note` (skip/fail reason),
+`processedAt`, `lastStatus`, `errorCode`, `errorTitle`, `clicked`.
+
+#### `GET /api/v1/admin/whatsapp/campaigns/:id/recipients.csv` 🔒 admin
+Every recipient as CSV (`phone, name, queue, delivery, clicked, replied, note,
+processed_at`), formula-safe, as an attachment.
+
+### Automations
+
+Registry (`whatsapp.automations.ts`), each with its own template + mapping:
+`seller_setup_followup` (store not set up N days after creation — `config.days`, default
+`[1, 3, 7]`, ≤ 5 days of 1–60; default template `seller_setup_pending`) ·
+`store_published` · `first_order` · `new_order_alert` (order fields `order_number`,
+`order_total`, `customer_name` added) · `inactive_store` (published, no order for
+`config.days`, default 14, 7–90). A scanner runs every 5 min between 09:00 and 21:00
+India time; each event fires once; only events after `enabledAt` count; marketing
+templates go only to sellers with consent.
+
+#### `GET /api/v1/admin/whatsapp/automations` 🔒 admin
+Each: `key`, `title`, `description`, `fieldKind` (`sellers` | `sellerOrders`),
+`configFields`, `enabled`, `enabledAt`, `templateName`, `languageCode`, `mapping`,
+`config`, `last7Days: { sent, skipped, failed }`, `lastRunAt`.
+
+#### `PUT /api/v1/admin/whatsapp/automations/:key` 🔒 admin
+`{ "enabled", "templateName", "languageCode", "mapping", "config" }`. Switching on needs
+a template whose mapping fits (`422` otherwise) and sets `enabledAt` to now. Tracking is
+not used (`track` is forced false). Unknown key → `404`. Audited.
+
+#### `GET /api/v1/admin/whatsapp/automations/:key/runs?page=&pageSize=` 🔒 admin
+What it did, newest first: `refKey` (the event), `waId`, `storeId`, `storeName`, `status`
+(`SENT` · `SKIPPED` · `FAILED` · `PENDING`), `note`, `messageId`, `createdAt`.
+
+### Seller reminders
+
+#### `GET /api/v1/admin/whatsapp/stores/:id/reminders` 🔒 admin
 Seller reminders for one store (`:id` = id or slug; unknown → `404`):
 ```jsonc
 {
@@ -2632,7 +2831,7 @@ Seller reminders for one store (`:id` = id or slug; unknown → `404`):
 }
 ```
 
-### `POST /api/v1/admin/whatsapp/stores/:id/reminders` 🔒 admin
+#### `POST /api/v1/admin/whatsapp/stores/:id/reminders` 🔒 admin
 Body `{ "key": "setup" | "catalog" | "address" | "tax" | "payout" | "tip" }`. Sends that
 template to the store's recipient, filled from the store's live readiness (no values
 from the client), and answers with the refreshed state above. `409` = opted out or the
@@ -2640,17 +2839,6 @@ same reminder was sent to this number in the last 24h (failed sends don't count)
 `422` = no phone, nothing outstanding / step already complete, or the template doesn't
 match (name, language, value or button count). Opt-out, dev allowlist (`403`) and Meta
 errors as for `send-template`. Rate limit 30/min. Audited as `whatsapp.seller_reminder`.
-
-### `GET /api/v1/admin/whatsapp/campaigns?page=&pageSize=` 🔒 admin
-Campaigns newest first: the counters plus `finishedAt` (null while sending — or for good
-if the server restarted mid-campaign).
-
-### `GET /api/v1/admin/whatsapp/messages/:waId?page=&pageSize=` 🔒 admin
-The conversation, newest first, paginated (`list` envelope). Each row: `id`, `wamid`,
-`direction` (`IN`/`OUT`), `type`, `body`, `mediaId`, `templateName`, `lastStatus`,
-`errorCode` / `errorTitle` / `errorDetails` (Meta's reason when `failed` — refused at
-send or failed later by webhook; otherwise null), `campaignId`, `createdAt`. Unknown
-contact → `404`.
 
 ---
 

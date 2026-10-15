@@ -168,9 +168,9 @@ backend/
 │   │   │                      #   sweep, settle-only)
 │   │   │                      #   (see docs/CASHFREE_PAYMENTS.md)
 │   │   ├── whatsapp/          # WhatsApp Cloud API: signed webhook in, template/
-│   │   │                      #   text sends + rate-paced campaigns out ·
-│   │   │                      #   repository (Prisma) · client (Graph API) ·
-│   │   │                      #   webhook.ts (pure, unit-tested)
+│   │   │                      #   text/media sends, queued campaigns, audiences,
+│   │   │                      #   automations, inbox · client (Graph API) ·
+│   │   │                      #   webhook/templates/fields.ts (pure, unit-tested)
 │   │   └── (shipping, inventory, settings, dashboard — planned)
 │   ├── scripts/
 │   │   ├── createAdmin.ts     # Bootstrap an admin (npm run create-admin)
@@ -659,57 +659,95 @@ Decisions worth keeping:
 
 ### WhatsApp Cloud API — `modules/whatsapp`
 
-Meta's webhook in, template/text sends and bulk template campaigns out.
-Endpoints: `docs/API.md` → WhatsApp Cloud API; setup: `backend/README.md`.
+Meta's webhook in; template, text and media sends, marketing campaigns and
+event-triggered automations out; the admin inbox. Endpoints: `docs/API.md` →
+WhatsApp Cloud API; setup: `backend/README.md`.
 
-- **Files.** The four standard ones plus `whatsapp.repository.ts` (every Prisma
-  call), `whatsapp.client.ts` (Graph API wrapper, `WaApiError`),
-  `whatsapp.types.ts` (wire shapes), and two pure files with **no env/Prisma
-  import**, so `test/unit/` covers them without a server: `whatsapp.webhook.ts`
-  (signature check, payload parsing) and `whatsapp.templates.ts` (which Meta
-  templates the send endpoints can fill, and the filled-in text).
-- **Off by default.** `WA_ENABLED=false` → every route 503. `true` without the
-  five credentials refuses to boot in **every** environment (`config/env.ts`).
+- **Files.** The four standard ones plus `whatsapp.client.ts` (Graph API wrapper,
+  `WaApiError`), `whatsapp.types.ts` (wire shapes), `whatsapp.repository.ts`
+  (contacts, messages, statuses, quick replies, overview counts), and one file per
+  feature that holds its own queries: `whatsapp.audiences.ts` (audience resolution,
+  segments), `whatsapp.campaigns.ts` (the queue, its worker, tracked links),
+  `whatsapp.automations.ts` (registry + scanner), `whatsapp.sellerReminders.ts`.
+  Three pure files have **no env/Prisma import**, so `test/unit/` covers them
+  without a server: `whatsapp.webhook.ts` (signature check, payload parsing,
+  `toWaId`), `whatsapp.templates.ts` (what a template needs and whether a send
+  fits it) and `whatsapp.fields.ts` (mappings: `{field}` placeholders, fallbacks).
+- **Off by default.** `WA_ENABLED=false` → every route 503 (except `status` and the
+  `/api/v1/r/:code` redirect). `true` without the five credentials refuses to boot
+  in **every** environment (`config/env.ts`).
 - **Raw body, one scope.** Like the Cashfree webhook, the public plugin swaps the
   JSON parser for a raw Buffer so `X-Hub-Signature-256` (HMAC-SHA256 with the
   app secret, `timingSafeEqual`) covers Meta's exact bytes. No guard, no rate
   limit.
 - **Ack first, process after.** A verified webhook gets `200` before any DB work
   (Meta retries slow answers); processing runs after the reply, logged on
-  failure. Idempotent throughout — inbound by unique `wamid`, statuses by unique
-  `(wamid, status)`, `lastStatus` only moves forward.
-- **Send rules** (service): opted-out → 409; free text only within 24h of the
-  last inbound → else 422; outside production, only `WA_DEV_ALLOWED_RECIPIENTS`
-  → else 403. Every attempt is stored, accepted or failed.
+  failure. Idempotent throughout — inbound by unique `wamid` (the contact's unread
+  count only moves for a first delivery), statuses by unique `(wamid, status)`,
+  `lastStatus` only moves forward.
+- **Send rules** (service): opted-out → 409; free text and media only within 24h
+  of the last inbound → else 422; outside production, only
+  `WA_DEV_ALLOWED_RECIPIENTS` → else 403. Every attempt is stored, accepted or
+  failed, and `deliver` answers the stored message's id.
+- **What a template needs.** Positional `{{n}}` body values, one value per URL
+  button whose link ends in `{{1}}` (sent as a `button` component at that button's
+  index), and a media header by link (image / video / document). Named variables,
+  header text variables and location headers are not sendable.
+- **Checked before Meta.** Sends, campaigns and automations are validated against
+  the cached template list (name + language, sendable, value / button / header
+  shape) and refused with a 422 naming the problem, rather than failing at Meta.
+- **Consent.** `WaContact.marketingOptInAt` records marketing consent (import,
+  admin, or the contact sending START); STOP clears it. Campaigns can require it
+  (`requireOptIn`); automations require it whenever the template's category is
+  MARKETING.
+- **Audiences** (`whatsapp.audiences.ts`) resolve from live data each time: sellers
+  (one per non-suspended store; store contact phone, else owner's login phone;
+  readiness, product and order counts evaluated in memory like the admin store
+  list's setup filter), contacts by tag/consent, saved segments, a pasted list, or a
+  retarget of an earlier campaign (re-resolves its original audience so field values
+  are current). Numbers are deduplicated, first wins. Links in fields use
+  `PUBLIC_WEB_URL` (else `https://uniemax.com`).
+- **Campaigns** (`whatsapp.campaigns.ts`). Creating one resolves the audience once
+  into `WaCampaignRecipient` rows — PENDING with final values (tracked buttons get
+  their `WaLink` code here), or SKIPPED with the reason — and returns 202. A worker
+  in the API process (started in `server.ts` after `listen`, so tests that build the
+  app never send) wakes every 10 s and right after a create/resume: promotes due
+  SCHEDULED campaigns, then sends PENDING rows oldest campaign first at
+  `WA_SEND_RATE_PER_SEC`, each claimed PENDING → SENDING by compare-and-set and
+  re-checked for opt-out and the frequency cap. A Meta 429 puts the row back and
+  pauses a minute. On boot, rows left SENDING by a dead process become FAILED
+  ("may or may not have been sent") — never resent. Single process by design (pm2
+  fork mode); a second process would still never double-send a row.
+- **Tracked links.** A template button whose URL is `<site>/api/v1/r/{{1}}` can
+  count clicks: the campaign stores each recipient's destination under a random
+  code, and `GET /api/v1/r/:code` counts and redirects. Replies are derived (an
+  inbound message within 7 days of the recipient's send), not stored.
+- **Automations** (`whatsapp.automations.ts`). A registry (`AUTOMATIONS`) of seller
+  triggers — setup follow-up, store published, first order, new order, quiet store —
+  each with `due()` returning events, plus a `WaAutomation` row of settings. A
+  scanner every 5 min, only 09:00–21:00 IST, inserts a `WaAutomationRun` for an event
+  **before** sending (unique `(automationKey, refKey)` = once per event), and only
+  considers events after `enabledAt`, so switching one on never blasts a backlog.
+  Missed earlier steps of the setup follow-up are not sent late.
 - **Errors.** The admin plugin has a scoped error handler: `WaApiError` answers
   with Meta's `code` beside the envelope; everything else falls through to the
   central handler.
-- **Campaigns** run in-process after the `202`, paced at `WA_SEND_RATE_PER_SEC`.
-  A restart stops one mid-way (counters show how far it got); a durable queue
-  is the upgrade if campaigns grow past one process.
 - **Logging.** Non-production logs full Graph requests/responses (URL, headers
   with the token masked, body, Meta's response) and inbound bodies; production
   logs only ids, types and error codes unless `WA_LOG_PAYLOADS=true` — a
   temporary debugging switch, since it puts message text in the logs.
-- **Checked before Meta.** Template sends and campaigns are validated against
-  the cached template list (name + language, sendable, `{{n}}` count) and
-  refused with a 422 naming the problem, rather than failing later at Meta.
 - **Failures carry their reason.** A refused send stores Meta's code/title/
   details on the WaMessage; a webhook `failed` status copies its error onto the
   message too, so the console shows why without joining statuses.
 - **Templates** are read from Meta (`GET /{waba}/message_templates`), cached 60 s
-  in-process. A template send stores the filled-in text as the message body so
-  the console thread reads like the customer's phone; a failed list fetch backs
-  off for the same 60 s so sends never wait on it repeatedly.
-- **Console reads** (`status`, `contacts`, `templates`, `campaigns`) back the
-  admin console's WhatsApp pages; `status` sits outside the enabled check so an
-  unconfigured server is explained rather than answered with 503.
-- **Admin-only sends**, mounted at `/admin/whatsapp` inside the `requireAdmin`
-  subtree; each send and campaign is written to the audit trail.
-- **Dynamic URL buttons** are filled only by server flows: `sendTemplate`'s
-  `buttonParams` option (not in the console's send schema) adds a `button`
-  component per dynamic URL button, at that button's index from the template
-  list. In the console picker such templates stay "not sendable".
+  in-process; the number's quality rating and messaging limit
+  (`GET /{phone-number-id}`) are cached 5 min for the Overview. A template send
+  stores the filled-in text as the message body so the console thread reads like
+  the customer's phone; a failed list fetch backs off for 60 s so sends never wait
+  on it repeatedly. Templates are created in WhatsApp Manager, not here.
+- **Media uploads** (`POST /media`) go to the media bucket under `whatsapp/` (JPEG,
+  PNG, MP4 — what WhatsApp accepts); Meta fetches them by public URL, so with the
+  local storage driver they only work if the API is publicly reachable.
 - **Seller reminders** (`whatsapp.sellerReminders.ts`) — template sends to a
   store's seller, chasing unfinished setup. The registry maps a key to an
   approved template: `setup` → `seller_setup_pending` (name, store, % complete,
@@ -723,6 +761,9 @@ Endpoints: `docs/API.md` → WhatsApp Cloud API; setup: `backend/README.md`.
   normalised to +91). The language is whichever the template was approved in.
   The same template to the same number at most once per 24h unless the last
   one failed (409). Renaming a template in WhatsApp Manager breaks its entry.
+- **Admin-only**, mounted at `/admin/whatsapp` inside the `requireAdmin` subtree;
+  sends, campaign creates/tests/controls, imports, consent changes and automation
+  edits are written to the audit trail.
 
 ### Affiliate marketing — the `package/affiliate` sub-system
 
@@ -1493,18 +1534,37 @@ schema (not `BigInt`: it does not survive `JSON.stringify` into responses).
 - **WaWebhookEvent** — every verified webhook body, verbatim (`payload` JSON) —
   the replay source.
 - **WaContact** — keyed by Meta's digits-only `waId`; `name` (profile name),
-  `optedOut` (STOP/UNSUBSCRIBE ↔ START), `lastInboundAt` (opens the 24h window),
-  `lastMessageAt` (either direction — orders the admin inbox; indexed).
-- **WaMessage** — `direction` (`WaDirection`: `IN | OUT`), `wamid` (unique; null
-  only for a send Meta refused), `type`, `body`, `mediaId`, `templateName`,
-  `lastStatus` (`accepted → sent → delivered → read`, or `failed`),
+  `optedOut` (STOP/UNSUBSCRIBE ↔ START), `marketingOptInAt` + `marketingOptInSource`
+  (`import` | `admin` | `start` — marketing consent; cleared by STOP), `tags` (String[],
+  GIN-indexed), `unreadCount`, `inboxState` (`WaInboxState`: `OPEN | DONE`; an inbound
+  message reopens), `lastInboundAt` (opens the 24h window), `lastMessageAt` (either
+  direction — orders the admin inbox; indexed).
+- **WaMessage** — `direction` (`WaDirection`: `IN | OUT`; indexed with `createdAt`),
+  `wamid` (unique; null only for a send Meta refused), `type`, `body`, `mediaId`,
+  `templateName`, `lastStatus` (`accepted → sent → delivered → read`, or `failed`),
   `errorCode` / `errorTitle` / `errorDetails` (Meta's reason when failed), optional
-  `campaignId` → **WaCampaign** (`SetNull` on delete).
+  `campaignId` → **WaCampaign** (`SetNull` on delete), optional `automationKey`.
 - **WaMessageStatus** — one row per `(wamid, status)` (unique — webhook retries
   are no-ops) with `recipientId`, `statusTimestamp` and Meta's error fields.
-- **WaCampaign** — `name`, `templateName`, `languageCode` and counters `total` ·
-  `sent` · `skipped` · `failed`, and `finishedAt` (set when the sender reaches the
-  last recipient; stays null if a restart killed it).
+- **WaCampaign** — `name`, `templateName`, `languageCode`, `category`, `status`
+  (`WaCampaignStatus`: `SCHEDULED | SENDING | PAUSED | COMPLETED | CANCELLED`;
+  indexed with `scheduledAt`), `audience` + `mapping` (JSON, as sent), `requireOptIn`,
+  `frequencyCapHours`, `scheduledAt` / `startedAt` / `finishedAt`, `createdBy`
+  (admin id), counters `total` · `sent` · `skipped` · `failed`.
+- **WaCampaignRecipient** — the send queue: one row per `(campaignId, waId)`
+  (unique; `Cascade`), `name`, `bodyParams` / `buttonParams` (JSON string arrays,
+  final values incl. tracking codes), `status` (`WaRecipientStatus`:
+  `PENDING | SENDING | SENT | SKIPPED | FAILED`; indexed with `campaignId`), `note`
+  (skip/fail reason), `messageId` → **WaMessage** (unique, `SetNull`), `processedAt`.
+- **WaLink** — tracked link: `code` (id), `url`, optional `campaignId` (`Cascade`) and
+  `waId`, `clicks`, `firstClickedAt`, `lastClickedAt`.
+- **WaSegment** — saved audience: `name`, `definition` (JSON sellers/contacts filter).
+- **WaAutomation** — keyed by registry `key`: `enabled`, `enabledAt`, `templateName`,
+  `languageCode`, `mapping`, `config` (JSON), `updatedBy`.
+- **WaAutomationRun** — one per `(automationKey, refKey)` (unique — the once-per-event
+  guarantee): `waId`, `storeId`, `status` (`PENDING | SENT | SKIPPED | FAILED`), `note`,
+  `messageId`; indexed by `(automationKey, createdAt)`.
+- **WaQuickReply** — `title`, `body` for the inbox composer.
 
 ---
 
@@ -1634,8 +1694,11 @@ of `APPROVED` commissions waits for the platform ledger. See
 
 Also done: **WhatsApp Cloud API** (`modules/whatsapp`) — HMAC-verified webhook
 (contacts, inbound messages, opt-out keywords, delivery statuses), admin
-template/text sends with the 24h window and a dev recipient allowlist, and
-rate-paced template campaigns with delivery breakdowns. Off unless `WA_ENABLED`.
+template/text/media sends with the 24h window and a dev recipient allowlist,
+marketing campaigns (audiences from live seller data, per-person mappings,
+consent and frequency rules, scheduling, a restart-safe queue, tracked links,
+retargeting, CSV export), seller automations, and the inbox (unread, done,
+tags, quick replies, linked seller/customer). Off unless `WA_ENABLED`.
 
 Also done: **marketplace discovery** (`modules/discovery` + the public store
 index in `modules/stores`) powering the marketplace homepage —

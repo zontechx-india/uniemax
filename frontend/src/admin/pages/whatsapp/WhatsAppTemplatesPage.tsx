@@ -7,13 +7,13 @@ import { Button, Chip, Detail } from '../../ui/primitives'
 import type { ChipTone } from '../../ui/primitives'
 import { DataTable } from '../../ui/DataTable'
 import type { Column } from '../../ui/DataTable'
-import { TemplatePreview, WhatsAppShell, templateKey } from './whatsappUi'
+import { TemplatePreview, WhatsAppShell, isTrackingUrl, templateKey, templateNeeds } from './whatsappUi'
 
 /**
  * Templates — read-only, straight from Meta (the backend caches the list for
  * a minute; "Refresh" skips the cache). Templates are created and approved in
- * WhatsApp Manager, not here: this tab answers "what can I send, and why
- * can't I send that one?".
+ * WhatsApp Manager, whose editor is the better tool for it: this tab answers
+ * "what can I send, what does each need, and why can't I send that one?".
  */
 
 const STATUS_TONE: Record<string, ChipTone> = {
@@ -62,16 +62,16 @@ export default function WhatsAppTemplatesPage() {
       cell: (t) => <span className="text-sm">{t.category ? titleCase(t.category) : '—'}</span>,
     },
     {
-      header: 'Values',
-      className: 'text-right',
-      cell: (t) => <span className="text-sm">{t.paramCount}</span>,
+      header: 'Needs',
+      hideOnMobile: true,
+      cell: (t) => <span className="whitespace-nowrap text-sm text-muted">{templateNeeds(t)}</span>,
     },
     {
       header: 'Status',
       cell: (t) => <Chip tone={STATUS_TONE[t.status] ?? 'neutral'}>{titleCase(t.status)}</Chip>,
     },
     {
-      header: 'Send from here',
+      header: 'Can send',
       cell: (t) =>
         t.sendable ? (
           <Chip tone="success">Yes</Chip>
@@ -125,10 +125,27 @@ export default function WhatsAppTemplatesPage() {
                   <Detail label="Status">
                     <Chip tone={STATUS_TONE[open.status] ?? 'neutral'}>{titleCase(open.status)}</Chip>
                   </Detail>
-                  <Detail label="Values needed">{open.paramCount}</Detail>
-                  <Detail label="Send from the console">{open.sendable ? 'Yes' : 'No'}</Detail>
+                  <Detail label="Needs">{templateNeeds(open)}</Detail>
+                  <Detail label="Can send">{open.sendable ? 'Yes' : 'No'}</Detail>
                 </dl>
                 {open.reason ? <p className="text-sm text-muted">{open.reason}</p> : null}
+                {open.urlButtons.length > 0 ? (
+                  <div className="space-y-1.5 text-sm">
+                    <p className="font-medium text-fg">Link buttons</p>
+                    {open.urlButtons.map((b) => (
+                      <p key={b.index} className="text-muted">
+                        <span className="text-fg">{b.text}</span> ·{' '}
+                        <span className="break-all font-mono text-xs">{b.url}</span>
+                        {isTrackingUrl(b.url) ? ' · counts clicks in campaigns' : ''}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+                <p className="text-xs text-muted">
+                  To count clicks on a campaign button, give it the link{' '}
+                  <span className="break-all font-mono">{`${window.location.origin}/api/v1/r/{{1}}`}</span>{' '}
+                  in WhatsApp Manager — each campaign then sets where the click goes.
+                </p>
               </div>
             ) : null}
           </Dialog>

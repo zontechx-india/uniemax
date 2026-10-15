@@ -229,13 +229,11 @@ async function buildState(seller: SellerContext, log: FastifyBaseLogger) {
       (optedOut ? "This number has opted out of WhatsApp messages" : null) ??
       unavailableReason(def, seller) ??
       (templates
-        ? templateSendProblem(
-            templates,
-            def.templateName,
-            language,
-            bodyParams.length,
-            buttonParams.length,
-          )
+        ? templateSendProblem(templates, def.templateName, language, {
+            params: bodyParams.length,
+            buttons: buttonParams.length,
+            headerMedia: false,
+          })
         : null) ??
       (coolingDown ? "Already sent in the last 24 hours" : null);
 
@@ -283,9 +281,10 @@ export async function sendSellerReminder(
       templateName: def.templateName,
       languageCode: reminder.language,
       bodyParams,
+      buttonParams,
+      header: null,
     },
     log,
-    { buttonParams },
   );
 
   return {

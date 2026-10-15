@@ -66,7 +66,7 @@ Verify: `curl http://localhost:4000/health`
 | `npm run audit-media` | Compare every S3 object against the media keys the current environment's DB references (`Store.logoKey`, `StoreProductMedia.key`, `OrderItem.imageKey`, plus bucket-hosted legacy URL columns). Writes `media-audit-<mode>.{json,md}` + CSVs to `backend/migration-backups/`. Both envs share one bucket, so run once per env and pass `-- --merge migration-backups/media-audit-<other>.json` on the second run to get true orphans (referenced by neither DB). Read-only unless `--delete-orphans --yes` is added to a merged run. |
 
 | `npm run optimize-media` | Bring stored images up to the server's upload rules (upright, size-capped WebP — what new uploads get) and render their missing derived images (sized `srcset` copies for every image, link previews for covers and logos — share images and store cards). **Dry run** unless `-- --apply`; `--only=products,logos,store-banners,marketplace-banners`, `--limit=N`. Runs against the current mode's DB — once per environment (`$env:APP_ENV="production"; npm run optimize-media -- --apply`). Re-runnable; never deletes (old objects stay for order snapshots — `audit-media` reports them). |
-| `npm run test:unit` | Unit tests for pure logic (`test/unit/*.test.ts`, `node:test` run through `tsx`) — no server, no database. Currently the WhatsApp webhook signature check and payload parsing, and the store-readiness gates (what blocks publishing, payouts and online payment) |
+| `npm run test:unit` | Unit tests for pure logic (`test/unit/*.test.ts`, `node:test` run through `tsx`) — no server, no database. Currently the WhatsApp webhook signature check and payload parsing, template requirements and campaign mappings, and the store-readiness gates (what blocks publishing, payouts and online payment) |
 | `npm run test:api` | API regression suite (`test/*.test.mjs`, Node's built-in `node:test`, no extra deps) against a **running** backend. Env: `API_BASE`, `QA_EMAIL_A`/`QA_PASSWORD_A` (seller + buyer), `QA_EMAIL_B`/`QA_PASSWORD_B` (second customer), optional `QA_PHONE_A` (+ `QA_OTP_CODE`, default `123456`) so the test store can publish via the SMS OTP bypass. Creates a store, products and orders — local or dev only; refuses `*.uniemax.com`. |
 
 ## Environment (`.env`)
@@ -137,8 +137,10 @@ Verify: `curl http://localhost:4000/health`
 
 Module: `src/modules/whatsapp/`. Endpoint contracts: [`docs/API.md`](../docs/API.md#whatsapp-cloud-api);
 rules and data model: [`docs/BACKEND_CONTEXT.md`](../docs/BACKEND_CONTEXT.md). Day to day
-it is used from the admin console's **WhatsApp** page (`/admin/whatsapp` — inbox,
-campaigns, templates); the curl below is for testing and scripting. Dev and
+it is used from the admin console's **WhatsApp** page (`/admin/whatsapp` — overview,
+inbox, campaigns, audiences, automations, templates); the curl below is for testing
+and scripting. The campaign sender and the automation scanner run inside the API
+process (started after `listen` in `src/server.ts`); nothing else needs starting. Dev and
 prod use **separate Meta apps**, so every credential differs per environment (see the
 per-mode blocks in `.env.example`).
 
@@ -183,16 +185,23 @@ curl -X POST $API/whatsapp/webhook -H 'content-type: application/json' \
 # 3. Template
 curl -X POST $API/admin/whatsapp/send-template -H "authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' \
-  -d '{"to":"+919876543210","templateName":"hello_world","languageCode":"en_US","bodyParams":[]}'
+  -d '{"to":"+919876543210","templateName":"hello_world","languageCode":"en_US","bodyParams":[],"buttonParams":[],"header":null}'
 
 # 4. Free-form text (only within 24h of the contact's last message)
 curl -X POST $API/admin/whatsapp/send-text -H "authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' -d '{"to":"919876543210","text":"Your order shipped!"}'
 
-# 5. Campaign → 202 { campaignId }
+# 5. Campaign to sellers who haven't finished setup — check first, then create → 202 { campaignId }
+DRAFT='{"name":"Finish setup","templateName":"seller_setup_pending","languageCode":"en",
+  "audience":{"kind":"sellers","filters":{"setup":"incomplete"}},
+  "mapping":{"body":[{"value":"{seller_name}","fallback":"there"},{"value":"{store_name}"},
+    {"value":"{setup_percent}"},{"value":"{pending_steps}"}],
+    "buttons":[{"value":"{store_slug}","track":false}],"header":null},
+  "requireOptIn":false,"frequencyCapHours":48,"scheduledAt":null}'
+curl -X POST $API/admin/whatsapp/campaigns/preview -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' -d "$DRAFT"
 curl -X POST $API/admin/whatsapp/campaigns -H "authorization: Bearer $TOKEN" \
-  -H 'content-type: application/json' \
-  -d '{"name":"Diwali","templateName":"festive_offer","languageCode":"en","recipients":[{"to":"919876543210","bodyParams":["Asha","20%"]}]}'
+  -H 'content-type: application/json' -d "$DRAFT"
 
 # 6. Campaign progress
 curl $API/admin/whatsapp/campaigns/<campaignId> -H "authorization: Bearer $TOKEN"

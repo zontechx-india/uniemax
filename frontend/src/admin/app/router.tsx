@@ -35,11 +35,15 @@ const CategoriesPage = lazy(() => import('../pages/CategoriesPage'))
 const CategoryMappingPage = lazy(() => import('../pages/CategoryMappingPage'))
 const SupportPage = lazy(() => import('../pages/SupportPage'))
 const SupportTicketPage = lazy(() => import('../pages/SupportTicketPage'))
+const WhatsAppOverviewPage = lazy(() => import('../pages/whatsapp/WhatsAppOverviewPage'))
 const WhatsAppInboxPage = lazy(() => import('../pages/whatsapp/WhatsAppInboxPage'))
 const WhatsAppThreadPage = lazy(() => import('../pages/whatsapp/WhatsAppThreadPage'))
 const WhatsAppCampaignsPage = lazy(() => import('../pages/whatsapp/WhatsAppCampaignsPage'))
 const WhatsAppCampaignPage = lazy(() => import('../pages/whatsapp/WhatsAppCampaignPage'))
 const WhatsAppTemplatesPage = lazy(() => import('../pages/whatsapp/WhatsAppTemplatesPage'))
+const WhatsAppNewCampaignPage = lazy(() => import('../pages/whatsapp/WhatsAppNewCampaignPage'))
+const WhatsAppAudiencesPage = lazy(() => import('../pages/whatsapp/WhatsAppAudiencesPage'))
+const WhatsAppAutomationsPage = lazy(() => import('../pages/whatsapp/WhatsAppAutomationsPage'))
 const ThemeTemplatesPage = lazy(() => import('../pages/ThemeTemplatesPage'))
 const BannersPage = lazy(() => import('../pages/BannersPage'))
 const AffiliateAdminPage = lazy(
@@ -210,10 +214,14 @@ export function AdminRouter() {
                 <Route path="category-mapping" element={<CategoryMappingPage />} />
                 <Route path="support" element={<SupportPage />} />
                 <Route path="support/:ticketId" element={<SupportTicketPage />} />
-                <Route path="whatsapp" element={<WhatsAppInboxPage />} />
+                <Route path="whatsapp" element={<WhatsAppOverviewPage />} />
+                <Route path="whatsapp/inbox" element={<WhatsAppInboxPage />} />
                 <Route path="whatsapp/chats/:waId" element={<WhatsAppThreadPage />} />
                 <Route path="whatsapp/campaigns" element={<WhatsAppCampaignsPage />} />
+                <Route path="whatsapp/campaigns/new" element={<WhatsAppNewCampaignPage />} />
                 <Route path="whatsapp/campaigns/:id" element={<WhatsAppCampaignPage />} />
+                <Route path="whatsapp/audiences" element={<WhatsAppAudiencesPage />} />
+                <Route path="whatsapp/automations" element={<WhatsAppAutomationsPage />} />
                 <Route path="whatsapp/templates" element={<WhatsAppTemplatesPage />} />
                 <Route path="theme-templates" element={<ThemeTemplatesPage />} />
                 <Route path="banners" element={<BannersPage />} />

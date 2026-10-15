@@ -3,6 +3,7 @@ import { env, isProduction } from "../../config/env.js";
 import { HttpError } from "../../utils/httpError.js";
 import type {
   GraphErrorBody,
+  GraphPhoneNumber,
   GraphSendResponse,
   GraphTemplate,
   GraphTemplateList,
@@ -149,6 +150,16 @@ export function sendMessage(
   log: FastifyBaseLogger,
 ): Promise<GraphSendResponse> {
   return graphRequest("POST", `/${env.WA_PHONE_NUMBER_ID}/messages`, log, payload);
+}
+
+/**
+ * The business number's health — quality rating and how many people it may
+ * message per 24h — as Meta reports it.
+ */
+export function getPhoneNumberInfo(log: FastifyBaseLogger): Promise<GraphPhoneNumber> {
+  const fields =
+    "display_phone_number,verified_name,quality_rating,messaging_limit_tier,name_status,status";
+  return graphRequest("GET", `/${env.WA_PHONE_NUMBER_ID}?fields=${fields}`, log);
 }
 
 /** Every template on the WABA (all statuses), following Meta's paging. */

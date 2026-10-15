@@ -1111,7 +1111,9 @@ Full detail: `docs/PUSH_NOTIFICATIONS.md`.
 Future:
 
 - Order SMS updates
-- WhatsApp Updates
+- WhatsApp updates for customers (sellers already get WhatsApp reminders,
+  campaigns and order alerts from the platform's WhatsApp module — see
+  `docs/BACKEND_CONTEXT.md` → WhatsApp Cloud API)
 - Per-kind notification preferences
 
 ---
