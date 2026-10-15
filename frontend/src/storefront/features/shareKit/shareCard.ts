@@ -111,14 +111,13 @@ export interface ShareCardAssets {
   product: Img | null
 }
 
-const SERIF = `'Fraunces', Georgia, 'Times New Roman', serif`
 const SANS = `'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif`
 
 /** Fonts the renderer uses — awaited once before the first draw. */
 export function loadShareFonts(): Promise<unknown> {
   if (!('fonts' in document)) return Promise.resolve()
   return Promise.all([
-    document.fonts.load(`600 64px ${SERIF}`),
+    document.fonts.load(`700 64px ${SANS}`),
     document.fonts.load(`500 32px ${SANS}`),
     document.fonts.load(`700 32px ${SANS}`),
     document.fonts.load(`800 32px ${SANS}`),
@@ -437,7 +436,7 @@ export function drawShareCard(ctx: CanvasRenderingContext2D, spec: ShareCardSpec
   const nameSizes = (spec.template === 'product' ? [60, 52, 46, 40] : [74, 64, 56, 48]).map((n) => Math.round(n * s))
   const name = fitText(ctx, spec.storeName, {
     // A story has the height for a third line; a post would lose QR size.
-    weight: 600, family: SERIF, sizes: nameSizes, maxWidth: textWidth, maxLines: spec.format === 'story' ? 3 : 2, leading: 1.12,
+    weight: 700, family: SANS, sizes: nameSizes, maxWidth: textWidth, maxLines: spec.format === 'story' ? 3 : 2, leading: 1.12,
   })
   rows.push({
     height: blockHeight(name),

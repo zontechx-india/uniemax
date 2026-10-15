@@ -869,7 +869,7 @@ function CategoryInitial({ name }: { name: string }) {
   return (
     <span
       aria-hidden
-      className="font-display text-2xl font-light text-brand"
+      className="font-display text-2xl font-semibold text-brand"
     >
       {name.trim().charAt(0).toUpperCase()}
     </span>
@@ -925,7 +925,7 @@ function CategoryTiles({
               </span>
               <span className="min-w-0 pt-3">
                 <span
-                  className={`block truncate font-display text-base font-medium decoration-1 underline-offset-4 group-hover:underline ${skin.text}`}
+                  className={`block truncate font-display text-base font-semibold decoration-1 underline-offset-4 group-hover:underline ${skin.text}`}
                 >
                   {category.name}
                 </span>
@@ -1334,7 +1334,7 @@ function CategoryShelf({
               Collection
             </span>
             <span
-              className={`mt-2 block truncate font-display text-xl font-medium sm:text-2xl lg:whitespace-normal lg:text-3xl ${skin.text}`}
+              className={`mt-2 block truncate font-display text-xl font-semibold sm:text-2xl lg:whitespace-normal lg:text-3xl ${skin.text}`}
             >
               {row.name}
             </span>
@@ -1439,7 +1439,7 @@ function ProductShowcase({
             {product.category.name}
           </p>
           <h2
-            className={`mt-1 font-display text-3xl font-medium leading-tight sm:text-5xl ${skin.text}`}
+            className={`mt-1 font-display text-xl font-semibold leading-tight sm:text-3xl ${skin.text}`}
           >
             {displayName(product.name)}
           </h2>

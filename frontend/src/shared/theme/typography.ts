@@ -2,29 +2,28 @@
  * Typography tokens.
  *
  * Scale/weights/line-heights come from the skill
- * (`skillui/tokens/typography.json` + `DESIGN.md` §3). The two families
- * deviate from the skill by design decision, adopted from the approved
- * UnieMax prototype (`prototype/index.html`):
+ * (`skillui/tokens/typography.json` + `DESIGN.md` §3). The family deviates
+ * from the skill by design decision:
  *
- * - Fraunces — headings, product names, prices, and the italic accent
- *   (`font-accent`). Soft editorial serif with an optical-size axis. SIL
- *   OFL, self-hosted (`public/fonts/Fraunces-*.woff2`, wght 100–900).
- * - Plus Jakarta Sans — body/UI text. SIL OFL, self-hosted
- *   (`public/fonts/PlusJakartaSans-*.woff2`, wght 200–800).
+ * - Plus Jakarta Sans — the ONE typeface, for every surface: headings,
+ *   storefront names and section titles, body and UI text. SIL OFL,
+ *   self-hosted (`public/fonts/PlusJakartaSans-*.woff2`, wght 200–800).
  *
- * Chosen in October 2026 ("soft editorial"), replacing Manrope + Inter.
- * Only these two families are allowed — never introduce a third typeface.
- * Keep these stacks in lockstep with the `--font-heading` / `--font-body`
+ * The Fraunces serif (headings / storefront names) was removed on
+ * 15 Oct 2026 — it read as fancy rather than premium. Never introduce a
+ * second typeface. Keep these stacks in lockstep with the `--font-*`
  * tokens in `index.css`.
  */
 
+const SANS = '"Plus Jakarta Sans", "Segoe UI", system-ui, -apple-system, sans-serif'
+
 export const fontFamily = {
   /** Headings / display. */
-  heading: '"Fraunces", Georgia, "Times New Roman", serif',
+  heading: SANS,
   /** Body / UI text. */
-  body: '"Plus Jakarta Sans", "Segoe UI", system-ui, -apple-system, sans-serif',
+  body: SANS,
   /** The italic accent (always italic). */
-  accent: '"Fraunces", Georgia, "Times New Roman", serif',
+  accent: SANS,
 } as const
 
 /** Weights from the DESIGN scale — both faces are variable fonts. */

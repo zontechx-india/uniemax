@@ -298,7 +298,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
                 {product.category.name}
               </Link>
               <h1
-                className={`mt-2 font-display text-3xl font-medium leading-tight tracking-tight sm:text-5xl ${skin.text}`}
+                className={`mt-2 font-display text-xl font-semibold leading-tight sm:text-3xl ${skin.text}`}
               >
                 {displayName(product.name)}
               </h1>

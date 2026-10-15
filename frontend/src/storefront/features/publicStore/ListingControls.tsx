@@ -128,8 +128,8 @@ export function SectionHeading({
       className={`flex justify-between gap-4 ${eyebrow ? 'items-end' : 'items-center'}`}
     >
       <div className="min-w-0">
-        {/* The storefront's classic voice: section titles in the serif, at
-            the scale's section size (22) on every screen — big enough to
+        {/* Section titles at the scale's section size (22), semibold, on
+            every screen — big enough to
             mark a section, small enough not to out-shout the products — and
             a quiet line under them. `sm` steps it down for a chip strip,
             which is a signpost rather than a section of its own. */}

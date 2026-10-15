@@ -847,8 +847,7 @@ backend: it reads the managed store (name, `logoUrl`, `theme`,
 - **Indian-language names.** Text is wrapped and cut with "…" by grapheme
   (`Intl.Segmenter`), never by code point, so Malayalam, Tamil and
   Devanagari conjuncts and vowel signs stay whole (splitting them draws
-  dotted circles). The card fonts (Fraunces, Plus Jakarta Sans) are
-  Latin-only, so those scripts render in the device's own font
+  dotted circles). The card font (Plus Jakarta Sans) is Latin-only, so those scripts render in the device's own font
   (Noto / Nirmala UI and similar). Checked with Malayalam, Tamil and Hindi
   names and taglines.
 - **Colour is never free-picked.** The store's own colours come first (the
@@ -906,7 +905,7 @@ backend: it reads the managed store (name, `logoUrl`, `theme`,
   in a safe box. The QR is the one flexible row: it gets the height the text
   leaves, within a minimum and maximum per format. The Story keeps clear of
   the top ~270 px and bottom ~300 px, where Instagram draws its own controls.
-  Shop names use Fraunces and drop through font sizes before being cut with
+  Shop names are Plus Jakarta Sans 700 and drop through font sizes before being cut with
   "…" (2 lines on a Post, 3 on a Story). Long URLs break after a `-` or `/`.
 - **The QR** (`qr.ts`, encoded with `qrcode-generator`) always uses error
   correction **H**. The centre logo covers about 22% of the side, with one
@@ -1350,10 +1349,10 @@ full-bleed section bands instead.
   - Over that slot, top-left, one small tag only when stock is zero:
     **"Sold out"** (ink on page colour). The saving is never a sticker on the
     photo — it is said beside the price.
-  - **No photo** draws the product's first letter large in the serif — a
+  - **No photo** draws the product's first letter large and semibold — a
     monogram reads as "photo coming" and still looks intentional. The exported
     **`NoProductImage`** (glyph + quiet "No image") remains for other callers.
-  - **`size="lg"`** is the spotlight lead only: the serif name at 18–22px,
+  - **`size="lg"`** is the spotlight lead only: the name semibold at 18–22px,
     the product's description, a `4/3` cover. Because that card is stretched to the height of
     the grid beside it, from `lg` its cover **absorbs the extra height**
     (`flex-1`, aspect dropped) instead of leaving the text floating above a void.
@@ -1479,7 +1478,7 @@ deliberately lives in the URL and **not in storage** (a sessionStorage
 part of browser history, so back/forward-cache restores, refreshes and
 multiple tabs all keep the right theme, where ambient tracking broke. All pages use
 the storefront treatment (full-width shell, flat surface+border cards,
-Fraunces headings, sticky top bar) with an order-summary panel stuck beside
+sans headings, sticky top bar) with an order-summary panel stuck beside
 the list on desktop.
 **Order summary — priced by the server.** `features/cart/useCheckoutQuote.ts`
 calls `POST …/orders/quote` whenever the lines or the current fulfilment
@@ -2979,8 +2978,8 @@ apps must share under `src/shared/`. **`storefront/` must never import from
 The authoritative design system lives in the repo-root `skillui/` package
 (the **anydesk** system: dark-themed, cool palette, 4px grid). Its colors,
 spacing, radius and type scale are used as-is; the typefaces are the one
-deliberate deviation (Fraunces + Plus Jakarta Sans instead of Times New
-Roman + Noto Sans — see below). **Read `skillui/SKILL.md` before building
+deliberate deviation (Plus Jakarta Sans instead of Times New Roman + Noto
+Sans — see below). **Read `skillui/SKILL.md` before building
 any UI.** Its tokens are materialized into reusable TypeScript constants
 under `src/shared/theme/` — the single source both apps import instead of
 hardcoding colors, fonts, spacing, radii, or shadows:
@@ -3134,7 +3133,7 @@ whole palette as CSS variables and maps them into Tailwind v4 via
 | `bg-brand-soft` | brand tint (Light Purple) | `logo-lockup` | the brand lockup (see *Brand art*) |
 | `text-danger` / `success` / `warning` | status | `shadow-floating` | elevation |
 | `text-pending` / `bg-pending-soft` | setup not finished (orange) | `bg-pending-gradient` | the animated pending mark |
-| `rounded-md` (4px) · `rounded-lg` (6px) · `rounded-pill` (50px) | radius | `font-heading` / `font-body` / `font-display` / `font-accent` / `font-figure` | Jakarta / Jakarta / Fraunces / Fraunces italic / Jakarta tabular |
+| `rounded-md` (4px) · `rounded-lg` (6px) · `rounded-pill` (50px) | radius | `font-heading` / `font-body` / `font-display` / `font-accent` / `font-figure` | all Plus Jakarta Sans (display: −0.015em; accent: italic 500; figure: tabular) |
 
 **Card hover language** (marketplace grids): `shadow-floating` at rest →
 `hover:-translate-y-1` (4px lift) + `hover:shadow-lifted` (the deeper
@@ -3225,32 +3224,28 @@ derived from it, and the secondary text is lifted to `#9a9a9a` because
 - **Fonts** (October 2026; a deliberate deviation from the skill's Times
   New Roman / Noto Sans): the whole app interface — headings and body —
   uses **Plus Jakarta Sans** (`--font-heading` = `--font-body`; `h1–h3`
-  tracked −0.015em). **Fraunces**, a soft serif with an optical-size axis, is
-  **storefront-only**: shop and product names via `font-display`
-  (`--font-display`; store header, footer, spotlight lead card, product
-  page, showcase), and — since the classic restyle of 15 Oct 2026 — the
-  storefront's **section titles** (`SectionHeading`, the contact band,
-  category shelf panels and tiles — 22px semibold, 18px for the category
-  strip), and the italic accent. Product names on a **grid card** use the
-  interface sans at 14px (model numbers read cleanly in it); the spotlight
-  lead, the showcase and the product page keep the serif. Storefront
-  eyebrows (a product's category, "Collection", footer column labels) are
-  small caps tracked `0.18–0.2em`. The italic accent — `font-accent` utility / `--font-accent`,
-  Fraunces italic 500 — is for small touches only (a shop tagline, a product
-  sub-line, one word in a heading), never running text or anything a seller
-  must act on. **Numbers never use the serif**: prices, totals, MRP and
-  dashboard counts use the `font-figure` utility — Plus Jakarta Sans with
-  lining, equal-width digits (`tnum`/`lnum`) and −0.015em tracking — because
-  Fraunces' shapes looked decorative on money; columns line up and counts do
-  not jump. Both SIL OFL, self-hosted in `public/fonts/` as variable woff2
-  split into **latin + latin-ext** files per style (`Fraunces-Latin`,
-  `Fraunces-LatinExt`, `Fraunces-Italic-*`, `PlusJakartaSans-*`) with
-  `unicode-range`, so a page downloads only what it uses; **₹ (U+20B9) is in
-  latin-ext** and was verified as a real glyph in all four. The two latin
-  normals are preloaded in `index.html` / `admin.html`. Fallbacks: Georgia /
-  serif for Fraunces, Segoe UI / `system-ui` for Jakarta. Only these two
-  families are allowed; swapping again is the `@font-face` blocks, the
-  `--font-heading/body/accent` tokens and `typography.ts`.
+  tracked −0.015em) — and so does the **storefront**: it is the only
+  typeface. The Fraunces serif that set storefront shop/product names and
+  section titles was **removed on 15 Oct 2026** (it read as fancy rather
+  than premium; its files, preload and `@font-face` blocks are gone).
+  `font-display` (`--font-display`: store header, footer, spotlight lead,
+  product page, showcase, `SectionHeading`, the contact band, shelf panels
+  and tiles) is kept as a role name — the same family tracked −0.015em, set
+  **semibold** (section titles 22px, the category strip 18px, product page
+  name 22 → 28px). Product names on a **grid card** are 14px medium.
+  Storefront eyebrows (a product's category, "Collection", footer column
+  labels) are small caps tracked `0.18–0.2em`. The italic accent —
+  `font-accent` / `--font-accent`, Jakarta italic 500 — is for small touches
+  only, never running text or anything a seller must act on. **Numbers** —
+  prices, totals, MRP and dashboard counts — use the `font-figure` utility:
+  lining, equal-width digits (`tnum`/`lnum`) and −0.015em tracking, so
+  columns line up and counts do not jump. SIL OFL, self-hosted in
+  `public/fonts/` as variable woff2 split into **latin + latin-ext** files
+  per style (`PlusJakartaSans-*`) with `unicode-range`, so a page downloads
+  only what it uses; **₹ (U+20B9) is in latin-ext** and was verified as a
+  real glyph. The latin normal is preloaded in `index.html` / `admin.html`.
+  Fallback: Segoe UI / `system-ui`. One family only; swapping is the
+  `@font-face` blocks, the `--font-*` tokens and `typography.ts`.
   Display conventions from the prototype: section headings `text-2xl
   sm:text-3xl` semibold, hero `text-4xl sm:text-6xl` bold `leading-none`,
   product-card names `text-lg` medium `leading-tight` — 700 is reserved for
@@ -3402,7 +3397,9 @@ JS mirror `glassByScheme` in `colors.ts`): `--glass-bg` (.70 white / .62 smoked)
 `--glass-highlight`, `--glass-shadow`, `--glass-blur` 16px / `--glass-blur-strong`
 22px, the canvas lights `--canvas-1..3`, `--overlay-soft` (sheet backdrop),
 `--scrim` (dark wash over a *photo*, `bg-scrim`) and `--whatsapp` /
-`--whatsapp-contrast` (`bg-whatsapp text-whatsapp-contrast`, 6.2:1).
+`--whatsapp-contrast` (`bg-whatsapp text-whatsapp-contrast`: white bold
+text and icon on WhatsApp's deeper green `#1da851`, ~3:1 — white on the
+lighter `#25d366` was ~2:1).
 
 **Utilities** (real `@utility`s, so `lg:glass` works):
 

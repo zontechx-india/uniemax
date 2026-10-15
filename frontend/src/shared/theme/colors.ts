@@ -166,8 +166,8 @@ export const invariants = {
   /** Dark wash over a photo so a white label on it reads (`bg-scrim`). */
   scrim: 'rgba(0, 0, 0, 0.55)',
   /** WhatsApp green + the dark label that passes AA on it. */
-  whatsapp: '#25d366',
-  whatsappContrast: '#0b3d1f',
+  whatsapp: '#1da851',
+  whatsappContrast: '#ffffff',
 } as const
 
 /**

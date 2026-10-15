@@ -78,13 +78,12 @@ export function ProductCard({
           className={`flex flex-1 flex-col ${large ? 'gap-1.5 pt-4 sm:pt-5 lg:flex-none' : 'gap-1 pt-3'}`}
         >
           {/* Two lines reserved whatever the name's length, so prices and
-              buttons line up across a row. Interface sans at card size —
-              model numbers read cleanly in it; the lead card keeps the
-              serif, where there is room for it. */}
+              buttons line up across a row. 14px medium on a grid card; the
+              lead card sets it larger and semibold. */}
           <h3
             className={`line-clamp-2 decoration-1 underline-offset-4 group-hover:underline ${
               large
-                ? 'font-display text-lg font-medium leading-snug sm:text-xl'
+                ? 'font-display text-lg font-semibold leading-snug sm:text-xl'
                 : 'min-h-10 text-sm font-medium leading-5'
             } ${skin.text}`}
           >
@@ -175,7 +174,7 @@ function ProductMedia({
 }
 
 /**
- * A product with no photo yet: its first letter, large, in the serif — a
+ * A product with no photo yet: its first letter, large and semibold — a
  * monogram on a plain tile reads as "photo coming" and still looks
  * intentional, where an icon over "NO IMAGE" looked broken.
  */
@@ -183,7 +182,7 @@ function Monogram({ name, large }: { name: string; large: boolean }) {
   return (
     <span
       aria-hidden
-      className={`flex h-full w-full items-center justify-center font-display font-light text-muted opacity-60 ${
+      className={`flex h-full w-full items-center justify-center font-display font-semibold text-muted opacity-50 ${
         large ? 'text-6xl' : 'text-5xl'
       }`}
     >

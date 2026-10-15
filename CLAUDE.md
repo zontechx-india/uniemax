@@ -72,10 +72,10 @@ Rules:
   fill is `--cta`, re-pointed to the **store owner's** colour by `storeVars()`.
 - **Type and shape come from the scale:** text `caption 13 · label 14 · body 16 ·
   subtitle 18 · section 22 · title 28 · display 40` (Tailwind's names map onto it),
-  never `text-[Npx]`; corners 8 / 12 / 16 / full. Interface font is Plus Jakarta Sans;
-  Fraunces (`font-display`, `font-accent`) only on the storefront — shop/product names
-  and its section titles;
-  prices use `font-figure`.
+  never `text-[Npx]`; corners 8 / 12 / 16 / full. **One typeface: Plus Jakarta Sans**,
+  everywhere — `font-display` (storefront names, section titles) and `font-accent`
+  are the same family (the Fraunces serif was removed 15 Oct 2026; never add a
+  second face); prices use `font-figure`.
 - **Never a bare `<img>` for a stored image.** Product photos, logos and banners are drawn
   with `shared/media/MediaImg.tsx` — `<MediaImg src sizes>`, where `sizes` says how wide
   it is drawn (`"48px"`, `"(min-width: 1024px) 25vw, 50vw"`). It offers the server's

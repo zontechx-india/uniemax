@@ -17,9 +17,9 @@ Status: ☐ planned · ◐ in progress · ☑ done
    existing glass may stay, new glass outside My Shops may not be added.
 2. **The storefront hero banner (A4 dots + arcs) stays** — the one decorative
    element, for shop identity. No other gradients.
-3. **Fonts:** Plus Jakarta Sans for all app interface; Fraunces only for
-   storefront shop/product names (`font-display`) and the italic accent;
-   prices and counts in `font-figure`.
+3. **Fonts:** Plus Jakarta Sans everywhere, storefront included (the
+   Fraunces serif on storefront names was removed 15 Oct 2026 — it read as
+   fancy, not premium); prices and counts in `font-figure`.
 4. The guidelines live in `docs/` and are linked from `CLAUDE.md`.
 
 ## Audit at the start (counted by `npm run check:ui`)
@@ -43,7 +43,8 @@ Also: 9 separate dialog implementations, 3 card styles, 13 corner radii,
   states; every `rise`/`sheen`/`ring` call site migrated; storefront `SKIN`
   `cta` / `ctaSecondary`.
 - Interface font = Plus Jakarta Sans; Fraunces moved to `font-display` on
-  storefront names; gradient `metal-text` brand names removed.
+  storefront names (later removed entirely, 15 Oct 2026); gradient
+  `metal-text` brand names removed.
 - `npm run check:ui` + `frontend/scripts/ui-budget.json`, run in CI.
 - Guidelines moved to `docs/`, linked from `CLAUDE.md`.
 - (Carried over from the font work: self-hosted fonts, 16px root, ₹ verified,
