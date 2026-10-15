@@ -21,7 +21,13 @@ export function ShareButton({
   variant = 'icon',
   label = 'Share',
   ariaLabel,
+  iconClassName,
 }: {
+  /**
+   * Icon variant: replaces the outlined round chrome — the store header
+   * passes `HEADER_ICON_BUTTON` so share, cart and menu are one shape.
+   */
+  iconClassName?: string
   /** Title passed to the native share sheet. */
   title: string
   /** Absolute URL to share/copy. */
@@ -52,7 +58,10 @@ export function ShareButton({
         onClick={share}
         aria-label={copied ? 'Link copied' : (ariaLabel ?? `Share ${title}`)}
         title={copied ? 'Link copied!' : (ariaLabel ?? 'Share')}
-        className={`relative flex size-tap shrink-0 items-center justify-center rounded-full border ${skin.border} ${skin.chip} transition hover:opacity-80`}
+        className={
+          iconClassName ??
+          `relative flex size-tap shrink-0 items-center justify-center rounded-full border ${skin.border} ${skin.chip} transition hover:opacity-80`
+        }
       >
         {copied ? (
           <CheckIcon className="h-5 w-5 text-success" />

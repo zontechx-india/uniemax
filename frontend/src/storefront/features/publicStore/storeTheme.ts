@@ -179,6 +179,10 @@ export function storeVars(theme: StoreThemeVars): React.CSSProperties {
     // Borders stay visibly distinct from surface-alt, otherwise card edges
     // disappear on light themes.
     '--line': darkSurface ? lighten(surface, 0.14) : darken(surface, 0.18),
+    // Product photos are multiplied onto their light well so a packshot's
+    // white background melts into the tile; on a dark well multiply would
+    // just darken the photo, so it stays normal there (`CARD_PHOTO`).
+    '--media-blend': darkSurface ? 'normal' : 'multiply',
     '--fg': darkBg ? '#ffffff' : '#101010',
     // 0.72 keeps small muted text at AA contrast on dark owner themes
     // (0.62 was borderline against near-black backgrounds).

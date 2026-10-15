@@ -6,7 +6,7 @@ import {
   type PublicStore,
 } from '../stores/storesApi'
 import { ImageIcon } from '../../layout/icons'
-import { canQuickAdd, QuickAdd } from './CartControls'
+import { CardAction } from './CartControls'
 import { stockLevel } from './catalog'
 import type { Skin } from './storeTheme'
 import { MediaImg } from '../../../shared/media/MediaImg'
@@ -17,27 +17,29 @@ import { displayName } from './shopShape'
  * storefront (category page, search results, homepage sections, related
  * products).
  *
- * The **whole card is one link** to the product page: there is no Add to Cart
- * here. Buying happens on the product page, where the customer can see the
- * full detail and pick an option — which also keeps every card the same shape
- * whether or not the product has variants, so a grid of thousands stays
- * uniform and scannable.
+ * **Photo, name, price, action — the same shape on every card.** The photo
+ * and the text are one link to the product page; the action sits UNDER them
+ * in its own row, never over the photo (a floating cart button hid the corner
+ * of the product it was selling). What the action is depends on what the
+ * product needs — see `CardAction`: "Add to cart" when there is nothing to
+ * choose, "View options" when a size or colour must be picked on the product
+ * page first, "Out of stock" when it cannot be bought.
  *
- * **One shape, two sizes.** Everything is fixed except the type scale and
- * padding, which `size` steps up for the lead card of a spotlight section. The
- * photo fills the card's square top edge to edge with `FillImage` — the whole
- * upload stays visible (nothing cropped off a seller's banner-shaped photo)
- * while a blurred copy of it fills the rest, so a row never goes ragged and
- * no card shows a small picture floating in a grey box.
+ * **Every row lines up.** The name always reserves two lines, the body
+ * stretches, and the action is pushed to the card's foot, so a one-line name
+ * beside a two-line one never leaves the buttons staggered.
  *
- * The body is name, price, and at most one status line. The category is NOT
- * repeated on every card (the page or section already says where you are).
+ * **Neutral photo tile** (`CARD_PHOTO`). The whole product stays visible
+ * (`object-contain` — nothing cropped off a scanner's cable or a
+ * banner-shaped upload), inset on the recessed neutral well so it never
+ * touches the tile's edge. On a light shop the photo is multiplied onto the
+ * well (`--media-blend`, set by `storeVars`), so a packshot's white
+ * background melts into the tile instead of drawing a white box inside a grey
+ * one. The category is NOT repeated on every card.
  *
  * **Classic, not boxed.** There is no card frame: the photo sits in its own
- * rounded tile and the name and price sit on the page beneath it, the way a
- * boutique lays out a rail. A bordered, filled box around every product read
- * as an admin table of inventory. Hover settles the cover a few percent larger
- * and underlines the name — nothing moves, so a grid stays still.
+ * rounded tile and the words sit on the page beneath it. A saving is said in
+ * words beside the price ("27% off"), not as a sticker on the photo.
  */
 export function ProductCard({
   store,
@@ -54,36 +56,43 @@ export function ProductCard({
   eager?: boolean
   /** `lg` is the lead card of a spotlight section; `md` is every other slot. */
   size?: 'md' | 'lg'
-  /** Extra classes for the `<li>` — per-row visibility caps, rail widths. */
+  /**
+   * Extra classes for the `<li>` — per-row visibility caps, rail widths. A
+   * cap that re-shows the card must use `flex` (`hidden md:flex`), not
+   * `list-item`, or the action loses its place at the card's foot.
+   */
   className?: string
 }) {
   const large = size === 'lg'
-  const quick = canQuickAdd(product)
   return (
-    <li className={`group relative ${className}`}>
+    <li className={`group flex flex-col ${className}`}>
       <Link
         to={storeProductUrl(store.slug, product.slug)}
-        className="flex h-full flex-col rounded-lg"
+        className="flex flex-1 flex-col rounded-lg"
       >
         <ProductMedia product={product} skin={skin} large={large} eager={eager} />
 
         <div
           // `lg:flex-none` so the lead card's spare height all goes to its
           // cover above, rather than being split with the text below it.
-          className={`flex flex-1 flex-col gap-1 ${large ? 'pt-4 sm:pt-5 lg:flex-none' : 'pt-3'}`}
+          className={`flex flex-1 flex-col ${large ? 'gap-1.5 pt-4 sm:pt-5 lg:flex-none' : 'gap-1 pt-3'}`}
         >
-          {/* Product names carry the serif at medium weight — bold reads
-              heavy at this size. Two lines, then ellipsis. */}
+          {/* Two lines reserved whatever the name's length, so prices and
+              buttons line up across a row. Interface sans at card size —
+              model numbers read cleanly in it; the lead card keeps the
+              serif, where there is room for it. */}
           <h3
-            className={`line-clamp-2 font-display font-medium leading-snug decoration-1 underline-offset-4 group-hover:underline ${
-              large ? 'text-lg sm:text-xl' : 'text-base'
+            className={`line-clamp-2 decoration-1 underline-offset-4 group-hover:underline ${
+              large
+                ? 'font-display text-lg font-medium leading-snug sm:text-xl'
+                : 'min-h-10 text-sm font-medium leading-5'
             } ${skin.text}`}
           >
             {displayName(product.name)}
           </h3>
 
           {large && product.description && (
-            <p className={`mt-0.5 line-clamp-2 text-sm ${skin.muted}`}>
+            <p className={`line-clamp-2 text-sm ${skin.muted}`}>
               {product.description}
             </p>
           )}
@@ -95,27 +104,26 @@ export function ProductCard({
           <CardNote product={product} />
         </div>
       </Link>
-      {/* Pinned to the photo's bottom corner: an overlay the cover's shape,
-          so the button lands on the photo whatever the text below wraps to.
-          The lead card's cover stretches from lg, so it drops the button
-          there rather than float it mid-card. */}
-      {quick && (
-        <div
-          className={`pointer-events-none absolute inset-x-0 top-0 ${large ? 'aspect-[4/3] lg:hidden' : 'aspect-square'}`}
-        >
-          <div className="pointer-events-auto absolute bottom-2.5 right-2.5">
-            <QuickAdd store={store} product={product} />
-          </div>
-        </div>
-      )}
+
+      <div className={large ? 'mt-4' : 'mt-3'}>
+        <CardAction store={store} product={product} />
+      </div>
     </li>
   )
 }
 
 /**
- * The cover slot: the photo edge to edge across the card's top (one frame —
- * the card's own border), a discount flag over the top-left corner and a
- * sold-out veil across the foot.
+ * A product photo on a neutral tile: whole, inset, and multiplied onto the
+ * well on light shops so a white packshot background disappears into it.
+ * Shared with the category thumbnails, which sit on the same tile.
+ */
+export const CARD_PHOTO =
+  'h-full w-full object-contain p-2 sm:p-3 [mix-blend-mode:var(--media-blend,normal)]'
+
+/**
+ * The cover slot: the whole photo on the neutral well, and a sold-out label
+ * over its top-left corner — the one status worth putting on the picture,
+ * because it decides whether the card is worth opening at all.
  */
 function ProductMedia({
   product,
@@ -128,7 +136,6 @@ function ProductMedia({
   large: boolean
   eager: boolean
 }) {
-  const off = discountPercent(product)
   const soldOut = product.stockQuantity <= 0
   return (
     // A spotlight's lead card is stretched to the height of the grid beside
@@ -145,34 +152,27 @@ function ProductMedia({
       } rounded-lg ${skin.well}`}
     >
       {product.image?.url ? (
-        <FillImage
-          eager={eager}
+        <MediaImg
           src={product.image.url}
           alt={product.image.altText ?? product.name}
           sizes={large ? '(min-width: 1024px) 33vw, 100vw' : '(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw'}
-          className={`transition-transform duration-500 ease-out group-hover:scale-[1.03] ${soldOut ? 'opacity-60' : ''}`}
+          loading={eager ? 'eager' : 'lazy'}
+          fetchPriority={eager ? 'high' : undefined}
+          decoding="async"
+          className={`${CARD_PHOTO} transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none ${soldOut ? 'opacity-60' : ''}`}
         />
       ) : (
         <Monogram name={product.name} large={large} />
       )}
 
-      {/* Corner tags: small, square-cornered caps — a label stitched on, not
-          a sticker. */}
-      {soldOut ? (
-        <span className={`${CORNER_TAG} bg-fg text-bg`}>Sold out</span>
-      ) : (
-        off !== null && (
-          <span className={`${CORNER_TAG} bg-brand text-brand-contrast`}>
-            {off}% off
-          </span>
-        )
+      {soldOut && (
+        <span className="absolute left-2 top-2 rounded-sm bg-fg px-1.5 py-0.5 text-xs font-semibold text-bg">
+          Sold out
+        </span>
       )}
     </div>
   )
 }
-
-const CORNER_TAG =
-  'absolute left-2.5 top-2.5 rounded-sm px-2 py-0.5 text-xs font-semibold uppercase tracking-wider'
 
 /**
  * A product with no photo yet: its first letter, large, in the serif — a
@@ -290,9 +290,11 @@ export function discountPercent(product: PublicProduct): number | null {
 
 /**
  * "From ₹X" when options exist, a plain price otherwise — with the MRP struck
- * through beside it when the product is genuinely on sale. The price is set in
- * the text colour, not the shop's: a classic shop lets the photo and the name
- * lead, and keeps colour for the saving.
+ * through and the saving in words beside it, only when the product is
+ * genuinely on sale (`discountPercent`; nothing is claimed otherwise). The
+ * price is the strongest thing in the line, in the text colour; the MRP is
+ * smaller and muted, and the saving is the one touch of colour — in words, so
+ * it never relies on colour alone.
  */
 export function PriceLabel({
   product,
@@ -302,8 +304,9 @@ export function PriceLabel({
   size?: 'md' | 'lg'
 }) {
   if (product.price === null) return null
+  const off = discountPercent(product)
   return (
-    <p className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5">
+    <p className="flex flex-wrap items-baseline gap-x-1.5">
       {product.variantCount > 0 && (
         <span className="text-xs text-muted">From</span>
       )}
@@ -314,10 +317,14 @@ export function PriceLabel({
       >
         {formatPrice(product.price)}
       </span>
-      {product.compareAtPrice && (
-        <s className="font-figure text-sm font-normal text-muted">
-          {formatPrice(product.compareAtPrice)}
-        </s>
+      {off !== null && (
+        <>
+          <s className="font-figure text-xs text-muted">
+            <span className="sr-only">MRP </span>
+            {formatPrice(product.compareAtPrice!)}
+          </s>
+          <span className="text-xs font-semibold text-success">{off}% off</span>
+        </>
       )}
     </p>
   )
@@ -342,7 +349,7 @@ export function VariantCount({ count }: { count: number }) {
  * from the next row's photo.
  */
 export const PRODUCT_GRID =
-  'grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-5 sm:gap-y-10 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
+  'grid grid-cols-2 gap-x-3 gap-y-6 sm:gap-x-5 sm:gap-y-8 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
 
 /** Responsive product grid — 2 columns on mobile, up to 5 wide. */
 export function ProductGrid({

@@ -98,11 +98,16 @@ export function StoreFooter({ store, skin }: { store: PublicStore; skin: Skin })
       {...builderSectionProps('footer')}
     >
       <div className={STORE_CONTAINER}>
+        {/* Two columns from the smallest phone: short link lists (Shop,
+            Quick Links) pair up side by side, while the brand, the contact rows
+            and addresses — long lines — take the full width until `lg`.
+            Stacking every block in one column made the footer the tallest
+            thing on a small shop's page. */}
         <div
-          className={`grid gap-10 py-12 sm:grid-cols-2 sm:gap-x-10 lg:py-16 ${BLOCK_COLUMNS[blocks] ?? 'lg:grid-cols-4'}`}
+          className={`grid grid-cols-2 gap-x-6 gap-y-8 py-10 sm:gap-x-10 lg:py-14 ${BLOCK_COLUMNS[blocks] ?? 'lg:grid-cols-4'}`}
         >
           <BrandBlock store={store} socials={socials} />
-          <ShopBlock store={store} />
+          <ShopBlock store={store} wide={!hasLinks} />
           {hasLinks && (
             <FooterBlock title="Quick Links">
               <ul className="space-y-2">
@@ -124,6 +129,7 @@ export function StoreFooter({ store, skin }: { store: PublicStore; skin: Skin })
           {footer.locations.length > 0 && (
             <FooterBlock
               title={footer.locations.length > 1 ? 'Our Locations' : 'Visit Us'}
+              wide
             >
               <ul className="space-y-5">
                 {[...footer.locations]
@@ -137,8 +143,8 @@ export function StoreFooter({ store, skin }: { store: PublicStore; skin: Skin })
               </ul>
             </FooterBlock>
           )}
-          <FooterBlock title="Customer Support">
-            <ul className="space-y-2.5 text-sm">
+          <FooterBlock title="Customer Support" wide>
+            <ul className="space-y-2 text-sm">
               {/* First, and always present: the tracked conversation. A
                   phone number can go unanswered; this one has a record. */}
               <ContactRow icon={<LifebuoyIcon className="h-4 w-4" />}>
@@ -195,7 +201,7 @@ export function StoreFooter({ store, skin }: { store: PublicStore; skin: Skin })
         </div>
 
         <div
-          className={`flex flex-col items-center justify-between gap-2 border-t ${skin.border} py-6 text-center text-xs sm:flex-row sm:text-left ${skin.muted}`}
+          className={`flex flex-col items-center justify-between gap-1.5 border-t ${skin.border} py-5 text-center text-xs sm:flex-row sm:text-left ${skin.muted}`}
         >
           <div>
             <p>{copyright}</p>
@@ -217,7 +223,7 @@ function BrandBlock({
 }) {
   const { footer } = store
   return (
-    <div className="sm:col-span-2 lg:col-span-1">
+    <div className="col-span-2 lg:col-span-1">
       <Link
         to={`/store/${store.slug}`}
         className="inline-flex items-center gap-2.5"
@@ -279,10 +285,10 @@ function BrandBlock({
  */
 const FOOTER_CATEGORY_LIMIT = 6
 
-function ShopBlock({ store }: { store: PublicStore }) {
+function ShopBlock({ store, wide }: { store: PublicStore; wide: boolean }) {
   const categories = store.categories.slice(0, FOOTER_CATEGORY_LIMIT)
   return (
-    <FooterBlock title="Shop">
+    <FooterBlock title="Shop" wide={wide}>
       <ul className="space-y-2">
         <li>
           <FooterAnchor href={storeHomeUrl(store.slug)}>Home</FooterAnchor>
@@ -313,19 +319,22 @@ function ShopBlock({ store }: { store: PublicStore }) {
 
 function FooterBlock({
   title,
+  wide = false,
   children,
 }: {
   title: string
+  /** Full width below `lg` — for long lines (contact rows, addresses). */
+  wide?: boolean
   children: React.ReactNode
 }) {
   return (
-    <div>
+    <div className={`min-w-0 ${wide ? 'col-span-2 lg:col-span-1' : ''}`}>
       {/* Small spaced caps in the muted tone: a label over the column, not a
           headline competing with the links under it. */}
       <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
         {title}
       </h3>
-      <div className="mt-4">{children}</div>
+      <div className="mt-3">{children}</div>
     </div>
   )
 }

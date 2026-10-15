@@ -26,7 +26,7 @@ import { Avatar } from '../../layout/Avatar'
 import { useSignOutConfirm } from '../../layout/useSignOutConfirm'
 import { openAuthDialog, storeAuthRequest } from '../auth/authDialogStore'
 import { ShareButton } from './ShareButton'
-import { STORE_CONTAINER } from './storeLayout'
+import { HEADER_ICON_BUTTON, STORE_CONTAINER } from './storeLayout'
 import { builderSectionProps } from './builderBridge'
 import {
   CartIcon,
@@ -133,7 +133,7 @@ function StoreHeaderBar({
           type="button"
           onClick={() => setDrawerOpen(true)}
           aria-label="Open menu"
-          className={`flex size-tap shrink-0 items-center justify-center rounded-md border lg:hidden ${skin.border} ${skin.chip} ${skin.text}`}
+          className={`${HEADER_ICON_BUTTON} -ml-2.5 lg:hidden`}
         >
           <MenuIcon className="h-5 w-5" />
         </button>
@@ -192,13 +192,16 @@ function StoreHeaderBar({
           <div className="hidden flex-1 md:block" />
         )}
 
-        <div className="ml-auto flex shrink-0 items-center gap-2 md:ml-0 md:pl-1">
+        {/* The trailing icon pulls in by its own padding, so the cart's glyph
+            lines up with the content column's edge rather than its circle. */}
+        <div className="-mr-2.5 ml-auto flex shrink-0 items-center gap-0.5 sm:mr-0 sm:gap-2 md:ml-0 md:pl-1">
           {/* Share this store (native sheet / copy link) */}
           <ShareButton
             title={store.name}
             url={publicStoreUrl(store.slug)}
             skin={skin}
             ariaLabel="Share this store"
+            iconClassName={HEADER_ICON_BUTTON}
           />
 
           {/* Cart */}
@@ -658,13 +661,14 @@ function CartButton({ skin, storeSlug }: { skin: Skin; storeSlug: string }) {
     <a
       // ?from= makes the cart continue THIS store's theme (see cartUrl).
       href={cartUrl(storeSlug)}
-      aria-label={`Cart, ${count} item${count === 1 ? '' : 's'}`}
-      className={`relative flex size-tap shrink-0 items-center justify-center rounded-full border ${skin.border} ${skin.chip} transition hover:opacity-80`}
+      aria-label={count > 0 ? `Cart, ${count} item${count === 1 ? '' : 's'}` : 'Cart'}
+      className={HEADER_ICON_BUTTON}
     >
       <CartIcon className={`h-5 w-5 ${skin.text}`} />
       {count > 0 && (
         <span
-          className={`absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold ${skin.cta}`}
+          aria-hidden
+          className={`absolute right-0.5 top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold ring-2 ring-bg ${skin.cta}`}
         >
           {count > 99 ? '99+' : count}
         </span>

@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { cart, useCartQty } from '../cart/cart'
-import { cartUrl, type PublicProduct, type PublicStore } from '../stores/storesApi'
+import {
+  cartUrl,
+  storeProductUrl,
+  type PublicProduct,
+  type PublicStore,
+} from '../stores/storesApi'
 import { CartIcon, CheckIcon, MinusIcon, PlusIcon } from '../../layout/icons'
-import { Button } from '../../../shared/ui/Button'
+import { Button, buttonClass } from '../../../shared/ui/Button'
 import { stockLevel } from './catalog'
 import type { Skin } from './storeTheme'
 
@@ -88,7 +93,7 @@ export function PurchaseActions({
       <div
         className={`flex h-11 w-full items-center justify-center rounded-md bg-surface-alt px-3 text-sm font-semibold text-muted`}
       >
-        Out of stock
+        Out of Stock
       </div>
     )
   }
@@ -211,16 +216,22 @@ export function QuantityStepper({
  * chrome talking to the visitor, not part of the store's design.
  */
 /**
- * One-tap **Add** on a listing card, for products with nothing to choose (no
- * sizes or colours) — a customer who already knows what they want no longer
- * has to open the product page for it. Products with options keep the card's
- * single link: picking a size belongs on the product page.
+ * The action row under a listing card — always present, so every card in a
+ * row ends on the same line, and always honest about what the next step is:
  *
- * It sits OVER the card (the card itself is one link, and a button inside a
- * link is invalid), at the card's bottom-right, 44px tall with a word on it.
- * The same "Added to cart — View cart" toast as the product page confirms it.
+ * | Product                              | Action                         |
+ * | ------------------------------------ | ------------------------------ |
+ * | one kind, priced, in stock           | **Add to cart** — one tap, the same "Added to cart — View cart" toast as the product page |
+ * | has sizes / colours                  | **View options** → product page, where the choice is made (never bypassed) |
+ * | no price yet                         | **View details** → product page |
+ * | out of stock                         | disabled **Out of stock**       |
+ *
+ * It sits BELOW the card's link (a button inside a link is invalid) rather
+ * than over the photo, where it used to hide the corner of the product. A
+ * supporting outline button, not the shop's filled colour: a grid repeats it
+ * on every card, and the page's one filled action stays on the product page.
  */
-export function QuickAdd({
+export function CardAction({
   store,
   product,
 }: {
@@ -231,7 +242,26 @@ export function QuickAdd({
   const timer = useRef<number | undefined>(undefined)
   useEffect(() => () => window.clearTimeout(timer.current), [])
 
-  if (!canQuickAdd(product)) return null
+  if (product.stockQuantity <= 0) {
+    return (
+      <Button variant="secondary" full disabled>
+        Out of Stock
+      </Button>
+    )
+  }
+
+  if (!canQuickAdd(product)) {
+    const options = product.variantCount > 0
+    return (
+      <Link
+        to={storeProductUrl(store.slug, product.slug)}
+        aria-label={`${options ? 'View options for' : 'View details of'} ${product.name}`}
+        className={buttonClass({ variant: 'secondary', full: true })}
+      >
+        {options ? 'View Options' : 'View Details'}
+      </Link>
+    )
+  }
 
   const add = () => {
     cart.add(
@@ -256,21 +286,22 @@ export function QuickAdd({
 
   return (
     <>
-      <button
-        type="button"
+      <Button
+        variant="secondary"
+        full
         onClick={add}
         aria-label={`Add ${product.name} to cart`}
-        // A quiet round button on the photo's corner (the card positions it):
-        // the shop's colour is saved for the moment it is pressed.
-        title={added ? 'Added' : 'Add to cart'}
-        className={`flex size-tap items-center justify-center rounded-full border shadow-floating transition-colors ${
-          added
-            ? 'border-transparent btn-primary'
-            : 'border-line bg-surface text-fg hover:border-brand hover:text-brand'
-        }`}
+        className="whitespace-nowrap"
       >
-        {added ? <CheckIcon className="h-[18px] w-[18px]" /> : <CartIcon className="h-[18px] w-[18px]" />}
-      </button>
+        {/* The glyph steps aside on the narrowest phones (a 320px screen's
+            card is ~138px), so the words never wrap onto two lines. */}
+        {added ? (
+          <CheckIcon className="hidden h-4 w-4 text-success min-[360px]:block" />
+        ) : (
+          <CartIcon className="hidden h-4 w-4 min-[360px]:block" />
+        )}
+        {added ? 'Added' : 'Add to Cart'}
+      </Button>
       {added && <AddedToast name={product.name} storeSlug={store.slug} />}
     </>
   )

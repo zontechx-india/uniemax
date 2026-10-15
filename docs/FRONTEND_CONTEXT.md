@@ -1003,7 +1003,10 @@ full-bleed section bands instead.
   a store that filled nothing in gets brand + Shop + Support, never a wall of
   empty headings. Bottom bar: owner's `copyrightText` (default
   "© {year} {store name}. All Rights Reserved."), GST/registration small
-  print, "Powered by UnieMax". Responsive: 1 → 2 columns, then on desktop
+  print, "Powered by UnieMax". Responsive: a 2-column grid from the smallest
+  phone — the short link lists (Shop, Quick Links) pair up side by side while
+  the brand, Customer Support and locations (long lines) span both columns
+  (`FooterBlock wide`; Shop spans both when there are no Quick Links), then on desktop
   **exactly as many as this store's blocks fill** (`BLOCK_COLUMNS`, 2–5) — a
   fixed four left a fully-configured store stranding its last block alone on a
   second row.
@@ -1021,8 +1024,11 @@ full-bleed section bands instead.
   page, so it gets a one-row header instead. **`SearchBox` suggests as you
   type** — after two letters and 250ms, up to five of the shop's matching
   products (photo, name, price) under the field, plus "See all N results";
-  Enter still opens Shop with `?q=`. Menu, share and cart buttons are 44px
-  (`size-tap`). The store name now shows at every size: it *grows* into
+  Enter still opens Shop with `?q=`. Menu, share and cart buttons are one
+  shape — `HEADER_ICON_BUTTON` (`storeLayout.ts`): a borderless 44px circle
+  that tints on hover (an outlined square menu beside outlined round share and
+  cart looked busier than the name they frame); the cart badge appears only
+  when this store's count is above zero. The store name now shows at every size: it *grows* into
   whatever the buttons leave and truncates there, so a long one never pushes
   the cart off a 320px screen. The resulting height is published as
   `--store-header` (see **Layout width**) rather than hardcoded anywhere. The share
@@ -1072,10 +1078,11 @@ full-bleed section bands instead.
   `trustFacts()`; a stored `hero` entry is dropped on read). Any banner
   whose image is missing renders as the shop-colour slide
   (`BannerCarousel`'s `fallbackLabel`) instead of an empty frame.
-  The page ends with **`ContactBand`** — "Questions? Talk to {shop}" with
-  WhatsApp and Call (`features/publicStore/ShopContact.tsx`), only when the
-  seller entered a number (Footer → Customer support, or the WhatsApp social
-  link). Every WhatsApp link goes through `contactLinks.ts`, which adds
+  The page ends with **`ContactBand`** — a compact strip, "Need help before
+  you order?" and one line (the seller's hours only when they wrote some),
+  text left / buttons right from `sm` — with WhatsApp and Call
+  (`features/publicStore/ShopContact.tsx`), only when the seller entered a
+  number (Footer → Customer support, or the WhatsApp social link). Every WhatsApp link goes through `contactLinks.ts`, which adds
   India's 91 to a ten-digit number — `wa.me` needs the full international
   number, and a bare one opened a chat with nobody.
   Otherwise: banners, Shop by Category, then the
@@ -1084,8 +1091,9 @@ full-bleed section bands instead.
   `GET …/home`. Sections render in the **owner-arranged order** (the payload's
   ordered `sections` list); each is skipped when disabled or empty. Every
   section is a **full-bleed band** (alternating page-canvas / surface tone,
-  **no divider rule**, `py-10/14/16`, or `dense` `py-3.5/4` for a one-row
-  strip) — separation comes from the tone change plus air (the classic
+  **no divider rule**, `py-8/12/14`; `compact` `py-6/8` for the category
+  chip strip and the contact band, `dense` `py-3.5/4` for a one-row strip;
+  the banners sit in `py-4/6`) — separation comes from the tone change plus air (the classic
   restyle of 15 Oct 2026 dropped the per-band rules, which read as a settings
   screen), and the band lives inside the section so a hidden one leaves no
   empty strip. Sections are filtered for *content* before the tones are
@@ -1100,7 +1108,7 @@ full-bleed section bands instead.
 
     | Section                     | Composition                                       | Falls back below |
     | --------------------------- | ------------------------------------------------- | ---------------- |
-    | Shop by Category            | one scrolling row of round pictures (`CategoryStrip`) | —            |
+    | Shop by Category            | one scrolling row of soft-square pictures (`CategoryStrip`) | —      |
     | Featured Products           | spotlight — one `size="lg"` lead + exactly 6       | 7 products       |
     | New Arrivals / Best Sellers | horizontal rail (`ProductRail`)                   | 6 products       |
     | Category Highlights         | shelf panel + that shelf's newest                 | 2 products       |
@@ -1122,8 +1130,10 @@ full-bleed section bands instead.
     rather than disappearing, so the control row does not reflow as you scroll.
   - **Shop by Category** (`CategoryStrip`) is **one scrolling row, never a
     wrapping block**: it is wayfinding, not merchandising. Each entry is a
-    72–80px **round picture with the name under it** (the shape every shopping
-    app uses on a phone). The picture is `categoryPicture()`: the shelf's
+    72–80px **soft-square tile** (the product cards' neutral well and
+    `CARD_PHOTO` — whole photo, never cropped by a circle) with the name under
+    it at caption size on up to **two lines**, so "Computers & Accessories"
+    reads in full. The picture is `categoryPicture()`: the shelf's
     `imageUrl` (seller's, else the taxonomy's — from the public shell), else
     the cover of one of its products already on the page, else the first
     letter. The `tiles` layout uses the same picture as a 4:3 `FillImage`.
@@ -1301,47 +1311,58 @@ full-bleed section bands instead.
   loaded page synchronously instead of refetching page 1, which — together
   with the `<ScrollRestoration/>` mounted at the public router's root
   (`publicRouter.tsx`) — restores the exact scroll position.
-- **`ProductCard`** — the **whole card is one link** to the product page.
-  A product with nothing to choose (no options, priced, in stock —
-  `canQuickAdd`) also gets **`QuickAdd`** (`CartControls.tsx`): a 44px round
-  cart-icon button (surface fill, hairline border; the shop's colour only once
-  pressed) laid OVER the photo's bottom-right corner — a button inside the
-  link would be invalid — adding one to the cart with the product page's
-  "Added to cart — View cart" toast. Products with
-  options keep the single link — choosing belongs on the product page. The
-  first two cards of the home grid load their photo eagerly (`eager`). Shows the **cover image**, the name through
-  `displayName()` (2 lines; a name typed in ALL CAPITALS shows in Title Case,
+- **`ProductCard`** — photo, name, price, **action**: the photo and text are
+  one link to the product page, and **`CardAction`** (`CartControls.tsx`)
+  sits UNDER them in its own row — never over the photo (the round quick-add
+  that used to sit on the photo's corner hid the product; removed 15 Oct
+  2026). The action is always present so every row ends on one line, and
+  says what the next step really is: **Add to Cart** (one kind, priced, in
+  stock — `canQuickAdd`; the product page's "Added to cart — View cart"
+  toast; the glyph hides below 360px so the words never wrap), **View
+  Options** (has options — choosing stays on the product page), **View
+  Details** (no price yet), or a disabled **Out of Stock**. All `secondary`
+  44px buttons: a grid repeats them, and the filled primary stays on the
+  product page. The first two cards of the home grid load their photo eagerly
+  (`eager`). The name goes through
+  `displayName()` (a name typed in ALL CAPITALS shows in Title Case,
   keeping abbreviations like LED / USB / XL and lower-casing "of", "for"…;
-  display only), a **"From ₹X"** price in the **text colour** (the shop's
-  colour is kept for the saving) with the MRP struck through, and one quiet
+  display only) in the **interface sans at 14px with two lines always
+  reserved** (`min-h-10`), so prices and buttons line up across a row; then a
+  **"From ₹X"** price (16px semibold, text colour), the MRP smaller and muted,
+  struck through, and **"N% off"** in the success colour beside it — in
+  words, and only when `discountPercent` finds a real saving; then one quiet
   line — "Only a few left" in the warning colour when stock is low, and
   **"N options"** (never the options themselves). No category
   label — the page or section already says where you are.
   - **Classic, not boxed** (15 Oct 2026): there is **no card frame**. The
-    photo is its own rounded tile and the serif name and price sit on the page
-    beneath it; `PRODUCT_GRID` spaces rows further apart than columns
-    (`gap-y-8/10`) because the gap is now what separates one product from the
-    next. Category tiles follow the same shape.
+    photo is its own rounded tile and the name and price sit on the page
+    beneath it; `PRODUCT_GRID` spaces rows a little further apart than
+    columns (`gap-y-6/8`). Category tiles follow the same shape.
   - **The cover slot is always a fixed ratio** (square; `4/3` for a
-    spotlight's lead), a rounded well, drawn by
-    **`FillImage`**: the photo `object-contain` over a blurred, enlarged copy
-    of itself (`sizes="64px"`, so the blur layer is the smallest sized file).
-    Nothing is cropped off a banner-shaped upload and no photo floats small in
-    a grey box. The product page's main gallery image uses the same blur fill.
-  - Over that slot, top-left, one small square-cornered caps tag: **"N% off"**
-    (from the MRP, only when the discount is real — it replaced a wordless
-    "Sale" tag) or **"Sold out"** (ink on page colour) when stock is zero.
+    spotlight's lead): the neutral well with the photo drawn by
+    **`CARD_PHOTO`** — `object-contain`, inset `p-2/3`, and
+    `mix-blend-mode: var(--media-blend)`, which `storeVars()` sets to
+    `multiply` on a light shop (a packshot's white background melts into the
+    well instead of drawing a white box in a grey one) and `normal` on a dark
+    one. Nothing is cropped. **`FillImage`** (contain over a blurred copy of
+    itself) is no longer used by cards; the category `tiles` layout, the
+    one-product showcase and the product page's main gallery image keep it.
+  - Over that slot, top-left, one small tag only when stock is zero:
+    **"Sold out"** (ink on page colour). The saving is never a sticker on the
+    photo — it is said beside the price.
   - **No photo** draws the product's first letter large in the serif — a
     monogram reads as "photo coming" and still looks intentional. The exported
     **`NoProductImage`** (glyph + quiet "No image") remains for other callers.
-  - **`size="lg"`** is the spotlight lead only: bigger type, the product's
-    description, a `4/3` cover. Because that card is stretched to the height of
+  - **`size="lg"`** is the spotlight lead only: the serif name at 18–22px,
+    the product's description, a `4/3` cover. Because that card is stretched to the height of
     the grid beside it, from `lg` its cover **absorbs the extra height**
     (`flex-1`, aspect dropped) instead of leaving the text floating above a void.
   - Hover settles the cover 3% larger *inside* its slot and underlines the
     name — nothing moves. The shared `PRODUCT_GRID`
     ramp (exported here, also used by `GridSkeleton` and the homepage rows)
-    runs 2 → 3 → 4 → **5 columns (xl)**.
+    runs 2 → 3 → 4 → **5 columns (xl)**. A capped row that re-shows a card at
+    a breakpoint uses `hidden md:flex`, not `list-item` — the card is a flex
+    column so its action sits at its foot.
 - **`FilterPanel`** — right slide-over on desktop, bottom sheet on mobile:
   Availability + Price Range live; Brand/Rating/Discount shown "Soon".
 
@@ -3206,10 +3227,13 @@ derived from it, and the secondary text is lifted to `#9a9a9a` because
   uses **Plus Jakarta Sans** (`--font-heading` = `--font-body`; `h1–h3`
   tracked −0.015em). **Fraunces**, a soft serif with an optical-size axis, is
   **storefront-only**: shop and product names via `font-display`
-  (`--font-display`; store header, footer, product card and page,
-  showcase), and — since the classic restyle of 15 Oct 2026 — the
+  (`--font-display`; store header, footer, spotlight lead card, product
+  page, showcase), and — since the classic restyle of 15 Oct 2026 — the
   storefront's **section titles** (`SectionHeading`, the contact band,
-  category shelf panels and tiles), and the italic accent. Storefront
+  category shelf panels and tiles — 22px semibold, 18px for the category
+  strip), and the italic accent. Product names on a **grid card** use the
+  interface sans at 14px (model numbers read cleanly in it); the spotlight
+  lead, the showcase and the product page keep the serif. Storefront
   eyebrows (a product's category, "Collection", footer column labels) are
   small caps tracked `0.18–0.2em`. The italic accent — `font-accent` utility / `--font-accent`,
   Fraunces italic 500 — is for small touches only (a shop tagline, a product

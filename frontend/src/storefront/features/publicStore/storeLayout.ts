@@ -33,6 +33,14 @@ export { CONTENT_COLUMN as STORE_CONTAINER } from '../../layout/contentWidth'
 export const STORE_HEADER_OFFSET =
   '[--store-header:7rem] md:[--store-header:4.15rem]'
 
+/**
+ * The header's icon actions — menu, share, cart — as ONE shape: a borderless
+ * 44px circle that tints on hover. Three outlined controls of two different
+ * shapes made the bar look busier than the store name it frames.
+ */
+export const HEADER_ICON_BUTTON =
+  'relative flex size-tap shrink-0 items-center justify-center rounded-full text-fg transition-colors hover:bg-surface-alt'
+
 /** Sits flush under the sticky header. */
 export const STICK_UNDER_HEADER = 'top-[var(--store-header)]'
 

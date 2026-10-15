@@ -122,20 +122,26 @@ export function SectionHeading({
   skin: Skin
 }) {
   return (
-    <div className="flex items-end justify-between gap-4">
+    // A lone title centres against the 44px action so their text shares a
+    // line; with a strapline the action drops to the block's foot instead.
+    <div
+      className={`flex justify-between gap-4 ${eyebrow ? 'items-end' : 'items-center'}`}
+    >
       <div className="min-w-0">
-        {/* The storefront's classic voice: section titles in the serif at a
-            medium weight, a quiet line under them. `sm` steps it down for a
-            chip strip, which is a signpost rather than a section of its own. */}
+        {/* The storefront's classic voice: section titles in the serif, at
+            the scale's section size (22) on every screen — big enough to
+            mark a section, small enough not to out-shout the products — and
+            a quiet line under them. `sm` steps it down for a chip strip,
+            which is a signpost rather than a section of its own. */}
         <h2
-          className={`font-display font-medium tracking-tight ${
-            size === 'sm' ? 'text-xl' : 'text-2xl sm:text-3xl'
+          className={`font-display font-semibold tracking-tight ${
+            size === 'sm' ? 'text-lg' : 'text-xl'
           } ${skin.text}`}
         >
           {title}
         </h2>
         {eyebrow && (
-          <p className={`mt-1.5 text-sm ${skin.muted}`}>{eyebrow}</p>
+          <p className={`mt-1 text-sm ${skin.muted}`}>{eyebrow}</p>
         )}
       </div>
       {(action || aside) && (
@@ -256,16 +262,16 @@ export function GridSkeleton({ skin }: { skin: Skin }) {
   return (
     <ul className={PRODUCT_GRID}>
       {Array.from({ length: 12 }).map((_, i) => (
-        <li
-          key={i}
-          className={`overflow-hidden rounded-lg border ${skin.border} ${skin.surface}`}
-        >
-          {/* Same shape as ProductCard: photo edge to edge, then name and price. */}
-          <div className={`aspect-square animate-pulse ${skin.well}`} />
-          <div className="space-y-2 p-3">
-            <div className="h-3.5 w-3/4 animate-pulse rounded-full bg-surface-alt" />
-            <div className="h-3.5 w-1/2 animate-pulse rounded-full bg-surface-alt" />
+        <li key={i} aria-hidden>
+          {/* Same shape as ProductCard: photo tile, two name lines, price,
+              then the action row — so nothing jumps when the grid lands. */}
+          <div className={`aspect-square animate-pulse rounded-lg ${skin.well}`} />
+          <div className="space-y-2 pt-3">
+            <div className="h-3.5 w-11/12 animate-pulse rounded-full bg-surface-alt" />
+            <div className="h-3.5 w-2/3 animate-pulse rounded-full bg-surface-alt" />
+            <div className="h-4 w-1/2 animate-pulse rounded-full bg-surface-alt" />
           </div>
+          <div className="mt-3 h-tap animate-pulse rounded-md bg-surface-alt" />
         </li>
       ))}
     </ul>
