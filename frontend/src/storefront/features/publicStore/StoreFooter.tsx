@@ -92,12 +92,14 @@ export function StoreFooter({ store, skin }: { store: PublicStore; skin: Skin })
     // preview it is a hit-target like any homepage band. Nothing is added on a
     // real storefront.
     <footer
-      className={`border-t ${skin.border}`}
+      // Its own raised tone closes the page the way a printed catalogue's
+      // back cover does, rather than trailing off after one more rule.
+      className={`border-t ${skin.border} ${skin.surface}`}
       {...builderSectionProps('footer')}
     >
       <div className={STORE_CONTAINER}>
         <div
-          className={`grid gap-10 py-10 sm:grid-cols-2 sm:gap-x-8 ${BLOCK_COLUMNS[blocks] ?? 'lg:grid-cols-4'}`}
+          className={`grid gap-10 py-12 sm:grid-cols-2 sm:gap-x-10 lg:py-16 ${BLOCK_COLUMNS[blocks] ?? 'lg:grid-cols-4'}`}
         >
           <BrandBlock store={store} socials={socials} />
           <ShopBlock store={store} />
@@ -228,7 +230,7 @@ function BrandBlock({
             className="h-9 w-9 rounded-md object-cover"
           />
         )}
-        <span className="font-display text-fg text-lg font-semibold">
+        <span className="font-display text-xl font-medium text-fg">
           {store.name}
         </span>
       </Link>
@@ -256,7 +258,7 @@ function BrandBlock({
                 rel="noreferrer"
                 aria-label={label}
                 title={label}
-                className="flex h-9 w-9 items-center justify-center rounded-md bg-surface-alt text-muted transition hover:bg-surface hover:text-brand"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-line text-muted transition-colors hover:border-brand hover:text-brand"
               >
                 <Icon className="h-[18px] w-[18px]" />
               </a>
@@ -318,10 +320,12 @@ function FooterBlock({
 }) {
   return (
     <div>
-      <h3 className="font-heading text-sm font-semibold uppercase tracking-wider text-fg">
+      {/* Small spaced caps in the muted tone: a label over the column, not a
+          headline competing with the links under it. */}
+      <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
         {title}
       </h3>
-      <div className="mt-3.5">{children}</div>
+      <div className="mt-4">{children}</div>
     </div>
   )
 }

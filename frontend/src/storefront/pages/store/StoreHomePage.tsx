@@ -396,22 +396,27 @@ function ContactBand({
   if (!whatsapp && !phone) return null
   return (
     <Band tone={tone} skin={skin}>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h2 className={`font-heading text-xl font-bold sm:text-2xl ${skin.text}`}>
-            Questions? Talk to {store.name}
-          </h2>
-          <p className={`mt-1 text-base ${skin.muted}`}>
-            {hours
-              ? `Available: ${hours}`
-              : 'Ask about sizes, colours, delivery — anything.'}
-          </p>
-        </div>
+      {/* Centred, like a note at the end of a catalogue — the one place on
+          the page that speaks to the shopper directly. */}
+      <div className="mx-auto flex max-w-xl flex-col items-center text-center">
+        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">
+          We're here to help
+        </span>
+        <h2
+          className={`mt-3 font-display text-2xl font-medium sm:text-3xl ${skin.text}`}
+        >
+          Questions? Talk to {store.name}
+        </h2>
+        <p className={`mt-2 text-base ${skin.muted}`}>
+          {hours
+            ? `Available: ${hours}`
+            : 'Ask about sizes, colours, delivery — anything.'}
+        </p>
         <ContactActions
           store={store}
           skin={skin}
           message={`Hi ${store.name}, I saw your shop on UnieMax.`}
-          className="sm:shrink-0"
+          className="mt-6 w-full justify-center sm:w-auto"
         />
       </div>
     </Band>
@@ -598,11 +603,11 @@ function HomeSection({
           banners={home.banners.length > 0 ? home.banners : [PLACEHOLDER_BANNER]}
           fallbackLabel={store.name}
           id="shop-banners"
-          className={`border-b ${skin.border} ${tone === 'alt' ? skin.surface : ''}`}
+          className={tone === 'alt' ? skin.surface : ''}
           // Artwork stays inside the same column as everything else: left
           // edge-to-edge it grew to 800px tall on a 2560px monitor.
           containerClassName={`${STORE_CONTAINER} py-6 sm:py-8`}
-          frameClassName={`overflow-hidden rounded-lg border ${skin.border}`}
+          frameClassName="overflow-hidden rounded-lg"
           wellClassName={skin.well}
           {...builder}
         />
@@ -699,9 +704,13 @@ function productLayout(layout: string | null): SectionLayout {
 type BandTone = 'base' | 'alt'
 
 /**
- * Full-bleed section band: the page canvas or the raised surface tone plus a
- * bottom divider, with the shared content column inside. The band is part of
- * the section, so a section that renders nothing leaves no empty strip.
+ * Full-bleed section band: the page canvas or the raised surface tone, with
+ * the shared content column inside. The band is part of the section, so a
+ * section that renders nothing leaves no empty strip.
+ *
+ * Separation is the tone change plus generous air — no divider rules. A
+ * classic shop breathes between sections; tight bands with a line under each
+ * read as a settings screen.
  */
 function Band({
   id,
@@ -723,11 +732,11 @@ function Band({
   children: React.ReactNode
 }) {
   const padding =
-    pad === 'dense' ? 'py-3.5 sm:py-4' : 'py-8 sm:py-10'
+    pad === 'dense' ? 'py-3.5 sm:py-4' : 'py-10 sm:py-14 lg:py-16'
   return (
     <section
       id={id}
-      className={`${SCROLL_UNDER_HEADER} border-b last:border-b-0 ${skin.border} ${tone === 'alt' ? skin.surface : ''} ${className}`}
+      className={`${SCROLL_UNDER_HEADER} ${tone === 'alt' ? skin.surface : ''} ${className}`}
       {...builder}
     >
       <div className={`${STORE_CONTAINER} ${padding}`}>{children}</div>
@@ -813,7 +822,7 @@ function CategoryStrip({
                   className="group flex flex-col items-center gap-2 text-center"
                 >
                   <span
-                    className={`flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-full border-2 transition-colors group-hover:border-brand sm:h-20 sm:w-20 ${skin.border} ${skin.well}`}
+                    className={`flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-full ring-1 ring-line ring-offset-2 ring-offset-transparent transition-shadow group-hover:ring-brand sm:h-20 sm:w-20 ${skin.well}`}
                   >
                     {picture ? (
                       <MediaImg
@@ -829,7 +838,7 @@ function CategoryStrip({
                     )}
                   </span>
                   <span
-                    className={`line-clamp-2 text-xs font-semibold leading-tight ${skin.text}`}
+                    className={`line-clamp-2 text-sm font-medium leading-tight ${skin.text}`}
                   >
                     {category.name}
                   </span>
@@ -848,14 +857,10 @@ function CategoryInitial({ name }: { name: string }) {
   return (
     <span
       aria-hidden
-      className="font-heading text-xl font-bold text-brand"
+      className="font-display text-2xl font-light text-brand"
     >
       {name.trim().charAt(0).toUpperCase()}
     </span>
-  )
-}
-
-/** How many tiles a band shows    </Band>
   )
 }
 
@@ -881,31 +886,34 @@ function CategoryTiles({
   skin: Skin
 }) {
   return (
-    <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-6">
+    <ul className="mt-6 grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-6">
       {categories.slice(0, CATEGORY_TILE_CAP).map((category) => {
         const picture = categoryPicture(category, products)
         return (
           <li key={category.id}>
+            {/* Framed like a product card — the picture is the tile, the
+                words sit on the page under it. */}
             <Link
               to={storeCategoryUrl(store.slug, category.slug)}
-              className={`group flex h-full flex-col overflow-hidden rounded-lg border card-hover ${skin.border} ${skin.surface}`}
+              className="group flex h-full flex-col rounded-lg"
             >
               <span
-                className={`relative flex aspect-[4/3] items-center justify-center overflow-hidden ${skin.well}`}
+                className={`relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-lg ${skin.well}`}
               >
                 {picture ? (
                   <FillImage
                     src={picture}
                     alt=""
                     sizes="(min-width: 1024px) 16vw, (min-width: 640px) 33vw, 50vw"
+                    className="transition-transform duration-500 ease-out group-hover:scale-[1.03]"
                   />
                 ) : (
                   <CategoryInitial name={category.name} />
                 )}
               </span>
-              <span className="min-w-0 p-3">
+              <span className="min-w-0 pt-3">
                 <span
-                  className={`block truncate text-base font-semibold ${skin.text}`}
+                  className={`block truncate font-display text-base font-medium decoration-1 underline-offset-4 group-hover:underline ${skin.text}`}
                 >
                   {category.name}
                 </span>
@@ -971,7 +979,7 @@ function ProductSection({
     return (
       <Band id={id} tone={tone} skin={skin} builder={builder}>
         <SectionHeading title={title} eyebrow={eyebrow} skin={skin} />
-        <ul className={`mt-5 ${PRODUCT_GRID}`}>
+        <ul className={`mt-6 ${PRODUCT_GRID}`}>
           {products.map((product, index) => (
             <ProductCard
               key={product.id}
@@ -1024,7 +1032,7 @@ function ProductSection({
       {effective === 'spotlight' ? (
         <Spotlight store={store} products={products} skin={skin} />
       ) : (
-        <ul className={`mt-5 ${PRODUCT_GRID}`}>
+        <ul className={`mt-6 ${PRODUCT_GRID}`}>
           {products.slice(0, ROW_SIZE).map((product, index) => (
             <ProductCard
               key={product.id}
@@ -1061,12 +1069,12 @@ function Spotlight({
 }) {
   const [lead, ...rest] = products
   return (
-    <ul className="mt-5 grid gap-3 sm:gap-4 lg:grid-cols-3">
+    <ul className="mt-6 grid gap-x-5 gap-y-8 lg:grid-cols-3">
       <ProductCard store={store} product={lead} skin={skin} size="lg" />
       {/* A list item holding the supporting grid, so the whole section stays
           one well-formed list rather than two side by side. */}
       <li className="lg:col-span-2">
-        <ul className="grid h-full grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+        <ul className="grid h-full grid-cols-2 gap-x-3 gap-y-8 sm:grid-cols-3 sm:gap-x-5">
           {rest.slice(0, SPOTLIGHT_SUPPORT).map((product) => (
             <ProductCard
               key={product.id}
@@ -1164,7 +1172,7 @@ function ProductRail({
       <ul
         ref={scroller}
         onScroll={sync}
-        className={`mt-5 flex snap-x snap-proximity gap-3 pb-1 sm:gap-4 ${EDGE_SCROLLER}`}
+        className={`mt-6 flex snap-x snap-proximity gap-3 pb-1 sm:gap-5 ${EDGE_SCROLLER}`}
       >
         {products.map((product) => (
           <ProductCard
@@ -1286,7 +1294,7 @@ function CategoryShelf({
           action={{ label: 'View all', to }}
           skin={skin}
         />
-        <ul className={`mt-5 ${PRODUCT_GRID}`}>
+        <ul className={`mt-6 ${PRODUCT_GRID}`}>
           {shown.map((product) => (
             <ProductCard
               key={product.id}
@@ -1304,17 +1312,17 @@ function CategoryShelf({
 
   return (
     <Band tone={tone} skin={skin} builder={builder}>
-      <div className="grid gap-3 sm:gap-4 lg:grid-cols-4">
+      <div className="grid gap-x-5 gap-y-6 lg:grid-cols-4">
         <Link
           to={to}
-          className={`group flex items-center justify-between gap-4 overflow-hidden rounded-lg border p-4 card-hover sm:p-5 lg:flex-col lg:items-start lg:justify-between ${split.panel} ${skin.border} ${skin.surface}`}
+          className={`group flex items-center justify-between gap-4 overflow-hidden rounded-lg border p-4 card-hover sm:p-5 lg:flex-col lg:items-start lg:justify-between lg:p-7 ${split.panel} ${skin.border} ${skin.surface}`}
         >
           <span className="min-w-0">
-            <span className="text-xs font-semibold uppercase tracking-[0.25em] text-brand">
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">
               Collection
             </span>
             <span
-              className={`mt-1.5 block truncate font-heading text-xl font-semibold sm:text-2xl lg:whitespace-normal ${skin.text}`}
+              className={`mt-2 block truncate font-display text-xl font-medium sm:text-2xl lg:whitespace-normal lg:text-3xl ${skin.text}`}
             >
               {row.name}
             </span>
@@ -1331,7 +1339,7 @@ function CategoryShelf({
         </Link>
 
         <ul
-          className={`grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 ${split.products}`}
+          className={`grid grid-cols-2 gap-x-3 gap-y-8 sm:grid-cols-3 sm:gap-x-5 ${split.products}`}
         >
           {shown.map((product, index) => (
             <ProductCard
@@ -1414,18 +1422,18 @@ function ProductShowcase({
             <NoProductImage />
           )}
           {off !== null && !soldOut && (
-            <span className="absolute left-3 top-3 rounded-pill bg-brand px-2.5 py-1 text-xs font-bold text-brand-contrast">
+            <span className="absolute left-3 top-3 rounded-sm bg-brand px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-brand-contrast">
               {off}% off
             </span>
           )}
         </Link>
 
         <div className="flex flex-col p-5 sm:p-7 lg:justify-center lg:p-10">
-          <p className={`text-xs font-semibold ${skin.muted}`}>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">
             {product.category.name}
           </p>
           <h2
-            className={`mt-1 font-display text-2xl font-semibold leading-tight sm:text-3xl ${skin.text}`}
+            className={`mt-1 font-display text-3xl font-medium leading-tight sm:text-5xl ${skin.text}`}
           >
             {displayName(product.name)}
           </h2>

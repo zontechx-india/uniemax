@@ -6,7 +6,8 @@ import {
   type PublicStore,
 } from '../stores/storesApi'
 import { ImageIcon } from '../../layout/icons'
-import { canQuickAdd, QuickAdd, StockBadge } from './CartControls'
+import { canQuickAdd, QuickAdd } from './CartControls'
+import { stockLevel } from './catalog'
 import type { Skin } from './storeTheme'
 import { MediaImg } from '../../../shared/media/MediaImg'
 import { displayName } from './shopShape'
@@ -32,9 +33,11 @@ import { displayName } from './shopShape'
  * The body is name, price, and at most one status line. The category is NOT
  * repeated on every card (the page or section already says where you are).
  *
- * Hover lifts the card and paints an evenly-spread halo (`card-hover`) while
- * the cover scales inside its slot — the frame itself never moves, so a grid
- * stays still under the cursor.
+ * **Classic, not boxed.** There is no card frame: the photo sits in its own
+ * rounded tile and the name and price sit on the page beneath it, the way a
+ * boutique lays out a rail. A bordered, filled box around every product read
+ * as an admin table of inventory. Hover settles the cover a few percent larger
+ * and underlines the name — nothing moves, so a grid stays still.
  */
 export function ProductCard({
   store,
@@ -60,20 +63,20 @@ export function ProductCard({
     <li className={`group relative ${className}`}>
       <Link
         to={storeProductUrl(store.slug, product.slug)}
-        className={`flex h-full flex-col overflow-hidden rounded-lg border card-hover ${skin.border} ${skin.surface}`}
+        className="flex h-full flex-col rounded-lg"
       >
         <ProductMedia product={product} skin={skin} large={large} eager={eager} />
 
         <div
           // `lg:flex-none` so the lead card's spare height all goes to its
           // cover above, rather than being split with the text below it.
-          className={`flex flex-1 flex-col gap-1 ${large ? 'p-4 sm:p-5 lg:flex-none' : 'p-3'}`}
+          className={`flex flex-1 flex-col gap-1 ${large ? 'pt-4 sm:pt-5 lg:flex-none' : 'pt-3'}`}
         >
-          {/* Product names carry the heading face at medium weight — bold
-              reads heavy at this size. Two lines, then ellipsis. */}
+          {/* Product names carry the serif at medium weight — bold reads
+              heavy at this size. Two lines, then ellipsis. */}
           <h3
-            className={`line-clamp-2 font-display font-medium leading-tight transition-colors group-hover:text-brand ${
-              large ? 'text-lg sm:text-xl' : 'text-base sm:text-base'
+            className={`line-clamp-2 font-display font-medium leading-snug decoration-1 underline-offset-4 group-hover:underline ${
+              large ? 'text-lg sm:text-xl' : 'text-base'
             } ${skin.text}`}
           >
             {displayName(product.name)}
@@ -87,23 +90,24 @@ export function ProductCard({
 
           <PriceLabel product={product} size={size} />
 
-          {/* Pushed to the bottom edge so the badge line sits level across a
-              row whatever the name wrapped to. */}
-          <div
-            // With a quick Add, the row is as tall as the button and keeps
-            // its right side free for it.
-            className={`mt-auto flex flex-wrap items-center gap-1.5 pt-2 ${quick ? 'min-h-[3.25rem] pr-[5.5rem]' : ''}`}
-          >
-            {/* Sold out is drawn over the cover instead — a chip here as well
-                would say the same thing twice. */}
-            {product.stockQuantity > 0 && (
-              <StockBadge stock={product.stockQuantity} />
-            )}
-            <VariantCount count={product.variantCount} />
-          </div>
+          {/* One quiet line, only when there is something to say. Sold out
+              is drawn over the cover instead. */}
+          <CardNote product={product} />
         </div>
       </Link>
-      <QuickAdd store={store} product={product} />
+      {/* Pinned to the photo's bottom corner: an overlay the cover's shape,
+          so the button lands on the photo whatever the text below wraps to.
+          The lead card's cover stretches from lg, so it drops the button
+          there rather than float it mid-card. */}
+      {quick && (
+        <div
+          className={`pointer-events-none absolute inset-x-0 top-0 ${large ? 'aspect-[4/3] lg:hidden' : 'aspect-square'}`}
+        >
+          <div className="pointer-events-auto absolute bottom-2.5 right-2.5">
+            <QuickAdd store={store} product={product} />
+          </div>
+        </div>
+      )}
     </li>
   )
 }
@@ -138,7 +142,7 @@ function ProductMedia({
         large
           ? 'aspect-[4/3] lg:aspect-auto lg:min-h-0 lg:flex-1'
           : 'aspect-square'
-      } ${skin.well}`}
+      } rounded-lg ${skin.well}`}
     >
       {product.image?.url ? (
         <FillImage
@@ -146,24 +150,62 @@ function ProductMedia({
           src={product.image.url}
           alt={product.image.altText ?? product.name}
           sizes={large ? '(min-width: 1024px) 33vw, 100vw' : '(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw'}
-          className={`transition-transform duration-300 group-hover:scale-105 ${soldOut ? 'opacity-60' : ''}`}
+          className={`transition-transform duration-500 ease-out group-hover:scale-[1.03] ${soldOut ? 'opacity-60' : ''}`}
         />
       ) : (
-        <NoProductImage />
+        <Monogram name={product.name} large={large} />
       )}
 
-      {soldOut && (
-        <span className="absolute inset-x-0 bottom-0 bg-[var(--overlay)] py-1 text-center text-xs font-bold uppercase tracking-wide text-white">
-          Sold out
-        </span>
-      )}
-
-      {off !== null && !soldOut && (
-        <span className="absolute left-2 top-2 rounded-pill bg-brand px-2 py-0.5 text-xs font-bold text-brand-contrast">
-          {off}% off
-        </span>
+      {/* Corner tags: small, square-cornered caps — a label stitched on, not
+          a sticker. */}
+      {soldOut ? (
+        <span className={`${CORNER_TAG} bg-fg text-bg`}>Sold out</span>
+      ) : (
+        off !== null && (
+          <span className={`${CORNER_TAG} bg-brand text-brand-contrast`}>
+            {off}% off
+          </span>
+        )
       )}
     </div>
+  )
+}
+
+const CORNER_TAG =
+  'absolute left-2.5 top-2.5 rounded-sm px-2 py-0.5 text-xs font-semibold uppercase tracking-wider'
+
+/**
+ * A product with no photo yet: its first letter, large, in the serif — a
+ * monogram on a plain tile reads as "photo coming" and still looks
+ * intentional, where an icon over "NO IMAGE" looked broken.
+ */
+function Monogram({ name, large }: { name: string; large: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={`flex h-full w-full items-center justify-center font-display font-light text-muted opacity-60 ${
+        large ? 'text-6xl' : 'text-5xl'
+      }`}
+    >
+      {name.trim().charAt(0).toUpperCase()}
+    </span>
+  )
+}
+
+/**
+ * The card's one status line: low stock (in words, in the warning colour —
+ * not a chip) and how many options there are. Nothing when there is no news.
+ */
+function CardNote({ product }: { product: PublicProduct }) {
+  const low =
+    product.stockQuantity > 0 && stockLevel(product.stockQuantity) === 'low'
+  if (!low && product.variantCount === 0) return null
+  return (
+    <p className="mt-auto flex flex-wrap items-center gap-x-2 pt-1 text-xs text-muted">
+      {low && <span className="font-semibold text-warning">Only a few left</span>}
+      {low && product.variantCount > 0 && <span aria-hidden>·</span>}
+      <VariantCount count={product.variantCount} />
+    </p>
   )
 }
 
@@ -227,9 +269,7 @@ export function NoProductImage({ label = 'No image' }: { label?: string }) {
   return (
     <span className="flex h-full w-full flex-col items-center justify-center gap-1.5 text-muted">
       <ImageIcon className="h-7 w-7 opacity-45" />
-      <span className="text-xs font-semibold uppercase tracking-wide opacity-70">
-        {label}
-      </span>
+      <span className="text-xs opacity-70">{label}</span>
     </span>
   )
 }
@@ -250,8 +290,9 @@ export function discountPercent(product: PublicProduct): number | null {
 
 /**
  * "From ₹X" when options exist, a plain price otherwise — with the MRP struck
- * through beside it when the product is genuinely on sale. The price is the
- * loudest thing in the card body: brand color, heading face, bold.
+ * through beside it when the product is genuinely on sale. The price is set in
+ * the text colour, not the shop's: a classic shop lets the photo and the name
+ * lead, and keeps colour for the saving.
  */
 export function PriceLabel({
   product,
@@ -264,17 +305,17 @@ export function PriceLabel({
   return (
     <p className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5">
       {product.variantCount > 0 && (
-        <span className="text-xs font-semibold text-muted">From</span>
+        <span className="text-xs text-muted">From</span>
       )}
       <span
-        className={`font-figure font-bold text-brand ${
-          size === 'lg' ? 'text-xl sm:text-2xl' : 'text-base sm:text-lg'
+        className={`font-figure font-semibold text-fg ${
+          size === 'lg' ? 'text-xl sm:text-2xl' : 'text-base'
         }`}
       >
         {formatPrice(product.price)}
       </span>
       {product.compareAtPrice && (
-        <s className="font-figure text-xs font-normal text-muted">
+        <s className="font-figure text-sm font-normal text-muted">
           {formatPrice(product.compareAtPrice)}
         </s>
       )}
@@ -286,7 +327,7 @@ export function PriceLabel({
 export function VariantCount({ count }: { count: number }) {
   if (count === 0) return null
   return (
-    <span className="text-xs font-semibold text-muted">
+    <span className="text-xs text-muted">
       {count} option{count === 1 ? '' : 's'}
     </span>
   )
@@ -296,10 +337,12 @@ export function VariantCount({ count }: { count: number }) {
  * Column ramp shared by every open-ended storefront grid (listings and the
  * loading skeleton): **2 on a phone, 3 on a tablet, 4–5 on a desktop**. It
  * stops at five deliberately — six across the 1440px content column produced
- * cards too small to read a product name in.
+ * cards too small to read a product name in. Rows sit further apart than
+ * columns: with no card frames, the gap is what separates one product's text
+ * from the next row's photo.
  */
 export const PRODUCT_GRID =
-  'grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
+  'grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-5 sm:gap-y-10 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
 
 /** Responsive product grid — 2 columns on mobile, up to 5 wide. */
 export function ProductGrid({

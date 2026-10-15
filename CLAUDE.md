@@ -73,7 +73,8 @@ Rules:
 - **Type and shape come from the scale:** text `caption 13 · label 14 · body 16 ·
   subtitle 18 · section 22 · title 28 · display 40` (Tailwind's names map onto it),
   never `text-[Npx]`; corners 8 / 12 / 16 / full. Interface font is Plus Jakarta Sans;
-  Fraunces (`font-display`, `font-accent`) only for storefront shop/product names;
+  Fraunces (`font-display`, `font-accent`) only on the storefront — shop/product names
+  and its section titles;
   prices use `font-figure`.
 - **Never a bare `<img>` for a stored image.** Product photos, logos and banners are drawn
   with `shared/media/MediaImg.tsx` — `<MediaImg src sizes>`, where `sizes` says how wide

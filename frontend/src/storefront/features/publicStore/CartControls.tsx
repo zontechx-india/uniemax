@@ -260,10 +260,16 @@ export function QuickAdd({
         type="button"
         onClick={add}
         aria-label={`Add ${product.name} to cart`}
-        className="absolute bottom-2.5 right-2.5 z-10 inline-flex h-11 items-center gap-1.5 rounded-pill px-3.5 text-sm font-bold shadow-floating transition btn-primary"
+        // A quiet round button on the photo's corner (the card positions it):
+        // the shop's colour is saved for the moment it is pressed.
+        title={added ? 'Added' : 'Add to cart'}
+        className={`flex size-tap items-center justify-center rounded-full border shadow-floating transition-colors ${
+          added
+            ? 'border-transparent btn-primary'
+            : 'border-line bg-surface text-fg hover:border-brand hover:text-brand'
+        }`}
       >
-        {added ? <CheckIcon className="h-4 w-4" /> : <CartIcon className="h-4 w-4" />}
-        {added ? 'Added' : 'Add'}
+        {added ? <CheckIcon className="h-[18px] w-[18px]" /> : <CartIcon className="h-[18px] w-[18px]" />}
       </button>
       {added && <AddedToast name={product.name} storeSlug={store.slug} />}
     </>

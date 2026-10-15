@@ -279,26 +279,26 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
         skin={skin}
       />
 
-      <div className="grid items-start gap-6 lg:grid-cols-2 lg:gap-10">
+      <div className="grid items-start gap-8 lg:grid-cols-2 lg:gap-14">
         {/* The gallery stays put while the long right column scrolls. */}
         <div className="min-w-0 lg:sticky lg:top-[5.5rem]">
           <MediaGallery product={product} focusId={variant?.mediaId ?? null} />
         </div>
 
-        {/* Everything about buying lives inside one card. */}
-        <div
-          className={`min-w-0 rounded-xl border p-5 sm:p-6 ${skin.border} ${skin.surface}`}
-        >
+        {/* Everything about buying, set straight on the page beside the
+            photos — no box around it. The product is the subject; a card
+            frame made it read like a form. */}
+        <div className="min-w-0 lg:pt-2">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <Link
                 to={storeCategoryUrl(store.slug, product.category.slug)}
-                className={`text-xs font-semibold uppercase tracking-wide transition-colors hover:text-brand ${skin.muted}`}
+                className="text-xs font-semibold uppercase tracking-[0.2em] text-brand transition-opacity hover:opacity-80"
               >
                 {product.category.name}
               </Link>
               <h1
-                className={`mt-1 font-display text-3xl font-semibold leading-tight ${skin.text}`}
+                className={`mt-2 font-display text-3xl font-medium leading-tight tracking-tight sm:text-5xl ${skin.text}`}
               >
                 {displayName(product.name)}
               </h1>
@@ -312,8 +312,8 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
             />
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <span className="font-figure text-3xl font-bold text-brand">
+          <div className={`mt-5 flex flex-wrap items-center gap-3 border-b pb-6 ${skin.border}`}>
+            <span className={`font-figure text-3xl font-semibold ${skin.text}`}>
               {formatPrice(price)}
             </span>
             {compareAt && Number(compareAt) > Number(price) && (
@@ -739,21 +739,19 @@ function SpecTable({
   rows.push({ label: 'Sold by', value: store.name })
 
   return (
-    <div className={`overflow-hidden rounded-xl border ${skin.border}`}>
+    // Hairline rows, no box and no zebra — a printed spec sheet, not a grid.
+    <div className={`border-t ${skin.border}`}>
       <table className="w-full text-sm">
         <tbody>
           {rows.map((row, i) => (
-            <tr
-              key={`${row.label}-${i}`}
-              className={i % 2 === 0 ? '' : 'bg-surface-alt'}
-            >
+            <tr key={`${row.label}-${i}`} className={`border-b ${skin.border}`}>
               <th
                 scope="row"
-                className={`w-2/5 break-words px-4 py-2.5 text-left align-top font-semibold ${skin.muted}`}
+                className={`w-2/5 break-words py-3.5 pr-4 text-left align-top font-normal ${skin.muted}`}
               >
                 {row.label}
               </th>
-              <td className={`break-words px-4 py-2.5 align-top ${skin.text}`}>
+              <td className={`break-words py-3.5 align-top font-medium ${skin.text}`}>
                 {row.value}
               </td>
             </tr>
@@ -1070,7 +1068,7 @@ function ProductSkeleton({ skin }: { skin: Skin }) {
   return (
     <div className="grid animate-pulse gap-6 lg:grid-cols-2 lg:gap-10">
       <div className={`aspect-square rounded-xl ${skin.well}`} />
-      <div className={`space-y-4 rounded-xl border p-6 ${skin.border} ${skin.surface}`}>
+      <div className="space-y-4 pt-2">
         <div className="h-3 w-24 rounded-full bg-surface-alt" />
         <div className="h-8 w-3/4 rounded-md bg-surface-alt" />
         <div className="h-6 w-32 rounded-md bg-surface-alt" />

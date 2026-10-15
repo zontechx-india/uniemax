@@ -124,29 +124,31 @@ export function SectionHeading({
   return (
     <div className="flex items-end justify-between gap-4">
       <div className="min-w-0">
-        <span className="block h-0.5 w-8 rounded-full bg-brand" />
-        {/* Heading scale from the prototype: semibold, 700 reserved for the
-            hero. `sm` steps it down for a chip strip, which is a signpost
-            rather than a section of its own. */}
+        {/* The storefront's classic voice: section titles in the serif at a
+            medium weight, a quiet line under them. `sm` steps it down for a
+            chip strip, which is a signpost rather than a section of its own. */}
         <h2
-          className={`mt-2 font-heading font-semibold ${
-            size === 'sm' ? 'text-lg sm:text-xl' : 'text-2xl sm:text-3xl'
+          className={`font-display font-medium tracking-tight ${
+            size === 'sm' ? 'text-xl' : 'text-2xl sm:text-3xl'
           } ${skin.text}`}
         >
           {title}
         </h2>
         {eyebrow && (
-          <p className={`mt-1 text-sm ${skin.muted}`}>{eyebrow}</p>
+          <p className={`mt-1.5 text-sm ${skin.muted}`}>{eyebrow}</p>
         )}
       </div>
       {(action || aside) && (
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-3">
           {action && (
             <Link
               to={action.to}
-              className="whitespace-nowrap text-sm font-semibold text-brand hover:underline"
+              className={`group inline-flex min-h-tap items-center gap-1 whitespace-nowrap text-sm font-semibold underline decoration-line decoration-1 underline-offset-[6px] transition-colors hover:text-brand hover:decoration-current ${skin.text}`}
             >
-              {action.label} →
+              {action.label}
+              <span aria-hidden className="transition-transform group-hover:translate-x-0.5">
+                →
+              </span>
             </Link>
           )}
           {aside}

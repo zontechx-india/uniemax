@@ -1083,11 +1083,11 @@ full-bleed section bands instead.
   Highlights and All Products) from
   `GET …/home`. Sections render in the **owner-arranged order** (the payload's
   ordered `sections` list); each is skipped when disabled or empty. Every
-  section is a **full-bleed band** (alternating page-canvas / surface tone plus
-  a bottom `border-line` divider, compact `py-8/10`, or `dense` `py-3.5/4` for
-  a one-row strip like Shop by Category) exactly like the
-  marketplace homepage — separation comes from the background change, not from
-  large gaps, and the band lives inside the section so a hidden one leaves no
+  section is a **full-bleed band** (alternating page-canvas / surface tone,
+  **no divider rule**, `py-10/14/16`, or `dense` `py-3.5/4` for a one-row
+  strip) — separation comes from the tone change plus air (the classic
+  restyle of 15 Oct 2026 dropped the per-band rules, which read as a settings
+  screen), and the band lives inside the section so a hidden one leaves no
   empty strip. Sections are filtered for *content* before the tones are
   assigned, so the alternation never breaks on an empty row, and the tone ramp
   counts **bands rather than sections** — Category Highlights paints one band
@@ -1303,40 +1303,43 @@ full-bleed section bands instead.
   (`publicRouter.tsx`) — restores the exact scroll position.
 - **`ProductCard`** — the **whole card is one link** to the product page.
   A product with nothing to choose (no options, priced, in stock —
-  `canQuickAdd`) also gets **`QuickAdd`** (`CartControls.tsx`): a 44px "Add"
-  pill laid OVER the card's bottom-right (a button inside the link would be
-  invalid), adding one to the cart with the product page's "Added to cart —
-  View cart" toast; the card's last row reserves its space. Products with
+  `canQuickAdd`) also gets **`QuickAdd`** (`CartControls.tsx`): a 44px round
+  cart-icon button (surface fill, hairline border; the shop's colour only once
+  pressed) laid OVER the photo's bottom-right corner — a button inside the
+  link would be invalid — adding one to the cart with the product page's
+  "Added to cart — View cart" toast. Products with
   options keep the single link — choosing belongs on the product page. The
   first two cards of the home grid load their photo eagerly (`eager`). Shows the **cover image**, the name through
   `displayName()` (2 lines; a name typed in ALL CAPITALS shows in Title Case,
   keeping abbreviations like LED / USB / XL and lower-casing "of", "for"…;
-  display only), a **"From ₹X"** price in the brand color with the MRP struck
-  through, a **stock badge** only when it matters (Low — plenty in stock says
-  nothing) and **"N options"** (never the options themselves). No category
-  label — the page or section already says where you are. The badge line is
-  `mt-auto`, so it sits level across a row however the names wrapped.
+  display only), a **"From ₹X"** price in the **text colour** (the shop's
+  colour is kept for the saving) with the MRP struck through, and one quiet
+  line — "Only a few left" in the warning colour when stock is low, and
+  **"N options"** (never the options themselves). No category
+  label — the page or section already says where you are.
+  - **Classic, not boxed** (15 Oct 2026): there is **no card frame**. The
+    photo is its own rounded tile and the serif name and price sit on the page
+    beneath it; `PRODUCT_GRID` spaces rows further apart than columns
+    (`gap-y-8/10`) because the gap is now what separates one product from the
+    next. Category tiles follow the same shape.
   - **The cover slot is always a fixed ratio** (square; `4/3` for a
-    spotlight's lead), **edge to edge** under the card's one border, drawn by
+    spotlight's lead), a rounded well, drawn by
     **`FillImage`**: the photo `object-contain` over a blurred, enlarged copy
     of itself (`sizes="64px"`, so the blur layer is the smallest sized file).
     Nothing is cropped off a banner-shaped upload and no photo floats small in
     a grey box. The product page's main gallery image uses the same blur fill.
-  - Over that slot: a **"N% off" flag** top-left, computed from the MRP and
-    only when the discount is real (it replaced a wordless "Sale" tag — the
-    number is what a shopper actually scans for), and a **"Sold out" veil**
-    across the foot when stock is zero, which is also why the stock chip below
-    only ever says Low.
-  - **`NoProductImage`** is the no-photo state: the same recessed well, one
-    muted glyph and a quiet "No image" label, so a catalog mid-upload reads as
-    "photo coming" rather than broken content.
+  - Over that slot, top-left, one small square-cornered caps tag: **"N% off"**
+    (from the MRP, only when the discount is real — it replaced a wordless
+    "Sale" tag) or **"Sold out"** (ink on page colour) when stock is zero.
+  - **No photo** draws the product's first letter large in the serif — a
+    monogram reads as "photo coming" and still looks intentional. The exported
+    **`NoProductImage`** (glyph + quiet "No image") remains for other callers.
   - **`size="lg"`** is the spotlight lead only: bigger type, the product's
     description, a `4/3` cover. Because that card is stretched to the height of
     the grid beside it, from `lg` its cover **absorbs the extra height**
     (`flex-1`, aspect dropped) instead of leaving the text floating above a void.
-  - Hover applies `card-hover`: the border darkens and `shadow-lifted`
-    appears (no movement, no coloured halo), the cover scales *inside* its
-    slot so the frame never moves, and the name shifts to the brand color. The shared `PRODUCT_GRID`
+  - Hover settles the cover 3% larger *inside* its slot and underlines the
+    name — nothing moves. The shared `PRODUCT_GRID`
     ramp (exported here, also used by `GridSkeleton` and the homepage rows)
     runs 2 → 3 → 4 → **5 columns (xl)**.
 - **`FilterPanel`** — right slide-over on desktop, bottom sheet on mobile:
@@ -3204,7 +3207,11 @@ derived from it, and the secondary text is lifted to `#9a9a9a` because
   tracked −0.015em). **Fraunces**, a soft serif with an optical-size axis, is
   **storefront-only**: shop and product names via `font-display`
   (`--font-display`; store header, footer, product card and page,
-  showcase) and the italic accent. The italic accent — `font-accent` utility / `--font-accent`,
+  showcase), and — since the classic restyle of 15 Oct 2026 — the
+  storefront's **section titles** (`SectionHeading`, the contact band,
+  category shelf panels and tiles), and the italic accent. Storefront
+  eyebrows (a product's category, "Collection", footer column labels) are
+  small caps tracked `0.18–0.2em`. The italic accent — `font-accent` utility / `--font-accent`,
   Fraunces italic 500 — is for small touches only (a shop tagline, a product
   sub-line, one word in a heading), never running text or anything a seller
   must act on. **Numbers never use the serif**: prices, totals, MRP and
