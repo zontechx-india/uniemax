@@ -89,6 +89,7 @@ database. Only the frontend *root* is shared in the sense that each has its own.
 | URL | `dev.uniemax.zontechx.com` | `uniemax.com`, `www` |
 | Deployed by | push to `main` → `deploy-dev.yml` | tag `v*` + approval → `deploy-prod.yml` |
 | `PAYMENTHUB_WEBHOOK_SECRET` | dev hub's secret, in `~/uniemax-dev/backend/.env.development` | prod hub's secret, in `~/uniemax/backend/.env.production` |
+| `PAYMENTHUB_API_KEY` | dev hub's `ph_test_…` key, same file — **not read by code yet** (reserved for the hub client) | not issued yet |
 | PaymentHub webhook URL | `https://dev.uniemax.zontechx.com/api/v1/payments/webhooks/paymenthub` | `https://uniemax.com/api/v1/payments/webhooks/paymenthub` |
 
 `PORT=4001` comes from `backend/ecosystem.dev.config.cjs`, not from
