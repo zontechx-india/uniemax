@@ -1374,7 +1374,9 @@ White-label design — one codebase, any business:
   gateway attempt fields `cfOrderId` (unique — the order id registered
   with Cashfree, `orderNumber` or `orderNumber~R<n>` on retries) and
   `paymentSessionId` (latest Cashfree session for the web SDK; see
-  `docs/CASHFREE_PAYMENTS.md`), and `idempotencyKey` — the placement
+  `docs/CASHFREE_PAYMENTS.md`), `paymentIntentId` (unique — the PaymentHub
+  intent `pi_…` of the latest hub payment, how hub webhooks find the order;
+  null until UnieMax creates payments through the hub), and `idempotencyKey` — the placement
   request's `Idempotency-Key` header, unique per `(customerId,
   idempotencyKey)`, so a retried/double-fired Place Order returns the order
   already created (a concurrent duplicate loses on the index and its whole
@@ -1413,6 +1415,12 @@ White-label design — one codebase, any business:
   the seller (`notifyCustomerCancelled`). Both mutations use a guarded
   `updateMany` re-checking the read status, so concurrent updates conflict
   (409) instead of double-applying.
+- **PaymentHubEvent** (`payment_hub_events`) — dedupe log for PaymentHub
+  webhooks: `id` = the hub's event id, `type`, `receivedAt`, `processedAt`
+  (set in the same transaction as the order update; null = reprocess on the
+  hub's retry). UnieMax's only PaymentHub table — the hub's own tables live in
+  schema `paymenthub` of the same database, which UnieMax's Prisma never
+  lists and never touches (keep `paymenthub` out of `schemas`).
 - **ShippingRule** — `FIXED` / `DISTRICT` / `STATE` / `FREE` with `priority`.
   **Legacy, unused**: shipping pricing lives in `Store.shipping.rate` +
   `StoreProduct.shippingOverride` (see `shippingRates.ts`); this table has no
@@ -1637,7 +1645,9 @@ UnieMax details, so no environment has to set them), and the Cashfree gateway se
 `CASHFREE_APP_ID` / `CASHFREE_SECRET_KEY` / `CASHFREE_ENV`
 (`sandbox`/`production`) / `CASHFREE_API_VERSION` (`2023-08-01`) /
 `PUBLIC_API_URL` (webhook `notify_url` origin) — see
-`docs/CASHFREE_PAYMENTS.md`. Mail-level
+`docs/CASHFREE_PAYMENTS.md` — and `PAYMENTHUB_WEBHOOK_SECRET` (PaymentHub
+webhook signing secret, per environment; unset → that route answers 503).
+Mail-level
 (`package/mail/index.ts`): reuses `RESEND_API_KEY`/`EMAIL_FROM`, plus optional
 `PUBLIC_WEB_URL` (storefront origin for deep links in order emails).
 Push-level, parsed by `package/push/config.ts`: `VAPID_PUBLIC_KEY` /

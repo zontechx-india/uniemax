@@ -60,6 +60,17 @@ const envSchema = z.object({
   // it, configure the webhook URL in the Cashfree merchant dashboard instead.
   PUBLIC_API_URL: z.string().optional(),
 
+  // PaymentHub (Zontechx's payment service) webhook signing secret — whsec_…,
+  // issued per environment by the hub dashboard. Verifies POSTs to
+  // /api/v1/payments/webhooks/paymenthub. Unset = that route answers 503
+  // (fail closed; the hub retries). Never logged.
+  // An empty value counts as unset rather than failing boot.
+  PAYMENTHUB_WEBHOOK_SECRET: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => v || undefined),
+
   // Platform support contact — printed on the seller's Support page and
   // served to clients at GET /api/v1/public/support-contact. Defaults are the
   // live UnieMax details, so no environment has to set them to work.

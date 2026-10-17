@@ -1847,6 +1847,46 @@ marks a still-pending order `FAILED` (retryable); everything else is
 acknowledged and ignored. Idempotent — replays and duplicates are no-ops.
 Not rate-limited. Details: [CASHFREE_PAYMENTS.md](./CASHFREE_PAYMENTS.md).
 
+### `POST /api/v1/payments/webhooks/paymenthub` (no auth — HMAC-guarded)
+
+Payment outcomes from **PaymentHub** (Zontechx's payment service — prod
+`pay.zontechx.com`, dev `pay.dev.zontechx.com`). Receiver only: UnieMax does
+not create hub payments yet (that comes later, feature-flagged), so today no
+order has a `paymentIntentId` and the direct Cashfree route above stays the
+live path.
+
+**Signature.** `PaymentHub-Signature: t=<unix s>,v1=<hex>` with
+`v1 = hex(HMAC-SHA256(PAYMENTHUB_WEBHOOK_SECRET, "<t>.<raw body>"))`, verified
+over the exact raw bytes, constant-time; `|now − t| > 300 s` is rejected.
+Several `v1=` entries are allowed (any match passes); unknown keys are ignored.
+
+| Response | When |
+| --- | --- |
+| `503` | `PAYMENTHUB_WEBHOOK_SECRET` unset — fail closed, the hub retries |
+| `401` | signature missing, malformed, stale or wrong — nothing processed |
+| `400` | signed, but not a valid envelope / event payload |
+| `413` | body over 64 KB |
+| `200 { received: true }` | processed, a duplicate, ignored (wrong mode, unknown order, unhandled type, mismatch) |
+| `500` | a database error — `processedAt` stays null, so the hub's retry reprocesses |
+
+**Body.** `{ id: "evt_…", type, createdAt, mode: "LIVE"|"TEST", data }`.
+Production accepts only `LIVE`; other environments accept both. Amounts are
+integer paise; `intent.reference` is the order number and `intent.metadata`
+carries `{ orderId, storeSlug }`.
+
+| `type` | Effect (forward-only — never un-pays an order) |
+| --- | --- |
+| `payment.succeeded` | `PENDING`/`FAILED` → `PAID`, `paymentRef = gatewayPaymentId` (or the intent id), then the usual `order.paid` event + placement notifications (refund-required alert if the order was already cancelled). Requires `amountMinor` = order `total` in paise (string maths), `INR`, matching reference/store and an `ONLINE` order — otherwise logged as an error and left alone. `lateCapture: true` is logged for ops review. |
+| `payment.failed` / `payment.expired` / `payment.cancelled` | `PENDING` → `FAILED` (retryable, like the Cashfree path). No-op if the order is past `PENDING` or the event is for an intent other than the order's current `paymentIntentId`. |
+| `refund.succeeded` / `refund.failed` | Logged and acknowledged — UnieMax has no refund records yet. |
+| anything else | Logged and acknowledged. |
+
+The order is found by `Order.paymentIntentId`, then `metadata.orderId`; no
+match → logged at error level, `200`. Every delivery is recorded in
+`payment_hub_events` (dedupe on the event id), and every order update is a
+guarded `updateMany`, so replays and out-of-order delivery are harmless. Not
+rate-limited.
+
 ### `GET /api/v1/orders` 🔒 customer
 
 The signed-in customer's order history, newest first (max 100) — the

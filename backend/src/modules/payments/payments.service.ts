@@ -205,6 +205,17 @@ async function markOrderPaid(
     data: { paymentStatus: "PAID", paymentRef: cfPaymentId },
   });
   if (updated.count === 0) return; // already settled
+  await afterOrderPaid(orderId);
+}
+
+/**
+ * Everything that follows a successful PENDING/FAILED → PAID flip: the
+ * `order.paid` event plus the deferred placement notifications (or the
+ * refund-required alert for an already-cancelled order). Call it only after
+ * the guarded update that won the flip — exactly once per order. Shared with
+ * the PaymentHub webhook, which flips inside its own transaction.
+ */
+export async function afterOrderPaid(orderId: string): Promise<void> {
   emit("order.paid", { orderId });
 
   const order = await prisma.order.findUnique({

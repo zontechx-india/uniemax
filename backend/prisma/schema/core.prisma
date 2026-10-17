@@ -1023,6 +1023,9 @@ model Order {
   /// Cashfree payment_session_id of the latest attempt (drives the web SDK
   /// checkout). Useless once paymentStatus is PAID.
   paymentSessionId String?
+  /// PaymentHub intent id (pi_…) of the latest hub payment — how hub webhooks
+  /// find the order. Null until UnieMax creates payments through the hub.
+  paymentIntentId  String?       @unique
 
   // Seller order-management lifecycle stamps — set when the seller moves the
   // order along PENDING → CONFIRMED → PACKED → SHIPPED → DELIVERED (forward
@@ -1064,6 +1067,22 @@ model Order {
   @@index([paymentStatus])
   @@map("orders")
 
+  @@schema("public")
+}
+
+/// Dedupe log for PaymentHub webhooks (delivery is at-least-once). The row is
+/// inserted before processing; `processedAt` is set in the same transaction
+/// as the order update, so a crash leaves it null and the hub's retry
+/// reprocesses. Lives in `public` — the hub's own tables are in schema
+/// `paymenthub` and UnieMax never touches them.
+model PaymentHubEvent {
+  /// The hub's event id (evt_…).
+  id          String    @id
+  type        String
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+
+  @@map("payment_hub_events")
   @@schema("public")
 }
 

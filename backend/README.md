@@ -83,6 +83,7 @@ Verify: `curl http://localhost:4000/health`
 | `CASHFREE_ENV` | `sandbox` (default — `sandbox.cashfree.com/pg`) \| `production` (`api.cashfree.com/pg`); also picks the web SDK mode |
 | `CASHFREE_API_VERSION` | `x-api-version` header (default `2023-08-01`, PG API v4) |
 | `PUBLIC_API_URL` | Optional public origin of this API — builds the per-order webhook `notify_url`; otherwise configure the webhook URL in the Cashfree dashboard (see [docs/CASHFREE_PAYMENTS.md](../docs/CASHFREE_PAYMENTS.md)) |
+| `PAYMENTHUB_WEBHOOK_SECRET` | PaymentHub webhook signing secret (`whsec_…`, from the hub dashboard — dev and prod hubs each issue their own, so it goes in the **per-mode** file). Verifies `POST /api/v1/payments/webhooks/paymenthub`; unset → that route answers 503. Server-side only, never logged |
 | `SUPPORT_EMAIL` / `SUPPORT_PHONE` / `SUPPORT_HOURS` | Platform support contact served at `GET /api/v1/public/support-contact` and printed on the seller's Help & Support page. All default to the live UnieMax details, so no environment has to set them |
 | `WEB_SHELL_PATH` | Optional path to the built storefront `index.html` the page shells (`GET /store/*`, `GET /c/*`) write each page's head into. Default: this clone's `../frontend/dist/index.html` — right on the server (each clone builds its own frontend) and locally after `npm run build` in `frontend/`. Without a build those routes answer 503 |
 | `AFFILIATE_MAX_PERCENT` | Highest percentage commission a seller may offer (default `50`) — the platform ceiling for `package/affiliate` |

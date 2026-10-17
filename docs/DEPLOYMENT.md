@@ -88,6 +88,8 @@ database. Only the frontend *root* is shared in the sense that each has its own.
 | nginx vhosts | `uniemax-domain`, `uniemax` | `uniemax-com`, `uniemax-prod` |
 | URL | `dev.uniemax.zontechx.com` | `uniemax.com`, `www` |
 | Deployed by | push to `main` → `deploy-dev.yml` | tag `v*` + approval → `deploy-prod.yml` |
+| `PAYMENTHUB_WEBHOOK_SECRET` | dev hub's secret, in `~/uniemax-dev/backend/.env.development` | prod hub's secret, in `~/uniemax/backend/.env.production` |
+| PaymentHub webhook URL | `https://dev.uniemax.zontechx.com/api/v1/payments/webhooks/paymenthub` | `https://uniemax.com/api/v1/payments/webhooks/paymenthub` |
 
 `PORT=4001` comes from `backend/ecosystem.dev.config.cjs`, not from
 `.env.development` — a real env var beats dotenv, so local development still
@@ -117,7 +119,7 @@ then `.env` for whatever the overlay omits:
 | File on the server | Contents |
 | ------------------ | -------- |
 | `backend/.env` | Shared values — JWT, S3/AWS, Cashfree, Resend, Message Central, media rules, `HOST`/`PORT`/`LOG_LEVEL`, `VAPID_SUBJECT` |
-| `backend/.env.production` | `NODE_ENV=production`, prod DB pair, `CORS_ORIGIN`, `PUBLIC_WEB_URL`, `PUBLIC_API_URL`, the server's `VAPID_*` pair |
+| `backend/.env.production` | `NODE_ENV=production`, prod DB pair, `CORS_ORIGIN`, `PUBLIC_WEB_URL`, `PUBLIC_API_URL`, the server's `VAPID_*` pair, `PAYMENTHUB_WEBHOOK_SECRET` (prod hub's secret) |
 | `backend/ecosystem.config.cjs` | **In git.** Sets `APP_ENV=production` for pm2 — the whole switch |
 
 **Live since 2026-08-07.** The pm2 side was applied with `pm2 delete` +
