@@ -83,6 +83,9 @@ Verify: `curl http://localhost:4000/health`
 | `CASHFREE_ENV` | `sandbox` (default — `sandbox.cashfree.com/pg`) \| `production` (`api.cashfree.com/pg`); also picks the web SDK mode |
 | `CASHFREE_API_VERSION` | `x-api-version` header (default `2023-08-01`, PG API v4) |
 | `PUBLIC_API_URL` | Optional public origin of this API — builds the per-order webhook `notify_url`; otherwise configure the webhook URL in the Cashfree dashboard (see [docs/CASHFREE_PAYMENTS.md](../docs/CASHFREE_PAYMENTS.md)) |
+| `PAYMENTHUB_URL` | The matching PaymentHub (`https://pay.dev.zontechx.com` on dev, `https://pay.zontechx.com` in production). Per-mode file |
+| `PAYMENTHUB_API_KEY` | That hub's key — `ph_test_…` on dev, `ph_live_…` in production. Per-mode file; server-side only, never logged |
+| `PAYMENTS_VIA_HUB` | `true` = new ONLINE orders pay through PaymentHub instead of Cashfree directly (orders already on Cashfree keep settling there). Default `false`. When `true`, boot fails unless the three `PAYMENTHUB_*` values are set and the key's mode fits the environment |
 | `PAYMENTHUB_WEBHOOK_SECRET` | PaymentHub webhook signing secret (`whsec_…`, from the hub dashboard — dev and prod hubs each issue their own, so it goes in the **per-mode** file). Verifies `POST /api/v1/payments/webhooks/paymenthub`; unset → that route answers 503. Server-side only, never logged |
 | `SUPPORT_EMAIL` / `SUPPORT_PHONE` / `SUPPORT_HOURS` | Platform support contact served at `GET /api/v1/public/support-contact` and printed on the seller's Help & Support page. All default to the live UnieMax details, so no environment has to set them |
 | `WEB_SHELL_PATH` | Optional path to the built storefront `index.html` the page shells (`GET /store/*`, `GET /c/*`) write each page's head into. Default: this clone's `../frontend/dist/index.html` — right on the server (each clone builds its own frontend) and locally after `npm run build` in `frontend/`. Without a build those routes answer 503 |

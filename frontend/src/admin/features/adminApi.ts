@@ -68,6 +68,7 @@ export interface OrderDetail extends OrderRow {
     country: string | null
   } | null
   cfOrderId: string | null
+  paymentIntentId: string | null
   confirmedAt: string | null
   packedAt: string | null
   shippedAt: string | null

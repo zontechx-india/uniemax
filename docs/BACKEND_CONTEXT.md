@@ -1645,8 +1645,11 @@ UnieMax details, so no environment has to set them), and the Cashfree gateway se
 `CASHFREE_APP_ID` / `CASHFREE_SECRET_KEY` / `CASHFREE_ENV`
 (`sandbox`/`production`) / `CASHFREE_API_VERSION` (`2023-08-01`) /
 `PUBLIC_API_URL` (webhook `notify_url` origin) — see
-`docs/CASHFREE_PAYMENTS.md` — and `PAYMENTHUB_WEBHOOK_SECRET` (PaymentHub
-webhook signing secret, per environment; unset → that route answers 503).
+`docs/CASHFREE_PAYMENTS.md` — and the PaymentHub set: `PAYMENTHUB_WEBHOOK_SECRET`
+(webhook signing secret, per environment; unset → that route answers 503),
+`PAYMENTHUB_URL` + `PAYMENTHUB_API_KEY` (the matching hub and its key) and
+`PAYMENTS_VIA_HUB` (`true` = new ONLINE orders pay through the hub; boot fails
+if the set is incomplete or the key's mode doesn't fit the environment).
 Mail-level
 (`package/mail/index.ts`): reuses `RESEND_API_KEY`/`EMAIL_FROM`, plus optional
 `PUBLIC_WEB_URL` (storefront origin for deep links in order emails).

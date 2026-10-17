@@ -92,11 +92,13 @@ database. Only the frontend *root* is shared in the sense that each has its own.
 | `PAYMENTHUB_API_KEY` | dev hub's TEST key `ph_test_6hl1…`, same file | prod hub's LIVE key `ph_live_kXFI…`, same file |
 | `PAYMENTHUB_URL` | `https://pay.dev.zontechx.com`, same file | `https://pay.zontechx.com`, same file |
 | PaymentHub webhook URL | `https://dev.uniemax.zontechx.com/api/v1/payments/webhooks/paymenthub` | `https://uniemax.com/api/v1/payments/webhooks/paymenthub` |
+| `PAYMENTS_VIA_HUB` | `true` — checkout pays through `pay.dev` (Cashfree **sandbox**, no real money) | unset (`false`) — checkout still calls Cashfree directly (live) |
 
 PaymentHub values come from the **matching** hub (dev ↔ `pay.dev`, prod ↔
 `pay`) — the hubs have separate databases, so a key or secret from the other one
-is rejected. `PAYMENTHUB_API_KEY` / `PAYMENTHUB_URL` are not read by code yet
-(reserved for the hub client); `PAYMENTHUB_WEBHOOK_SECRET` is read at boot, so
+is rejected. With `PAYMENTS_VIA_HUB=true` the backend refuses to boot unless all
+three are set and the key's mode fits (`ph_test_` outside production,
+`ph_live_` in production). All three are read at boot, so
 **rotating it in a hub dashboard breaks delivery until the new value is in the
 env file and the backend is restarted** (`pm2 restart <app> --update-env && pm2 save`).
 Both secrets were last rotated on 2026-10-17.

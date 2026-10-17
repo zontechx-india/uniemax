@@ -113,6 +113,7 @@ export async function getOrder(orderId: string) {
       discount: true,
       billingAddress: true,
       cfOrderId: true,
+      paymentIntentId: true,
       confirmedAt: true,
       packedAt: true,
       shippedAt: true,

@@ -177,20 +177,44 @@ Such an order shows in the seller's list as `CANCELLED` + payment `PAID`.
 It is deliberately excluded from dashboard revenue (which skips `CANCELLED`)
 and is not counted as `REFUNDED` until the refund actually happens.
 
+## Via PaymentHub (`PAYMENTS_VIA_HUB=true`)
+
+With the switch on, new ONLINE orders pay through **PaymentHub** (Zontechx's
+payment service) instead of calling Cashfree directly. The hub owns the
+Cashfree account per environment: the dev hub (`pay.dev.zontechx.com`) uses the
+Cashfree **sandbox**, the prod hub (`pay.zontechx.com`) Cashfree production.
+The storefront is unchanged — it still opens the Cashfree SDK with
+`paymentSessionId` + `mode`, which now come from the hub.
+
+| Step | Direct Cashfree | Via PaymentHub (`paymenthub.client.ts`) |
+| --- | --- | --- |
+| Placement | create Cashfree order | `POST /v1/payment-intents` — reference = `orderNumber`, amount in paise, `metadata: { orderId, storeSlug }`; saves `paymentIntentId` + `paymentSessionId` |
+| Pay again | reuse ACTIVE session or new `~R<n>` order | `GET …?refresh=true` → paid: settle; open: `/retry` (same live session, or a new one); past expiry: `/cancel` + a new intent |
+| Settled by | Cashfree webhook | the hub's signed webhook (`/payments/webhooks/paymenthub`, [API.md](./API.md)) |
+| Return page / sweep | `GET /orders/{id}` | `GET …?refresh=true`, same checks as the webhook (reference, store, amount) |
+| Seller cancels | terminate the Cashfree order | `POST …/cancel` |
+
+Each order stays on the provider it started with: an order with a `cfOrderId`
+keeps settling through Cashfree after the switch, but a *new* attempt for it
+goes through the hub. Refunds through the hub are not wired yet (same gap as
+below). Switch: [DEPLOYMENT.md](./DEPLOYMENT.md) — on for dev, off for prod.
+
 ## Data model (Order)
 
 | Field              | Meaning                                                            |
 | ------------------ | ------------------------------------------------------------------ |
 | `paymentStatus`    | `PENDING` → `PAID` (webhook/reconcile) or `FAILED` (retryable)     |
 | `paymentRef`       | Cashfree `cf_payment_id` (or `"DEV-SIMULATED"` without keys)       |
-| `cfOrderId`        | `order_id` registered with Cashfree for the latest attempt         |
+| `cfOrderId`        | `order_id` registered with Cashfree for the latest attempt (direct) |
+| `paymentIntentId`  | PaymentHub intent for the latest attempt (via the hub)             |
 | `paymentSessionId` | Latest `payment_session_id` (drives the web SDK)                   |
 
 ## Testing
 
-**There is no non-charging environment any more.** With production keys
-everywhere, placing an ONLINE order and completing it moves real money, and
-the refund has to be issued by hand from the Cashfree dashboard. Test with
+**Dev pays in the Cashfree sandbox** through the dev hub — use Cashfree's
+sandbox test cards/UPI; no real money moves. **Production is live:** placing
+an ONLINE order on uniemax.com and completing it moves real money, and the
+refund has to be issued by hand from the Cashfree dashboard. Test prod with
 the smallest possible amount, and prefer verifying the parts that do not
 require payment:
 
@@ -199,9 +223,9 @@ require payment:
   `order_status: ACTIVE` proves the keys and the merchant account are live.
 - **Webhook check** — `POST` an unsigned body to the webhook URL; a `401`
   proves it is reachable and the signature check is enforced.
-- To get a non-charging environment back, restore the sandbox pair from
-  `~/uniemax/backup/env.predeploy-cashfree` on the server (or the Cashfree
-  dashboard) and set `CASHFREE_ENV=sandbox`.
+- Dev is non-charging only while `PAYMENTS_VIA_HUB=true` there; the shared
+  `CASHFREE_*` keys are still the live pair, so switching it off makes dev
+  charge real cards again.
 
 ## Known gaps / next milestones
 

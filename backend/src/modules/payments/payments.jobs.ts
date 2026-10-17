@@ -1,7 +1,6 @@
 import type { FastifyBaseLogger } from "fastify";
 import { prisma } from "../../config/prisma.js";
-import { cashfreeConfigured } from "./cashfree.client.js";
-import { reconcilePendingPayment } from "./payments.service.js";
+import { gatewayConfigured, reconcilePendingPayment } from "./payments.service.js";
 
 /**
  * Stranded-payment sweep — the webhook's safety net.
@@ -9,8 +8,9 @@ import { reconcilePendingPayment } from "./payments.service.js";
  * An ONLINE order is marked PAID by Cashfree's webhook, or when its buyer
  * reopens the order page (`reconcilePendingPayment`). If the webhook is lost
  * AND the buyer never comes back, the seller used to see a paid order as
- * unpaid indefinitely. This asks Cashfree about recent unpaid ONLINE orders
- * every few minutes. It only ever SETTLES real payments — it never cancels,
+ * unpaid indefinitely. Every few minutes this asks the provider (Cashfree or
+ * PaymentHub) about recent unpaid ONLINE orders.
+ * It only ever SETTLES real payments — it never cancels,
  * voids or releases stock, so a gateway hiccup costs nothing but a retry.
  */
 const INTERVAL_MS = 10 * 60_000;
@@ -26,7 +26,7 @@ export async function reconcileStrandedPayments(): Promise<number> {
     where: {
       paymentMethod: "ONLINE",
       paymentStatus: { in: ["PENDING", "FAILED"] },
-      cfOrderId: { not: null },
+      OR: [{ cfOrderId: { not: null } }, { paymentIntentId: { not: null } }],
       status: { not: "CANCELLED" },
       placedAt: { gte: new Date(now - MAX_AGE_MS), lte: new Date(now - MIN_AGE_MS) },
     },
@@ -41,7 +41,7 @@ export async function reconcileStrandedPayments(): Promise<number> {
 }
 
 export function startPaymentJobs(log: FastifyBaseLogger): () => void {
-  if (!cashfreeConfigured) return () => undefined;
+  if (!gatewayConfigured) return () => undefined;
   const run = async () => {
     try {
       const checked = await reconcileStrandedPayments();

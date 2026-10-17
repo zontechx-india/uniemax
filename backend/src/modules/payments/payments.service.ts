@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { prisma } from "../../config/prisma.js";
 import { env } from "../../config/env.js";
 import { Prisma } from "../../generated/prisma/client.js";
@@ -17,8 +17,22 @@ import {
   getCashfreePayments,
   terminateCashfreeOrder,
 } from "./cashfree.client.js";
+import {
+  cancelIntent,
+  createIntent,
+  getIntent,
+  HubApiError,
+  retryIntent,
+  type HubIntent,
+} from "./paymenthub.client.js";
+import { decide, rupeesToPaise, type OrderSnapshot } from "./paymenthub.webhook.js";
 
 /**
+ * Two providers behind one lifecycle. With PAYMENTS_VIA_HUB=true, new ONLINE
+ * orders pay through PaymentHub (Order.paymentIntentId); otherwise straight
+ * through Cashfree (Order.cfOrderId). Each order stays on the provider it
+ * started with — every function below dispatches on which id the order has.
+ *
  * Cashfree payment lifecycle around an Order:
  *
  *   placement (ONLINE)  → createPaymentSession()   → payment_session_id
@@ -36,6 +50,7 @@ import {
 
 export interface PaymentSession {
   paymentSessionId: string;
+  /** Cashfree order id, or the PaymentHub intent id for hub orders. */
   cfOrderId: string;
   /** Which SDK environment to load on the client. */
   mode: "sandbox" | "production";
@@ -46,14 +61,17 @@ export interface SessionOrder {
   id: string;
   orderNumber: string;
   storeSlug: string;
-  total: { toString(): string };
+  total: { toString(): string; toFixed(digits: number): string };
   customerId: string | null;
   customerName: string | null;
   customerPhone: string | null;
   customerEmail: string | null;
 }
 
-export { cashfreeConfigured };
+const viaHub = env.PAYMENTS_VIA_HUB;
+
+/** Some payment provider is live — ONLINE orders take real payments. */
+export const gatewayConfigured = viaHub || cashfreeConfigured;
 
 function returnUrlFor(order: { storeSlug: string; id: string }): string | null {
   // The storefront success page — it polls the order until the webhook (or
@@ -77,6 +95,7 @@ export async function createPaymentSession(
   order: SessionOrder,
   attempt = 0,
 ): Promise<PaymentSession> {
+  if (viaHub) return createHubSession(order, `order:${order.id}:intent:${attempt}`);
   const cfOrderId =
     attempt === 0 ? order.orderNumber : `${order.orderNumber}~R${attempt}`;
 
@@ -105,6 +124,109 @@ export async function createPaymentSession(
   };
 }
 
+// ---------------------------------------------------------------------------
+// PaymentHub path
+// ---------------------------------------------------------------------------
+
+const HUB_PAID = new Set(["SUCCEEDED", "PARTIALLY_REFUNDED", "REFUNDED"]);
+const HUB_OPEN = new Set(["CREATED", "PENDING", "FAILED"]);
+
+/** Open a hub intent for the order; the reference is the orderNumber. */
+async function createHubSession(
+  order: SessionOrder,
+  idempotencyKey: string,
+): Promise<PaymentSession> {
+  const amountMinor = rupeesToPaise(order.total);
+  if (amountMinor === null || amountMinor <= 0n) {
+    throw new Error(`Order ${order.orderNumber} has an unpayable total ${order.total.toString()}`);
+  }
+  const returnUrl = returnUrlFor(order);
+  const intent = await createIntent(
+    {
+      reference: order.orderNumber,
+      amountMinor: Number(amountMinor),
+      customer: {
+        id: order.customerId ?? `guest-${order.id}`,
+        ...(order.customerName ? { name: order.customerName.slice(0, 100) } : {}),
+        ...(order.customerEmail ? { email: order.customerEmail } : {}),
+        ...(order.customerPhone ? { phone: order.customerPhone.slice(0, 20) } : {}),
+      },
+      ...(returnUrl ? { returnUrl } : {}),
+      metadata: { orderId: order.id, storeSlug: order.storeSlug },
+    },
+    idempotencyKey,
+  );
+  return saveHubSession(order.id, intent);
+}
+
+async function saveHubSession(orderId: string, intent: HubIntent): Promise<PaymentSession> {
+  if (!intent.checkout) {
+    throw HttpError.badGateway(`PaymentHub returned no checkout for a ${intent.status} payment`);
+  }
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { paymentIntentId: intent.id, paymentSessionId: intent.checkout.sessionId },
+  });
+  return {
+    paymentSessionId: intent.checkout.sessionId,
+    cfOrderId: intent.id,
+    mode: intent.checkout.mode,
+  };
+}
+
+/**
+ * Settle the order when the hub says the intent was paid — through the same
+ * checks as the webhook (reference, store, amount). True when it is paid.
+ */
+async function settleIfHubPaid(order: OrderSnapshot, intent: HubIntent): Promise<boolean> {
+  if (!HUB_PAID.has(intent.status)) return false;
+  const decision = decide({ kind: "payment", type: "payment.succeeded", intent }, order);
+  if (decision.action === "markPaid") {
+    await markOrderPaid(order.id, decision.paymentRef);
+    return true;
+  }
+  if (decision.action !== "ignore") return false; // unreachable for a success
+  if (decision.level === "error") {
+    // eslint-disable-next-line no-console
+    console.error(`PaymentHub reconcile for ${order.orderNumber}: ${decision.reason}`);
+    return false;
+  }
+  return true; // already PAID/REFUNDED on our side
+}
+
+/** "Pay now / retry" for an order already on the hub. */
+async function hubPaySession(
+  order: OrderSnapshot & SessionOrder & { paymentIntentId: string },
+): Promise<{ paymentStatus: "PAID" } | { paymentStatus: "PENDING"; payment: PaymentSession }> {
+  let intent = await getIntent(order.paymentIntentId, true);
+  if (await settleIfHubPaid(order, intent)) return { paymentStatus: "PAID" };
+
+  if (HUB_OPEN.has(intent.status)) {
+    try {
+      // A live session comes back unchanged; a failed/expired one is replaced.
+      intent = await retryIntent(intent.id, `order:${order.id}:retry:${randomUUID()}`);
+      if (await settleIfHubPaid(order, intent)) return { paymentStatus: "PAID" };
+      if (intent.checkout) {
+        return { paymentStatus: "PENDING", payment: await saveHubSession(order.id, intent) };
+      }
+    } catch (err) {
+      // Past the intent's expiry → INVALID_STATE; start a fresh intent below.
+      if (!(err instanceof HubApiError && err.hubCode === "INVALID_STATE")) throw err;
+    }
+    // The old intent may still hold the reference — release it first.
+    try {
+      await cancelIntent(intent.id, `order:${order.id}:cancel:${intent.id}`);
+    } catch (err) {
+      if (!(err instanceof HubApiError && err.hubCode === "INVALID_STATE")) throw err;
+      intent = await getIntent(intent.id);
+      if (await settleIfHubPaid(order, intent)) return { paymentStatus: "PAID" };
+    }
+  }
+
+  const payment = await createHubSession(order, `order:${order.id}:after:${intent.id}`);
+  return { paymentStatus: "PENDING", payment };
+}
+
 /**
  * "Pay now / retry payment" — returns a usable session for an unpaid ONLINE
  * order the signed-in customer owns. Reconciles against Cashfree first (the
@@ -117,7 +239,7 @@ export async function getOrCreatePaySession(
   orderId: string,
   customerId: string,
 ): Promise<{ paymentStatus: "PAID" } | { paymentStatus: "PENDING"; payment: PaymentSession }> {
-  if (!cashfreeConfigured) {
+  if (!gatewayConfigured) {
     throw new HttpError(503, "Online payment is not available right now");
   }
   const order = await prisma.order.findFirst({
@@ -131,6 +253,7 @@ export async function getOrCreatePaySession(
       paymentMethod: true,
       paymentStatus: true,
       cfOrderId: true,
+      paymentIntentId: true,
       paymentSessionId: true,
       customerId: true,
       customerName: true,
@@ -149,7 +272,11 @@ export async function getOrCreatePaySession(
     return { paymentStatus: "PAID" };
   }
 
-  if (order.cfOrderId) {
+  if (order.paymentIntentId) {
+    return hubPaySession({ ...order, paymentIntentId: order.paymentIntentId });
+  }
+
+  if (order.cfOrderId && cashfreeConfigured) {
     const remote = await getCashfreeOrder(order.cfOrderId);
     if (remote.order_status === "PAID") {
       await settlePaidOrder(order.id, order.cfOrderId);
@@ -256,22 +383,29 @@ export async function afterOrderPaid(orderId: string): Promise<void> {
  * that slips through is caught by the CANCELLED branch of `markOrderPaid`.
  */
 export async function voidPaymentSession(orderId: string): Promise<void> {
-  if (!cashfreeConfigured) return;
+  if (!gatewayConfigured) return;
   try {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
-      select: { paymentMethod: true, paymentStatus: true, cfOrderId: true },
+      select: { paymentMethod: true, paymentStatus: true, cfOrderId: true, paymentIntentId: true },
     });
     if (
       !order ||
       order.paymentMethod !== "ONLINE" ||
-      !order.cfOrderId ||
       order.paymentStatus === "PAID" ||
       order.paymentStatus === "REFUNDED"
     ) {
       return;
     }
-    await terminateCashfreeOrder(order.cfOrderId);
+    if (order.paymentIntentId) {
+      // A payment that already landed comes back as INVALID_STATE; the hub
+      // then sends payment.succeeded and the CANCELLED branch alerts ops.
+      await cancelIntent(order.paymentIntentId, `order:${orderId}:cancel:${order.paymentIntentId}`);
+    } else if (order.cfOrderId && cashfreeConfigured) {
+      await terminateCashfreeOrder(order.cfOrderId);
+    } else {
+      return;
+    }
     await prisma.order.updateMany({
       where: { id: orderId, paymentStatus: { in: ["PENDING", "FAILED"] } },
       data: { paymentSessionId: null },
@@ -280,7 +414,7 @@ export async function voidPaymentSession(orderId: string): Promise<void> {
     // Already paid, already terminated, or the gateway is down — the
     // markOrderPaid guard is the backstop.
     // eslint-disable-next-line no-console
-    console.error("Cashfree terminate failed:", err);
+    console.error("Payment void failed:", err);
   }
 }
 
@@ -297,19 +431,37 @@ async function settlePaidOrder(orderId: string, cfOrderId: string) {
  * hiccup must never break the confirmation page.
  */
 export async function reconcilePendingPayment(orderId: string): Promise<void> {
-  if (!cashfreeConfigured) return;
+  if (!gatewayConfigured) return;
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { id: true, paymentMethod: true, paymentStatus: true, cfOrderId: true },
+    select: {
+      id: true,
+      orderNumber: true,
+      storeSlug: true,
+      total: true,
+      paymentMethod: true,
+      paymentStatus: true,
+      cfOrderId: true,
+      paymentIntentId: true,
+    },
   });
   if (
     !order ||
     order.paymentMethod !== "ONLINE" ||
-    !order.cfOrderId ||
     (order.paymentStatus !== "PENDING" && order.paymentStatus !== "FAILED")
   ) {
     return;
   }
+  if (order.paymentIntentId) {
+    try {
+      await settleIfHubPaid(order, await getIntent(order.paymentIntentId, true));
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("PaymentHub reconcile failed:", err);
+    }
+    return;
+  }
+  if (!order.cfOrderId || !cashfreeConfigured) return;
   try {
     const remote = await getCashfreeOrder(order.cfOrderId);
     if (remote.order_status === "PAID") {

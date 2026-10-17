@@ -70,6 +70,25 @@ const envSchema = z.object({
     .trim()
     .optional()
     .transform((v) => v || undefined),
+  // The hub this environment pays through (dev → https://pay.dev.zontechx.com,
+  // prod → https://pay.zontechx.com) and its API key (ph_test_… on dev,
+  // ph_live_… in production). Never logged.
+  PAYMENTHUB_URL: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v ? v.replace(/\/+$/, "") : undefined)),
+  PAYMENTHUB_API_KEY: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => v || undefined),
+  // true = new ONLINE orders pay through PaymentHub instead of calling
+  // Cashfree directly. Orders already on Cashfree keep settling there.
+  PAYMENTS_VIA_HUB: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
 
   // Platform support contact — printed on the seller's Support page and
   // served to clients at GET /api/v1/public/support-contact. Defaults are the
@@ -180,6 +199,31 @@ if (env.NODE_ENV === "production") {
   if (problems.length > 0) {
     // eslint-disable-next-line no-console
     console.error("❌ Unsafe production configuration:");
+    for (const problem of problems) {
+      // eslint-disable-next-line no-console
+      console.error(`  - ${problem}`);
+    }
+    process.exit(1);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// PaymentHub fail-fast — every environment. Switched on without its URL, key
+// or webhook secret, checkout would fail or payments would never settle; a
+// key of the wrong mode would be refused by the hub on every order.
+// ---------------------------------------------------------------------------
+if (env.PAYMENTS_VIA_HUB) {
+  const problems: string[] = [];
+  if (!env.PAYMENTHUB_URL) problems.push("PAYMENTHUB_URL is required");
+  if (!env.PAYMENTHUB_API_KEY) problems.push("PAYMENTHUB_API_KEY is required");
+  if (!env.PAYMENTHUB_WEBHOOK_SECRET) problems.push("PAYMENTHUB_WEBHOOK_SECRET is required");
+  const expectedPrefix = env.NODE_ENV === "production" ? "ph_live_" : "ph_test_";
+  if (env.PAYMENTHUB_API_KEY && !env.PAYMENTHUB_API_KEY.startsWith(expectedPrefix)) {
+    problems.push(`PAYMENTHUB_API_KEY must be a ${expectedPrefix}… key in this environment`);
+  }
+  if (problems.length > 0) {
+    // eslint-disable-next-line no-console
+    console.error("❌ PAYMENTS_VIA_HUB=true but PaymentHub is misconfigured:");
     for (const problem of problems) {
       // eslint-disable-next-line no-console
       console.error(`  - ${problem}`);

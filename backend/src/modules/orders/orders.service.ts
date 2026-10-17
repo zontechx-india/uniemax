@@ -49,7 +49,7 @@ import {
   notifyOrderStatusChange,
 } from "./orders.notifications.js";
 import {
-  cashfreeConfigured,
+  gatewayConfigured,
   createPaymentSession,
   reconcilePendingPayment,
   voidPaymentSession,
@@ -477,7 +477,7 @@ export async function createOrder(
     throw HttpError.badRequest("This store does not accept cash on delivery");
   }
   // Per-product COD is checked once the lines are priced (below).
-  if (input.paymentMethod === "ONLINE" && isProduction && !cashfreeConfigured) {
+  if (input.paymentMethod === "ONLINE" && isProduction && !gatewayConfigured) {
     // Without gateway keys, production must never pretend a payment happened.
     throw new HttpError(
       503,
@@ -575,9 +575,9 @@ export async function createOrder(
 
   // Real gateway when keys are configured (any env — sandbox keys in dev
   // exercise the real flow); the old dev simulation only without them.
-  const viaGateway = input.paymentMethod === "ONLINE" && cashfreeConfigured;
+  const viaGateway = input.paymentMethod === "ONLINE" && gatewayConfigured;
   const simulated =
-    input.paymentMethod === "ONLINE" && !isProduction && !cashfreeConfigured;
+    input.paymentMethod === "ONLINE" && !isProduction && !gatewayConfigured;
 
   let row: OrderRow;
   try {

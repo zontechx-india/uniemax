@@ -253,7 +253,11 @@ export default function OrderDetailPage() {
                   '—'
                 )}
               </Detail>
-              {order.cfOrderId ? (
+              {order.paymentIntentId ? (
+                <Detail label="PaymentHub intent">
+                  <span className="font-mono text-xs">{order.paymentIntentId}</span>
+                </Detail>
+              ) : order.cfOrderId ? (
                 <Detail label="Gateway order">
                   <span className="font-mono text-xs">{order.cfOrderId}</span>
                 </Detail>

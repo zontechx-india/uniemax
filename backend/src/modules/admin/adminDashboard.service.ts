@@ -1,7 +1,7 @@
 import { prisma } from "../../config/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { mediaUrl } from "../../package/storage/index.js";
-import { cashfreeConfigured } from "../payments/payments.service.js";
+import { gatewayConfigured } from "../payments/payments.service.js";
 import { pushConfigured } from "../../package/push/index.js";
 import type { RangeQuery } from "./admin.schema.js";
 import {
@@ -289,6 +289,6 @@ export async function getDashboard(query: RangeQuery) {
     })),
     // Integration health — surfaced on the dashboard so a missing key is
     // noticed before a customer hits it, not after.
-    integrations: { paymentGateway: cashfreeConfigured, push: pushConfigured },
+    integrations: { paymentGateway: gatewayConfigured, push: pushConfigured },
   };
 }
