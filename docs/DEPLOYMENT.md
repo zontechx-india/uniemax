@@ -89,8 +89,17 @@ database. Only the frontend *root* is shared in the sense that each has its own.
 | URL | `dev.uniemax.zontechx.com` | `uniemax.com`, `www` |
 | Deployed by | push to `main` → `deploy-dev.yml` | tag `v*` + approval → `deploy-prod.yml` |
 | `PAYMENTHUB_WEBHOOK_SECRET` | dev hub's secret, in `~/uniemax-dev/backend/.env.development` | prod hub's secret, in `~/uniemax/backend/.env.production` |
-| `PAYMENTHUB_API_KEY` | dev hub's `ph_test_…` key, same file — **not read by code yet** (reserved for the hub client) | not issued yet |
+| `PAYMENTHUB_API_KEY` | dev hub's TEST key `ph_test_6hl1…`, same file | prod hub's LIVE key `ph_live_kXFI…`, same file |
+| `PAYMENTHUB_URL` | `https://pay.dev.zontechx.com`, same file | `https://pay.zontechx.com`, same file |
 | PaymentHub webhook URL | `https://dev.uniemax.zontechx.com/api/v1/payments/webhooks/paymenthub` | `https://uniemax.com/api/v1/payments/webhooks/paymenthub` |
+
+PaymentHub values come from the **matching** hub (dev ↔ `pay.dev`, prod ↔
+`pay`) — the hubs have separate databases, so a key or secret from the other one
+is rejected. `PAYMENTHUB_API_KEY` / `PAYMENTHUB_URL` are not read by code yet
+(reserved for the hub client); `PAYMENTHUB_WEBHOOK_SECRET` is read at boot, so
+**rotating it in a hub dashboard breaks delivery until the new value is in the
+env file and the backend is restarted** (`pm2 restart <app> --update-env && pm2 save`).
+Both secrets were last rotated on 2026-10-17.
 
 `PORT=4001` comes from `backend/ecosystem.dev.config.cjs`, not from
 `.env.development` — a real env var beats dotenv, so local development still
