@@ -1035,10 +1035,10 @@ const FEW_CATEGORIES = 4
  * else a cover of one of its products already on the page
  * (`categoryPicture`), else the name's first letter: always something real.
  *
- * **A few categories** (≤ `FEW_CATEGORIES`) sit two across on a phone and
- * four on a desktop, so even one or two stay a compact way in rather than a
- * billboard that pushes the first product off a phone's screen. **More**
- * run two to six across, capped at `CATEGORY_TILE_CAP`.
+ * Three across on a phone, four from `sm`, six from `lg`, capped at
+ * `CATEGORY_TILE_CAP` (two full rows on a desktop) — small enough that even
+ * one or two stay a compact way in rather than a billboard that pushes the
+ * first product off a phone's screen.
  */
 function CategoryTiles({
   store,
@@ -1049,26 +1049,15 @@ function CategoryTiles({
   categories: PublicCategory[]
   products: PublicProduct[]
 }) {
-  const few = categories.length <= FEW_CATEGORIES
   return (
-    <ul
-      className={
-        few
-          ? 'mt-4 grid grid-cols-2 gap-3 sm:mt-6 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4'
-          : 'mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-6'
-      }
-    >
+    <ul className="mt-4 grid grid-cols-3 gap-2 sm:mt-6 sm:grid-cols-4 sm:gap-4 lg:grid-cols-6">
       {categories.slice(0, CATEGORY_TILE_CAP).map((category) => (
         <CategoryCard
           key={category.id}
           store={store}
           category={category}
           picture={categoryPicture(category, products)}
-          sizes={
-            few
-              ? '(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw'
-              : '(min-width: 1280px) 16vw, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw'
-          }
+          sizes="(min-width: 1024px) 16vw, (min-width: 640px) 25vw, 33vw"
         />
       ))}
     </ul>
@@ -1099,7 +1088,7 @@ function CategoryCard({
     <li>
       <Link
         to={storeCategoryUrl(store.slug, category.slug)}
-        className="group relative flex aspect-[3/4] flex-col justify-between overflow-hidden rounded-2xl text-white card-hover"
+        className="group relative flex aspect-[3/4] flex-col justify-between overflow-hidden rounded-xl text-white card-hover sm:rounded-2xl"
         style={
           picture
             ? undefined
@@ -1125,13 +1114,13 @@ function CategoryCard({
         ) : (
           <span
             aria-hidden
-            className="absolute right-6 bottom-6 origin-bottom-right scale-[3] font-display text-display leading-none font-bold text-cta-contrast/15"
+            className="absolute right-4 bottom-4 origin-bottom-right scale-[2] font-display text-display leading-none font-bold text-cta-contrast/15"
           >
             {category.name.trim().charAt(0).toUpperCase()}
           </span>
         )}
-        <span className={`relative p-4 sm:p-5 ${picture ? '' : 'text-cta-contrast'}`}>
-          <span className="line-clamp-3 font-display text-xl leading-tight font-bold drop-shadow-sm sm:text-3xl">
+        <span className={`relative p-2.5 sm:p-4 ${picture ? '' : 'text-cta-contrast'}`}>
+          <span className="line-clamp-3 font-display text-sm leading-tight font-bold drop-shadow-sm sm:text-xl">
             {category.name}
           </span>
           <span className="mt-1 block text-xs font-medium opacity-80">
@@ -1139,12 +1128,15 @@ function CategoryCard({
           </span>
         </span>
         <span
-          className={`relative flex items-center gap-2 p-4 text-xs font-semibold tracking-widest uppercase sm:p-5 ${
+          className={`relative flex items-center gap-1 p-2.5 text-xs font-semibold tracking-wide uppercase sm:gap-2 sm:p-4 sm:tracking-widest ${
             picture ? '' : 'text-cta-contrast'
           }`}
         >
-          <ArrowUpRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 motion-reduce:transition-none" />
-          Shop now
+          <ArrowUpRightIcon className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 motion-reduce:transition-none sm:h-4 sm:w-4" />
+          {/* "Shop" alone on a phone's narrow card, so it never wraps. */}
+          <span>
+            Shop<span className="hidden sm:inline"> now</span>
+          </span>
         </span>
       </Link>
     </li>

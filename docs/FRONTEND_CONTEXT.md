@@ -1150,9 +1150,10 @@ full-bleed section bands instead.
     poster on a gradient of the **store owner's** colour (`--cta` →
     `--cta-lo`, text `--cta-contrast`) with the initial as a large faded
     mark. **A shop with ≤ 4 categories** (`FEW_CATEGORIES`) gets tiles by
-    default — unless the owner chose a layout in the Store Builder — 2/3/4
-    across (phone/`sm`/`lg`); more run 2/3/4/6 across, capped at 12.
-    (Landscape cards with a coloured "N products · Shop ›" footer band,
+    default — unless the owner chose a layout in the Store Builder. Tiles
+    run 3/4/6 across (phone/`sm`/`lg`), capped at 12; on a phone the call
+    reads just "↗ SHOP" so it never wraps. (2/3/4 across, 18 Oct 2026, made
+    the cards too big; landscape cards with a coloured "N products · Shop ›" footer band,
     18 Oct 2026, boxed the photo in; a small framed photo inside a padded
     card looked pasted in; full-width 4:5 tiles filled a phone's first
     screen with two categories; 80px chips had left a desktop row empty.)
