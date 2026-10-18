@@ -37,10 +37,18 @@ export interface PurchaseTarget {
  * next to **Add to Cart**, with **Buy Now** beneath it (add, then straight to
  * this store's checkout — orders are placed per store).
  *
- * The quantity is local until the customer commits it, which is what makes a
- * "3 × Add to Cart" possible; the live cart line is only *reported* ("N in
- * cart"), never mirrored into the selector — a stepper that silently rewrote
- * the cart on every tap made the button meaningless.
+ * There is only ever ONE quantity on screen:
+ *
+ * | Line in cart? | Selector shows                  | Beside it          |
+ * | ------------- | ------------------------------- | ------------------ |
+ * | no            | how many to add (local, from 1) | **Add to Cart**    |
+ * | yes           | the cart line itself — each tap writes the cart | **View Cart** |
+ *
+ * Two numbers side by side (a local "how many to add" next to "N in your
+ * cart") read as one: shoppers stepped to 10, never pressed Add, and found 6
+ * in the cart. Once the line exists the selector IS the line, so what the
+ * page shows is what the cart holds — for guests and signed-in shoppers
+ * alike (the sync mirrors the local cart either way).
  *
  * Adding pops the short **"Added to cart — View cart"** toast, closing the
  * feedback loop.
@@ -83,9 +91,31 @@ export function PurchaseActions({
       },
       qty,
     )
+    // The selector now shows the cart line; if that line is later removed,
+    // "how many to add" starts over at one rather than at a stale count.
+    setQty(1)
     setAdded(true)
     window.clearTimeout(toastTimer.current)
     toastTimer.current = window.setTimeout(() => setAdded(false), TOAST_MS)
+  }
+
+  /**
+   * Set the cart line to `next`. The page holds live price and stock, so they
+   * are written onto the line first: the cart caps a quantity at the line's
+   * snapshotted stock, and a snapshot from days ago must not hold the
+   * selector below what is really available (or above it).
+   */
+  const setCartQty = (next: number) => {
+    cart.sync([
+      {
+        storeSlug: target.storeSlug,
+        productId: target.productId,
+        variantId: target.variantId,
+        price: target.price,
+        stockQuantity: target.stock,
+      },
+    ])
+    cart.setQty(target.storeSlug, target.productId, target.variantId, next)
   }
 
   if (target.stock <= 0) {
@@ -99,25 +129,38 @@ export function PurchaseActions({
   }
 
   const buyNow = () => {
-    // "Buy Now" means THIS quantity: a line already in the cart is set to
-    // it, not added to — tapping Buy Now twice must not order two.
-    if (inCart > 0) {
-      cart.setQty(target.storeSlug, target.productId, target.variantId, qty)
-    } else {
-      addToCart()
-    }
+    // Already in the cart: the selector already shows (and set) the line, so
+    // check out what is there — tapping Buy Now twice must not order two.
+    if (inCart === 0) addToCart()
     navigate(`/checkout/${target.storeSlug}`)
   }
+
+  const viewCart = (
+    <Link
+      to={cartUrl(target.storeSlug)}
+      className={buttonClass({ variant: 'secondary', className: 'flex-1' })}
+    >
+      <CheckIcon className="h-4 w-4 text-success" />
+      {compact ? 'In Cart' : 'View Cart'}
+    </Link>
+  )
 
   if (compact) {
     return (
       <>
         {/* Add sits beside Buy Now, so it takes the Ring: same gradient
-            family, no competing weight. Buy Now is the committing action. */}
-        <Button variant="secondary" onClick={addToCart} className="flex-1">
-          <CartIcon className="h-4 w-4" />
-          Add
-        </Button>
+            family, no competing weight. Buy Now is the committing action.
+            Once the line exists the bar points at the cart instead — a
+            second "Add" here would silently grow a quantity the selector
+            above is showing. */}
+        {inCart > 0 ? (
+          viewCart
+        ) : (
+          <Button variant="secondary" onClick={addToCart} className="flex-1">
+            <CartIcon className="h-4 w-4" />
+            Add
+          </Button>
+        )}
         <Button variant="primary" onClick={buyNow} className="flex-1">
           Buy Now
         </Button>
@@ -129,16 +172,26 @@ export function PurchaseActions({
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
-        <QuantityStepper
-          qty={qty}
-          max={max}
-          onChange={setQty}
-          skin={skin}
-        />
-        <Button variant="secondary" onClick={addToCart} className="flex-1">
-          <CartIcon className="h-4 w-4" />
-          Add to Cart
-        </Button>
+        {inCart > 0 ? (
+          // The cart line itself: every tap writes the cart. Minus stops at
+          // 1, as on the cart page — removing is a deliberate act there.
+          <QuantityStepper
+            qty={inCart}
+            max={max}
+            onChange={setCartQty}
+            skin={skin}
+          />
+        ) : (
+          <QuantityStepper qty={qty} max={max} onChange={setQty} skin={skin} />
+        )}
+        {inCart > 0 ? (
+          viewCart
+        ) : (
+          <Button variant="secondary" onClick={addToCart} className="flex-1">
+            <CartIcon className="h-4 w-4" />
+            Add to Cart
+          </Button>
+        )}
       </div>
 
       {/* The one committing action on the product page. */}
@@ -147,11 +200,8 @@ export function PurchaseActions({
       </Button>
 
       {inCart > 0 && (
-        <p className={`text-xs ${skin.muted}`}>
-          {inCart} already in your{' '}
-          <Link to={cartUrl(target.storeSlug)} className="font-semibold text-brand hover:underline">
-            cart
-          </Link>
+        <p role="status" aria-live="polite" className={`text-xs ${skin.muted}`}>
+          {inCart} in your cart — changing the quantity updates it
         </p>
       )}
 

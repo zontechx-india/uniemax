@@ -43,6 +43,8 @@ let generation = 0
 /** True once local and server are known to agree — pushing before this
  *  could overwrite another device's cart with a cart we never reconciled. */
 let hydrated = false
+/** A reconciliation request is in flight (see `hydrate`). */
+let hydrating = false
 /** What the server was last told, so an echo of our own write is not
  *  pushed straight back. */
 let lastPushed: string | null = null
@@ -74,21 +76,35 @@ function cancelPendingPush() {
  * so a cart we never reconciled can never overwrite the stored one.
  */
 async function hydrate(customerId: string) {
+  // One reconciliation at a time: taps made while it is in flight are picked
+  // up by the running one (below), not by a second racing request.
+  if (hydrating) return
+  hydrating = true
   const mine = generation
-  const local = cart.items()
   try {
-    // A guest cart must not be thrown away, and an account cart must not be
-    // thrown away either — so the only safe operation on a non-empty local
-    // cart is the union. With nothing local there is nothing to reconcile.
-    const server = local.length > 0 ? await cartApi.merge(local) : await cartApi.get()
-    if (generation !== mine || syncingCustomerId !== customerId) return
-    cart.replaceAll(server)
-    lastPushed = signature(server)
-    hydrated = true
+    for (let attempt = 1; ; attempt++) {
+      const local = cart.items()
+      // A guest cart must not be thrown away, and an account cart must not be
+      // thrown away either — so the only safe operation on a non-empty local
+      // cart is the union. With nothing local there is nothing to reconcile.
+      const server = local.length > 0 ? await cartApi.merge(local) : await cartApi.get()
+      if (generation !== mine || syncingCustomerId !== customerId) return
+      // The shopper changed the cart during the round trip (a tap right after
+      // page load). Applying `server` now would wipe that change, so reconcile
+      // again with the newer cart. Bounded, so a cart that never sits still
+      // cannot loop forever.
+      if (signature(cart.items()) !== signature(local) && attempt < 3) continue
+      cart.replaceAll(server)
+      lastPushed = signature(server)
+      hydrated = true
+      return
+    }
   } catch {
     // Offline, or the session died between the probe and here. The local
     // cart is untouched and still fully usable; the next change retries.
-    hydrated = false
+    if (generation === mine) hydrated = false
+  } finally {
+    if (generation === mine) hydrating = false
   }
 }
 
@@ -139,6 +155,7 @@ export function startCartSync(customerId: string) {
   generation += 1
   syncingCustomerId = customerId
   hydrated = false
+  hydrating = false
   lastPushed = null
 
   void hydrate(customerId)
@@ -169,6 +186,7 @@ export function stopCartSync() {
   generation += 1
   syncingCustomerId = null
   hydrated = false
+  hydrating = false
   lastPushed = null
   cancelPendingPush()
   unsubscribe?.()
