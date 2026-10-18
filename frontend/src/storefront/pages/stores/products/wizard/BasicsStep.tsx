@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { toApiError } from '../../../../../shared/auth/http'
-import { CheckIcon, PlusIcon, SlidersIcon, TagIcon } from '../../../../layout/icons'
+import { CheckIcon, PlusIcon, TagIcon } from '../../../../layout/icons'
 import { Button } from '../../../../../shared/ui/Button'
 import { CategoryChooserSheet } from '../../ui/CategoryChooserSheet'
 import { showToast } from '../../ui/Toast'
@@ -9,10 +9,9 @@ import type {
   StoreCategory,
   StoreProduct,
 } from '../../../../features/stores/storesApi'
-import { exampleChoice, findNameHint, listWords, withoutWord } from './choicesHelp'
+import { exampleChoice, findNameHint, listWords, VersionCard, withoutWord } from './choicesHelp'
 import {
   categoryOptions,
-  ChoiceCard,
   Field,
   inputClass,
   StepButtons,
@@ -193,19 +192,21 @@ export function BasicsStep({
           <p className="mb-1.5 text-base font-semibold text-fg">
             Do you have it in more than one colour, size or weight?
           </p>
-          <div role="radiogroup" aria-label="More than one colour, size or weight?" className="grid gap-3 sm:grid-cols-2">
-            <ChoiceCard
+          <div role="radiogroup" aria-label="More than one colour, size or weight?" className="grid grid-cols-2 gap-3">
+            <VersionCard
+              many={false}
+              values={example.values}
               active={plan === 'one'}
-              icon={TagIcon}
               title="No, just one"
-              body="One price and one stock count."
+              body="One price, one stock count."
               onClick={() => onPlanChange('one')}
             />
-            <ChoiceCard
+            <VersionCard
+              many
+              values={example.values}
               active={plan === 'many'}
-              icon={SlidersIcon}
               title="Yes, more than one"
-              body={`Like ${listWords(example.values)}. Put them all in this one product — not a new product for each.`}
+              body={`Like ${listWords(example.values)} — all in this one product.`}
               onClick={() => onPlanChange('many')}
             />
           </div>

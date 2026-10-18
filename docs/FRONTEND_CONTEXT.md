@@ -1260,10 +1260,15 @@ full-bleed section bands instead.
     always; an
     unmatched combination shows "This combination isn't available" and
     disables purchase through stock 0) →
-    **quantity selector + Add to Cart + Buy Now** (`PurchaseActions`; Buy Now
-    adds the line — or, if it is already in the cart, SETS it to the chosen
-    quantity, so a second Buy Now never orders two — then goes straight to
-    `/checkout/{storeSlug}`) → the delivery check → ONE bordered
+    **quantity selector + Add to Cart + Buy Now** (`PurchaseActions`). Only
+    one quantity is ever on screen: before the line exists the selector is
+    "how many to add" beside **Add to Cart**; once it exists the selector IS
+    the cart line (every tap writes the cart, live price/stock applied
+    first; minus stops at 1) beside a **View Cart** link, with "N in your
+    cart — changing the quantity updates it" under Buy Now. The sticky bar's
+    **Add** likewise becomes **In Cart**. Buy Now adds the line if absent,
+    else checks out what is there (a second Buy Now never orders two), then
+    goes straight to `/checkout/{storeSlug}`) → the delivery check → ONE bordered
     "Delivery and payment" panel holding the delivery rows and the trust
     badges (three blocks in three styles read as clutter). The spec table is
     capped at `max-w-3xl` with a 1/3 label column, and labels typed in
@@ -1465,7 +1470,10 @@ unchanged.
   still a working cart. Until the reconciliation has succeeded the sync stays
   *un-hydrated* and the next local change **retries the reconciliation instead
   of pushing** — a cart that was never reconciled can never overwrite the
-  stored one.
+  stored one. Only one reconciliation runs at a time; if the cart changed
+  while it was in flight (a tap right after page load) it reconciles again
+  with the newer cart (up to 3 tries) instead of applying a response that
+  would wipe that tap.
 **Logging out empties the cart in this browser** — `stopCartSync()` **then**
 `cart.clear()`, wired into the storefront's `signOut` in `StorefrontApp.tsx`.
 The order matters: clearing first would mirror the empty cart and destroy the
@@ -2124,7 +2132,10 @@ is never shown a pickup-address item.
   `CategoryChooserSheet`, adds the pick, refreshes the page's list via
   `onCategoriesChange` and selects it without leaving the product)
   (name + category, and **"Do you have it in more than one colour, size or
-  weight?"** as two cards — sellers who met that question only at step 3 had
+  weight?"** as two picture cards side by side (`choicesHelp.VersionCard`:
+  one shirt vs the same shirt three times — in the category example's
+  colours when every value is a drawable colour (a small product-swatch map,
+  data not theme tokens), else in three sizes) — sellers who met that question only at step 3 had
   named and photographed one colour and made a product per colour. The
   answer (`VersionPlan`, wizard state only, never saved) changes step 2's
   lead to "a photo of every colour" and pre-picks step 3's answer. A colour

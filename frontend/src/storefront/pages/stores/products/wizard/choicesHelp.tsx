@@ -76,6 +76,132 @@ export function listWords(values: string[]): string {
   return `${values.slice(0, -1).join(', ')} and ${values[values.length - 1]}`
 }
 
+/** One shirt, 48×48 — the same shape in every colour is the whole idea. */
+const SHIRT =
+  'M17 6 8 10 3 19l7 4 2-3v22h24V20l2 3 7-4-5-9-9-4c-1 3-3.5 5-7 5s-6-2-7-5Z'
+
+/**
+ * Product colours, not UI colours: a swatch shows the cloth the seller
+ * sells, so these are data (like a variant swatch), not theme tokens.
+ */
+const SWATCH: Record<string, string> = {
+  black: '#262A33', white: '#F7F7F4', grey: '#9AA0AA', gray: '#9AA0AA', red: '#D2393F',
+  maroon: '#7D2235', pink: '#E87BA4', blue: '#3B6FD8', navy: '#24366B', green: '#2E9E6A',
+  yellow: '#F2C14E', orange: '#EE8A3C', purple: '#7B4FD6', brown: '#8A5A3B', beige: '#DCCBAE',
+  cream: '#F1E7D0', gold: '#D1A637', silver: '#C3C8CF', peach: '#F4B394', teal: '#2C9A9A',
+}
+
+/** The example's values as swatches — only when every one is a colour we can draw. */
+function swatches(values: string[]): string[] | null {
+  const colours = values.map((v) => SWATCH[v.trim().toLowerCase()])
+  return colours.length >= 3 && colours.every(Boolean) ? (colours as string[]) : null
+}
+
+function Shirt({ fill, transform }: { fill: string; transform?: string }) {
+  return (
+    <g transform={transform}>
+      <path
+        d={SHIRT}
+        fill={fill}
+        stroke="var(--fg)"
+        strokeOpacity={0.22}
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+    </g>
+  )
+}
+
+/**
+ * One shirt, or the same shirt three times: in the category's example
+ * colours when they are colours (Black / White / Blue), else in three sizes
+ * — which reads as "S, M, L" or "500 g, 1 kg, 2 kg" just as well.
+ */
+function VersionPicture({ many, values }: { many: boolean; values: string[] }) {
+  const colours = swatches(values)
+  const brand = 'var(--brand)'
+  if (!many) {
+    return (
+      <svg viewBox="0 0 48 48" className="h-14 w-14">
+        <Shirt fill={colours?.[0] ?? brand} />
+      </svg>
+    )
+  }
+  if (colours) {
+    return (
+      <svg viewBox="0 0 112 52" className="h-14 w-auto">
+        <Shirt fill={colours[1]!} transform="translate(6 6) rotate(-12 24 24)" />
+        <Shirt fill={colours[2]!} transform="translate(58 6) rotate(12 24 24)" />
+        <Shirt fill={colours[0]!} transform="translate(32 2)" />
+      </svg>
+    )
+  }
+  return (
+    <svg viewBox="0 0 112 52" className="h-14 w-auto">
+      <Shirt fill={brand} transform="translate(4 24) scale(0.55)" />
+      <Shirt fill={brand} transform="translate(34 14) scale(0.75)" />
+      <Shirt fill={brand} transform="translate(68 2) scale(1)" />
+    </svg>
+  )
+}
+
+/**
+ * Step 1's "one or many?" answer as a picture card: a single shirt, or the
+ * same shirt in three colours (or sizes). Sellers read the drawing before
+ * the words. Wrap a pair in a `role="radiogroup"`.
+ */
+export function VersionCard({
+  many,
+  values,
+  active,
+  title,
+  body,
+  onClick,
+}: {
+  many: boolean
+  /** The category's example values, so the picture matches the words. */
+  values: string[]
+  active: boolean
+  title: string
+  body: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      onClick={onClick}
+      className={`relative flex flex-col rounded-2xl border p-2.5 text-left transition ${
+        active
+          ? 'border-brand bg-brand-soft ring-2 ring-brand/25'
+          : 'border-line bg-surface/70 hover:border-brand/60'
+      }`}
+    >
+      <span
+        aria-hidden
+        className={`flex h-24 items-end justify-center rounded-xl pb-3 transition-colors ${
+          active ? 'bg-surface/80' : 'bg-fg/5'
+        }`}
+      >
+        <VersionPicture many={many} values={values} />
+      </span>
+      <span
+        aria-hidden
+        className={`absolute top-4 right-4 flex h-5 w-5 items-center justify-center rounded-full border-2 bg-surface ${
+          active ? 'border-brand' : 'border-fg/25'
+        }`}
+      >
+        {active && <span className="h-2.5 w-2.5 rounded-full bg-brand" />}
+      </span>
+      <span className="px-1 pt-2.5 pb-1">
+        <span className="block text-base font-bold text-fg">{title}</span>
+        <span className="mt-0.5 block text-hint text-muted">{body}</span>
+      </span>
+    </button>
+  )
+}
+
 /**
  * A small drawing of the product page with a choice on it — the seller sees
  * what "choices" means before deciding, with their own photo and name.
