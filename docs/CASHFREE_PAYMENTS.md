@@ -197,7 +197,8 @@ The storefront is unchanged — it still opens the Cashfree SDK with
 Each order stays on the provider it started with: an order with a `cfOrderId`
 keeps settling through Cashfree after the switch, but a *new* attempt for it
 goes through the hub. Refunds through the hub are not wired yet (same gap as
-below). Switch: [DEPLOYMENT.md](./DEPLOYMENT.md) — on for dev, off for prod.
+below). Switch: [DEPLOYMENT.md](./DEPLOYMENT.md) — on for dev and prod (prod since 2026-10-18). Orders placed on prod
+before then stay on direct Cashfree and never appear in the hub.
 
 ## Data model (Order)
 

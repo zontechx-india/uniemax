@@ -92,7 +92,7 @@ database. Only the frontend *root* is shared in the sense that each has its own.
 | `PAYMENTHUB_API_KEY` | dev hub's TEST key `ph_test_6hl1…`, same file | prod hub's LIVE key `ph_live_kXFI…`, same file |
 | `PAYMENTHUB_URL` | `https://pay.dev.zontechx.com`, same file | `https://pay.zontechx.com`, same file |
 | PaymentHub webhook URL | `https://dev.uniemax.zontechx.com/api/v1/payments/webhooks/paymenthub` | `https://uniemax.com/api/v1/payments/webhooks/paymenthub` |
-| `PAYMENTS_VIA_HUB` | `true` — checkout pays through `pay.dev` (Cashfree **sandbox**, no real money) | unset (`false`) — checkout still calls Cashfree directly (live) |
+| `PAYMENTS_VIA_HUB` | `true` — checkout pays through `pay.dev` (Cashfree **sandbox**, no real money) | `true` since 2026-10-18 (`v1.49.0`) — checkout pays through `pay` (Cashfree production, live), in `.env.production` |
 
 PaymentHub values come from the **matching** hub (dev ↔ `pay.dev`, prod ↔
 `pay`) — the hubs have separate databases, so a key or secret from the other one
