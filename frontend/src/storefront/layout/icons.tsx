@@ -537,6 +537,15 @@ export function ArrowRightIcon({ className }: { className?: string }) {
   )
 }
 
+/** Up-right arrow — "go in" on a picture card. */
+export function ArrowUpRightIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M7 17 17 7M8.5 7H17v8.5" />
+    </Svg>
+  )
+}
+
 /** Chain link — a store's shareable address. */
 export function LinkIcon({ className }: { className?: string }) {
   return (

@@ -1141,20 +1141,21 @@ full-bleed section bands instead.
     reads in full. The picture is `categoryPicture()`: the shelf's
     `imageUrl` (seller's, else the taxonomy's — from the public shell), else
     the cover of one of its products already on the page, else the first
-    letter. The `tiles` layout draws every category as a **picture card**
-    (`CategoryCard`, after the marketplace's brand tiles): the photo fills
-    the card edge to edge (`object-cover`), the name sits top-left in white
-    on a top scrim (`from-scrim`), and a bottom band shows "N products ·
-    Shop ›" on a gradient of the **store owner's** colour (`--cta` →
-    `--cta-lo`, text `--cta-contrast`). No picture → the card keeps its
-    shape on the well, the initial as a faded corner mark and the name in
-    the page's text colour. **A shop with ≤ 4 categories**
-    (`FEW_CATEGORIES`) gets tiles by default — unless the owner chose a
-    layout in the Store Builder — two across on a phone and four from `lg`,
-    4:3 then 16:9 from `sm`; more run 2/3/4/6 across at 4:3, capped at 12.
-    (A small framed photo inside a padded card, 18 Oct 2026, looked pasted
-    in; full-width 4:5 tiles before that filled a phone's first screen with
-    two categories; 80px chips had left a desktop row empty.)
+    letter. The `tiles` layout draws every category as a **portrait 3:4
+    poster card** (`CategoryCard`): the photo fills the card edge to edge
+    (`object-cover`) under one scrim dark at both ends (`from-scrim
+    via-transparent to-scrim`); the name sits top-left, big and bold in
+    white, with "N products" under it, and "↗ SHOP NOW" (caps, wide
+    tracking, `ArrowUpRightIcon`) sits bottom-left. No picture → a solid
+    poster on a gradient of the **store owner's** colour (`--cta` →
+    `--cta-lo`, text `--cta-contrast`) with the initial as a large faded
+    mark. **A shop with ≤ 4 categories** (`FEW_CATEGORIES`) gets tiles by
+    default — unless the owner chose a layout in the Store Builder — 2/3/4
+    across (phone/`sm`/`lg`); more run 2/3/4/6 across, capped at 12.
+    (Landscape cards with a coloured "N products · Shop ›" footer band,
+    18 Oct 2026, boxed the photo in; a small framed photo inside a padded
+    card looked pasted in; full-width 4:5 tiles filled a phone's first
+    screen with two categories; 80px chips had left a desktop row empty.)
   - **`StoreIntro`** — when no banner is on screen, the homepage opens on
     the shop's introduction instead of straight into a grid: logo (or its
     initial on the shop colour), the name as the visible `<h1>`, the About

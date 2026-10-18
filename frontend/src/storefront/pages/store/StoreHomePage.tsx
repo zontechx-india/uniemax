@@ -51,7 +51,12 @@ import {
   GridSkeleton,
   SectionHeading,
 } from '../../features/publicStore/ListingControls'
-import { CheckIcon, ChevronLeftIcon, ChevronRightIcon } from '../../layout/icons'
+import {
+  ArrowUpRightIcon,
+  CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+} from '../../layout/icons'
 import type { Skin } from '../../features/publicStore/storeTheme'
 import { BannerCarousel } from '../../features/banners/BannerCarousel'
 import {
@@ -960,7 +965,6 @@ function CategoryStrip({
           store={store}
           categories={categories}
           products={products}
-          skin={skin}
         />
       ) : (
         // Soft-square pictures with the name underneath — the same neutral
@@ -1040,19 +1044,17 @@ function CategoryTiles({
   store,
   categories,
   products,
-  skin,
 }: {
   store: PublicStore
   categories: PublicCategory[]
   products: PublicProduct[]
-  skin: Skin
 }) {
   const few = categories.length <= FEW_CATEGORIES
   return (
     <ul
       className={
         few
-          ? 'mt-4 grid grid-cols-2 gap-3 sm:mt-6 sm:gap-4 lg:grid-cols-4'
+          ? 'mt-4 grid grid-cols-2 gap-3 sm:mt-6 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4'
           : 'mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-6'
       }
     >
@@ -1062,13 +1064,11 @@ function CategoryTiles({
           store={store}
           category={category}
           picture={categoryPicture(category, products)}
-          wide={few}
           sizes={
             few
-              ? '(min-width: 1024px) 25vw, 50vw'
+              ? '(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw'
               : '(min-width: 1280px) 16vw, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw'
           }
-          skin={skin}
         />
       ))}
     </ul>
@@ -1076,35 +1076,35 @@ function CategoryTiles({
 }
 
 /**
- * One category as a picture card, after the marketplace's brand tiles: the
- * photo fills the card edge to edge (a framed thumbnail inside a padded card
- * looked like a pasted-in image), the name sits top-left on a soft scrim so
- * it reads on any photo, and a band along the bottom carries the count and
- * "Shop ›" in the **store owner's** colour (`--cta` → `--cta-lo`), never
- * a fixed platform hue. A shelf with no picture keeps the card shape, its
- * initial as a faded corner mark, and the name in the page's own text colour.
+ * One category as a **portrait** poster card: the photo fills the card edge
+ * to edge, the name sits big and bold top-left over a scrim so it reads on
+ * any photo, and an "↗ Shop now" call sits bottom-left over a second scrim —
+ * no coloured footer band boxing the picture in. A shelf with no picture
+ * becomes a solid poster in the **store owner's** colour (`--cta` →
+ * `--cta-lo`, never a fixed platform hue) with its initial as a large faded
+ * mark, so it still looks deliberate beside the photo cards.
  */
 function CategoryCard({
   store,
   category,
   picture,
-  wide,
   sizes,
-  skin,
 }: {
   store: PublicStore
   category: PublicCategory
   picture: string | null
-  /** Landscape from `sm` up — the few-categories row, whose cards are wide. */
-  wide: boolean
   sizes: string
-  skin: Skin
 }) {
   return (
     <li>
       <Link
         to={storeCategoryUrl(store.slug, category.slug)}
-        className={`group relative flex aspect-[4/3] flex-col overflow-hidden rounded-2xl card-hover ${wide ? 'sm:aspect-[16/9]' : ''} ${skin.well}`}
+        className="group relative flex aspect-[3/4] flex-col justify-between overflow-hidden rounded-2xl text-white card-hover"
+        style={
+          picture
+            ? undefined
+            : { backgroundImage: 'linear-gradient(150deg, var(--cta) 0%, var(--cta-lo) 100%)' }
+        }
       >
         {picture ? (
           <>
@@ -1116,38 +1116,35 @@ function CategoryCard({
               decoding="async"
               className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105 motion-reduce:transition-none"
             />
+            {/* One scrim, dark at both ends: the name above, the call below. */}
             <span
               aria-hidden
-              className="absolute inset-x-0 top-0 h-2/3 bg-gradient-to-b from-scrim to-transparent"
+              className="absolute inset-0 bg-gradient-to-b from-scrim via-transparent to-scrim"
             />
           </>
         ) : (
-          // The initial as a faded corner mark, clear of the name on any width.
           <span
             aria-hidden
-            className="absolute right-3 bottom-11 font-display text-display leading-none font-bold text-brand/25 sm:right-4"
+            className="absolute right-6 bottom-6 origin-bottom-right scale-[3] font-display text-display leading-none font-bold text-cta-contrast/15"
           >
             {category.name.trim().charAt(0).toUpperCase()}
           </span>
         )}
-        <span
-          className={`relative line-clamp-2 p-3 font-display text-lg leading-tight font-bold sm:p-4 ${
-            picture ? 'text-white drop-shadow-sm' : skin.text
-          }`}
-        >
-          {category.name}
-        </span>
-        <span
-          className="relative mt-auto flex items-center justify-between gap-2 px-3 py-2 text-sm font-semibold text-cta-contrast sm:px-4"
-          style={{ backgroundImage: 'linear-gradient(90deg, var(--cta) 0%, var(--cta-lo) 100%)' }}
-        >
-          <span className="truncate">
+        <span className={`relative p-4 sm:p-5 ${picture ? '' : 'text-cta-contrast'}`}>
+          <span className="line-clamp-3 font-display text-xl leading-tight font-bold drop-shadow-sm sm:text-3xl">
+            {category.name}
+          </span>
+          <span className="mt-1 block text-xs font-medium opacity-80">
             {category.productCount} {category.productCount === 1 ? 'product' : 'products'}
           </span>
-          <span className="flex shrink-0 items-center gap-0.5">
-            Shop
-            <ChevronRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
-          </span>
+        </span>
+        <span
+          className={`relative flex items-center gap-2 p-4 text-xs font-semibold tracking-widest uppercase sm:p-5 ${
+            picture ? '' : 'text-cta-contrast'
+          }`}
+        >
+          <ArrowUpRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 motion-reduce:transition-none" />
+          Shop now
         </span>
       </Link>
     </li>
