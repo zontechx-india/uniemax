@@ -2126,9 +2126,18 @@ is never shown a pickup-address item.
   over a scrolling step whose Back / Continue bar (`StepButtons`) is sticky.
   From `sm` up it stays inline in a `glass-card` with a 44px clickable step
   row. Fields are 48px (`inputClass` = `h-field`), labels 15px, hints 13px.
-  **1 What is it?** (the name, then the category as big tappable cards —
-  the shop's most specific categories first, each with "in {group}" under it
-  — instead of a dropdown of paths, plus **Add a new category**, which opens
+  **1 What is it?** (the name, then the category in two labelled steps
+  (`wizard/CategoryPick.tsx`): **① Main category** as chips (the shop's root
+  categories; hidden when there is only one) and **② Sub-category in
+  {main}** as radio cards grouped under small headings for the levels in
+  between (WOMEN: Sarees, Kurtis · MEN: Shirts). Middle levels are headings,
+  not choices, each with a quiet "Something else in Women" row; a main with
+  nothing inside is itself the answer; a search box appears past 12
+  sub-categories; a green line shows the full path ("Fashion › Women ›
+  **Sarees**"). A flat list of identical cards mixed Sarees, Women and
+  Fashion and sellers could not tell them apart. A **new** product starts
+  with no category chosen unless the shop has exactly one leaf (a pre-picked
+  first card was tapped straight past). "Not in the list? **Add a category**" opens
   `CategoryChooserSheet`, adds the pick, refreshes the page's list via
   `onCategoriesChange` and selects it without leaving the product)
   (name + category, and **"Do you have it in more than one colour, size or
@@ -2998,6 +3007,7 @@ frontend/
     │           │   ├── wizard/               # ProductWizard — steps, progress, review/publish
     │           │   │   ├── ProductWizard.tsx    # Full-screen on phones (portal) / inline card; step sheet; Review
     │           │   │   ├── BasicsStep.tsx       # Name + "more than one colour?" + category → creates the draft
+    │           │   │   ├── CategoryPick.tsx     # ① Main category chips → ② grouped sub-category cards
     │           │   │   ├── PhotosStep.tsx       # Media Board on the draft
     │           │   │   ├── PricingStep.tsx      # One version / choices → Choices screen → Prices screen
     │           │   │   ├── choicesHelp.tsx      # Colour/weight-in-name hint, category example, ChoicesPreview

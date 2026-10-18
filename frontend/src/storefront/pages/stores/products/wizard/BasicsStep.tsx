@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { toApiError } from '../../../../../shared/auth/http'
-import { CheckIcon, PlusIcon, TagIcon } from '../../../../layout/icons'
 import { Button } from '../../../../../shared/ui/Button'
 import { CategoryChooserSheet } from '../../ui/CategoryChooserSheet'
 import { showToast } from '../../ui/Toast'
@@ -10,8 +9,8 @@ import type {
   StoreProduct,
 } from '../../../../features/stores/storesApi'
 import { exampleChoice, findNameHint, listWords, VersionCard, withoutWord } from './choicesHelp'
+import { CategoryPick } from './CategoryPick'
 import {
-  categoryOptions,
   Field,
   inputClass,
   StepButtons,
@@ -69,7 +68,6 @@ export function BasicsStep({
   const [kept, setKept] = useState<string | null>(null)
 
   const shelf = categories.find((c) => c.id === categoryId) ?? null
-  const options = shelfOptions(categories)
   // Only a product not yet priced or split into choices — one that is has
   // answered this already, and step 3 is where it changes.
   const askPlan =
@@ -103,7 +101,7 @@ export function BasicsStep({
 
   const next = async () => {
     if (!name.trim()) return setError('Give the product a name first.')
-    if (!categoryId) return setError('Choose a category.')
+    if (!categoryId) return setError('Choose the sub-category it belongs in — tap one under “Which category is it in?”.')
     setError(null)
 
     const unchanged =
@@ -214,54 +212,16 @@ export function BasicsStep({
       )}
 
       <div>
-        <p className="mb-1.5 text-base font-semibold text-fg">Which category is it in?</p>
-        <div role="radiogroup" aria-label="Category" className="grid gap-2 sm:grid-cols-2">
-          {options.map((option) => {
-            const selected = option.id === categoryId
-            return (
-              <button
-                key={option.id}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                onClick={() => setCategoryId(option.id)}
-                className={`flex min-h-[60px] items-center gap-3 rounded-2xl border px-3.5 py-2.5 text-left transition ${
-                  selected
-                    ? 'border-brand bg-brand-soft ring-2 ring-brand/25'
-                    : 'border-line bg-surface/70 hover:border-brand/50'
-                }`}
-              >
-                <span
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                    selected ? 'bg-brand text-brand-contrast' : 'bg-fg/5 text-muted'
-                  }`}
-                >
-                  {selected ? <CheckIcon className="h-5 w-5" /> : <TagIcon className="h-5 w-5" />}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-base font-semibold break-words text-fg">{option.name}</span>
-                  {option.group && (
-                    <span className="block truncate text-hint text-muted">in {option.group}</span>
-                  )}
-                </span>
-              </button>
-            )
-          })}
-          <button
-            type="button"
-            onClick={() => setChoosing(true)}
-            className="flex min-h-[60px] items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-brand/40 px-3.5 text-base font-semibold text-brand transition hover:bg-brand-soft"
-          >
-            <PlusIcon className="h-5 w-5" />
-            Add a new category
-          </button>
-        </div>
-        {shelf?.taxonomy && (
-          <p className="mt-1.5 text-hint text-muted">
-            Customers find it under <span className="text-fg">{shelf.taxonomy.pathLabel}</span>,
-            and through search.
-          </p>
-        )}
+        <p className="mb-3 text-base font-semibold text-fg">Which category is it in?</p>
+        <CategoryPick
+          categories={categories}
+          value={categoryId}
+          onChange={(id) => {
+            setCategoryId(id)
+            setError(null)
+          }}
+          onAdd={() => setChoosing(true)}
+        />
       </div>
 
       <CategoryChooserSheet
@@ -285,29 +245,13 @@ export function BasicsStep({
 }
 
 /**
- * The shop's categories as cards: the MOST SPECIFIC ones first (a product
- * usually belongs in "Sarees", not "Women"), then the groups above them, each
- * with its parent path as a small "in …" line.
- */
-function shelfOptions(categories: StoreCategory[]): { id: string; name: string; group: string }[] {
-  const parents = new Set(categories.map((c) => c.parentId))
-  const ordered = categoryOptions(categories)
-  const toOption = (option: { id: string; label: string }) => {
-    const parts = option.label.split(' › ')
-    return { id: option.id, name: parts[parts.length - 1]!, group: parts.slice(0, -1).join(' › ') }
-  }
-  const leaves = ordered.filter((option) => !parents.has(option.id)).map(toOption)
-  const groups = ordered.filter((option) => parents.has(option.id)).map(toOption)
-  return [...leaves, ...groups]
-}
-
-/**
- * The first MOST SPECIFIC category, in the order the picker lists them.
- * Picking "Women" adds "Fashion › Women", and defaulting a new product to the
- * parent the seller never chose filed it one level too high.
+ * A new product's category: chosen for the seller only when the shop has
+ * exactly one place it can go. A pre-picked first card was tapped straight
+ * past (the same trap as a pre-picked "No" on step 3), and defaulting to a
+ * parent filed products one level too high.
  */
 function defaultCategoryId(categories: StoreCategory[]): string {
   const parents = new Set(categories.map((c) => c.parentId))
-  const ordered = categoryOptions(categories)
-  return (ordered.find((option) => !parents.has(option.id)) ?? ordered[0])?.id ?? ''
+  const leaves = categories.filter((c) => !parents.has(c.id))
+  return leaves.length === 1 ? leaves[0]!.id : ''
 }
