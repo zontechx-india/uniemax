@@ -1027,16 +1027,14 @@ const CATEGORY_TILE_CAP = 12
 const FEW_CATEGORIES = 4
 
 /**
- * Categories as cards — a picture, the name and the count. The picture is the
- * shelf's own artwork, else a cover of one of its products already on the
- * page (`categoryPicture`), else the name's first letter: always something
- * real. Two across on a phone and up to six on a wide monitor, so a tile
- * never stretches into a billboard on a 2560px screen.
+ * Categories as picture cards (`CategoryCard`) — the shelf's own artwork,
+ * else a cover of one of its products already on the page
+ * (`categoryPicture`), else the name's first letter: always something real.
  *
- * **A few categories** (≤ `FEW_CATEGORIES`) get compact horizontal cards —
- * a small square photo, the name and the count (`FewCategoryTile`). They were
- * full-width portrait tiles once, and two of them filled a phone's screen
- * before a single product showed: a category is a way in, not the display.
+ * **A few categories** (≤ `FEW_CATEGORIES`) sit two across on a phone and
+ * four on a desktop, so even one or two stay a compact way in rather than a
+ * billboard that pushes the first product off a phone's screen. **More**
+ * run two to six across, capped at `CATEGORY_TILE_CAP`.
  */
 function CategoryTiles({
   store,
@@ -1049,117 +1047,108 @@ function CategoryTiles({
   products: PublicProduct[]
   skin: Skin
 }) {
-  if (categories.length <= FEW_CATEGORIES) {
-    return (
-      <ul className="mt-4 grid grid-cols-1 gap-3 sm:mt-6 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
-        {categories.map((category) => (
-          <FewCategoryTile
-            key={category.id}
-            store={store}
-            category={category}
-            picture={categoryPicture(category, products)}
-            skin={skin}
-          />
-        ))}
-      </ul>
-    )
-  }
+  const few = categories.length <= FEW_CATEGORIES
   return (
-    <ul className="mt-6 grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-6">
-      {categories.slice(0, CATEGORY_TILE_CAP).map((category) => {
-        const picture = categoryPicture(category, products)
-        return (
-          <li key={category.id}>
-            {/* Framed like a product card — the picture is the tile, the
-                words sit on the page under it. */}
-            <Link
-              to={storeCategoryUrl(store.slug, category.slug)}
-              className="group flex h-full flex-col rounded-lg"
-            >
-              <span
-                className={`relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-lg ${skin.well}`}
-              >
-                {picture ? (
-                  <FillImage
-                    src={picture}
-                    alt=""
-                    sizes="(min-width: 1024px) 16vw, (min-width: 640px) 33vw, 50vw"
-                    className="transition-transform duration-500 ease-out group-hover:scale-[1.03]"
-                  />
-                ) : (
-                  <CategoryInitial name={category.name} />
-                )}
-              </span>
-              <span className="min-w-0 pt-3">
-                <span
-                  className={`block truncate font-display text-base font-semibold decoration-1 underline-offset-4 group-hover:underline ${skin.text}`}
-                >
-                  {category.name}
-                </span>
-                <span className={`mt-0.5 block text-xs ${skin.muted}`}>
-                  {category.productCount}{' '}
-                  {category.productCount === 1 ? 'product' : 'products'}
-                </span>
-              </span>
-            </Link>
-          </li>
-        )
-      })}
+    <ul
+      className={
+        few
+          ? 'mt-4 grid grid-cols-2 gap-3 sm:mt-6 sm:gap-4 lg:grid-cols-4'
+          : 'mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-6'
+      }
+    >
+      {categories.slice(0, CATEGORY_TILE_CAP).map((category) => (
+        <CategoryCard
+          key={category.id}
+          store={store}
+          category={category}
+          picture={categoryPicture(category, products)}
+          wide={few}
+          sizes={
+            few
+              ? '(min-width: 1024px) 25vw, 50vw'
+              : '(min-width: 1280px) 16vw, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw'
+          }
+          skin={skin}
+        />
+      ))}
     </ul>
   )
 }
 
 /**
- * One of a few category cards: a small square photo beside the name and the
- * count, with a chevron saying it leads somewhere.
+ * One category as a picture card, after the marketplace's brand tiles: the
+ * photo fills the card edge to edge (a framed thumbnail inside a padded card
+ * looked like a pasted-in image), the name sits top-left on a soft scrim so
+ * it reads on any photo, and a band along the bottom carries the count and
+ * "Shop ›" in the **store owner's** colour (`--cta` → `--cta-lo`), never
+ * a fixed platform hue. A shelf with no picture keeps the card shape, its
+ * initial as a faded corner mark, and the name in the page's own text colour.
  */
-function FewCategoryTile({
+function CategoryCard({
   store,
   category,
   picture,
+  wide,
+  sizes,
   skin,
 }: {
   store: PublicStore
   category: PublicCategory
   picture: string | null
+  /** Landscape from `sm` up — the few-categories row, whose cards are wide. */
+  wide: boolean
+  sizes: string
   skin: Skin
 }) {
   return (
     <li>
       <Link
         to={storeCategoryUrl(store.slug, category.slug)}
-        className={`group flex h-full items-center gap-4 rounded-lg border p-3 card-hover ${skin.border} ${skin.surface}`}
+        className={`group relative flex aspect-[4/3] flex-col overflow-hidden rounded-2xl card-hover ${wide ? 'sm:aspect-[16/9]' : ''} ${skin.well}`}
       >
-        <span
-          className={`relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg sm:size-20 ${skin.well}`}
-        >
-          {picture ? (
+        {picture ? (
+          <>
             <MediaImg
               src={picture}
               alt=""
-              sizes="80px"
+              sizes={sizes}
               loading="lazy"
               decoding="async"
-              className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105 motion-reduce:transition-none"
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105 motion-reduce:transition-none"
             />
-          ) : (
-            <CategoryInitial name={category.name} />
-          )}
-        </span>
-        <span className="min-w-0 flex-1">
+            <span
+              aria-hidden
+              className="absolute inset-x-0 top-0 h-2/3 bg-gradient-to-b from-scrim to-transparent"
+            />
+          </>
+        ) : (
+          // The initial as a faded corner mark, clear of the name on any width.
           <span
-            className={`line-clamp-2 font-display text-base font-semibold decoration-1 underline-offset-4 group-hover:underline ${skin.text}`}
+            aria-hidden
+            className="absolute right-3 bottom-11 font-display text-display leading-none font-bold text-brand/25 sm:right-4"
           >
-            {category.name}
+            {category.name.trim().charAt(0).toUpperCase()}
           </span>
-          <span className={`mt-0.5 block text-sm ${skin.muted}`}>
-            {category.productCount}{' '}
-            {category.productCount === 1 ? 'product' : 'products'}
+        )}
+        <span
+          className={`relative line-clamp-2 p-3 font-display text-lg leading-tight font-bold sm:p-4 ${
+            picture ? 'text-white drop-shadow-sm' : skin.text
+          }`}
+        >
+          {category.name}
+        </span>
+        <span
+          className="relative mt-auto flex items-center justify-between gap-2 px-3 py-2 text-sm font-semibold text-cta-contrast sm:px-4"
+          style={{ backgroundImage: 'linear-gradient(90deg, var(--cta) 0%, var(--cta-lo) 100%)' }}
+        >
+          <span className="truncate">
+            {category.productCount} {category.productCount === 1 ? 'product' : 'products'}
+          </span>
+          <span className="flex shrink-0 items-center gap-0.5">
+            Shop
+            <ChevronRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
           </span>
         </span>
-        <ChevronRightIcon
-          className={`h-5 w-5 shrink-0 transition-transform group-hover:translate-x-0.5 ${skin.muted}`}
-        />
       </Link>
     </li>
   )
