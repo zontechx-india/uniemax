@@ -90,7 +90,7 @@
    *   subtitle 18  card titles, subtitles                (text-lg, text-subtitle)
    *   section  22  section titles                        (text-xl/2xl, text-section)
    *   title    28  page titles                           (text-3xl/4xl, text-title)
-   *   display  40  storefront hero only                  (text-5xl/6xl, text-display)
+   *   display  40  largest headlines only                (text-5xl/6xl, text-display)
    * Weights: 400 body, 500 labels, 600 titles and buttons, 700 page titles
    * and figures. */
   --text-xs: 13px;

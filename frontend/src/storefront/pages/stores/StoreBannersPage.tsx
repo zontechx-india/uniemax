@@ -31,8 +31,8 @@ import { GripIcon, ImageIcon, PlusIcon, TrashIcon } from '../../layout/icons'
 import { MediaImg } from '../../../shared/media/MediaImg'
 
 /**
- * Banners section of Store Management — the promo carousel above the
- * storefront hero.
+ * Banners section of Store Management — the promo carousel at the top of
+ * the storefront homepage.
  *
  * A **grid of previews**, not a form list: a banner is a picture, so the
  * picture is the row. Each card shows the artwork at the exact ratio the

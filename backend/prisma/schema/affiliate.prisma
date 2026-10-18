@@ -62,13 +62,13 @@ model AffiliateProgram {
   id      String @id @default(cuid())
   storeId String @unique
 
-  enabled        Boolean                 @default(false)
-  commissionType AffiliateCommissionType @default(PERCENTAGE)
-  commissionRate Decimal                 @default(10) @db.Decimal(10, 2)
+  enabled         Boolean                 @default(false)
+  commissionType  AffiliateCommissionType @default(PERCENTAGE)
+  commissionRate  Decimal                 @default(10) @db.Decimal(10, 2)
   /// How long a click keeps earning, in days.
-  attributionDays Int @default(30)
+  attributionDays Int                     @default(30)
   /// Days after delivery before a commission is approved (return window).
-  holdDays Int @default(7)
+  holdDays        Int                     @default(7)
 
   productRules AffiliateProductRule[]
 
@@ -124,15 +124,15 @@ model AffiliateInvitation {
   storeName String
   token     String @unique
 
-  name  String
-  email String
+  name           String
+  email          String
   /// Optional negotiated rate; null = programme default at the time.
   commissionType AffiliateCommissionType?
   commissionRate Decimal?                 @db.Decimal(10, 2)
 
-  status     AffiliateInviteStatus @default(PENDING)
-  expiresAt  DateTime
-  acceptedAt DateTime?
+  status      AffiliateInviteStatus @default(PENDING)
+  expiresAt   DateTime
+  acceptedAt  DateTime?
   /// Set on acceptance so the seller can see who took the invite.
   affiliateId String?
 
@@ -152,7 +152,7 @@ model StoreAffiliate {
   storeName   String
   storeSlug   String
 
-  status StoreAffiliateStatus @default(ACTIVE)
+  status         StoreAffiliateStatus     @default(ACTIVE)
   /// Affiliate-specific override; null = programme default.
   commissionType AffiliateCommissionType?
   commissionRate Decimal?                 @db.Decimal(10, 2)
@@ -234,7 +234,7 @@ model AffiliateAttribution {
 
   expiresAt DateTime
   /// Set once an order used this attribution — never reused after.
-  orderId String? @unique
+  orderId   String?  @unique
 
   createdAt DateTime @default(now())
 
@@ -267,7 +267,7 @@ model AffiliateCommission {
   commissionRate Decimal                 @db.Decimal(10, 2)
   amount         Decimal                 @db.Decimal(10, 2)
 
-  status AffiliateCommissionStatus @default(PENDING)
+  status     AffiliateCommissionStatus @default(PENDING)
   /// When the return window closes and the commission can be approved.
   maturesAt  DateTime?
   approvedAt DateTime?
