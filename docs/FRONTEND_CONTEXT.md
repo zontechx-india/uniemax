@@ -1143,11 +1143,11 @@ full-bleed section bands instead.
     the cover of one of its products already on the page, else the first
     letter. The `tiles` layout uses the same picture as a 4:3 `FillImage`.
     **A shop with ≤ 4 categories** (`FEW_CATEGORIES`) gets tiles by default
-    — unless the owner chose a layout in the Store Builder — as big **4:5
-    picture tiles** (`FewCategoryTile`, framed like the product cards with
-    `photoFillsFrame`): two across (three for exactly three), four from
-    `lg`, name and count under each. Two 80px chips had left a desktop row
-    almost empty.
+    — unless the owner chose a layout in the Store Builder — as **compact
+    horizontal cards** (`FewCategoryTile`): a 64/80px square photo, name +
+    count and a chevron; one per line on a phone, two from `sm`, four from
+    `lg`. (Full-width 4:5 tiles before 18 Oct 2026 filled a phone's first
+    screen with two categories; 80px chips had left a desktop row empty.)
   - **`StoreIntro`** — when no banner is on screen, the homepage opens on
     the shop's introduction instead of straight into a grid: logo (or its
     initial on the shop colour), the name as the visible `<h1>`, the About

@@ -570,6 +570,43 @@ async function categoryRows(
   );
 }
 
+/** Shop-by-Category tiles the storefront draws (the rest live on Shop). */
+const CATEGORY_TILE_CAP = 12;
+
+/**
+ * Gives every Shop-by-Category tile without artwork its newest product's
+ * photo. The storefront can only borrow a cover from products already in the
+ * homepage payload, so a shop whose newest stock is all on one shelf drew its
+ * other shelves as bare letters. Shelf artwork, when there is one, still wins.
+ */
+async function withCoverPictures(
+  storeId: string,
+  categories: PublicCategoryNode[],
+): Promise<PublicCategoryNode[]> {
+  const bare = categories
+    .slice(0, CATEGORY_TILE_CAP)
+    .filter((category) => !category.imageUrl);
+  if (bare.length === 0) return categories;
+
+  const idx = shelfIndex(await loadShelves(storeId));
+  const covers = new Map(
+    await Promise.all(
+      bare.map(async ({ id }) => {
+        const [newest] = await section(
+          storeId,
+          { categoryId: { in: idx.descendantIds(id) } },
+          1,
+        );
+        return [id, newest?.image?.url ?? null] as const;
+      }),
+    ),
+  );
+  return categories.map((category) => ({
+    ...category,
+    imageUrl: category.imageUrl ?? covers.get(category.id) ?? null,
+  }));
+}
+
 /**
  * Homepage payload: the category strip, the three curated product sections,
  * and the two flag-free rows that keep an uncurated shop from looking empty.
@@ -589,7 +626,13 @@ export async function getPublicStoreHome(slug: string, viewerId?: string) {
   const on = (key: HomepageSectionKey) =>
     sections.find((s) => s.key === key)?.enabled ?? false;
 
-  const [banners, featured, newArrivals, bestSellers, shelves, catalog] =
+  // Categories are navigation, not merchandising: the row is headed "Shop by
+  // Category", so showing every top-level category when the owner has starred
+  // none is accurate rather than a claim about them. Starring some narrows it
+  // to that curated set.
+  const starred = shell.categories.filter((c) => c.isFeatured);
+
+  const [banners, featured, newArrivals, bestSellers, shelves, catalog, strip] =
     await Promise.all([
       on("banners") ? listPublicBanners(shell.id, shell.slug) : [],
       on("featured") ? section(shell.id, { isFeatured: true }) : [],
@@ -598,23 +641,19 @@ export async function getPublicStoreHome(slug: string, viewerId?: string) {
       on("categoryRows") ? categoryRows(shell.id, shell.categories) : [],
       // No scope at all — every visible product, newest first.
       on("catalog") ? section(shell.id, {}, CATALOG_LIMIT) : [],
+      on("categories")
+        ? withCoverPictures(
+            shell.id,
+            starred.length > 0 ? starred : shell.categories,
+          )
+        : [],
     ]);
-
-  // Categories are navigation, not merchandising: the row is headed "Shop by
-  // Category", so showing every top-level category when the owner has starred
-  // none is accurate rather than a claim about them. Starring some narrows it
-  // to that curated set.
-  const starred = shell.categories.filter((c) => c.isFeatured);
 
   return {
     // The ordered section list drives BOTH what renders and in what order.
     sections,
     banners,
-    featuredCategories: on("categories")
-      ? starred.length > 0
-        ? starred
-        : shell.categories
-      : [],
+    featuredCategories: strip,
     featured,
     newArrivals,
     bestSellers,

@@ -25,10 +25,8 @@ import { useSeo } from '../../../shared/seo'
 import { storeJsonLd } from '../../features/publicStore/structuredData'
 import {
   CARD_PHOTO,
-  CARD_PHOTO_FILL,
   FillImage,
   NoProductImage,
-  photoFillsFrame,
   PRODUCT_GRID,
   PriceLabel,
   ProductCard,
@@ -1035,9 +1033,10 @@ const FEW_CATEGORIES = 4
  * real. Two across on a phone and up to six on a wide monitor, so a tile
  * never stretches into a billboard on a 2560px screen.
  *
- * **A few categories** (≤ `FEW_CATEGORIES`) get bigger, portrait tiles —
- * three across for exactly three, else two; four across from `lg` — framed
- * like the product cards (`FewCategoryTile`).
+ * **A few categories** (≤ `FEW_CATEGORIES`) get compact horizontal cards —
+ * a small square photo, the name and the count (`FewCategoryTile`). They were
+ * full-width portrait tiles once, and two of them filled a phone's screen
+ * before a single product showed: a category is a way in, not the display.
  */
 function CategoryTiles({
   store,
@@ -1052,11 +1051,7 @@ function CategoryTiles({
 }) {
   if (categories.length <= FEW_CATEGORIES) {
     return (
-      <ul
-        className={`mt-4 grid gap-x-3 gap-y-5 sm:mt-6 sm:gap-x-5 lg:grid-cols-4 ${
-          categories.length === 3 ? 'grid-cols-3' : 'grid-cols-2'
-        }`}
-      >
+      <ul className="mt-4 grid grid-cols-1 gap-3 sm:mt-6 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
         {categories.map((category) => (
           <FewCategoryTile
             key={category.id}
@@ -1115,9 +1110,8 @@ function CategoryTiles({
 }
 
 /**
- * One of a few big category tiles: a 4:5 picture framed by its own shape
- * (`photoFillsFrame` — a model shot fills the tile, a packshot sits whole on
- * the well), then the name and the count.
+ * One of a few category cards: a small square photo beside the name and the
+ * count, with a chevron saying it leads somewhere.
  */
 function FewCategoryTile({
   store,
@@ -1130,49 +1124,42 @@ function FewCategoryTile({
   picture: string | null
   skin: Skin
 }) {
-  const [fill, setFill] = useState(false)
   return (
     <li>
       <Link
         to={storeCategoryUrl(store.slug, category.slug)}
-        className="group flex h-full flex-col rounded-lg"
+        className={`group flex h-full items-center gap-4 rounded-lg border p-3 card-hover ${skin.border} ${skin.surface}`}
       >
         <span
-          className={`relative flex aspect-[4/5] items-center justify-center overflow-hidden rounded-lg ${skin.well}`}
+          className={`relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg sm:size-20 ${skin.well}`}
         >
           {picture ? (
             <MediaImg
               src={picture}
               alt=""
-              sizes="(min-width: 1024px) 25vw, 50vw"
+              sizes="80px"
               loading="lazy"
               decoding="async"
-              onLoad={(e) =>
-                setFill(
-                  photoFillsFrame(
-                    e.currentTarget.naturalWidth,
-                    e.currentTarget.naturalHeight,
-                    4 / 5,
-                  ),
-                )
-              }
-              className={`${fill ? CARD_PHOTO_FILL : CARD_PHOTO} transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none`}
+              className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105 motion-reduce:transition-none"
             />
           ) : (
             <CategoryInitial name={category.name} />
           )}
         </span>
-        <span className="min-w-0 pt-3">
+        <span className="min-w-0 flex-1">
           <span
-            className={`line-clamp-2 font-display text-sm font-semibold decoration-1 underline-offset-4 group-hover:underline sm:text-base ${skin.text}`}
+            className={`line-clamp-2 font-display text-base font-semibold decoration-1 underline-offset-4 group-hover:underline ${skin.text}`}
           >
             {category.name}
           </span>
-          <span className={`mt-0.5 block text-xs ${skin.muted}`}>
+          <span className={`mt-0.5 block text-sm ${skin.muted}`}>
             {category.productCount}{' '}
             {category.productCount === 1 ? 'product' : 'products'}
           </span>
         </span>
+        <ChevronRightIcon
+          className={`h-5 w-5 shrink-0 transition-transform group-hover:translate-x-0.5 ${skin.muted}`}
+        />
       </Link>
     </li>
   )

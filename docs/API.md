@@ -1588,7 +1588,9 @@ Which categories `categoryRows` covers follows the same rule as
 roots, else the first few. `featuredCategories` itself is navigation rather
 than merchandising — the row is headed "Shop by Category", so it lists every
 top-level category when the owner has starred none, and narrows to the starred
-set otherwise.
+set otherwise. Within the first 12 (the tiles the storefront draws), a category
+with no artwork gets its newest product's photo as `imageUrl`, so no tile falls
+back to a bare letter while the category has a photographed product.
 
 ### `GET /api/v1/public/stores/:slug/categories/:categorySlug`
 Category header + breadcrumb ancestry for the category page.
