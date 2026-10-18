@@ -407,7 +407,7 @@ function StoreIntro({ store, skin }: { store: PublicStore; skin: Skin }) {
   const about = store.footer.info.about
   return (
     <section className={STORE_CONTAINER}>
-      <div className="py-6 sm:py-10">
+      <div className="py-4 sm:py-6">
         <div className="flex items-center gap-4 sm:gap-5">
           {store.logoUrl ? (
             <MediaImg
@@ -859,9 +859,10 @@ type BandTone = 'base' | 'alt'
  * the shared content column inside. The band is part of the section, so a
  * section that renders nothing leaves no empty strip.
  *
- * Separation is the tone change plus generous air — no divider rules. A
- * classic shop breathes between sections; tight bands with a line under each
- * read as a settings screen.
+ * Separation is the tone change plus modest air — no divider rules (bands
+ * with a line under each read as a settings screen). The air is kept small
+ * on purpose: 56px above and below every band wasted most of a screen on
+ * empty space.
  */
 function Band({
   id,
@@ -886,8 +887,8 @@ function Band({
     pad === 'dense'
       ? 'py-3.5 sm:py-4'
       : pad === 'compact'
-        ? 'py-6 sm:py-8'
-        : 'py-8 sm:py-12 lg:py-14'
+        ? 'py-4 sm:py-5'
+        : 'py-5 sm:py-7 lg:py-8'
   return (
     <section
       id={id}

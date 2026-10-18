@@ -1096,9 +1096,10 @@ full-bleed section bands instead.
   `GET …/home`. Sections render in the **owner-arranged order** (the payload's
   ordered `sections` list); each is skipped when disabled or empty. Every
   section is a **full-bleed band** (alternating page-canvas / surface tone,
-  **no divider rule**, `py-8/12/14`; `compact` `py-6/8` for the category
+  **no divider rule**, `py-5/7/8`; `compact` `py-4/5` for the category
   chip strip and the contact band, `dense` `py-3.5/4` for a one-row strip;
-  the banners sit in `py-4/6`) — separation comes from the tone change plus air (the classic
+  the banners sit in `py-4/6`, the store intro in `py-4/6`; cut from
+  `py-8/12/14` on 18 Oct 2026, which wasted most of a screen on air) — separation comes from the tone change plus air (the classic
   restyle of 15 Oct 2026 dropped the per-band rules, which read as a settings
   screen), and the band lives inside the section so a hidden one leaves no
   empty strip. Sections are filtered for *content* before the tones are
