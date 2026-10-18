@@ -17,7 +17,7 @@ import { PhotosStep } from './PhotosStep'
 import { PricingStep } from './PricingStep'
 import { categoryOptions, StepButtons, StepError, STEPS, StepShell } from './shared'
 import { buttonClass } from '../../../../../shared/ui/Button'
-import type { StepKey } from './shared'
+import type { StepKey, VersionPlan } from './shared'
 import { MediaImg } from '../../../../../shared/media/MediaImg'
 import { Button } from '../../../../../shared/ui/Button'
 
@@ -62,6 +62,7 @@ export function ProductWizard({
 }) {
   const [product, setProduct] = useState<StoreProduct | null>(initial)
   const [step, setStep] = useState<StepKey>(initial ? startAt : 'basics')
+  const [plan, setPlan] = useState<VersionPlan>(null)
 
   const index = STEPS.findIndex((s) => s.key === step)
   const go = (delta: number) => {
@@ -160,12 +161,15 @@ export function ProductWizard({
             onSaved={saved}
             onNext={() => go(1)}
             onCategoriesChange={onCategoriesChange}
+            plan={plan}
+            onPlanChange={setPlan}
           />
         )}
         {product && step === 'photos' && (
           <PhotosStep
             storeId={storeId}
             product={product}
+            plan={plan}
             onSaved={saved}
             onBack={() => go(-1)}
             onNext={() => go(1)}
@@ -176,6 +180,7 @@ export function ProductWizard({
             storeId={storeId}
             categories={categories}
             product={product}
+            plan={plan}
             onSaved={saved}
             onOtherProductChange={onProductChange}
             onCatalogChanged={() => onCatalogChanged?.()}

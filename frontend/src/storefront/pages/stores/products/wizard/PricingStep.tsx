@@ -30,10 +30,12 @@ import { CheckIcon, PlusIcon, SlidersIcon, TagIcon } from '../../../../layout/ic
 import { OptionTypesEditor } from '../OptionTypesEditor'
 import type { OptionsDraft } from '../OptionTypesEditor'
 import { VariantMatrix } from '../VariantMatrix'
+import { ChoicesPreview, exampleChoice, listWords } from './choicesHelp'
 import { Field, ChoiceCard, Hint, inputClass, StepButtons, StepError, StepShell } from './shared'
-import type { StepKey } from './shared'
+import type { StepKey, VersionPlan } from './shared'
 
-type Mode = 'single' | 'options'
+/** null = not answered yet: a new, unpriced product starts with no answer picked. */
+type Mode = 'single' | 'options' | null
 type Draft = { types: OptionTypeDraft[]; rows: VariantDraft[] }
 type PendingDrop = Draft & { groups: GroupDraft[]; order: string[]; dropped: VariantDraft[] }
 
@@ -56,11 +58,17 @@ type PendingDrop = Draft & { groups: GroupDraft[]; order: string[]; dropped: Var
  * through the groups PUT (likewise, one transaction); both are validated
  * locally before the first write, so a naming clash never leaves half a
  * save behind.
+ *
+ * A new product starts with NEITHER answer picked (unless step 1 answered
+ * it): "No" pre-selected let sellers tap Continue straight past the question,
+ * then make a product per colour. Until one is picked the step shows what a
+ * customer would see with choices — the seller's own photo and name.
  */
 export function PricingStep({
   storeId,
   categories,
   product,
+  plan,
   onSaved,
   onOtherProductChange,
   onCatalogChanged,
@@ -71,6 +79,8 @@ export function PricingStep({
   storeId: string
   categories: StoreCategory[]
   product: StoreProduct
+  /** Step 1's answer, if the seller gave one. */
+  plan: VersionPlan
   onSaved: (product: StoreProduct) => void
   /** A DIFFERENT product came back from the server (a family member). */
   onOtherProductChange: (product: StoreProduct) => void
@@ -81,9 +91,11 @@ export function PricingStep({
   onBack: () => void
   onNext: () => void
 }) {
-  const [mode, setMode] = useState<Mode>(
-    product.hasVariants || product.groups.length > 0 ? 'options' : 'single',
-  )
+  const [mode, setMode] = useState<Mode>(() => {
+    if (product.hasVariants || product.groups.length > 0) return 'options'
+    if (Number(product.defaultVariant?.price ?? 0) > 0) return 'single'
+    return plan === 'many' ? 'options' : plan === 'one' ? 'single' : null
+  })
 
   // Single version — the implicit Default variant's four numbers.
   const base = product.defaultVariant
@@ -124,6 +136,9 @@ export function PricingStep({
   const unusedPresets = presets.filter((preset) => !usedNames.has(preset.name.toLowerCase()))
   const images = product.media.filter((m) => m.type === 'IMAGE')
   const cardCount = draft.types.length + groups.length
+  const example = exampleChoice(presets)
+  // The seller's own name reads best in the example, unless it is long.
+  const thisOne = product.name.length <= 32 ? product.name : 'this product'
 
   /**
    * Every change from the editor comes through here so the matrix is
@@ -229,7 +244,7 @@ export function PricingStep({
    */
   const validateOptions = (d: Draft, g: GroupDraft[]): string | null => {
     if (d.types.length === 0 && g.length === 0) {
-      return 'Add at least one choice — Size, Colour, Weight… — or pick "No — one kind only".'
+      return 'Add at least one choice — Size, Colour, Weight… — or pick “Just one version”.'
     }
     if (d.types.length > 0) {
       const result = draftToInput(d.types, d.rows)
@@ -365,6 +380,9 @@ export function PricingStep({
   }
 
   const next = () => {
+    if (mode === null) {
+      return setError('Pick one first: “Just one version” or “Many colours, sizes or weights”.')
+    }
     // Typed options are priced on their own screen.
     if (mode === 'options' && part === 'choices' && draft.types.length > 0) return toPrices()
     if (mode === 'single') {
@@ -437,7 +455,7 @@ export function PricingStep({
       lead={
         mode === 'options' && part === 'prices'
           ? 'Type a price and how many you have for each one. Use “Same price for all” if most are the same.'
-          : 'Does this product come in different sizes, colours or weights?'
+          : 'Same product in different colours, sizes or weights? Put them all in this one product — don’t make a new product for each.'
       }
     >
       {/* Where the seller is on the two-screen path. */}
@@ -469,27 +487,39 @@ export function PricingStep({
           <ChoiceCard
             active={mode === 'single'}
             icon={TagIcon}
-            title="No — one kind only"
-            body="One price and one stock count. Most products."
-            onClick={() => setMode('single')}
+            title="Just one version"
+            body="One price and one stock count."
+            onClick={() => {
+              setMode('single')
+              setError(null)
+            }}
           />
           <ChoiceCard
             active={mode === 'options'}
             icon={SlidersIcon}
-            title="Yes — sizes, colours or weights"
-            body="Customers pick a size, colour or weight before they buy."
-            onClick={() => setMode('options')}
+            title="Many colours, sizes or weights"
+            body={`Like ${thisOne} in ${listWords(example.values)}. Customers pick one on the same page.`}
+            onClick={() => {
+              setMode('options')
+              setError(null)
+            }}
           />
         </div>
       )}
 
-      {mode === 'single' ? (
+      {/* Show, don't explain — while the seller decides. Once they pick, it
+          would only push the next tap below the fold. */}
+      {mode === null && (
+        <ChoicesPreview name={product.name} photo={images[0] ?? null} choice={example} />
+      )}
+
+      {mode === null ? null : mode === 'single' ? (
         singleFields
       ) : part === 'choices' ? (
         <div className="space-y-5">
           {unusedPresets.length > 0 && (
             <div>
-              <p className="text-base font-semibold text-fg">Tap to add a common choice</p>
+              <p className="text-base font-semibold text-fg">What do customers choose? Tap one</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {unusedPresets.map((preset) => (
                   <button

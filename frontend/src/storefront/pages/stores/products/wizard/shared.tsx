@@ -20,6 +20,13 @@ export const STEPS = [
 
 export type StepKey = (typeof STEPS)[number]['key']
 
+/**
+ * The seller's step-1 answer to "more than one colour or size?", carried to
+ * the photo and price steps so they can speak to it. Null = not answered
+ * (skipped, or an existing product) — step 3 asks again.
+ */
+export type VersionPlan = 'one' | 'many' | null
+
 // 48px tall (px, so the 90% root cannot shrink it); phones also get the
 // 16px input floor from index.css, so focusing never zooms the page.
 export const inputClass =

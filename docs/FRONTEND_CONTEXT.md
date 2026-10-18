@@ -2123,18 +2123,33 @@ is never shown a pickup-address item.
   — instead of a dropdown of paths, plus **Add a new category**, which opens
   `CategoryChooserSheet`, adds the pick, refreshes the page's list via
   `onCategoriesChange` and selects it without leaving the product)
-  (name + category; Continue creates the product as a **draft** on the
+  (name + category, and **"Do you have it in more than one colour, size or
+  weight?"** as two cards — sellers who met that question only at step 3 had
+  named and photographed one colour and made a product per colour. The
+  answer (`VersionPlan`, wizard state only, never saved) changes step 2's
+  lead to "a photo of every colour" and pre-picks step 3's answer. A colour
+  or weight typed into the name ("…saree, pink", "rice 5kg" —
+  `choicesHelp.findNameHint`) gets a note with one-tap **Take "pink" out**
+  (also answers "Yes") or **No, keep the name**. Nothing here blocks
+  Continue; it is asked only while the product is unpriced and has no
+  choices; Continue creates the product as a **draft** on the
   server, so every later step saves on Continue and "Finish later" always
   keeps what was done) · **2 Photos** (the shared Media Board on
   `useLiveMedia`, uploading straight onto the draft) · **3 Price & choices**
-  (two radio cards — **"No — one kind only"** = selling price, printed price /
+  (lead: "Same product in different colours, sizes or weights? Put them all
+  in this one product". Two radio cards, and on a **new unpriced** product
+  **neither is pre-selected** unless step 1 answered — a pre-selected "No"
+  was tapped straight past. Until one is picked, `ChoicesPreview` draws what
+  a customer sees: the seller's own cover photo and name with a choice row
+  from the category's option templates (`exampleChoice` — Colour first), and
+  Continue asks the seller to pick. **"Just one version"** = selling price, printed price /
   MRP, how many you have, product code (optional). "How many you have" starts
   **empty** on a never-priced draft and is required — a prefilled 0 used to
-  be saved untouched and the product went live sold out; **"Yes — sizes, colours or
-  weights"** = TWO screens inside one `PricingStep` (state survives between
+  be saved untouched and the product went live sold out; **"Many colours,
+  sizes or weights"** (body: "Like {product} in Red, Maroon and Pink") = TWO screens inside one `PricingStep` (state survives between
   them; a "1 Choices · 2 Prices" strip shows where you are):
   **Choices** — the category's **suggested options** as one-tap 44px chips
-  ("Tap to add a common choice") and the `OptionTypesEditor`; Continue
+  ("What do customers choose? Tap one") and the `OptionTypesEditor`; Continue
   checks every choice is named and has options, then **Prices** — the
   `VariantMatrix` (a blank stock counts as 0, but ALL blank is refused —
   `draftToInput` asks for counts and points at "Same stock for all"), whose
@@ -2971,9 +2986,10 @@ frontend/
     │           ├── products/             # Editors the product wizard composes
     │           │   ├── wizard/               # ProductWizard — steps, progress, review/publish
     │           │   │   ├── ProductWizard.tsx    # Full-screen on phones (portal) / inline card; step sheet; Review
-    │           │   │   ├── BasicsStep.tsx       # Name + category → creates the draft
+    │           │   │   ├── BasicsStep.tsx       # Name + "more than one colour?" + category → creates the draft
     │           │   │   ├── PhotosStep.tsx       # Media Board on the draft
-    │           │   │   ├── PricingStep.tsx      # One kind / choices → Choices screen → Prices screen
+    │           │   │   ├── PricingStep.tsx      # One version / choices → Choices screen → Prices screen
+    │           │   │   ├── choicesHelp.tsx      # Colour/weight-in-name hint, category example, ChoicesPreview
     │           │   │   ├── DetailsStep.tsx      # Description + suggested spec rows
     │           │   │   ├── DeliveryStep.tsx     # Store settings vs per-product overrides
     │           │   │   └── shared.tsx           # Steps, Field/Hint/StepShell, categoryOptions

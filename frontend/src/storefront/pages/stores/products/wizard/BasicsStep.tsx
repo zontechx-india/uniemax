@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { toApiError } from '../../../../../shared/auth/http'
-import { CheckIcon, PlusIcon, TagIcon } from '../../../../layout/icons'
+import { CheckIcon, PlusIcon, SlidersIcon, TagIcon } from '../../../../layout/icons'
+import { Button } from '../../../../../shared/ui/Button'
 import { CategoryChooserSheet } from '../../ui/CategoryChooserSheet'
 import { showToast } from '../../ui/Toast'
 import { storeCatalogApi } from '../../../../features/stores/storesApi'
@@ -8,14 +9,17 @@ import type {
   StoreCategory,
   StoreProduct,
 } from '../../../../features/stores/storesApi'
+import { exampleChoice, findNameHint, listWords, withoutWord } from './choicesHelp'
 import {
   categoryOptions,
+  ChoiceCard,
   Field,
   inputClass,
   StepButtons,
   StepError,
   StepShell,
 } from './shared'
+import type { VersionPlan } from './shared'
 
 /**
  * Step 1 — the two answers that make a product exist: what it is called and
@@ -27,6 +31,12 @@ import {
  * of a dropdown of "Fashion › Women › Sarees" paths. If the right one is
  * missing, **Add a new category** opens the same chooser the Categories page
  * uses, adds it, and selects it — the seller never has to leave the product.
+ *
+ * It also asks, before any photo is taken, whether the product comes in more
+ * than one colour or size. Sellers who met that question only at step 3 had
+ * already named and photographed one colour, answered "no", and made a
+ * product per colour. A colour or weight typed into the name gets a one-tap
+ * "take it out". Neither blocks Continue; step 3 asks again if skipped.
  */
 export function BasicsStep({
   storeId,
@@ -35,6 +45,8 @@ export function BasicsStep({
   onSaved,
   onNext,
   onCategoriesChange,
+  plan,
+  onPlanChange,
 }: {
   storeId: string
   categories: StoreCategory[]
@@ -43,6 +55,8 @@ export function BasicsStep({
   onNext: () => void
   /** A category was added from here — the page's list must learn of it. */
   onCategoriesChange?: (categories: StoreCategory[]) => void
+  plan: VersionPlan
+  onPlanChange: (plan: VersionPlan) => void
 }) {
   const [name, setName] = useState(product?.name ?? '')
   const [categoryId, setCategoryId] = useState(
@@ -52,9 +66,22 @@ export function BasicsStep({
   const [busy, setBusy] = useState(false)
   const [choosing, setChoosing] = useState(false)
   const [adding, setAdding] = useState(false)
+  /** The name word the seller chose to keep ("it really is only pink"). */
+  const [kept, setKept] = useState<string | null>(null)
 
   const shelf = categories.find((c) => c.id === categoryId) ?? null
   const options = shelfOptions(categories)
+  // Only a product not yet priced or split into choices — one that is has
+  // answered this already, and step 3 is where it changes.
+  const askPlan =
+    !product ||
+    (!product.hasVariants &&
+      product.groups.length === 0 &&
+      !(Number(product.defaultVariant?.price ?? 0) > 0))
+  const example = exampleChoice(shelf?.taxonomy?.optionTemplates ?? [])
+  const found = askPlan && plan !== 'one' ? findNameHint(name) : null
+  const tip = found && found.word.toLowerCase() !== kept ? found : null
+  const shorter = tip ? withoutWord(name, tip.word) : ''
   const addedIds = new Set(categories.flatMap((c) => (c.categoryId ? [c.categoryId] : [])))
 
   /** Add a platform category to the shop from inside the wizard, and pick it. */
@@ -107,14 +134,14 @@ export function BasicsStep({
   return (
     <StepShell
       title="What are you selling?"
-      lead="Just a name and a category to start — everything else comes step by step, and you can stop any time."
+      lead="A name, a category and one quick question to start — everything else comes step by step, and you can stop any time."
     >
       <Field
         label="Product name"
         hint={
           <>
             Write it the way a customer would search for it — e.g.{' '}
-            <span className="text-fg">Banarasi silk saree, pink</span> or{' '}
+            <span className="text-fg">Banarasi silk saree</span> or{' '}
             <span className="text-fg">Kashmir willow cricket bat</span>.
           </>
         }
@@ -128,6 +155,62 @@ export function BasicsStep({
           className={inputClass}
         />
       </Field>
+
+      {tip && (
+        <div role="note" className="rounded-2xl border border-brand/30 bg-brand-soft p-4">
+          <p className="text-base font-semibold text-fg">
+            {tip.kind === 'colour'
+              ? 'Do you sell this in other colours too?'
+              : 'Do you sell this in other weights or sizes too?'}
+          </p>
+          <p className="mt-1 text-hint text-muted">
+            Then leave “{tip.word}” out of the name. Make one product and add every{' '}
+            {tip.kind === 'colour' ? 'colour' : 'weight'} to it in step 3 — customers pick theirs
+            on the same page.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {shorter.length >= 2 && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setName(shorter)
+                  onPlanChange('many')
+                }}
+              >
+                Take “{tip.word}” out
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={() => setKept(tip.word.toLowerCase())}>
+              No, keep the name
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {askPlan && (
+        <div>
+          <p className="mb-1.5 text-base font-semibold text-fg">
+            Do you have it in more than one colour, size or weight?
+          </p>
+          <div role="radiogroup" aria-label="More than one colour, size or weight?" className="grid gap-3 sm:grid-cols-2">
+            <ChoiceCard
+              active={plan === 'one'}
+              icon={TagIcon}
+              title="No, just one"
+              body="One price and one stock count."
+              onClick={() => onPlanChange('one')}
+            />
+            <ChoiceCard
+              active={plan === 'many'}
+              icon={SlidersIcon}
+              title="Yes, more than one"
+              body={`Like ${listWords(example.values)}. Put them all in this one product — not a new product for each.`}
+              onClick={() => onPlanChange('many')}
+            />
+          </div>
+        </div>
+      )}
 
       <div>
         <p className="mb-1.5 text-base font-semibold text-fg">Which category is it in?</p>
