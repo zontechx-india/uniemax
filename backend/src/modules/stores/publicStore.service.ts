@@ -56,6 +56,11 @@ import { listPublicBanners } from "./storeBanner.service.js";
 
 /** How many products each homepage section shows. */
 const SECTION_LIMIT = 12;
+/**
+ * "All Products" loads more: the storefront draws it as two full rows (up to
+ * 10) after skipping what the rows above it drew (up to 3 per shelf).
+ */
+const CATALOG_LIMIT = 24;
 /** How many categories the "Shop by Category" product rows cover. */
 const CATEGORY_ROW_COUNT = 3;
 /** How many related products a product page suggests. */
@@ -507,12 +512,16 @@ export async function listPublicProducts(
  * empty storefront that rule leaves behind — separate sections the owner can
  * hide, never a substitution inside a curated one.
  */
-async function section(storeId: string, scope: Prisma.StoreProductWhereInput) {
+async function section(
+  storeId: string,
+  scope: Prisma.StoreProductWhereInput,
+  take = SECTION_LIMIT,
+) {
   const rows = await prisma.storeProduct.findMany({
     where: { ...visibleProductWhere(storeId), ...scope },
     select: listProductSelect,
     orderBy: { createdAt: "desc" },
-    take: SECTION_LIMIT,
+    take,
   });
   return rows.map(shapeListProduct);
 }
@@ -588,7 +597,7 @@ export async function getPublicStoreHome(slug: string, viewerId?: string) {
       on("bestSellers") ? section(shell.id, { isBestSeller: true }) : [],
       on("categoryRows") ? categoryRows(shell.id, shell.categories) : [],
       // No scope at all — every visible product, newest first.
-      on("catalog") ? section(shell.id, {}) : [],
+      on("catalog") ? section(shell.id, {}, CATALOG_LIMIT) : [],
     ]);
 
   // Categories are navigation, not merchandising: the row is headed "Shop by

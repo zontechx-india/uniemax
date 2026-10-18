@@ -1066,7 +1066,7 @@ full-bleed section bands instead.
   | ---------------- | -------- |
   | `one` — 1 product | banners (or `StoreIntro`), then **`ProductShowcase`**: that product unboxed — photo tile and words beside it, like the product page (photo full-width on a phone, name, price and % off, stock, description; side by side from `lg`) carrying the real **`PurchaseActions`** (quantity, Add to Cart, Buy Now) when there is nothing to choose, else one button to the product page. Nothing else. |
   | `small` — ≤ 12 (`SMALL_SHOP_MAX`, the payload's section size) | every product **once** in All Products (uncapped grid, "N products", no "View all"); the curated rows and Category Highlights are dropped and the owner's Featured → Best Sellers → New Arrivals picks **lead** the grid instead |
-  | `full` | every section below; All Products skips products a row **above** it already showed |
+  | `full` | every section below; All Products skips products a row **above** it already **drew** — a shelf's first 3, a curated row's visible cards (`drawnProducts`), not everything the payload loaded |
   | **no products** (no categories in the shell) | laid out like any other shop — header, banners and footer render as their switches say — and only the **product area** becomes the **"Products coming soon"** card (`EmptyCatalog`, in its own band after the sections, before `ContactBand` and the footer), shown straight away even while `/home` loads. A Banners section that is on but has nothing uploaded shows **one slide in the shop's colour (`--cta`) with its name**. Stocked shops still hide an empty Banners section. |
 
   Category pickers (the strip) only
@@ -1117,7 +1117,7 @@ full-bleed section bands instead.
     | Featured Products           | spotlight — one `size="lg"` lead + exactly 6       | 7 products       |
     | New Arrivals / Best Sellers | horizontal rail (`ProductRail`)                   | 6 products       |
     | Category Highlights         | shelf panel + that shelf's newest                 | 2 products       |
-    | All Products                | the capped grid row                               | —                |
+    | All Products                | two full grid rows (`CATALOG_ROWS`)               | —                |
 
     The fallback is always the capped grid row, and it is the whole reason the
     three live in one `ProductSection`: the choice is made **once, from the
@@ -1157,8 +1157,9 @@ full-bleed section bands instead.
     cards · Since {year}.
   - **Category Highlights / All Products** — the two sections that need no
     merchandising flags, and what a shop shows before its owner has curated
-    anything. All Products is the plain capped row (newest shop-wide, "View
-    all" into Shop). Category Highlights paints one band per category, each a
+    anything. All Products is the capped grid at **two full rows** (newest shop-wide,
+    "View all" into Shop; `fullRowsVisibility` shows only whole rows per
+    breakpoint; the API sends 24 so two rows survive the shelves' dedupe). Category Highlights paints one band per category, each a
     **shelf panel beside that shelf's newest stock** — the panel names the
     collection, counts it (from the shell's category tree; the row payload
     carries no total) and links into it, which reads as a collection rather
@@ -1166,6 +1167,9 @@ full-bleed section bands instead.
     card from `lg`, where **it absorbs whatever the shelf does not need**
     (`SHELF_SPLIT`): a two-product shelf fills its band instead of leaving a
     card-shaped hole, and the cards stay the width they are everywhere else.
+    On `lg` a three-product shelf's panel also **peeks** at the stock past the
+    row — a 2 × 2 of the next photos (`SHELF_PEEK_SIZE`, whole lines of two
+    only), the last tile dimmed with "+N" for the rest of the category.
     A one-product shelf drops the panel entirely — a "collection" of one is
     theatre.
   - **Banners** — the owner's promo carousel, first on the page by default and

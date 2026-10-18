@@ -1539,7 +1539,7 @@ image rather than a dead link. Managed through `/admin/banners` (below); the
 per-store equivalent is `/stores/:id/banners`.
 
 ### `GET /api/v1/public/stores/:slug/home`
-Homepage merchandising payload — each product section capped at 12.
+Homepage merchandising payload — each product section capped at 12, `catalog` at 24.
 ```jsonc
 { "sections": [ { "key": "banners", "enabled": true }, … ],  // ORDERED
   "banners": [                  // active only, in the owner's order

@@ -86,6 +86,35 @@ const ROW_VISIBILITY = [
   'hidden xl:flex',
 ]
 
+/** Full rows "All Products" draws in a big shop (the others draw one). */
+const CATALOG_ROWS = 2
+
+/** Columns of `PRODUCT_GRID` per breakpoint, narrowest first. */
+const GRID_COLUMNS = [
+  { show: '', hide: 'hidden', cols: 2 },
+  { show: 'md:flex', hide: 'md:hidden', cols: 3 },
+  { show: 'lg:flex', hide: 'lg:hidden', cols: 4 },
+  { show: 'xl:flex', hide: 'xl:hidden', cols: 5 },
+] as const
+
+/**
+ * `ROW_VISIBILITY` for up to `rows` rows: at every breakpoint the card shows
+ * only if it falls inside the FULL rows `total` products can make there, so
+ * nine products draw 2 × 4 on `lg` and 1 × 5 on `xl` — never a ragged line.
+ * Literal class strings, because Tailwind scans source text.
+ */
+function fullRowsVisibility(index: number, total: number, rows: number): string {
+  const classes: string[] = []
+  let shownBefore = true
+  for (const { show, hide, cols } of GRID_COLUMNS) {
+    const visible =
+      total < cols ? index < total : index < cols * Math.min(rows, Math.floor(total / cols))
+    if (visible !== shownBefore) classes.push(visible ? show : hide)
+    shownBefore = visible
+  }
+  return classes.join(' ')
+}
+
 /**
  * Below this a rail would not scroll at the widest breakpoint (5 across), so
  * it would just be a short row pretending to be a carousel — those sections
@@ -122,6 +151,9 @@ const SHELF_SPLIT = {
   2: { panel: 'lg:col-span-2', products: 'lg:col-span-2 lg:grid-cols-2' },
   3: { panel: 'lg:col-span-1', products: 'lg:col-span-3 lg:grid-cols-3' },
 } as const
+
+/** Thumbnails of the products past the row, in the shelf panel (2 × 2). */
+const SHELF_PEEK_SIZE = 4
 
 /** Below this a shelf renders as a plain titled row instead — see below. */
 const SHELF_PANEL_MIN = 2
@@ -579,16 +611,18 @@ function shapeHome(home: PublicStoreHome, size: ShopSize): ShapedHome {
     }
   }
 
-  // A big shop: "All Products" skips anything a row ABOVE it already showed.
+  // A big shop: "All Products" skips anything a row ABOVE it already showed —
+  // what it DREW, not what it loaded. A shelf loads twelve and draws three;
+  // skipping all twelve emptied "All Products" in a one-category shop.
   const shown = new Set<string>()
   for (const section of home.sections) {
     if (section.key === 'catalog') break
     if (!section.enabled) continue
     const products =
       section.key === 'featured' || section.key === 'newArrivals' || section.key === 'bestSellers'
-        ? home[section.key]
+        ? drawnProducts(home[section.key], section)
         : section.key === 'categoryRows'
-          ? home.categoryRows.flatMap((row) => row.products)
+          ? home.categoryRows.flatMap((row) => row.products.slice(0, SHELF_ROW_SIZE))
           : []
     for (const product of products) shown.add(product.id)
   }
@@ -598,6 +632,20 @@ function shapeHome(home: PublicStoreHome, size: ShopSize): ShapedHome {
     catalogAll: false,
     pictures,
   }
+}
+
+/**
+ * The products a curated section actually puts on screen, by the same rule
+ * `ProductSection` uses to pick its composition: a rail draws all of them, a
+ * spotlight its lead + six, the capped row one row.
+ */
+function drawnProducts(products: PublicProduct[], section: HomeSectionEntry): PublicProduct[] {
+  const layout = productLayout(sectionCopy(section).layout ?? defaultLayout(section.key))
+  if (layout === 'rail' && products.length >= RAIL_MIN) return products
+  if (layout === 'spotlight' && products.length >= SPOTLIGHT_MIN) {
+    return products.slice(0, 1 + SPOTLIGHT_SUPPORT)
+  }
+  return products.slice(0, ROW_SIZE)
 }
 
 /**
@@ -778,6 +826,9 @@ function HomeSection({
           products={home.catalog}
           layout={productLayout(layout)}
           all={catalogAll}
+          // The one section that is "everything we stock": two full rows, so
+          // a shop with most of its stock on one shelf still shows plenty.
+          rows={CATALOG_ROWS}
           skin={skin}
           tone={tone}
           builder={builder}
@@ -1149,6 +1200,7 @@ function ProductSection({
   products,
   layout,
   all = false,
+  rows = 1,
   skin,
   tone,
   builder,
@@ -1166,6 +1218,8 @@ function ProductSection({
    * no "View all" (there is nothing more to view).
    */
   all?: boolean
+  /** Full rows the capped grid may draw (only "All Products" asks for two). */
+  rows?: number
   skin: Skin
   tone: BandTone
   builder?: Record<string, string> | undefined
@@ -1230,13 +1284,17 @@ function ProductSection({
         <Spotlight store={store} products={products} skin={skin} />
       ) : (
         <ul className={`mt-4 sm:mt-6 ${PRODUCT_GRID}`}>
-          {products.slice(0, ROW_SIZE).map((product, index) => (
+          {products.slice(0, ROW_SIZE * rows).map((product, index) => (
             <ProductCard
               key={product.id}
               store={store}
               product={product}
               skin={skin}
-              className={ROW_VISIBILITY[index] ?? ''}
+              className={
+                rows === 1
+                  ? (ROW_VISIBILITY[index] ?? '')
+                  : fullRowsVisibility(index, products.length, rows)
+              }
             />
           ))}
         </ul>
@@ -1506,6 +1564,14 @@ function CategoryShelf({
   }
 
   const split = SHELF_SPLIT[shown.length as 2 | 3]
+  // The panel is as tall as a product card on `lg`; a peek at what is past
+  // the row fills it with the shelf's own stock instead of empty space.
+  const photos = row.products
+    .slice(SHELF_ROW_SIZE)
+    .flatMap((product) => (product.image?.url ? [{ id: product.id, url: product.image.url }] : []))
+  // Whole lines of two only — three would leave a hole in the 2 × 2.
+  const peek = photos.slice(0, Math.min(SHELF_PEEK_SIZE, photos.length - (photos.length % 2)))
+  const more = Math.max(0, count - shown.length - peek.length)
 
   return (
     <Band tone={tone} skin={skin} builder={builder}>
@@ -1529,6 +1595,30 @@ function CategoryShelf({
               </span>
             )}
           </span>
+          {peek.length >= 2 && (
+            <span aria-hidden className="hidden w-full grid-cols-2 gap-2 lg:mt-6 lg:grid">
+              {peek.map((photo, index) => (
+                <span
+                  key={photo.id}
+                  className={`relative aspect-square overflow-hidden rounded-lg ${skin.well}`}
+                >
+                  <MediaImg
+                    sizes="120px"
+                    src={photo.url}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                  {more > 0 && index === peek.length - 1 && (
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-lg font-semibold text-white">
+                      +{more}
+                    </span>
+                  )}
+                </span>
+              ))}
+            </span>
+          )}
           <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm font-semibold text-brand lg:mt-6">
             Shop all
             <ChevronRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
