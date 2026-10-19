@@ -1159,7 +1159,8 @@ Full rules and design: [AFFILIATE.md](./AFFILIATE.md).
 - Product Ratings
 - Recently Viewed Products
 - Multiple Admins
-- Multiple Vendors
+- Multiple Vendors — dropshipping: sellers bring their own suppliers, who ship
+  straight to customers; plan and status in [dropshipping/](./dropshipping/README.md)
 - Delivery Partner Integration
 - Invoice Download (PDF)
 - Analytics Dashboard

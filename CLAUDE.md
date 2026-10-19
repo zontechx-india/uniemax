@@ -20,6 +20,7 @@ one file (no duplication).
 | Prisma schema models/enums                       | [`docs/BACKEND_CONTEXT.md`](./docs/BACKEND_CONTEXT.md) (Data Model section) |
 | Frontend structure, shared UI, theme tokens, per-store theming | [`docs/FRONTEND_CONTEXT.md`](./docs/FRONTEND_CONTEXT.md) |
 | Affiliate system (programmes, invitations, links, attribution, commission, payouts) | [`docs/AFFILIATE.md`](./docs/AFFILIATE.md) |
+| Dropshipping — anything in `package/dropship` (its endpoints, schema, rules, screens), plans and status | [`docs/dropshipping/`](./docs/dropshipping/README.md) — start at its README |
 | UI/UX rules (spacing, type, colour, components, states) | [`docs/DESIGN_GUIDELINES.md`](./docs/DESIGN_GUIDELINES.md) — **read before any UI work; it wins over older plans** |
 | Design-system clean-up phases and status | [`docs/DESIGN_SYSTEM_PLAN.md`](./docs/DESIGN_SYSTEM_PLAN.md) |
 | Anything SEO — head tags, structured data, `robots.txt`, sitemaps, page shells, indexing rules, `/c/` landing pages' SEO, the SEO roadmap | [`docs/SEO.md`](./docs/SEO.md) (rules tables, status, roadmap **and** change log) |
@@ -81,6 +82,15 @@ Rules:
   it is drawn (`"48px"`, `"(min-width: 1024px) 25vw, 50vw"`). It offers the server's
   sized copies so phones never download the 1920 px original. Bare `<img>` only for
   local `blob:` previews and static assets.
+
+## Dropshipping (knowledge base — docs/dropshipping/)
+
+- **`docs/dropshipping/` is the single source of truth for dropshipping.** Read
+  its `README.md` first, then **only** the files its reading map lists for the
+  task. Each phase file says what to read, build, test and update.
+- Update the knowledge base in the same task (tick tasks, flip ☐/◐/☑ markers).
+  Package facts live only there (`docs/API.md` keeps a pointer); core changes made
+  for it also go to the main doc this table names.
 
 ## SEO Conventions (summary — full detail in docs/SEO.md)
 
