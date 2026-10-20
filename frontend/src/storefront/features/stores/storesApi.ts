@@ -2127,6 +2127,67 @@ export interface PlacedOrderItem {
   unitPrice: string
   quantity: number
   lineTotal: string
+  /** The parcel this line went out in — null until it ships. */
+  shipmentId: string | null
+}
+
+/** One parcel of an order — courier, tracking, and what happened to it. */
+export interface OrderShipment {
+  id: string
+  /** Code from the courier list; null for a courier the seller typed ("Other"). */
+  carrierCode: string | null
+  /** Courier name as the customer sees it ("Own delivery" for the store's own). */
+  carrier: string
+  /** Null for own delivery — and on anyone else's view of the order link. */
+  trackingNumber: string | null
+  /** A tracking link the seller pasted; null = none (copy the number instead). */
+  trackingUrl: string | null
+  /** The courier's own website — "Open {courier}" when there's no link. */
+  courierSite: string | null
+  /** "Shipped by …" — null = the store itself. */
+  senderName: string | null
+  source: 'SELLER' | 'PACKAGE'
+  shippedAt: string
+  deliveredAt: string | null
+  /** The parcel came back undelivered (returned to sender). */
+  returnedAt: string | null
+  /** Seller and admin views only: on cancelling, its items went back in stock. */
+  restocked?: boolean
+  /** Seller and admin views only: the proof-of-delivery photo. */
+  podUrl?: string | null
+}
+
+/** A courier in the "Mark as sent" picker (GET /public/couriers). */
+export interface Courier {
+  code: string
+  /** Empty for "other" — the seller types the name. */
+  name: string
+  site: string | null
+  /** False for own delivery: no tracking number to give. */
+  tracking: boolean
+}
+
+/** Courier + tracking for sending a parcel or correcting its tracking. */
+export interface ShipmentTrackingInput {
+  carrierCode: string
+  carrierName?: string | null
+  trackingNumber?: string | null
+  trackingUrl?: string | null
+}
+
+let couriersRequest: Promise<Courier[]> | null = null
+
+export const courierApi = {
+  /** The courier list — fetched once per session (it is static). */
+  list(): Promise<Courier[]> {
+    couriersRequest ??= call<Courier[]>(http.get('/api/v1/public/couriers')).catch(
+      (err: unknown) => {
+        couriersRequest = null
+        throw err
+      },
+    )
+    return couriersRequest
+  },
 }
 
 /** The order lifecycle. Sellers move orders forward; CANCELLED sits apart. */
@@ -2179,6 +2240,8 @@ export interface PlacedOrder {
   /** The buyer cancelled it themselves (before the seller confirmed). */
   cancelledByCustomer: boolean
   items: PlacedOrderItem[]
+  /** Parcels the order went out in, oldest first. */
+  shipments: OrderShipment[]
   /** Order lookup only: true when the viewer is not the customer who placed
    *  the order — contact + delivery fields then come back null. */
   redacted?: boolean
@@ -2334,16 +2397,81 @@ export const sellerOrderApi = {
   },
 
   /**
-   * Cancel the order (only before it ships) — restores stock; a paid
-   * (dev-simulated) payment flips to refunded.
+   * Cancel the order — before it ships, or once its parcel came back. Items
+   * that never shipped go back in stock; items that came back only when
+   * `restockReturned` says so (required for such an order). A paid payment
+   * flips to refunded.
    */
   async cancel(
     storeRef: string,
     orderId: string,
     reason: string | null,
+    restockReturned?: boolean,
   ): Promise<PlacedOrder> {
     return call<PlacedOrder>(
-      http.post(`${base()}/${storeRef}/orders/${orderId}/cancel`, { reason }),
+      http.post(`${base()}/${storeRef}/orders/${orderId}/cancel`, {
+        reason,
+        ...(restockReturned === undefined ? {} : { restockReturned }),
+      }),
+    )
+  },
+
+  /**
+   * Send the order: one parcel with everything not already on its way (also
+   * "add tracking" to an order sent before parcels existed, and "send again"
+   * after a parcel came back). The customer is told, with the tracking.
+   */
+  async ship(
+    storeRef: string,
+    orderId: string,
+    input: ShipmentTrackingInput,
+  ): Promise<PlacedOrder> {
+    return call<PlacedOrder>(
+      http.post(`${base()}/${storeRef}/orders/${orderId}/shipments`, input),
+    )
+  },
+
+  /** Correct a parcel's courier, number or link while it is on its way. */
+  async updateTracking(
+    storeRef: string,
+    orderId: string,
+    shipmentId: string,
+    input: ShipmentTrackingInput,
+  ): Promise<PlacedOrder> {
+    return call<PlacedOrder>(
+      http.patch(`${base()}/${storeRef}/orders/${orderId}/shipments/${shipmentId}`, input),
+    )
+  },
+
+  /** Delivered — with an optional proof-of-delivery photo (already WebP). */
+  async markDelivered(
+    storeRef: string,
+    orderId: string,
+    shipmentId: string,
+    photo: { blob: Blob; filename: string } | null,
+    onProgress?: (fraction: number) => void,
+  ): Promise<PlacedOrder> {
+    const url = `${base()}/${storeRef}/orders/${orderId}/shipments/${shipmentId}/delivered`
+    if (!photo) return call<PlacedOrder>(http.post(url, {}))
+    const form = new FormData()
+    form.append('file', photo.blob, photo.filename)
+    return call<PlacedOrder>(
+      http.post(url, form, {
+        onUploadProgress: (e) => {
+          if (onProgress && e.total) onProgress(e.loaded / e.total)
+        },
+      }),
+    )
+  },
+
+  /** The parcel came back undelivered — then send it again, or cancel. */
+  async markReturned(
+    storeRef: string,
+    orderId: string,
+    shipmentId: string,
+  ): Promise<PlacedOrder> {
+    return call<PlacedOrder>(
+      http.post(`${base()}/${storeRef}/orders/${orderId}/shipments/${shipmentId}/returned`, {}),
     )
   },
 }

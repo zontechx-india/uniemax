@@ -728,6 +728,35 @@ count; a card skeleton shows while the layout's fetch is in flight.
   their order page) and explains that stock
   is restored (and a paid order marked refunded). Conflicts (409 — e.g.
   a race with another tab) surface as inline errors.
+- **Parcels** (delivery orders; `pages/stores/orders/`, rules in
+  [dropshipping/shipments](./dropshipping/shipments/context.md)) — **Mark as
+  sent** opens `ShipDialog` (shared `Dialog`: a courier `Select` with nothing
+  pre-picked, from `courierApi.list()`; for "Other" a name field; a tracking
+  number nudged with *"Add it so your customer can follow the parcel"*; an
+  optional pasted tracking link; Own delivery shows a note instead). The
+  same sheet is **Add tracking** (an order sent before parcels existed),
+  **Send again** (the sticky action once every parcel came back) and **Edit
+  tracking**. A `ParcelCard` under the customer card shows each parcel —
+  courier, `Badge` status (On the way / Delivered / Came back), the number
+  with **Copy**, **Track** (pasted link) or **Open {courier}**, sent /
+  delivered / came-back times and the proof-of-delivery thumbnail
+  (`MediaImg`). **Mark as delivered** on an order with a parcel opens
+  `DeliveredDialog`: an optional photo, shrunk to WebP in the browser
+  (`prepareImage`, as product photos) and previewed from its `blob:`. The
+  "⋯" gains **Parcel came back** (confirm), and once every parcel came back
+  **Cancel** returns — its dialog then asks *"Put the items that came back
+  into stock?"* (two radio cards, nothing pre-selected, the confirm held via
+  `ConfirmDialog`'s `confirmDisabled` until answered). The timeline's Sent
+  step carries "courier · number" and a Came back step appears.
+- **Customer side** — `features/stores/ParcelTracking.tsx`: the order page
+  (`OrderSuccessPage`) gets a **Tracking** section after Order progress (one
+  block per parcel: courier, status `Badge`, the number with a Copy that
+  says "Copied", **Track parcel** for a pasted link or **Open the {courier}
+  website** + "copy the number, then paste it there"; "Parcel 1 of 2",
+  "Shipped by …"; a redacted view says "Sign in as the buyer to see the
+  tracking number"), and each shipped order card on My Orders a one-line
+  `ParcelLine` ("Delhivery · 2123… · Track"). Admin's order detail shows a
+  **Parcels** card with the proof photo.
 
 **Publish & share** — one body (`ShareActions` in `StorePublishCard.tsx`, state
 in `usePublishActions.ts`) in two frames: on desktop it ends the left card
@@ -2967,6 +2996,7 @@ frontend/
     │           ├── StoreDashboardPage.tsx # Manage landing: hero (stats + ONE next step), order chips, latest orders
     │           ├── StoreOrdersPage.tsx  # Seller orders list (status tabs, search, Load More)
     │           ├── StoreOrderDetailPage.tsx # One order: items, timeline, status actions + cancel
+    │           ├── orders/               # Parcels: ShipDialog, DeliveredDialog, ParcelCard
     │           ├── orderMeta.tsx        # Shared status chips / payment labels / date formats
     │           ├── StorePublishCard.tsx # ShareActions: desktop StorePublishCard + phone StoreShareSheet; ShopNotLiveNudge
     │           ├── StoreDetailsPage.tsx # Name + logo upload (crop → progress → replace/remove)

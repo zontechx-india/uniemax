@@ -7,6 +7,7 @@ import {
   normalizePincode,
   paginationQuery,
 } from "../../utils/zodHelpers.js";
+import { COURIER_CODES, isHttpUrl } from "./couriers.js";
 
 /**
  * Storefront order placement (per store, guests welcome). The payload
@@ -178,6 +179,13 @@ export const orderStatusUpdateSchema = z.object({
 
 export const orderCancelSchema = z.object({
   reason: optionalText(300),
+  /**
+   * Only for an order whose parcel came back: whether those returned items go
+   * back in stock (they may be damaged). Asked, never assumed — the service
+   * refuses the cancel when it is needed and missing. Items that never shipped
+   * always go back in stock.
+   */
+  restockReturned: z.boolean().optional(),
 });
 
 export const sellerOrderParamSchema = z.object({
@@ -185,6 +193,70 @@ export const sellerOrderParamSchema = z.object({
   orderId: z.string().min(1),
 });
 
+// ---------------------------------------------------------------------------
+// Parcels (/stores/:id/orders/:orderId/shipments) — courier + tracking
+// ---------------------------------------------------------------------------
+
+/** "1234 5678 9012" → "123456789012"; letters, digits and dashes only. */
+const trackingNumberSchema = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(/\s+/g, ""))
+  .pipe(
+    z
+      .string()
+      .min(4, "A tracking number has at least 4 characters")
+      .max(40, "A tracking number has at most 40 characters")
+      .regex(/^[A-Za-z0-9-]+$/, "Use only letters, numbers and dashes"),
+  );
+
+const optionalTrackingNumber = z
+  .union([trackingNumberSchema, z.literal(""), z.null()])
+  .optional()
+  .transform((value) => (value ? value : null));
+
+/** Only http(s): a `javascript:` link would run in the customer's browser. */
+const optionalTrackingUrl = z
+  .union([
+    z
+      .string()
+      .trim()
+      .max(500, "The link is too long")
+      .refine(isHttpUrl, "The link must start with http:// or https://"),
+    z.literal(""),
+    z.null(),
+  ])
+  .optional()
+  .transform((value) => (value ? value : null));
+
+/**
+ * Courier + tracking for a parcel — used to send one and to correct its
+ * tracking (the sheet always sends the full set). "other" needs the typed
+ * courier name; own delivery ("self") has no tracking, so any number or link
+ * sent with it is dropped by the service.
+ */
+export const shipmentTrackingSchema = z
+  .object({
+    carrierCode: z.enum(COURIER_CODES),
+    carrierName: optionalText(60),
+    trackingNumber: optionalTrackingNumber,
+    trackingUrl: optionalTrackingUrl,
+  })
+  .superRefine((value, ctx) => {
+    if (value.carrierCode === "other" && !value.carrierName) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["carrierName"],
+        message: "Type the courier's name",
+      });
+    }
+  });
+
+export const shipmentParamSchema = sellerOrderParamSchema.extend({
+  shipmentId: z.string().min(1),
+});
+
 export type SellerOrderListQuery = z.infer<typeof sellerOrderListQuerySchema>;
 export type OrderStatusUpdateInput = z.infer<typeof orderStatusUpdateSchema>;
 export type OrderCancelInput = z.infer<typeof orderCancelSchema>;
+export type ShipmentTrackingInput = z.infer<typeof shipmentTrackingSchema>;

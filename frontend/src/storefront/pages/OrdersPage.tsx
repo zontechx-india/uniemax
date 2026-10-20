@@ -4,6 +4,7 @@ import { call, http, toApiError } from '../../shared/auth/http'
 import { formatPrice, storeHomeUrl } from '../features/stores/storesApi'
 import type { PlacedOrder } from '../features/stores/storesApi'
 import { orderStatusCopy } from '../features/stores/orderStatus'
+import { ParcelLine } from '../features/stores/ParcelTracking'
 import { BoxIcon, CartIcon, ChevronRightIcon } from '../layout/icons'
 import { buttonClass } from '../../shared/ui/Button'
 import { MediaImg } from '../../shared/media/MediaImg'
@@ -175,6 +176,15 @@ export function OrdersPage() {
                   </li>
                 ))}
               </ul>
+
+              {/* Parcels — courier + tracking number, one line each */}
+              {order.shipments.length > 0 && order.status !== 'CANCELLED' && (
+                <div className="space-y-1 border-t border-line px-5 py-3">
+                  {order.shipments.map((parcel) => (
+                    <ParcelLine key={parcel.id} parcel={parcel} />
+                  ))}
+                </div>
+              )}
 
               {/* Footer actions */}
               <div className="flex items-center justify-between border-t border-line px-5 py-3">

@@ -3,6 +3,8 @@ import { storeActor } from "../stores/storeActor.js";
 import { list, ok } from "../../utils/response.js";
 import { idParamSchema, slugParamSchema } from "../../utils/zodHelpers.js";
 import { optionalCustomerId } from "../../package/auth/index.js";
+import { readUpload } from "../../package/storage/index.js";
+import { COURIERS } from "./couriers.js";
 import {
   orderCancelSchema,
   idempotencyHeaderSchema,
@@ -12,8 +14,11 @@ import {
   orderStatusUpdateSchema,
   sellerOrderListQuerySchema,
   sellerOrderParamSchema,
+  shipmentParamSchema,
+  shipmentTrackingSchema,
 } from "./orders.schema.js";
 import * as service from "./orders.service.js";
+import * as shipments from "./shipments.service.js";
 
 /**
  * Storefront order endpoints. Placement runs behind `requireCustomer`
@@ -103,9 +108,74 @@ export async function updateStoreOrderStatus(request: FastifyRequest) {
 
 export async function cancelStoreOrder(request: FastifyRequest) {
   const { id, orderId } = sellerOrderParamSchema.parse(request.params);
-  // Cancel takes no other input, so a missing/empty body is fine too.
-  const { reason } = orderCancelSchema.parse(request.body ?? {});
+  // Every field is optional, so a missing/empty body is fine too.
+  const { reason, restockReturned } = orderCancelSchema.parse(request.body ?? {});
   return ok(
-    await service.cancelOrder(storeActor(request), id, orderId, reason),
+    await service.cancelOrder(
+      storeActor(request),
+      id,
+      orderId,
+      reason,
+      restockReturned,
+    ),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Parcels — courier + tracking (stores.routes.ts, same guards as above).
+// Every action answers with the whole order as the seller sees it.
+// ---------------------------------------------------------------------------
+
+/** Send the order: a parcel with everything not already on its way (201). */
+export async function createShipment(request: FastifyRequest, reply: FastifyReply) {
+  const { id, orderId } = sellerOrderParamSchema.parse(request.params);
+  const input = shipmentTrackingSchema.parse(request.body);
+  const order = await shipments.createShipment(storeActor(request), id, orderId, input);
+  return reply.status(201).send(ok(order));
+}
+
+export async function updateShipmentTracking(request: FastifyRequest) {
+  const { id, orderId, shipmentId } = shipmentParamSchema.parse(request.params);
+  const input = shipmentTrackingSchema.parse(request.body);
+  return ok(
+    await shipments.updateShipmentTracking(
+      storeActor(request),
+      id,
+      orderId,
+      shipmentId,
+      input,
+    ),
+  );
+}
+
+/**
+ * Delivered. The proof-of-delivery photo is optional: multipart with a
+ * `file` part attaches one (image rules, normalised like any upload); a plain
+ * JSON or empty body marks the parcel delivered without one.
+ */
+export async function markShipmentDelivered(request: FastifyRequest) {
+  const { id, orderId, shipmentId } = shipmentParamSchema.parse(request.params);
+  const photo = request.isMultipart() ? await readUpload(request, "image") : null;
+  return ok(
+    await shipments.markShipmentDelivered(
+      storeActor(request),
+      id,
+      orderId,
+      shipmentId,
+      photo,
+    ),
+  );
+}
+
+export async function markShipmentReturned(request: FastifyRequest) {
+  const { id, orderId, shipmentId } = shipmentParamSchema.parse(request.params);
+  return ok(
+    await shipments.markShipmentReturned(storeActor(request), id, orderId, shipmentId),
+  );
+}
+
+/** The courier list for the "Mark as sent" sheet (public, static). */
+export async function listCouriers(_request: FastifyRequest, reply: FastifyReply) {
+  reply.header("Cache-Control", "public, max-age=3600");
+  return ok(COURIERS);
 }

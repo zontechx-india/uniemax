@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma.js";
 import { publicWebUrl, sendMail } from "../../package/mail/index.js";
 import { notify, notifyAdmins } from "../notifications/notifications.service.js";
+import { escapeHtml } from "./couriers.js";
 
 /**
  * Order notifications — **email + push, from one place**, so a new order
@@ -322,6 +323,125 @@ export function notifyOrderStatusChange(
       ),
     });
   })().catch(logFailure(`customer ${order.status.toLowerCase()}`));
+}
+
+/** A parcel as the customer messages need it (the shaped parcel satisfies it). */
+export interface ParcelMailData {
+  carrierCode: string | null;
+  carrier: string;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  courierSite: string | null;
+  senderName: string | null;
+}
+
+/**
+ * One parcel's message to the customer — push + email, with the courier, the
+ * tracking number and where to follow it. The courier, number and link are
+ * seller-typed, so the HTML escapes every value (the link is already
+ * http(s)-only by validation).
+ */
+function sendParcelMessage(
+  order: OrderMailData,
+  parcel: ParcelMailData,
+  customerId: string | null,
+  subject: string,
+  line: string,
+): void {
+  const number = parcel.trackingNumber;
+  const orderPath = `/order/${order.storeSlug}/${order.id}`;
+
+  if (customerId) {
+    notify({
+      principalType: "CUSTOMER",
+      principalId: customerId,
+      kind: "ORDER_STATUS",
+      title: subject,
+      body: number ? `${line} Tracking number: ${number}.` : line,
+      url: orderPath,
+      data: { orderId: order.id, status: order.status },
+    });
+  }
+
+  void (async () => {
+    const to = await customerAddress(order, customerId);
+    if (!to) return;
+    const orderUrl = publicWebUrl ? `${publicWebUrl}${orderPath}` : null;
+    // The seller's own tracking link wins; without one, the courier's site
+    // (where the customer pastes the number).
+    const trackUrl = parcel.trackingUrl ?? (number ? parcel.courierSite : null);
+    const trackLabel = parcel.trackingUrl
+      ? "Track your parcel"
+      : `Track it on the ${parcel.carrier} website`;
+    const shippedBy = parcel.senderName ? `Shipped by ${parcel.senderName}.` : null;
+
+    const text = [
+      `Hi${order.customerName ? ` ${order.customerName}` : ""},`,
+      "",
+      line,
+      shippedBy,
+      number ? `Tracking number: ${number}` : null,
+      trackUrl
+        ? `${trackLabel}: ${trackUrl}${parcel.trackingUrl ? "" : " (use the tracking number above)"}`
+        : null,
+      orderUrl ? `\nView your order: ${orderUrl}` : null,
+    ]
+      .filter((part) => part !== null)
+      .join("\n");
+
+    await sendMail({
+      to,
+      subject,
+      text,
+      html: wrapHtml(
+        escapeHtml(subject),
+        `<p style="margin:0;font-size:14px;color:#444">${escapeHtml(line)}</p>
+         ${shippedBy ? `<p style="margin:4px 0 0;font-size:13px;color:#444">${escapeHtml(shippedBy)}</p>` : ""}
+         ${number ? `<p style="margin:12px 0 0;font-size:14px;color:#111">Tracking number: <strong>${escapeHtml(number)}</strong></p>` : ""}
+         ${trackUrl ? linkHtml(escapeHtml(trackUrl), escapeHtml(trackLabel)) : ""}
+         ${orderUrl ? linkHtml(orderUrl, "View your order") : ""}`,
+      ),
+    });
+  })().catch(logFailure("customer parcel"));
+}
+
+/**
+ * A parcel left the store. `first` = this parcel moved the order to Shipped
+ * (it replaces the plain "shipped" message, so the customer gets one, with
+ * the tracking); otherwise tracking was added to an order already sent, or the
+ * order was sent again after a parcel came back.
+ */
+export function notifyParcelShipped(
+  order: OrderMailData,
+  parcel: ParcelMailData,
+  customerId: string | null,
+  { first }: { first: boolean },
+): void {
+  const line =
+    parcel.carrierCode === "self"
+      ? `${order.storeName} is delivering your order themselves.`
+      : `${order.storeName} has ${first ? "shipped" : "sent"} your order with ${parcel.carrier}.`;
+  const subject = first
+    ? `Order ${order.orderNumber} shipped`
+    : `Tracking for order ${order.orderNumber}`;
+  sendParcelMessage(order, parcel, customerId, subject, line);
+}
+
+/** The seller corrected a parcel's courier, number or link. */
+export function notifyTrackingUpdated(
+  order: OrderMailData,
+  parcel: ParcelMailData,
+  customerId: string | null,
+): void {
+  sendParcelMessage(
+    order,
+    parcel,
+    customerId,
+    `Tracking updated for order ${order.orderNumber}`,
+    parcel.carrierCode === "self"
+      ? `${order.storeName} has updated the delivery details — they are delivering your order themselves.`
+      : `${order.storeName} has updated the tracking for your order — it's on the way with ${parcel.carrier}.`,
+  );
 }
 
 /**

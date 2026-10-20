@@ -49,6 +49,11 @@ import {
   notifyOrderStatusChange,
 } from "./orders.notifications.js";
 import {
+  shapeShipment,
+  shipmentSelect,
+  type OrderAudience,
+} from "./shipments.shape.js";
+import {
   gatewayConfigured,
   createPaymentSession,
   reconcilePendingPayment,
@@ -150,22 +155,43 @@ const orderSelect = {
       unitPrice: true,
       quantity: true,
       lineTotal: true,
+      /** The parcel this line went out in (null until it ships). */
+      shipmentId: true,
     },
   },
+  shipments: { orderBy: { shippedAt: "asc" }, select: shipmentSelect },
 } satisfies Prisma.OrderSelect;
 
 type OrderRow = Prisma.OrderGetPayload<{ select: typeof orderSelect }>;
 
-function shapeOrder(row: OrderRow) {
-  const { items, ...rest } = row;
+/**
+ * The order as `audience` may see it. Only its parcels differ by audience
+ * (the proof photo is the seller's, tracking is hidden from the public link);
+ * contact redaction for the public link is `getPublicOrder`'s job.
+ */
+function shapeOrder(row: OrderRow, audience: OrderAudience = "customer") {
+  const { items, shipments, ...rest } = row;
   return {
     ...rest,
     items: items.map(({ imageKey, ...item }) => ({
       ...item,
       imageUrl: mediaUrl("media", imageKey),
     })),
+    shipments: shipments.map((shipment) => shapeShipment(shipment, audience)),
   };
 }
+
+/** One order, freshly read and shaped for `audience`. */
+export async function loadOrder(orderId: string, audience: OrderAudience) {
+  const row = await prisma.order.findFirst({
+    where: { id: orderId },
+    select: orderSelect,
+  });
+  if (!row) throw HttpError.notFound("Order not found");
+  return shapeOrder(row, audience);
+}
+
+export type ShapedOrder = ReturnType<typeof shapeOrder>;
 
 /** Require + format-check the fields this store collects for this order. */
 function validateCustomerFields(
@@ -790,7 +816,7 @@ export async function listMyOrders(customerId: string) {
     take: 100,
     select: orderSelect,
   });
-  return rows.map(shapeOrder);
+  return rows.map((row) => shapeOrder(row, "customer"));
 }
 
 // ---------------------------------------------------------------------------
@@ -804,7 +830,7 @@ export async function listMyOrders(customerId: string) {
  * CANCELLED sits outside the sequence and has its own endpoint because it
  * restores stock.
  */
-const STATUS_RANK: Record<string, number> = {
+export const STATUS_RANK: Record<string, number> = {
   PENDING: 0,
   CONFIRMED: 1,
   PACKED: 2,
@@ -892,14 +918,89 @@ export async function getStoreOrder(
     select: orderSelect,
   });
   if (!row) throw HttpError.notFound("Order not found");
-  return shapeOrder(row);
+  return shapeOrder(row, "seller");
+}
+
+/** What a status change reads, and guards its write on. */
+export const statusGuardSelect = {
+  id: true,
+  status: true,
+  paymentMethod: true,
+  paymentStatus: true,
+  customerId: true,
+} satisfies Prisma.OrderSelect;
+
+type StatusGuard = Prisma.OrderGetPayload<{ select: typeof statusGuardSelect }>;
+export type ForwardStatus = OrderStatusUpdateInput["status"];
+
+/**
+ * Write a forward status change — the ONE place it is written, for the
+ * seller's buttons and for parcels alike (never backwards; terminal states
+ * stay terminal). Marking a COD order DELIVERED settles its payment — cash
+ * changed hands at the door — so `paymentStatus` flips to PAID. The write
+ * re-checks the status read before, so two simultaneous changes (two tabs,
+ * a double tap) can't both win. Runs in the caller's transaction; announce
+ * it with `announceStatusChange` once that commits.
+ */
+export async function writeStatusChange(
+  db: Prisma.TransactionClient,
+  current: StatusGuard,
+  to: ForwardStatus,
+): Promise<{ paid: boolean }> {
+  if (current.status === "CANCELLED") {
+    throw HttpError.conflict("A cancelled order cannot be updated");
+  }
+  if (STATUS_RANK[to]! <= STATUS_RANK[current.status]!) {
+    throw HttpError.conflict(
+      `This order is already ${STATUS_LABELS[current.status]} — it can only move forward`,
+    );
+  }
+
+  const data: Prisma.OrderUpdateManyMutationInput = {
+    status: to,
+    [STATUS_STAMP[to]]: new Date(),
+  };
+  const paid =
+    to === "DELIVERED" &&
+    current.paymentMethod === "COD" &&
+    current.paymentStatus === "PENDING";
+  if (paid) data.paymentStatus = "PAID";
+
+  const updated = await db.order.updateMany({
+    where: { id: current.id, status: current.status },
+    data,
+  });
+  if (updated.count === 0) {
+    throw HttpError.conflict("The order just changed — reload and try again");
+  }
+  return { paid };
 }
 
 /**
- * Progress an order along the lifecycle (never backwards; terminal states
- * stay terminal). Marking a COD order DELIVERED settles its payment — cash
- * changed hands at the door — so `paymentStatus` flips to PAID.
+ * Announce a committed status change: the customer's message (unless the
+ * caller sends its own — a parcel's shipped mail carries the tracking) and
+ * the `order.status` / `order.paid` events other packages run on (affiliate
+ * commissions approve on DELIVERED). Answers with the order as the seller
+ * sees it.
  */
+export async function announceStatusChange(
+  orderId: string,
+  to: ForwardStatus,
+  change: { paid: boolean },
+  customerId: string | null,
+  options: { notifyCustomer?: boolean } = {},
+) {
+  const shaped = await loadOrder(orderId, "seller");
+  if (options.notifyCustomer !== false) {
+    // Fire-and-forget customer update (Confirmed/Shipped/Delivered have copy).
+    notifyOrderStatusChange(shaped, customerId);
+  }
+  emit("order.status", { orderId, status: to });
+  if (change.paid) emit("order.paid", { orderId });
+  return shaped;
+}
+
+/** Progress an order along the lifecycle from the seller's buttons. */
 export async function updateOrderStatus(
   actor: StoreActor,
   storeRef: string,
@@ -909,63 +1010,33 @@ export async function updateOrderStatus(
   const store = await getMyStore(actor, storeRef);
   const current = await prisma.order.findFirst({
     where: { id: orderId, storeId: store.id },
-    select: {
-      status: true,
-      paymentMethod: true,
-      paymentStatus: true,
-      customerId: true,
-    },
+    select: statusGuardSelect,
   });
   if (!current) throw HttpError.notFound("Order not found");
 
-  if (current.status === "CANCELLED") {
-    throw HttpError.conflict("A cancelled order cannot be updated");
-  }
-  if (STATUS_RANK[input.status]! <= STATUS_RANK[current.status]!) {
-    throw HttpError.conflict(
-      `This order is already ${STATUS_LABELS[current.status]} — it can only move forward`,
-    );
-  }
-
-  const data: Prisma.OrderUpdateManyMutationInput = {
-    status: input.status,
-    [STATUS_STAMP[input.status]]: new Date(),
-  };
-  if (
-    input.status === "DELIVERED" &&
-    current.paymentMethod === "COD" &&
-    current.paymentStatus === "PENDING"
-  ) {
-    data.paymentStatus = "PAID";
-  }
-
-  // Guarded update — the WHERE re-checks the status read above, so two
-  // simultaneous updates (two tabs, double-click) can't both win.
-  const updated = await prisma.order.updateMany({
-    where: { id: orderId, storeId: store.id, status: current.status },
-    data,
+  const change = await prisma.$transaction(async (tx) => {
+    const result = await writeStatusChange(tx, current, input.status);
+    // Delivered from the button closes any parcel still on its way, so the
+    // order and its parcels never disagree.
+    if (input.status === "DELIVERED") {
+      await tx.orderShipment.updateMany({
+        where: { orderId, deliveredAt: null, returnedAt: null },
+        data: { deliveredAt: new Date() },
+      });
+    }
+    return result;
   });
-  if (updated.count === 0) {
-    throw HttpError.conflict("The order just changed — reload and try again");
-  }
 
-  const row = await prisma.order.findFirst({
-    where: { id: orderId },
-    select: orderSelect,
-  });
-  const shaped = shapeOrder(row!);
-  // Fire-and-forget customer update (Confirmed/Shipped/Delivered have copy).
-  notifyOrderStatusChange(shaped, current.customerId);
-  emit("order.status", { orderId, status: input.status });
-  if (data.paymentStatus === "PAID") emit("order.paid", { orderId });
-  return shaped;
+  return announceStatusChange(orderId, input.status, change, current.customerId);
 }
 
 /**
- * Cancel an order (PENDING / CONFIRMED / PACKED only — once it ships, plain
- * cancellation is off the table; returns/RTO are a future flow). Restores
- * the stock the order had reserved and recomputes product aggregates in the
- * same transaction.
+ * Cancel an order: PENDING / CONFIRMED / PACKED, or a SHIPPED one whose every
+ * parcel came back (undelivered, returned to sender) — a delivered order, or
+ * one with a parcel still on its way, can't be cancelled. Puts stock back in
+ * the same transaction: items that never shipped always; items that came back
+ * only when the seller says so (`restockReturned` — they may be damaged, so
+ * it is asked, never assumed).
  *
  * Payment: an UNPAID online order also has its Cashfree order terminated, so
  * a customer sitting on the hosted checkout can't pay for stock that just
@@ -980,6 +1051,7 @@ export async function cancelOrder(
   storeRef: string,
   orderId: string,
   reason: string | null,
+  restockReturned?: boolean,
 ) {
   const store = await getMyStore(actor, storeRef);
   const current = await prisma.order.findFirst({
@@ -988,7 +1060,10 @@ export async function cancelOrder(
       status: true,
       paymentStatus: true,
       customerId: true,
-      items: { select: { productId: true, variantId: true, quantity: true } },
+      items: {
+        select: { productId: true, variantId: true, quantity: true, shipmentId: true },
+      },
+      shipments: { select: { id: true, returnedAt: true } },
     },
   });
   if (!current) throw HttpError.notFound("Order not found");
@@ -996,11 +1071,33 @@ export async function cancelOrder(
   if (current.status === "CANCELLED") {
     throw HttpError.conflict("This order is already cancelled");
   }
-  if (current.status === "SHIPPED" || current.status === "DELIVERED") {
-    throw HttpError.conflict(
-      `A ${STATUS_LABELS[current.status]!.toLowerCase()} order can no longer be cancelled`,
+  if (current.status === "DELIVERED") {
+    throw HttpError.conflict("A delivered order can no longer be cancelled");
+  }
+  const cameBack = new Set(
+    current.shipments.filter((s) => s.returnedAt).map((s) => s.id),
+  );
+  if (current.status === "SHIPPED") {
+    const allBack =
+      current.shipments.length > 0 && cameBack.size === current.shipments.length;
+    if (!allBack) {
+      throw HttpError.conflict(
+        "A sent order can't be cancelled while its parcel is on the way. If it comes back, mark it as came back first.",
+      );
+    }
+  }
+  const returnedItems = current.items.filter(
+    (item) => item.shipmentId !== null && cameBack.has(item.shipmentId),
+  );
+  if (returnedItems.length > 0 && restockReturned === undefined) {
+    throw HttpError.badRequest(
+      "Choose whether the items that came back go back in stock",
     );
   }
+  const toRestock = [
+    ...current.items.filter((item) => item.shipmentId === null),
+    ...(restockReturned ? returnedItems : []),
+  ];
 
   await prisma.$transaction(async (tx) => {
     const updated = await tx.order.updateMany({
@@ -1026,8 +1123,25 @@ export async function cancelOrder(
     if (updated.count === 0) {
       throw HttpError.conflict("The order just changed — reload and try again");
     }
+    // The guarded write holds the order's row lock, and sending a parcel
+    // takes the same lock — so a parcel sent again from another tab is
+    // either seen here or refused there, never missed.
+    if (current.status === "SHIPPED") {
+      const out = await tx.orderShipment.count({
+        where: { orderId, returnedAt: null },
+      });
+      if (out > 0) {
+        throw HttpError.conflict("The order just changed — reload and try again");
+      }
+    }
 
-    await restockItems(current.items, tx);
+    await restockItems(toRestock, tx);
+    if (restockReturned && cameBack.size > 0) {
+      await tx.orderShipment.updateMany({
+        where: { id: { in: [...cameBack] } },
+        data: { restocked: true },
+      });
+    }
   });
 
   // Close the payment window before answering: the stock is back on sale, so
@@ -1039,7 +1153,7 @@ export async function cancelOrder(
     where: { id: orderId },
     select: orderSelect,
   });
-  const shaped = shapeOrder(row!);
+  const shaped = shapeOrder(row!, "seller");
   // Fire-and-forget cancellation email to the customer.
   notifyOrderStatusChange(shaped, current.customerId);
   emit("order.cancelled", { orderId });
@@ -1201,8 +1315,10 @@ export async function getPublicOrder(
   });
   if (!row) throw HttpError.notFound("Order not found");
   const { customerId, ...order } = row;
-  const shaped = shapeOrder(order);
   const isOwner = !!viewerCustomerId && viewerCustomerId === customerId;
+  // Anyone else holding the link sees parcels without tracking numbers: a
+  // courier's site can show the delivery address for one.
+  const shaped = shapeOrder(order, isOwner ? "customer" : "public");
   if (isOwner) return { ...shaped, redacted: false };
   return {
     ...shaped,

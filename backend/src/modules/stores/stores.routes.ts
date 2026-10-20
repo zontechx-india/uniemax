@@ -75,6 +75,22 @@ export const storeRoutes: FastifyPluginAsync<StoreRoutesOptions> = async (
   app.get("/:id/orders/:orderId", ordersController.getStoreOrder);
   app.patch("/:id/orders/:orderId/status", ordersController.updateStoreOrderStatus);
   app.post("/:id/orders/:orderId/cancel", ordersController.cancelStoreOrder);
+  // Parcels — send with a courier + tracking number, correct the tracking,
+  // delivered (optional proof photo, multipart), came back. Both mounts:
+  // support can correct a seller's parcel the same way (audited).
+  app.post("/:id/orders/:orderId/shipments", ordersController.createShipment);
+  app.patch(
+    "/:id/orders/:orderId/shipments/:shipmentId",
+    ordersController.updateShipmentTracking,
+  );
+  app.post(
+    "/:id/orders/:orderId/shipments/:shipmentId/delivered",
+    ordersController.markShipmentDelivered,
+  );
+  app.post(
+    "/:id/orders/:orderId/shipments/:shipmentId/returned",
+    ordersController.markShipmentReturned,
+  );
   // Customer support — the shop's own inbox: threads shoppers opened with
   // this store. (Its Help & Support *with UnieMax* is /api/v1/support.)
   //

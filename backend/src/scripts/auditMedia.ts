@@ -18,7 +18,7 @@ import { DERIVED_PREFIX } from "../package/storage/images.js";
  * which are dead weight?
  *
  * The DB stores object KEYS (Store.logoKey, StoreProductMedia.key,
- * OrderItem.imageKey) without the per-bucket folder prefix; the S3 driver
+ * OrderItem.imageKey, OrderShipment.podKey) without the per-bucket folder prefix; the S3 driver
  * adds the prefix on the way out. This script rebuilds the full S3 key the
  * same way, so what it compares is exactly what sits in the bucket. Legacy
  * URL columns (Banner.imageUrl, Category.imageUrl, StoreSetting.logoUrl,
@@ -161,6 +161,20 @@ async function collectReferences(): Promise<Record<string, Reference[]>> {
       column: "imageKey",
       id: `${o.id} → order ${o.orderId} (${o.productName})`,
       value: o.imageKey!,
+    });
+  }
+
+  // Proof-of-delivery photos (parcels) — never orphans while a parcel holds them.
+  const parcels = await prisma.orderShipment.findMany({
+    where: { podKey: { not: null } },
+    select: { id: true, orderId: true, podKey: true },
+  });
+  for (const p of parcels) {
+    add(refId(mediaBucket, fullKey("media", p.podKey!)), {
+      table: "order_shipments",
+      column: "podKey",
+      id: `${p.id} → order ${p.orderId}`,
+      value: p.podKey!,
     });
   }
 

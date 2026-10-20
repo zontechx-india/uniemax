@@ -201,6 +201,62 @@ export default function OrderDetailPage() {
               )}
             </dl>
           </Card>
+
+          {order.shipments.length > 0 ? (
+            <Card>
+              <CardHeader
+                title={order.shipments.length === 1 ? 'Parcel' : `Parcels (${order.shipments.length})`}
+              />
+              <ul className="divide-y divide-line">
+                {order.shipments.map((parcel) => (
+                  <li key={parcel.id} className="space-y-1 py-3 first:pt-0 last:pb-0">
+                    <p className="text-sm font-medium text-fg">
+                      {parcel.carrier}
+                      {parcel.senderName ? (
+                        <span className="text-muted"> · shipped by {parcel.senderName}</span>
+                      ) : null}
+                    </p>
+                    <p className="font-mono text-xs text-muted">
+                      {parcel.trackingNumber ?? 'No tracking number'}
+                    </p>
+                    {parcel.trackingUrl ? (
+                      <a
+                        href={parcel.trackingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block text-sm text-accent hover:underline"
+                      >
+                        Tracking link
+                      </a>
+                    ) : null}
+                    <p className="text-xs text-muted">
+                      Sent {formatDateTime(parcel.shippedAt)}
+                      {parcel.deliveredAt ? ` · delivered ${formatDateTime(parcel.deliveredAt)}` : ''}
+                      {parcel.returnedAt ? ` · came back ${formatDateTime(parcel.returnedAt)}` : ''}
+                      {parcel.returnedAt && parcel.restocked ? ' · put back in stock' : ''}
+                    </p>
+                    {parcel.podUrl ? (
+                      <a
+                        href={parcel.podUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 inline-flex items-center gap-2 text-sm text-accent hover:underline"
+                      >
+                        <MediaImg
+                          sizes="48px"
+                          src={parcel.podUrl}
+                          alt="Proof of delivery"
+                          className="h-12 w-12 shrink-0 rounded-md border border-line object-cover"
+                          loading="lazy"
+                        />
+                        Proof of delivery
+                      </a>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
         </div>
 
         <div className="space-y-4">

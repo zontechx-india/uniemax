@@ -25,7 +25,7 @@ Status: ☐ planned
 | "Duplicate product" creates an unlinked draft. | `storeCatalog.service.ts#copyProduct` | Duplicating a copy is refused. |
 | Sized image versions render on first request. | `modules/media/media.service.ts` | Copying a photo means copying only the original object. |
 | Upload kinds are `image`, `video` and `logo`. There is no PDF kind. | `package/storage/config.ts` (`mediaRules`) | Proof of delivery is a photo in the MVP. |
-| The order "Shipped" message has no tracking: *"{store} has shipped your order — it's on the way."* | `modules/orders/orders.notifications.ts` | Phase 0 adds tracking to it. |
+| Since Phase 0, orders have parcels (`OrderShipment`): sending one emails the customer the courier + tracking (`notifyParcelShipped`). Status changes go through `writeStatusChange` / `announceStatusChange`. | `modules/orders/shipments.service.ts`, `orders.service.ts`, `orders.notifications.ts` | Phase 1 hooks plug into these; supplier parcels reuse them. |
 | `NotificationKind` has no dropship value; `AFFILIATE` shows the pattern. | `prisma/schema/core.prisma`, `package/affiliate/hosts/inProcess.ts` | Add `DROPSHIP`. |
 | Support tickets go to `PLATFORM` or `STORE`, with category `ORDERS` available. | `core.prisma` (`SupportRecipient`, `SupportTicketCategory`) | "Report a problem" opens a `PLATFORM` / `ORDERS` ticket. |
 | The affiliate package is self-contained, and its endpoints are listed in `API.md`. | `package/affiliate/README.md`, `docs/API.md` | Same packaging. `API.md` gets only a pointer section here (README rule 4). |
@@ -74,7 +74,7 @@ documented in the main doc the root `CLAUDE.md` names, and this table links to i
 
 | Change | Phase | Main doc when built |
 | --- | --- | --- |
-| `OrderShipment` (parcels): ship with tracking, delivered with optional proof photo, came back; tracking in customer notifications | 0 | `BACKEND_CONTEXT.md`, `API.md`, `FRONTEND_CONTEXT.md` |
+| ☑ `OrderShipment` (parcels): ship with tracking, delivered with optional proof photo, came back; tracking in customer notifications | 0 | ☑ written to `BACKEND_CONTEXT.md`, `API.md`, `FRONTEND_CONTEXT.md` |
 | `package/events/hooks.ts` + hook calls in orders, checkout and catalog | 1 | `BACKEND_CONTEXT.md` |
 | Catalog events | 1 | `BACKEND_CONTEXT.md` |
 | `OrderItem.fulfilledBy` + parcel-driven `SHIPPED` / `DELIVERED` | 1 | `BACKEND_CONTEXT.md` |

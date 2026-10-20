@@ -442,8 +442,9 @@ List envelope of summary rows: `{ id, orderNumber, status, fulfilment,
 customerName, paymentMethod, paymentStatus, total, placedAt, itemCount }`.
 
 **`GET /api/v1/stores/:id/orders/:orderId`** — one order, full shape (same
-as order placement below, incl. the lifecycle stamps). `404` if not this
-store's.
+as order placement below, incl. the lifecycle stamps and its parcels —
+`shipments[]` with the proof-of-delivery photo, see **Parcels** below).
+`404` if not this store's.
 
 **`PATCH /api/v1/stores/:id/orders/:orderId/status`**
 ```jsonc
@@ -452,17 +453,29 @@ store's.
 Moves the order forward and stamps the matching timestamp
 (`confirmedAt` / `packedAt` / `shippedAt` / `deliveredAt`). Marking a COD
 order `DELIVERED` also flips `paymentStatus` to `PAID` (cash changed hands
-at the door). `409` when the move isn't forward, the order is cancelled, or
-a concurrent update won the race. Returns the full order.
+at the door), and closes any parcel still on its way (its `deliveredAt` is
+set). `409` when the move isn't forward, the order is cancelled, or a
+concurrent update won the race. Returns the full order. Sending a delivery
+order with a courier and tracking number is the **Parcels** endpoint below;
+this one stays for confirm / pack, pickup orders and orders sent before
+parcels existed.
 
 **`POST /api/v1/stores/:id/orders/:orderId/cancel`**
 ```jsonc
-{ "reason": "Out of stock" }   // optional (≤ 300 chars); body may be empty
+{
+  "reason": "Out of stock",   // optional (≤ 300 chars); body may be empty
+  "restockReturned": true     // only for an order whose parcel came back — see below
+}
 ```
-Cancels the order — allowed only while it hasn't shipped (`PENDING` /
-`CONFIRMED` / `PACKED`; `409` otherwise). In one transaction the items'
-stock is **restored** (lines whose product/variant was deleted since are
-skipped) and product aggregates recompute. An **unpaid ONLINE** order also
+Cancels the order — allowed while it hasn't shipped (`PENDING` /
+`CONFIRMED` / `PACKED`), or once it shipped **and every parcel came back**
+(`returnedAt` set); a delivered order, or one with a parcel still on its
+way, answers `409`. In one transaction stock is **restored**: items that
+never shipped always; items that came back only when `restockReturned` is
+`true` (they may be damaged, so it is asked — `400` when the order has such
+items and the field is missing; their parcels get `restocked: true`). Lines
+whose product/variant was deleted since are skipped, and product aggregates
+recompute. An **unpaid ONLINE** order also
 has its Cashfree order terminated, so a customer sitting on the hosted
 checkout can no longer pay for stock that just went back on sale; a payment
 that still races through is recorded and flagged for refund rather than
@@ -472,6 +485,83 @@ refund API is not wired yet, so money paid through the gateway must
 currently be refunded from the Cashfree merchant dashboard (the automatic
 refund call is the next payments milestone). Returns the full order
 (`cancelledAt` + `cancelReason` set).
+
+### Parcels — `/api/v1/stores/:id/orders/:orderId/shipments`
+
+A delivery order goes out in **parcels**: a courier, an optional tracking
+number, an optional tracking link the seller pasted, and what happened to
+it. The customer is told the moment a parcel is sent — email + push with
+the courier, number and link. Rules and failure cases:
+[dropshipping/shipments](./dropshipping/shipments/context.md). Same two
+mounts as the rest of this router (owner, and super-admin support —
+audited). Every action answers with the **full order** (`shipments[]`
+included); every write is guarded on the state read before it, so a repeat
+or a second tab gets `409`, never a duplicate.
+
+**Parcel shape** (`shipments[]`, oldest first; each order item carries
+`shipmentId`, null until it ships):
+```jsonc
+{
+  "id": "…",
+  "carrierCode": "delhivery",   // from GET /public/couriers; null = typed ("Other")
+  "carrier": "Delhivery",       // shown to the customer ("Own delivery" for the store's own)
+  "trackingNumber": "2123456789012", // null for own delivery / not given
+  "trackingUrl": null,          // only a link the seller pasted — never guessed
+  "courierSite": "https://www.delhivery.com/", // "Open Delhivery" when there's no link
+  "senderName": null,           // "Shipped by …" — null = the store itself
+  "source": "SELLER",
+  "shippedAt": "…", "deliveredAt": null, "returnedAt": null,
+  "restocked": false,           // seller + admin views only
+  "podUrl": null                // proof-of-delivery photo — seller + admin views only
+}
+```
+The buyer's views (`GET /api/v1/orders`, their order link) carry neither
+`restocked` nor `podUrl`; anyone else opening an order link gets
+`trackingNumber` and `trackingUrl` as `null` too (a courier's site can show
+the delivery address).
+
+**`POST /api/v1/stores/:id/orders/:orderId/shipments`** → `201`
+```jsonc
+{
+  "carrierCode": "delhivery",          // required — a code from GET /public/couriers
+  "carrierName": "Speed Couriers",     // required when carrierCode is "other" (≤ 60)
+  "trackingNumber": "2123 4567 8901 2",// optional; spaces dropped → 4–40 of A–Z 0–9 -
+  "trackingUrl": "https://…"           // optional; http(s) only, ≤ 500
+}
+```
+Sends everything not already on its way — items never sent, or items whose
+parcel came back (**send again**) — as one parcel. Moves the order to
+`SHIPPED` (stamped) when it isn't yet; on an order already `SHIPPED` (sent
+before parcels existed, or sent again) it only adds the parcel. `"self"`
+(own delivery) keeps no number or link. `409` for a pickup, cancelled or
+delivered order, or when nothing is left to send.
+
+**`PATCH /api/v1/stores/:id/orders/:orderId/shipments/:shipmentId`** — same
+body; corrects the courier, number or link while the parcel is on its way
+(`409` once it is delivered or came back). The customer gets *"Tracking
+updated"* only when something changed.
+
+**`POST /api/v1/stores/:id/orders/:orderId/shipments/:shipmentId/delivered`**
+— JSON `{}`, or multipart with one `file` part: an optional proof-of-delivery
+photo (the `image` rule of `GET /public/media-config`, stored as WebP like
+any upload). Marks the parcel delivered once (`409` after). When nothing is
+left on its way and every item went out, the order becomes `DELIVERED`
+exactly as the status endpoint does it (COD → `PAID`, customer message,
+`order.status` / `order.paid` events).
+
+**`POST /api/v1/stores/:id/orders/:orderId/shipments/:shipmentId/returned`**
+— `{}`. The parcel came back undelivered (`returnedAt`). Its items stay with
+the order: send it again (POST above), or cancel — the cancel then asks
+`restockReturned`.
+
+### `GET /api/v1/public/couriers` (no auth)
+
+The courier list behind the **Mark as sent** sheet — static, cached for an
+hour. `[{ code, name, site, tracking }]`: `site` is the courier's own
+website (null when it could not be confirmed); `tracking: false` for
+`"self"` (own delivery); `"other"` has an empty `name` (the seller types
+it). The list has no per-number tracking links on purpose — see
+[dropshipping/shipments](./dropshipping/shipments/context.md).
 
 ### `PATCH /api/v1/stores/:id`
 Update `name`. Renaming does **not** change the slug, so shared links keep
@@ -1791,7 +1881,9 @@ Response: the full order —
   "deliveredAt", "cancelledAt", "cancelReason",   // until the seller gets there
   "items": [ { "id", "productName", "variantName", "sku", "productSlug",
                "imageUrl",          // snapshot: the variant's photo, else the cover (key-derived)
-               "unitPrice", "quantity", "lineTotal" } ],
+               "unitPrice", "quantity", "lineTotal",
+               "shipmentId" } ],    // the parcel it went out in — null until sent
+  "shipments": [],                  // parcels — shape under "Parcels" (Customer Stores)
   "payment": {                      // ONLY on a gateway ONLINE placement —
     "paymentSessionId": "session_…",// feed to the Cashfree web SDK checkout()
     "cfOrderId": "UM-…",            // the order id registered with Cashfree
@@ -1808,9 +1900,12 @@ opens in a fresh session. Same shape as above (never includes `payment`) plus
 `redacted`: **only the customer who placed the order** gets `redacted: false`
 and the full contact + delivery snapshot. Anyone else (anonymous, another
 account) gets `redacted: true` with `customerPhone`, `customerEmail`,
-`addressLine`, `pincode`, `billingAddress` and a real `paymentRef` nulled and
-`customerName` cut to the first name — a cuid is time-ordered and leaks
-through shared links, so it must not unlock a buyer's address on its own.
+`addressLine`, `pincode`, `billingAddress` and a real `paymentRef` nulled,
+each parcel's `trackingNumber` / `trackingUrl` nulled (a courier's site can
+show the delivery address), and `customerName` cut to the first name — a
+cuid is time-ordered and leaks through shared links, so it must not unlock
+a buyer's address on its own. The buyer's own view carries the tracking but
+never the proof-of-delivery photo.
 `404` if unknown. An ONLINE order still awaiting payment is
 **reconciled against Cashfree** before answering (webhook fallback, at most
 once per order every 5 s — the endpoint is public), so the success page
@@ -1893,7 +1988,8 @@ rate-limited.
 
 The signed-in customer's order history, newest first (max 100) — the
 account **Orders** page. Full order shape (same as placement, including
-per-item `imageUrl` thumbnails). The auth package's `GET /auth/me/orders`
+per-item `imageUrl` thumbnails and `shipments[]` — courier + tracking, never
+the proof-of-delivery photo). The auth package's `GET /auth/me/orders`
 predates this and returns a leaner shape without media.
 
 ---
@@ -3154,7 +3250,9 @@ List query: `q` (order number / customer / phone / store / payment reference),
 `pageSize`. The list also returns **`filteredRevenue`** — the revenue of the
 current filter, so the header answers "what is this slice worth".
 Detail adds the money breakdown, contact + delivery snapshot, lifecycle
-timestamps, `cfOrderId`, the linked customer/store, and items with `imageUrl`.
+timestamps, `cfOrderId`, the linked customer/store, items with `imageUrl`,
+and `shipments[]` as the seller sees them (proof-of-delivery `podUrl`
+included — shape under **Parcels**).
 
 ### `GET /api/v1/admin/payments`
 

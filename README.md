@@ -44,7 +44,8 @@ never ships to a shopper.
   already there) so it follows the customer across devices.
 - Checkout collects only the fields that store enabled; COD or online payment
   (Cashfree), delivery or pickup, per the seller's configuration.
-- Order history, saved addresses, notification feed with Web Push.
+- Order history with parcel tracking (courier, tracking number to copy, and a
+  link to follow it), saved addresses, notification feed with Web Push.
 - Help & Support **with UnieMax** (account menu) or **with the shop itself**
   (store top bar / footer) — call, email, or raise a tracked ticket.
 
@@ -100,6 +101,11 @@ never ships to a shopper.
   which checkout fields to ask for.
 - Orders: dashboard counters, order list/detail, forward-only status progression,
   pre-shipment cancellation with transactional stock restore.
+- Parcel tracking: send an order with the courier and tracking number (the
+  customer gets them by email and notification at once), correct the tracking,
+  mark delivered with an optional proof-of-delivery photo, and handle a parcel
+  that came back — send it again, or cancel and choose whether the returned
+  items go back in stock.
 - Payout bank account (verified manually by platform staff).
 - Answer the support tickets their own shoppers raise.
 - Publish switch — a store is a private draft until the owner publishes it. The
@@ -277,6 +283,9 @@ env config — see [`backend/docs/PACKAGE_AUTH.md`](./backend/docs/PACKAGE_AUTH.
   are **derived and read-only**.
 - **Order / OrderItem** — placed per store, re-priced from the live catalog at
   placement, stock decremented transactionally.
+- **OrderShipment** — a parcel of an order: courier, tracking number, optional
+  pasted tracking link, delivered / came back, optional proof-of-delivery photo;
+  each order line points at the parcel it went out in.
 - **SupportTicket / SupportTicketMessage** — one table serving all three
   conversations (shopper→UnieMax, seller→UnieMax, shopper→shop), separated by
   `recipient` + `storeId`.

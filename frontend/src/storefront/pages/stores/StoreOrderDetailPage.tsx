@@ -6,7 +6,11 @@ import { copyToClipboard } from '../../../shared/share'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { ErrorNote, InfoNote } from '../../../shared/ui/form'
 import { formatPrice, sellerOrderApi } from '../../features/stores/storesApi'
-import type { PlacedOrder } from '../../features/stores/storesApi'
+import type {
+  OrderShipment,
+  PlacedOrder,
+  ShipmentTrackingInput,
+} from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import {
   ArrowLeftIcon,
@@ -17,13 +21,20 @@ import {
   CloseIcon,
   MapPinIcon,
   PhoneCallIcon,
+  ReturnIcon,
+  TruckIcon,
   UserIcon,
 } from '../../layout/icons'
 import { OrderStatusChip, formatOrderDateTime, paymentLabel, timeAgo } from './orderMeta'
 import { Button, buttonClass } from '../../../shared/ui/Button'
 import { MediaImg } from '../../../shared/media/MediaImg'
+import { DeliveredDialog } from './orders/DeliveredDialog'
+import type { PickedPhoto } from './orders/DeliveredDialog'
+import { ParcelCard } from './orders/ParcelCard'
+import { ShipDialog } from './orders/ShipDialog'
 import { GlassCard } from './ui/GlassCard'
 import { RowMenu } from './ui/RowMenu'
+import type { RowMenuAction } from './ui/RowMenu'
 import { showToast } from './ui/Toast'
 
 /**
@@ -88,6 +99,20 @@ function nextAction(
 
 const CANCELLABLE = new Set(['PENDING', 'CONFIRMED', 'PACKED'])
 
+/** Which courier sheet is open — sending, adding tracking, sending again, or correcting. */
+type ShipSheet =
+  | { kind: 'send' | 'add' | 'again' }
+  | { kind: 'edit'; parcel: OrderShipment }
+
+const SHIP_SHEET_COPY: Record<ShipSheet['kind'], { title: string; submit: string; done: string }> = {
+  send: { title: 'Mark as sent', submit: 'Mark as sent', done: 'Order sent' },
+  add: { title: 'Add tracking', submit: 'Save tracking', done: 'Tracking saved' },
+  again: { title: 'Send it again', submit: 'Send again', done: 'Order sent again' },
+  edit: { title: 'Edit tracking', submit: 'Save tracking', done: 'Tracking updated' },
+}
+
+const onTheWay = (parcel: OrderShipment) => !parcel.deliveredAt && !parcel.returnedAt
+
 /** wa.me wants digits with the country code; a bare 10-digit number is Indian. */
 function whatsAppNumber(phone: string): string {
   const digits = phone.replace(/\D/g, '')
@@ -104,8 +129,15 @@ export function StoreOrderDetailPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [confirming, setConfirming] = useState<'advance' | 'cancel' | null>(null)
+  const [confirming, setConfirming] = useState<'advance' | 'cancel' | 'returned' | null>(null)
   const [cancelReason, setCancelReason] = useState('')
+  // Cancelling after a parcel came back asks whether those items go back in
+  // stock — no answer is assumed.
+  const [restockAnswer, setRestockAnswer] = useState<boolean | null>(null)
+  const [shipSheet, setShipSheet] = useState<ShipSheet | null>(null)
+  const [delivering, setDelivering] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
+  const [sheetError, setSheetError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -125,6 +157,86 @@ export function StoreOrderDetailPage() {
   }, [store.id, orderId])
 
   const action = order ? nextAction(order) : null
+  const parcels = order?.shipments ?? []
+  const openParcels = parcels.filter(onTheWay)
+  const cameBackIds = new Set(parcels.filter((p) => p.returnedAt).map((p) => p.id))
+  const allBack = parcels.length > 0 && cameBackIds.size === parcels.length
+  const hasReturnedItems = !!order?.items.some(
+    (item) => item.shipmentId !== null && cameBackIds.has(item.shipmentId),
+  )
+  // A sent order whose every parcel came back is sent again (or cancelled).
+  const sendAgain = order?.status === 'SHIPPED' && allBack
+
+  /** The sticky button: sending and delivering a delivery order open their sheets. */
+  const primary = () => {
+    if (!order || !action) return
+    setSheetError(null)
+    if (order.fulfilment === 'DELIVERY' && action.status === 'SHIPPED') {
+      setShipSheet({ kind: 'send' })
+    } else if (order.fulfilment === 'DELIVERY' && action.status === 'DELIVERED' && openParcels.length > 0) {
+      setDelivering(true)
+    } else {
+      setConfirming('advance')
+    }
+  }
+
+  const submitShip = async (input: ShipmentTrackingInput) => {
+    if (!order || !shipSheet) return
+    setBusy(true)
+    setSheetError(null)
+    try {
+      const updated =
+        shipSheet.kind === 'edit'
+          ? await sellerOrderApi.updateTracking(store.id, order.id, shipSheet.parcel.id, input)
+          : await sellerOrderApi.ship(store.id, order.id, input)
+      setOrder(updated)
+      showToast(SHIP_SHEET_COPY[shipSheet.kind].done)
+      setShipSheet(null)
+      refreshDashboard()
+    } catch (err) {
+      setSheetError(toApiError(err).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const submitDelivered = async (photo: PickedPhoto | null) => {
+    const parcel = openParcels[0]
+    if (!order || !parcel) return
+    setBusy(true)
+    setSheetError(null)
+    setUploadProgress(photo ? 0 : null)
+    try {
+      setOrder(
+        await sellerOrderApi.markDelivered(store.id, order.id, parcel.id, photo, setUploadProgress),
+      )
+      setDelivering(false)
+      refreshDashboard()
+      showToast('Order delivered')
+    } catch (err) {
+      setSheetError(toApiError(err).message)
+    } finally {
+      setBusy(false)
+      setUploadProgress(null)
+    }
+  }
+
+  const markCameBack = async () => {
+    const parcel = openParcels[0]
+    if (!order || !parcel) return
+    setBusy(true)
+    setActionError(null)
+    try {
+      setOrder(await sellerOrderApi.markReturned(store.id, order.id, parcel.id))
+      setConfirming(null)
+      showToast('Marked as came back')
+    } catch (err) {
+      setActionError(toApiError(err).message)
+      setConfirming(null)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const advance = async () => {
     if (!order || !action) return
@@ -153,10 +265,12 @@ export function StoreOrderDetailPage() {
           store.id,
           order.id,
           cancelReason.trim() || null,
+          hasReturnedItems ? (restockAnswer ?? undefined) : undefined,
         ),
       )
       setConfirming(null)
       setCancelReason('')
+      setRestockAnswer(null)
       refreshDashboard()
       showToast('Order cancelled')
     } catch (err) {
@@ -182,7 +296,42 @@ export function StoreOrderDetailPage() {
     }
   }
 
-  const cancellable = order ? CANCELLABLE.has(order.status) : false
+  const cancellable = order
+    ? CANCELLABLE.has(order.status) || (order.status === 'SHIPPED' && allBack)
+    : false
+
+  const menuActions: RowMenuAction[] = []
+  if (openParcels.length > 0) {
+    menuActions.push({
+      label: 'Parcel came back',
+      icon: ReturnIcon,
+      note: 'The courier returned it. Then send it again or cancel.',
+      onSelect: () => setConfirming('returned'),
+    })
+  }
+  if (cancellable) {
+    menuActions.push({
+      label: 'Cancel this order',
+      icon: CloseIcon,
+      note: hasReturnedItems
+        ? 'You choose whether the returned items go back in stock.'
+        : 'Items go back in stock. The customer is told.',
+      danger: true,
+      onSelect: () => {
+        setRestockAnswer(null)
+        setConfirming('cancel')
+      },
+    })
+  }
+  const showParcels =
+    !!order &&
+    order.fulfilment === 'DELIVERY' &&
+    (parcels.length > 0 || order.status === 'SHIPPED')
+  const keptOutOfStock =
+    !!order &&
+    order.status === 'CANCELLED' &&
+    cameBackIds.size > 0 &&
+    parcels.every((p) => !p.returnedAt || !p.restocked)
 
   return (
     <div className="space-y-4">
@@ -234,8 +383,10 @@ export function StoreOrderDetailPage() {
               This order was cancelled
               {order.cancelledByCustomer && <> by the customer</>}
               {order.cancelledAt && <> on {formatOrderDateTime(order.cancelledAt)}</>}
-              {order.cancelReason && <> — “{order.cancelReason}”</>}. Its items
-              were put back in stock.
+              {order.cancelReason && <> — “{order.cancelReason}”</>}.{' '}
+              {keptOutOfStock
+                ? 'The items that came back were kept out of stock.'
+                : 'Its items were put back in stock.'}
             </InfoNote>
           )}
 
@@ -327,6 +478,21 @@ export function StoreOrderDetailPage() {
                 </div>
               </GlassCard>
 
+              {/* Parcel — courier, tracking, delivered / came back */}
+              {showParcels && (
+                <ParcelCard
+                  order={order}
+                  onEdit={(parcel) => {
+                    setSheetError(null)
+                    setShipSheet({ kind: 'edit', parcel })
+                  }}
+                  onAddTracking={() => {
+                    setSheetError(null)
+                    setShipSheet({ kind: 'add' })
+                  }}
+                />
+              )}
+
               {/* Items */}
               <GlassCard
                 icon={BoxIcon}
@@ -402,6 +568,8 @@ export function StoreOrderDetailPage() {
                   <>
                     {order.confirmedAt && <TimelineRow label="Confirmed" at={order.confirmedAt} />}
                     {order.packedAt && <TimelineRow label="Packed" at={order.packedAt} />}
+                    {order.shippedAt && <TimelineRow label="Sent" at={order.shippedAt} note={sentNote(parcels)} />}
+                    {cameBackAt(parcels) && <TimelineRow label="Came back" at={cameBackAt(parcels)} />}
                     <TimelineRow label="Cancelled" at={order.cancelledAt} cancelled last />
                   </>
                 ) : (
@@ -409,8 +577,9 @@ export function StoreOrderDetailPage() {
                     <TimelineRow label="Confirmed" at={order.confirmedAt} />
                     <TimelineRow label="Packed" at={order.packedAt} />
                     {order.fulfilment === 'DELIVERY' && (
-                      <TimelineRow label="Sent" at={order.shippedAt} />
+                      <TimelineRow label="Sent" at={order.shippedAt} note={sentNote(parcels)} />
                     )}
+                    {cameBackAt(parcels) && <TimelineRow label="Came back" at={cameBackAt(parcels)} />}
                     <TimelineRow
                       label={order.fulfilment === 'PICKUP' ? 'Picked up' : 'Delivered'}
                       at={order.deliveredAt}
@@ -424,16 +593,31 @@ export function StoreOrderDetailPage() {
 
           {/* The ONE next step, under the thumb. Sticky, not fixed: it lives
               inside the glass panel, and rises above the phone tab bar. */}
-          {(action || cancellable) && (
+          {(action || sendAgain || menuActions.length > 0) && (
             <div className="sticky bottom-[calc(var(--seller-dock,0px)+0.75rem)] z-20">
               <div className="glass-strong flex items-center gap-2 rounded-glass p-2 sm:p-3">
-                {action ? (
+                {sendAgain ? (
                   <Button
                     type="button"
                     size="lg"
                     variant="primary"
                     disabled={busy}
-                    onClick={() => setConfirming('advance')}
+                    onClick={() => {
+                      setSheetError(null)
+                      setShipSheet({ kind: 'again' })
+                    }}
+                    className="min-w-0 flex-1 text-base"
+                  >
+                    <TruckIcon className="h-5 w-5" />
+                    Send again
+                  </Button>
+                ) : action ? (
+                  <Button
+                    type="button"
+                    size="lg"
+                    variant="primary"
+                    disabled={busy}
+                    onClick={primary}
                     className="min-w-0 flex-1 text-base"
                   >
                     <CheckIcon className="h-5 w-5" />
@@ -444,25 +628,23 @@ export function StoreOrderDetailPage() {
                     Waiting for the order to be delivered.
                   </p>
                 )}
-                {cancellable && (
-                  <RowMenu
-                    title={`Order ${order.orderNumber}`}
-                    actions={[
-                      {
-                        label: 'Cancel this order',
-                        icon: CloseIcon,
-                        note: 'Items go back in stock. The customer is told.',
-                        danger: true,
-                        onSelect: () => setConfirming('cancel'),
-                      },
-                    ]}
-                  />
+                {menuActions.length > 0 && (
+                  <RowMenu title={`Order ${order.orderNumber}`} actions={menuActions} />
                 )}
               </div>
             </div>
           )}
-          {order.status === 'SHIPPED' && (
-            <p className="text-hint text-muted">A sent order can no longer be cancelled.</p>
+          {order.status === 'SHIPPED' && !allBack && (
+            <p className="text-hint text-muted">
+              {openParcels.length > 0
+                ? 'A sent order can’t be cancelled while it is on its way. If the parcel comes back, choose “Parcel came back” in the ⋯ menu.'
+                : 'A sent order can no longer be cancelled.'}
+            </p>
+          )}
+          {sendAgain && (
+            <p className="text-hint text-muted">
+              The parcel came back. Send it again, or cancel the order from the ⋯ menu.
+            </p>
           )}
         </>
       )}
@@ -494,10 +676,31 @@ export function StoreOrderDetailPage() {
         title="Cancel this order?"
         description={
           <>
-            The items go back into stock and the customer sees the order as
-            Cancelled
+            {hasReturnedItems ? 'The customer' : 'The items go back into stock and the customer'} sees
+            the order as Cancelled
             {order?.paymentStatus === 'PAID' && <> (its payment is marked refunded)</>}
             . This cannot be undone.
+            {hasReturnedItems && (
+              <fieldset className="mt-3">
+                <legend className="text-sm font-semibold text-fg">
+                  Put the items that came back into stock?
+                </legend>
+                <div className="mt-2 grid gap-2">
+                  <RestockChoice
+                    checked={restockAnswer === true}
+                    onSelect={() => setRestockAnswer(true)}
+                    title="Yes, put them back in stock"
+                    note="They can be sold again."
+                  />
+                  <RestockChoice
+                    checked={restockAnswer === false}
+                    onSelect={() => setRestockAnswer(false)}
+                    title="No, keep them out of stock"
+                    note="For example, they came back damaged."
+                  />
+                </div>
+              </fieldset>
+            )}
             <textarea
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
@@ -512,10 +715,99 @@ export function StoreOrderDetailPage() {
         cancelLabel="Keep order"
         tone="danger"
         busy={busy}
+        confirmDisabled={hasReturnedItems && restockAnswer === null}
         onConfirm={() => void cancel()}
         onCancel={() => setConfirming(null)}
       />
+
+      {/* The parcel came back undelivered */}
+      <ConfirmDialog
+        open={confirming === 'returned'}
+        title="Did the parcel come back?"
+        description={
+          <>
+            Use this when the courier returned it to you undelivered — a wrong
+            address, or the customer refused it. Then send it again, or cancel
+            the order.
+          </>
+        }
+        confirmLabel="Yes, it came back"
+        cancelLabel="Go back"
+        tone="neutral"
+        busy={busy}
+        onConfirm={() => void markCameBack()}
+        onCancel={() => setConfirming(null)}
+      />
+
+      {/* Courier + tracking: send, add tracking, send again, edit */}
+      <ShipDialog
+        open={shipSheet !== null}
+        title={shipSheet ? SHIP_SHEET_COPY[shipSheet.kind].title : ''}
+        submitLabel={shipSheet ? SHIP_SHEET_COPY[shipSheet.kind].submit : ''}
+        parcel={shipSheet?.kind === 'edit' ? shipSheet.parcel : null}
+        busy={busy}
+        error={sheetError}
+        onSubmit={(input) => void submitShip(input)}
+        onClose={() => setShipSheet(null)}
+      />
+
+      {/* Delivered — optional proof photo */}
+      <DeliveredDialog
+        open={delivering}
+        cod={order?.paymentMethod === 'COD' && order.paymentStatus === 'PENDING'}
+        busy={busy}
+        progress={uploadProgress}
+        error={sheetError}
+        onSubmit={(photo) => void submitDelivered(photo)}
+        onClose={() => setDelivering(false)}
+      />
     </div>
+  )
+}
+
+/** "Delhivery · 2123456789012" for the timeline's Sent step. */
+function sentNote(parcels: OrderShipment[]): string | undefined {
+  const last = parcels[parcels.length - 1]
+  if (!last) return undefined
+  return last.trackingNumber ? `${last.carrier} · ${last.trackingNumber}` : last.carrier
+}
+
+/** When the latest parcel that came back did so. */
+function cameBackAt(parcels: OrderShipment[]): string | null {
+  const back = parcels.filter((p) => p.returnedAt).map((p) => p.returnedAt!)
+  return back.length > 0 ? back[back.length - 1]! : null
+}
+
+/** One answer to the restock question — a radio drawn as a tappable card. */
+function RestockChoice({
+  checked,
+  onSelect,
+  title,
+  note,
+}: {
+  checked: boolean
+  onSelect: () => void
+  title: string
+  note: string
+}) {
+  return (
+    <label
+      className={`flex min-h-tap cursor-pointer items-start gap-3 rounded-md border px-3 py-2.5 transition ${
+        checked ? 'border-brand bg-brand-soft' : 'border-line hover:bg-fg/5'
+      }`}
+    >
+      <input
+        type="radio"
+        name="restock-returned"
+        checked={checked}
+        onChange={onSelect}
+        className="mt-1 h-4 w-4 shrink-0 accent-[var(--brand)]"
+      />
+      <span>
+        <span className="block text-sm font-semibold text-fg">{title}</span>
+        <span className="block text-hint text-muted">{note}</span>
+      </span>
+    </label>
   )
 }
 
@@ -532,11 +824,14 @@ function Line({ label, value }: { label: string; value: ReactNode }) {
 function TimelineRow({
   label,
   at,
+  note,
   cancelled = false,
   last = false,
 }: {
   label: string
   at: string | null
+  /** One extra line once reached — the courier and tracking number for "Sent". */
+  note?: string
   cancelled?: boolean
   last?: boolean
 }) {
@@ -563,6 +858,7 @@ function TimelineRow({
       <div className="min-w-0 pt-0.5">
         <p className={`text-base font-semibold ${at ? 'text-fg' : 'text-muted'}`}>{label}</p>
         <p className="text-hint text-muted">{at ? formatOrderDateTime(at) : 'Not yet'}</p>
+        {at && note && <p className="text-hint break-words text-muted">{note}</p>}
       </div>
     </li>
   )

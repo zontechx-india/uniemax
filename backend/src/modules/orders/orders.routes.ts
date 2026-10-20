@@ -55,6 +55,14 @@ export const publicOrderRoutes: FastifyPluginAsync = async (app) => {
 };
 
 /**
+ * The courier list behind the seller's "Mark as sent" sheet — public and
+ * static (cacheable). Mounted at /api/v1/public.
+ */
+export const publicCourierRoutes: FastifyPluginAsync = async (app) => {
+  app.get("/couriers", controller.listCouriers);
+};
+
+/**
  * The signed-in customer's order history — the account Orders page.
  * Mounted at /api/v1/orders. (The auth package's /auth/me/orders predates
  * this; this one carries the full shaped orders incl. item thumbnails.)

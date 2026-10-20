@@ -1034,10 +1034,12 @@ model Order {
   /// Place Order returns the order it already created instead of a second one.
   idempotencyKey      String?
   estimatedDeliveryAt DateTime?
-  placedAt            DateTime    @default(now())
+  placedAt            DateTime        @default(now())
   items               OrderItem[]
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
+  /// Parcels the order went out in — courier, tracking, delivered / came back.
+  shipments           OrderShipment[]
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 
   @@unique([customerId, idempotencyKey])
   // Every order list is "this store's / this customer's orders, newest
@@ -1088,13 +1090,69 @@ model OrderItem {
   sku         String?
   productSlug String?
   imageKey    String?
-  unitPrice   Decimal @db.Decimal(10, 2)
+  unitPrice   Decimal        @db.Decimal(10, 2)
   quantity    Int
-  lineTotal   Decimal @db.Decimal(10, 2)
+  lineTotal   Decimal        @db.Decimal(10, 2)
+  /// The parcel this line went out in — null until it ships.
+  shipmentId  String?
+  shipment    OrderShipment? @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
   @@index([productId])
+  @@index([shipmentId])
   @@map("order_items")
+  @@schema("public")
+}
+
+/// Who created a parcel: the store itself, or a package acting for the order
+/// (dropshipping's supplier parcels — docs/dropshipping/shipments/context.md).
+enum ShipmentSource {
+  SELLER
+  PACKAGE
+
+  @@schema("public")
+}
+
+/// One parcel of an order: the courier, its tracking number, and what
+/// happened to it. Every line that ships points at its parcel
+/// (`OrderItem.shipmentId`). Forward-only: a parcel is delivered OR comes
+/// back, never both, and neither is undone.
+model OrderShipment {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// Code from the courier list (`modules/orders/couriers.ts`); null for a
+  /// courier the seller typed in ("Other").
+  carrierCode    String?
+  /// Courier name as shown to the customer — snapshotted, so renaming a
+  /// courier in the list never rewrites a sent parcel.
+  carrier        String
+  trackingNumber String?
+  /// Only a link the seller typed (for "Other"). Known couriers' links are
+  /// built from the list's template at read time, so fixing a template fixes
+  /// every parcel that used it.
+  trackingUrl    String?
+  /// "Shipped by {senderName}" — null = the store itself.
+  senderName     String?
+  source         ShipmentSource @default(SELLER)
+  /// Opaque reference of whoever created a PACKAGE parcel.
+  externalRef    String?
+  shippedAt      DateTime       @default(now())
+  deliveredAt    DateTime?
+  /// The parcel came back undelivered (returned to sender).
+  returnedAt     DateTime?
+  /// On coming back, its items were put back in stock.
+  restocked      Boolean        @default(false)
+  /// Optional proof-of-delivery photo (media bucket). Shown to the seller,
+  /// supplier and admins only — never to customers or on public pages.
+  podKey         String?
+  items          OrderItem[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([orderId])
+  @@map("order_shipments")
   @@schema("public")
 }
 

@@ -31,6 +31,8 @@
 | D-21 | 2026-10-20 | Cashfree holds each vendor's money **12 days** (Defer Settlement) before paying out (was Q-3). | Product owner accepted the suggestion: longest ship-within (7) + typical transit (~5). |
 | D-22 | 2026-10-20 | Every store's own payouts move to Easy Split; **each store is a Cashfree vendor** (was Q-4). | Product owner: yes. |
 | D-23 | 2026-10-20 | D-16 is read as confirmed: until Easy Split is live, prepaid supplier orders settle **directly** between the seller and the supplier. | Product owner: "yes, implement your suggestion". |
+| D-24 | 2026-10-20 | **No guessed tracking links.** A parcel links to its tracking only through a link the seller pasted; otherwise the customer copies the number and opens the courier's own website. The courier list carries websites, not per-number URL templates. | Building Phase 0: none of the couriers' direct tracking URLs could be confirmed on their own sites (JavaScript pages, OTP, captcha) — a wrong link is worse than none. |
+| D-25 | 2026-10-20 | **"Came back" doesn't ask about stock.** The parcel's items stay with the order; the seller sends it again (stock untouched) or cancels — and the cancel asks whether the returned items go back in stock. | Building Phase 0: a parcel returned for a wrong address must be sendable again, and asking at cancel time keeps stock from ever being counted twice. Replaces the "restock choice on came back" in the first plan. |
 
 ## Open questions
 

@@ -23,6 +23,7 @@ export function ConfirmDialog({
   cancelLabel = 'Cancel',
   tone = 'danger',
   busy = false,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
 }: {
@@ -34,6 +35,8 @@ export function ConfirmDialog({
   /** `danger` = red confirm (destructive), `neutral` = primary confirm. */
   tone?: 'danger' | 'neutral'
   busy?: boolean
+  /** Hold the confirm until a question in `description` is answered. */
+  confirmDisabled?: boolean
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -84,6 +87,7 @@ export function ConfirmDialog({
           variant={tone === 'danger' ? 'danger' : 'primary'}
           size="lg"
           loading={busy}
+          disabled={confirmDisabled}
           onClick={onConfirm}
         >
           {busy ? 'Please wait…' : confirmLabel}

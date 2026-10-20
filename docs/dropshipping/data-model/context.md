@@ -17,7 +17,7 @@
 
 | Area | Models | Phase | File |
 | --- | --- | --- | --- |
-| Core additions | `OrderShipment`, `OrderItem.shipmentId`, `OrderItem.fulfilledBy`, `NotificationKind.DROPSHIP` | 0, 1 | this file (below) |
+| Core additions | `OrderShipment` ☑, `OrderItem.shipmentId` ☑, `OrderItem.fulfilledBy`, `NotificationKind.DROPSHIP` | 0, 1 | this file (below) |
 | Suppliers | `Supplier`, `SupplierInvite`, `SupplierLink`, `SupplyProduct`, `SupplyVariant`, `TermsChange` | 2 | [suppliers/context.md](suppliers/context.md) |
 | Supplier products | `Resale`, `ResaleVariant` | 3 | [supplier-products/context.md](supplier-products/context.md) |
 | Orders | `SupplierOrder`, `SupplierOrderLine`, `SupplierOrderEvent` | 4 | [orders/context.md](orders/context.md) |
@@ -28,7 +28,10 @@
 Once built, these are documented in `BACKEND_CONTEXT.md` (Data Model), and
 this section links there.
 
-### Phase 0 ☐
+### Phase 0 ☑ (built 20 Oct 2026 — migration `20261020120000_order_shipments`)
+
+Documented in full in `BACKEND_CONTEXT.md` (Data Model → **OrderShipment**);
+the shape, for reference:
 
 ```prisma
 enum ShipmentSource { SELLER PACKAGE }
@@ -38,24 +41,28 @@ model OrderShipment {
   id             String         @id @default(cuid())
   orderId        String
   order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  carrier        String                     // "Delhivery", "DTDC", … or the typed "Other" name
+  carrierCode    String?                    // code from modules/orders/couriers.ts; null = typed "Other"
+  carrier        String                     // the name, snapshotted
   trackingNumber String?                    // required for PACKAGE parcels (D-4)
-  trackingUrl    String?
+  trackingUrl    String?                    // only a link the seller pasted (D-24)
   senderName     String?                    // "Shipped by {supplier}"; null = the store itself
   source         ShipmentSource @default(SELLER)
   externalRef    String?                    // opaque, e.g. the supplier order id
   shippedAt      DateTime       @default(now())
   deliveredAt    DateTime?
   returnedAt     DateTime?                  // "came back"
+  restocked      Boolean        @default(false) // its returned items went back in stock on cancel
   podKey         String?                    // optional proof-of-delivery photo (media bucket)
   items          OrderItem[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   @@index([orderId])
+  @@map("order_shipments")
 }
 
 // OrderItem gains:
-//   shipmentId String?  → OrderShipment (onDelete: SetNull) — the parcel this item went in
+//   shipmentId String?  → OrderShipment (onDelete: SetNull), @@index([shipmentId])
+//   — the parcel this item went out in
 ```
 
 ### Phase 1 ☐

@@ -15,6 +15,7 @@ import {
   storeSupportUrl,
 } from '../../features/stores/storesApi'
 import type { PlacedOrder } from '../../features/stores/storesApi'
+import { ParcelTracking } from '../../features/stores/ParcelTracking'
 import {
   formatStepTime,
   orderProgress,
@@ -358,6 +359,21 @@ export function OrderSuccessPage({
                 </ol>
               )}
             </section>
+
+            {/* Where to follow the parcel — courier + tracking number */}
+            {order.shipments.length > 0 && !cancelled && (
+              <section
+                aria-label="Tracking"
+                className="mt-4 rounded-xl border border-line bg-surface p-5"
+              >
+                <h2 className="font-body text-base font-semibold tracking-normal">
+                  Tracking
+                </h2>
+                <div className="mt-3">
+                  <ParcelTracking shipments={order.shipments} redacted={!!order.redacted} />
+                </div>
+              </section>
+            )}
 
             {/* What was ordered */}
             <section className="mt-4 rounded-xl border border-line bg-surface">

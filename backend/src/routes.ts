@@ -30,6 +30,7 @@ import { cartRoutes } from "./modules/cart/cart.routes.js";
 import {
   publicOrderRoutes,
   customerOrderRoutes,
+  publicCourierRoutes,
 } from "./modules/orders/orders.routes.js";
 import { paymentRoutes } from "./modules/payments/payments.routes.js";
 import { adminConsoleRoutes } from "./modules/admin/admin.routes.js";
@@ -97,6 +98,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       await api.register(publicStoreRoutes, { prefix: "/public/stores" });
       // Order placement + confirmation lookup (guest checkout, same prefix).
       await api.register(publicOrderRoutes, { prefix: "/public/stores" });
+      // The courier list behind the seller's "Mark as sent" sheet.
+      await api.register(publicCourierRoutes, { prefix: "/public" });
       // Marketplace discovery — global search + platform stats (homepage).
       await api.register(publicDiscoveryRoutes, { prefix: "/public" });
       // XML sitemaps for the storefronts. Under /public so the existing nginx

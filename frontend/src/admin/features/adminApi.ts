@@ -89,7 +89,30 @@ export interface OrderDetail extends OrderRow {
     unitPrice: string
     quantity: number
     lineTotal: string
+    /** The parcel this line went out in — null until it ships. */
+    shipmentId: string | null
   }[]
+  /** Parcels the order went out in, oldest first — staff see them as the seller does. */
+  shipments: OrderParcel[]
+}
+
+/** One parcel of an order: courier, tracking and what happened to it. */
+export interface OrderParcel {
+  id: string
+  carrierCode: string | null
+  carrier: string
+  trackingNumber: string | null
+  trackingUrl: string | null
+  courierSite: string | null
+  /** "Shipped by …" — null = the store itself. */
+  senderName: string | null
+  source: 'SELLER' | 'PACKAGE'
+  shippedAt: string
+  deliveredAt: string | null
+  returnedAt: string | null
+  restocked: boolean
+  /** Proof-of-delivery photo — staff and the seller only. */
+  podUrl: string | null
 }
 
 /**

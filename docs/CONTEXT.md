@@ -162,9 +162,17 @@ A single account can own multiple stores and switch between them.
   **Confirm → Pack → Ship → Deliver** (a pickup order goes Packed →
   Picked up, skipping shipping), one confirmation dialog per step since
   the customer sees status changes immediately. Marking a
-  cash-on-delivery order Delivered also records it as paid. An order can
-  be **cancelled** any time before it ships (optional reason); its items
-  return to stock automatically, and a paid order is marked refunded
+  cash-on-delivery order Delivered also records it as paid. **Sending** a
+  delivery order asks for the courier and the tracking number (optional
+  for the seller's own deliveries, but nudged for), plus any tracking link
+  the courier gave — and the customer gets them straight away by email and
+  notification, and on their order page. Delivered can carry an optional
+  proof-of-delivery photo that only the seller and UnieMax support see. A
+  parcel that **came back** undelivered can be sent again, or the order
+  cancelled. An order can be **cancelled** any time before it ships, or
+  once its parcel came back (optional reason); items that never shipped
+  return to stock automatically, items that came back only if the seller
+  says so (they may be damaged), and a paid order is marked refunded
   (status only for gateway payments — the money is refunded from the
   Cashfree dashboard until the automatic refund call ships).
 - **Store Builder** — the one place a seller designs their shop, replacing the

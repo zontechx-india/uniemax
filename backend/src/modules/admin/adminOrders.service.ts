@@ -3,6 +3,7 @@ import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../../utils/httpError.js";
 import { buildListMeta } from "../../utils/response.js";
 import { mediaUrl } from "../../package/storage/index.js";
+import { shapeShipment, shipmentSelect } from "../orders/shipments.shape.js";
 import type { OrderListQuery, PaymentListQuery } from "./admin.schema.js";
 
 /**
@@ -135,13 +136,15 @@ export async function getOrder(orderId: string) {
           unitPrice: true,
           quantity: true,
           lineTotal: true,
+          shipmentId: true,
         },
       },
+      shipments: { orderBy: { shippedAt: "asc" }, select: shipmentSelect },
     },
   });
   if (!order) throw HttpError.notFound("Order not found");
 
-  const { _count, items, ...rest } = order;
+  const { _count, items, shipments, ...rest } = order;
   return {
     ...rest,
     itemCount: _count.items,
@@ -149,6 +152,8 @@ export async function getOrder(orderId: string) {
       ...item,
       imageUrl: mediaUrl("media", imageKey),
     })),
+    // Staff see parcels as the seller does — proof-of-delivery photo included.
+    shipments: shipments.map((shipment) => shapeShipment(shipment, "seller")),
   };
 }
 

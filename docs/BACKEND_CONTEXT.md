@@ -133,6 +133,10 @@ backend/
 │   │   │                      #   + confirmation lookup (public) + history
 │   │   │                      #   + seller order management (list/detail/
 │   │   │                      #   status progression/cancel w/ stock restore)
+│   │   │                      #   + parcels: shipments.service.ts (send /
+│   │   │                      #   tracking / delivered / came back),
+│   │   │                      #   shipments.shape.ts, couriers.ts (list +
+│   │   │                      #   GET /public/couriers)
 │   │   │                      #   + orders.notifications.ts (email alerts)
 │   │   │                      #   (GET /orders) + seller dashboard
 │   │   │                      #   (GET /stores/:id/dashboard)
@@ -1403,18 +1407,49 @@ White-label design — one codebase, any business:
   (forward-only lifecycle `PENDING → CONFIRMED → PACKED → SHIPPED →
   DELIVERED`, jumps ahead allowed — pickup orders skip SHIPPED; each move
   stamps `confirmedAt`/`packedAt`/`shippedAt`/`deliveredAt`; delivering a
-  COD order flips `paymentStatus` to PAID) and `POST …/cancel` (only before
-  SHIPPED; stamps `cancelledAt` + optional `cancelReason`, **restores item
-  stock** and recomputes aggregates transactionally, **terminates the
-  Cashfree order** of an unpaid ONLINE order so the returned stock can't
-  still be paid for, flips a PAID payment to REFUNDED — status only; the
-  Cashfree refund API call is a planned follow-up). The **buyer** can cancel
+  COD order flips `paymentStatus` to PAID, and closes any parcel still on
+  its way) and `POST …/cancel` (before SHIPPED, or once every parcel came
+  back; stamps `cancelledAt` + optional `cancelReason`, **restores stock**
+  transactionally — items that never shipped always, items that came back
+  only when `restockReturned` says so — and recomputes aggregates,
+  **terminates the Cashfree order** of an unpaid ONLINE order so the returned
+  stock can't still be paid for, flips a PAID payment to REFUNDED — status
+  only; the Cashfree refund API call is a planned follow-up). Every status
+  change goes through ONE pair of helpers — `writeStatusChange` (the guarded
+  write, inside the caller's transaction; COD → PAID on DELIVERED) and
+  `announceStatusChange` (after commit: the customer message unless the
+  caller sends its own, plus the `order.status` / `order.paid` events) — used
+  by the status button and by parcels alike. The **buyer** can cancel
   too (`POST /public/stores/:slug/orders/:orderId/cancel`, `cancelMyOrder`) —
   only while `PENDING` and unpaid; it shares `restockItems`, sets
   `cancelledByCustomer` (so both sides are told who cancelled) and notifies
   the seller (`notifyCustomerCancelled`). Both mutations use a guarded
   `updateMany` re-checking the read status, so concurrent updates conflict
-  (409) instead of double-applying.
+  (409) instead of double-applying. Order responses are shaped per audience
+  (`shapeOrder(row, audience)`): the parcels' proof-of-delivery photo is the
+  seller's (and admins'), the buyer sees courier + tracking, and anyone else
+  on an order link gets tracking numbers nulled.
+- **OrderShipment** (`order_shipments`) — one **parcel** of an order
+  (`modules/orders/shipments.service.ts`; rules in
+  [dropshipping/shipments](./dropshipping/shipments/context.md)):
+  `carrierCode` (from `modules/orders/couriers.ts` — null for a typed
+  "Other"), `carrier` (the name, snapshotted), optional `trackingNumber`,
+  `trackingUrl` (only a link the seller pasted — no per-number links are
+  guessed), `senderName` / `source` (`ShipmentSource` SELLER | PACKAGE) /
+  `externalRef` for packages, `shippedAt` / `deliveredAt` / `returnedAt`,
+  `restocked` (its returned items went back in stock on cancel) and an
+  optional `podKey` (proof-of-delivery photo, media bucket under
+  `pod/{storeId}/{orderId}/`, referenced by `npm run audit-media`). Each line
+  that ships points at its parcel through **`OrderItem.shipmentId`**
+  (SetNull). Sending takes everything not already on its way (never sent,
+  or in a parcel that came back — "send again") under a guarded write that
+  holds the order's row lock, so a cancel from another tab can't cross it;
+  a parcel is delivered OR comes back, forward-only. When nothing is on its
+  way and every item went out, the order becomes DELIVERED through
+  `writeStatusChange`. Customer messages for parcels (shipped with the
+  tracking, *"Tracking updated"*) are `notifyParcelShipped` /
+  `notifyTrackingUpdated` in `orders.notifications.ts`, which HTML-escape
+  every seller-typed value.
 - **PaymentHubEvent** (`payment_hub_events`) — dedupe log for PaymentHub
   webhooks: `id` = the hub's event id, `type`, `receivedAt`, `processedAt`
   (set in the same transaction as the order update; null = reprocess on the
