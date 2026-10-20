@@ -1,8 +1,7 @@
 # Phase 0: Parcel tracking for every order (core) ◐
 
-> Built 20 Oct 2026 and verified locally (see "Verified"). Still open: the
-> walkthrough on dev and a run of the API tests with the `QA_*` accounts —
-> then flip this to ☑.
+> Built 20 Oct 2026 and verified locally (see "Verified"). The API tests pass
+> on dev (21 Oct 2026). Still open: the walkthrough on dev — then flip this to ☑.
 
 ## Goal
 
@@ -60,8 +59,8 @@ in Phase 4 (D-6).
   preview: sent, ship sheet, delivered sheet, delivered with photo, came back
   + send again, cancel with the stock question, older order without
   tracking, and the customer blocks.
-- ☐ `npm run test:api` — `test/order-shipments.test.mjs` is written but not
-  yet run: it needs a running server and the `QA_*` test accounts.
+- ☑ `npm run test:api` — `test/order-shipments.test.mjs` passes on dev (21 Oct 2026),
+  with the seller account's phone already linked (the SMS bypass is off on dev).
 - ☐ Walkthrough on dev after deploy.
 
 ## Done when

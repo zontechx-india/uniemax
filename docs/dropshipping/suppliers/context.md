@@ -4,7 +4,7 @@
 > seller–supplier link and its COD setting, supplier settings, or offering
 > products to sellers. **Update when:** any of those change.
 
-Status: ◐ built 20 Oct 2026 (Phase 2) — API test run pending. Effects on copies built in Phase 3 (D-31). Tables:
+Status: ◐ built 20 Oct 2026 (Phase 2) — API tests pass on dev; screen walkthrough pending. Effects on copies built in Phase 3 (D-31). Tables:
 [data-model/suppliers](../data-model/suppliers/context.md). Words: [glossary](../glossary.md).
 
 ## Rules

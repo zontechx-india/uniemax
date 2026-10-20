@@ -1,7 +1,6 @@
-# Phase 1: Core seams for packages ◐
+# Phase 1: Core seams for packages ☑
 
-> Built 20 Oct 2026 and verified locally (see "Verified"). Still open: a run
-> of the API tests with the `QA_*` accounts — then flip this to ☑.
+> Built 20 Oct 2026, verified locally and by the API tests on dev (21 Oct 2026).
 
 ## Goal
 
@@ -67,8 +66,7 @@ as before.
   a real store's quote answers `restrictions: { cod: null, pickup: null }`.
 - Frontend `npm run build`, `npm run check:ui` (within budget),
   `npm run test:unit` 15/15.
-- ☐ `npm run test:api` (the existing suites + `order-shipments.test.mjs`) —
-  needs a running server and the `QA_*` test accounts.
+- ☑ `npm run test:api` against dev (flag on, `DROPSHIP_ENABLED=true` in the dev server's `.env.development`): 61 of 64 pass; the 3 failures are `page-shell` (2) and `images` (1), none dropship.
 
 ## Done when
 

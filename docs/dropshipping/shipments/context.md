@@ -88,7 +88,7 @@ and supplier parcels reuse it (D-6). Model:
 - Admin: the **Parcels** card on `admin/pages/OrderDetailPage.tsx`.
 - Tests: `backend/test/unit/shipments.test.ts` (courier list, link and input
   rules, escaping); `backend/test/order-shipments.test.mjs` (API flow — needs a
-  running server and the `QA_*` accounts).
+  running server and the `QA_*` accounts; passes on dev, 21 Oct 2026).
 
 ## Failure cases
 

@@ -1,8 +1,8 @@
 # Phase 2: Suppliers, invite and join ◐
 
 > Built 20 Oct 2026 (migration `20261020180000_dropship_suppliers`). Left:
-> the API test run (`test/dropship-suppliers.test.mjs`, needs the `QA_*`
-> accounts) and the dev check with `DROPSHIP_ENABLED=true` on the dev server.
+> the walkthrough of the screens on dev. The API suite
+> (`test/dropship-suppliers.test.mjs`) passes on dev with the flag on (21 Oct 2026).
 
 ## Goal
 
@@ -83,8 +83,7 @@ Both term answers are required.
   customers refused on admin routes.
 - Frontend: `tsc -b`, `vite build`, `check:ui` (no budget rises); the
   screens checked at 390 px with mocked data (no overflow, no console errors).
-- **Not run yet:** `npm run test:api` (`test/dropship-suppliers.test.mjs`) —
-  the `QA_*` accounts aren't set up on this machine.
+- `npm run test:api` against dev (flag on, `DROPSHIP_ENABLED=true` in the dev server's `.env.development`): 61 of 64 pass; the 3 failures are `page-shell` (2) and `images` (1), none dropship. `test/dropship-suppliers.test.mjs` passes in full.
 
 ## Done when
 

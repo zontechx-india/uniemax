@@ -4,7 +4,7 @@
 > pricing (follow / fixed, MRP), sync from the supplier, editor locks, or
 > pause and resume. **Update when:** any of those change.
 
-Status: ◐ built 20 Oct 2026 (Phase 3; API test run pending). Code:
+Status: ◐ built 20 Oct 2026 (Phase 3; API tests pass on dev, screen walkthrough pending). Code:
 `backend/src/package/dropship/services/{catalog,resale}.ts`, `hooks.ts`, `events.ts`;
 `frontend/src/packages/dropship/pages/seller/` (`SupplierProductsPage`, `AddSheet`,
 `SuppliedNote`, `SuppliedSteps`). Tables:

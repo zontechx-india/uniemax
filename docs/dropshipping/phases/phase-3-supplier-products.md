@@ -1,8 +1,8 @@
 # Phase 3: Supplier products in the seller's store ◐
 
 > Built 20 Oct 2026 (migration `20261021100000_dropship_resales`). Left: the
-> API test run (`test/dropship-supplier-products.test.mjs`, needs the `QA_*`
-> accounts) and the dev check with `DROPSHIP_ENABLED=true` on the dev server.
+> walkthrough of the screens on dev. The API suite
+> (`test/dropship-supplier-products.test.mjs`) passes on dev with the flag on (21 Oct 2026).
 
 ## Goal
 
@@ -70,8 +70,8 @@ C-1…C-24, including:
   catalogue, add sheet (one, many, pickup-only store), product list (badge,
   paused note), empty list and the copy's Price and Delivery steps checked at
   390 px with mocked data (no overflow, no console errors).
-- **Not run yet:** `npm run test:api` (`test/dropship-supplier-products.test.mjs`) —
-  the `QA_*` accounts aren't set up on this machine.
+- `npm run test:api` against dev (flag on, `DROPSHIP_ENABLED=true` in the dev server's `.env.development`): 61 of 64 pass; the 3 failures are `page-shell` (2) and `images` (1), none dropship. `test/dropship-supplier-products.test.mjs` passes in full (6 tests:
+  add, C-10, C-1 / C-21, C-4 / C-17, SU-7, C-14).
 
 ## Done when
 

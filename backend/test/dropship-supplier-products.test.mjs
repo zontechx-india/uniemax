@@ -76,6 +76,9 @@ async function added(t) {
   return c;
 }
 
+/** An option-less product keeps its one price on `defaultVariant`; `variants` lists real options only. */
+const firstVariant = (p) => p.variants[0] ?? p.defaultVariant;
+
 const copyOf = async (c) =>
   (await c.A.req("GET", `/api/v1/stores/${c.fx.store.id}/products`)).body.data.find((p) => p.id === c.copyId);
 
@@ -100,12 +103,12 @@ test("C-10 adding the same product twice is refused", async (t) => {
 test("C-1 / C-21 the supplier's price change moves the copy's price once", async (t) => {
   const c = await added(t);
   if (!c) return;
-  const before = Number((await copyOf(c)).variants[0].price);
+  const before = Number(firstVariant(await copyOf(c)).price);
   await c.offer(520);
-  const after = Number((await copyOf(c)).variants[0].price);
+  const after = Number(firstVariant(await copyOf(c)).price);
   assert.equal(after, before + 70);
   await c.offer(520);
-  assert.equal(Number((await copyOf(c)).variants[0].price), after);
+  assert.equal(Number(firstVariant(await copyOf(c)).price), after);
 });
 
 test("C-4 / C-17 a copy's locked fields and Duplicate are refused", async (t) => {
@@ -113,7 +116,7 @@ test("C-4 / C-17 a copy's locked fields and Duplicate are refused", async (t) =>
   if (!c) return;
   const P = `/api/v1/stores/${c.fx.store.id}/products/${c.copyId}`;
   const copy = await copyOf(c);
-  assert.equal((await c.A.req("PATCH", `${P}/variants/${copy.variants[0].id}`, { json: { stockQuantity: 99 } })).status, 400);
+  assert.equal((await c.A.req("PATCH", `${P}/variants/${firstVariant(copy).id}`, { json: { stockQuantity: 99 } })).status, 400);
   assert.equal((await c.A.req("PATCH", P, { json: { codAvailable: false } })).status, 400);
   assert.equal((await c.A.req("POST", `${P}/copy`, { json: {} })).status, 409);
 });
