@@ -15,6 +15,7 @@ import {
   affiliatePublicRoutes,
   affiliateSellerRoutes,
 } from '../../packages/affiliate'
+import { dropshipPublicRoutes, dropshipStoreRoutes } from '../../packages/dropship'
 
 /**
  * `/stores/**` → `/mystores/**`, forwarding the rest of the path, the query
@@ -110,6 +111,8 @@ export const router = createBrowserRouter([
       })),
       // Affiliate short links and invitations — public, no layout.
       ...affiliatePublicRoutes,
+      // Supplier invite links — public, no layout.
+      ...dropshipPublicRoutes,
 
       // ---- Account subtree (signed-in customers only) --------------------------
       {
@@ -337,6 +340,9 @@ export const router = createBrowserRouter([
                   },
                   // Affiliate Marketing — programme, products, partners, commissions.
                   affiliateSellerRoutes,
+                  // Suppliers (seller) and Products for sellers / Sellers / Supplier
+                  // settings (supplier) — screens exist only when the API answers.
+                  ...dropshipStoreRoutes,
                 ],
               },
             ],

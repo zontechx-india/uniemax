@@ -91,6 +91,7 @@ Verify: `curl http://localhost:4000/health`
 | `WEB_SHELL_PATH` | Optional path to the built storefront `index.html` the page shells (`GET /store/*`, `GET /c/*`) write each page's head into. Default: this clone's `../frontend/dist/index.html` — right on the server (each clone builds its own frontend) and locally after `npm run build` in `frontend/`. Without a build those routes answer 503 |
 | `AFFILIATE_MAX_PERCENT` | Highest percentage commission a seller may offer (default `50`) — the platform ceiling for `package/affiliate` |
 | `AFFILIATE_INVITE_DAYS` | Days an affiliate invitation stays valid (default `14`) |
+| `DROPSHIP_ENABLED` | `true` registers the dropshipping package (`/api/v1/dropship`, `/api/v1/admin/dropship`). Default off; on in dev only until the feature is complete. Other `DROPSHIP_*` knobs: [docs/dropshipping/architecture](../docs/dropshipping/architecture/context.md) (Config) |
 | `AFFILIATE_CLICK_RETENTION_DAYS` | Days of raw click rows kept before the hourly job prunes them (default `90`); link click counters are never pruned |
 | `DATABASE_URL` | Pooled connection (runtime) — Supabase PgBouncer `:6543`  |
 | `DIRECT_URL`   | Direct connection (migrations) — Supabase `:5432`         |

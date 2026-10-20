@@ -5,7 +5,8 @@
 > how the supplier is paid), or any calculation that uses them.
 > **Update when:** a term is added or its rules change.
 
-Status: ☐ planned. Link terms and the change log: Phase 2. Snapshots: Phase 4.
+Status: ◐ link terms, the change log and change notices built (Phase 2, 20 Oct
+2026; `services/terms.ts`, `domain.ts#describeChange`). Snapshots: Phase 4.
 `settleVia = SPLIT`: Phase 6.
 
 ## The rule (D-18)

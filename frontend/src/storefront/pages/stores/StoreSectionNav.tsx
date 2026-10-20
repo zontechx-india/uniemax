@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
-import { NavLink, useLocation, useResolvedPath } from 'react-router-dom'
+import { NavLink, useLocation, useParams, useResolvedPath } from 'react-router-dom'
+import { useDropshipRole } from '../../../packages/dropship'
+import type { DropshipRole } from '../../../packages/dropship'
 import type { StepState } from '../../features/stores/storeProfile'
 import { useStoreManageScope } from '../../features/stores/storeManageScope'
 import { StatusMark, StatusTag, sectionStatus } from './SetupStatus'
 import {
+  BagIcon,
   BankIcon,
   BoxIcon,
   CardIcon,
@@ -16,10 +19,13 @@ import {
   LifebuoyIcon,
   MegaphoneIcon,
   PaletteIcon,
+  RupeeIcon,
+  SlidersIcon,
   StoreIcon,
   TagIcon,
   TruckIcon,
   ShieldCheckIcon,
+  UsersIcon,
 } from '../../layout/icons'
 
 /**
@@ -154,6 +160,43 @@ export function sectionItem(to: string): SectionItem | undefined {
   )
 }
 
+/** Settings rows a supply-only store doesn't use: it never sells to customers. */
+const SELLING_ONLY = new Set(['payments', 'shipping', 'checkout'])
+
+/**
+ * The supplier rows (docs/dropshipping/): **Suppliers** under Catalog for a
+ * shop that sells, and a **Supply to sellers** group for a store that
+ * supplies. A supply-only store — one made when its owner joined as a
+ * supplier — has no storefront, so its storefront, marketing and selling
+ * rows are hidden (D-28).
+ */
+function withSupplierSections(groups: SectionGroup[], role: DropshipRole): SectionGroup[] {
+  const supplyOnly = role.supplier?.supplyOnly ?? false
+  const out: SectionGroup[] = []
+  for (const group of groups) {
+    if (supplyOnly && (group.key === 'storefront' || group.key === 'marketing')) continue
+    if (group.key === 'catalog' && !supplyOnly) {
+      out.push({ ...group, items: [...group.items, { label: 'Suppliers', to: 'suppliers', icon: UsersIcon }] })
+    } else if (group.key === 'settings' && supplyOnly) {
+      out.push({ ...group, items: group.items.filter((item) => !SELLING_ONLY.has(item.to)) })
+    } else {
+      out.push(group)
+    }
+    if (group.key === 'catalog' && role.supplier) {
+      out.push({
+        key: 'supply',
+        caption: 'Supply to sellers',
+        items: [
+          { label: 'Products for sellers', to: 'supply', icon: RupeeIcon },
+          { label: 'Sellers', to: 'sellers', icon: BagIcon },
+          { label: 'Supplier settings', to: 'supplier-settings', icon: SlidersIcon },
+        ],
+      })
+    }
+  }
+  return out
+}
+
 /**
  * The sections THIS mode may open.
  *
@@ -163,14 +206,19 @@ export function sectionItem(to: string): SectionItem | undefined {
  * so they keep the exact array above — same object identity, no re-render.
  */
 export function useSectionGroups(): SectionGroup[] {
-  const { hiddenSections } = useStoreManageScope()
+  const { hiddenSections, mode } = useStoreManageScope()
+  const { storeSlug } = useParams()
+  // The supplier screens are seller-only and exist only while the package is
+  // on (the API answers); the admin view never asks.
+  const role = useDropshipRole(mode === 'owner' ? storeSlug : null)
   return useMemo(() => {
-    if (hiddenSections.length === 0) return SECTION_GROUPS
-    return SECTION_GROUPS.map((group) => ({
+    const groups = role ? withSupplierSections(SECTION_GROUPS, role) : SECTION_GROUPS
+    if (hiddenSections.length === 0) return groups
+    return groups.map((group) => ({
       ...group,
       items: group.items.filter((item) => !hiddenSections.includes(item.to)),
     })).filter((group) => group.items.length > 0)
-  }, [hiddenSections])
+  }, [hiddenSections, role])
 }
 
 // ---------------------------------------------------------------------------

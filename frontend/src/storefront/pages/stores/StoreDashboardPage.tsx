@@ -22,6 +22,7 @@ import { launchSteps, stepAction, stepMissing } from './setupSteps'
 import { usePublishActions, whatsAppShareUrl } from './usePublishActions'
 import { EmptyState } from './ui/EmptyState'
 import { WhatsAppShareLink } from './ui/WhatsAppShareLink'
+import { SupplierHome, useDropshipRole } from '../../../packages/dropship'
 
 /**
  * Dashboard — the landing view of store management.
@@ -83,10 +84,17 @@ export function StoreDashboardPage() {
     if (reEntered.current) refreshDashboard()
   }, [refreshDashboard])
 
+  const { mode } = useStoreManageScope()
+  const supplyOnly =
+    useDropshipRole(mode === 'owner' ? store.slug : null)?.supplier?.supplyOnly ?? false
+
   const hasOrders = (dashboard?.stats.totalOrders ?? 0) > 0
   // Once a LIVE store has orders, they are the daily job: the optional
   // online-payments setup moves below them. (Unpublished, "get live" leads.)
   const setupBelow = store.isPublished && hasOrders
+
+  // No storefront to launch: the supplier's own next steps instead.
+  if (supplyOnly) return <SupplierHome storeName={store.name} />
 
   return (
     <div className="space-y-5">

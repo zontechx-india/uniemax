@@ -54,9 +54,10 @@ library, VAPID; console fallback without keys — see
 ```
 backend/
 ├── prisma/
-│   ├── schema/                # Multi-file Prisma schema (one datasource, two Postgres schemas)
+│   ├── schema/                # Multi-file Prisma schema (one datasource, three Postgres schemas)
 │   │   ├── core.prisma        #   the platform models — `public` schema
-│   │   └── affiliate.prisma   #   affiliate_* models — `affiliate` schema, no FK to core
+│   │   ├── affiliate.prisma   #   affiliate_* models — `affiliate` schema, no FK to core
+│   │   └── dropship.prisma    #   supplier models — `dropship` schema, no FK to core
 │   └── check.sql              # Connectivity probe for `npm run db:check`
 ├── prisma.config.ts           # Prisma 7 config — migration datasource (DIRECT_URL)
 ├── src/
@@ -99,6 +100,9 @@ backend/
 │   │   │   ├── services/      #   program · invitations · partner · tracking · commissions
 │   │   │   ├── routes/        #   seller · partner · public · admin (/api/v1/affiliate)
 │   │   │   └── events.ts      #   order-event subscribers + hourly approve/prune job
+│   │   ├── dropship/          # Sellers' own suppliers (only when DROPSHIP_ENABLED) —
+│   │   │                      #   same shape as affiliate; documented only in
+│   │   │                      #   docs/dropshipping/ (architecture/context.md)
 │   │   └── auth/              # The whole auth system — see "Authentication" below
 │   │       ├── index.ts       #   PUBLIC facade — the ONLY entry the app imports
 │   │       ├── guards.ts      #   requireAdmin / requireCustomer + request types
@@ -801,6 +805,17 @@ without the core naming it. Rules: [dropshipping/architecture](./dropshipping/ar
   (the seller's cores without a store scope), and `createPackageShipment`,
   `updatePackageShipmentTracking`, `markPackageShipmentDelivered`,
   `markPackageShipmentReturned` in `shipments.service.ts`.
+
+### Dropshipping — the `package/dropship` sub-system
+
+Built like `package/affiliate` (facade `registerDropship`, a `DropshipHost`,
+its own `dropship` Postgres schema with no foreign key to core) and mounted by
+`app.ts` only when `DROPSHIP_ENABLED=true`. Everything inside it is documented
+in [`docs/dropshipping/`](./dropshipping/README.md). Core pieces it uses:
+the package seams above, and `createStoreWithoutLogo` in `stores.service.ts`
+— an unpublished, logo-less store with the given business phone and address
+in its profile (same slug and profile seeding as `createStore`), made for a
+supplier who joins without a store of its own.
 
 ### Affiliate marketing — the `package/affiliate` sub-system
 

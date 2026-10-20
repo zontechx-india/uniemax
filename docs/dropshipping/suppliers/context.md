@@ -4,7 +4,7 @@
 > seller–supplier link and its COD setting, supplier settings, or offering
 > products to sellers. **Update when:** any of those change.
 
-Status: ☐ planned (Phase 2). Tables:
+Status: ◐ built 20 Oct 2026 (Phase 2) — API test run pending. Effects on copies wait for Phase 3 (D-31). Tables:
 [data-model/suppliers](../data-model/suppliers/context.md). Words: [glossary](../glossary.md).
 
 ## Rules
@@ -12,12 +12,13 @@ Status: ☐ planned (Phase 2). Tables:
 1. Only a seller can bring a supplier, by invite (D-3). There is no public
    supplier list in the MVP.
 2. One invite is one one-time link, valid for `inviteExpiryDays`. The seller can
-   resend or revoke it. Only a hash of the token is stored.
+   resend it (a new link, D-27) or revoke it. Only a sha-256 hash of the token is stored.
 3. Whoever opens the link and signs in (the existing OTP sign-in) becomes the
    supplier for that seller. The seller then sees the supplier's business name
    and phone, and can end the link (SU-2).
 4. The supplier is a store (D-8): one it already owns, or a new **supply-only**
-   store created when it joins (unpublished, with the storefront set-up steps hidden).
+   store created when it joins (unpublished, no logo, storefront set-up steps
+   hidden; marked by `Supplier.supplyOnly`, D-28).
 5. The link carries two **terms** set by the seller: **`codAllowed`** (D-5) and
    **`returnFeePayer`**, who pays the supplier's shipping fee when a parcel comes
    back (D-17). Both are asked when inviting (no answer pre-selected), shown to
@@ -82,36 +83,62 @@ price shows a warning but is allowed.
   or **End** (the same, for good). Open orders still complete and the
   statement stays. The other side is told.
 
-## API: `/api/v1/dropship` ☐
+## API: `/api/v1/dropship` ◐
 
-**Seller** (`requireCustomer` + owns `:storeId`)
+Built 20 Oct 2026 in `backend/src/package/dropship/routes/`; registered only
+when `DROPSHIP_ENABLED=true`. `:storeId` is the store's id or slug.
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| GET | `/stores/:storeId/suppliers` | Invites + linked suppliers |
-| POST | `/stores/:storeId/supplier-invites` | `{ name, phone?, email?, codAllowed, returnFeePayer, turnOnStoreCod? }` → `{ inviteUrl }` |
-| POST | `/stores/:storeId/supplier-invites/:id/resend` · `/revoke` | |
-| PATCH | `/stores/:storeId/suppliers/:linkId` | `{ codAllowed?, returnFeePayer?, status?: "ACTIVE" \| "PAUSED" \| "ENDED" }`. Each term change is logged |
-| GET | `/stores/:storeId/suppliers/:linkId/terms` | Current terms + change log |
+| Method | Path | Guard | Purpose |
+| --- | --- | --- | --- |
+| GET | `/status` | — | `{ enabled: true }`; a 404 means the package is off (D-30) |
+| GET | `/stores/:storeId/role` | owner | `{ supplier: { status, supplyOnly } \| null, hasSuppliers }` — drives the nav |
 
-**Invite** (token in the path)
+**Seller** (`requireCustomer` + owns `:storeId`; another store → 404, SU-10)
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/invites/:token` | Public preview: seller name, COD, expiry |
-| POST | `/invites/:token/accept` | `requireCustomer`. `{ storeId? , newStore?: { name, phone, address }, shippingFee, shipWithinDays, returnDays }` |
+| GET | `/stores/:storeId/suppliers` | `{ invites, suppliers }`: open invites (SENT / EXPIRED) and every link with the supplier's store card and profile |
+| POST | `/stores/:storeId/supplier-invites` | `{ name, phone?, email?, codAllowed, returnFeePayer, turnOnStoreCod? }` (phone or email; both terms required, no default) → 201 `{ invite, inviteUrl, shareText, emailed }`. 409 "Already your supplier" (SU-14) |
+| POST | `/stores/:storeId/supplier-invites/:id/resend` | A new link with a fresh expiry; the old link stops working (D-27) → same shape |
+| POST | `/stores/:storeId/supplier-invites/:id/revoke` | SENT / EXPIRED → REVOKED |
+| PATCH | `/stores/:storeId/suppliers/:linkId` | `{ codAllowed?, returnFeePayer?, status?, turnOnStoreCod? }`. Each term change is logged and the supplier notified. ENDED is final (409) |
+| GET | `/stores/:storeId/suppliers/:linkId/terms` | `{ current, log }` — see [terms](../terms/context.md) |
 
-**Supplier** (`requireCustomer` + owns `:storeId` + `requireSupplier` = an `ACTIVE` Supplier)
+**Invite** (token in the path; 30 requests/min)
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET / PATCH | `/stores/:storeId/supplier` | Profile: shipping fee, ship within, returns |
+| GET | `/invites/:token` | Public preview: seller name + logo, both terms, effective status, expiry, the ship-within / returns limits |
+| GET | `/invites/:token/stores` | `requireCustomer`. The caller's stores for the join sheet: `hasAddress`, `isSeller` (the inviting store), existing supplier terms |
+| POST | `/invites/:token/accept` | `requireCustomer`. `{ storeId \| newStore: { name, phone, address }, shippingFee?, shipWithinDays?, returnDays? }` — the three terms are required unless that store already supplies. → `{ linkId, storeId, storeSlug, supplyOnly, alreadyJoined }` |
+
+**Supplier** (`requireCustomer` + owns `:storeId` + `requireSupplier` = an `ACTIVE` Supplier; otherwise 403, SU-9)
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET / PATCH | `/stores/:storeId/supplier` | Profile: `shippingFee`, `shipWithinDays` (1…`shipWithinDaysMax`), `returnDays` (0…`returnDaysMax`). Changes logged; every seller not ended is notified |
 | GET | `/stores/:storeId/sellers` | The sellers it supplies, with each link's terms |
-| PATCH | `/stores/:storeId/sellers/:linkId` | `{ status: "ACTIVE" \| "PAUSED" \| "ENDED" }` (D-19) |
-| GET | `/stores/:storeId/sellers/:linkId/terms` | Current terms + change log |
-| GET | `/stores/:storeId/supply` | Own products with offer state and prices for sellers |
-| PUT | `/stores/:storeId/supply/:productId` | `{ isOpen, variants: [{ variantId, cost, isOpen }] }` |
-| POST | `/stores/:storeId/supply/bulk` | `{ productIds, discountPct }` |
+| PATCH | `/stores/:storeId/sellers/:linkId` | `{ status }` (D-19) → the updated list |
+| GET | `/stores/:storeId/sellers/:linkId/terms` | `{ current, log }` |
+| GET | `/stores/:storeId/supply` | Own products; each option with shop price, stock, `cost`, `isOpen`, `aboveShopPrice` |
+| PUT | `/stores/:storeId/supply/:productId` | `{ isOpen, variants: [{ variantId, cost \| null, isOpen }] }`. An offered option needs a price; `cost: null` withdraws it. Price changes are logged as `cost:{variantId}` |
+| POST | `/stores/:storeId/supply/bulk` | `{ productIds, discountPct (0–90) }` → every option at shop price − N %, rounded to paise; the full list back |
+
+Admin routes: [admin](../admin/context.md).
+
+## Screens ◐ (`frontend/src/packages/dropship`)
+
+- Seller: `/mystores/:slug/suppliers` — the invite sheet, the share step
+  (WhatsApp to the given number, Copy link, an "emailed" note), the **Your
+  suppliers** and **Invited** lists, and each supplier's **Terms** sheet (edit
+  the two terms, the change log, Pause / Resume / Stop working together).
+- Join: `/supplier-invite/:token` — preview, sign in in place, then the join
+  sheet. A store without a business address can't be chosen; the address is
+  asked only for a new supplier account (SU-16). After joining: **Add the
+  products you'll supply** (supply-only) or **Choose products to offer**.
+- Supplier: `supply` (**Products for sellers**, with the bulk bar), `sellers`,
+  `supplier-settings`. A supply-only store's dashboard is `SupplierHome`.
+- Words: [glossary](../glossary.md). Nav rows: `docs/FRONTEND_CONTEXT.md`.
 
 ## Failure cases
 
@@ -121,17 +148,17 @@ price shows a warning but is allowed.
 | SU-2 | The link is forwarded to someone else. | The token is the authority. The seller sees who joined (business name, phone) and can **End**. |
 | SU-3 | The supplier already has a UnieMax store. | It chooses that store, or creates a supplier account. |
 | SU-4 | The same supplier is invited by two sellers. | One `Supplier`, two links, each with its own COD setting and statement. |
-| SU-5 | The seller changes COD or who pays the returned-parcel fee. | New orders only: each order keeps its snapshot ([terms](../terms/context.md)). Copies' `codAvailable` re-syncs, the change is logged, and the supplier is notified. |
+| SU-5 | The seller changes COD or who pays the returned-parcel fee. | New orders only: each order keeps its snapshot ([terms](../terms/context.md)). The change is logged and the supplier notified (built). Copies' `codAvailable` re-sync: Phase 3. |
 | SU-6 | The seller picks COD but the store doesn't accept COD. | The store's COD switch is shown on the invite sheet. |
-| SU-7 | The seller pauses or ends a supplier. | Copies pause (`LINK_INACTIVE`). Open supplier orders complete; the statement stays. |
-| SU-8 | Admin suspends the supplier, or its store. | Copies pause (`SUPPLIER_INACTIVE`) via `catalog.store.changed`. Open orders go on admin's **Needs action**. |
+| SU-7 | The seller pauses or ends a supplier. | Status + `statusBy` set and the supplier told (built). Copies pause (`LINK_INACTIVE`, Phase 3). Open supplier orders complete; the statement stays. |
+| SU-8 | Admin suspends the supplier, or its store. | Built: `SUSPENDED` blocks the supplier routes and the supplier is told. Copies pause (`SUPPLIER_INACTIVE`) via `catalog.store.changed` (Phase 3). Open orders go on admin's **Needs action**. |
 | SU-9 | A non-supplier calls supplier routes. | `requireSupplier` → 403. |
 | SU-10 | A seller reads another store's suppliers. | Every seller route resolves the store through `host.getOwnedStore`. |
-| SU-11 | A supplier offers a product that is itself a copy. | Refused: only a store's own products can be offered. |
+| SU-11 | A supplier offers a product that is itself a copy. | Refused: only products of the supplier's own store can be offered (built). The "is a copy" check (`isCopy` in `services/supply.ts`) is filled in with the Resale table in Phase 3. |
 | SU-12 | Price for sellers above the shop price. | Warning, not blocked. |
-| SU-13 | The invite is accepted twice (double tap, two devices). | Guarded single-use update; the second request returns the link already made. |
+| SU-13 | The invite is accepted twice (double tap, two devices). | A guarded claim (`SENT → ACCEPTED`) runs before anything is created; the same supplier gets the link already made (`alreadyJoined`), anyone else 409. A failure after the claim gives the invite back. |
 | SU-14 | The seller invites a supplier they already have. | *"Already your supplier"*, with a link to it. |
-| SU-15 | The seller invites their own store. | Refused. |
+| SU-15 | The seller invites their own store. | Refused at accept: the inviting store can't be chosen (400). Another store of the same owner may supply it. |
 | SU-16 | The supplier's address is missing. | Asked on the join sheet itself. |
-| SU-17 | The supplier no longer wants to supply a seller (for example, it disagrees with changed terms). | It can **Pause** or **End** too (D-19). Copies pause (`LINK_INACTIVE`); open orders complete; the seller is told. |
+| SU-17 | The supplier no longer wants to supply a seller (for example, it disagrees with changed terms). | It can **Pause** or **End** too (D-19); the seller is told (built). Copies pause (`LINK_INACTIVE`, Phase 3); open orders complete. |
 | SU-18 | A supplier wants UnieMax to pay it but has no bank account. | Phase 6 asks for it in place. Until then its prepaid orders settle directly (PS-1); nothing is blocked. |

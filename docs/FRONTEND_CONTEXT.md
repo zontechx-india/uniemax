@@ -565,6 +565,14 @@ once-ever setting look as important as a daily job:
 | **Marketing** | Affiliate Marketing |
 | **Help** | Customer messages · Help from UnieMax |
 
+When the dropship package is on (`useDropshipRole`, below), `useSectionGroups`
+adds **Suppliers** to Catalog for every owned store, and a **Supply to sellers**
+group (Products for sellers · Sellers · Supplier settings) after Catalog for a
+store that supplies. A **supply-only** store (made when its owner joined as a
+supplier) loses Storefront, Marketing and Payments · Delivery · Checkout; its
+layout hides the publish card and the phone strip's Publish button, and its
+Dashboard is the package's `SupplierHome`. The admin view never shows these rows.
+
 Row labels are plain words a first-time seller would use (the routes keep
 their old names — `details`, `builder`, `bank-accounts`, `shipping`,
 `customer-support`, `support` — so links in the wild still resolve). The
@@ -2542,6 +2550,24 @@ and calls `clearAttribution(storeSlug)` once the order is placed — one click
 credits one order. The platform-admin calls go to `/api/v1/admin/affiliate/**`
 — inside the admin API subtree, so the path-scoped admin session cookies are
 sent and `shared/auth/http.ts` picks the admin CSRF cookie from the prefix alone.
+
+## Dropshipping (`src/packages/dropship/`)
+
+The UI half of `package/dropship`, the same shape as `packages/affiliate`.
+Screens, words and rules are documented only in [`docs/dropshipping/`](./dropshipping/README.md);
+what the host apps see:
+
+- `index.ts` exports `dropshipPublicRoutes` (`/supplier-invite/:token`),
+  `dropshipStoreRoutes` (`suppliers`, `supply`, `sellers`,
+  `supplier-settings` under `/mystores/:storeSlug`), `useDropshipRole`,
+  `refreshDropshipRole`, `isDropshipEnabled` and `SupplierHome`.
+- **The flag comes from the backend**: `GET /api/v1/dropship/status` answers only
+  when the package is registered; a 404 keeps every supplier row and the admin
+  **Suppliers** nav item hidden. `role.ts` caches it, and each store's role, per
+  page load.
+- The admin console loads the package **lazily** (`AdminLayout` imports it
+  only to ask `isDropshipEnabled`), so neither app's entry bundle carries it;
+  `/suppliers` in the console is a lazy route.
 
 ## Notifications & push (both apps)
 

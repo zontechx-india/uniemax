@@ -5,7 +5,8 @@
 > **Update when:** the layout, host interface, hooks, events, config or jobs
 > change.
 
-Status: ◐ core seams built (Phase 1, 20 Oct 2026); the package itself is planned
+Status: ◐ core seams built (Phase 1); the package skeleton, invites, links,
+supplier profile and supply built (Phase 2, 20 Oct 2026); the rest is planned
 
 ## Code facts this design relies on (checked 19 Oct 2026)
 
@@ -30,7 +31,14 @@ Status: ◐ core seams built (Phase 1, 20 Oct 2026); the package itself is plann
 | Support tickets go to `PLATFORM` or `STORE`, with category `ORDERS` available. | `core.prisma` (`SupportRecipient`, `SupportTicketCategory`) | "Report a problem" opens a `PLATFORM` / `ORDERS` ticket. |
 | The affiliate package is self-contained, and its endpoints are listed in `API.md`. | `package/affiliate/README.md`, `docs/API.md` | Same packaging. `API.md` gets only a pointer section here (README rule 4). |
 
-## Package layout ☐
+## Package layout ◐
+
+Built in Phase 2 (☑): `index.ts`, `types.ts`, `config.ts`, `deps.ts`,
+`domain.ts`, `guards.ts` (`requireOwnedStore`, `requireSupplier`), `schema.ts`
+(Zod), `hosts/inProcess.ts`, `services/{invites,suppliers,supply,terms}.ts`,
+`routes/{seller,supplier,invite,admin}.ts`, `dropship.prisma`, and
+`frontend/src/packages/dropship` (`api.ts`, `role.ts`, `ui.tsx`, `pages/`).
+The rest is planned. Admin routes mount at **`/api/v1/admin/dropship`** (D-29).
 
 ```
 backend/src/package/dropship/
@@ -80,7 +88,9 @@ documented in the main doc the root `CLAUDE.md` names, and this table links to i
 | ☑ `OrderItem.fulfilledBy` + parcel-driven `SHIPPED` / `DELIVERED` | 1 | ☑ `BACKEND_CONTEXT.md` (OrderShipment), `API.md` |
 | ☑ System actions: `confirmOrderAsSystem`, `cancelOrderAsSystem`, `*PackageShipment*` | 1 | ☑ `BACKEND_CONTEXT.md` (Package seams) |
 | ☑ `NotificationKind.DROPSHIP` (migration `20261020150000_package_seams`) | 1 | ☑ `BACKEND_CONTEXT.md` |
-| `API.md` pointer section + `DROPSHIP_ENABLED` in `backend/README.md` | 2 | `API.md`, `backend/README.md` |
+| ☑ `API.md` pointer section + `DROPSHIP_ENABLED` in `backend/README.md` | 2 | ☑ `API.md`, `backend/README.md` |
+| ☑ `createStoreWithoutLogo` in `stores.service.ts` (the supply-only store, D-28) | 2 | ☑ `BACKEND_CONTEXT.md` (Dropshipping) |
+| ☑ Store nav rows, supply-only layout and dashboard (`StoreSectionNav`, `StoreManageLayout`, `StoreDashboardPage`); admin nav item | 2 | ☑ `FRONTEND_CONTEXT.md` |
 | Easy Split (payments track): a Cashfree vendor per store, split after payment, Defer Settlement, split refunds, adjustments, all in PaymentHub + `modules/payments` | 6 | `CASHFREE_PAYMENTS.md`, `API.md`, PaymentHub docs |
 
 ## Hooks (`package/events/hooks.ts`) ☑ (built Phase 1 — the built signatures)
@@ -125,7 +135,16 @@ Added to `AppEvents` in `package/events/index.ts` and emitted after commit:
 
 Existing events used: `order.placed`, `order.paid`, `order.status`, `order.cancelled`.
 
-## `DropshipHost` ☐
+## `DropshipHost` ◐
+
+Built in Phase 2 (`types.ts`): `getStore`, `getStores`, `getOwnedStore`,
+`listOwnedStores`, `createSupplyStore` (core `createStoreWithoutLogo`; the
+address is re-validated with the core schema), `setStoreCod(customerId,
+storeId, on)` (the core `updateStorePayments`, so its gates and
+`catalog.store.changed` apply), `listStoreProducts`, `getStoreProducts`,
+`getCustomer`, `notify`, `sendMail`, `webUrl`. `StoreRef` carries `logoUrl`,
+`suspended`, `acceptCod`, the profile `phone` / `email` and `hasAddress`. The
+rest of the interface below is planned.
 
 ```ts
 interface DropshipHost {
@@ -157,9 +176,13 @@ interface DropshipHost {
 }
 ```
 
-## Config (`package/dropship/config.ts`) ☐
+## Config (`package/dropship/config.ts`) ◐
 
-Every key can be overridden by env (document new env vars in `backend/README.md`).
+Every key can be overridden by env as `DROPSHIP_` + the key in
+UPPER_SNAKE (`DROPSHIP_INVITE_EXPIRY_DAYS`, …); `DROPSHIP_ENABLED` is in
+`backend/README.md`. Built in Phase 2: `enabled`, `inviteExpiryDays`,
+`inviteNeedsAdminApproval`, `shipWithinDaysMax`, and `returnDaysMax` (30, the
+longest returns window a supplier may offer). The rest is planned.
 
 | Key | Default | Meaning |
 | --- | --- | --- |

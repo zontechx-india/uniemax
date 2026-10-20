@@ -3,13 +3,16 @@
 > **Read when:** working on admin screens or endpoints for dropshipping.
 > **Update when:** they change.
 
-Status: ☐ planned. Suppliers: Phase 2. Needs action: Phase 4.
+Status: ◐ Suppliers built (Phase 2, 20 Oct 2026). Needs action: Phase 4.
 
 ## Screens (`frontend/src/admin`)
 
-- **Suppliers:** every supplier with its store, linked sellers, status and join
-  date. **Suspend** / **Restore** with a note. Suspending pauses every copy of
-  its products (SU-8).
+- ☑ **Suppliers** (`/suppliers` in the console; nav item shown only while the
+  package is on): every supplier with its store, the sellers it supplies,
+  terms, status, join date and note; filter by status. **Suspend** /
+  **Restore** with a note the supplier is shown. Suspending blocks the
+  supplier routes now; pausing every copy of its products (SU-8) arrives with
+  copies in Phase 3.
 - **Needs action:** one list with a filter by kind:
   - **Late:** parcels past their "Ship by" date.
   - **Can't ship on mixed orders:** a manual partial refund may be needed (F-4).
@@ -28,14 +31,15 @@ Status: ☐ planned. Suppliers: Phase 2. Needs action: Phase 4.
 - There is no supplier payments screen. Money settles directly between the
   seller and the supplier until Easy Split pays prepaid orders (D-16, Phase 6).
 
-## API: `/api/v1/dropship/admin` ☐
+## API: `/api/v1/admin/dropship` ◐
 
-`requireAdmin` (and the admin CSRF check the admin subtree already carries).
+Inside the admin subtree its session cookies are scoped to (D-29):
+`requireAdmin` + `requireAdminCsrf`. Built in Phase 2: the two supplier rows.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/suppliers?status&page` | Supplier list |
-| POST | `/suppliers/:id/suspend` · `/restore` | `{ note }` |
+| GET | `/suppliers?status&page&pageSize` | ☑ Supplier list (`list()` envelope) |
+| POST | `/suppliers/:id/suspend` · `/restore` | ☑ `{ note }` (required) |
 | GET | `/needs-action?kind&page` | The list above |
 | POST | `/needs-action/:supplierOrderId/resolve` | `{ note }` |
 | POST | `/supplier-orders/:id/status` | Force a transition, `{ to, note }` |

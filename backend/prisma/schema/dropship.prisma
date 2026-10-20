@@ -1,0 +1,182 @@
+// Dropshipping — sellers bring their own suppliers, who ship straight to the
+// seller's customers. Lives in its own Postgres schema and never relates to a
+// core model: every core id is a plain string, so the package can move to a
+// standalone service. Design and status: docs/dropshipping/.
+
+enum SupplierStatus {
+  PENDING // only when inviteNeedsAdminApproval
+  ACTIVE
+  SUSPENDED
+
+  @@schema("dropship")
+}
+
+enum SupplierVisibility {
+  PRIVATE
+  PUBLIC // public catalogue, Phase 7
+
+  @@schema("dropship")
+}
+
+enum InviteStatus {
+  SENT
+  ACCEPTED
+  REVOKED
+  EXPIRED
+
+  @@schema("dropship")
+}
+
+enum LinkStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+
+  @@schema("dropship")
+}
+
+/// Who pays the supplier's shipping fee when a parcel comes back (D-17).
+enum ReturnFeePayer {
+  SELLER
+  SUPPLIER
+
+  @@schema("dropship")
+}
+
+enum DropshipActor {
+  SUPPLIER
+  SELLER
+  ADMIN
+  SYSTEM
+
+  @@schema("dropship")
+}
+
+/// A store that ships orders for the sellers it is linked to.
+model Supplier {
+  id             String             @id @default(cuid())
+  /// The supplier's store (core `stores.id`).
+  storeId        String             @unique
+  /// True when the store was created on joining (D-28): its storefront
+  /// set-up steps are hidden.
+  supplyOnly     Boolean            @default(false)
+  status         SupplierStatus     @default(ACTIVE)
+  visibility     SupplierVisibility @default(PRIVATE)
+  /// Charged per supplier order.
+  shippingFee    Decimal            @default(0) @db.Decimal(10, 2)
+  /// Asked when joining, never pre-selected.
+  shipWithinDays Int
+  /// 0 = no returns. Asked when joining, never pre-selected.
+  returnDays     Int
+  /// Admin's note on suspend / restore.
+  statusNote     String?
+  links          SupplierLink[]
+  products       SupplyProduct[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([status])
+  @@map("suppliers")
+  @@schema("dropship")
+}
+
+/// A one-time link a seller sends to bring a supplier.
+model SupplierInvite {
+  id             String         @id @default(cuid())
+  /// sha-256 of the link token; the token itself is never stored.
+  tokenHash      String         @unique
+  sellerStoreId  String
+  /// Customer id of the seller who sent it.
+  createdBy      String
+  contactName    String
+  contactPhone   String?
+  contactEmail   String?
+  codAllowed     Boolean
+  returnFeePayer ReturnFeePayer
+  status         InviteStatus   @default(SENT)
+  expiresAt      DateTime
+  /// Set on accept.
+  linkId         String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([sellerStoreId, status])
+  @@map("supplier_invites")
+  @@schema("dropship")
+}
+
+/// One seller–supplier relationship.
+model SupplierLink {
+  id             String          @id @default(cuid())
+  supplierId     String
+  supplier       Supplier        @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  sellerStoreId  String
+  /// Current terms; every order keeps its own copy (D-18).
+  codAllowed     Boolean
+  returnFeePayer ReturnFeePayer
+  status         LinkStatus      @default(ACTIVE)
+  /// Who paused or ended it (either side, D-19).
+  statusBy       DropshipActor?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@unique([supplierId, sellerStoreId])
+  @@index([sellerStoreId, status])
+  @@map("supplier_links")
+  @@schema("dropship")
+}
+
+/// A supplier's own product offered to its sellers.
+model SupplyProduct {
+  id         String          @id @default(cuid())
+  supplierId String
+  supplier   Supplier        @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  /// The supplier's own StoreProduct (never a copy).
+  productId  String          @unique
+  isOpen     Boolean         @default(true)
+  variants   SupplyVariant[]
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@index([supplierId, isOpen])
+  @@map("supply_products")
+  @@schema("dropship")
+}
+
+model SupplyVariant {
+  id              String        @id @default(cuid())
+  supplyProductId String
+  supplyProduct   SupplyProduct @relation(fields: [supplyProductId], references: [id], onDelete: Cascade)
+  /// The supplier's StoreProductVariant.
+  variantId       String        @unique
+  /// "Price for sellers".
+  cost            Decimal       @db.Decimal(10, 2)
+  isOpen          Boolean       @default(true)
+
+  @@index([supplyProductId])
+  @@map("supply_variants")
+  @@schema("dropship")
+}
+
+/// Every change to a term, shown to both sides and kept for disputes (D-18).
+/// A change takes effect for orders placed after createdAt.
+model TermsChange {
+  id         String        @id @default(cuid())
+  supplierId String
+  /// null = a supplier-wide term (fee, ship within, returns, price).
+  linkId     String?
+  /// "shippingFee" · "shipWithinDays" · "returnDays" · "cost:{variantId}" ·
+  /// "codAllowed" · "returnFeePayer"
+  field      String
+  fromValue  String?
+  toValue    String?
+  /// Customer or admin id.
+  changedBy  String
+  changedAs  DropshipActor
+  createdAt  DateTime      @default(now())
+
+  @@index([supplierId, createdAt])
+  @@index([linkId, createdAt])
+  @@map("terms_changes")
+  @@schema("dropship")
+}

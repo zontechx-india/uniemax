@@ -10,7 +10,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["public", "affiliate"]
+  schemas  = ["public", "affiliate", "dropship"]
 }
 
 // ---------------------------------------------------------------------------

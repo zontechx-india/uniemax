@@ -7,6 +7,11 @@ import { env, resolveTrustProxy } from "./config/env.js";
 import { registerAuthPlugins } from "./package/auth/index.js";
 import { registerStoragePlugins } from "./package/storage/index.js";
 import { createInProcessHost, registerAffiliate } from "./package/affiliate/index.js";
+import {
+  createInProcessHost as createDropshipHost,
+  dropshipConfig,
+  registerDropship,
+} from "./package/dropship/index.js";
 import { loggerConfig } from "./utils/logger.js";
 import { registerPrisma } from "./plugins/prisma.js";
 import { registerRoutes } from "./routes.js";
@@ -93,6 +98,15 @@ export async function buildApp(): Promise<FastifyInstance> {
     prisma: app.prisma,
     host: createInProcessHost(app.prisma),
   });
+
+  // Dropshipping — self-contained package, only when DROPSHIP_ENABLED=true
+  // (off in production until it is complete). See docs/dropshipping/.
+  if (dropshipConfig.enabled) {
+    await registerDropship(app, {
+      prisma: app.prisma,
+      host: createDropshipHost(app.prisma),
+    });
+  }
 
   // Webhook safety net: settle ONLINE orders whose payment landed but whose
   // webhook never did. No-op without Cashfree credentials.

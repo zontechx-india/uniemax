@@ -34,6 +34,7 @@ import {
   resolveProfile,
 } from "./storeProfile.schema.js";
 import type { StoreProfileUpdateInput } from "./storeProfile.schema.js";
+import type { StoreAddress } from "./storeAddress.schema.js";
 import { evaluateReadiness, gateBlockedMessage } from "./storeReadiness.js";
 import { storeScope } from "./storeActor.js";
 import type { StoreActor } from "./storeActor.js";
@@ -325,6 +326,43 @@ export async function createStore(
     await prisma.store.delete({ where: { id: created.id } }).catch(() => {});
     throw err;
   }
+}
+
+/**
+ * Create an unpublished store with no logo, on behalf of a package (a
+ * supplier joining by invite gets a supply-only store this way). Same slug and
+ * profile seeding as `createStore`; the given business phone and address are
+ * written into the profile. The logo stays optional here because such a store
+ * never shows a storefront until its owner sets one up.
+ */
+export async function createStoreWithoutLogo(
+  ownerId: string,
+  input: { name: string; phone: string | null; address: StoreAddress },
+) {
+  const slug = await uniqueSlug(slugify(input.name));
+  const owner = await prisma.customer.findUniqueOrThrow({
+    where: { id: ownerId },
+    select: { name: true, email: true, emailVerifiedAt: true },
+  });
+  const profile = {
+    ...DEFAULT_STORE_PROFILE,
+    businessName: input.name,
+    sellerName: owner.name,
+    phone: input.phone,
+    email: owner.emailVerifiedAt ? owner.email : null,
+    address: input.address,
+    tax: { ...DEFAULT_STORE_TAX },
+  };
+  return prisma.store.create({
+    data: {
+      ownerId,
+      name: input.name,
+      slug,
+      theme: DEFAULT_STORE_THEME,
+      profile: profile as unknown as Prisma.InputJsonValue,
+    },
+    select: { id: true, name: true, slug: true },
+  });
 }
 
 /** `storeRef` is the store's id or slug — both resolve, ownership enforced. */

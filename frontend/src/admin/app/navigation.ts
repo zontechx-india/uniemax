@@ -18,6 +18,8 @@ export interface NavItem {
   end?: boolean
   /** Only a SUPER_ADMIN sees the item — the API enforces it regardless. */
   superAdminOnly?: boolean
+  /** Shown only when the supplier package is switched on (DROPSHIP_ENABLED). */
+  dropship?: boolean
 }
 
 export interface NavGroup {
@@ -46,6 +48,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/stores', label: 'Stores & sellers' },
       { to: '/customers', label: 'Customers' },
       { to: '/affiliates', label: 'Affiliates' },
+      { to: '/suppliers', label: 'Suppliers', dropship: true },
     ],
   },
   {
@@ -74,6 +77,7 @@ const TITLES: [string, string][] = [
   ['/category-mapping', 'Category mapping'],
   ['/stores', 'Stores'],
   ['/customers', 'Customers'],
+  ['/suppliers', 'Suppliers'],
   ['/support', 'Support'],
   ['/whatsapp', 'WhatsApp'],
   ['/theme-templates', 'Store themes'],

@@ -22,6 +22,7 @@ import {
 import { useStoreManageScope } from '../../features/stores/storeManageScope'
 import { MediaImg } from '../../../shared/media/MediaImg'
 import { ToastHost } from './ui/Toast'
+import { useDropshipRole } from '../../../packages/dropship'
 
 /**
  * Store management — Flipkart-account style split inside the app's main
@@ -46,6 +47,10 @@ export function StoreManageLayout() {
   usePrivatePageTitle('Manage', store?.name)
   // Owner by default; the admin console wraps these routes to say otherwise.
   const scope = useStoreManageScope()
+  // A supply-only store (made when its owner joined as a supplier) has no
+  // storefront: nothing to publish or share.
+  const supplyOnly =
+    useDropshipRole(scope.mode === 'owner' ? storeSlug : null)?.supplier?.supplyOnly ?? false
 
   // Minimised-nav preference. Owned here because the grid track width is this
   // file's; the nav renders the icons.
@@ -189,29 +194,31 @@ export function StoreManageLayout() {
           <p className="truncate font-heading text-base font-bold text-fg">{store.name}</p>
           <span
             className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-              store.isPublished ? 'text-success' : 'text-pending'
+              supplyOnly ? 'text-muted' : store.isPublished ? 'text-success' : 'text-pending'
             }`}
           >
             <span
               aria-hidden
-              className={`h-1.5 w-1.5 rounded-full ${store.isPublished ? 'bg-success' : 'bg-pending'}`}
+              className={`h-1.5 w-1.5 rounded-full ${supplyOnly ? 'bg-muted' : store.isPublished ? 'bg-success' : 'bg-pending'}`}
             />
-            {store.isPublished ? 'Live' : 'Not live yet'}
+            {supplyOnly ? 'Supplier account' : store.isPublished ? 'Live' : 'Not live yet'}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={() => setShareOpen(true)}
-          aria-haspopup="dialog"
-          className={buttonClass({
-            variant: store.isPublished ? 'secondary' : 'primary',
-            size: 'md',
-            className: 'px-3.5',
-          })}
-        >
-          <ShareIcon className="h-4 w-4" />
-          {store.isPublished ? 'Share' : 'Publish'}
-        </button>
+        {!supplyOnly && (
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            aria-haspopup="dialog"
+            className={buttonClass({
+              variant: store.isPublished ? 'secondary' : 'primary',
+              size: 'md',
+              className: 'px-3.5',
+            })}
+          >
+            <ShareIcon className="h-4 w-4" />
+            {store.isPublished ? 'Share' : 'Publish'}
+          </button>
+        )}
       </div>
 
       {/* Acting on someone else's shop.
@@ -307,7 +314,7 @@ export function StoreManageLayout() {
               state — a dot the seller can hover. The rail is a desktop idea
               (below `lg` the nav is a dropdown), so the full card still
               renders on a phone whatever the stored preference says. */}
-          {rail && (
+          {rail && !supplyOnly && (
             <div
               className="hidden justify-center border-t border-line py-3 lg:flex"
               title={store.isPublished ? 'Published' : 'Not published'}
@@ -321,9 +328,11 @@ export function StoreManageLayout() {
               />
             </div>
           )}
-          <div className={rail ? 'lg:hidden' : ''}>
-            <StorePublishCard store={store} onStoreChange={setStore} />
-          </div>
+          {!supplyOnly && (
+            <div className={rail ? 'lg:hidden' : ''}>
+              <StorePublishCard store={store} onStoreChange={setStore} />
+            </div>
+          )}
           </div>
         </aside>
 

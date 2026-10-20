@@ -26,6 +26,20 @@ export function AdminLayout() {
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [confirmSignOut, setConfirmSignOut] = useState(false)
+  // The Suppliers entry shows only while the supplier package is on. Loaded
+  // lazily so the console's own bundle never carries the package.
+  const [dropshipOn, setDropshipOn] = useState(false)
+  useEffect(() => {
+    let live = true
+    void import('../../packages/dropship')
+      .then((m) => m.isDropshipEnabled())
+      .then((on) => {
+        if (live) setDropshipOn(on)
+      })
+    return () => {
+      live = false
+    }
+  }, [])
 
   // Close the drawer on navigation, and keep the tab title in step.
   useEffect(() => {
@@ -44,7 +58,9 @@ export function AdminLayout() {
   const nav = (
     <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
       {NAV_GROUPS.map((group) => {
-        const items = group.items.filter((item) => !item.superAdminOnly || isSuperAdmin)
+        const items = group.items.filter(
+          (item) => (!item.superAdminOnly || isSuperAdmin) && (!item.dropship || dropshipOn),
+        )
         if (items.length === 0) return null
         return (
           <div key={group.title}>
