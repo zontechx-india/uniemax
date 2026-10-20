@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../../utils/httpError.js";
 import { slugify } from "../../utils/slug.js";
+import { emit } from "../../package/events/index.js";
 import {
   mediaUrl,
   newObjectKey,
@@ -622,6 +623,7 @@ export async function updateStorePayments(
     data: { payments: merged },
     select: storeSelect,
   });
+  emit("catalog.store.changed", { storeId: store.id });
   return withReadiness(row);
 }
 
@@ -676,6 +678,7 @@ export async function updateStoreShipping(
     data: { shipping: merged as unknown as Prisma.InputJsonValue },
     select: storeSelect,
   });
+  emit("catalog.store.changed", { storeId: store.id });
   return withReadiness(row);
 }
 

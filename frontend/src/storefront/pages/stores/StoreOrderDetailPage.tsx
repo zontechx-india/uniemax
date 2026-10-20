@@ -156,10 +156,26 @@ export function StoreOrderDetailPage() {
     }
   }, [store.id, orderId])
 
-  const action = order ? nextAction(order) : null
   const parcels = order?.shipments ?? []
-  const openParcels = parcels.filter(onTheWay)
+  // The store acts on its OWN parcels; another party's move on their side.
+  const openParcels = parcels.filter((p) => onTheWay(p) && p.source === 'SELLER')
   const cameBackIds = new Set(parcels.filter((p) => p.returnedAt).map((p) => p.id))
+  // Lines another party ships (a package's tag) — the store never sends or
+  // delivers them; the order moves on as their parcels do.
+  const hasTagged = !!order?.items.some((item) => item.fulfilledBy)
+  const ownUnsent =
+    order?.items.filter(
+      (item) =>
+        !item.fulfilledBy && (item.shipmentId === null || cameBackIds.has(item.shipmentId)),
+    ).length ?? 0
+  const baseAction = order ? nextAction(order) : null
+  const action =
+    hasTagged &&
+    baseAction &&
+    ((baseAction.status === 'SHIPPED' && ownUnsent === 0) ||
+      (baseAction.status === 'DELIVERED' && openParcels.length === 0))
+      ? null
+      : baseAction
   const allBack = parcels.length > 0 && cameBackIds.size === parcels.length
   const hasReturnedItems = !!order?.items.some(
     (item) => item.shipmentId !== null && cameBackIds.has(item.shipmentId),
@@ -523,6 +539,11 @@ export function StoreOrderDetailPage() {
                         {item.variantName && (
                           <p className="mt-0.5 text-hint font-semibold text-brand">{item.variantName}</p>
                         )}
+                        {item.fulfilledBy && (
+                          <p className="mt-0.5 text-hint text-muted">
+                            {shippedByLabel(parcels.find((p) => p.id === item.shipmentId))}
+                          </p>
+                        )}
                         <p className="mt-0.5 text-hint text-muted">
                           <span className="font-semibold text-fg">{item.quantity}</span> ×{' '}
                           {formatPrice(item.unitPrice)}
@@ -625,7 +646,9 @@ export function StoreOrderDetailPage() {
                   </Button>
                 ) : (
                   <p className="min-w-0 flex-1 px-2 text-hint text-muted">
-                    Waiting for the order to be delivered.
+                    {hasTagged
+                      ? 'Waiting for the other parcels.'
+                      : 'Waiting for the order to be delivered.'}
                   </p>
                 )}
                 {menuActions.length > 0 && (
@@ -763,6 +786,11 @@ export function StoreOrderDetailPage() {
       />
     </div>
   )
+}
+
+/** Who ships a line another party fulfils — its parcel's sender, once sent. */
+function shippedByLabel(parcel: OrderShipment | undefined): string {
+  return parcel?.senderName ? `Shipped by ${parcel.senderName}` : 'Shipped separately'
 }
 
 /** "Delhivery · 2123456789012" for the timeline's Sent step. */

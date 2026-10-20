@@ -24,13 +24,17 @@ import {
 } from "./orders.service.js";
 
 /**
- * Parcels — the seller sends an order with a courier and tracking number,
- * corrects the tracking, marks the parcel delivered (optional proof photo)
- * or records that it came back. Rules: docs/dropshipping/shipments/context.md.
+ * Parcels — an order goes out with a courier and tracking number, its
+ * tracking can be corrected, a parcel is delivered (optional proof photo) or
+ * comes back. Rules: docs/dropshipping/shipments/context.md.
  *
- * Every action is owner-scoped through `getMyStore` (a foreign store's order
- * 404s), every write is guarded on the state read before it (a double tap or
- * a second tab gets 409, never a duplicate), and every action answers with the
+ * Two callers share ONE core per action:
+ *   - the seller (owner-scoped through `getMyStore`; a foreign order 404s),
+ *     who sends only the lines the store ships itself (`fulfilledBy` null);
+ *   - a package acting for the order (`*PackageShipment*`, the dropship
+ *     host's API — no HTTP route), which sends the lines it tagged.
+ * Every write is guarded on the state read before it (a double tap or a
+ * second tab gets 409, never a duplicate). Seller actions answer with the
  * whole order as the seller sees it.
  */
 
@@ -46,11 +50,13 @@ function trackingData(input: ShipmentTrackingInput) {
   };
 }
 
-/** A parcel of one of this store's orders — 404 for anything else. */
-async function findParcel(storeId: string, orderId: string, shipmentId: string) {
+/** A parcel still on its way — 404 if absent, 409 once delivered or back. */
+async function findParcel(where: Prisma.OrderShipmentWhereInput) {
   const parcel = await prisma.orderShipment.findFirst({
-    where: { id: shipmentId, orderId, order: { storeId } },
+    where,
     select: {
+      id: true,
+      orderId: true,
       carrier: true,
       trackingNumber: true,
       trackingUrl: true,
@@ -78,12 +84,165 @@ const onTheWay = (shipmentId: string, orderId: string) =>
     returnedAt: null,
   }) satisfies Prisma.OrderShipmentWhereInput;
 
+/** Lines not on their way: never sent, or their parcel came back. */
+const notOnTheWay = {
+  OR: [{ shipmentId: null }, { shipment: { returnedAt: { not: null } } }],
+} satisfies Prisma.OrderItemWhereInput;
+
+type SendableOrder = Prisma.OrderGetPayload<{
+  select: typeof statusGuardSelect & { fulfilment: true };
+}>;
+
+/** The order a parcel may leave from — refuses pickup, cancelled, delivered. */
+async function sendableOrder(where: Prisma.OrderWhereInput): Promise<SendableOrder> {
+  const order = await prisma.order.findFirst({
+    where,
+    select: { ...statusGuardSelect, fulfilment: true },
+  });
+  if (!order) throw HttpError.notFound("Order not found");
+  if (order.fulfilment === "PICKUP") {
+    throw HttpError.conflict("A pickup order isn't sent — mark it as picked up instead");
+  }
+  if (order.status === "CANCELLED") {
+    throw HttpError.conflict("A cancelled order can't be sent");
+  }
+  if (order.status === "DELIVERED") {
+    throw HttpError.conflict("This order is already delivered");
+  }
+  return order;
+}
+
 /**
- * Send an order: one parcel holding everything not already on its way —
- * items never sent, or items whose parcel came back (sending it again). Moves
- * the order to Shipped when it isn't yet; on an order already Shipped (sent
- * before parcels existed, or after a parcel came back) it only adds the
- * parcel. The customer gets ONE message, with the tracking.
+ * The send itself: one parcel holding the lines `lines` selects (among those
+ * not on their way). Takes the order's row lock first, guarded on its
+ * status, so a cancel from another tab can't cross it. Moves the order to
+ * Shipped only when no line is left unsent — an order whose other lines
+ * another party ships waits for their parcels. The customer gets ONE message,
+ * with the tracking.
+ */
+async function sendParcel(
+  order: SendableOrder,
+  lines: Prisma.OrderItemWhereInput,
+  expectedLines: number | null,
+  data: Omit<Prisma.OrderShipmentUncheckedCreateInput, "orderId">,
+) {
+  const { shipmentId, change } = await prisma.$transaction(async (tx) => {
+    const touched = await tx.order.updateMany({
+      where: { id: order.id, status: order.status },
+      data: { updatedAt: new Date() },
+    });
+    if (touched.count === 0) {
+      throw HttpError.conflict("The order just changed — reload and try again");
+    }
+
+    const shipment = await tx.orderShipment.create({
+      data: { orderId: order.id, ...data },
+      select: { id: true },
+    });
+    const taken = await tx.orderItem.updateMany({
+      where: { orderId: order.id, AND: [notOnTheWay, lines] },
+      data: { shipmentId: shipment.id },
+    });
+    if (taken.count === 0 || (expectedLines !== null && taken.count !== expectedLines)) {
+      throw HttpError.conflict(
+        "Everything in this order is already on its way — refresh to see its parcel",
+      );
+    }
+
+    const unsent = await tx.orderItem.count({ where: { orderId: order.id, shipmentId: null } });
+    const advancing = unsent === 0 && STATUS_RANK[order.status]! < STATUS_RANK.SHIPPED!;
+    const change = advancing ? await writeStatusChange(tx, order, "SHIPPED") : null;
+    return { shipmentId: shipment.id, change };
+  });
+
+  const shaped = change
+    ? await announceStatusChange(order.id, "SHIPPED", change, order.customerId, {
+        notifyCustomer: false,
+      })
+    : await loadOrder(order.id, "seller");
+  const parcel = shaped.shipments.find((s) => s.id === shipmentId);
+  if (parcel) {
+    notifyParcelShipped(shaped, parcel, order.customerId, { first: !!change });
+  }
+  return { shipmentId, order: shaped };
+}
+
+/** Correct a parcel's courier, number or link; the customer is told if it changed. */
+async function retrack(parcel: Awaited<ReturnType<typeof findParcel>>, input: ShipmentTrackingInput) {
+  const next = trackingData(input);
+  const updated = await prisma.orderShipment.updateMany({
+    where: onTheWay(parcel.id, parcel.orderId),
+    data: next,
+  });
+  if (updated.count === 0) {
+    throw HttpError.conflict("The parcel just changed — reload and try again");
+  }
+  const order = await loadOrder(parcel.orderId, "seller");
+  const changed =
+    next.carrier !== parcel.carrier ||
+    next.trackingNumber !== parcel.trackingNumber ||
+    next.trackingUrl !== parcel.trackingUrl;
+  const shaped = order.shipments.find((s) => s.id === parcel.id);
+  if (changed && shaped) notifyTrackingUpdated(order, shaped, parcel.order.customerId);
+  return order;
+}
+
+/**
+ * Delivered. When nothing is left on its way and every line went out, the
+ * order becomes Delivered through the same path as the seller's button (a COD
+ * order is marked paid, the customer is told, `order.status` fires).
+ */
+async function deliverParcel(orderId: string, shipmentId: string, podKey: string | null) {
+  const result = await prisma.$transaction(async (tx) => {
+    const updated = await tx.orderShipment.updateMany({
+      where: onTheWay(shipmentId, orderId),
+      data: { deliveredAt: new Date(), podKey },
+    });
+    if (updated.count === 0) {
+      throw HttpError.conflict("This parcel is already marked delivered or came back");
+    }
+    const order = await tx.order.findUniqueOrThrow({
+      where: { id: orderId },
+      select: statusGuardSelect,
+    });
+    const open = await tx.orderShipment.count({
+      where: { orderId, deliveredAt: null, returnedAt: null },
+    });
+    const unsent = await tx.orderItem.count({ where: { orderId, shipmentId: null } });
+    const done =
+      open === 0 &&
+      unsent === 0 &&
+      order.status !== "DELIVERED" &&
+      order.status !== "CANCELLED";
+    const change = done ? await writeStatusChange(tx, order, "DELIVERED") : null;
+    return { change, customerId: order.customerId };
+  });
+
+  return result.change
+    ? announceStatusChange(orderId, "DELIVERED", result.change, result.customerId)
+    : loadOrder(orderId, "seller");
+}
+
+/** The parcel came back undelivered; its lines stay with the order. */
+async function returnParcel(orderId: string, shipmentId: string) {
+  const updated = await prisma.orderShipment.updateMany({
+    where: onTheWay(shipmentId, orderId),
+    data: { returnedAt: new Date() },
+  });
+  if (updated.count === 0) {
+    throw HttpError.conflict("The parcel just changed — reload and try again");
+  }
+  return loadOrder(orderId, "seller");
+}
+
+// ---------------------------------------------------------------------------
+// The seller (stores.routes.ts) — owner-scoped
+// ---------------------------------------------------------------------------
+
+/**
+ * Send the store's own lines — those never sent, or whose parcel came back
+ * (sending again). Also "add tracking" to an order sent before parcels
+ * existed. Lines another party ships are never touched.
  */
 export async function createShipment(
   actor: StoreActor,
@@ -92,69 +251,9 @@ export async function createShipment(
   input: ShipmentTrackingInput,
 ) {
   const store = await getMyStore(actor, storeRef);
-  const current = await prisma.order.findFirst({
-    where: { id: orderId, storeId: store.id },
-    select: { ...statusGuardSelect, fulfilment: true },
-  });
-  if (!current) throw HttpError.notFound("Order not found");
-  if (current.fulfilment === "PICKUP") {
-    throw HttpError.conflict(
-      "A pickup order isn't sent — mark it as picked up instead",
-    );
-  }
-  if (current.status === "CANCELLED") {
-    throw HttpError.conflict("A cancelled order can't be sent");
-  }
-  if (current.status === "DELIVERED") {
-    throw HttpError.conflict("This order is already delivered");
-  }
-
-  const advancing = STATUS_RANK[current.status]! < STATUS_RANK.SHIPPED!;
-  const { shipmentId, change } = await prisma.$transaction(async (tx) => {
-    let change: { paid: boolean } | null = null;
-    if (advancing) {
-      change = await writeStatusChange(tx, current, "SHIPPED");
-    } else {
-      // Already Shipped: still take the order's row lock, guarded on its
-      // status, so a cancel from another tab can't cross this parcel.
-      const touched = await tx.order.updateMany({
-        where: { id: orderId, status: current.status },
-        data: { updatedAt: new Date() },
-      });
-      if (touched.count === 0) {
-        throw HttpError.conflict("The order just changed — reload and try again");
-      }
-    }
-
-    const shipment = await tx.orderShipment.create({
-      data: { orderId, ...trackingData(input) },
-      select: { id: true },
-    });
-    const taken = await tx.orderItem.updateMany({
-      where: {
-        orderId,
-        OR: [{ shipmentId: null }, { shipment: { returnedAt: { not: null } } }],
-      },
-      data: { shipmentId: shipment.id },
-    });
-    if (taken.count === 0) {
-      throw HttpError.conflict(
-        "Everything in this order is already on its way — refresh to see its parcel",
-      );
-    }
-    return { shipmentId: shipment.id, change };
-  });
-
-  const order = change
-    ? await announceStatusChange(orderId, "SHIPPED", change, current.customerId, {
-        notifyCustomer: false,
-      })
-    : await loadOrder(orderId, "seller");
-  const parcel = order.shipments.find((s) => s.id === shipmentId);
-  if (parcel) {
-    notifyParcelShipped(order, parcel, current.customerId, { first: !!change });
-  }
-  return order;
+  const order = await sendableOrder({ id: orderId, storeId: store.id });
+  const sent = await sendParcel(order, { fulfilledBy: null }, null, trackingData(input));
+  return sent.order;
 }
 
 /** Correct a parcel's courier, number or link while it is on its way. */
@@ -166,35 +265,14 @@ export async function updateShipmentTracking(
   input: ShipmentTrackingInput,
 ) {
   const store = await getMyStore(actor, storeRef);
-  const before = await findParcel(store.id, orderId, shipmentId);
-  const next = trackingData(input);
-
-  const updated = await prisma.orderShipment.updateMany({
-    where: onTheWay(shipmentId, orderId),
-    data: next,
-  });
-  if (updated.count === 0) {
-    throw HttpError.conflict("The parcel just changed — reload and try again");
-  }
-
-  const order = await loadOrder(orderId, "seller");
-  const changed =
-    next.carrier !== before.carrier ||
-    next.trackingNumber !== before.trackingNumber ||
-    next.trackingUrl !== before.trackingUrl;
-  const parcel = order.shipments.find((s) => s.id === shipmentId);
-  if (changed && parcel) {
-    notifyTrackingUpdated(order, parcel, before.order.customerId);
-  }
-  return order;
+  const parcel = await findParcel({ id: shipmentId, orderId, order: { storeId: store.id } });
+  return retrack(parcel, input);
 }
 
 /**
- * The parcel reached the customer — optionally with a proof-of-delivery photo
- * (already read and normalised by `readUpload`). When nothing is left on its
- * way and every item went out, the order becomes Delivered through the same
- * path as the seller's button (a COD order is marked paid, the customer is
- * told, `order.status` fires).
+ * Delivered — optionally with a proof-of-delivery photo (already read and
+ * normalised by `readUpload`). The photo is stored first; if the write then
+ * loses a race it is removed again.
  */
 export async function markShipmentDelivered(
   actor: StoreActor,
@@ -204,51 +282,19 @@ export async function markShipmentDelivered(
   photo: UploadedFile | null,
 ) {
   const store = await getMyStore(actor, storeRef);
-  await findParcel(store.id, orderId, shipmentId);
+  await findParcel({ id: shipmentId, orderId, order: { storeId: store.id } });
 
   let podKey: string | null = null;
   if (photo) {
     podKey = newObjectKey(`pod/${store.id}/${orderId}`, photo.contentType);
     await storeUpload("media", podKey, photo);
   }
-
-  let result: { change: { paid: boolean } | null; customerId: string | null };
   try {
-    result = await prisma.$transaction(async (tx) => {
-      const updated = await tx.orderShipment.updateMany({
-        where: onTheWay(shipmentId, orderId),
-        data: { deliveredAt: new Date(), podKey },
-      });
-      if (updated.count === 0) {
-        throw HttpError.conflict("This parcel is already marked delivered or came back");
-      }
-      const order = await tx.order.findUniqueOrThrow({
-        where: { id: orderId },
-        select: statusGuardSelect,
-      });
-      const open = await tx.orderShipment.count({
-        where: { orderId, deliveredAt: null, returnedAt: null },
-      });
-      const unsent = await tx.orderItem.count({ where: { orderId, shipmentId: null } });
-      const done =
-        open === 0 &&
-        unsent === 0 &&
-        order.status !== "DELIVERED" &&
-        order.status !== "CANCELLED";
-      const change = done ? await writeStatusChange(tx, order, "DELIVERED") : null;
-      return { change, customerId: order.customerId };
-    });
+    return await deliverParcel(orderId, shipmentId, podKey);
   } catch (err) {
-    // The photo was stored before the write that lost: don't leave it behind.
-    if (podKey) {
-      void storage.remove("media", podKey).catch(() => undefined);
-    }
+    if (podKey) void storage.remove("media", podKey).catch(() => undefined);
     throw err;
   }
-
-  return result.change
-    ? announceStatusChange(orderId, "DELIVERED", result.change, result.customerId)
-    : loadOrder(orderId, "seller");
 }
 
 /**
@@ -263,14 +309,67 @@ export async function markShipmentReturned(
   shipmentId: string,
 ) {
   const store = await getMyStore(actor, storeRef);
-  await findParcel(store.id, orderId, shipmentId);
+  await findParcel({ id: shipmentId, orderId, order: { storeId: store.id } });
+  return returnParcel(orderId, shipmentId);
+}
 
-  const updated = await prisma.orderShipment.updateMany({
-    where: onTheWay(shipmentId, orderId),
-    data: { returnedAt: new Date() },
-  });
-  if (updated.count === 0) {
-    throw HttpError.conflict("The parcel just changed — reload and try again");
+// ---------------------------------------------------------------------------
+// A package acting for the order (the dropship host) — system level, no route
+// ---------------------------------------------------------------------------
+
+/**
+ * Send lines a package tagged (`fulfilledBy` set) — all of `orderItemIds`, or
+ * nothing. A package parcel always carries a tracking number (D-4), except
+ * own delivery. Answers with the new parcel's id and the order.
+ */
+export async function createPackageShipment(input: {
+  orderId: string;
+  orderItemIds: string[];
+  tracking: ShipmentTrackingInput;
+  senderName: string | null;
+  externalRef: string | null;
+}) {
+  if (input.orderItemIds.length === 0) {
+    throw HttpError.badRequest("A parcel needs at least one line");
   }
-  return loadOrder(orderId, "seller");
+  const data = trackingData(input.tracking);
+  if (input.tracking.carrierCode !== "self" && !data.trackingNumber) {
+    throw HttpError.badRequest("A tracking number is required for this parcel");
+  }
+  const order = await sendableOrder({ id: input.orderId });
+  return sendParcel(
+    order,
+    { id: { in: input.orderItemIds }, fulfilledBy: { not: null } },
+    input.orderItemIds.length,
+    {
+      ...data,
+      source: "PACKAGE",
+      senderName: input.senderName,
+      externalRef: input.externalRef,
+    },
+  );
+}
+
+/** Correct a package parcel's tracking. */
+export async function updatePackageShipmentTracking(
+  shipmentId: string,
+  tracking: ShipmentTrackingInput,
+) {
+  const parcel = await findParcel({ id: shipmentId, source: "PACKAGE" });
+  return retrack(parcel, tracking);
+}
+
+/** A package parcel was delivered (the proof photo, if any, already stored). */
+export async function markPackageShipmentDelivered(
+  shipmentId: string,
+  podKey: string | null,
+) {
+  const parcel = await findParcel({ id: shipmentId, source: "PACKAGE" });
+  return deliverParcel(parcel.orderId, shipmentId, podKey);
+}
+
+/** A package parcel came back undelivered. */
+export async function markPackageShipmentReturned(shipmentId: string) {
+  const parcel = await findParcel({ id: shipmentId, source: "PACKAGE" });
+  return returnParcel(parcel.orderId, shipmentId);
 }

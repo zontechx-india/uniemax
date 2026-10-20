@@ -455,7 +455,9 @@ Moves the order forward and stamps the matching timestamp
 order `DELIVERED` also flips `paymentStatus` to `PAID` (cash changed hands
 at the door), and closes any parcel still on its way (its `deliveredAt` is
 set). `409` when the move isn't forward, the order is cancelled, or a
-concurrent update won the race. Returns the full order. Sending a delivery
+concurrent update won the race — and for SHIPPED / DELIVERED on an order
+with lines another party ships (`items[].fulfilledBy` set): those orders
+move on as their parcels do. Returns the full order. Sending a delivery
 order with a courier and tracking number is the **Parcels** endpoint below;
 this one stays for confirm / pack, pickup orders and orders sent before
 parcels existed.
@@ -1767,8 +1769,14 @@ Response:
   "total": "1278.00",                // = subtotal − discount + shippingCharge + tax
   "paymentMethods": { "online": false, "cod": false,
                       "codUnavailableFor": ["Fragile Vase"] },  // products whose codAvailable=false
+  "restrictions": { "cod": null, "pickup": null },
+                                     // shopper-facing reason a package rules COD / pickup
+                                     // out for this cart (e.g. supplier items); a COD reason
+                                     // also sets paymentMethods.cod false. null = allowed —
+                                     // always null until a package is plugged in
   "lines": [ { "productId", "variantId", "quantity", "unitPrice", "lineTotal" } ] }
 ```
+Placement refuses COD or pickup with that same reason (`400`).
 Visible stores (an owner's draft preview included, via an optional session);
 lines that are no longer sellable are **dropped** from the quote rather than
 failing it — the cart's own revalidation reports those. Rate-limited
@@ -1882,7 +1890,8 @@ Response: the full order —
   "items": [ { "id", "productName", "variantName", "sku", "productSlug",
                "imageUrl",          // snapshot: the variant's photo, else the cover (key-derived)
                "unitPrice", "quantity", "lineTotal",
-               "shipmentId" } ],    // the parcel it went out in — null until sent
+               "shipmentId",        // the parcel it went out in — null until sent
+               "fulfilledBy" } ],   // set when another party ships the line; null = the store
   "shipments": [],                  // parcels — shape under "Parcels" (Customer Stores)
   "payment": {                      // ONLY on a gateway ONLINE placement —
     "paymentSessionId": "session_…",// feed to the Cashfree web SDK checkout()

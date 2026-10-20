@@ -33,6 +33,7 @@
 | D-23 | 2026-10-20 | D-16 is read as confirmed: until Easy Split is live, prepaid supplier orders settle **directly** between the seller and the supplier. | Product owner: "yes, implement your suggestion". |
 | D-24 | 2026-10-20 | **No guessed tracking links.** A parcel links to its tracking only through a link the seller pasted; otherwise the customer copies the number and opens the courier's own website. The courier list carries websites, not per-number URL templates. | Building Phase 0: none of the couriers' direct tracking URLs could be confirmed on their own sites (JavaScript pages, OTP, captcha) — a wrong link is worse than none. |
 | D-25 | 2026-10-20 | **"Came back" doesn't ask about stock.** The parcel's items stay with the order; the seller sends it again (stock untouched) or cancels — and the cancel asks whether the returned items go back in stock. | Building Phase 0: a parcel returned for a wrong address must be sendable again, and asking at cancel time keeps stock from ever being counted twice. Replaces the "restock choice on came back" in the first plan. |
+| D-26 | 2026-10-20 | **Pickup is restricted through the `checkout.options` hook**, not a per-product `pickupAvailable` column. The hook answers per cart with the reason the shopper sees, for COD and pickup alike. | Building Phase 1: one seam covers both options and the multi-parcel COD rule (D-13), with no core schema for a package concern. |
 
 ## Open questions
 

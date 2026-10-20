@@ -8,7 +8,7 @@
 > **OrderShipment**), and the screens in [`FRONTEND_CONTEXT.md`](../../FRONTEND_CONTEXT.md)
 > (Orders → **Parcels**). This file keeps the rules and failure cases.
 
-Status: ☑ rules 1–6 and 8 built (Phase 0, 20 Oct 2026) · ☐ rule 7 (Phase 1).
+Status: ☑ all rules built — 1–6 and 8 in Phase 0, rule 7 in Phase 1 (20 Oct 2026).
 
 ## Why it is core
 
@@ -58,13 +58,14 @@ and supplier parcels reuse it (D-6). Model:
    they may be damaged). Items that never shipped always go back. A prepaid
    order then becomes `REFUNDED`, like any paid cancellation (refunded by
    hand today).
-7. ☐ **Parcels drive status** (Phase 1): for an order with items another party
-   ships (`OrderItem.fulfilledBy` set), the order becomes `SHIPPED` when every
-   item is in a shipped parcel and `DELIVERED` when every parcel is delivered;
-   a COD order is still marked `PAID` on `DELIVERED`; the seller's buttons
-   ship and deliver only the seller's own items. (Phase 0 already makes an
-   order DELIVERED when its last open parcel is delivered and every item went
-   out.)
+7. ☑ **Parcels drive status** (Phase 1): for an order with lines another party
+   ships (`OrderItem.fulfilledBy` set), the order becomes `SHIPPED` once no
+   line is left unsent and `DELIVERED` once no parcel is on its way and every
+   line went out; a COD order is still marked `PAID` on `DELIVERED`. The
+   seller's send takes only untagged lines and the seller's status `PATCH` to
+   SHIPPED / DELIVERED is refused (409) while tagged lines exist. Package
+   parcels come from `createPackageShipment` (`source: PACKAGE`, tracking
+   number required, D-4).
 8. ☑ Every write is guarded on the state read before it (`updateMany` with the
    expected state) — a repeat or a second tab gets 409. Sending a parcel holds
    the order's row lock (a guarded write on its status), and cancel re-checks

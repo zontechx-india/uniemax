@@ -17,7 +17,7 @@
 
 | Area | Models | Phase | File |
 | --- | --- | --- | --- |
-| Core additions | `OrderShipment` ☑, `OrderItem.shipmentId` ☑, `OrderItem.fulfilledBy`, `NotificationKind.DROPSHIP` | 0, 1 | this file (below) |
+| Core additions | `OrderShipment` ☑, `OrderItem.shipmentId` ☑, `OrderItem.fulfilledBy` ☑, `NotificationKind.DROPSHIP` ☑ | 0, 1 | this file (below) |
 | Suppliers | `Supplier`, `SupplierInvite`, `SupplierLink`, `SupplyProduct`, `SupplyVariant`, `TermsChange` | 2 | [suppliers/context.md](suppliers/context.md) |
 | Supplier products | `Resale`, `ResaleVariant` | 3 | [supplier-products/context.md](supplier-products/context.md) |
 | Orders | `SupplierOrder`, `SupplierOrderLine`, `SupplierOrderEvent` | 4 | [orders/context.md](orders/context.md) |
@@ -65,7 +65,7 @@ model OrderShipment {
 //   — the parcel this item went out in
 ```
 
-### Phase 1 ☐
+### Phase 1 ☑ (built 20 Oct 2026 — migration `20261020150000_package_seams`)
 
 ```prisma
 // OrderItem gains:

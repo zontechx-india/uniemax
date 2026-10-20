@@ -120,6 +120,8 @@ enum NotificationKind {
   ANNOUNCEMENT
   SUPPORT
   AFFILIATE
+  /// Supplier dropshipping (package/dropship).
+  DROPSHIP
 
   @@schema("public")
 }
@@ -1096,6 +1098,10 @@ model OrderItem {
   /// The parcel this line went out in — null until it ships.
   shipmentId  String?
   shipment    OrderShipment? @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+  /// Opaque tag a package sets while the order is placed (`order.placing`
+  /// hook) for a line ANOTHER party ships — null = the store ships it. The
+  /// seller's own send/deliver actions never touch a tagged line.
+  fulfilledBy String?
 
   @@index([orderId])
   @@index([productId])

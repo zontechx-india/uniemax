@@ -11,6 +11,8 @@ import {
 } from "../../package/storage/index.js";
 import type { UploadedFile } from "../../package/storage/index.js";
 import { getMyStore } from "./stores.service.js";
+import { emit } from "../../package/events/index.js";
+import { runHooks } from "../../package/events/hooks.js";
 import {
   recomputeProductAggregates,
   uniqueCategorySlug,
@@ -707,6 +709,8 @@ export async function updateProduct(
     select: { id: true, publishedAt: true },
   });
   if (!product) throw HttpError.notFound("Product not found");
+  // A package may refuse this edit (e.g. a field it manages) — before any write.
+  await runHooks("product.saving", productId, { kind: "update", input: patch });
 
   // A product can only move to a category (root or sub) of the same store —
   // the same rule enforced on create.
@@ -795,6 +799,7 @@ export async function updateProduct(
     data,
     select: productSelect,
   });
+  emit("catalog.product.changed", { productId });
   const [shaped] = await withProductTaxonomy([shapeProduct(row)]);
   return shaped!;
 }
@@ -837,6 +842,7 @@ export async function deleteProduct(
   for (const item of product.media) {
     await storage.remove("media", item.key).catch(() => {});
   }
+  emit("catalog.product.changed", { productId, deleted: true });
   return { id: productId };
 }
 
@@ -894,6 +900,7 @@ export async function replaceProductOptions(
   input: StoreProductOptionsInput,
 ) {
   const { productId: id, storeId } = await getMyProductRef(actor, storeRef, productId);
+  await runHooks("product.saving", id, { kind: "options", input });
 
   // An axis is EITHER typed values (here) or other products (a group) — never
   // both under one name — and groups count towards the option cap.
@@ -1031,6 +1038,7 @@ export async function replaceProductOptions(
     // variant set that was just written.
     await recomputeProductAggregates(id, tx);
   });
+  emit("catalog.product.changed", { productId: id });
 
   const row = await prisma.storeProduct.findUniqueOrThrow({
     where: { id },
@@ -1355,6 +1363,7 @@ export async function copyProduct(
     },
   });
   if (!source) throw HttpError.notFound("Product not found");
+  await runHooks("product.saving", productId, { kind: "copy", input });
 
   const json = (value: Prisma.JsonValue | null) =>
     value === null ? Prisma.DbNull : (value as Prisma.InputJsonValue);
@@ -1379,6 +1388,7 @@ export async function copyProduct(
     select: { id: true },
   });
   await recomputeProductAggregates(created.id);
+  emit("catalog.product.changed", { productId: created.id });
   return shapedProduct(created.id);
 }
 
@@ -1390,6 +1400,7 @@ export async function updateVariant(
   patch: StoreVariantUpdateInput,
 ) {
   const { productId: id, storeId } = await getMyProductRef(actor, storeRef, productId);
+  await runHooks("product.saving", id, { kind: "variant", variantId, input: patch });
 
   const variant = await prisma.storeProductVariant.findFirst({
     where: { id: variantId, productId: id },
@@ -1420,6 +1431,7 @@ export async function updateVariant(
   if (patch.mediaId) await assertOwnImages(id, [patch.mediaId]);
 
   await prisma.storeProductVariant.update({ where: { id: variantId }, data });
+  emit("catalog.variant.changed", { variantId });
   // Price / stock / isActive all move the aggregates.
   await recomputeProductAggregates(id);
   const row = await prisma.storeProduct.findUniqueOrThrow({

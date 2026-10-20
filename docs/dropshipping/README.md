@@ -16,7 +16,7 @@ earns the difference.
 | Phase | What | Status |
 | --- | --- | --- |
 | 0 | Parcel tracking for every order (core) | ◐ built 20 Oct 2026 — dev check + API test run pending |
-| 1 | Core seams for packages | ☐ not started |
+| 1 | Core seams for packages | ◐ built 20 Oct 2026 — API test run pending |
 | 2 | Suppliers: invite and join | ☐ not started |
 | 3 | Supplier products in the seller's store | ☐ not started |
 | 4 | Orders and shipping | ☐ not started |

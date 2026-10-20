@@ -7,7 +7,7 @@
 | Phase | Goal | Ships to | Needs first | Status |
 | --- | --- | --- | --- | --- |
 | [0](phase-0-shipments.md) | Parcel tracking for every order (core) | **production on its own** | — | ◐ built — dev check + API test run pending |
-| [1](phase-1-core-seams.md) | Core seams for packages (no visible change) | dev → production with the next release | 0 | ☐ |
+| [1](phase-1-core-seams.md) | Core seams for packages (no visible change) | dev → production with the next release | 0 | ◐ built — API test run pending |
 | [2](phase-2-suppliers.md) | Suppliers: invite and join; link terms | dev (`DROPSHIP_ENABLED`) | 1 | ☐ |
 | [3](phase-3-supplier-products.md) | Supplier products in the seller's store | dev (flag) | 2 | ☐ |
 | [4](phase-4-orders.md) | Orders and shipping, prepaid and COD, terms snapshot | dev (flag) | 3 | ☐ |

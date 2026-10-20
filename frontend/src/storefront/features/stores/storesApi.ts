@@ -2086,6 +2086,12 @@ export interface OrderQuote {
     /** Product names that rule COD out for this cart (empty when the store disables it). */
     codUnavailableFor: string[]
   }
+  /**
+   * Why COD or pickup is unavailable for this cart because of a package
+   * (e.g. supplier items) — null when allowed. Always null until a package
+   * is plugged in; checkout shows them from dropshipping Phase 4.
+   */
+  restrictions: { cod: string | null; pickup: string | null }
   /** Lines the server could price; vanished ones are simply absent. */
   lines: {
     productId: string
@@ -2129,6 +2135,8 @@ export interface PlacedOrderItem {
   lineTotal: string
   /** The parcel this line went out in — null until it ships. */
   shipmentId: string | null
+  /** Set when another party ships this line (e.g. a supplier); null = the store. */
+  fulfilledBy: string | null
 }
 
 /** One parcel of an order — courier, tracking, and what happened to it. */

@@ -32,7 +32,8 @@ export type NotificationKind =
   | "ACCOUNT"
   | "ANNOUNCEMENT"
   | "SUPPORT"
-  | "AFFILIATE";
+  | "AFFILIATE"
+  | "DROPSHIP";
 
 export interface NotifyInput {
   principalType: PrincipalType;

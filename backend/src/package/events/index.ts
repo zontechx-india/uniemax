@@ -12,6 +12,12 @@ export interface AppEvents {
     status: "CONFIRMED" | "PACKED" | "SHIPPED" | "DELIVERED";
   };
   "order.cancelled": { orderId: string };
+  /** A product was edited, copied or deleted (emitted after commit). */
+  "catalog.product.changed": { productId: string; deleted?: boolean };
+  /** One variant's price, stock or state changed (emitted after commit). */
+  "catalog.variant.changed": { variantId: string; deleted?: boolean };
+  /** A store's payment / shipping settings, or its suspension, changed. */
+  "catalog.store.changed": { storeId: string };
 }
 
 type EventName = keyof AppEvents;

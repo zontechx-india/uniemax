@@ -5,7 +5,7 @@
 > **Update when:** the layout, host interface, hooks, events, config or jobs
 > change.
 
-Status: ☐ planned
+Status: ◐ core seams built (Phase 1, 20 Oct 2026); the package itself is planned
 
 ## Code facts this design relies on (checked 19 Oct 2026)
 
@@ -67,7 +67,7 @@ Rules (as in `package/affiliate/README.md`):
 - Every event handler and job step is idempotent.
 - `domain.ts` is pure, so every money, status and price rule is unit-tested there.
 
-## Core changes, by phase ☐
+## Core changes, by phase ◐
 
 Each is generic: nothing in the core names dropshipping. Once built, each is
 documented in the main doc the root `CLAUDE.md` names, and this table links to it.
@@ -75,15 +75,15 @@ documented in the main doc the root `CLAUDE.md` names, and this table links to i
 | Change | Phase | Main doc when built |
 | --- | --- | --- |
 | ☑ `OrderShipment` (parcels): ship with tracking, delivered with optional proof photo, came back; tracking in customer notifications | 0 | ☑ written to `BACKEND_CONTEXT.md`, `API.md`, `FRONTEND_CONTEXT.md` |
-| `package/events/hooks.ts` + hook calls in orders, checkout and catalog | 1 | `BACKEND_CONTEXT.md` |
-| Catalog events | 1 | `BACKEND_CONTEXT.md` |
-| `OrderItem.fulfilledBy` + parcel-driven `SHIPPED` / `DELIVERED` | 1 | `BACKEND_CONTEXT.md` |
-| System actor: confirm / cancel / ship on the order's behalf | 1 | `BACKEND_CONTEXT.md` |
-| `NotificationKind.DROPSHIP` | 1 | `BACKEND_CONTEXT.md` |
+| ☑ `package/events/hooks.ts` + hook calls in orders, checkout and catalog | 1 | ☑ `BACKEND_CONTEXT.md` (Package seams) |
+| ☑ Catalog events | 1 | ☑ `BACKEND_CONTEXT.md` (Package seams) |
+| ☑ `OrderItem.fulfilledBy` + parcel-driven `SHIPPED` / `DELIVERED` | 1 | ☑ `BACKEND_CONTEXT.md` (OrderShipment), `API.md` |
+| ☑ System actions: `confirmOrderAsSystem`, `cancelOrderAsSystem`, `*PackageShipment*` | 1 | ☑ `BACKEND_CONTEXT.md` (Package seams) |
+| ☑ `NotificationKind.DROPSHIP` (migration `20261020150000_package_seams`) | 1 | ☑ `BACKEND_CONTEXT.md` |
 | `API.md` pointer section + `DROPSHIP_ENABLED` in `backend/README.md` | 2 | `API.md`, `backend/README.md` |
 | Easy Split (payments track): a Cashfree vendor per store, split after payment, Defer Settlement, split refunds, adjustments, all in PaymentHub + `modules/payments` | 6 | `CASHFREE_PAYMENTS.md`, `API.md`, PaymentHub docs |
 
-## Hooks (`package/events/hooks.ts`) ☐
+## Hooks (`package/events/hooks.ts`) ☑ (built Phase 1 — the built signatures)
 
 Synchronous hooks that run **inside the core's transaction** and can veto by
 throwing `HttpError`. With nothing registered they do nothing.
@@ -97,20 +97,25 @@ export interface AppHooks {
   /** Inside cancelOrder / cancelMyOrder, before commit. */
   "order.cancelling": (tx: Tx, orderId: string) => Promise<void>;
   /** Checkout quote and placement: hide COD or pickup, with the reason shown to the shopper. */
-  "checkout.options": (storeId: string, lines: CheckoutLine[]) => Promise<{ cod?: string; pickup?: string }>;
+  "checkout.options": (storeId: string, lines: CheckoutLine[]) => Promise<{ cod?: string | null; pickup?: string | null }>;
   /** Before a product or variant save in the editor (veto only). */
   "product.saving": (productId: string, change: ProductChange) => Promise<void>;
 }
 export function hook<K extends keyof AppHooks>(name: K, fn: AppHooks[K]): void;
-export async function runHooks<K extends keyof AppHooks>(name: K, ...args: Parameters<AppHooks[K]>): Promise<void>;
+export async function runHooks(name, ...args): Promise<void>;          // every hook but checkout.options
+export async function checkoutRestrictions(storeId, lines): Promise<{ cod: string | null; pickup: string | null }>; // first reason wins
+// ProductChange = { kind: "update" | "options" | "variant" | "copy"; variantId?; input }  (the parsed body)
 ```
+
+Pickup is restricted only through `checkout.options` — there is no per-product
+`pickupAvailable` column (D-26).
 
 Call sites: placement and gateway undo in `orders.service.ts`; `cancelOrder`
 and `cancelMyOrder`; the checkout quote and placement; and, in
 `storeCatalog.service.ts`, `updateProduct`, `replaceProductOptions`,
 `updateVariant` and `copyProduct`.
 
-## Events ☐
+## Events ☑ (built Phase 1)
 
 Added to `AppEvents` in `package/events/index.ts` and emitted after commit:
 - `"catalog.product.changed": { productId, deleted? }`

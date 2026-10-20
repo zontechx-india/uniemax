@@ -3,6 +3,7 @@ import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../../utils/httpError.js";
 import { buildListMeta } from "../../utils/response.js";
 import { mediaUrl } from "../../package/storage/index.js";
+import { emit } from "../../package/events/index.js";
 import {
   resolveCheckoutFields,
   resolvePayments,
@@ -310,6 +311,7 @@ export async function setSuspended(storeRef: string, input: StoreSuspendInput) {
       ? { suspendedAt: new Date(), suspendedReason: input.reason ?? null }
       : { suspendedAt: null, suspendedReason: null },
   });
+  emit("catalog.store.changed", { storeId: store.id });
 
   notify({
     principalType: "CUSTOMER",

@@ -89,7 +89,8 @@ backend/
 │   │   │   ├── types.ts       #   PushSender port (send → sent/expired/failed)
 │   │   │   └── drivers/       #   webPush.ts (real) · console.ts (no keys)
 │   │   ├── events/            # Typed in-process event bus (on / emit) — orders +
-│   │   │                      #   payments publish, packages subscribe at boot
+│   │   │                      #   payments publish, packages subscribe at boot;
+│   │   │                      #   hooks.ts: synchronous hooks inside core actions
 │   │   ├── affiliate/         # Seller-run affiliate marketing — see "Affiliate
 │   │   │   ├── index.ts       #   marketing" below. facade: registerAffiliate()
 │   │   │   ├── types.ts       #   AffiliateHost — everything it needs from the platform
@@ -768,6 +769,38 @@ WhatsApp Cloud API; setup: `backend/README.md`.
 - **Admin-only**, mounted at `/admin/whatsapp` inside the `requireAdmin` subtree;
   sends, campaign creates/tests/controls, imports, consent changes and automation
   edits are written to the audit trail.
+
+### Package seams — hooks and catalog events (`package/events`)
+
+What lets a package (dropshipping, Phases 2+) take part in core actions
+without the core naming it. Rules: [dropshipping/architecture](./dropshipping/architecture/context.md).
+
+- **Hooks** (`hooks.ts`): `hook(name, fn)` at boot; the core calls
+  `runHooks` **inside its own action** — a hook that throws an `HttpError`
+  refuses it and rolls the transaction back. With nothing registered every
+  hook is a no-op.
+  - `order.placing(tx, orderId)`: inside the placement transaction of
+    `createOrder`, after the order and its lines exist.
+  - `order.unplacing(tx, orderId)`: inside the gateway-undo transaction,
+    before the order is deleted.
+  - `order.cancelling(tx, orderId)`: inside `cancelOrder` / `cancelMyOrder`,
+    after the guarded write.
+  - `checkout.options(storeId, lines)`: `checkoutRestrictions()` merges the
+    answers into `{ cod, pickup }` shopper-facing reasons; `quoteOrder`
+    returns them as `restrictions` (and drops COD), `createOrder` refuses COD
+    or pickup with the reason. Pickup is restricted this way — there is no
+    per-product pickup column.
+  - `product.saving(productId, { kind, input })`: before any write in
+    `updateProduct`, `replaceProductOptions`, `updateVariant` and
+    `copyProduct` (veto only).
+- **Catalog events**, emitted after commit: `catalog.product.changed`
+  (edit, options, copy, delete), `catalog.variant.changed` (variant edit),
+  `catalog.store.changed` (payments / shipping settings, admin suspension).
+- **System actions** — the host API a package calls, no HTTP route:
+  `confirmOrderAsSystem` and `cancelOrderAsSystem` in `orders.service.ts`
+  (the seller's cores without a store scope), and `createPackageShipment`,
+  `updatePackageShipmentTracking`, `markPackageShipmentDelivered`,
+  `markPackageShipmentReturned` in `shipments.service.ts`.
 
 ### Affiliate marketing — the `package/affiliate` sub-system
 
@@ -1449,7 +1482,13 @@ White-label design — one codebase, any business:
   `writeStatusChange`. Customer messages for parcels (shipped with the
   tracking, *"Tracking updated"*) are `notifyParcelShipped` /
   `notifyTrackingUpdated` in `orders.notifications.ts`, which HTML-escape
-  every seller-typed value.
+  every seller-typed value. **`OrderItem.fulfilledBy`** is an opaque tag a
+  package sets in `order.placing` for a line another party ships (null = the
+  store): the seller's send takes only untagged lines, the order becomes
+  SHIPPED only once no line is left unsent, and the seller's status `PATCH`
+  to SHIPPED / DELIVERED is refused (409) while tagged lines exist — the
+  order moves on as their parcels do (`createPackageShipment`,
+  `source: PACKAGE`, tracking number required).
 - **PaymentHubEvent** (`payment_hub_events`) — dedupe log for PaymentHub
   webhooks: `id` = the hub's event id, `type`, `receivedAt`, `processedAt`
   (set in the same transaction as the order update; null = reprocess on the
@@ -1532,7 +1571,7 @@ White-label design — one codebase, any business:
 Enums: `OrderStatus`, `PaymentMethod`, `PaymentStatus`, `ShippingType`,
 `OtpChannel`, `OtpPurpose`, `AuthProvider`, `AdminRole`, `StoreMediaType`,
 `BankVerificationStatus`, `BankVerificationMethod`, `PrincipalType`,
-`NotificationKind` (includes `SUPPORT`, `AFFILIATE`), `SupportRecipient`,
+`NotificationKind` (includes `SUPPORT`, `AFFILIATE`, `DROPSHIP`), `SupportRecipient`,
 `SupportTicketStatus`, `SupportTicketCategory`, `SupportTicketPriority`.
 
 **Affiliate marketing** (`prisma/schema/affiliate.prisma`, Postgres schema

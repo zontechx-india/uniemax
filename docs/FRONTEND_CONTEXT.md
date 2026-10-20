@@ -747,7 +747,12 @@ count; a card skeleton shows while the layout's fetch is in flight.
   **Cancel** returns — its dialog then asks *"Put the items that came back
   into stock?"* (two radio cards, nothing pre-selected, the confirm held via
   `ConfirmDialog`'s `confirmDisabled` until answered). The timeline's Sent
-  step carries "courier · number" and a Came back step appears.
+  step carries "courier · number" and a Came back step appears. Lines
+  another party ships (`items[].fulfilledBy`, set by a package) show
+  *"Shipped by {sender}"* / *"Shipped separately"*; the sticky action then
+  covers only the store's own lines and parcels, and reads *"Waiting for the
+  other parcels"* when nothing is left for the store to do (the full
+  mixed-order screens are dropshipping Phase 4).
 - **Customer side** — `features/stores/ParcelTracking.tsx`: the order page
   (`OrderSuccessPage`) gets a **Tracking** section after Order progress (one
   block per parcel: courier, status `Badge`, the number with a Copy that

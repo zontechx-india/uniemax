@@ -13,6 +13,11 @@ import {
 import { buildListMeta } from "../../utils/response.js";
 import { mediaUrl } from "../../package/storage/index.js";
 import { emit } from "../../package/events/index.js";
+import {
+  checkoutRestrictions,
+  runHooks,
+  type CheckoutLine,
+} from "../../package/events/hooks.js";
 import { clearStoreLines } from "../cart/cart.service.js";
 import { recomputeProductAggregates } from "../stores/catalogSlug.js";
 import { getMyStore } from "../stores/stores.service.js";
@@ -157,6 +162,8 @@ const orderSelect = {
       lineTotal: true,
       /** The parcel this line went out in (null until it ships). */
       shipmentId: true,
+      /** Set when another party ships this line (a package's tag). */
+      fulfilledBy: true,
     },
   },
   shipments: { orderBy: { shippedAt: "asc" }, select: shipmentSelect },
@@ -272,6 +279,15 @@ interface PricedLine {
   stockVariantId: string;
   codAvailable: boolean;
   shippingOverride: ReturnType<typeof resolveProductShippingOverride>;
+}
+
+/** Priced lines as the checkout-options hook sees them. */
+function checkoutLines(lines: PricedLine[]): CheckoutLine[] {
+  return lines.map((line) => ({
+    productId: line.productId,
+    variantId: line.variantId,
+    quantity: line.quantity,
+  }));
 }
 
 /** Duplicate product+variant references are a client bug, not a merge request. */
@@ -430,10 +446,18 @@ export async function quoteOrder(
     .filter((line): line is PricedLine => line !== null);
 
   const money = priceOrder(lines, input.fulfilment, resolveShipping(store.shipping));
+  // A package may rule COD or pickup out for this cart (with the reason the
+  // checkout shows) — always null while none is registered.
+  const restrictions = await checkoutRestrictions(store.id, checkoutLines(lines));
+  const paymentMethods = paymentMethodsFor(resolvePayments(store.payments), lines);
   return {
     fulfilment: input.fulfilment,
     ...money,
-    paymentMethods: paymentMethodsFor(resolvePayments(store.payments), lines),
+    paymentMethods: {
+      ...paymentMethods,
+      cod: paymentMethods.cod && restrictions.cod === null,
+    },
+    restrictions,
     lines: lines.map((line) => ({
       productId: line.productId,
       variantId: line.variantId,
@@ -546,6 +570,15 @@ export async function createOrder(
     }
   }
 
+  // --- a package may rule COD / pickup out for this cart (hooks.ts) ---------
+  const restrictions = await checkoutRestrictions(store.id, checkoutLines(lines));
+  if (input.paymentMethod === "COD" && restrictions.cod) {
+    throw HttpError.badRequest(restrictions.cod);
+  }
+  if (input.fulfilment === "PICKUP" && restrictions.pickup) {
+    throw HttpError.badRequest(restrictions.pickup);
+  }
+
   // --- delivery areas: every line must reach the customer's pincode --------
   // The product's own rule wins over the store default (deliveryRules.ts).
   // A restricted product with no pincode to check against is refused rather
@@ -628,7 +661,7 @@ export async function createOrder(
         await recomputeProductAggregates(productId, tx);
       }
 
-      return tx.order.create({
+      const created = await tx.order.create({
         data: {
           orderNumber: newOrderNumber(),
           storeId: store.id,
@@ -673,6 +706,10 @@ export async function createOrder(
         },
         select: orderSelect,
       });
+      // A package takes its part inside the same transaction (e.g. reserving
+      // a supplier's stock) — or refuses, rolling the whole placement back.
+      await runHooks("order.placing", tx, created.id);
+      return created;
     });
   } catch (err) {
     // Two requests with the same key raced past the replay check: the
@@ -712,6 +749,7 @@ export async function createOrder(
         for (const productId of new Set(lines.map((l) => l.productId))) {
           await recomputeProductAggregates(productId, tx);
         }
+        await runHooks("order.unplacing", tx, row.id);
         await tx.order.delete({ where: { id: row.id } });
       });
       throw err;
@@ -1013,6 +1051,18 @@ export async function updateOrderStatus(
     select: statusGuardSelect,
   });
   if (!current) throw HttpError.notFound("Order not found");
+  // Lines another party ships move the order through THEIR parcels — the
+  // seller's buttons can't declare them sent or delivered.
+  if (input.status === "SHIPPED" || input.status === "DELIVERED") {
+    const tagged = await prisma.orderItem.count({
+      where: { orderId, fulfilledBy: { not: null } },
+    });
+    if (tagged > 0) {
+      throw HttpError.conflict(
+        "Some items ship separately — this order moves on as their parcels do.",
+      );
+    }
+  }
 
   const change = await prisma.$transaction(async (tx) => {
     const result = await writeStatusChange(tx, current, input.status);
@@ -1054,8 +1104,22 @@ export async function cancelOrder(
   restockReturned?: boolean,
 ) {
   const store = await getMyStore(actor, storeRef);
+  return cancelOrderCore(orderId, store.id, reason, restockReturned);
+}
+
+/**
+ * The cancel itself — scoped to the seller's store, or unscoped for the
+ * system (`cancelOrderAsSystem`). One set of rules for both.
+ */
+async function cancelOrderCore(
+  orderId: string,
+  storeId: string | null,
+  reason: string | null,
+  restockReturned?: boolean,
+) {
+  const scope = storeId ? { storeId } : {};
   const current = await prisma.order.findFirst({
-    where: { id: orderId, storeId: store.id },
+    where: { id: orderId, ...scope },
     select: {
       status: true,
       paymentStatus: true,
@@ -1107,7 +1171,7 @@ export async function cancelOrder(
       // "refund on the way". Now it's a conflict; the retry sees PAID.
       where: {
         id: orderId,
-        storeId: store.id,
+        ...scope,
         status: current.status,
         paymentStatus: current.paymentStatus,
       },
@@ -1135,6 +1199,9 @@ export async function cancelOrder(
       }
     }
 
+    // A package closes its part (e.g. releases a supplier's stock) in the
+    // same transaction — or refuses the cancel.
+    await runHooks("order.cancelling", tx, orderId);
     await restockItems(toRestock, tx);
     if (restockReturned && cameBack.size > 0) {
       await tx.orderShipment.updateMany({
@@ -1158,6 +1225,36 @@ export async function cancelOrder(
   notifyOrderStatusChange(shaped, current.customerId);
   emit("order.cancelled", { orderId });
   return shaped;
+}
+
+/**
+ * The SYSTEM cancels an order on its own — a package acting for it (e.g. a
+ * supplier couldn't ship). Exactly the seller's cancel rules, without a
+ * store scope; answers with the order as the seller sees it.
+ */
+export async function cancelOrderAsSystem(
+  orderId: string,
+  reason: string | null,
+  restockReturned?: boolean,
+) {
+  return cancelOrderCore(orderId, null, reason, restockReturned);
+}
+
+/**
+ * The SYSTEM confirms a still-PENDING order (e.g. every supplier confirmed
+ * its part). An order already past PENDING is left as it is.
+ */
+export async function confirmOrderAsSystem(orderId: string) {
+  const current = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: statusGuardSelect,
+  });
+  if (!current) throw HttpError.notFound("Order not found");
+  if (current.status !== "PENDING") return loadOrder(orderId, "seller");
+  const change = await prisma.$transaction((tx) =>
+    writeStatusChange(tx, current, "CONFIRMED"),
+  );
+  return announceStatusChange(orderId, "CONFIRMED", change, current.customerId);
 }
 
 /**
@@ -1251,6 +1348,7 @@ export async function cancelMyOrder(
     if (updated.count === 0) {
       throw HttpError.conflict("The order just changed — reload and try again");
     }
+    await runHooks("order.cancelling", tx, orderId);
     await restockItems(current.items, tx);
   });
 
