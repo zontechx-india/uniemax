@@ -40,6 +40,8 @@ export function useLoad<T>(fetcher: () => Promise<T>, deps: unknown[]) {
 
 export function money(value: number | null | undefined): string {
   if (value == null) return '—'
+  // A loss reads "−₹20", not "₹-20".
+  if (value < 0) return `−${money(-value)}`
   return `₹${value.toLocaleString('en-IN', {
     minimumFractionDigits: value % 1 === 0 ? 0 : 2,
     maximumFractionDigits: 2,

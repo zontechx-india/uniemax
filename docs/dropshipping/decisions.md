@@ -39,6 +39,10 @@
 | D-29 | 2026-10-20 | **Admin routes live at `/api/v1/admin/dropship`**, not `/api/v1/dropship/admin`. | The admin session cookies are scoped to `/api/v1/admin`; affiliate hit the same problem. |
 | D-30 | 2026-10-20 | **The frontend learns the flag from the backend** (`GET /api/v1/dropship/status`, 404 when off). No `VITE_` variable. | One switch per environment; the frontend can't drift from the API. |
 | D-31 | 2026-10-20 | **Effects on copies wait for Phase 3**: `codAvailable` re-sync (SU-5), copies pausing on pause / end / suspension (SU-7, SU-8, SU-17), and the "is a copy" refusal (SU-11). Phase 2 offers only the supplier store's own products and leaves one `isCopy()` seam. | Copies (`Resale`) don't exist before Phase 3. |
+| D-32 | 2026-10-20 | **"+ New shelf" is the supplier product's own taxonomy category**, created with core `createCategory`, not a typed name. Adding many offers "Each on its own category shelf". A product with no category needs an existing shelf. | Building Phase 3: shelves are taxonomy-backed; a free-typed name has nowhere to go. |
+| D-33 | 2026-10-20 | **Delivery-area labels are PIN-code based**: "All India", "Selected PIN codes (N)", "All India except N PIN codes". | Delivery rules hold PIN codes, not states, so "Kerala, Tamil Nadu" can't be worked out. |
+| D-34 | 2026-10-20 | **On a copy, the product wizard's Price and Delivery steps are the package's** ("Your price" with the supplier controls; read-only *Set by supplier* delivery and COD). Basics, Photos and Details stay core. The server still refuses locked fields through `product.saving`. | Options, stock and Duplicate all live in the core Price step; swapping the step hides them without touching it. |
+| D-35 | 2026-10-20 | **MRP on a copy**: the supplier's MRP caps the price, and is written to the copy's `compareAtPrice` only when above the copy's price. A **%** markup rounds up to a whole rupee. | Core requires MRP > price, so a price at MRP shows no strike-through rather than "0% off"; prices like ₹5,198.70 look wrong to customers. |
 
 ## Open questions
 

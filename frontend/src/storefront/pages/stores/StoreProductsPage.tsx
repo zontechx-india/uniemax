@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { toApiError } from '../../../shared/auth/http'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { ErrorNote } from '../../../shared/ui/form'
@@ -36,6 +37,8 @@ import { ProductWizard } from './products/wizard/ProductWizard'
 import type { StepKey } from './products/wizard/shared'
 import { Button, buttonClass } from '../../../shared/ui/Button'
 import { MediaImg } from '../../../shared/media/MediaImg'
+import { SuppliedNote, SupplierProductsEntry, useSuppliedProducts } from '../../../packages/dropship'
+import type { Supplied } from '../../../packages/dropship'
 
 /**
  * Products section of the store manage page.
@@ -77,6 +80,8 @@ export function StoreProductsPage() {
   const [choosingFirst, setChoosingFirst] = useState(false)
   const [addingFirst, setAddingFirst] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
+  // Supplier products: their "Supplied by" badge and paused note (docs/dropshipping/).
+  const supplied = useSuppliedProducts(store.id, store.slug)
 
   useEffect(() => {
     let cancelled = false
@@ -135,6 +140,7 @@ export function StoreProductsPage() {
       .listProducts(store.id)
       .then(setProducts)
       .catch(() => {})
+    supplied.reload()
   }
 
   const toggleActive = async (product: StoreProduct, next: boolean) => {
@@ -330,6 +336,11 @@ export function StoreProductsPage() {
               </Button>
             }
           />
+          {supplied.hasSuppliers && (
+            <div className="mt-4">
+              <SupplierProductsEntry />
+            </div>
+          )}
         </GlassCard>
       ) : (
         <ProductList
@@ -345,6 +356,8 @@ export function StoreProductsPage() {
           onToggleActive={toggleActive}
           onDelete={setToDelete}
           onPlacement={setPlacementId}
+          supplied={supplied.byProduct}
+          suppliedNote={(row) => <SuppliedNote storeId={store.id} supplied={row} onChanged={reload} />}
         />
       )}
 
@@ -424,6 +437,8 @@ function ProductList({
   onToggleActive,
   onDelete,
   onPlacement,
+  supplied,
+  suppliedNote,
 }: {
   products: StoreProduct[]
   categories: StoreCategory[]
@@ -437,6 +452,8 @@ function ProductList({
   onToggleActive: (product: StoreProduct, next: boolean) => void
   onDelete: (product: StoreProduct) => void
   onPlacement: (id: string) => void
+  supplied: Map<string, Supplied>
+  suppliedNote: (row: Supplied) => ReactNode
 }) {
   // A handful of products needs no search; past that, finding one does.
   const searchable = products.length > 5
@@ -510,6 +527,7 @@ function ProductList({
                 onToggleActive={(next) => onToggleActive(product, next)}
                 onDelete={() => onDelete(product)}
                 onPlacement={() => onPlacement(product.id)}
+                extra={supplied.has(product.id) ? suppliedNote(supplied.get(product.id)!) : null}
               />
             </li>
           ))}
@@ -569,6 +587,7 @@ function ProductRow({
   onToggleActive,
   onDelete,
   onPlacement,
+  extra,
 }: {
   product: StoreProduct
   categories: StoreCategory[]
@@ -579,6 +598,8 @@ function ProductRow({
   onDelete: () => void
   /** Opens the home-page placement sheet. */
   onPlacement: () => void
+  /** A package's note under the row (a supplier product's badge and paused reason). */
+  extra?: ReactNode
 }) {
   const cover = product.media.find((m) => m.type === 'IMAGE')?.url ?? null
   const stock = product.stockQuantity
@@ -632,6 +653,7 @@ function ProductRow({
       }
       below={
         <div className="space-y-2">
+          {extra}
           {/* How complete, and the one next thing — the nudge that fills a shop gradually. */}
           {nextUp && (
             <button

@@ -20,6 +20,7 @@ import { buttonClass } from '../../../../../shared/ui/Button'
 import type { StepKey, VersionPlan } from './shared'
 import { MediaImg } from '../../../../../shared/media/MediaImg'
 import { Button } from '../../../../../shared/ui/Button'
+import { SuppliedDeliveryStep, SuppliedPricingStep, useSuppliedFor } from '../../../../../packages/dropship'
 
 /**
  * Adding — or finishing — a product, one question at a time.
@@ -63,6 +64,7 @@ export function ProductWizard({
   const [product, setProduct] = useState<StoreProduct | null>(initial)
   const [step, setStep] = useState<StepKey>(initial ? startAt : 'basics')
   const [plan, setPlan] = useState<VersionPlan>(null)
+  const { supplied, setSupplied } = useSuppliedFor(storeId, product?.id)
 
   const index = STEPS.findIndex((s) => s.key === step)
   const go = (delta: number) => {
@@ -176,18 +178,34 @@ export function ProductWizard({
           />
         )}
         {product && step === 'pricing' && (
-          <PricingStep
-            storeId={storeId}
-            categories={categories}
-            product={product}
-            plan={plan}
-            onSaved={saved}
-            onOtherProductChange={onProductChange}
-            onCatalogChanged={() => onCatalogChanged?.()}
-            onSwitchProduct={switchTo}
-            onBack={() => go(-1)}
-            onNext={() => go(1)}
-          />
+          supplied === undefined ? null : supplied ? (
+            <SuppliedPricingStep
+              storeId={storeId}
+              product={product}
+              supplied={supplied}
+              onSupplied={setSupplied}
+              onSaved={saved}
+              onRemoved={() => {
+                onCatalogChanged?.()
+                onClose()
+              }}
+              onBack={() => go(-1)}
+              onNext={() => go(1)}
+            />
+          ) : (
+            <PricingStep
+              storeId={storeId}
+              categories={categories}
+              product={product}
+              plan={plan}
+              onSaved={saved}
+              onOtherProductChange={onProductChange}
+              onCatalogChanged={() => onCatalogChanged?.()}
+              onSwitchProduct={switchTo}
+              onBack={() => go(-1)}
+              onNext={() => go(1)}
+            />
+          )
         )}
         {product && step === 'details' && (
           <DetailsStep
@@ -200,13 +218,22 @@ export function ProductWizard({
           />
         )}
         {product && step === 'delivery' && (
-          <DeliveryStep
-            storeId={storeId}
-            product={product}
-            onSaved={saved}
-            onBack={() => go(-1)}
-            onNext={() => go(1)}
-          />
+          supplied === undefined ? null : supplied ? (
+            <SuppliedDeliveryStep
+              product={product}
+              supplied={supplied}
+              onBack={() => go(-1)}
+              onNext={() => go(1)}
+            />
+          ) : (
+            <DeliveryStep
+              storeId={storeId}
+              product={product}
+              onSaved={saved}
+              onBack={() => go(-1)}
+              onNext={() => go(1)}
+            />
+          )
         )}
         {product && step === 'review' && (
           <ReviewStep

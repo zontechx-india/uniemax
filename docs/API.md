@@ -2994,7 +2994,8 @@ errors as for `send-template`. Rate limit 30/min. Audited as `whatsapp.seller_re
 Served by `package/dropship`, registered **only when `DROPSHIP_ENABLED=true`**
 (otherwise every path below is a plain `404`). Its endpoints, rules and status
 are documented only in the knowledge base: [`docs/dropshipping/`](./dropshipping/README.md)
-— API tables in [suppliers](./dropshipping/suppliers/context.md)
+— API tables in [suppliers](./dropshipping/suppliers/context.md),
+[supplier-products](./dropshipping/supplier-products/context.md)
 and [admin](./dropshipping/admin/context.md).
 
 ---

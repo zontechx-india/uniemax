@@ -117,6 +117,7 @@ model SupplierLink {
   status         LinkStatus      @default(ACTIVE)
   /// Who paused or ended it (either side, D-19).
   statusBy       DropshipActor?
+  resales        Resale[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
@@ -135,6 +136,7 @@ model SupplyProduct {
   productId  String          @unique
   isOpen     Boolean         @default(true)
   variants   SupplyVariant[]
+  resales    Resale[]
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
 
@@ -178,5 +180,67 @@ model TermsChange {
   @@index([supplierId, createdAt])
   @@index([linkId, createdAt])
   @@map("terms_changes")
+  @@schema("dropship")
+}
+
+enum ResaleState {
+  ACTIVE
+  PAUSED
+
+  @@schema("dropship")
+}
+
+enum PauseReason {
+  COST_ABOVE_PRICE
+  SUPPLY_CLOSED
+  SUPPLIER_INACTIVE
+  LINK_INACTIVE
+  SOURCE_REMOVED
+
+  @@schema("dropship")
+}
+
+/// A seller's copy of a supply product: a real StoreProduct in the seller's
+/// store (D-9), kept in sync with the supplier's by services/resale.ts (sync).
+model Resale {
+  id              String          @id @default(cuid())
+  sellerStoreId   String
+  linkId          String
+  link            SupplierLink    @relation(fields: [linkId], references: [id], onDelete: Restrict)
+  /// The copy (the seller's StoreProduct).
+  productId       String          @unique
+  supplyProductId String
+  supplyProduct   SupplyProduct   @relation(fields: [supplyProductId], references: [id], onDelete: Restrict)
+  /// D-12: the price follows the supplier's price so earnings stay the same.
+  followCost      Boolean         @default(true)
+  state           ResaleState     @default(ACTIVE)
+  pauseReason     PauseReason?
+  /// The copy was live when the system paused it; only then does it go back on (C-15).
+  resumeOnClear   Boolean         @default(false)
+  variants        ResaleVariant[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([sellerStoreId, supplyProductId])
+  @@index([linkId])
+  @@index([supplyProductId])
+  @@map("resales")
+  @@schema("dropship")
+}
+
+model ResaleVariant {
+  id              String  @id @default(cuid())
+  resaleId        String
+  resale          Resale  @relation(fields: [resaleId], references: [id], onDelete: Cascade)
+  /// The copy's variant.
+  variantId       String  @unique
+  /// The supplier's StoreProductVariant it mirrors.
+  supplyVariantId String
+  /// Cost already applied to the price; makes follow-price idempotent (C-21).
+  lastCost        Decimal @db.Decimal(10, 2)
+
+  @@index([resaleId])
+  @@index([supplyVariantId])
+  @@map("resale_variants")
   @@schema("dropship")
 }

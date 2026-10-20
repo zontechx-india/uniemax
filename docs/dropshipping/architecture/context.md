@@ -6,7 +6,8 @@
 > change.
 
 Status: ◐ core seams built (Phase 1); the package skeleton, invites, links,
-supplier profile and supply built (Phase 2, 20 Oct 2026); the rest is planned
+supplier profile and supply built (Phase 2, 20 Oct 2026); supplier products,
+hooks, events and the copy re-sync job built (Phase 3, 20 Oct 2026); the rest is planned
 
 ## Code facts this design relies on (checked 19 Oct 2026)
 
@@ -38,7 +39,9 @@ Built in Phase 2 (☑): `index.ts`, `types.ts`, `config.ts`, `deps.ts`,
 (Zod), `hosts/inProcess.ts`, `services/{invites,suppliers,supply,terms}.ts`,
 `routes/{seller,supplier,invite,admin}.ts`, `dropship.prisma`, and
 `frontend/src/packages/dropship` (`api.ts`, `role.ts`, `ui.tsx`, `pages/`).
-The rest is planned. Admin routes mount at **`/api/v1/admin/dropship`** (D-29).
+Built in Phase 3 (☑): `hooks.ts`, `events.ts`, `services/{catalog,resale}.ts`,
+and in the frontend `pricing.ts` (the add sheet's sums), `supplied.ts`
+(`useSuppliedProducts`, `useSuppliedFor`) and the seller pages. The rest is planned. Admin routes mount at **`/api/v1/admin/dropship`** (D-29).
 
 ```
 backend/src/package/dropship/
@@ -91,6 +94,7 @@ documented in the main doc the root `CLAUDE.md` names, and this table links to i
 | ☑ `API.md` pointer section + `DROPSHIP_ENABLED` in `backend/README.md` | 2 | ☑ `API.md`, `backend/README.md` |
 | ☑ `createStoreWithoutLogo` in `stores.service.ts` (the supply-only store, D-28) | 2 | ☑ `BACKEND_CONTEXT.md` (Dropshipping) |
 | ☑ Store nav rows, supply-only layout and dashboard (`StoreSectionNav`, `StoreManageLayout`, `StoreDashboardPage`); admin nav item | 2 | ☑ `FRONTEND_CONTEXT.md` |
+| ☑ Product list note slot (`ProductRow` `extra`) and the empty-list entry; the wizard swaps its Price / Delivery steps on a copy (D-34); **Supplier products** nav row | 3 | ☑ `FRONTEND_CONTEXT.md` |
 | Easy Split (payments track): a Cashfree vendor per store, split after payment, Defer Settlement, split refunds, adjustments, all in PaymentHub + `modules/payments` | 6 | `CASHFREE_PAYMENTS.md`, `API.md`, PaymentHub docs |
 
 ## Hooks (`package/events/hooks.ts`) ☑ (built Phase 1 — the built signatures)
@@ -143,8 +147,19 @@ address is re-validated with the core schema), `setStoreCod(customerId,
 storeId, on)` (the core `updateStorePayments`, so its gates and
 `catalog.store.changed` apply), `listStoreProducts`, `getStoreProducts`,
 `getCustomer`, `notify`, `sendMail`, `webUrl`. `StoreRef` carries `logoUrl`,
-`suspended`, `acceptCod`, the profile `phone` / `email` and `hasAddress`. The
-rest of the interface below is planned.
+`suspended`, `acceptCod`, the profile `phone` / `email` and `hasAddress`.
+
+Built in Phase 3: `getProductSnapshots(ids)` (options, variants with price /
+MRP / stock / active / option values / SKU / photo, media keys, description,
+specs, global category, **effective** delivery rule), `getStoreSelling`
+(shipping mode + default rate), `listShelves`, `ensureShelf(customerId,
+storeId, globalCategoryId)` (core `createCategory`), `setStoreDelivery(customerId,
+storeId, amount)` (core `updateStoreShipping`, mode BOTH), `copyMedia(key,
+toStoreId)` / `removeMedia`, `createCopy(tx, input)`, `updateCopy(tx, productId,
+patch)` (renamed options are parked on placeholder names first, then
+aggregates recomputed), `addCopyVariant`, `replaceCopyContent`, `getCopyState`
+and `getOrderLines(orderId)`. Copy writes emit no catalog events (the package
+made them). The rest of the interface below is planned.
 
 ```ts
 interface DropshipHost {
@@ -182,7 +197,9 @@ Every key can be overridden by env as `DROPSHIP_` + the key in
 UPPER_SNAKE (`DROPSHIP_INVITE_EXPIRY_DAYS`, …); `DROPSHIP_ENABLED` is in
 `backend/README.md`. Built in Phase 2: `enabled`, `inviteExpiryDays`,
 `inviteNeedsAdminApproval`, `shipWithinDaysMax`, and `returnDaysMax` (30, the
-longest returns window a supplier may offer). The rest is planned.
+longest returns window a supplier may offer). Built in Phase 3:
+`suggestedMarkupPct`, `minMarginWarnPct`, `platformFeePct` and `jobIntervalMs`.
+The rest is planned.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
@@ -200,10 +217,11 @@ longest returns window a supplier may offer). The rest is planned.
 | `suggestedMarkupPct` | 30 | Suggested price when the supplier has no shop price |
 | `jobIntervalMs` | 3 600 000 | Hourly job |
 
-## Hourly job and self-healing ☐
+## Hourly job and self-healing ◐
 
 Runs every `jobIntervalMs`, and 10 s after boot (as in affiliate). Every step
-is idempotent:
+is idempotent. Built in Phase 3 (`events.ts` `startJobs`): re-sync every copy
+(`syncAll`), the copy half of step 5. The other steps come with Phases 4–6.
 1. **Expire** unpaid parts older than `unpaidHoldHours` (release stock).
 2. **Reminders:** a new order not confirmed after `confirmReminderHours`; a
    parcel not shipped by `shipBy` (late flag).

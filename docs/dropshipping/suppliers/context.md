@@ -4,7 +4,7 @@
 > seller–supplier link and its COD setting, supplier settings, or offering
 > products to sellers. **Update when:** any of those change.
 
-Status: ◐ built 20 Oct 2026 (Phase 2) — API test run pending. Effects on copies wait for Phase 3 (D-31). Tables:
+Status: ◐ built 20 Oct 2026 (Phase 2) — API test run pending. Effects on copies built in Phase 3 (D-31). Tables:
 [data-model/suppliers](../data-model/suppliers/context.md). Words: [glossary](../glossary.md).
 
 ## Rules
@@ -148,17 +148,17 @@ Admin routes: [admin](../admin/context.md).
 | SU-2 | The link is forwarded to someone else. | The token is the authority. The seller sees who joined (business name, phone) and can **End**. |
 | SU-3 | The supplier already has a UnieMax store. | It chooses that store, or creates a supplier account. |
 | SU-4 | The same supplier is invited by two sellers. | One `Supplier`, two links, each with its own COD setting and statement. |
-| SU-5 | The seller changes COD or who pays the returned-parcel fee. | New orders only: each order keeps its snapshot ([terms](../terms/context.md)). The change is logged and the supplier notified (built). Copies' `codAvailable` re-sync: Phase 3. |
+| SU-5 | The seller changes COD or who pays the returned-parcel fee. | New orders only: each order keeps its snapshot ([terms](../terms/context.md)). The change is logged and the supplier notified. Copies' `codAvailable` re-syncs (built). |
 | SU-6 | The seller picks COD but the store doesn't accept COD. | The store's COD switch is shown on the invite sheet. |
-| SU-7 | The seller pauses or ends a supplier. | Status + `statusBy` set and the supplier told (built). Copies pause (`LINK_INACTIVE`, Phase 3). Open supplier orders complete; the statement stays. |
-| SU-8 | Admin suspends the supplier, or its store. | Built: `SUSPENDED` blocks the supplier routes and the supplier is told. Copies pause (`SUPPLIER_INACTIVE`) via `catalog.store.changed` (Phase 3). Open orders go on admin's **Needs action**. |
+| SU-7 | The seller pauses or ends a supplier. | Status + `statusBy` set and the supplier told. Copies pause (`LINK_INACTIVE`) and resume when it's active again (built). Open supplier orders complete; the statement stays. |
+| SU-8 | Admin suspends the supplier, or its store. | Built: `SUSPENDED` blocks the supplier routes and the supplier is told; copies pause (`SUPPLIER_INACTIVE`) on admin suspend and on `catalog.store.changed`, and resume on restore. Open orders go on admin's **Needs action**. |
 | SU-9 | A non-supplier calls supplier routes. | `requireSupplier` → 403. |
 | SU-10 | A seller reads another store's suppliers. | Every seller route resolves the store through `host.getOwnedStore`. |
-| SU-11 | A supplier offers a product that is itself a copy. | Refused: only products of the supplier's own store can be offered (built). The "is a copy" check (`isCopy` in `services/supply.ts`) is filled in with the Resale table in Phase 3. |
+| SU-11 | A supplier offers a product that is itself a copy. | Refused: only the supplier store's own products can be offered, and never a copy (`isCopy` in `services/supply.ts` checks `Resale`) (built). |
 | SU-12 | Price for sellers above the shop price. | Warning, not blocked. |
 | SU-13 | The invite is accepted twice (double tap, two devices). | A guarded claim (`SENT → ACCEPTED`) runs before anything is created; the same supplier gets the link already made (`alreadyJoined`), anyone else 409. A failure after the claim gives the invite back. |
 | SU-14 | The seller invites a supplier they already have. | *"Already your supplier"*, with a link to it. |
 | SU-15 | The seller invites their own store. | Refused at accept: the inviting store can't be chosen (400). Another store of the same owner may supply it. |
 | SU-16 | The supplier's address is missing. | Asked on the join sheet itself. |
-| SU-17 | The supplier no longer wants to supply a seller (for example, it disagrees with changed terms). | It can **Pause** or **End** too (D-19); the seller is told (built). Copies pause (`LINK_INACTIVE`, Phase 3); open orders complete. |
+| SU-17 | The supplier no longer wants to supply a seller (for example, it disagrees with changed terms). | It can **Pause** or **End** too (D-19); the seller is told. Copies pause (`LINK_INACTIVE`) (built); open orders complete. |
 | SU-18 | A supplier wants UnieMax to pay it but has no bank account. | Phase 6 asks for it in place. Until then its prepaid orders settle directly (PS-1); nothing is blocked. |

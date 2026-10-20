@@ -254,3 +254,119 @@ export const adminSuppliersApi = {
   restore: (id: string, note: string) =>
     call<SupplierProfile>(http.post(`${ADMIN}/suppliers/${id}/restore`, { note })),
 }
+
+// ---- Phase 3: supplier products in the seller's store ----------------------
+
+export type PauseReason =
+  | 'COST_ABOVE_PRICE'
+  | 'SUPPLY_CLOSED'
+  | 'SUPPLIER_INACTIVE'
+  | 'LINK_INACTIVE'
+  | 'SOURCE_REMOVED'
+
+export interface CatalogVariant {
+  supplyVariantId: string
+  name: string
+  isDefault: boolean
+  optionValues: Record<string, string> | null
+  cost: number
+  shopPrice: number
+  mrp: number | null
+  suggested: number
+  stock: number
+}
+
+export interface CatalogItem {
+  supplyProductId: string
+  name: string
+  imageUrl: string | null
+  supplier: { id: string; name: string }
+  category: { id: string; name: string | null } | null
+  costMin: number
+  costMax: number
+  suggestedPrice: number
+  youEarn: number
+  delivery: string
+  returnDays: number
+  shipWithinDays: number
+  supplierShippingFee: number
+  codAllowed: boolean
+  inStoreProductId: string | null
+  variants: CatalogVariant[]
+}
+
+export interface DeliveryRate {
+  type: 'FREE' | 'FLAT'
+  amount: number
+  freeAbove: number | null
+}
+
+export interface Catalog {
+  items: CatalogItem[]
+  meta: { total: number; page: number; pageSize: number; totalPages: number }
+  filters: { suppliers: { id: string; name: string }[]; categories: { id: string; name: string | null }[] }
+  store: {
+    mode: 'DELIVERY' | 'PICKUP' | 'BOTH'
+    deliveryRate: DeliveryRate
+    shelves: { id: string; name: string; globalCategoryId: string | null }[]
+    platformFeePct: number
+    minMarginWarnPct: number
+  }
+}
+
+export interface CatalogQuery {
+  supplierId?: string
+  q?: string
+  categoryId?: string
+  page?: number
+}
+
+export interface AddInput {
+  items: { supplyProductId: string; prices?: { supplyVariantId: string; price: number }[] }[]
+  shelf: { shelfId: string } | { newShelf: true }
+  addOnTop?: { amount: number } | { percent: number }
+  followCost: boolean
+  deliveryAmount?: number
+}
+
+export interface Supplied {
+  id: string
+  productId: string
+  name: string
+  isActive: boolean
+  followCost: boolean
+  state: 'ACTIVE' | 'PAUSED'
+  pauseReason: PauseReason | null
+  pauseText: string | null
+  supplier: { name: string; linkId: string }
+  supplierShippingFee: number
+  variants: {
+    variantId: string
+    name: string
+    price: number
+    cost: number | null
+    mrp: number | null
+    isActive: boolean
+    youEarn: number | null
+    fixPrice: number | null
+  }[]
+  newOptions: { supplyVariantId: string; name: string; cost: number; mrp: number | null }[]
+}
+
+export const suppliedApi = {
+  catalog: (storeId: string, query: CatalogQuery) =>
+    call<Catalog>(http.get(`${store(storeId)}/catalog`, { params: query })),
+  add: (storeId: string, input: AddInput) =>
+    call<{ supplyProductId: string; productId: string; added: boolean; isActive: boolean }[]>(
+      http.post(`${store(storeId)}/resales`, input),
+    ),
+  list: (storeId: string, productId?: string) =>
+    call<Supplied[]>(http.get(`${store(storeId)}/resales`, { params: productId ? { productId } : {} })),
+  setFollow: (storeId: string, id: string, followCost: boolean) =>
+    call<Supplied>(http.patch(`${store(storeId)}/resales/${id}`, { followCost })),
+  refresh: (storeId: string, id: string) => call<Supplied>(http.post(`${store(storeId)}/resales/${id}/refresh`)),
+  addOption: (storeId: string, id: string, supplyVariantId: string, price: number) =>
+    call<Supplied>(http.post(`${store(storeId)}/resales/${id}/options`, { supplyVariantId, price })),
+  fixPrice: (storeId: string, id: string) => call<Supplied>(http.post(`${store(storeId)}/resales/${id}/fix-price`)),
+  remove: (storeId: string, id: string) => call(http.delete(`${store(storeId)}/resales/${id}`)),
+}

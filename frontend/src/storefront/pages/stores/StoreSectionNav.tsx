@@ -164,8 +164,8 @@ export function sectionItem(to: string): SectionItem | undefined {
 const SELLING_ONLY = new Set(['payments', 'shipping', 'checkout'])
 
 /**
- * The supplier rows (docs/dropshipping/): **Suppliers** under Catalog for a
- * shop that sells, and a **Supply to sellers** group for a store that
+ * The supplier rows (docs/dropshipping/): **Suppliers** (and, once one has
+ * joined, **Supplier products**) under Catalog for a shop that sells, and a **Supply to sellers** group for a store that
  * supplies. A supply-only store — one made when its owner joined as a
  * supplier — has no storefront, so its storefront, marketing and selling
  * rows are hidden (D-28).
@@ -176,7 +176,14 @@ function withSupplierSections(groups: SectionGroup[], role: DropshipRole): Secti
   for (const group of groups) {
     if (supplyOnly && (group.key === 'storefront' || group.key === 'marketing')) continue
     if (group.key === 'catalog' && !supplyOnly) {
-      out.push({ ...group, items: [...group.items, { label: 'Suppliers', to: 'suppliers', icon: UsersIcon }] })
+      out.push({
+        ...group,
+        items: [
+          ...group.items,
+          { label: 'Suppliers', to: 'suppliers', icon: UsersIcon },
+          ...(role.hasSuppliers ? [{ label: 'Supplier products', to: 'supplier-products', icon: TruckIcon }] : []),
+        ],
+      })
     } else if (group.key === 'settings' && supplyOnly) {
       out.push({ ...group, items: group.items.filter((item) => !SELLING_ONLY.has(item.to)) })
     } else {

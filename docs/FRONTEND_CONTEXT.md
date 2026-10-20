@@ -566,7 +566,8 @@ once-ever setting look as important as a daily job:
 | **Help** | Customer messages · Help from UnieMax |
 
 When the dropship package is on (`useDropshipRole`, below), `useSectionGroups`
-adds **Suppliers** to Catalog for every owned store, and a **Supply to sellers**
+adds **Suppliers** to Catalog for every owned store (plus **Supplier products**
+once the store has a supplier), and a **Supply to sellers**
 group (Products for sellers · Sellers · Supplier settings) after Catalog for a
 store that supplies. A **supply-only** store (made when its owner joined as a
 supplier) loses Storefront, Marketing and Payments · Delivery · Checkout; its
@@ -2558,9 +2559,22 @@ Screens, words and rules are documented only in [`docs/dropshipping/`](./dropshi
 what the host apps see:
 
 - `index.ts` exports `dropshipPublicRoutes` (`/supplier-invite/:token`),
-  `dropshipStoreRoutes` (`suppliers`, `supply`, `sellers`,
+  `dropshipStoreRoutes` (`suppliers`, `supplier-products`, `supply`, `sellers`,
   `supplier-settings` under `/mystores/:storeSlug`), `useDropshipRole`,
-  `refreshDropshipRole`, `isDropshipEnabled` and `SupplierHome`.
+  `refreshDropshipRole`, `isDropshipEnabled` and `SupplierHome`, plus the
+  product seams below.
+- **Supplier products in the core product screens** (the core imports only the
+  facade):
+  - `StoreProductsPage` reads `useSuppliedProducts(store.id, store.slug)` (no
+    request while the package is off or the store has no supplier). A copy's
+    row gets the package's `SuppliedNote` (badge, paused reason, one-tap fix)
+    through `ProductRow`'s `extra` slot; the empty list adds
+    `SupplierProductsEntry` once the store has a supplier.
+  - `ProductWizard` asks `useSuppliedFor(storeId, product.id)`. On a copy its
+    **Price & choices** and **Delivery & payment** steps are the package's
+    `SuppliedPricingStep` / `SuppliedDeliveryStep` (D-34); while the answer
+    is loading those two steps render nothing, and a 404 (package off) means
+    an ordinary product.
 - **The flag comes from the backend**: `GET /api/v1/dropship/status` answers only
   when the package is registered; a 404 keeps every supplier row and the admin
   **Suppliers** nav item hidden. `role.ts` caches it, and each store's role, per

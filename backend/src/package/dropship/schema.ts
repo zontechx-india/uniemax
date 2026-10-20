@@ -126,6 +126,46 @@ export const adminNoteSchema = z.object({
   note: z.string().trim().min(1, "Add a note").max(500),
 });
 
+/** Add one or many supplier products to the seller's store. */
+export const resaleAddSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        supplyProductId: z.string().min(1),
+        /** Each option's own price ("Set each price myself"). */
+        prices: z.array(z.object({ supplyVariantId: z.string().min(1), price: money })).max(200).optional(),
+      }),
+    )
+    .min(1)
+    .max(50),
+  /** An existing shelf, or each product on its own category's shelf (D-32). */
+  shelf: z.union([z.object({ shelfId: z.string().min(1) }), z.object({ newShelf: z.literal(true) })]),
+  addOnTop: z
+    .union([
+      z.object({ amount: z.coerce.number().min(0).max(1_000_000) }),
+      z.object({ percent: z.coerce.number().min(0).max(1000) }),
+    ])
+    .optional(),
+  followCost: z.boolean(),
+  /** A pickup-only store turns on home delivery in place (C-22). */
+  deliveryAmount: money.optional(),
+});
+
+export const resaleParam = storeParam.extend({ id: z.string().min(1) });
+export const resaleUpdateSchema = z.object({ followCost: z.boolean() });
+export const resaleOptionSchema = z.object({ supplyVariantId: z.string().min(1), price: money });
+export const catalogQuery = z.object({
+  supplierId: z.string().min(1).optional(),
+  q: z.string().trim().min(1).max(100).optional(),
+  categoryId: z.string().min(1).optional(),
+  minPrice: z.coerce.number().min(0).optional(),
+  maxPrice: z.coerce.number().min(0).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(60).default(24),
+});
+
+export type ResaleAddInput = z.infer<typeof resaleAddSchema>;
+export type CatalogQuery = z.infer<typeof catalogQuery>;
 export type InviteCreateInput = z.infer<typeof inviteCreateSchema>;
 export type InviteAcceptInput = z.infer<typeof inviteAcceptSchema>;
 export type SupplierProfileInput = z.infer<typeof supplierProfileSchema>;

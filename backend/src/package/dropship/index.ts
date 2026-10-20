@@ -1,6 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { ok } from "../../utils/response.js";
 import { deps } from "./deps.js";
+import { startJobs, subscribe } from "./events.js";
+import { registerHooks } from "./hooks.js";
 import { adminRoutes } from "./routes/admin.js";
 import { inviteRoutes } from "./routes/invite.js";
 import { sellerRoutes } from "./routes/seller.js";
@@ -18,6 +20,10 @@ export async function registerDropship(
   options: DropshipDeps,
 ): Promise<void> {
   Object.assign(deps, options);
+  registerHooks();
+  subscribe();
+  const stopJobs = startJobs(app.log);
+  app.addHook("onClose", async () => stopJobs());
 
   await app.register(
     async (dropship) => {

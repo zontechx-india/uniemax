@@ -6,6 +6,7 @@ import type { LinkStatus } from "../domain.js";
 import type { SellerLinkUpdateInput, SupplierProfileUpdateInput } from "../schema.js";
 import type { StoreRef } from "../types.js";
 import { shapeInvite } from "./invites.js";
+import { syncForLink, syncForSupplier } from "./resale.js";
 import { logChanges } from "./terms.js";
 
 type SupplierRow = {
@@ -159,6 +160,8 @@ export async function updateLinkAsSeller(
       deps.host.notify(supplierStore.ownerId, statusNotice(store.name, statusChange, url));
     }
   }
+  // Copies follow: COD re-synced (SU-5), paused / resumed (SU-7).
+  await syncForLink(link.id);
   return sellerLinkView(store.id, link.id);
 }
 
@@ -268,6 +271,7 @@ export async function updateLinkAsSupplier(
     where: { id: link.id },
     data: { status, statusBy: "SUPPLIER" },
   });
+  await syncForLink(link.id); // SU-17: copies pause / resume
   const [seller, supplier] = await Promise.all([
     deps.host.getStore(link.sellerStoreId),
     deps.prisma.supplier.findUniqueOrThrow({ where: { id: supplierId } }),
@@ -336,5 +340,6 @@ export async function adminSetStatus(id: string, status: "ACTIVE" | "SUSPENDED",
       url: `/mystores/${store.slug}/sellers`,
     });
   }
+  await syncForSupplier(id); // SU-8: copies pause / resume
   return shapeProfile(updated);
 }

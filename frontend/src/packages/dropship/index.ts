@@ -18,6 +18,11 @@ export {
 } from './role'
 export type { DropshipRole } from './role'
 export { SupplierHome } from './pages/supplier/SupplierHome'
+// Seams in the seller's product list and product editor (supplier products, D-34).
+export { useSuppliedFor, useSuppliedProducts } from './supplied'
+export type { Supplied } from './api'
+export { SuppliedNote, SupplierProductsEntry } from './pages/seller/SuppliedNote'
+export { SuppliedDeliveryStep, SuppliedPricingStep } from './pages/seller/SuppliedSteps'
 
 /** /supplier-invite/:token — public, outside any layout. */
 export const dropshipPublicRoutes: RouteObject[] = [
@@ -33,6 +38,12 @@ export const dropshipStoreRoutes: RouteObject[] = [
     path: 'suppliers',
     lazy: async () => ({
       Component: (await import('./pages/seller/SuppliersPage')).SuppliersPage,
+    }),
+  },
+  {
+    path: 'supplier-products',
+    lazy: async () => ({
+      Component: (await import('./pages/seller/SupplierProductsPage')).SupplierProductsPage,
     }),
   },
   {
@@ -56,4 +67,4 @@ export const dropshipStoreRoutes: RouteObject[] = [
 ]
 
 /** The store-section `to` values above — hidden where the package has no mount (admin view). */
-export const DROPSHIP_SECTIONS = ['suppliers', 'supply', 'sellers', 'supplier-settings'] as const
+export const DROPSHIP_SECTIONS = ['suppliers', 'supplier-products', 'supply', 'sellers', 'supplier-settings'] as const

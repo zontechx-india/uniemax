@@ -6,19 +6,19 @@ import type { TermDiff } from "../domain.js";
 import type { SupplyBulkInput, SupplyUpdateInput } from "../schema.js";
 import type { ProductRef } from "../types.js";
 import { logChanges } from "./terms.js";
+import { sellerCounts, syncForSupplierProduct } from "./resale.js";
 
 /**
  * SU-11: only a store's own products may be offered, never a copy of another
- * supplier's. Copies arrive with the Resale table in Phase 3 (D-31), which
- * fills this in; until then every product in the store is its own.
+ * supplier's (copies are the products with a Resale row).
  */
-async function isCopy(_productId: string): Promise<boolean> {
-  return false;
+async function isCopy(productId: string): Promise<boolean> {
+  return (await deps.prisma.resale.count({ where: { productId } })) > 0;
 }
 
 type SupplyRow = Prisma.SupplyProductGetPayload<{ include: { variants: true } }>;
 
-function shape(product: ProductRef, supply: SupplyRow | undefined) {
+function shape(product: ProductRef, supply: SupplyRow | undefined, sellers = 0) {
   const byVariant = new Map(supply?.variants.map((v) => [v.variantId, v]) ?? []);
   return {
     productId: product.id,
@@ -26,6 +26,8 @@ function shape(product: ProductRef, supply: SupplyRow | undefined) {
     imageUrl: product.imageUrl,
     isActive: product.isActive,
     isOpen: supply?.isOpen ?? false,
+    /** "Sold by N sellers". */
+    sellers,
     variants: product.variants.map((variant) => {
       const offered = byVariant.get(variant.id);
       const cost = offered ? Number(offered.cost) : null;
@@ -51,7 +53,11 @@ export async function listSupply(supplierId: string, storeId: string) {
     deps.prisma.supplyProduct.findMany({ where: { supplierId }, include: { variants: true } }),
   ]);
   const byProduct = new Map(supply.map((s) => [s.productId, s]));
-  return products.map((p) => shape(p, byProduct.get(p.id)));
+  const counts = await sellerCounts(supply.map((s) => s.id));
+  return products.map((p) => {
+    const row = byProduct.get(p.id);
+    return shape(p, row, row ? counts.get(row.id) ?? 0 : 0);
+  });
 }
 
 async function ownProducts(storeId: string, productIds: string[]) {
@@ -154,11 +160,13 @@ export async function updateSupply(
       isOpen: v.isOpen,
     })),
   );
+  await syncForSupplierProduct(productId); // copies follow the new prices / offer
   const supply = await deps.prisma.supplyProduct.findUnique({
     where: { productId },
     include: { variants: true },
   });
-  return shape(product!, supply ?? undefined);
+  const counts = supply ? await sellerCounts([supply.id]) : new Map<string, number>();
+  return shape(product!, supply ?? undefined, supply ? counts.get(supply.id) ?? 0 : 0);
 }
 
 /** Bulk "Offer at shop price − N %": every option of each product, still editable after. */
@@ -181,6 +189,7 @@ export async function bulkOffer(
         isOpen: v.isActive,
       })),
     );
+    await syncForSupplierProduct(product.id);
   }
   return listSupply(supplierId, storeId);
 }

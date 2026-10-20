@@ -1,8 +1,13 @@
-# Data model: supplier products (Phase 3) ☐
+# Data model: supplier products (Phase 3) ☑
 
 > **Read when:** working on the seller's copies of supplier products, pricing
 > or sync. **Update when:** these models change.
 > Conventions: [data-model](../context.md).
+
+Built 20 Oct 2026, migration `20261021100000_dropship_resales` (schema
+`dropship`, tables `resales`, `resale_variants`). No foreign key to core: `productId`,
+`variantId`, `supplyVariantId` and `sellerStoreId` are plain ids, and a deleted
+copy drops its `Resale` through the `catalog.product.changed` event.
 
 ```prisma
 enum ResaleState { ACTIVE PAUSED }
@@ -25,6 +30,8 @@ model Resale {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   @@unique([sellerStoreId, supplyProductId])
+  @@index([linkId])
+  @@index([supplyProductId])
 }
 
 model ResaleVariant {
@@ -34,6 +41,11 @@ model ResaleVariant {
   variantId       String  @unique                      // the copy's variant
   supplyVariantId String
   lastCost        Decimal @db.Decimal(10, 2)           // cost already applied to the price; makes follow-price idempotent
+  @@index([resaleId])
   @@index([supplyVariantId])
 }
 ```
+
+`lastCost` moves when follow-price applies a cost change, when the seller saves
+a price on the copy (or takes the one-tap fix), and when follow is turned back
+on. A fixed price leaves it alone, so the fix can offer the old margin.

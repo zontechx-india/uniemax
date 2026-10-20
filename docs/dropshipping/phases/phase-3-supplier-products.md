@@ -1,4 +1,8 @@
-# Phase 3: Supplier products in the seller's store ☐
+# Phase 3: Supplier products in the seller's store ◐
+
+> Built 20 Oct 2026 (migration `20261021100000_dropship_resales`). Left: the
+> API test run (`test/dropship-supplier-products.test.mjs`, needs the `QA_*`
+> accounts) and the dev check with `DROPSHIP_ENABLED=true` on the dev server.
 
 ## Goal
 
@@ -20,30 +24,30 @@ Phase 2 done. Check the product editor (`frontend/src/storefront/pages/stores/pr
 
 ## Build: backend
 
-- ☐ `dropship.prisma`, Phase 3 models (+ migration).
-- ☐ Catalogue: the offered products of `ACTIVE` links, with "You earn" worked
+- ☑ `dropship.prisma`, Phase 3 models (+ migration).
+- ☑ Catalogue: the offered products of `ACTIVE` links, with "You earn" worked
   out from this store's own delivery charge.
-- ☐ Add one or many (`host.createCopy` in one transaction per product):
+- ☑ Add one or many (`host.createCopy` in one transaction per product):
   - photos copied, options copied, no SKU;
   - the supplier's effective delivery rule, and `codAvailable` from the link;
   - an existing or new shelf;
   - delivery settings in place for pickup-only stores.
-- ☐ Pricing: follow with `lastCost` (idempotent), MRP cap, fixed-price switch,
+- ☑ Pricing: follow with `lastCost` (idempotent), MRP cap, fixed-price switch,
   and price bounds through `product.saving`.
-- ☐ `resale.sync`, driven by the catalog events and link or supplier changes.
+- ☑ `resale.sync`, driven by the catalog events and link or supplier changes.
   Pause and resume with `resumeOnClear`.
-- ☐ Editor locks and the Duplicate refusal (`product.saving`).
-- ☐ Refresh (latest photos, description, new options) and remove.
-- ☐ The `order.placing` hook refuses supplier products with *"Coming soon"* (C-24).
+- ☑ Editor locks and the Duplicate refusal (`product.saving`).
+- ☑ Refresh (latest photos, description, new options) and remove.
+- ☑ The `order.placing` hook refuses supplier products with *"Coming soon"* (C-24).
 
 ## Build: frontend
 
-- ☐ **Supplier products**: browse, filters, select many, and the empty-catalogue entry point.
-- ☐ The add sheet: price or "Add on top [₹ | %]", the result line, the MRP
+- ☑ **Supplier products**: browse, filters, select many, and the empty-catalogue entry point.
+- ☑ The add sheet: price or "Add on top [₹ | %]", the result line, the MRP
   note, the follow sentence and switch, the shelf picker or new shelf, and
   delivery in place.
-- ☐ Product list: the "Supplied by" badge, and the paused banner with its one-tap fix.
-- ☐ Editor: read-only *Set by supplier* fields, the Supplier block, Duplicate hidden.
+- ☑ Product list: the "Supplied by" badge, and the paused banner with its one-tap fix.
+- ☑ Editor: read-only *Set by supplier* fields, the Supplier block, Duplicate hidden.
 
 ## Tests
 
@@ -52,6 +56,22 @@ C-1…C-24, including:
 - the MRP cap (C-18);
 - a switched-off copy stays off after a pause clears (C-15);
 - SKUs never clash (C-16).
+
+### Verified (20 Oct 2026)
+
+- `npm run typecheck` and `npm run test:unit` (93 pass; `test/unit/dropship-sync.test.ts`
+  covers `planSync` — C-1, C-2, C-5…C-7, C-15, C-18, C-21 run twice — and the
+  default price, add on top, earnings and delivery labels).
+- An `app.inject` run on the dev database with throwaway stores (deleted
+  after): 26 checks — the catalogue and "You earn", C-1, 3, 4, 7, 8, 10, 11,
+  14, 15, 16, 17, 18, 19, 20, 21, 24, the one-tap price fix, a supplier
+  stock change by event, SU-5, SU-8, SU-11, SU-17 and "Sold by N sellers".
+- Frontend: `tsc -b`, `vite build`, `check:ui` (no budget rises); the
+  catalogue, add sheet (one, many, pickup-only store), product list (badge,
+  paused note), empty list and the copy's Price and Delivery steps checked at
+  390 px with mocked data (no overflow, no console errors).
+- **Not run yet:** `npm run test:api` (`test/dropship-supplier-products.test.mjs`) —
+  the `QA_*` accounts aren't set up on this machine.
 
 ## Done when
 

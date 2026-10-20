@@ -15,4 +15,12 @@ export const dropshipConfig = {
   shipWithinDaysMax: num("DROPSHIP_SHIP_WITHIN_DAYS_MAX", 7),
   /** Longest returns window a supplier may offer. */
   returnDaysMax: num("DROPSHIP_RETURN_DAYS_MAX", 30),
+  /** Suggested price when the supplier has no shop price: cost + this %. */
+  suggestedMarkupPct: num("DROPSHIP_SUGGESTED_MARKUP_PCT", 30),
+  /** Earnings below this % of the price turn amber on the add sheet. */
+  minMarginWarnPct: num("DROPSHIP_MIN_MARGIN_WARN_PCT", 10),
+  /** Platform fee, % of the order total, from the seller's share (D-20; rate: Q-5). */
+  platformFeePct: num("DROPSHIP_PLATFORM_FEE_PCT", 0),
+  /** The hourly job: re-sync every copy (C-13). */
+  jobIntervalMs: num("DROPSHIP_JOB_INTERVAL_MS", 60 * 60 * 1000),
 };

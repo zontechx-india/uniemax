@@ -4,7 +4,10 @@
 > pricing (follow / fixed, MRP), sync from the supplier, editor locks, or
 > pause and resume. **Update when:** any of those change.
 
-Status: ☐ planned (Phase 3). Tables:
+Status: ◐ built 20 Oct 2026 (Phase 3; API test run pending). Code:
+`backend/src/package/dropship/services/{catalog,resale}.ts`, `hooks.ts`, `events.ts`;
+`frontend/src/packages/dropship/pages/seller/` (`SupplierProductsPage`, `AddSheet`,
+`SuppliedNote`, `SuppliedSteps`). Tables:
 [data-model/supplier-products](../data-model/supplier-products/context.md).
 
 ## Rules
@@ -13,7 +16,8 @@ Status: ☐ planned (Phase 3). Tables:
    links, grouped by supplier.
 2. **Adding** creates a real `StoreProduct` in the seller's store (D-9), live
    straight away:
-   - photos copied (storage `get` + `put`; sized versions render on first view);
+   - photos copied (storage `get` + `put` to `products/{storeId}/supplied/…`;
+     sized versions render on first view); live only once it has a photo;
    - options and option names copied;
    - **no SKU** copied (SKUs are unique per store);
    - delivery rule = the supplier's effective rule;
@@ -21,10 +25,15 @@ Status: ☐ planned (Phase 3). Tables:
 3. **Pricing** (D-12): follow by default. When the supplier's price changes,
    `price += cost − lastCost`, capped at MRP. The seller can switch to a fixed
    price. A price must always be at least the supplier price and at most MRP.
+   A **%** markup (add on top, or the default `suggestedMarkupPct`) lands on
+   a whole rupee, rounded up. The supplier's MRP is written to the copy only
+   when it is above the copy's price (D-35).
 4. **Sync is the only path** by which supplier changes reach copies (below).
 5. **Locked on copies:** options, stock, COD and delivery area (shown as *Set
    by supplier*), and **Duplicate** is refused. Editable: name, description,
-   photos, shelf, price and the homepage flags.
+   photos, shelf, price and the homepage flags. In the product wizard the
+   **Price & choices** and **Delivery & payment** steps are the package's on a
+   copy (D-34); Duplicate lives in the core Price step, so it disappears.
 6. Until Phase 4 routes orders, the `order.placing` hook refuses supplier
    products with *"Coming soon"*.
 
@@ -35,9 +44,11 @@ catalogue: *"No products yet? Sell your suppliers' products. No stock needed,
 they ship for you."*
 
 **Browse card:** photo, name, supplier, **Supplier price ₹450**, **Suggested
-price ₹699**, **You earn ₹189**, delivery area ("All India" / "Kerala, Tamil
-Nadu"), returns ("7-day returns" / "No returns"), "Ships within N days".
-Filters: supplier, category, price. Search.
+price ₹699**, **You earn ₹189**, delivery area ("All India" / "Selected PIN codes (N)" / "All India
+except N PIN codes", D-33), returns ("7-day returns" / "No returns"), "Ships within N days".
+Filters: supplier, category (each shown once there are two or more). Search.
+A product already in the store shows **In your shop — view** instead of the
+add button and its tick box.
 
 **Add sheet (one product):**
 - The product's photo and name at the top.
@@ -56,31 +67,41 @@ Filters: supplier, category, price. Search.
   changes by the same amount, so you keep earning ₹238."* Next to it, a switch:
   **Keep my price fixed instead**.
 - **Shelf:** pre-picked when one of the store's shelves carries the same global
-  category. Otherwise **+ New shelf** opens inline with the supplier's category
-  name typed in.
+  category. Otherwise **+ New shelf: {category}** creates the shelf for the
+  supplier product's own taxonomy category (D-32). A product with no category
+  needs an existing shelf.
 - **Pickup-only store:** the sheet shows the store's delivery settings in place
   (*"Supplier products need home delivery. Turn on delivery: ₹__ per order"*).
-- **Add to my store** → live, and a toast offers **View**.
+- **Add to my store** → live (with a photo), and a toast: *"Added to your shop
+  — see it in Products"*.
 
 **Add many:** tick cards → **Add N to my store** → one sheet with one shelf and
-**Add on top [₹ | %]**, plus each product's price and earnings.
+**Add on top [₹ | %]**, plus each product's price and earnings. The shelf
+choice includes **Each on its own category shelf**.
 
 **Looking after them:** a **Supplied by {supplier}** badge in the product list.
-A paused copy shows the reason with a one-tap fix, for example *"The supplier's
-price is now ₹520 and your price is ₹499. [Set price to ₹569 — you keep
-earning ₹49]"*. In the editor, a **Supplier** block shows the supplier price,
-MRP and "You earn", the follow switch, **Get supplier's latest photos and
-description**, **New option available — add it**, and **Remove from my store**.
+A paused copy shows the reason, and for `COST_ABOVE_PRICE` a one-tap fix:
+*"Supplier ₹520 · yours ₹499. At ₹569 you keep earning ₹49. [Set price to
+₹569]"*. The fix price is `cost + max(0, price − lastCost)`, capped at MRP.
+`LINK_INACTIVE` links to **Suppliers**. Once the store has a supplier, the
+empty product list carries the entry point. In the editor, **Your price** shows
+each option's price, supplier price, MRP and "You earn", the follow switch,
+**New option available** (price + **Add it**), **Get supplier's latest photos
+and description** and **Remove from my store**; **Delivery & payment** shows
+the delivery area and COD read-only, *Set by {supplier}*.
 
 ## Sync rules (`resale.sync`)
 
-Triggered by the catalog events, after every reserve or release, and by the
-hourly job. For each copy linked to the changed store, product, variant or link:
+Triggered by the catalog events, by `order.placed` / `order.cancelled` of a
+supplier store (stock), by link and supplier status changes, by supply edits,
+and by the hourly job (`jobIntervalMs`). For each copy linked to the changed store, product, variant or link:
 
 1. **Options and option names** := the supplier's (renames follow).
 2. **Stock** := the supplier variant's stock. **MRP** := the supplier's.
 3. **Price**, when `followCost` is on and `cost ≠ lastCost`:
    `price += cost − lastCost`, capped at MRP; then `lastCost := cost`.
+   `lastCost` moves only here and when the seller saves a price (or takes the
+   one-tap fix), so the fix can offer the old margin.
 4. **Delivery area** := the supplier's effective rule (its product override,
    otherwise its store default). **`codAvailable`** := the link's `codAllowed`.
 5. **supplyOk** := supplier `ACTIVE` ∧ supplier store not suspended ∧ link
@@ -93,15 +114,17 @@ hourly job. For each copy linked to the changed store, product, variant or link:
      switched off.
 7. Notify the seller only when the state or the price changes.
 
-## API: `/api/v1/dropship` ☐ (seller: `requireCustomer` + owns `:storeId`)
+## API: `/api/v1/dropship` ◐ (seller: `requireCustomer` + owns `:storeId`)
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/stores/:storeId/catalog?supplierId&q&category&minPrice&maxPrice&page` | Browse, with "You earn" worked out for this store |
-| POST | `/stores/:storeId/resales` | Add one or many: `{ items: [{ supplyProductId, variants?: [{ supplyVariantId, price }] }], shelf: { categoryId } \| { newShelfName }, addOnTop?: { amount } \| { percent }, followCost, delivery? }` |
-| GET | `/stores/:storeId/resales` | Supplier products with state and pause reason |
-| PATCH | `/stores/:storeId/resales/:id` | `{ followCost }` |
-| POST | `/stores/:storeId/resales/:id/refresh` | Latest photos and description, new options |
+| GET | `/stores/:storeId/catalog?supplierId&q&categoryId&minPrice&maxPrice&page&pageSize` | Browse (`pageSize` ≤ 60, default 24): `{ items, meta, filters: { suppliers, categories }, store: { mode, deliveryRate, shelves, platformFeePct, minMarginWarnPct } }`. Each item has its variants (cost, shop price, MRP, suggested, stock), "You earn" for this store, and `inStoreProductId` |
+| POST | `/stores/:storeId/resales` | Add 1–50 → 201 `[{ supplyProductId, productId, added, isActive }]`. Body: `{ items: [{ supplyProductId, prices?: [{ supplyVariantId, price }] }], shelf: { shelfId } \| { newShelf: true }, addOnTop?: { amount } \| { percent }, followCost, deliveryAmount? }` (`deliveryAmount` required for a pickup-only store). 409 C-10, 400 C-11 |
+| GET | `/stores/:storeId/resales?productId` | Supplier products: state, pause reason and text, supplier, each option's price / cost / MRP / You earn / one-tap `fixPrice`, and `newOptions`. `productId` narrows to one copy (the editor) |
+| PATCH | `/stores/:storeId/resales/:id` | `{ followCost }`; turning it on takes today's cost as `lastCost` |
+| POST | `/stores/:storeId/resales/:id/refresh` | Latest photos and description (C-20) |
+| POST | `/stores/:storeId/resales/:id/options` | `{ supplyVariantId, price }`: add a new supplier option (C-8) |
+| POST | `/stores/:storeId/resales/:id/fix-price` | The one-tap fix: each option with a `fixPrice` takes it, then sync |
 | DELETE | `/stores/:storeId/resales/:id` | Remove from the store (C-14) |
 
 ## Failure cases
@@ -117,7 +140,7 @@ hourly job. For each copy linked to the changed store, product, variant or link:
 | C-7 | The supplier, its store, or the link becomes inactive. | Copies pause (`SUPPLIER_INACTIVE` / `LINK_INACTIVE`). |
 | C-8 | The supplier adds a new option. | Not added automatically. *"New option available — add it"* with a price. |
 | C-9 | The supplier deletes a photo the copy used. | Copies own their photos (copied at add time). |
-| C-10 | The seller adds the same product twice. | `@@unique([sellerStoreId, supplyProductId])` → *"Already in your store"* with **View**. |
+| C-10 | The seller adds the same product twice. | `@@unique([sellerStoreId, supplyProductId])` → 409 *"Already in your store"*; the catalogue card shows **In your shop — view**. |
 | C-11 | Products of a supplier the seller isn't linked to. | Not in the catalogue; `add` refuses them. |
 | C-12 | The supplier narrows its delivery area. | The effective rule is mirrored; the storefront's pincode check applies. |
 | C-13 | The stock mirror drifts (lost event, crash). | Checkout reserves the **supplier's** stock, so drift can't oversell; the hourly job re-mirrors. |

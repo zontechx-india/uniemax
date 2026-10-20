@@ -2,7 +2,20 @@ import type { FastifyPluginAsync } from "fastify";
 import { requireCustomer } from "../../auth/index.js";
 import { ok } from "../../../utils/response.js";
 import { requireOwnedStore } from "../guards.js";
-import { inviteCreateSchema, inviteParam, linkParam, sellerLinkUpdateSchema } from "../schema.js";
+import {
+  catalogQuery,
+  inviteCreateSchema,
+  inviteParam,
+  linkParam,
+  resaleAddSchema,
+  resaleOptionSchema,
+  resaleParam,
+  resaleUpdateSchema,
+  sellerLinkUpdateSchema,
+} from "../schema.js";
+import { z } from "zod";
+import * as catalog from "../services/catalog.js";
+import * as resales from "../services/resale.js";
 import * as invites from "../services/invites.js";
 import * as suppliers from "../services/suppliers.js";
 import { linkTerms } from "../services/terms.js";
@@ -42,6 +55,51 @@ export const sellerRoutes: FastifyPluginAsync = async (app) => {
     return ok(
       await suppliers.updateLinkAsSeller(request.dropshipStore!, linkId, request.customer!.id, input),
     );
+  });
+
+  // ---- Supplier products (Phase 3) ----------------------------------------
+
+  app.get("/catalog", async (request) =>
+    ok(await catalog.browseCatalog(request.dropshipStore!.id, catalogQuery.parse(request.query))),
+  );
+
+  app.get("/resales", async (request) => {
+    const { productId } = z.object({ productId: z.string().min(1).optional() }).parse(request.query);
+    return ok(await resales.listResales(request.dropshipStore!.id, productId));
+  });
+
+  app.post("/resales", async (request, reply) => {
+    const input = resaleAddSchema.parse(request.body);
+    const result = await resales.addResales(request.dropshipStore!, request.customer!.id, input);
+    return reply.status(201).send(ok(result));
+  });
+
+  app.patch("/resales/:id", async (request) => {
+    const { id } = resaleParam.parse(request.params);
+    const { followCost } = resaleUpdateSchema.parse(request.body);
+    return ok(await resales.setFollow(request.dropshipStore!.id, id, followCost));
+  });
+
+  app.post("/resales/:id/refresh", async (request) => {
+    const { id } = resaleParam.parse(request.params);
+    return ok(await resales.refreshResale(request.dropshipStore!, id));
+  });
+
+  app.post("/resales/:id/options", async (request) => {
+    const { id } = resaleParam.parse(request.params);
+    const { supplyVariantId, price } = resaleOptionSchema.parse(request.body);
+    return ok(await resales.addResaleOption(request.dropshipStore!.id, id, supplyVariantId, price));
+  });
+
+  app.post("/resales/:id/fix-price", async (request) => {
+    const { id } = resaleParam.parse(request.params);
+    return ok(await resales.fixPrices(request.dropshipStore!.id, id));
+  });
+
+  app.delete("/resales/:id", async (request) => {
+    const { id } = resaleParam.parse(request.params);
+    await resales.removeResale(request.dropshipStore!.id, id);
+    return ok({ removed: true });
   });
 
   app.get("/suppliers/:linkId/terms", async (request) => {

@@ -18,7 +18,7 @@ earns the difference.
 | 0 | Parcel tracking for every order (core) | ◐ built 20 Oct 2026 — dev check + API test run pending |
 | 1 | Core seams for packages | ◐ built 20 Oct 2026 — API test run pending |
 | 2 | Suppliers: invite and join | ◐ built 20 Oct 2026 — API test run pending; dev needs `DROPSHIP_ENABLED=true` |
-| 3 | Supplier products in the seller's store | ☐ not started |
+| 3 | Supplier products in the seller's store | ◐ built 20 Oct 2026 — API test run pending; dev needs `DROPSHIP_ENABLED=true` |
 | 4 | Orders and shipping | ☐ not started |
 | 5 | Money statement and background jobs. **MVP complete** | ☐ not started |
 | 6 | Easy Split pays suppliers for prepaid orders | ☐ not started |
