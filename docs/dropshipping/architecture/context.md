@@ -36,7 +36,7 @@ parcels and Needs action built (Phase 4, 21 Oct 2026); the rest is planned
 ## Package layout ◐
 
 Built in Phase 2 (☑): `index.ts`, `types.ts`, `config.ts`, `deps.ts`,
-`domain.ts`, `guards.ts` (`requireOwnedStore`, `requireSupplier`), `schema.ts`
+`domain.ts`, `guards.ts` (`requireOwnedStore`, `requireSellingStore` — 403 for a supplier account on the seller routes, D-49 —, `requireSupplier`), `schema.ts`
 (Zod), `hosts/inProcess.ts`, `services/{invites,suppliers,supply,terms}.ts`,
 `routes/{seller,supplier,invite,admin}.ts`, `dropship.prisma`, and
 `frontend/src/packages/dropship` (`api.ts`, `role.ts`, `ui.tsx`, `pages/`).

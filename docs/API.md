@@ -394,6 +394,9 @@ Requirements that do not apply are omitted rather than reported unmet — a
 delivery-only store has no pickup-address requirement at all. Turning a
 capability **off** is never gated, and neither is unpublishing.
 
+With dropshipping on, the `store.publishing` hook also refuses (409) a **supplier account** (a
+supply-only store has no shop; see [dropshipping D-49](./dropshipping/decisions.md)).
+
 **Grandfathering.** The `PUBLISH` gate is enforced only on a store's **first**
 publish (`publishedAt === null`). Stores that were already live before these
 requirements existed can still unpublish and re-publish freely.

@@ -64,7 +64,7 @@ Open the link → sign in (OTP) → **Join {seller} as a supplier**:
   days*. Asked, never pre-selected.
 - **Join** → the link is active. Next step offered: **Add the products you'll
   supply** (the store's product editor), or **Choose products to offer** for an
-  existing store.
+  existing supplier account.
 
 ### The supplier offers products
 **Products for sellers**: a switch per product, a **Price for sellers** per
@@ -91,7 +91,7 @@ when `DROPSHIP_ENABLED=true`. `:storeId` is the store's id or slug.
 | Method | Path | Guard | Purpose |
 | --- | --- | --- | --- |
 | GET | `/status` | — | `{ enabled: true }`; a 404 means the package is off (D-30) |
-| GET | `/stores/:storeId/role` | owner | `{ supplier: { status, supplyOnly } \| null, hasSuppliers }` — drives the nav |
+| GET | `/stores/:storeId/role` | owner (the only seller-side route a supplier account may call; every other `/stores/:storeId/**` seller route answers it **403**, SU-20) | `{ supplier: { status, supplyOnly } \| null, hasSuppliers }` — drives the nav |
 
 **Seller** (`requireCustomer` + owns `:storeId`; another store → 404, SU-10)
 
@@ -109,8 +109,8 @@ when `DROPSHIP_ENABLED=true`. `:storeId` is the store's id or slug.
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/invites/:token` | Public preview: seller name + logo, both terms, effective status, expiry, the ship-within / returns limits |
-| GET | `/invites/:token/stores` | `requireCustomer`. The caller's stores for the join sheet: `hasAddress`, `isSeller` (the inviting store), existing supplier terms |
-| POST | `/invites/:token/accept` | `requireCustomer`. `{ storeId \| newStore: { name, phone, address }, shippingFee?, shipWithinDays?, returnDays? }` — the three terms are required unless that store already supplies. → `{ linkId, storeId, storeSlug, supplyOnly, alreadyJoined }` |
+| GET | `/invites/:token/stores` | `requireCustomer`. The caller's **supplier accounts** for the join sheet (shops that sell are left out, SU-21): `hasAddress`, `isSeller` (the inviting store), existing supplier terms |
+| POST | `/invites/:token/accept` | `requireCustomer`. `storeId` must be a supplier account — a shop that sells is refused 400 "can't also be a supplier" (SU-21). `{ storeId \| newStore: { name, phone, address }, shippingFee?, shipWithinDays?, returnDays? }` — the three terms are required unless that store already supplies. → `{ linkId, storeId, storeSlug, supplyOnly, alreadyJoined }` |
 
 **Supplier** (`requireCustomer` + owns `:storeId` + `requireSupplier` = an `ACTIVE` Supplier; otherwise 403, SU-9)
 
@@ -133,8 +133,9 @@ Admin routes: [admin](../admin/context.md).
   suppliers** and **Invited** lists, and each supplier's **Terms** sheet (edit
   the two terms, the change log, Pause / Resume / Stop working together).
 - Join: `/supplier-invite/:token` — preview, sign in in place, then the join
-  sheet. A store without a business address can't be chosen; the address is
-  asked only for a new supplier account (SU-16). After joining: **Add the
+  sheet. Only **supplier accounts** are offered (a shop that sells can't join, SU-21); a
+  supplier account without a business address can't be chosen, and the address is
+  asked for a new one (SU-16). After joining: **Add the
   products you'll supply** (supply-only) or **Choose products to offer**.
 - Supplier: `supply` (**Products for sellers**, with the bulk bar), `sellers`,
   `supplier-settings`. A supply-only store's dashboard is `SupplierHome`.

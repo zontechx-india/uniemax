@@ -34,8 +34,8 @@ the same rules.
   `hosts/inProcess.ts`. Registered in `app.ts` only when `DROPSHIP_ENABLED=true`.
 - ☑ `dropship.prisma`, Phase 2 models (+ migration).
 - ☑ Invites: create (stores only the token's hash), resend, revoke, public
-  preview, accept (with an existing store or a new supply-only store), and
-  expiry. The invite email goes through the host's `sendMail`.
+  preview, accept (with an existing supplier account or a new supply-only one — never a
+  shop that sells, D-49), and expiry. The invite email goes through the host's `sendMail`.
 - ☑ Links: change COD and who pays the returned-parcel fee. Each change is
   logged in `TermsChange`, and the supplier is told it applies to orders placed
   from now on. Pause and end from **either side** (D-19).
