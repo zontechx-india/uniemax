@@ -2582,6 +2582,11 @@ what the host apps see:
     order?" prompt) when any line is tagged (`fulfilledBy`); "Cancel order" opens the
     page's own cancel dialog. The order list row (`SellerOrderRow`) shows a **Supplier
     ships** chip from `hasPackageLines`.
+  - A **supplier account** (`supplier.supplyOnly`) is not a shop: `StoreProductsPage` hides the "shop isn't
+    live" Publish prompt and shows the package's `SupplyOnlyNote` (these are your products; sellers only see
+    the ones you offer, under Products for sellers). Its menu row **Orders to ship** carries a badge with the
+    role's `ordersToShip` count (`SectionItem.count`, refreshed after each action), and `SupplierHome` opens
+    with an *"N new orders to ship"* card.
   - `ShipDialog` takes `requireTracking` (the tracking number is required and "Own
     delivery" is not offered): the supplier's Ship / Edit tracking sheet reuses it, and
     `DeliveredDialog` is reused as is.

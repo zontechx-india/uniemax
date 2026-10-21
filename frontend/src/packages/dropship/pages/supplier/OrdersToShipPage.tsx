@@ -17,6 +17,7 @@ import { ShipDialog } from '../../../../storefront/pages/stores/orders/ShipDialo
 import { PageHeader, showToast } from '../../../../storefront/pages/stores/ui'
 import { supplierOrdersApi } from '../../api'
 import type { CantShipReason, SupplierOrder, SupplierTab, TrackingBody } from '../../api'
+import { refreshDropshipRole } from '../../role'
 import { OrderStatusBadge, dateTime, money, shipByText, shortDate, useLoad } from '../../ui'
 
 const TABS: { key: SupplierTab; label: string }[] = [
@@ -53,6 +54,8 @@ export function OrdersToShipPage() {
     setActing(null)
     showToast(message)
     inbox.reload()
+    // The menu badge counts the orders still to ship.
+    refreshDropshipRole(store.slug)
   }
 
   const confirm = async (order: SupplierOrder) => {

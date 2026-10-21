@@ -45,6 +45,8 @@ export interface AppHooks {
   ) => Promise<CheckoutRestrictions>;
   /** Before a product save in the editor — veto only. */
   "product.saving": (productId: string, change: ProductChange) => Promise<void>;
+  /** Before a store is put on the marketplace — veto only (e.g. a supplier account has no shop). */
+  "store.publishing": (storeId: string) => Promise<void>;
 }
 
 type HookName = keyof AppHooks;

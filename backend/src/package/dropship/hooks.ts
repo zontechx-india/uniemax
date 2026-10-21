@@ -61,6 +61,15 @@ export function registerHooks(): void {
   // Placement, the gateway's undo and every cancel run inside the core's own
   // transaction (services/supplierOrders.ts): stock is reserved, tagged and
   // snapshotted together, or the whole placement is refused (K-1, K-7).
+  // A supplier account (made when its owner joined as a supplier) has no shop: it is never put on the
+  // marketplace, so its stock cannot be bought from there. To sell to customers it needs a store of its own.
+  hook("store.publishing", async (storeId) => {
+    const supplier = await deps.prisma.supplier.findUnique({ where: { storeId }, select: { supplyOnly: true } });
+    if (supplier?.supplyOnly) {
+      throw HttpError.conflict("This is a supplier account, so it has no shop to publish. To sell to customers, create a store of your own.");
+    }
+  });
+
   hook("order.placing", (tx, orderId) => orders.place(tx, orderId));
   hook("order.unplacing", (tx, orderId) => orders.unplace(tx, orderId));
   hook("order.cancelling", (tx, orderId) => orders.cancelling(tx, orderId));

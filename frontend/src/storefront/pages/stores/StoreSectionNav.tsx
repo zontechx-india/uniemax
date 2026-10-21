@@ -56,6 +56,8 @@ export interface SectionItem {
   end?: boolean
   /** Renders the pending-order count. Only Orders carries live state. */
   badge?: boolean
+  /** An explicit count for this row (a supplier's orders to ship), shown in the same badge. */
+  count?: number
 }
 
 export interface SectionGroup {
@@ -199,7 +201,7 @@ function withSupplierSections(groups: SectionGroup[], role: DropshipRole): Secti
         key: 'supply',
         caption: 'Supply to sellers',
         items: [
-          { label: 'Orders to ship', to: 'orders-to-ship', icon: TruckIcon },
+          { label: 'Orders to ship', to: 'orders-to-ship', icon: TruckIcon, count: role.ordersToShip },
           { label: 'Products for sellers', to: 'supply', icon: RupeeIcon },
           { label: 'Sellers', to: 'sellers', icon: BagIcon },
           { label: 'Supplier settings', to: 'supplier-settings', icon: SlidersIcon },
@@ -355,7 +357,9 @@ function groupSignals(group: SectionGroup, { pendingOrders, setupSteps }: NavDat
     const steps = setupSteps.get(item.to)
     return steps !== undefined && !sectionStatus(steps).complete
   })
-  const orders = group.items.some((item) => item.badge) ? pendingOrders : 0
+  const orders =
+    (group.items.some((item) => item.badge) ? pendingOrders : 0) +
+    group.items.reduce((sum, item) => sum + (item.count ?? 0), 0)
   return { pendingSetup, orders }
 }
 
@@ -384,7 +388,7 @@ function SectionRow({
   large?: boolean
   onNavigate?: () => void
 }) {
-  const { label, to, icon: Icon, end, badge } = item
+  const { label, to, icon: Icon, end, badge, count } = item
   const steps = data.setupSteps.get(to)
   const setup = steps ? sectionStatus(steps) : null
 
@@ -416,6 +420,7 @@ function SectionRow({
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {setup && <StatusTag status={setup} section={label} />}
       {badge && data.pendingOrders > 0 && <OrderBadge count={data.pendingOrders} />}
+      {(count ?? 0) > 0 && <OrderBadge count={count!} />}
     </NavLink>
   )
 }
@@ -638,7 +643,7 @@ export function StoreSectionNav({ rail, ...data }: NavData & { rail: boolean }) 
                   index > 0 ? 'mt-1 border-t border-line/70 pt-2' : ''
                 }`}
               >
-                {group.items.map(({ label, to, icon: Icon, end, badge }) => {
+                {group.items.map(({ label, to, icon: Icon, end, badge, count }) => {
                   const steps = data.setupSteps.get(to)
                   const pending = steps ? !sectionStatus(steps).complete : false
 
@@ -671,6 +676,9 @@ export function StoreSectionNav({ rail, ...data }: NavData & { rail: boolean }) 
                           count={data.pendingOrders}
                           className="absolute -top-1 -right-1"
                         />
+                      )}
+                      {(count ?? 0) > 0 && (
+                        <OrderBadge count={count!} className="absolute -top-1 -right-1" />
                       )}
                     </NavLink>
                   )

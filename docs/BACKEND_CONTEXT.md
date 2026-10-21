@@ -828,6 +828,9 @@ It is a `package/`, not a `modules/` feature, because it is built to be lifted
 out into its own service later. The `package/storage` idea — a `types.ts` port
 and swappable `drivers/` — is applied to the **host platform itself**:
 `types.ts` declares `AffiliateHost` (stores, products, order snapshots, mail,
+  - `store.publishing(storeId)`: before a store is put on the marketplace, in
+    `setStorePublished` (veto only — dropshipping refuses a supplier account, which has
+    no shop).
 notifications), `hosts/inProcess.ts` answers it from the core tables today, and
 an HTTP host would answer it after extraction. Nothing above that interface
 changes.

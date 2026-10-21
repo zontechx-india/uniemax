@@ -3,6 +3,7 @@ import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../../utils/httpError.js";
 import { slugify } from "../../utils/slug.js";
 import { emit } from "../../package/events/index.js";
+import { runHooks } from "../../package/events/hooks.js";
 import {
   mediaUrl,
   newObjectKey,
@@ -747,6 +748,10 @@ export async function setStorePublished(
     select: { publishedAt: true },
   });
 
+  if (isPublished) {
+    // A package may refuse: a supplier account has no shop to put on the marketplace.
+    await runHooks("store.publishing", store.id);
+  }
   if (isPublished && previous.publishedAt === null) {
     await assertGate(store, "PUBLISH");
   }

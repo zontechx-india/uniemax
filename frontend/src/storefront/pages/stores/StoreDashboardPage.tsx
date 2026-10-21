@@ -94,7 +94,7 @@ export function StoreDashboardPage() {
   const setupBelow = store.isPublished && hasOrders
 
   // No storefront to launch: the supplier's own next steps instead.
-  if (supplyOnly) return <SupplierHome storeName={store.name} />
+  if (supplyOnly) return <SupplierHome storeName={store.name} storeSlug={store.slug} />
 
   return (
     <div className="space-y-5">

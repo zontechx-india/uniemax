@@ -37,7 +37,7 @@ import { ProductWizard } from './products/wizard/ProductWizard'
 import type { StepKey } from './products/wizard/shared'
 import { Button, buttonClass } from '../../../shared/ui/Button'
 import { MediaImg } from '../../../shared/media/MediaImg'
-import { SuppliedNote, SupplierProductsEntry, useSuppliedProducts } from '../../../packages/dropship'
+import { SuppliedNote, SupplierProductsEntry, SupplyOnlyNote, useDropshipRole, useSuppliedProducts } from '../../../packages/dropship'
 import type { Supplied } from '../../../packages/dropship'
 
 /**
@@ -82,6 +82,8 @@ export function StoreProductsPage() {
   const [filter, setFilter] = useState<Filter>('all')
   // Supplier products: their "Supplied by" badge and paused note (docs/dropshipping/).
   const supplied = useSuppliedProducts(store.id, store.slug)
+  // A supplier account has no shop: nothing to publish, and its products are offered to sellers instead.
+  const supplyOnly = useDropshipRole(store.slug)?.supplier?.supplyOnly ?? false
 
   useEffect(() => {
     let cancelled = false
@@ -269,13 +271,17 @@ export function StoreProductsPage() {
     <div className="space-y-4">
       {/* Only once there is something live to see — a new seller with no
           products isn't nagged about publishing. */}
-      {!wizard && products.some((p) => !p.isDraft && p.isActive) && (
+      {!wizard && !supplyOnly && products.some((p) => !p.isDraft && p.isActive) && (
         <ShopNotLiveNudge store={store} onStoreChange={onStoreChange} />
       )}
       <PageHeader
         icon={BoxIcon}
         title="Products"
-        description="What your customers see and buy. Add one in a few small steps — you can stop any time."
+        description={
+          supplyOnly
+            ? "The products you supply. Add one in a few small steps — you can stop any time."
+            : "What your customers see and buy. Add one in a few small steps — you can stop any time."
+        }
         action={
           !wizard && products.length > 0 ? (
             <Button
@@ -289,6 +295,8 @@ export function StoreProductsPage() {
           ) : undefined
         }
       />
+
+      {supplyOnly && !wizard && <SupplyOnlyNote />}
 
       {error && (
         <div className="max-w-md">

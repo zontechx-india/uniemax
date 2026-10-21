@@ -19,6 +19,8 @@ export type SplitMode = 'off' | 'sandbox' | 'live'
 export interface StoreRole {
   supplier: { status: SupplierStatus; supplyOnly: boolean } | null
   hasSuppliers: boolean
+  /** A supplier's new orders waiting to be shipped (0 for a store that isn't one). */
+  ordersToShip: number
   /** Easy Split payouts: off, simulated (no money moves), or real. */
   split: SplitMode
   /** Whether THIS store can be paid out to; null while payouts are off. */

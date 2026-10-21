@@ -161,4 +161,5 @@ Admin routes: [admin](../admin/context.md).
 | SU-15 | The seller invites their own store. | Refused at accept: the inviting store can't be chosen (400). Another store of the same owner may supply it. |
 | SU-16 | The supplier's address is missing. | Asked on the join sheet itself. |
 | SU-17 | The supplier no longer wants to supply a seller (for example, it disagrees with changed terms). | It can **Pause** or **End** too (D-19); the seller is told. Copies pause (`LINK_INACTIVE`) (built); open orders complete. |
+| SU-19 | A supplier account is put on the marketplace (its owner taps Publish on the products page). | **Refused** (`store.publishing` hook, 409): a supplier account has no shop (D-28), so it is never listed or searchable, and its stock can't be bought from there. The Publish prompt is hidden for it, and its Products page says only the offered products reach sellers. To sell to customers it needs a store of its own. |
 | SU-18 | A supplier wants UnieMax to pay it but has no bank account. | Phase 6 asks for it in place. Until then its prepaid orders settle directly (PS-1); nothing is blocked. |

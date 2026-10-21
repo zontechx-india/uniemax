@@ -120,6 +120,8 @@ export interface AppHooks {
   "checkout.options": (storeId: string, lines: CheckoutLine[]) => Promise<{ cod?: string | null; pickup?: string | null }>;
   /** Before a product or variant save in the editor (veto only). */
   "product.saving": (productId: string, change: ProductChange) => Promise<void>;
+  /** Before a store is put on the marketplace — veto only (a supplier account has no shop). */
+  "store.publishing": (storeId: string) => Promise<void>;
 }
 export function hook<K extends keyof AppHooks>(name: K, fn: AppHooks[K]): void;
 export async function runHooks(name, ...args): Promise<void>;          // every hook but checkout.options

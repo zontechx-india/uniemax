@@ -41,6 +41,10 @@ export async function storeRole(storeId: string) {
     deps.prisma.supplier.findUnique({ where: { storeId } }),
     deps.prisma.supplierLink.count({ where: { sellerStoreId: storeId } }),
   ]);
+  // A supplier's new orders waiting to be shipped: the badge on its menu and its dashboard.
+  const ordersToShip = supplier
+    ? await deps.prisma.supplierOrder.count({ where: { supplierId: supplier.id, status: { in: ["NEW", "ACCEPTED"] } } })
+    : 0;
   // Easy Split (Phase 6): which mode payouts are in, and whether THIS store can be paid out to.
   const split = splitMode();
   const payout =
@@ -50,6 +54,7 @@ export async function storeRole(storeId: string) {
       ? { status: supplier.status, supplyOnly: supplier.supplyOnly }
       : null,
     hasSuppliers: links > 0,
+    ordersToShip,
     split,
     payout,
   };

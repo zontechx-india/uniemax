@@ -18,6 +18,7 @@ export {
 } from './role'
 export type { DropshipRole } from './role'
 export { SupplierHome } from './pages/supplier/SupplierHome'
+export { SupplyOnlyNote } from './pages/supplier/SupplyOnlyNote'
 // Seams in the seller's product list and product editor (supplier products, D-34).
 export { useSuppliedFor, useSuppliedProducts } from './supplied'
 export type { Supplied } from './api'

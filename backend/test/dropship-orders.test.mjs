@@ -196,3 +196,25 @@ test("access: the seller can't act as the supplier, and a stranger can't read th
   const stranger = new Client();
   assert.ok([401, 403].includes((await stranger.req("GET", `${c.S}/shipments`, { anonymous: true })).status));
 });
+
+test("a supplier account can't be published: it has no shop (D-28)", async (t) => {
+  const c = await setup(t);
+  if (!c) return;
+  const r = await c.B.req("PATCH", `/api/v1/stores/${c.supStoreId}/publish`, { json: { isPublished: true } });
+  assert.equal(r.status, 409, JSON.stringify(r.body));
+  assert.match(r.body.message, /supplier account/);
+  const store = (await c.B.req("GET", `/api/v1/stores/${c.supStoreId}`)).body.data;
+  assert.equal(store.isPublished, false);
+});
+
+test("the supplier's role counts the new orders waiting to be shipped (the menu badge)", async (t) => {
+  const c = await setup(t);
+  if (!c) return;
+  const before = (await c.B.req("GET", `${c.Sup}/role`)).body.data.ordersToShip;
+  assert.equal(typeof before, "number");
+  const placed = await placeCod(c, [copyLine(c)]);
+  assert.equal(placed.status, 201, JSON.stringify(placed.body));
+  assert.equal((await c.B.req("GET", `${c.Sup}/role`)).body.data.ordersToShip, before + 1);
+  // a store that is not a supplier has nothing to ship
+  assert.equal((await c.A.req("GET", `${c.S}/role`)).body.data.ordersToShip, 0);
+});
