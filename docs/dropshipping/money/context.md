@@ -4,7 +4,7 @@
 > statement, recording payments, Easy Split payouts, refunds, or anything about
 > who owes whom. **Update when:** any money rule changes.
 
-Status: ◐ the account (statement), recorded payments and the job's owed transition are built (Phase 5, 21 Oct 2026; API tests and the screen walkthrough pending). Amounts are recorded from Phase 4 (`costTotal`, `shippingFee`, `supplierShare`, `platformFee`, `collectAmount` on each supplier order). Every line is `DIRECT`; Easy Split is Phase 6.
+Status: ◐ the account (statement), recorded payments and the job's owed transition are built (Phase 5, 21 Oct 2026; API tests pass on dev, screen walkthrough pending). Amounts are recorded from Phase 4 (`costTotal`, `shippingFee`, `supplierShare`, `platformFee`, `collectAmount` on each supplier order). Every line is `DIRECT`; Easy Split is Phase 6.
 The account is **computed on read** from the supplier orders and the live payments (D-40): one pure function (`domain.ts` `statementLine`, `statementBalance`), so both sides always see the same numbers. Decisions: D-16,
 D-17, D-18 in [decisions](../decisions.md). Every amount here comes from the
 order's snapshot ([terms](../terms/context.md)).

@@ -1,8 +1,8 @@
 # Phase 5: Statement, reminders, self-healing. MVP complete ◐
 
-> Built 21 Oct 2026 (migration `20261021150000_dropship_statement`). Left: the API suite on dev
-> (`test/dropship-statement.test.mjs`, runs once this is deployed there), the walkthrough of
-> the screens on dev, and the **Release** steps below, which are the owner's.
+> Built 21 Oct 2026 (migration `20261021150000_dropship_statement`). The API suites pass on dev
+> (21 Oct 2026). Left: the walkthrough of the screens on dev, and the **Release** steps below,
+> which are the owner's.
 
 ## Goal
 
@@ -60,7 +60,9 @@ and cancelled cases. A dropped `order.paid` handler is repaired by reconcile.
   access. The Phase 3 (25) and Phase 4 (29) checks still pass.
 - Frontend: `tsc -b`, `vite build`, `check:ui` (no budget rises); the Account page checked at
   390 px with mocked data — you owe, they owe, settled, supplier side and the record sheet.
-- **Not run yet:** `npm run test:api` for `test/dropship-statement.test.mjs` — it needs this code on dev.
+- `npm run test:api` on dev after the deploy: `test/dropship-statement.test.mjs` (6 tests: pending line,
+  COD delivered with both sides agreeing, a recorded payment, only-the-recorder delete, payment
+  validation, access) with the orders, supplier-products, suppliers and shipments suites: 33 of 33 pass.
 
 ## Release
 
