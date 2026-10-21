@@ -5,7 +5,7 @@
 > shipping, cancellations, problems, or the seller's view of all this.
 > **Update when:** any of those change.
 
-Status: ◐ built 21 Oct 2026 (Phase 4; API suite + dev walkthrough pending). Code:
+Status: ◐ built 21 Oct 2026 (Phase 4; API tests pass on dev, screen walkthrough pending). Code:
 `backend/src/package/dropship/services/{supplierOrders,orderViews}.ts`, `hooks.ts`,
 `events.ts`; `frontend/src/packages/dropship/pages/{supplier,seller,admin}/`
 (`OrdersToShipPage`, `SlipsPage`, `SupplierParts`, `ShipmentsPage`, `NeedsActionPage`).

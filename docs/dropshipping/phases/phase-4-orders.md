@@ -1,8 +1,7 @@
 # Phase 4: Orders and shipping ◐
 
-> Built 21 Oct 2026 (migration `20261021140000_dropship_supplier_orders`). Left:
-> the API suite on dev (`test/dropship-orders.test.mjs`, runs once this is
-> deployed there) and the walkthrough of the screens on dev.
+> Built 21 Oct 2026 (migration `20261021140000_dropship_supplier_orders`). The
+> API suites pass on dev (21 Oct 2026). Left: the walkthrough of the screens on dev.
 
 ## Goal
 
@@ -89,8 +88,9 @@ K-1…K-12, F-1…F-16 and T-1…T-8, including:
   product last (architecture → Lock order).
 - Frontend: `tsc -b`, `vite build`, `check:ui` (no budget rises); every new
   screen checked at 390 px with mocked data (no overflow, no console errors).
-- **Not run yet:** `npm run test:api` for `test/dropship-orders.test.mjs` — it
-  needs this code deployed on dev.
+- `npm run test:api` on dev after the deploy: `test/dropship-orders.test.mjs` (6 tests: quote
+  rules, mixed COD refused, COD order → ship → delivered, can't ship, buyer cancel, access),
+  with the suppliers, supplier-products and shipments suites: 27 of 27 pass.
 
 ## Done when
 
