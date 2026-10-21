@@ -262,9 +262,6 @@ export async function acceptInvite(token: string, customerId: string, input: Inv
     if (existingStore.id === seller.id) {
       throw HttpError.badRequest("Your own store can't supply itself"); // SU-15
     }
-    if (!existingStore.hasAddress) {
-      throw HttpError.badRequest("Add your store's business address first"); // SU-16
-    }
   }
   const existingSupplier = existingStore
     ? await deps.prisma.supplier.findUnique({ where: { storeId: existingStore.id } })
@@ -273,6 +270,9 @@ export async function acceptInvite(token: string, customerId: string, input: Inv
     throw HttpError.badRequest(
       "A shop that sells can't also be a supplier. Create a supplier account instead.",
     ); // D-49
+  }
+  if (existingStore && !existingStore.hasAddress) {
+    throw HttpError.badRequest("Add your store's business address first"); // SU-16
   }
   if (existingSupplier?.status === "SUSPENDED") {
     throw HttpError.forbidden("This store can't supply sellers right now — contact UnieMax support");
