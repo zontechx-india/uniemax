@@ -33,4 +33,14 @@ export const dropshipConfig = {
   deliveredReminderDays: num("DROPSHIP_DELIVERED_REMINDER_DAYS", 7),
   /** Shipped this long ago and never marked delivered → it counts as owed (F-10). */
   owedFallbackDays: num("DROPSHIP_OWED_FALLBACK_DAYS", 15),
+  /** Easy Split (Phase 6): new prepaid supplier orders may be paid by split (off by default). */
+  splitEnabled: flag("DROPSHIP_SPLIT"),
+  /** Who answers the split calls. Only `sandbox` is built; `paymenthub` is reserved (D-44). */
+  splitProvider: process.env.DROPSHIP_SPLIT_PROVIDER ?? "sandbox",
+  /** The split is requested at least this long after the payment lands (Cashfree needs ~2 minutes). */
+  splitDelayMinutes: num("DROPSHIP_SPLIT_DELAY_MINUTES", 2),
+  /** Cashfree's Order Split Delay window; a split not done with 2 h left goes on admin's list (PS-3). */
+  splitWindowHours: num("DROPSHIP_SPLIT_WINDOW_HOURS", 24),
+  /** Cashfree holds a vendor's money this long before paying out (D-21). */
+  vendorHoldDays: num("DROPSHIP_VENDOR_HOLD_DAYS", 12),
 };

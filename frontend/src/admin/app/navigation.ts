@@ -50,6 +50,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/affiliates', label: 'Affiliates' },
       { to: '/suppliers', label: 'Suppliers', dropship: true },
       { to: '/needs-action', label: 'Needs action', dropship: true },
+      { to: '/payouts', label: 'Payouts', dropship: true },
     ],
   },
   {
@@ -80,6 +81,7 @@ const TITLES: [string, string][] = [
   ['/customers', 'Customers'],
   ['/suppliers', 'Suppliers'],
   ['/needs-action', 'Needs action'],
+  ['/payouts', 'Payouts'],
   ['/support', 'Support'],
   ['/whatsapp', 'WhatsApp'],
   ['/theme-templates', 'Store themes'],

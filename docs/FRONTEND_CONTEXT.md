@@ -2586,7 +2586,11 @@ what the host apps see:
     delivery" is not offered): the supplier's Ship / Edit tracking sheet reuses it, and
     `DeliveredDialog` is reused as is.
 - The admin console's **Needs action** (`/needs-action`, lazy, gated like Suppliers) is
-  `pages/admin/NeedsActionPage`.
+  `pages/admin/NeedsActionPage`. **Payouts** (`/payouts`, the same gating) is the read-only
+  list of split payouts (`pages/admin/PayoutsPage`).
+- **Easy Split bank prompt**: `StoreBankPage` exports its `AccountForm`, and the package's `BankPrompt`
+  (Orders to ship, Supplier settings, the seller's Suppliers page) shows it in a dialog when payouts are on
+  and the store has no payout account, so a supplier adds its bank account without leaving the page.
 - **The flag comes from the backend**: `GET /api/v1/dropship/status` answers only
   when the package is registered; a 404 keeps every supplier row and the admin
   **Suppliers** nav item hidden. `role.ts` caches it, and each store's role, per

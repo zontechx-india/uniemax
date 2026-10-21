@@ -1,7 +1,9 @@
 import { Prisma } from "../../../generated/prisma/client.js";
 import { HttpError } from "../../../utils/httpError.js";
+import { dropshipConfig } from "../config.js";
 import { deps } from "../deps.js";
-import { balanceWords, lineStateWords, rupee, statementBalance, statementLine, validatePayment } from "../domain.js";
+import { balanceWords, lineStateWords, payoutDate, rupee, statementBalance, statementLine, validatePayment } from "../domain.js";
+import { splitMode } from "./suppliers.js";
 import type { StatementViewer } from "../domain.js";
 import type { PaymentInput } from "../schema.js";
 import type { StoreRef } from "../types.js";
@@ -74,7 +76,10 @@ export async function getAccount(ctx: Ctx, customerId: string) {
       paymentMode: o.paymentMode,
       status: o.status,
       state: o.statementState,
-      stateText: lineStateWords(o.statementState, o.status),
+      stateText: stateTextOf(o),
+      /** Paid by UnieMax through Easy Split, and when it reaches the supplier's bank (D-21). */
+      settleVia: o.settleVia,
+      payoutOn: o.statementState === "SPLIT" && o.splitAt ? payoutDate(o.splitAt, dropshipConfig.vendorHoldDays) : null,
       counts: l.counts,
       customerPaid: views.get(o.orderId) ? num(views.get(o.orderId)!.total) : null,
       supplierGets: num(o.supplierShare),
@@ -97,6 +102,8 @@ export async function getAccount(ctx: Ctx, customerId: string) {
     lines,
     /** More orders than the list shows — they are all in the balance. */
     moreLines: everyOrder.length > orders.length,
+    /** Payouts mode: a note on the screen says when nothing real moves. */
+    split: splitMode(),
     payments: payments.map((p) => {
       const paidByViewer = (p.direction === "SELLER_TO_SUPPLIER") === (viewer === "seller");
       return {
@@ -113,6 +120,17 @@ export async function getAccount(ctx: Ctx, customerId: string) {
       };
     }),
   };
+}
+
+/** A line's state in words, with Easy Split's own wording for a split-paid order. */
+function stateTextOf(o: { statementState: "PENDING" | "OWED" | "HELD" | "VOID" | "SPLIT"; status: Parameters<typeof lineStateWords>[1]; settleVia: string; splitState: string | null; splitAt: Date | null }): string {
+  if (o.statementState === "SPLIT") {
+    const when = o.splitAt ? payoutDate(o.splitAt, dropshipConfig.vendorHoldDays).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : null;
+    return when ? `Paid by UnieMax · pays out on ${when}` : "Paid by UnieMax";
+  }
+  // Chosen for Easy Split, not paid out yet: say so rather than "not delivered".
+  if (o.settleVia === "SPLIT" && o.splitState !== "DONE" && o.statementState !== "VOID" && o.statementState !== "HELD") return "To be paid by UnieMax";
+  return lineStateWords(o.statementState, o.status);
 }
 
 const accountUrl = (store: StoreRef, side: StatementViewer, linkId: string) =>

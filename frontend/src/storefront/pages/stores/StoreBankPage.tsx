@@ -529,7 +529,8 @@ interface AccountDraft {
   upiId: string
 }
 
-function AccountForm({
+/** Also used in place by the dropship package's bank prompt (a supplier adds its payout account without leaving its page). */
+export function AccountForm({
   initial,
   busy,
   onSubmit,

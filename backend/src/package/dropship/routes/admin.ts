@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { requireAdmin, requireAdminCsrf } from "../../auth/index.js";
 import { idParamSchema } from "../../../utils/zodHelpers.js";
 import { list, ok } from "../../../utils/response.js";
-import { adminNoteSchema, adminSupplierQuery, needsActionQuery } from "../schema.js";
+import { adminNoteSchema, adminSupplierQuery, needsActionQuery, payoutsQuery } from "../schema.js";
 import * as orders from "../services/supplierOrders.js";
 import * as views from "../services/orderViews.js";
 import * as suppliers from "../services/suppliers.js";
@@ -34,6 +34,13 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   app.get("/needs-action", async (request) => {
     const { kind, page } = needsActionQuery.parse(request.query);
     const { items, meta } = await views.needsAction(kind, page);
+    return list(items, meta);
+  });
+
+  // Payouts: every order paid by Easy Split (sandbox or live) and where its split stands. Read-only.
+  app.get("/payouts", async (request) => {
+    const { page } = payoutsQuery.parse(request.query);
+    const { items, meta } = await views.adminPayouts(page);
     return list(items, meta);
   });
 

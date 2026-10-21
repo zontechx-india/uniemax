@@ -7,7 +7,7 @@
 
 Status: ◐ link terms, the change log and change notices built (Phase 2, 20 Oct
 2026; `services/terms.ts`, `domain.ts#describeChange`). Snapshots built in Phase 4 (21 Oct 2026; `services/supplierOrders.ts` `place`, shown on the order screens as "Terms for this order").
-`settleVia = SPLIT`: Phase 6.
+`settleVia = SPLIT` built in Phase 6 (21 Oct 2026, sandbox): decided per part at placement by `chooseSettleVia`, and only ever falling back to `DIRECT` afterwards (T-10).
 
 ## The rule (D-18)
 
@@ -62,7 +62,7 @@ change to a term affects orders placed after it, never before.
 | T-6 | The supplier changes its ship-within days. | Orders already placed keep their deadline. |
 | T-7 | Several changes in one day. | Each order uses the terms in force at its own placement time. The log shows the order of the changes. |
 | T-8 | A change is saved at the same moment an order is placed. | Placement reads one consistent set of terms inside its transaction. A change committed after that read applies to the next order. |
-| T-9 | Easy Split goes live, or a supplier adds its bank account. | Orders placed before stay `DIRECT`; orders after become `SPLIT`. |
+| T-9 | Easy Split goes live, or a supplier adds its bank account. | Orders placed before stay `DIRECT`; orders after become `SPLIT`. ☑ (a part decided `DIRECT` is never moved to `SPLIT`.) |
 | T-10 | A `SPLIT` supplier's payout account fails after the order was placed. | The only allowed change to `settleVia` after placement: it falls back to `DIRECT`, logged, and both sides are told (PS-2 in [money](../money/context.md)). |
 | T-11 | The two sides dispute what was agreed. | The `TermsChange` log and the order's snapshot are the record. Admins can see both. |
 | T-12 | The platform fee rate changes. | Each order keeps the `platformFee` it was placed with. |

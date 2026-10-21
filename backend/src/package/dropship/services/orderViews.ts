@@ -4,7 +4,7 @@ import { HttpError } from "../../../utils/httpError.js";
 import { mediaUrl } from "../../storage/index.js";
 import { dropshipConfig } from "../config.js";
 import { deps } from "../deps.js";
-import { customerDataHidden, isLate, orderEarnings } from "../domain.js";
+import { customerDataHidden, isLate, orderEarnings, payoutDate, splitAmounts, splitWindowClosing } from "../domain.js";
 import type { OrderView, ParcelRef, StoreRef } from "../types.js";
 
 /**
@@ -107,6 +107,9 @@ function shapeForSupplier(r: Row, view: OrderView | undefined, seller: StoreRef 
     parcel: shapeParcel(parcelOf(view, r.shipmentId)),
     closeReason: r.closeReason,
     amounts: { costTotal: money(r.costTotal), shippingFee: money(r.shippingFee), supplierShare: money(r.supplierShare) },
+    /** How this supplier is paid: by UnieMax (Easy Split) or directly by the seller (D-16). */
+    paidBy: r.settleVia === "SPLIT" ? "UNIEMAX" : "SELLER",
+    split: r.settleVia === "SPLIT" ? { state: r.splitState ?? "WAITING", payoutOn: r.splitAt ? payoutDate(r.splitAt, dropshipConfig.vendorHoldDays) : null } : null,
     terms: termsLine(r),
   };
 }
@@ -278,9 +281,9 @@ export async function sellerShipments(
 // Admin: Needs action
 // ===========================================================================
 
-export type NeedsKind = "late" | "cant_ship" | "came_back" | "problem" | "refund";
+export type NeedsKind = "late" | "cant_ship" | "came_back" | "problem" | "refund" | "split" | "vendor_balance";
 
-export const NEEDS_KINDS: NeedsKind[] = ["late", "cant_ship", "came_back", "problem", "refund"];
+export const NEEDS_KINDS: NeedsKind[] = ["late", "cant_ship", "came_back", "problem", "refund", "split", "vendor_balance"];
 
 /**
  * One list of everything a person has to look at; each item disappears once
@@ -296,10 +299,17 @@ export async function needsAction(kind: NeedsKind | undefined, page: number) {
     came_back: { ...open, status: "RETURNED" },
     problem: { ...open, issueOpenAt: { not: null } },
     refund: { ...open, paymentMode: "PREPAID", status: { in: ["REJECTED", "RETURNED", "CANCELLED"] } },
+    // Easy Split (Phase 6): a split that keeps failing, and a COD fee the seller's vendor couldn't cover.
+    split: { ...open, settleVia: "SPLIT", splitState: "FAILED", paidAt: { not: null } },
+    vendor_balance: { ...open, feeAdjustError: { not: null } },
   };
   const kinds = kind ? [kind] : NEEDS_KINDS;
   const { rows, views } = await load({ OR: kinds.map((k) => candidates[k]) }, [{ updatedAt: "desc" }], 500);
   const stores = await storesById([...rows.map((r) => r.sellerStoreId), ...rows.map((r) => r.supplier.storeId)]);
+  const vendorAmounts = await vendorAmountsByOrder(
+    rows.filter((r) => r.settleVia === "SPLIT" && r.splitState === "DONE").map((r) => r.orderId),
+    views,
+  );
 
   const items = rows.flatMap((r) => {
     const view = views.get(r.orderId);
@@ -312,6 +322,8 @@ export async function needsAction(kind: NeedsKind | undefined, page: number) {
     if (r.status === "RETURNED") kindsOf.push("came_back");
     if (r.issueOpenAt) kindsOf.push("problem");
     if (r.paymentMode === "PREPAID" && view?.paymentStatus === "REFUNDED") kindsOf.push("refund");
+    if (splitWindowClosing(r, dropshipConfig.splitWindowHours, now)) kindsOf.push("split");
+    if (r.feeAdjustError) kindsOf.push("vendor_balance");
     return kindsOf
       .filter((k) => !kind || k === kind)
       .map((k) => ({
@@ -328,6 +340,12 @@ export async function needsAction(kind: NeedsKind | undefined, page: number) {
         ticketId: r.issueTicketId,
         orderTotal: view ? Number(view.total) : null,
         supplierShare: money(r.supplierShare),
+        /** Easy Split: what a Split Refund needs, per vendor (PS-8). */
+        vendorAmounts: k === "refund" ? (vendorAmounts.get(r.orderId) ?? null) : null,
+        splitError: r.splitError,
+        splitAttempts: r.splitAttempts,
+        feeAdjustError: r.feeAdjustError,
+        platformFee: money(r.platformFee),
         createdAt: r.createdAt,
       }));
   });
@@ -335,5 +353,83 @@ export async function needsAction(kind: NeedsKind | undefined, page: number) {
   return {
     items: items.slice((page - 1) * pageSize, page * pageSize),
     meta: { page, pageSize, total: items.length, totalPages: Math.max(1, Math.ceil(items.length / pageSize)) },
+  };
+}
+
+// ===========================================================================
+// Easy Split (Phase 6): per-vendor amounts and the Payouts list
+// ===========================================================================
+
+/**
+ * What each payee of a split order got: the figures a Split Refund needs when
+ * the order is refunded (PS-8). Supplier shares, then the seller's remainder;
+ * the platform fee stays with UnieMax.
+ */
+async function vendorAmountsByOrder(orderIds: string[], views: Map<string, OrderView>) {
+  const out = new Map<string, { entries: { name: string; role: "SUPPLIER" | "SELLER"; amount: number }[]; fee: number }>();
+  const ids = [...new Set(orderIds)];
+  if (ids.length === 0) return out;
+  const parts = await deps.prisma.supplierOrder.findMany({
+    where: { orderId: { in: ids }, settleVia: "SPLIT" },
+    include: { supplier: true },
+  });
+  const stores = await storesById([...parts.map((p) => p.sellerStoreId), ...parts.map((p) => p.supplier.storeId)]);
+  for (const orderId of ids) {
+    const mine = parts.filter((p) => p.orderId === orderId);
+    const view = views.get(orderId);
+    if (!view || mine.length === 0) continue;
+    const r = splitAmounts({
+      orderTotal: view.total,
+      sellerStoreId: mine[0]!.sellerStoreId,
+      parts: mine.map((p) => ({ storeId: p.supplier.storeId, supplierShare: p.supplierShare, platformFee: p.platformFee })),
+    });
+    if (!r.ok) continue;
+    out.set(orderId, {
+      entries: r.entries.map((e) => ({ name: stores.get(e.storeId)?.name ?? "—", role: e.role, amount: Number(e.amount.toFixed(2)) })),
+      fee: Number(r.fee.toFixed(2)),
+    });
+  }
+  return out;
+}
+
+/** Admin → Payouts: every order paid (or meant to be paid) by Easy Split, and where each stands. Read-only. */
+export async function adminPayouts(page: number) {
+  const pageSize = 30;
+  const where: Prisma.SupplierOrderWhereInput = { OR: [{ settleVia: "SPLIT" }, { splitState: "FALLBACK_DIRECT" }] };
+  const [total, rows] = await Promise.all([
+    deps.prisma.supplierOrder.count({ where }),
+    deps.prisma.supplierOrder.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: { supplier: true },
+    }),
+  ]);
+  const views = new Map((await deps.host.getOrderViews([...new Set(rows.map((r) => r.orderId))])).map((v) => [v.id, v]));
+  const amounts = await vendorAmountsByOrder(rows.filter((r) => r.settleVia === "SPLIT").map((r) => r.orderId), views);
+  const stores = await storesById([...rows.map((r) => r.sellerStoreId), ...rows.map((r) => r.supplier.storeId)]);
+  return {
+    items: rows.map((r) => ({
+      supplierOrderId: r.id,
+      orderId: r.orderId,
+      orderNumber: r.orderNumber,
+      seller: stores.get(r.sellerStoreId)?.name ?? "—",
+      supplier: stores.get(r.supplier.storeId)?.name ?? "—",
+      settleVia: r.settleVia,
+      state: r.splitState ?? "WAITING",
+      ref: r.splitRef,
+      attempts: r.splitAttempts,
+      error: r.splitError,
+      paidAt: r.paidAt,
+      splitAt: r.splitAt,
+      payoutOn: r.splitAt ? payoutDate(r.splitAt, dropshipConfig.vendorHoldDays) : null,
+      orderTotal: views.get(r.orderId) ? Number(views.get(r.orderId)!.total) : null,
+      supplierGets: money(r.supplierShare),
+      platformFee: money(r.platformFee),
+      /** What the seller's vendor gets from the whole order's split. */
+      sellerGets: amounts.get(r.orderId)?.entries.find((e) => e.role === "SELLER")?.amount ?? null,
+    })),
+    meta: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
   };
 }

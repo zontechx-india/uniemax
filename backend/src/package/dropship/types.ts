@@ -80,6 +80,15 @@ export interface DropshipHost {
   /** The customer order, confirmed / cancelled by the system (the seller's rules, no store scope). */
   confirmOrder(orderId: string): Promise<void>;
   cancelOrder(orderId: string, reason: string): Promise<void>;
+  // ---- Phase 6: payouts (Easy Split) — sandbox today, PaymentHub later (D-44) ---------
+  /** Whether payouts can be split right now (the provider is ready). */
+  splitLive(): boolean;
+  /** Which stores can be paid out to. Sandbox: a primary bank account that isn't FAILED (D-45). */
+  getPayoutAccounts(storeIds: string[]): Promise<Map<string, { active: boolean }>>;
+  /** One request per order, idempotent by key. Throws `HostSplitError` when it can't be done. */
+  requestSplit(orderId: string, entries: SplitEntry[], key: string): Promise<{ ref: string }>;
+  /** Debit or credit a store's payout balance (the COD platform fee). Idempotent by key. */
+  adjustPayout(storeId: string, direction: "DEBIT" | "CREDIT", amount: Prisma.Decimal, key: string): Promise<{ ref: string }>;
   /** A support ticket to UnieMax about an order (F-9). Returns its id. */
   openTicket(customerId: string, storeId: string, subject: string, message: string): Promise<string>;
   notify(customerId: string, message: HostNotification): void;
@@ -331,4 +340,23 @@ export interface OrderView {
   createdAt: Date;
   items: { id: string; fulfilledBy: string | null; shipmentId: string | null; lineTotal: Prisma.Decimal; imageKey: string | null }[];
   parcels: ParcelRef[];
+}
+
+// ---- Phase 6 --------------------------------------------------------------
+
+export interface SplitEntry {
+  /** The store (a Cashfree vendor, D-22) that gets this amount. */
+  storeId: string;
+  role: "SUPPLIER" | "SELLER";
+  amount: Prisma.Decimal;
+}
+
+/** Why a split or an adjustment couldn't be done. `INSUFFICIENT`: the vendor's balance is too low. */
+export class HostSplitError extends Error {
+  constructor(
+    public code: "FAILED" | "INSUFFICIENT" | "NO_ACCOUNT",
+    message: string,
+  ) {
+    super(message);
+  }
 }

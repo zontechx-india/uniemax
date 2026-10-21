@@ -73,7 +73,11 @@ function AccountPage({ side }: { side: 'seller' | 'supplier' }) {
             <p className="text-xl font-semibold text-fg">{data.words}</p>
             <p className="mt-1 text-sm text-muted">
               Only delivered orders count. An order on hold or still on its way is shown but not added up.
+              {data.lines.some((l) => l.settleVia === 'SPLIT') && " Orders paid by UnieMax don't count here: the supplier is paid straight from the payment."}
             </p>
+            {data.split === 'sandbox' && (
+              <p className="mt-1 text-xs text-muted">Payouts through UnieMax are in sandbox for now: nothing real moves.</p>
+            )}
             <div className="mt-3 flex flex-wrap gap-2">
               <Button onClick={() => setRecording(true)}>Record a payment</Button>
             </div>
@@ -170,9 +174,10 @@ function AccountPage({ side }: { side: 'seller' | 'supplier' }) {
 }
 
 function LineRow({ line: l, side }: { line: AccountLine; side: 'seller' | 'supplier' }) {
-  const tone = l.state === 'OWED' ? 'brand' : l.state === 'HELD' ? 'pending' : l.state === 'VOID' ? 'danger' : 'neutral'
+  const tone =
+    l.state === 'OWED' || l.state === 'SPLIT' ? 'brand' : l.state === 'HELD' ? 'pending' : l.state === 'VOID' ? 'danger' : 'neutral'
   const amountText =
-    l.state === 'VOID' ? '—' : l.forYou === 0 ? '—' : l.forYou > 0 ? `You get ${money(l.forYou)}` : `You owe ${money(-l.forYou)}`
+    l.state === 'VOID' ? '—' : l.state === 'SPLIT' ? 'Nothing to settle between you' : l.forYou === 0 ? '—' : l.forYou > 0 ? `You get ${money(l.forYou)}` : `You owe ${money(-l.forYou)}`
   return (
     <li className="rounded-lg border border-line bg-surface p-3">
       <div className="flex flex-wrap items-center gap-2">

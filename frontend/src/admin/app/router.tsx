@@ -55,6 +55,9 @@ const SuppliersAdminPage = lazy(
 const NeedsActionPage = lazy(
   () => import('../../packages/dropship/pages/admin/NeedsActionPage'),
 )
+const PayoutsPage = lazy(
+  () => import('../../packages/dropship/pages/admin/PayoutsPage'),
+)
 const NotificationsPage = lazy(() => import('../pages/NotificationsPage'))
 const ActivityPage = lazy(() => import('../pages/ActivityPage'))
 const AdminsPage = lazy(() => import('../pages/AdminsPage'))
@@ -234,6 +237,7 @@ export function AdminRouter() {
                 <Route path="affiliates" element={<AffiliateAdminPage />} />
                 <Route path="suppliers" element={<SuppliersAdminPage />} />
                 <Route path="needs-action" element={<NeedsActionPage />} />
+                <Route path="payouts" element={<PayoutsPage />} />
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="activity" element={<ActivityPage />} />
                 <Route path="admins" element={<AdminsPage />} />

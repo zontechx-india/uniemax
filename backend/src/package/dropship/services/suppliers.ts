@@ -1,5 +1,6 @@
 import { HttpError } from "../../../utils/httpError.js";
 import { buildListMeta } from "../../../utils/response.js";
+import { dropshipConfig } from "../config.js";
 import { deps } from "../deps.js";
 import { canMoveLink, describeChange, diffTerms } from "../domain.js";
 import type { LinkStatus } from "../domain.js";
@@ -40,12 +41,24 @@ export async function storeRole(storeId: string) {
     deps.prisma.supplier.findUnique({ where: { storeId } }),
     deps.prisma.supplierLink.count({ where: { sellerStoreId: storeId } }),
   ]);
+  // Easy Split (Phase 6): which mode payouts are in, and whether THIS store can be paid out to.
+  const split = splitMode();
+  const payout =
+    split === "off" ? null : { active: (await deps.host.getPayoutAccounts([storeId])).get(storeId)?.active ?? false };
   return {
     supplier: supplier
       ? { status: supplier.status, supplyOnly: supplier.supplyOnly }
       : null,
     hasSuppliers: links > 0,
+    split,
+    payout,
   };
+}
+
+/** `off` · `sandbox` (simulated, no money moves — D-44) · `live` (the real provider). */
+export function splitMode(): "off" | "sandbox" | "live" {
+  if (!dropshipConfig.splitEnabled || !deps.host.splitLive()) return "off";
+  return dropshipConfig.splitProvider === "sandbox" ? "sandbox" : "live";
 }
 
 // ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@
 > **Read when:** working on admin screens or endpoints for dropshipping.
 > **Update when:** they change.
 
-Status: ◐ Suppliers built (Phase 2, 20 Oct 2026); Needs action built (Phase 4, 21 Oct 2026); forcing a status is not built (D-37).
+Status: ◐ Suppliers built (Phase 2, 20 Oct 2026); Needs action built (Phase 4, 21 Oct 2026) with **Split not done** and **Vendor balance low** added in Phase 6 (21 Oct 2026); a read-only **Payouts** page (Phase 6); forcing a status is not built (D-37).
 
 ## Screens (`frontend/src/admin`)
 
@@ -31,6 +31,9 @@ Status: ◐ Suppliers built (Phase 2, 20 Oct 2026); Needs action built (Phase 4,
 - There is no supplier payments screen. Money settles directly between the
   seller and the supplier until Easy Split pays prepaid orders (D-16, Phase 6).
 
+- ☑ **Payouts** (`/payouts` in the console, shown while the package is on): every order paid, or meant to be paid, by Easy Split — state, reference, what the supplier, the seller and UnieMax's fee each get, the payout date, attempts and the last error. Read-only; labelled *Sandbox — no money moves* while payouts are simulated.
+- ☑ **Refunds to make** on a split order carries the per-vendor amounts a Split Refund needs (PS-8).
+
 ## API: `/api/v1/admin/dropship` ◐
 
 Inside the admin subtree its session cookies are scoped to (D-29):
@@ -40,6 +43,7 @@ Inside the admin subtree its session cookies are scoped to (D-29):
 | --- | --- | --- |
 | GET | `/suppliers?status&page&pageSize` | ☑ Supplier list (`list()` envelope) |
 | POST | `/suppliers/:id/suspend` · `/restore` | ☑ `{ note }` (required) |
-| GET | `/needs-action?kind&page` | ☑ The list above (`list()` envelope) |
+| GET | `/needs-action?kind&page` | ☑ The list above (`list()` envelope); kinds `late · cant_ship · came_back · problem · refund · split · vendor_balance` |
+| GET | `/payouts?page` | ☑ Split payouts (`list()` envelope) |
 | POST | `/needs-action/:supplierOrderId/resolve` | ☑ `{ note }`: marks it resolved, a held line goes back to pending, the seller is told a problem was resolved |
 | POST | `/supplier-orders/:id/status` | ☐ Force a transition, `{ to, note }` — not built (D-37) |

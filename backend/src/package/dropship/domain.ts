@@ -615,7 +615,7 @@ export function cantShipText(reason: CantShipReason, note: string | null): strin
 // The statement (Phase 5, docs/dropshipping/money → Who owes whom)
 // ---------------------------------------------------------------------------
 
-export type StatementState = "PENDING" | "OWED" | "HELD" | "VOID";
+export type StatementState = "PENDING" | "OWED" | "HELD" | "VOID" | "SPLIT";
 export type StatementViewer = "seller" | "supplier";
 
 export interface StatementOrder {
@@ -647,6 +647,8 @@ export interface StatementOrder {
 export function statementLine(o: StatementOrder): { amount: Prisma.Decimal; counts: boolean } {
   const counts = o.statementState === "OWED";
   if (o.statementState === "VOID") return { amount: D(0), counts: false };
+  // Paid by Easy Split: the supplier's share went straight to its vendor, so nothing is owed between the two.
+  if (o.statementState === "SPLIT") return { amount: D(0), counts: false };
   switch (o.status) {
     case "RETURNED":
       return { amount: o.returnFeePayer === "SELLER" ? paise(D(o.shippingFee)) : D(0), counts };
@@ -695,6 +697,7 @@ export function balanceWords(balance: Money, viewer: StatementViewer, otherName:
 /** What a line's state means to a person. */
 export function lineStateWords(state: StatementState, status: SupplierOrderStatus): string {
   if (state === "VOID") return "Cancelled";
+  if (state === "SPLIT") return "Paid by UnieMax";
   if (state === "HELD") return "On hold — a problem is open";
   if (state === "OWED") return status === "RETURNED" ? "Came back" : "Counted";
   return "Not delivered yet";
@@ -752,4 +755,98 @@ export function deliveredDue(o: ReminderOrder, days: number, now = new Date()): 
 /** Shipped more than `days` ago, never marked delivered, no open problem → counts as owed. */
 export function owedFallbackDue(o: ReminderOrder, days: number, now = new Date()): boolean {
   return o.status === "SHIPPED" && o.statementState === "PENDING" && !o.issueOpenAt && !!o.shippedAt && now.getTime() - o.shippedAt.getTime() > days * DAY;
+}
+
+// ---------------------------------------------------------------------------
+// Easy Split payouts (Phase 6, docs/dropshipping/money → Easy Split)
+// ---------------------------------------------------------------------------
+
+export type SettleVia = "DIRECT" | "SPLIT";
+
+/**
+ * How a supplier order is paid, decided once at placement (D-18): by Easy Split
+ * only for a prepaid order, only while the provider is live, and only when both
+ * the seller and this supplier can be paid out to. Cash on delivery never goes
+ * through Cashfree, so it is always direct.
+ */
+export function chooseSettleVia(i: {
+  paymentMode: "PREPAID" | "COD";
+  splitLive: boolean;
+  sellerActive: boolean;
+  supplierActive: boolean;
+}): SettleVia {
+  return i.paymentMode === "PREPAID" && i.splitLive && i.sellerActive && i.supplierActive ? "SPLIT" : "DIRECT";
+}
+
+export interface SplitPart {
+  /** The supplier's store: the vendor its share goes to. */
+  storeId: string;
+  supplierShare: Money;
+  platformFee: Money;
+}
+
+export interface SplitShare {
+  storeId: string;
+  role: "SUPPLIER" | "SELLER";
+  amount: Prisma.Decimal;
+}
+
+/**
+ * The split of one customer order: amounts, never percentages. Each supplier
+ * gets its `supplierShare`; the seller gets the rest of what the customer paid
+ * less the platform fee, which UnieMax keeps. Checked before the call (PS-6):
+ * nothing negative, and never more than the customer paid. When it can't be
+ * done the order is simply paid directly.
+ */
+export function splitAmounts(i: {
+  orderTotal: Money;
+  sellerStoreId: string;
+  parts: SplitPart[];
+}): { ok: true; entries: SplitShare[]; fee: Prisma.Decimal } | { ok: false; reason: string } {
+  const total = paise(D(i.orderTotal));
+  const entries: SplitShare[] = i.parts.map((p) => ({ storeId: p.storeId, role: "SUPPLIER" as const, amount: paise(D(p.supplierShare)) }));
+  const fee = paise(i.parts.reduce((sum, p) => sum.add(D(p.platformFee)), D(0)));
+  const shares = entries.reduce((sum, e) => sum.add(e.amount), D(0));
+  const seller = paise(total.sub(shares).sub(fee));
+  if (entries.some((e) => e.amount.lt(0))) return { ok: false, reason: "A supplier share is negative" };
+  if (seller.lt(0)) return { ok: false, reason: "The shares and the fee are more than the customer paid" };
+  entries.push({ storeId: i.sellerStoreId, role: "SELLER", amount: seller });
+  const paidOut = entries.reduce((sum, e) => sum.add(e.amount), D(0));
+  if (paidOut.add(fee).gt(total)) return { ok: false, reason: "The split is more than the customer paid" };
+  return { ok: true, entries, fee };
+}
+
+/** When Cashfree pays a vendor out: the hold (D-21) after the split. */
+export function payoutDate(splitAt: Date, holdDays: number): Date {
+  return daysFromNow(holdDays, splitAt);
+}
+
+interface SplitOrder {
+  settleVia: SettleVia;
+  splitState: "REQUESTED" | "DONE" | "FAILED" | "FALLBACK_DIRECT" | null;
+  paidAt: Date | null;
+}
+
+/** A SPLIT part still waiting for its split, and the payment is old enough (Cashfree needs a couple of minutes). */
+export function splitDue(o: SplitOrder, delayMinutes: number, now = new Date()): boolean {
+  if (o.settleVia !== "SPLIT" || !o.paidAt) return false;
+  if (o.splitState === "DONE" || o.splitState === "FALLBACK_DIRECT") return false;
+  return now.getTime() >= o.paidAt.getTime() + delayMinutes * 60 * 1000;
+}
+
+/** Within `marginHours` of the end of the Order Split Delay window and still not split → a person must act (PS-3). */
+export function splitWindowClosing(o: SplitOrder, windowHours: number, now = new Date(), marginHours = 2): boolean {
+  if (o.settleVia !== "SPLIT" || !o.paidAt) return false;
+  if (o.splitState === "DONE" || o.splitState === "FALLBACK_DIRECT") return false;
+  return now.getTime() >= o.paidAt.getTime() + (windowHours - marginHours) * HOUR;
+}
+
+/** A COD order's platform fee is debited from the seller's vendor once the order is delivered (D-20). */
+export function codFeeDue(o: {
+  paymentMode: "PREPAID" | "COD";
+  status: SupplierOrderStatus;
+  platformFee: Money;
+  feeAdjustedAt: Date | null;
+}): boolean {
+  return o.paymentMode === "COD" && o.status === "DELIVERED" && D(o.platformFee).gt(0) && !o.feeAdjustedAt;
 }

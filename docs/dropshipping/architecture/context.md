@@ -173,6 +173,8 @@ storeId, on)` (the core `updateStorePayments`, so its gates and
 `getCustomer`, `notify`, `sendMail`, `webUrl`. `StoreRef` carries `logoUrl`,
 `suspended`, `acceptCod`, the profile `phone` / `email` and `hasAddress`.
 
+Built in Phase 6 (the sandbox provider, D-44): `splitLive`, `getPayoutAccounts`, `requestSplit` and `adjustPayout` — the four methods PaymentHub replaces. The sandbox writes `sandbox_ledger` (per payee, keyed so a repeat is answered, never repeated) and keeps a per-store balance so a debit beyond what a store was paid fails like Cashfree's *unsettled balance*.
+
 Built in Phase 4: `getPlacingOrder(tx, orderId)` (the order and its lines, with the
 variant whose stock each line took), `reserveStock` / `releaseStock` (conditional
 decrement, aggregates), `getVariantSkus`, `tagItems`, `getOrderViews`,
@@ -214,9 +216,10 @@ interface DropshipHost {
   confirmOrder(orderId): Promise<void>;                        // CONFIRMED as system
   cancelOrder(orderId, reason): Promise<void>;                 // as system
   openTicket(input): Promise<string>;                          // PLATFORM / ORDERS support ticket
-  splitLive(): boolean;                                        // Easy Split enabled on the platform (Phase 6)
-  getPayoutAccount(storeId): Promise<{ active: boolean } | null>; // the store's Cashfree vendor, via payments
-  requestSplit(orderId, entries: { storeId; amount }[], idempotencyKey): Promise<SplitResult>; // core payments → PaymentHub
+  splitLive(): boolean;                                        // ☑ Phase 6: the provider is ready (sandbox today)
+  getPayoutAccounts(storeIds): Promise<Map<storeId, { active: boolean }>>; // ☑ sandbox: a primary bank account that hasn't failed
+  requestSplit(orderId, entries: { storeId; role; amount }[], key): Promise<{ ref }>; // ☑ idempotent by key; throws HostSplitError
+  adjustPayout(storeId, DEBIT | CREDIT, amount, key): Promise<{ ref }>; // ☑ the COD platform fee; INSUFFICIENT when the balance is low
   notify(customerId, n): void;                                 // kind DROPSHIP
   sendMail(m): Promise<void>;
   webUrl: string | null;
@@ -231,13 +234,13 @@ UPPER_SNAKE (`DROPSHIP_INVITE_EXPIRY_DAYS`, …); `DROPSHIP_ENABLED` is in
 `inviteNeedsAdminApproval`, `shipWithinDaysMax`, and `returnDaysMax` (30, the
 longest returns window a supplier may offer). Built in Phase 3:
 `suggestedMarkupPct`, `minMarginWarnPct`, `platformFeePct` and `jobIntervalMs`; in Phase 4:
-`unpaidHoldHours` and `customerDataDays`; in Phase 5: `confirmReminderHours`, `deliveredReminderDays` and `owedFallbackDays`.
+`unpaidHoldHours` and `customerDataDays`; in Phase 5: `confirmReminderHours`, `deliveredReminderDays` and `owedFallbackDays`; in Phase 6: `splitEnabled` (`DROPSHIP_SPLIT`), `splitProvider` (`sandbox`), `splitDelayMinutes` (2), `splitWindowHours` (24) and `vendorHoldDays` (12).
 The rest is planned.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `DROPSHIP_ENABLED` (env) | `false` | Registers the package. On in dev from Phase 2, in production after Phase 5. |
-| `DROPSHIP_SPLIT` (env) | `false` | New prepaid supplier orders may be `SPLIT` (only while `host.splitLive()` and both payout accounts are active). Lets store payouts move to Easy Split before dropship does. Phase 6. |
+| `DROPSHIP_SPLIT` (env) ☑ | `false` | New prepaid supplier orders may be `SPLIT` (only while `host.splitLive()` and both payout accounts are active). Lets store payouts move to Easy Split before dropship does. Phase 6. |
 | `inviteExpiryDays` | 14 | How long an invite link works |
 | `inviteNeedsAdminApproval` | `false` | D-7 |
 | `unpaidHoldHours` | 2 | How long an unpaid online checkout holds the supplier's stock |
@@ -265,7 +268,7 @@ runs the paid step; a cancelled order whose part is still open is closed and its
 younger than 10 minutes are left alone). Step 4 **privacy** needs no job: the customer-data cut-off is
 a read-time rule (D-42). Reconcile also finishes a ship whose parcel was created but whose
 supplier order never moved (`repairShipped`: the supplier would otherwise be stuck at "new"
-and a retry refused). Splits (step 3, Phase 6) are not built.
+and a retry refused). **Splits** (Phase 6, `services/payouts.ts`, ☑): the job runs `runSplits` (and a one-shot timer fires `splitDelayMinutes` after `order.paid`): for each paid order with a split-paid part it skips a cancelled order (PS-4), re-checks who can be paid (an account that failed flips that part to direct and tells both sides, T-10; the seller's failing flips them all), builds the amounts (`splitAmounts`, checked before the call, PS-6), asks the provider with a key built from the order and the amounts (PS-7), and records `DONE` or `FAILED` with the error — retried each run; with 2 h left of `splitWindowHours` it appears on admin's **Needs action**. `collectCodFees` debits a delivered COD order's platform fee from the seller's vendor, once (PS-5).
 1. **Expire** unpaid parts older than `unpaidHoldHours` (release stock).
 2. **Reminders:** a new order not confirmed after `confirmReminderHours`; a
    parcel not shipped by `shipBy` (late flag).

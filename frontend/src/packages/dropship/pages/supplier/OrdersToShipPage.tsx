@@ -7,6 +7,7 @@ import { Button, buttonClass } from '../../../../shared/ui/Button'
 import { Dialog } from '../../../../shared/ui/Dialog'
 import { ErrorNote, InfoNote, TextField } from '../../../../shared/ui/form'
 import { EmptyState, ErrorState, PageSkeleton } from '../../../../shared/ui/states'
+import { BankPrompt } from '../BankPrompt'
 import { useManagedStore } from '../../../../storefront/features/stores/useManagedStore'
 import type { OrderShipment } from '../../../../storefront/features/stores/storesApi'
 import { BagIcon, BoxIcon, TruckIcon } from '../../../../storefront/layout/icons'
@@ -16,7 +17,7 @@ import { ShipDialog } from '../../../../storefront/pages/stores/orders/ShipDialo
 import { PageHeader, showToast } from '../../../../storefront/pages/stores/ui'
 import { supplierOrdersApi } from '../../api'
 import type { CantShipReason, SupplierOrder, SupplierTab, TrackingBody } from '../../api'
-import { OrderStatusBadge, dateTime, money, shipByText, useLoad } from '../../ui'
+import { OrderStatusBadge, dateTime, money, shipByText, shortDate, useLoad } from '../../ui'
 
 const TABS: { key: SupplierTab; label: string }[] = [
   { key: 'new', label: 'New' },
@@ -83,6 +84,8 @@ export function OrdersToShipPage() {
           ) : undefined
         }
       />
+
+      <BankPrompt audience="supplier" />
 
       <div className="flex gap-2" role="group" aria-label="Show">
         {TABS.map((t) => {
@@ -185,6 +188,13 @@ function OrderCard({
           ? `Collect ${money(o.collectAmount)} cash`
           : "Prepaid — don't collect cash"}
       </p>
+
+      {o.paidBy === 'UNIEMAX' && (
+        <p className="mt-2 text-sm text-fg">
+          You get {money(o.amounts.supplierShare)} from UnieMax
+          {o.split?.payoutOn ? ` — it reaches your bank on ${shortDate(o.split.payoutOn)}` : ', once the order is paid out'}.
+        </p>
+      )}
 
       <ul className="mt-3 space-y-2">
         {o.items.map((i) => (

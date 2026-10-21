@@ -6,6 +6,7 @@ import { ConfirmDialog } from '../../../../shared/ui/ConfirmDialog'
 import { Dialog } from '../../../../shared/ui/Dialog'
 import { ErrorNote, InfoNote, TextField } from '../../../../shared/ui/form'
 import { EmptyState, ErrorState, PageSkeleton } from '../../../../shared/ui/states'
+import { BankPrompt } from '../BankPrompt'
 import { MediaImg } from '../../../../shared/media/MediaImg'
 import { useManagedStore } from '../../../../storefront/features/stores/useManagedStore'
 import type { Store } from '../../../../storefront/features/stores/storesApi'
@@ -91,6 +92,7 @@ export function SuppliersPage() {
         description="Sell products your suppliers ship straight to your customers. You set the price; you keep the difference."
         action={data && (data.suppliers.length > 0 || data.invites.length > 0) ? inviteButton : undefined}
       />
+      <BankPrompt audience="seller" />
 
       {overview.loading && !data && <PageSkeleton label="Loading your suppliers" />}
       {overview.error && <ErrorState message={overview.error} onRetry={overview.reload} />}

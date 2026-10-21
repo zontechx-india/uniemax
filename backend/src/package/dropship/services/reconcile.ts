@@ -17,7 +17,7 @@ import * as supplierOrders from "./supplierOrders.js";
 export async function promoteOwed(now = new Date()): Promise<number> {
   let n = 0;
   const shipped = await deps.prisma.supplierOrder.findMany({
-    where: { status: "SHIPPED", statementState: "PENDING", issueOpenAt: null, shippedAt: { not: null } },
+    where: { status: "SHIPPED", statementState: "PENDING", settleVia: "DIRECT", issueOpenAt: null, shippedAt: { not: null } },
     take: 500,
   });
   for (const o of shipped) {
@@ -33,7 +33,8 @@ export async function promoteOwed(now = new Date()): Promise<number> {
     n++;
   }
   const stuck = await deps.prisma.supplierOrder.updateMany({
-    where: { status: { in: ["DELIVERED", "RETURNED"] }, statementState: "PENDING" },
+    // (a delivered SPLIT order is paid by UnieMax: it never becomes owed)
+    where: { OR: [{ status: "DELIVERED", settleVia: "DIRECT" }, { status: "RETURNED" }], statementState: "PENDING" },
     data: { statementState: "OWED", owedAt: now },
   });
   return n + stuck.count;

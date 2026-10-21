@@ -3,6 +3,7 @@ import { toApiError } from '../../../../shared/auth/http'
 import { Button } from '../../../../shared/ui/Button'
 import { ErrorNote, Select, TextField } from '../../../../shared/ui/form'
 import { ErrorState, PageSkeleton } from '../../../../shared/ui/states'
+import { BankPrompt } from '../BankPrompt'
 import { useManagedStore } from '../../../../storefront/features/stores/useManagedStore'
 import { SlidersIcon } from '../../../../storefront/layout/icons'
 import { PageHeader, showToast } from '../../../../storefront/pages/stores/ui'
@@ -28,6 +29,7 @@ export function SupplierSettingsPage() {
         title="Supplier settings"
         description="The terms you give every seller. Changes apply to orders placed from now on, and your sellers are told."
       />
+      <BankPrompt audience="supplier" />
       {profile.loading && !profile.data && <PageSkeleton label="Loading your settings" />}
       {profile.error && <ErrorState message={profile.error} onRetry={profile.reload} />}
       {profile.data && (

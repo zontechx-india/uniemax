@@ -2,6 +2,7 @@ import type { FastifyBaseLogger } from "fastify";
 import { on } from "../events/index.js";
 import { dropshipConfig } from "./config.js";
 import { deps } from "./deps.js";
+import * as payouts from "./services/payouts.js";
 import * as reconcile from "./services/reconcile.js";
 import * as reminders from "./services/reminders.js";
 import * as resale from "./services/resale.js";
@@ -100,6 +101,14 @@ export function startJobs(logger: FastifyBaseLogger): () => void {
       if (fixed.paid + fixed.cancelled + fixed.shipped > 0) logger.info(fixed, "dropship: reconciled supplier orders");
     } catch (err) {
       logger.error({ err }, "dropship: reconcile failed");
+    }
+    try {
+      const split = await payouts.runSplits();
+      if (split.done + split.failed + split.direct > 0) logger.info(split, "dropship: payouts split");
+      const fees = await payouts.collectCodFees();
+      if (fees > 0) logger.info({ fees }, "dropship: COD platform fees collected");
+    } catch (err) {
+      logger.error({ err }, "dropship: payouts failed");
     }
     try {
       const n = await resale.syncAll();

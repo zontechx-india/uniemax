@@ -27,7 +27,19 @@ const KINDS: Record<NeedsKind, { label: string; tone: 'danger' | 'pending' | 'br
     label: 'Refund to make',
     tone: 'danger',
     hint: (i) =>
-      `A paid order was cancelled for a supplier reason. Refund ${i.orderTotal != null ? money(i.orderTotal) : 'the customer'} from the gateway dashboard.`,
+      `A paid order was cancelled for a supplier reason. Refund ${i.orderTotal != null ? money(i.orderTotal) : 'the customer'} from the gateway dashboard.${i.vendorAmounts ? ' It was paid out by Easy Split, so use Split Refund with the amounts below.' : ''}`,
+  },
+  split: {
+    label: 'Split not done',
+    tone: 'danger',
+    hint: (i) =>
+      `The split for this paid order hasn't gone through after ${i.splitAttempts} ${i.splitAttempts === 1 ? 'try' : 'tries'}${i.splitError ? ` (${i.splitError})` : ''}. The window is closing — if it isn't done the money settles to UnieMax, and the supplier and seller must be paid by hand.`,
+  },
+  vendor_balance: {
+    label: 'Vendor balance low',
+    tone: 'pending',
+    hint: (i) =>
+      `The ${i.platformFee != null ? money(i.platformFee) : ''} platform fee on this cash-on-delivery order couldn't be taken from ${i.seller}'s payout balance — it is too low. It is tried again each hour; resolve it if you settle it by hand.`,
   },
 }
 
@@ -93,6 +105,23 @@ export default function NeedsActionPage() {
                     Seller {i.seller} · Supplier {i.supplier}
                     {i.supplierShare != null ? ` · supplier gets ${money(i.supplierShare)}` : ''}
                   </p>
+                  {i.kind === 'refund' && i.vendorAmounts && (
+                    <dl className="mt-2 rounded-md bg-surface-alt px-3 py-2 text-sm">
+                      <dt className="text-xs text-muted">Split Refund — per vendor</dt>
+                      {i.vendorAmounts.entries.map((e) => (
+                        <dd key={e.role + e.name} className="flex justify-between gap-3 text-fg">
+                          <span>
+                            {e.name} <span className="text-xs text-muted">({e.role === 'SELLER' ? 'seller' : 'supplier'})</span>
+                          </span>
+                          <span className="font-medium">{money(e.amount)}</span>
+                        </dd>
+                      ))}
+                      <dd className="flex justify-between gap-3 text-xs text-muted">
+                        <span>UnieMax fee (kept)</span>
+                        <span>{money(i.vendorAmounts.fee)}</span>
+                      </dd>
+                    </dl>
+                  )}
                   {i.kind === 'problem' && i.ticketId && (
                     <Link to={`/support/${i.ticketId}`} className="mt-1 inline-block text-sm font-semibold text-brand underline">
                       Open the support ticket

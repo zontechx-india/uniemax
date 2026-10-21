@@ -278,6 +278,16 @@ enum StatementState {
   OWED
   HELD
   VOID
+  SPLIT
+
+  @@schema("dropship")
+}
+
+enum SplitState {
+  REQUESTED
+  DONE
+  FAILED
+  FALLBACK_DIRECT
 
   @@schema("dropship")
 }
@@ -328,6 +338,18 @@ model SupplierOrder {
   confirmRemindedAt   DateTime?
   lateNotifiedAt      DateTime?
   deliveredRemindedAt DateTime?
+  /// When the customer's payment landed (prepaid): the split waits a couple of minutes after it.
+  paidAt          DateTime?
+  /// Easy Split (Phase 6, D-46): one request per customer order, key split:{orderId}.
+  splitState      SplitState?
+  /// The provider's reference for the split.
+  splitRef        String?
+  splitAt         DateTime?
+  splitAttempts   Int                 @default(0)
+  splitError      String?
+  /// A COD order's platform fee debited from the seller's vendor (once), or why it couldn't be.
+  feeAdjustedAt   DateTime?
+  feeAdjustError  String?
   costTotal       Decimal             @db.Decimal(10, 2)
   shippingFee     Decimal             @db.Decimal(10, 2)
   /// costTotal + shippingFee.
@@ -424,5 +446,36 @@ model Settlement {
 
   @@index([linkId, paidOn])
   @@map("settlements")
+  @@schema("dropship")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 6: the sandbox payout provider (D-44). Written only by the sandbox host;
+// the real provider (PaymentHub) never touches it. No money moves.
+// ---------------------------------------------------------------------------
+
+enum SandboxLedgerKind {
+  SPLIT
+  ADJUSTMENT
+
+  @@schema("dropship")
+}
+
+model SandboxLedger {
+  id        String            @id @default(cuid())
+  /// Idempotency: the same key answers with the same row.
+  key       String            @unique
+  kind      SandboxLedgerKind
+  /// The customer order (a split) — null for an adjustment.
+  orderId   String?
+  /// The store debited or credited (an adjustment).
+  storeId   String?
+  amount    Decimal?          @db.Decimal(10, 2)
+  /// A split: the entries as requested; an adjustment: its direction.
+  payload   Json
+  createdAt DateTime          @default(now())
+
+  @@index([orderId])
+  @@map("sandbox_ledger")
   @@schema("dropship")
 }

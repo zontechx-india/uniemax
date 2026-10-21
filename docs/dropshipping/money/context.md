@@ -70,7 +70,15 @@ the seller owes the supplier.
   notified. The person who recorded a payment can delete it; it is kept for
   audit and the other side is told.
 
-## Easy Split (Phase 6)
+## Easy Split (Phase 6) ◐ — built in sandbox mode
+
+> Built 21 Oct 2026 behind `DROPSHIP_SPLIT`. The package's side is complete and tested; the provider is a
+> **sandbox** (D-44): `requestSplit` and `adjustPayout` write to a small `sandbox_ledger` table and nothing
+> else, and a store counts as payable when it has a primary bank account that hasn't failed verification
+> (D-45). When PaymentHub is ready, only the host methods change. Status of each rule below: PS-1…PS-4,
+> PS-7 and PS-8 (the amounts) ☑ in sandbox; PS-5 ☑ for the COD fee (a debit beyond the vendor's balance
+> is flagged); PS-6 ☑ (checked before the call); PS-9 and PS-10 are for the real integration. Executing
+> a Split Refund and Cashfree's refund debits are not built (D-48): the amounts are shown.
 
 **What Cashfree offers** (Cashfree docs, checked 20 Oct 2026; re-check when building):
 - **Split after payment**: `POST /easy-split/orders/{order_id}/split` with an

@@ -215,7 +215,7 @@ export const sellerShipmentsQuery = paginationQuery.pick({ page: true }).extend(
 });
 
 export const needsActionQuery = paginationQuery.pick({ page: true }).extend({
-  kind: z.enum(["late", "cant_ship", "came_back", "problem", "refund"]).optional(),
+  kind: z.enum(["late", "cant_ship", "came_back", "problem", "refund", "split", "vendor_balance"]).optional(),
 });
 
 export type TrackingBody = z.infer<typeof trackingSchema>;
@@ -234,3 +234,5 @@ export const paymentSchema = z.object({
   note: z.string().trim().max(300).nullish().transform((v) => v || null),
 });
 export type PaymentInput = z.infer<typeof paymentSchema>;
+
+export const payoutsQuery = paginationQuery.pick({ page: true });

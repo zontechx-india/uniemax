@@ -31,7 +31,13 @@ model Settlement {
 }
 ```
 
-## Phase 6: Easy Split ☐
+## Phase 6: Easy Split ☑ (sandbox)
+
+Built 21 Oct 2026, migration `20261021160000_dropship_split`. As built: `SplitState`, `StatementState` += `SPLIT`,
+and on `supplier_orders`: `paidAt`, `splitState`, `splitRef`, `splitAt`, `splitAttempts`, `splitError`,
+`feeAdjustedAt`, `feeAdjustError`; plus `sandbox_ledger` (`key` unique, `kind` SPLIT / ADJUSTMENT, `orderId?`,
+`storeId?`, signed `amount?`, `payload`) written only by the sandbox provider (D-44). The sketch below is the
+original design.
 
 ```prisma
 enum SplitState { REQUESTED DONE FAILED FALLBACK_DIRECT }
@@ -43,4 +49,4 @@ enum SplitState { REQUESTED DONE FAILED FALLBACK_DIRECT }
 ```
 
 Payout accounts (Cashfree vendors) belong to the core payments track, not to
-this schema. The host answers `getPayoutAccount(storeId)`.
+this schema. The host answers `getPayoutAccounts(storeIds)`.

@@ -28,7 +28,9 @@ import {
 import { shipmentTrackingSchema } from "../../../modules/orders/orders.schema.js";
 import { cancelOrderAsSystem, confirmOrderAsSystem } from "../../../modules/orders/orders.service.js";
 import { createTicket } from "../../../modules/support/support.service.js";
-import type { DropshipHost, OptionTypeRef, OrderView, ProductRef, StoreRef } from "../types.js";
+import { dropshipConfig } from "../config.js";
+import { HostSplitError } from "../types.js";
+import type { DropshipHost, OptionTypeRef, OrderView, ProductRef, SplitEntry, StoreRef } from "../types.js";
 
 const json = (value: unknown) =>
   value === null || value === undefined ? Prisma.DbNull : (value as Prisma.InputJsonValue);
@@ -584,6 +586,63 @@ export function createInProcessHost(prisma: PrismaClient): DropshipHost {
       if (ids.length > 0) {
         await tx.$queryRaw`SELECT "id" FROM "public"."store_product_variants" WHERE "id" IN (${Prisma.join(ids)}) ORDER BY "id" FOR UPDATE`;
       }
+    },
+
+    // ---- Phase 6: payouts — the SANDBOX provider (D-44) -------------------------------------
+    // Everything here is simulated: no gateway is called and no money moves. It answers the
+    // way Cashfree Easy Split would, so the package above never changes when PaymentHub replaces it.
+
+    splitLive() {
+      return dropshipConfig.splitEnabled && dropshipConfig.splitProvider === "sandbox";
+    },
+
+    async getPayoutAccounts(storeIds) {
+      // Sandbox rule (D-45): a primary bank account that hasn't failed verification.
+      const rows = await prisma.storeBankAccount.findMany({
+        where: { storeId: { in: storeIds }, isPrimary: true, verificationStatus: { not: "FAILED" } },
+        select: { storeId: true },
+      });
+      const active = new Set(rows.map((r) => r.storeId));
+      return new Map(storeIds.map((id) => [id, { active: active.has(id) }]));
+    },
+
+    async requestSplit(orderId, entries: SplitEntry[], key) {
+      const order = await prisma.order.findUnique({ where: { id: orderId }, select: { total: true, paymentStatus: true } });
+      if (!order) throw new HostSplitError("FAILED", "The order was not found");
+      if (order.paymentStatus !== "PAID") throw new HostSplitError("FAILED", "The order is not paid");
+      const total = entries.reduce((sum, e) => sum.add(e.amount), new Prisma.Decimal(0));
+      if (total.gt(order.total)) throw new HostSplitError("FAILED", "The split is more than the customer paid");
+      // One row per payee, keyed so the same request is answered, never repeated (PS-7).
+      for (const e of entries) {
+        await prisma.sandboxLedger
+          .create({
+            data: { key: `${key}#${e.storeId}`, kind: "SPLIT", orderId, storeId: e.storeId, amount: e.amount, payload: { role: e.role } },
+          })
+          .catch((err) => {
+            if (err?.code !== "P2002") throw err; // already recorded: fine
+          });
+      }
+      return { ref: `sandbox:${key}` };
+    },
+
+    async adjustPayout(storeId, direction, amount, key) {
+      const done = await prisma.sandboxLedger.findUnique({ where: { key } });
+      if (done) return { ref: `sandbox:${key}` };
+      if (direction === "DEBIT") {
+        // A debit can only take what the vendor has been paid so far, like Cashfree's unsettled balance.
+        const balance = await prisma.sandboxLedger.aggregate({ where: { storeId }, _sum: { amount: true } });
+        if (new Prisma.Decimal(balance._sum.amount ?? 0).lt(amount)) {
+          throw new HostSplitError("INSUFFICIENT", "The vendor's balance is too low for this adjustment");
+        }
+      }
+      await prisma.sandboxLedger
+        .create({
+          data: { key, kind: "ADJUSTMENT", storeId, amount: direction === "DEBIT" ? amount.neg() : amount, payload: { direction } },
+        })
+        .catch((err) => {
+          if (err?.code !== "P2002") throw err;
+        });
+      return { ref: `sandbox:${key}` };
     },
 
     async getVariantSkus(tx, variantIds) {

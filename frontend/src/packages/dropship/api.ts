@@ -14,9 +14,15 @@ export type InviteStatus = 'SENT' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED'
 export type SupplierStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED'
 export type Actor = 'SUPPLIER' | 'SELLER' | 'ADMIN' | 'SYSTEM'
 
+export type SplitMode = 'off' | 'sandbox' | 'live'
+
 export interface StoreRole {
   supplier: { status: SupplierStatus; supplyOnly: boolean } | null
   hasSuppliers: boolean
+  /** Easy Split payouts: off, simulated (no money moves), or real. */
+  split: SplitMode
+  /** Whether THIS store can be paid out to; null while payouts are off. */
+  payout: { active: boolean } | null
 }
 
 export interface StoreCard {
@@ -419,6 +425,9 @@ export interface SupplierOrder {
   parcel: ParcelInfo | null
   closeReason: string | null
   amounts: { costTotal: number | null; shippingFee: number | null; supplierShare: number | null }
+  /** Paid by UnieMax (Easy Split) or directly by the seller. */
+  paidBy: 'UNIEMAX' | 'SELLER'
+  split: { state: string; payoutOn: string | null } | null
   terms: string
 }
 
@@ -538,7 +547,7 @@ export const sellerPartsApi = {
     }>(http.get(`${store(storeId)}/shipments`, { params: query })),
 }
 
-export type NeedsKind = 'late' | 'cant_ship' | 'came_back' | 'problem' | 'refund'
+export type NeedsKind = 'late' | 'cant_ship' | 'came_back' | 'problem' | 'refund' | 'split' | 'vendor_balance'
 
 export interface NeedsItem {
   key: string
@@ -554,6 +563,12 @@ export interface NeedsItem {
   ticketId: string | null
   orderTotal: number | null
   supplierShare: number | null
+  /** A Split Refund's per-vendor amounts (refund items of a split order). */
+  vendorAmounts: { entries: { name: string; role: 'SUPPLIER' | 'SELLER'; amount: number }[]; fee: number } | null
+  splitError: string | null
+  splitAttempts: number
+  feeAdjustError: string | null
+  platformFee: number | null
   createdAt: string
 }
 
@@ -573,7 +588,7 @@ export interface AccountLine {
   date: string
   paymentMode: 'PREPAID' | 'COD'
   status: SupplierOrderStatus
-  state: 'PENDING' | 'OWED' | 'HELD' | 'VOID'
+  state: 'PENDING' | 'OWED' | 'HELD' | 'VOID' | 'SPLIT'
   stateText: string
   counts: boolean
   customerPaid: number | null
@@ -582,6 +597,9 @@ export interface AccountLine {
   forYou: number
   /** Cash a courier collected on a COD order. */
   collected: number | null
+  settleVia: 'DIRECT' | 'SPLIT'
+  /** A split line: when the supplier's share reaches its bank. */
+  payoutOn: string | null
 }
 
 export interface AccountPayment {
@@ -606,6 +624,7 @@ export interface Account {
   lines: AccountLine[]
   /** More orders than the list shows; every one is in the balance. */
   moreLines: boolean
+  split: SplitMode
   payments: AccountPayment[]
 }
 
@@ -628,4 +647,31 @@ export const accountApi = {
     call<Account>(http.post(`${accountBase(side, storeId, linkId)}/payments`, body)),
   remove: (side: 'seller' | 'supplier', storeId: string, linkId: string, paymentId: string) =>
     call<Account>(http.delete(`${accountBase(side, storeId, linkId)}/payments/${paymentId}`)),
+}
+
+// ---- Phase 6: Easy Split payouts ------------------------------------------------------
+
+export interface PayoutRow {
+  supplierOrderId: string
+  orderId: string
+  orderNumber: string
+  seller: string
+  supplier: string
+  settleVia: 'DIRECT' | 'SPLIT'
+  /** WAITING · REQUESTED · DONE · FAILED · FALLBACK_DIRECT */
+  state: string
+  ref: string | null
+  attempts: number
+  error: string | null
+  paidAt: string | null
+  splitAt: string | null
+  payoutOn: string | null
+  orderTotal: number | null
+  supplierGets: number | null
+  platformFee: number | null
+  sellerGets: number | null
+}
+
+export const adminPayoutsApi = {
+  list: (page: number) => callList<PayoutRow>(http.get(`${ADMIN}/payouts`, { params: { page } })),
 }

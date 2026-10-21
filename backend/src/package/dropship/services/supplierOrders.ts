@@ -10,6 +10,7 @@ import {
   ORDER_MOVES,
   canMove,
   cantShipText,
+  chooseSettleVia,
   moveRefusal,
   platformFeeFor,
   rollup,
@@ -19,6 +20,7 @@ import {
 import type { CantShipReason, OrderActor, OrderMove, SupplierOrderStatus } from "../domain.js";
 import type { TrackingInput, Tx } from "../types.js";
 import * as resale from "./resale.js";
+import { scheduleSplit } from "./payouts.js";
 
 /**
  * Supplier orders — one supplier's share of one customer order
@@ -124,6 +126,11 @@ export async function place(tx: Tx, orderId: string): Promise<void> {
   const cod = order.paymentMethod === "COD";
   const live = cod || order.paid; // K-12: paid at placement → straight to NEW
   const now = new Date();
+  // Easy Split (Phase 6): decided once, here, for every part (D-18, T-9). Only a prepaid order can be split.
+  const splitOn = !cod && deps.host.splitLive();
+  const accounts = splitOn
+    ? await deps.host.getPayoutAccounts([...new Set([...groups.values()].flatMap((g) => [g.link.sellerStoreId, g.link.supplier.storeId]))])
+    : new Map<string, { active: boolean }>();
   for (const [supplierId, { link, lines }] of groups) {
     const s = link.supplier;
     const amounts = supplierAmounts(lines, s.shippingFee);
@@ -148,7 +155,14 @@ export async function place(tx: Tx, orderId: string): Promise<void> {
         returnFeePayer: link.returnFeePayer,
         // D-20, per supplier order: the rate × this supplier's lines.
         platformFee: platformFeeFor(linesTotal, dropshipConfig.platformFeePct),
-        settleVia: "DIRECT", // Easy Split is Phase 6 (D-16)
+        settleVia: chooseSettleVia({
+          paymentMode: cod ? "COD" : "PREPAID",
+          splitLive: splitOn,
+          sellerActive: accounts.get(link.sellerStoreId)?.active ?? false,
+          supplierActive: accounts.get(s.storeId)?.active ?? false,
+        }),
+        // A prepaid order that is already paid at placement (the dev simulation): the split clock starts now.
+        paidAt: !cod && order.paid ? now : null,
         shipBy: live ? shipByDate(now, s.shipWithinDays) : null,
         costTotal: amounts.costTotal,
         shippingFee: amounts.shippingFee,
@@ -226,6 +240,8 @@ export async function afterPlaced(orderId: string): Promise<void> {
   const parts = await deps.prisma.supplierOrder.findMany({ where: { orderId }, include: { lines: true, supplier: true } });
   for (const p of parts) if (p.status === "NEW") await tellSupplierNew(p).catch(log("new-order notice"));
   await remirror(parts.flatMap((p) => p.lines));
+  // Already paid at placement (the dev simulation): the split clock is running.
+  if (parts.some((p) => p.settleVia === "SPLIT" && p.paidAt)) scheduleSplit();
 }
 
 /** `order.cancelled`: tell suppliers who had it to ship; copies re-mirror. */
@@ -263,14 +279,14 @@ export async function onPaid(orderId: string): Promise<void> {
     const shipBy = shipByDate(new Date(), p.shipWithinDays);
     if (p.status === "AWAITING_PAYMENT") {
       const moved = await deps.prisma
-        .$transaction((tx) => guardedMove(tx, p, "paid", "SYSTEM", null, null, { shipBy }))
+        .$transaction((tx) => guardedMove(tx, p, "paid", "SYSTEM", null, null, { shipBy, paidAt: new Date() }))
         .then(() => true, () => false);
       if (moved) await tellSupplierNew({ ...p, shipBy }).catch(log("new-order notice"));
     } else if (p.status === "EXPIRED") {
       const back = await deps.prisma
         .$transaction(async (tx) => {
           if (!(await reserveLines(tx, p.lines))) throw new SoldOut();
-          await guardedMove(tx, p, "repaid", "SYSTEM", null, "Paid after the hold ended", { shipBy, closeReason: null });
+          await guardedMove(tx, p, "repaid", "SYSTEM", null, "Paid after the hold ended", { shipBy, closeReason: null, paidAt: new Date() });
         })
         .then(
           () => true,
@@ -296,6 +312,8 @@ export async function onPaid(orderId: string): Promise<void> {
   }
   await remirror(parts.flatMap((p) => p.lines));
   if (rejected) await rollUp(orderId, "cantShip");
+  // The customer paid: a split-paid supplier is paid out a couple of minutes from now (Phase 6).
+  if (parts.some((p) => p.settleVia === "SPLIT")) scheduleSplit();
 }
 
 class SoldOut extends Error {}
@@ -498,7 +516,8 @@ export async function delivered(p: SoRow, actor: "SUPPLIER" | "SELLER", by: stri
       deliveredAt: now,
       closedAt: now,
       // Delivered: the line now counts on the account — unless a problem holds it.
-      ...(p.statementState === "PENDING" ? { statementState: "OWED" as const, owedAt: now } : {}),
+      // (A split order is paid by UnieMax, so it never becomes a line the two owe each other.)
+      ...(p.statementState === "PENDING" && p.settleVia === "DIRECT" ? { statementState: "OWED" as const, owedAt: now } : {}),
     }),
   );
 }
@@ -518,7 +537,7 @@ export async function cameBack(supplierId: string, id: string, by: string, resto
       closedAt: new Date(),
       closeReason: "The parcel came back",
       // The returned-parcel fee (D-17) is now a line on the account.
-      ...(p.statementState === "PENDING" ? { statementState: "OWED" as const, owedAt: new Date() } : {}),
+      ...(p.statementState === "PENDING" || p.statementState === "SPLIT" ? { statementState: "OWED" as const, owedAt: new Date() } : {}),
     });
     if (restock) await releaseLines(tx, p.lines);
   });
@@ -632,7 +651,9 @@ export async function resolve(id: string, adminId: string, note: string) {
       // A held line goes back to where it was: counted once delivered or came
       // back (or shipped long enough), otherwise still waiting.
       ...(p.statementState === "HELD"
-        ? p.owedAt || p.status === "DELIVERED" || p.status === "RETURNED"
+        ? p.settleVia === "SPLIT" && p.splitState === "DONE" && p.status !== "RETURNED"
+          ? { statementState: "SPLIT" as const }
+          : p.owedAt || p.status === "DELIVERED" || p.status === "RETURNED"
           ? { statementState: "OWED" as const, owedAt: p.owedAt ?? new Date() }
           : { statementState: "PENDING" as const }
         : {}),
