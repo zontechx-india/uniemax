@@ -88,9 +88,12 @@ Orders placed before this phase stay `DIRECT` (D-18, T-9).
   5 checks still pass.
 - Frontend: `tsc -b`, `vite build`, `check:ui` (no budget rises); the account, the bank prompt and its
   form, the supplier's card, admin Payouts and Needs action checked at 390 px with mocked data.
-- **Not run yet:** `npm run test:api` for `test/dropship-split.test.mjs` — it needs this code on dev with
-  `DROPSHIP_SPLIT=true`. A prepaid order's split can't be driven through the API suite (it needs the
-  payment hub's checkout); the end-to-end run above covers it.
+- `npm run test:api` on dev with `DROPSHIP_SPLIT=true` (set in the dev server's `.env.development`, 21 Oct
+  2026): `test/dropship-split.test.mjs` (5 tests: the role's mode and payout state, adding a bank account in
+  place, COD never split, the account's mode, access) with the suppliers, supplier-products, orders,
+  statement and shipments suites: all pass. A prepaid order's split can't be driven through the API suite
+  (it needs the payment hub's checkout); the end-to-end run above covers it, and on dev it can be tried by
+  paying a prepaid order on the TEST hub.
 
 ## Done when
 

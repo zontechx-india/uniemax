@@ -21,7 +21,7 @@ earns the difference.
 | 3 | Supplier products in the seller's store | ◐ built 20 Oct 2026 — API tests pass on dev (flag on); dev walkthrough pending |
 | 4 | Orders and shipping | ◐ built 21 Oct 2026 — API tests pass on dev; dev walkthrough pending |
 | 5 | Money statement and background jobs. **MVP complete** | ◐ built 21 Oct 2026 — API tests pass on dev; dev walkthrough pending; production release steps are the owner's |
-| 6 | Easy Split pays suppliers for prepaid orders | ◐ built 21 Oct 2026 in **sandbox mode** (no money moves) — API tests pending; the real PaymentHub integration is the owner's |
+| 6 | Easy Split pays suppliers for prepaid orders | ◐ built 21 Oct 2026 in **sandbox mode** (no money moves) — API tests pass on dev with `DROPSHIP_SPLIT=true`; the real PaymentHub integration is the owner's |
 | 7 | Later | — |
 
 Details and release plan: [phases/context.md](phases/context.md).
