@@ -4,8 +4,8 @@
 > statement, recording payments, Easy Split payouts, refunds, or anything about
 > who owes whom. **Update when:** any money rule changes.
 
-Status: ☐ planned. Amounts are recorded from Phase 4 (built 21 Oct 2026: `costTotal`, `shippingFee`, `supplierShare`, `platformFee`, `collectAmount` on each supplier order); the statement and
-payments are Phase 5 (all `DIRECT`); Easy Split is Phase 6. Decisions: D-16,
+Status: ◐ the account (statement), recorded payments and the job's owed transition are built (Phase 5, 21 Oct 2026; API tests and the screen walkthrough pending). Amounts are recorded from Phase 4 (`costTotal`, `shippingFee`, `supplierShare`, `platformFee`, `collectAmount` on each supplier order). Every line is `DIRECT`; Easy Split is Phase 6.
+The account is **computed on read** from the supplier orders and the live payments (D-40): one pure function (`domain.ts` `statementLine`, `statementBalance`), so both sides always see the same numbers. Decisions: D-16,
 D-17, D-18 in [decisions](../decisions.md). Every amount here comes from the
 order's snapshot ([terms](../terms/context.md)).
 
@@ -57,8 +57,8 @@ the seller owes the supplier.
 
 ## Screens
 
-- Seller: Suppliers → {supplier} → **Account**. Supplier: Sellers → {seller} →
-  **Account**. Both sides see the same numbers, plus the **Terms** panel with its
+- ☑ Seller: Suppliers → {supplier} → **Account** (an **Account** button beside **Terms**, route `suppliers/:linkId/account`). Supplier: Sellers → {seller} →
+  **Account** (`sellers/:linkId/account`). Both sides see the same numbers, plus the **Terms** panel with its
   change log ([terms](../terms/context.md)).
 - The top line is the balance in plain words: *"You owe Sri Textiles ₹3,450"*
   or *"Sri Textiles owes you ₹1,200"*.

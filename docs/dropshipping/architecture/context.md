@@ -224,7 +224,7 @@ UPPER_SNAKE (`DROPSHIP_INVITE_EXPIRY_DAYS`, …); `DROPSHIP_ENABLED` is in
 `inviteNeedsAdminApproval`, `shipWithinDaysMax`, and `returnDaysMax` (30, the
 longest returns window a supplier may offer). Built in Phase 3:
 `suggestedMarkupPct`, `minMarginWarnPct`, `platformFeePct` and `jobIntervalMs`; in Phase 4:
-`unpaidHoldHours` and `customerDataDays`.
+`unpaidHoldHours` and `customerDataDays`; in Phase 5: `confirmReminderHours`, `deliveredReminderDays` and `owedFallbackDays`.
 The rest is planned.
 
 | Key | Default | Meaning |
@@ -234,13 +234,14 @@ The rest is planned.
 | `inviteExpiryDays` | 14 | How long an invite link works |
 | `inviteNeedsAdminApproval` | `false` | D-7 |
 | `unpaidHoldHours` | 2 | How long an unpaid online checkout holds the supplier's stock |
-| `confirmReminderHours` | 24 | Reminder to a supplier who hasn't opened a new order |
+| `confirmReminderHours` ☑ | 24 | Reminder to a supplier who hasn't opened a new order |
 | `shipWithinDaysMax` | 7 | Longest "ship within" a supplier may choose |
-| `owedFallbackDays` | 15 | Shipped but never marked delivered → counts as owed |
+| `owedFallbackDays` ☑ | 15 | Shipped but never marked delivered → counts as owed |
 | `customerDataDays` | 30 | After a parcel closes, the supplier stops seeing the customer's phone and address |
 | `platformFeePct` | 0 | Platform fee, % of the order total, from the seller's share (D-20). Set the real rate (Q-5) before production. |
 | `minMarginWarnPct` | 10 | Earnings below this turn amber on the add sheet |
 | `suggestedMarkupPct` | 30 | Suggested price when the supplier has no shop price |
+| `deliveredReminderDays` ☑ | 7 | Shipped this long ago and nobody marked it delivered: the supplier is nudged once (F-10) |
 | `jobIntervalMs` | 3 600 000 | Hourly job |
 
 ## Hourly job and self-healing ◐
@@ -248,8 +249,14 @@ The rest is planned.
 Runs every `jobIntervalMs`, and 10 s after boot (as in affiliate). Every step
 is idempotent. Built (`events.ts` `startJobs`): step 1, **expire** unpaid parts
 (Phase 4, `expireUnpaid`), then re-sync every copy (`syncAll`, Phase 3), the copy half
-of step 5. Reminders, the statement, privacy sweeps and reconcile come with Phases 5–6
-(the customer-data cut-off is already applied when a supplier's order is read).
+of step 5. Built in Phase 5 (☑, `services/{reminders,reconcile}.ts`): step 2 **reminders** (the
+confirm reminder to the supplier, the late notice to the seller, the delivered nudge to the supplier —
+each sent once, tracked by a timestamp on the order, D-41), step 3 **statement** (`promoteOwed`: shipped
+more than `owedFallbackDays` ago with no open problem counts as owed; delivered / came-back lines
+still pending are healed) and step 5 **reconcile** (a paid order whose part is still awaiting payment
+runs the paid step; a cancelled order whose part is still open is closed and its stock released; orders
+younger than 10 minutes are left alone). Step 4 **privacy** needs no job: the customer-data cut-off is
+a read-time rule (D-42). Splits (step 3, Phase 6) are not built.
 1. **Expire** unpaid parts older than `unpaidHoldHours` (release stock).
 2. **Reminders:** a new order not confirmed after `confirmReminderHours`; a
    parcel not shipped by `shipBy` (late flag).

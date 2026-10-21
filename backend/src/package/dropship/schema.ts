@@ -219,3 +219,18 @@ export const needsActionQuery = paginationQuery.pick({ page: true }).extend({
 });
 
 export type TrackingBody = z.infer<typeof trackingSchema>;
+
+// ---- Phase 5: the account and recorded payments --------------------------------
+
+export const accountParam = storeParam.extend({ linkId: z.string().min(1) });
+export const paymentParam = accountParam.extend({ paymentId: z.string().min(1) });
+
+export const paymentSchema = z.object({
+  /** "I paid {name}" (me) or "{name} paid me" (them). */
+  paid: z.enum(["me", "them"], { error: "Choose who paid" }),
+  amount: z.coerce.number({ error: "Enter the amount that was paid" }),
+  paidOn: z.coerce.date({ error: "Choose the date it was paid" }),
+  reference: z.string().trim().max(60).nullish().transform((v) => v || null),
+  note: z.string().trim().max(300).nullish().transform((v) => v || null),
+});
+export type PaymentInput = z.infer<typeof paymentSchema>;

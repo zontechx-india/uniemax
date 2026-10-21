@@ -1,9 +1,14 @@
-# Data model: money (Phases 5–6) ☐
+# Data model: money (Phases 5–6) ◐
 
 > **Read when:** working on recorded payments or Easy Split fields.
 > **Update when:** these models change. Conventions: [data-model](../context.md).
 
-## Phase 5: recorded payments ☐
+## Phase 5: recorded payments ☑
+
+Built 21 Oct 2026, migration `20261021150000_dropship_statement` (table `settlements`). The same
+migration adds three nullable reminder timestamps to `supplier_orders` (D-41):
+`confirmRemindedAt`, `lateNotifiedAt`, `deliveredRemindedAt` — one reminder each, never repeated.
+The statement itself is not stored: it is computed on read (D-40).
 
 ```prisma
 enum SettlementDirection { SELLER_TO_SUPPLIER SUPPLIER_TO_SELLER }

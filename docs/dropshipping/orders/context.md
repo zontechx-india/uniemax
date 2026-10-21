@@ -5,7 +5,7 @@
 > shipping, cancellations, problems, or the seller's view of all this.
 > **Update when:** any of those change.
 
-Status: ◐ built 21 Oct 2026 (Phase 4; API tests pass on dev, screen walkthrough pending). Code:
+Status: ◐ built 21 Oct 2026 (Phase 4; API tests pass on dev, screen walkthrough pending); reminders and the statement flips: Phase 5 (21 Oct 2026). Code:
 `backend/src/package/dropship/services/{supplierOrders,orderViews}.ts`, `hooks.ts`,
 `events.ts`; `frontend/src/packages/dropship/pages/{supplier,seller,admin}/`
 (`OrdersToShipPage`, `SlipsPage`, `SupplierParts`, `ShipmentsPage`, `NeedsActionPage`).
@@ -96,6 +96,10 @@ The customer order never runs ahead of its slowest parcel.
   [shipments](../shipments/context.md)). The seller's buttons ship only the
   seller's own items. An order made only of supplier products shows no
   ship or deliver buttons to the seller.
+- **Statement (Phase 5):** *Delivered* and *Came back* make the order's line count on the account
+  (`statementState` `OWED`); a reported problem holds it (`HELD`) and resolving returns it to counted.
+  Reminders go out once each from the hourly job: **F-1** to the supplier, **F-2** to the seller (it is
+  late), **F-10** to the supplier.
 - **Can't ship:**
   - no items of the seller's own → the order is cancelled automatically
     (`host.cancelOrder`). The customer is told; a paid order goes on admin's

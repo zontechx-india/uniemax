@@ -563,3 +563,67 @@ export const adminNeedsApi = {
   resolve: (supplierOrderId: string, note: string) =>
     call<{ resolved: boolean }>(http.post(`${ADMIN}/needs-action/${supplierOrderId}/resolve`, { note })),
 }
+
+// ---- Phase 5: the account with one supplier or seller -----------------------------
+
+export interface AccountLine {
+  supplierOrderId: string
+  orderId: string
+  orderNumber: string
+  date: string
+  paymentMode: 'PREPAID' | 'COD'
+  status: SupplierOrderStatus
+  state: 'PENDING' | 'OWED' | 'HELD' | 'VOID'
+  stateText: string
+  counts: boolean
+  customerPaid: number | null
+  supplierGets: number
+  /** From your side: positive = you get, negative = you owe. */
+  forYou: number
+  /** Cash a courier collected on a COD order. */
+  collected: number | null
+}
+
+export interface AccountPayment {
+  id: string
+  text: string
+  amount: number
+  paidOn: string
+  reference: string | null
+  note: string | null
+  recordedByYou: boolean
+  canDelete: boolean
+  createdAt: string
+}
+
+export interface Account {
+  linkId: string
+  viewer: 'seller' | 'supplier'
+  other: { name: string; phone: string | null }
+  /** Positive = they owe you; negative = you owe them. */
+  balance: number
+  words: string
+  lines: AccountLine[]
+  payments: AccountPayment[]
+}
+
+export interface PaymentBody {
+  paid: 'me' | 'them'
+  amount: number
+  paidOn: string
+  reference?: string | null
+  note?: string | null
+}
+
+/** The seller's account with a supplier, and the supplier's with a seller — the same numbers. */
+const accountBase = (side: 'seller' | 'supplier', storeId: string, linkId: string) =>
+  `${store(storeId)}/${side === 'seller' ? 'suppliers' : 'sellers'}/${linkId}`
+
+export const accountApi = {
+  get: (side: 'seller' | 'supplier', storeId: string, linkId: string) =>
+    call<Account>(http.get(`${accountBase(side, storeId, linkId)}/account`)),
+  record: (side: 'seller' | 'supplier', storeId: string, linkId: string, body: PaymentBody) =>
+    call<Account>(http.post(`${accountBase(side, storeId, linkId)}/payments`, body)),
+  remove: (side: 'seller' | 'supplier', storeId: string, linkId: string, paymentId: string) =>
+    call<Account>(http.delete(`${accountBase(side, storeId, linkId)}/payments/${paymentId}`)),
+}

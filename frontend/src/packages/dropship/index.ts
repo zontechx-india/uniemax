@@ -43,6 +43,18 @@ export const dropshipStoreRoutes: RouteObject[] = [
     }),
   },
   {
+    path: 'suppliers/:linkId/account',
+    lazy: async () => ({
+      Component: (await import('./pages/AccountPage')).SellerAccountPage,
+    }),
+  },
+  {
+    path: 'sellers/:linkId/account',
+    lazy: async () => ({
+      Component: (await import('./pages/AccountPage')).SupplierAccountPage,
+    }),
+  },
+  {
     path: 'supplier-products',
     lazy: async () => ({
       Component: (await import('./pages/seller/SupplierProductsPage')).SupplierProductsPage,

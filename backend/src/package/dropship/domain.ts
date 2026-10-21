@@ -186,8 +186,13 @@ function wholeRupees(v: Prisma.Decimal): Prisma.Decimal {
   return v.toDecimalPlaces(0, Prisma.Decimal.ROUND_UP);
 }
 
+/** ₹3,450 / ₹1,25,000 / ₹99.50 — Indian digit grouping, paise only when there are some. */
 export function rupee(v: Money): string {
-  return `₹${D(v).toFixed(2).replace(/\.00$/, "")}`;
+  const n = D(v).toDecimalPlaces(2);
+  return `₹${n.toNumber().toLocaleString("en-IN", {
+    minimumFractionDigits: n.isInteger() ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 /**
@@ -604,4 +609,147 @@ export type CantShipReason = keyof typeof CANT_SHIP_REASONS;
 export function cantShipText(reason: CantShipReason, note: string | null): string {
   const base = CANT_SHIP_REASONS[reason];
   return note ? `${base}: ${note}` : base;
+}
+
+// ---------------------------------------------------------------------------
+// The statement (Phase 5, docs/dropshipping/money → Who owes whom)
+// ---------------------------------------------------------------------------
+
+export type StatementState = "PENDING" | "OWED" | "HELD" | "VOID";
+export type StatementViewer = "seller" | "supplier";
+
+export interface StatementOrder {
+  status: SupplierOrderStatus;
+  statementState: StatementState;
+  paymentMode: "PREPAID" | "COD";
+  supplierShare: Money;
+  collectAmount: Money | null;
+  shippingFee: Money;
+  returnFeePayer: ReturnFeePayer;
+}
+
+/**
+ * One order's line on the account. `amount` is signed from the seller's side:
+ * positive = the seller owes the supplier, negative = the supplier owes the
+ * seller. It is what the order is worth on the account once it counts; `counts`
+ * says whether it counts yet (only OWED lines do — pending, held and void ones
+ * are shown but never in the balance). Every figure is the order's own
+ * snapshot (D-18); nothing reads the current settings.
+ *
+ * - Delivered (or shipped long enough to count as delivered), prepaid, paid
+ *   directly: the seller owes the supplier its `supplierShare`.
+ * - The same, cash on delivery: the supplier's courier collected the cash, so
+ *   the supplier owes the seller `collectAmount − supplierShare`.
+ * - Came back: the supplier's shipping fee, owed by the seller only when this
+ *   order's own `returnFeePayer` says so (D-17).
+ * - Cancelled, couldn't ship, expired: nothing.
+ */
+export function statementLine(o: StatementOrder): { amount: Prisma.Decimal; counts: boolean } {
+  const counts = o.statementState === "OWED";
+  if (o.statementState === "VOID") return { amount: D(0), counts: false };
+  switch (o.status) {
+    case "RETURNED":
+      return { amount: o.returnFeePayer === "SELLER" ? paise(D(o.shippingFee)) : D(0), counts };
+    case "NEW":
+    case "ACCEPTED":
+    case "SHIPPED":
+    case "DELIVERED":
+      return {
+        amount:
+          o.paymentMode === "COD"
+            ? paise(D(o.supplierShare).sub(D(o.collectAmount ?? 0)))
+            : paise(D(o.supplierShare)),
+        counts,
+      };
+    default:
+      return { amount: D(0), counts: false }; // awaiting payment, expired, rejected, cancelled
+  }
+}
+
+/**
+ * What the seller owes the supplier: the counted lines, less what the seller
+ * has paid, plus what the supplier has paid back. Positive = the seller owes.
+ */
+export function statementBalance(
+  lines: { amount: Money; counts: boolean }[],
+  payments: { direction: "SELLER_TO_SUPPLIER" | "SUPPLIER_TO_SELLER"; amount: Money }[],
+): Prisma.Decimal {
+  let balance = D(0);
+  for (const l of lines) if (l.counts) balance = balance.add(l.amount);
+  for (const p of payments) {
+    balance = p.direction === "SELLER_TO_SUPPLIER" ? balance.sub(p.amount) : balance.add(p.amount);
+  }
+  return paise(balance);
+}
+
+/** The top line of the account, in plain words. */
+export function balanceWords(balance: Money, viewer: StatementViewer, otherName: string): string {
+  const b = D(balance);
+  if (b.isZero()) return `All settled with ${otherName}`;
+  const sellerOwes = b.gt(0);
+  const amount = rupee(b.abs());
+  if (viewer === "seller") return sellerOwes ? `You owe ${otherName} ${amount}` : `${otherName} owes you ${amount}`;
+  return sellerOwes ? `${otherName} owes you ${amount}` : `You owe ${otherName} ${amount}`;
+}
+
+/** What a line's state means to a person. */
+export function lineStateWords(state: StatementState, status: SupplierOrderStatus): string {
+  if (state === "VOID") return "Cancelled";
+  if (state === "HELD") return "On hold — a problem is open";
+  if (state === "OWED") return status === "RETURNED" ? "Came back" : "Counted";
+  return "Not delivered yet";
+}
+
+export const MAX_PAYMENT = 1_000_000;
+
+/** A recorded payment: a positive amount, not absurd, not dated in the future. */
+export function validatePayment(input: { amount: Money; paidOn: Date }, now = new Date()): string | null {
+  const a = D(input.amount);
+  if (!a.gt(0)) return "Enter the amount that was paid";
+  if (a.gt(MAX_PAYMENT)) return `The amount can't be more than ${rupee(MAX_PAYMENT)}`;
+  if (a.decimalPlaces() > 2) return "Use rupees and paise only";
+  // A day of slack: the date is picked in the person's own time zone.
+  if (input.paidOn.getTime() > now.getTime() + 24 * 60 * 60 * 1000) return "The payment date can't be in the future";
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// The hourly job's due-date rules (Phase 5) — pure, so each is tested alone
+// ---------------------------------------------------------------------------
+
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
+
+interface ReminderOrder {
+  status: SupplierOrderStatus;
+  shipBy: Date | null;
+  shipWithinDays: number;
+  shippedAt: Date | null;
+  issueOpenAt: Date | null;
+  statementState: StatementState;
+  confirmRemindedAt: Date | null;
+  lateNotifiedAt: Date | null;
+  deliveredRemindedAt: Date | null;
+}
+
+/** F-1: still NEW (not confirmed) `hours` after it became NEW; the supplier is nudged once. */
+export function confirmDue(o: ReminderOrder, hours: number, now = new Date()): boolean {
+  if (o.status !== "NEW" || o.confirmRemindedAt || !o.shipBy) return false;
+  const becameNew = o.shipBy.getTime() - o.shipWithinDays * DAY;
+  return now.getTime() - becameNew >= hours * HOUR;
+}
+
+/** F-2: past "Ship by" and not shipped; the seller is told once. */
+export function lateDue(o: ReminderOrder, now = new Date()): boolean {
+  return isLate(o, now) && !o.lateNotifiedAt;
+}
+
+/** F-10: shipped `days` ago and nobody marked it delivered; the supplier is nudged once. */
+export function deliveredDue(o: ReminderOrder, days: number, now = new Date()): boolean {
+  return o.status === "SHIPPED" && !!o.shippedAt && !o.deliveredRemindedAt && now.getTime() - o.shippedAt.getTime() >= days * DAY;
+}
+
+/** Shipped more than `days` ago, never marked delivered, no open problem → counts as owed. */
+export function owedFallbackDue(o: ReminderOrder, days: number, now = new Date()): boolean {
+  return o.status === "SHIPPED" && o.statementState === "PENDING" && !o.issueOpenAt && !!o.shippedAt && now.getTime() - o.shippedAt.getTime() > days * DAY;
 }

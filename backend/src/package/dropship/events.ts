@@ -2,6 +2,8 @@ import type { FastifyBaseLogger } from "fastify";
 import { on } from "../events/index.js";
 import { dropshipConfig } from "./config.js";
 import { deps } from "./deps.js";
+import * as reconcile from "./services/reconcile.js";
+import * as reminders from "./services/reminders.js";
 import * as resale from "./services/resale.js";
 import * as supplierOrders from "./services/supplierOrders.js";
 
@@ -68,7 +70,11 @@ export function subscribe(): void {
   on("order.paid", ({ orderId }) => supplierOrders.onPaid(orderId).catch(log("paid")));
 }
 
-/** Hourly (and 10 s after boot): expire unpaid supplier orders, then re-sync every copy. */
+/**
+ * Hourly (and 10 s after boot), each step on its own so one failure never
+ * stops the rest: expire unpaid supplier orders, send reminders, count shipped
+ * lines as owed, reconcile lost events, re-sync every copy.
+ */
 export function startJobs(logger: FastifyBaseLogger): () => void {
   const run = async () => {
     try {
@@ -76,6 +82,24 @@ export function startJobs(logger: FastifyBaseLogger): () => void {
       if (expired > 0) logger.info({ orders: expired }, "dropship: unpaid supplier orders expired");
     } catch (err) {
       logger.error({ err }, "dropship: expiring unpaid orders failed");
+    }
+    try {
+      const sent = await reminders.sendReminders();
+      if (sent > 0) logger.info({ reminders: sent }, "dropship: reminders sent");
+    } catch (err) {
+      logger.error({ err }, "dropship: reminders failed");
+    }
+    try {
+      const counted = await reconcile.promoteOwed();
+      if (counted > 0) logger.info({ lines: counted }, "dropship: statement lines now count as owed");
+    } catch (err) {
+      logger.error({ err }, "dropship: statement step failed");
+    }
+    try {
+      const fixed = await reconcile.reconcile();
+      if (fixed.paid + fixed.cancelled > 0) logger.info(fixed, "dropship: reconciled supplier orders");
+    } catch (err) {
+      logger.error({ err }, "dropship: reconcile failed");
     }
     try {
       const n = await resale.syncAll();

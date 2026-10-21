@@ -1,4 +1,8 @@
-# Phase 5: Statement, reminders, self-healing. MVP complete ☐
+# Phase 5: Statement, reminders, self-healing. MVP complete ◐
+
+> Built 21 Oct 2026 (migration `20261021150000_dropship_statement`). Left: the API suite on dev
+> (`test/dropship-statement.test.mjs`, runs once this is deployed there), the walkthrough of
+> the screens on dev, and the **Release** steps below, which are the owner's.
 
 ## Goal
 
@@ -23,24 +27,40 @@ UnieMax and the seller, so it doesn't touch the seller–supplier balance.
 
 ## Build: backend
 
-- ☐ `Settlement` (+ migration).
-- ☐ Statement per link: line states (`PENDING` → `OWED` / `HELD` / `VOID`),
+- ☑ `Settlement` (+ migration).
+- ☑ Statement per link: line states (`PENDING` → `OWED` / `HELD` / `VOID`),
   the came-back rule from each order's own `returnFeePayer` (D-17), and the balance.
-- ☐ Record a payment and delete your own (soft delete), with the other side
+- ☑ Record a payment and delete your own (soft delete), with the other side
   notified.
-- ☐ Hourly job steps: ship-by reminders and late flags, the confirm reminder,
+- ☑ Hourly job steps: ship-by reminders and late flags, the confirm reminder,
   statement `OWED` transitions, the customer-data cut-off, and reconcile (S-1).
 
 ## Build: frontend
 
-- ☐ Seller: Suppliers → {supplier} → **Account**.
-- ☐ Supplier: Sellers → {seller} → **Account**.
-- ☐ **Record a payment** sheet.
+- ☑ Seller: Suppliers → {supplier} → **Account**.
+- ☑ Supplier: Sellers → {seller} → **Account**.
+- ☑ **Record a payment** sheet.
 
 ## Tests
 
 M-1…M-9 and S-1…S-4. Balances match on both sides for prepaid, COD, came back
 and cancelled cases. A dropped `order.paid` handler is repaired by reconcile.
+
+### Verified (21 Oct 2026)
+
+- `npm run typecheck` and `npm run test:unit` (132 pass; `test/unit/dropship-money.test.ts` covers every
+  statement case, the balance and its words, payment validation, M-4 and M-5, and the four job due-date rules).
+- An `app.inject` run on the dev database with throwaway stores (deleted after): 18 checks — a
+  new order shows as pending and doesn't count; COD delivered (the supplier owes the seller
+  `collect − share`); prepaid delivered (the seller owes the share); came back with the fee on the
+  seller, then on the supplier, and an older order keeping its own terms; a cancelled order
+  at zero; a held line out of the balance and back once resolved; a payment recorded by each side,
+  the words flipping per side, only the recorder deleting, the other side told; the 15-day fallback;
+  each reminder once; reconcile repairing a lost `order.paid` and a cancelled order left open;
+  access. The Phase 3 (25) and Phase 4 (29) checks still pass.
+- Frontend: `tsc -b`, `vite build`, `check:ui` (no budget rises); the Account page checked at
+  390 px with mocked data — you owe, they owe, settled, supplier side and the record sheet.
+- **Not run yet:** `npm run test:api` for `test/dropship-statement.test.mjs` — it needs this code on dev.
 
 ## Release
 

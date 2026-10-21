@@ -120,6 +120,7 @@ model SupplierLink {
   statusBy       DropshipActor?
   resales        Resale[]
   orders         SupplierOrder[]
+  settlements    Settlement[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
@@ -322,6 +323,11 @@ model SupplierOrder {
   /// Admin's Needs action → Resolve.
   adminResolvedAt DateTime?
   adminNote       String?
+  /// Hourly-job reminders, one each (D-41): the supplier was nudged to confirm,
+  /// the seller was told it is late, the supplier was nudged to mark it delivered.
+  confirmRemindedAt   DateTime?
+  lateNotifiedAt      DateTime?
+  deliveredRemindedAt DateTime?
   costTotal       Decimal             @db.Decimal(10, 2)
   shippingFee     Decimal             @db.Decimal(10, 2)
   /// costTotal + shippingFee.
@@ -383,5 +389,40 @@ model SupplierOrderEvent {
 
   @@index([supplierOrderId, createdAt])
   @@map("supplier_order_events")
+  @@schema("dropship")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5: recorded payments (docs/dropshipping/data-model/money)
+// ---------------------------------------------------------------------------
+
+enum SettlementDirection {
+  SELLER_TO_SUPPLIER
+  SUPPLIER_TO_SELLER
+
+  @@schema("dropship")
+}
+
+/// A payment one side recorded as made to the other (D-16, DIRECT lines). The
+/// statement counts it until its recorder deletes it; the row is kept for audit.
+model Settlement {
+  id         String              @id @default(cuid())
+  linkId     String
+  link       SupplierLink        @relation(fields: [linkId], references: [id], onDelete: Restrict)
+  direction  SettlementDirection
+  amount     Decimal             @db.Decimal(10, 2)
+  paidOn     DateTime
+  /// UPI or bank reference.
+  reference  String?
+  note       String?
+  /// The customer who recorded it.
+  recordedBy String
+  /// SELLER or SUPPLIER.
+  recordedAs DropshipActor
+  deletedAt  DateTime?
+  createdAt  DateTime            @default(now())
+
+  @@index([linkId, paidOn])
+  @@map("settlements")
   @@schema("dropship")
 }

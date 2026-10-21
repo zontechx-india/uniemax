@@ -27,4 +27,10 @@ export const dropshipConfig = {
   unpaidHoldHours: num("DROPSHIP_UNPAID_HOLD_HOURS", 2),
   /** After an order closes, the supplier stops seeing the customer's phone and address (F-12). */
   customerDataDays: num("DROPSHIP_CUSTOMER_DATA_DAYS", 30),
+  /** A new order the supplier hasn't opened after this long gets one reminder (F-1). */
+  confirmReminderHours: num("DROPSHIP_CONFIRM_REMINDER_HOURS", 24),
+  /** Shipped but never marked delivered: after this many days the supplier is nudged once (F-10). */
+  deliveredReminderDays: num("DROPSHIP_DELIVERED_REMINDER_DAYS", 7),
+  /** Shipped this long ago and never marked delivered → it counts as owed (F-10). */
+  owedFallbackDays: num("DROPSHIP_OWED_FALLBACK_DAYS", 15),
 };

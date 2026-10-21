@@ -21,7 +21,7 @@
 | Suppliers | `Supplier` ☑, `SupplierInvite` ☑, `SupplierLink` ☑, `SupplyProduct` ☑, `SupplyVariant` ☑, `TermsChange` ☑ | 2 | [suppliers/context.md](suppliers/context.md) |
 | Supplier products | `Resale` ☑, `ResaleVariant` ☑ | 3 | [supplier-products/context.md](supplier-products/context.md) |
 | Orders | `SupplierOrder` ☑, `SupplierOrderLine` ☑, `SupplierOrderEvent` ☑ | 4 | [orders/context.md](orders/context.md) |
-| Money | `Settlement`; Easy Split fields | 5, 6 | [money/context.md](money/context.md) |
+| Money | `Settlement` ☑; Easy Split fields | 5, 6 | [money/context.md](money/context.md) |
 
 ## Core additions (`prisma/schema/core.prisma`)
 

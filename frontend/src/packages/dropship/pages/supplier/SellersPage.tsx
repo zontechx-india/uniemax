@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { toApiError } from '../../../../shared/auth/http'
 import { MediaImg } from '../../../../shared/media/MediaImg'
-import { Button } from '../../../../shared/ui/Button'
+import { Button, buttonClass } from '../../../../shared/ui/Button'
 import { ConfirmDialog } from '../../../../shared/ui/ConfirmDialog'
 import { Dialog } from '../../../../shared/ui/Dialog'
 import { ErrorNote, InfoNote } from '../../../../shared/ui/form'
@@ -77,9 +78,14 @@ export function SellersPage() {
                     </p>
                   </div>
                 </div>
-                <Button variant="secondary" size="sm" onClick={() => setOpenId(s.linkId)}>
-                  Terms
-                </Button>
+                <div className="flex gap-2">
+                  <Link to={`${s.linkId}/account`} className={buttonClass({ variant: 'secondary', size: 'sm' })}>
+                    Account
+                  </Link>
+                  <Button variant="secondary" size="sm" onClick={() => setOpenId(s.linkId)}>
+                    Terms
+                  </Button>
+                </div>
               </li>
             )
           })}

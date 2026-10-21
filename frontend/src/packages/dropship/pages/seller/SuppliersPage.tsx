@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { toApiError } from '../../../../shared/auth/http'
-import { Button } from '../../../../shared/ui/Button'
+import { Button, buttonClass } from '../../../../shared/ui/Button'
 import { ConfirmDialog } from '../../../../shared/ui/ConfirmDialog'
 import { Dialog } from '../../../../shared/ui/Dialog'
 import { ErrorNote, InfoNote, TextField } from '../../../../shared/ui/form'
@@ -237,9 +238,14 @@ function SupplierRow({ supplier, onOpen }: { supplier: SellerSupplier; onOpen: (
           </p>
         </div>
       </div>
-      <Button variant="secondary" size="sm" onClick={onOpen} className="sm:w-auto">
-        Terms
-      </Button>
+      <div className="flex gap-2">
+        <Link to={`${supplier.linkId}/account`} className={buttonClass({ variant: 'secondary', size: 'sm' })}>
+          Account
+        </Link>
+        <Button variant="secondary" size="sm" onClick={onOpen} className="sm:w-auto">
+          Terms
+        </Button>
+      </div>
     </li>
   )
 }

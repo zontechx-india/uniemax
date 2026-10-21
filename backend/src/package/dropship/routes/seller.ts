@@ -3,10 +3,13 @@ import { requireCustomer } from "../../auth/index.js";
 import { ok } from "../../../utils/response.js";
 import { requireOwnedStore } from "../guards.js";
 import {
+  accountParam,
   catalogQuery,
   inviteCreateSchema,
   inviteParam,
   linkParam,
+  paymentParam,
+  paymentSchema,
   resaleAddSchema,
   resaleOptionSchema,
   resaleParam,
@@ -22,6 +25,7 @@ import * as catalog from "../services/catalog.js";
 import * as resales from "../services/resale.js";
 import * as invites from "../services/invites.js";
 import * as orders from "../services/supplierOrders.js";
+import * as statement from "../services/statement.js";
 import * as views from "../services/orderViews.js";
 import * as suppliers from "../services/suppliers.js";
 import { linkTerms } from "../services/terms.js";
@@ -138,5 +142,26 @@ export const sellerRoutes: FastifyPluginAsync = async (app) => {
   app.get("/shipments", async (request) => {
     const query = sellerShipmentsQuery.parse(request.query);
     return ok(await views.sellerShipments(request.dropshipStore!.id, query));
+  });
+
+  // ---- The account with one supplier (Phase 5) ---------------------------------
+
+  app.get("/suppliers/:linkId/account", async (request) => {
+    const { linkId } = accountParam.parse(request.params);
+    const ctx = await statement.sellerContext(request.dropshipStore!.id, linkId);
+    return ok(await statement.getAccount(ctx, request.customer!.id));
+  });
+
+  app.post("/suppliers/:linkId/payments", async (request) => {
+    const { linkId } = accountParam.parse(request.params);
+    const input = paymentSchema.parse(request.body);
+    const ctx = await statement.sellerContext(request.dropshipStore!.id, linkId);
+    return ok(await statement.recordPayment(ctx, request.customer!.id, input));
+  });
+
+  app.delete("/suppliers/:linkId/payments/:paymentId", async (request) => {
+    const { linkId, paymentId } = paymentParam.parse(request.params);
+    const ctx = await statement.sellerContext(request.dropshipStore!.id, linkId);
+    return ok(await statement.deletePayment(ctx, request.customer!.id, paymentId));
   });
 };

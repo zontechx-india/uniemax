@@ -4,10 +4,13 @@ import { ok } from "../../../utils/response.js";
 import { readUpload } from "../../storage/index.js";
 import { requireOwnedStore, requireSupplier } from "../guards.js";
 import {
+  accountParam,
   cameBackSchema,
   cantShipSchema,
   linkParam,
   orderParam,
+  paymentParam,
+  paymentSchema,
   productParam,
   slipsQuery,
   supplierInboxQuery,
@@ -18,6 +21,7 @@ import {
   supplyUpdateSchema,
 } from "../schema.js";
 import * as orders from "../services/supplierOrders.js";
+import * as statement from "../services/statement.js";
 import * as views from "../services/orderViews.js";
 import * as suppliers from "../services/suppliers.js";
 import * as supply from "../services/supply.js";
@@ -133,5 +137,26 @@ export const supplierRoutes: FastifyPluginAsync = async (app) => {
     const { restock } = cameBackSchema.parse(request.body);
     await orders.cameBack(request.dropshipSupplier!.id, id, request.customer!.id, restock);
     return ok(await views.supplierDetail(request.dropshipSupplier!.id, id));
+  });
+
+  // ---- The account with one seller (Phase 5) -----------------------------------
+
+  app.get("/sellers/:linkId/account", async (request) => {
+    const { linkId } = accountParam.parse(request.params);
+    const ctx = await statement.supplierContext(request.dropshipSupplier!.id, linkId);
+    return ok(await statement.getAccount(ctx, request.customer!.id));
+  });
+
+  app.post("/sellers/:linkId/payments", async (request) => {
+    const { linkId } = accountParam.parse(request.params);
+    const input = paymentSchema.parse(request.body);
+    const ctx = await statement.supplierContext(request.dropshipSupplier!.id, linkId);
+    return ok(await statement.recordPayment(ctx, request.customer!.id, input));
+  });
+
+  app.delete("/sellers/:linkId/payments/:paymentId", async (request) => {
+    const { linkId, paymentId } = paymentParam.parse(request.params);
+    const ctx = await statement.supplierContext(request.dropshipSupplier!.id, linkId);
+    return ok(await statement.deletePayment(ctx, request.customer!.id, paymentId));
   });
 };

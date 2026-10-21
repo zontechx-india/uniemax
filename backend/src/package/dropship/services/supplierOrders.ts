@@ -474,7 +474,12 @@ export async function delivered(p: SoRow, actor: "SUPPLIER" | "SELLER", by: stri
   }
   const now = new Date();
   await deps.prisma.$transaction((tx) =>
-    guardedMove(tx, p, "delivered", actor, by, null, { deliveredAt: now, closedAt: now }),
+    guardedMove(tx, p, "delivered", actor, by, null, {
+      deliveredAt: now,
+      closedAt: now,
+      // Delivered: the line now counts on the account — unless a problem holds it.
+      ...(p.statementState === "PENDING" ? { statementState: "OWED" as const, owedAt: now } : {}),
+    }),
   );
 }
 
@@ -492,6 +497,8 @@ export async function cameBack(supplierId: string, id: string, by: string, resto
     await guardedMove(tx, p, "cameBack", "SUPPLIER", by, restock ? "Put back in stock" : "Not put back in stock", {
       closedAt: new Date(),
       closeReason: "The parcel came back",
+      // The returned-parcel fee (D-17) is now a line on the account.
+      ...(p.statementState === "PENDING" ? { statementState: "OWED" as const, owedAt: new Date() } : {}),
     });
     if (restock) await releaseLines(tx, p.lines);
   });
@@ -602,7 +609,13 @@ export async function resolve(id: string, adminId: string, note: string) {
     data: {
       adminResolvedAt: new Date(),
       adminNote: note,
-      ...(p.statementState === "HELD" ? { statementState: "PENDING" as const } : {}),
+      // A held line goes back to where it was: counted once delivered or came
+      // back (or shipped long enough), otherwise still waiting.
+      ...(p.statementState === "HELD"
+        ? p.owedAt || p.status === "DELIVERED" || p.status === "RETURNED"
+          ? { statementState: "OWED" as const, owedAt: p.owedAt ?? new Date() }
+          : { statementState: "PENDING" as const }
+        : {}),
     },
   });
   await deps.prisma.supplierOrderEvent.create({
