@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { requireCustomer } from "../../auth/index.js";
 import { ok } from "../../../utils/response.js";
-import { requireOwnedStore } from "../guards.js";
+import { requireOwnedStore, requireSellingStore } from "../guards.js";
 import {
   accountParam,
   catalogQuery,
@@ -34,6 +34,7 @@ import { linkTerms } from "../services/terms.js";
 export const sellerRoutes: FastifyPluginAsync = async (app) => {
   app.addHook("preHandler", requireCustomer);
   app.addHook("preHandler", requireOwnedStore);
+  app.addHook("preHandler", requireSellingStore);
 
   /** Whether this store supplies and/or has suppliers — drives the nav. */
   app.get("/role", async (request) => ok(await suppliers.storeRole(request.dropshipStore!.id)));

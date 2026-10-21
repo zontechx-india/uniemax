@@ -188,7 +188,9 @@ export async function inviteStores(token: string, customerId: string) {
     where: { storeId: { in: stores.map((s) => s.id) } },
   });
   const byStore = new Map(suppliers.map((s) => [s.storeId, s]));
-  return stores.map((store) => {
+  // Seller and supplier are different: only the customer's supplier accounts can supply here, never a
+  // shop that sells to customers (D-49).
+  return stores.filter((store) => byStore.get(store.id)?.supplyOnly).map((store) => {
     const supplier = byStore.get(store.id);
     return {
       id: store.id,
@@ -267,6 +269,11 @@ export async function acceptInvite(token: string, customerId: string, input: Inv
   const existingSupplier = existingStore
     ? await deps.prisma.supplier.findUnique({ where: { storeId: existingStore.id } })
     : null;
+  if (existingStore && !existingSupplier?.supplyOnly) {
+    throw HttpError.badRequest(
+      "A shop that sells can't also be a supplier. Create a supplier account instead.",
+    ); // D-49
+  }
   if (existingSupplier?.status === "SUSPENDED") {
     throw HttpError.forbidden("This store can't supply sellers right now — contact UnieMax support");
   }

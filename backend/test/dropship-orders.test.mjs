@@ -218,3 +218,38 @@ test("the supplier's role counts the new orders waiting to be shipped (the menu 
   // a store that is not a supplier has nothing to ship
   assert.equal((await c.A.req("GET", `${c.S}/role`)).body.data.ordersToShip, 0);
 });
+
+test("seller and supplier are different: a supplier account can't use the seller side (D-49)", async (t) => {
+  const c = await setup(t);
+  if (!c) return;
+  // The supplier account's own store id, on the seller routes: invite, supplier products, the suppliers list.
+  assert.equal((await c.B.req("GET", `${c.Sup}/suppliers`)).status, 403);
+  assert.equal((await c.B.req("GET", `${c.Sup}/catalog`)).status, 403);
+  assert.equal((await c.B.req("POST", `${c.Sup}/supplier-invites`, { json: { name: "X", email: "x@example.test", codAllowed: true, returnFeePayer: "SELLER" } })).status, 403);
+  // …but it can still ask what it is.
+  assert.equal((await c.B.req("GET", `${c.Sup}/role`)).status, 200);
+});
+
+test("a shop that sells can't join as a supplier, and isn't offered on the join sheet (D-49)", async (t) => {
+  const c = await setup(t);
+  if (!c) return;
+  const shop = await c.B.req("POST", "/api/v1/stores", { form: fileForm({ name: uniq("QA Shop") }, PNG_1PX, "logo.png") });
+  assert.equal(shop.status, 201, JSON.stringify(shop.body));
+  const inv = await c.A.req("POST", `${c.S}/supplier-invites`, {
+    json: { name: "QA Second", email: `${uniq("qa-two")}@example.test`, codAllowed: true, returnFeePayer: "SELLER" },
+  });
+  assert.equal(inv.status, 201, JSON.stringify(inv.body));
+  const token = inv.body.data.inviteUrl.split("/").pop();
+  // The picker offers supplier accounts only.
+  const offered = (await c.B.req("GET", `/api/v1/dropship/invites/${token}/stores`)).body.data.map((s) => s.id);
+  assert.ok(offered.includes(c.supStoreId), "its supplier account is offered");
+  assert.ok(!offered.includes(shop.body.data.id), "a shop that sells is not");
+  // Joining with the shop is refused, and the invite stays usable.
+  const refused = await c.B.req("POST", `/api/v1/dropship/invites/${token}/accept`, {
+    json: { storeId: shop.body.data.id, shippingFee: 60, shipWithinDays: 2, returnDays: 0 },
+  });
+  assert.equal(refused.status, 400, JSON.stringify(refused.body));
+  assert.match(refused.body.message, /can't also be a supplier/);
+  const withAccount = await c.B.req("POST", `/api/v1/dropship/invites/${token}/accept`, { json: { storeId: c.supStoreId } });
+  assert.equal(withAccount.status, 200, JSON.stringify(withAccount.body));
+});

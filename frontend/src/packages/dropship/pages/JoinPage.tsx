@@ -20,8 +20,9 @@ const NEW = 'new'
 /**
  * /supplier-invite/:token — where a seller's invite lands. Public, so the
  * supplier reads who is inviting and on what terms before signing in; the
- * sign-in dialog opens in place. Then the join sheet: an existing store or a
- * short form, and the supplier's own terms, none pre-selected
+ * sign-in dialog opens in place. Then the join sheet: one of the supplier
+ * accounts they already have, or a short form for a new one (a shop that sells
+ * can't also be a supplier, D-49), and the supplier's own terms, none pre-selected
  * (docs/dropshipping/suppliers/context.md → "The supplier joins").
  */
 export function JoinPage() {
@@ -184,7 +185,7 @@ function JoinForm({
   return (
     <div className="mt-6 space-y-6">
       {usable.length > 0 && (
-        <Question legend="Which store will supply?" error={errors.choice}>
+        <Question legend="Which supplier account will supply?" error={errors.choice}>
           {usable.map((s) => (
             <ChoiceCard
               key={s.id}
@@ -207,7 +208,7 @@ function JoinForm({
             checked={isNew}
             onSelect={() => setChoice(NEW)}
             title="Create a supplier account"
-            note="A separate account just for supplying sellers."
+            note="A separate account just for supplying sellers. Your shops that sell to customers stay separate."
           />
         </Question>
       )}

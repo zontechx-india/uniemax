@@ -22,6 +22,21 @@ export async function requireOwnedStore(request: FastifyRequest): Promise<void> 
   request.dropshipStore = await deps.host.getOwnedStore(customerId, storeId);
 }
 
+/**
+ * Runs after `requireOwnedStore` on the SELLER routes: a supplier account can't use them. It has no shop
+ * and sells nothing, so it can't invite suppliers, add supplier products or read a seller's account (D-49).
+ * Its own role is the one thing it may ask for.
+ */
+export async function requireSellingStore(request: FastifyRequest): Promise<void> {
+  const store = request.dropshipStore;
+  if (!store) throw HttpError.unauthorized();
+  if (request.routeOptions.url?.endsWith("/role")) return;
+  const supplier = await deps.prisma.supplier.findUnique({ where: { storeId: store.id }, select: { supplyOnly: true } });
+  if (supplier?.supplyOnly) {
+    throw HttpError.forbidden("A supplier account can't sell. To sell to customers, create a store of your own.");
+  }
+}
+
 /** Runs after `requireOwnedStore`: that store must be an ACTIVE supplier (SU-9). */
 export async function requireSupplier(request: FastifyRequest): Promise<void> {
   const store = request.dropshipStore;
