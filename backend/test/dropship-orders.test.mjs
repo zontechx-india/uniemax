@@ -139,6 +139,13 @@ test("a COD order reaches the supplier; shipping with tracking moves the custome
   assert.equal(order.shipments[0].trackingNumber, "QA1234567");
   assert.equal(order.shipments[0].senderName.startsWith("QA Supply"), true, "Shipped by the supplier");
 
+  // The parcel is the supplier's: the seller can't edit it, deliver it or mark it returned through the core's own endpoints.
+  const own = `/api/v1/stores/${c.fx.store.id}/orders/${orderId}/shipments/${order.shipments[0].id}`;
+  assert.equal((await c.A.req("PATCH", own, { json: { carrierCode: "dtdc", trackingNumber: "ZZ99999" } })).status, 409);
+  assert.equal((await c.A.req("POST", `${own}/delivered`)).status, 409);
+  assert.equal((await c.A.req("POST", `${own}/returned`)).status, 409);
+  assert.equal((await sellerOrder(c, orderId)).shipments[0].trackingNumber, "QA1234567", "the supplier's tracking is unchanged");
+
   const parts = await c.A.req("GET", `${c.S}/orders/${orderId}/parts`);
   assert.equal(parts.status, 200, JSON.stringify(parts.body));
   assert.equal(parts.body.data.parts[0].status, "SHIPPED");

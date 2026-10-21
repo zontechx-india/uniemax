@@ -156,6 +156,13 @@ locks in the same order: `updateCopy` writes the variants first and the product 
 The other way round, a re-sync racing a sale on the same copy deadlocks (found and
 fixed in Phase 4).
 
+A second order exists across the copy and the supplier: **placement** locks the copy's
+stock row (core) and then the supplier's (our hook), but a **cancel** runs our hook
+*before* core puts the copy's stock back — so `cancelling` first takes the line's own
+stock rows with `host.lockOrderStock` (`SELECT … FOR UPDATE`, sorted), putting it in the
+same order. Without that, an order and a cancel on the same product at the same moment
+deadlock (11 of 12 transactions did in the cross-check of 21 Oct 2026).
+
 ## `DropshipHost` ◐
 
 Built in Phase 2 (`types.ts`): `getStore`, `getStores`, `getOwnedStore`,
@@ -256,7 +263,9 @@ more than `owedFallbackDays` ago with no open problem counts as owed; delivered 
 still pending are healed) and step 5 **reconcile** (a paid order whose part is still awaiting payment
 runs the paid step; a cancelled order whose part is still open is closed and its stock released; orders
 younger than 10 minutes are left alone). Step 4 **privacy** needs no job: the customer-data cut-off is
-a read-time rule (D-42). Splits (step 3, Phase 6) are not built.
+a read-time rule (D-42). Reconcile also finishes a ship whose parcel was created but whose
+supplier order never moved (`repairShipped`: the supplier would otherwise be stuck at "new"
+and a retry refused). Splits (step 3, Phase 6) are not built.
 1. **Expire** unpaid parts older than `unpaidHoldHours` (release stock).
 2. **Reminders:** a new order not confirmed after `confirmReminderHours`; a
    parcel not shipped by `shipBy` (late flag).

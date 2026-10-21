@@ -750,7 +750,8 @@ count; a card skeleton shows while the layout's fetch is in flight.
   courier, `Badge` status (On the way / Delivered / Came back), the number
   with **Copy**, **Track** (pasted link) or **Open {courier}**, sent /
   delivered / came-back times and the proof-of-delivery thumbnail
-  (`MediaImg`). **Mark as delivered** on an order with a parcel opens
+  (`MediaImg`). **Edit tracking** is only offered on the store's own parcels
+  (`source: SELLER`) — a supplier's parcel is the supplier's to update (the core refuses it too). **Mark as delivered** on an order with a parcel opens
   `DeliveredDialog`: an optional photo, shrunk to WebP in the browser
   (`prepareImage`, as product photos) and previewed from its `blob:`. The
   "⋯" gains **Parcel came back** (confirm), and once every parcel came back

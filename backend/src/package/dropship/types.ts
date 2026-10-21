@@ -55,6 +55,12 @@ export interface DropshipHost {
   /** Conditional decrement of a variant's stock (K-1, K-2); false = not enough left. */
   reserveStock(tx: Tx, variantId: string, quantity: number): Promise<boolean>;
   releaseStock(tx: Tx, variantId: string, quantity: number): Promise<void>;
+  /**
+   * Takes the row locks on the stock of every line of an order — the lines' own variants —
+   * so a hook that is about to touch the supplier's stock does so in the core's lock order
+   * (the line's variant first, then the supplier's). Changes nothing.
+   */
+  lockOrderStock(tx: Tx, orderId: string): Promise<void>;
   /** The supplier's own SKUs, for its packing slips. */
   getVariantSkus(tx: Tx, variantIds: string[]): Promise<Map<string, string | null>>;
   /** Marks order lines as shipped by another party (`OrderItem.fulfilledBy`). */
@@ -323,6 +329,6 @@ export interface OrderView {
   state: string | null;
   country: string | null;
   createdAt: Date;
-  items: { id: string; fulfilledBy: string | null; lineTotal: Prisma.Decimal; imageKey: string | null }[];
+  items: { id: string; fulfilledBy: string | null; shipmentId: string | null; lineTotal: Prisma.Decimal; imageKey: string | null }[];
   parcels: ParcelRef[];
 }

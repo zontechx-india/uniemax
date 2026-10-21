@@ -125,6 +125,9 @@ function AccountPage({ side }: { side: 'seller' | 'supplier' }) {
                 ))}
               </ul>
             )}
+            {data.moreLines && (
+              <p className="text-xs text-muted">Showing the most recent orders. Older ones are all counted in the balance.</p>
+            )}
           </section>
 
           <section className="space-y-3">

@@ -604,6 +604,8 @@ export interface Account {
   balance: number
   words: string
   lines: AccountLine[]
+  /** More orders than the list shows; every one is in the balance. */
+  moreLines: boolean
   payments: AccountPayment[]
 }
 

@@ -97,7 +97,7 @@ export function startJobs(logger: FastifyBaseLogger): () => void {
     }
     try {
       const fixed = await reconcile.reconcile();
-      if (fixed.paid + fixed.cancelled > 0) logger.info(fixed, "dropship: reconciled supplier orders");
+      if (fixed.paid + fixed.cancelled + fixed.shipped > 0) logger.info(fixed, "dropship: reconciled supplier orders");
     } catch (err) {
       logger.error({ err }, "dropship: reconcile failed");
     }

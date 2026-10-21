@@ -500,7 +500,9 @@ the courier, number and link. Rules and failure cases:
 mounts as the rest of this router (owner, and super-admin support —
 audited). Every action answers with the **full order** (`shipments[]`
 included); every write is guarded on the state read before it, so a repeat
-or a second tab gets `409`, never a duplicate.
+or a second tab gets `409`, never a duplicate. A parcel a supplier made
+(`source: PACKAGE`) can't be edited, delivered or marked returned from here: those three
+refuse it with `409` — the supplier updates it.
 
 **Parcel shape** (`shipments[]`, oldest first; each order item carries
 `shipmentId`, null until it ships):

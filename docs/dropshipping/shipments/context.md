@@ -72,6 +72,13 @@ and supplier parcels reuse it (D-6). Model:
    for a parcel on its way inside its own transaction, so "send again" and
    "cancel" from two tabs can't cross.
 
+9. ☑ **A supplier's parcel is the supplier's** (audit, 21 Oct 2026): the seller's own parcel actions
+   — edit tracking, delivered, came back — refuse a `PACKAGE` parcel with 409 *"This parcel is
+   shipped by a supplier, who keeps it up to date"*, and the seller's parcel card hides **Edit
+   tracking** on it. Changing it there would leave the supplier's order out of step with the
+   parcel (stock, the account, the rollup). The supplier updates it from **Orders to ship**; the
+   seller marks a supplier part delivered through the package (**Mark as delivered**).
+
 ## Where it lives
 
 - Backend: `modules/orders/shipments.service.ts` (send / tracking /

@@ -44,22 +44,24 @@ const SETTLE_MS = 10 * 60 * 1000;
 
 /**
  * S-1: repair what a lost event left behind.
+ * - A supplier order still "new" although its parcel was already sent: finish the move.
  * - A paid order whose supplier part still awaits payment (or expired): run the paid step.
  * - A cancelled order whose supplier part is still open: close it and give the stock back.
  */
-export async function reconcile(now = new Date()): Promise<{ paid: number; cancelled: number }> {
+export async function reconcile(now = new Date()): Promise<{ paid: number; cancelled: number; shipped: number }> {
   const quiet = new Date(now.getTime() - SETTLE_MS);
   const open = await deps.prisma.supplierOrder.findMany({
     where: { status: { in: ["AWAITING_PAYMENT", "EXPIRED", "NEW", "ACCEPTED"] }, updatedAt: { lt: quiet } },
-    select: { orderId: true, status: true },
+    select: { id: true, orderId: true, status: true, lines: { select: { orderItemId: true } } },
     take: 300,
   });
-  if (open.length === 0) return { paid: 0, cancelled: 0 };
+  if (open.length === 0) return { paid: 0, cancelled: 0, shipped: 0 };
   const orderIds = [...new Set(open.map((o) => o.orderId))];
   const views = new Map((await deps.host.getOrderViews(orderIds)).map((v) => [v.id, v]));
 
   let paid = 0;
   let cancelled = 0;
+  let shipped = 0;
   for (const orderId of orderIds) {
     const view = views.get(orderId);
     if (!view) continue;
@@ -73,5 +75,17 @@ export async function reconcile(now = new Date()): Promise<{ paid: number; cance
       await supplierOrders.onPaid(orderId).then(() => paid++, () => undefined);
     }
   }
-  return { paid, cancelled };
+  // A part still "new" whose parcel already exists: finish the move the supplier's tap started.
+  for (const part of open) {
+    if (part.status !== "NEW" && part.status !== "ACCEPTED") continue;
+    const view = views.get(part.orderId);
+    if (!view || view.status === "CANCELLED") continue;
+    const mine = view.items.filter((i) => part.lines.some((l) => l.orderItemId === i.id));
+    const parcelId = mine[0]?.shipmentId;
+    if (!parcelId || mine.some((i) => i.shipmentId !== parcelId)) continue;
+    const parcel = view.parcels.find((x) => x.id === parcelId);
+    if (!parcel) continue;
+    if (await supplierOrders.repairShipped(part.id, parcelId, parcel.shippedAt)) shipped++;
+  }
+  return { paid, cancelled, shipped };
 }

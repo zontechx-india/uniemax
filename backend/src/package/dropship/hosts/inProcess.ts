@@ -573,6 +573,19 @@ export function createInProcessHost(prisma: PrismaClient): DropshipHost {
       if (v) await recomputeProductAggregates(v.productId, tx);
     },
 
+    async lockOrderStock(tx, orderId) {
+      const items = await tx.orderItem.findMany({ where: { orderId }, select: { productId: true, variantId: true } });
+      const simple = items.filter((i) => !i.variantId && i.productId).map((i) => i.productId!);
+      const defaults = simple.length
+        ? await tx.storeProductVariant.findMany({ where: { productId: { in: simple }, isDefault: true }, select: { id: true } })
+        : [];
+      const ids = [...items.flatMap((i) => (i.variantId ? [i.variantId] : [])), ...defaults.map((d) => d.id)].sort();
+      // A row lock and nothing else; sorted so two callers never lock in opposite orders.
+      if (ids.length > 0) {
+        await tx.$queryRaw`SELECT "id" FROM "public"."store_product_variants" WHERE "id" IN (${Prisma.join(ids)}) ORDER BY "id" FOR UPDATE`;
+      }
+    },
+
     async getVariantSkus(tx, variantIds) {
       const rows = await tx.storeProductVariant.findMany({
         where: { id: { in: variantIds } },
@@ -606,7 +619,7 @@ export function createInProcessHost(prisma: PrismaClient): DropshipHost {
           state: true,
           country: true,
           createdAt: true,
-          items: { select: { id: true, fulfilledBy: true, lineTotal: true, imageKey: true } },
+          items: { select: { id: true, fulfilledBy: true, shipmentId: true, lineTotal: true, imageKey: true } },
           shipments: {
             select: {
               id: true,

@@ -50,6 +50,7 @@
 | D-40 | 2026-10-21 | **The account is computed on read** from the supplier orders and the live payments, not stored as lines. One pure function decides each line, and both sides call it, so they can never disagree (M-8); a fix to a rule corrects history. Amounts still come only from each order's snapshot (D-18). | Building Phase 5: stored lines would need repair jobs whenever a rule or a status changed. |
 | D-41 | 2026-10-21 | **Reminders are tracked by three nullable timestamps on the supplier order** (`confirmRemindedAt`, `lateNotifiedAt`, `deliveredRemindedAt`), claimed in a guarded write, so each goes out once even with two workers. New knob `deliveredReminderDays` (7). | An hourly job must not repeat a reminder, and a timestamp is queryable where an event note is not. |
 | D-42 | 2026-10-21 | **The customer-data cut-off stays a read-time rule** (`customerDataDays`, applied when a supplier's order is read). The hourly job has no privacy step. | Already enforced where the data is shown; a job copy of it would add nothing. |
+| D-43 | 2026-10-21 | **A supplier's parcel can't be changed from the seller's side.** The core's edit-tracking, delivered and came-back actions refuse a `PACKAGE` parcel (409), and the seller's card hides Edit tracking on it. | Cross-check of Phases 0–5: those core actions had no ownership check, so a seller could move a supplier's parcel and leave the supplier order, its stock and the account out of step. |
 
 ## Open questions
 

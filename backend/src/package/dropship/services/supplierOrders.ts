@@ -186,6 +186,10 @@ export async function unplace(tx: Tx, orderId: string): Promise<void> {
  */
 export async function cancelling(tx: Tx, orderId: string): Promise<void> {
   const parts = await tx.supplierOrder.findMany({ where: { orderId }, include: { lines: true } });
+  if (parts.length === 0) return;
+  // Core locks a line's own stock row before ours when it places an order. A cancel must take the
+  // same order, or an order and a cancel on the same product can wait on each other (deadlock).
+  await deps.host.lockOrderStock(tx, orderId);
   if (parts.some((p) => p.status === "SHIPPED")) {
     throw HttpError.conflict(
       "A supplier's parcel for this order is on its way, so it can't be cancelled now. If it comes back, you can cancel it then.",
@@ -415,6 +419,22 @@ export async function ship(supplierId: string, id: string, by: string, tracking:
     guardedMove(tx, p, "ship", "SUPPLIER", by, null, { shipmentId, shippedAt: new Date() }),
   );
   await rollUp(p.orderId, "moved");
+}
+
+/**
+ * Reconcile: the parcel exists (the customer was told) but this order's own update never
+ * landed, so the supplier is stuck at "new" and a retry is refused. Move it to shipped.
+ */
+export async function repairShipped(partId: string, shipmentId: string, shippedAt: Date): Promise<boolean> {
+  const p = await deps.prisma.supplierOrder.findUnique({ where: { id: partId } });
+  if (!p || !canMove("ship", p.status, "SUPPLIER")) return false;
+  const moved = await deps.prisma
+    .$transaction((tx) =>
+      guardedMove(tx, p, "ship", "SYSTEM", null, "Repaired: the parcel had already been sent", { shipmentId, shippedAt }),
+    )
+    .then(() => true, () => false);
+  if (moved) await rollUp(p.orderId, "moved");
+  return moved;
 }
 
 /** F-6: correct the courier, number or link while it's on its way. The customer is told. */

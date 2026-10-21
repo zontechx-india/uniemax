@@ -149,7 +149,8 @@ function SellerParcel({
         </a>
       )}
 
-      {(followAt || onTheWay) && (
+      {/* A supplier's parcel is the supplier's to update — only the store's own can be edited here. */}
+      {(followAt || (onTheWay && parcel.source === 'SELLER')) && (
         <div className="flex flex-wrap gap-2">
           {followAt && (
             <a
@@ -162,7 +163,7 @@ function SellerParcel({
               <ExternalLinkIcon className="h-4 w-4" />
             </a>
           )}
-          {onTheWay && (
+          {onTheWay && parcel.source === 'SELLER' && (
             <Button type="button" variant="ghost" size="sm" onClick={onEdit}>
               <PencilIcon className="h-4 w-4" />
               Edit tracking

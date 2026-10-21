@@ -62,6 +62,7 @@ async function findParcel(where: Prisma.OrderShipmentWhereInput) {
       trackingUrl: true,
       deliveredAt: true,
       returnedAt: true,
+      source: true,
       order: { select: { customerId: true } },
     },
   });
@@ -71,6 +72,20 @@ async function findParcel(where: Prisma.OrderShipmentWhereInput) {
   }
   if (parcel.returnedAt) {
     throw HttpError.conflict("This parcel already came back");
+  }
+  return parcel;
+}
+
+/**
+ * A parcel of THIS store's order, for the seller's own actions (edit tracking,
+ * delivered, came back). A parcel another party made — a supplier's — is theirs
+ * to update, through the package: letting the seller change it here would leave
+ * the supplier's order out of step with the parcel.
+ */
+async function findSellerParcel(storeId: string, orderId: string, shipmentId: string) {
+  const parcel = await findParcel({ id: shipmentId, orderId, order: { storeId } });
+  if (parcel.source === "PACKAGE") {
+    throw HttpError.conflict("This parcel is shipped by a supplier, who keeps it up to date");
   }
   return parcel;
 }
@@ -265,7 +280,7 @@ export async function updateShipmentTracking(
   input: ShipmentTrackingInput,
 ) {
   const store = await getMyStore(actor, storeRef);
-  const parcel = await findParcel({ id: shipmentId, orderId, order: { storeId: store.id } });
+  const parcel = await findSellerParcel(store.id, orderId, shipmentId);
   return retrack(parcel, input);
 }
 
@@ -282,7 +297,7 @@ export async function markShipmentDelivered(
   photo: UploadedFile | null,
 ) {
   const store = await getMyStore(actor, storeRef);
-  await findParcel({ id: shipmentId, orderId, order: { storeId: store.id } });
+  await findSellerParcel(store.id, orderId, shipmentId);
 
   let podKey: string | null = null;
   if (photo) {
@@ -309,7 +324,7 @@ export async function markShipmentReturned(
   shipmentId: string,
 ) {
   const store = await getMyStore(actor, storeRef);
-  await findParcel({ id: shipmentId, orderId, order: { storeId: store.id } });
+  await findSellerParcel(store.id, orderId, shipmentId);
   return returnParcel(orderId, shipmentId);
 }
 

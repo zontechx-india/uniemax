@@ -13,6 +13,9 @@ import type { StoreRef } from "../types.js";
  * the same `statementLine`, so they always see the same numbers.
  */
 
+/** The most recent orders listed on the account; the balance always counts every one. */
+const SHOWN_LINES = 200;
+
 const num = (v: Prisma.Decimal) => Number(v.toFixed(2));
 /** The `recordedAs` value for a viewer. */
 const actorOf = (viewer: StatementViewer) => (viewer === "seller" ? "SELLER" : "SUPPLIER");
@@ -46,11 +49,13 @@ export async function getAccount(ctx: Ctx, customerId: string) {
   const other = viewer === "seller" ? ctx.supplier : ctx.seller;
 
   // Orders the supplier ever saw: not the ones that never got paid.
-  const orders = await deps.prisma.supplierOrder.findMany({
-    where: { linkId: link.id, shipBy: { not: null }, status: { notIn: ["AWAITING_PAYMENT", "EXPIRED"] } },
-    orderBy: { createdAt: "desc" },
-    take: 500,
+  const where = { linkId: link.id, shipBy: { not: null }, status: { notIn: ["AWAITING_PAYMENT", "EXPIRED"] } } satisfies Prisma.SupplierOrderWhereInput;
+  // The balance is built from EVERY order (a narrow read); only the list shown is capped.
+  const everyOrder = await deps.prisma.supplierOrder.findMany({
+    where,
+    select: { status: true, statementState: true, paymentMode: true, supplierShare: true, collectAmount: true, shippingFee: true, returnFeePayer: true },
   });
+  const orders = await deps.prisma.supplierOrder.findMany({ where, orderBy: { createdAt: "desc" }, take: SHOWN_LINES });
   const views = new Map((await deps.host.getOrderViews([...new Set(orders.map((o) => o.orderId))])).map((v) => [v.id, v]));
   const payments = await deps.prisma.settlement.findMany({
     where: { linkId: link.id, deletedAt: null },
@@ -79,7 +84,7 @@ export async function getAccount(ctx: Ctx, customerId: string) {
     };
   });
 
-  const balance = statementBalance(orders.map((o) => statementLine(o)), payments);
+  const balance = statementBalance(everyOrder.map((o) => statementLine(o)), payments);
   // Positive = the seller owes the supplier. For the viewer: positive = they owe you.
   const theyOweYou = viewer === "seller" ? balance.neg() : balance;
 
@@ -90,6 +95,8 @@ export async function getAccount(ctx: Ctx, customerId: string) {
     balance: num(theyOweYou),
     words: balanceWords(balance, viewer, other.name),
     lines,
+    /** More orders than the list shows — they are all in the balance. */
+    moreLines: everyOrder.length > orders.length,
     payments: payments.map((p) => {
       const paidByViewer = (p.direction === "SELLER_TO_SUPPLIER") === (viewer === "seller");
       return {
