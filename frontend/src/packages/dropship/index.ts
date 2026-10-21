@@ -56,15 +56,9 @@ export const dropshipStoreRoutes: RouteObject[] = [
     }),
   },
   {
-    path: 'supplier-products',
+    path: 'suppliers/products',
     lazy: async () => ({
       Component: (await import('./pages/seller/SupplierProductsPage')).SupplierProductsPage,
-    }),
-  },
-  {
-    path: 'shipments',
-    lazy: async () => ({
-      Component: (await import('./pages/seller/ShipmentsPage')).ShipmentsPage,
     }),
   },
   {
@@ -100,4 +94,4 @@ export const dropshipStoreRoutes: RouteObject[] = [
 ]
 
 /** The store-section `to` values above — hidden where the package has no mount (admin view). */
-export const DROPSHIP_SECTIONS = ['suppliers', 'supplier-products', 'shipments', 'orders-to-ship', 'supply', 'sellers', 'supplier-settings'] as const
+export const DROPSHIP_SECTIONS = ['suppliers', 'orders-to-ship', 'supply', 'sellers', 'supplier-settings'] as const

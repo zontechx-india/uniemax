@@ -18,7 +18,6 @@ import {
   sellerLinkUpdateSchema,
   sellerPartParam,
   sellerOrderParam,
-  sellerShipmentsQuery,
 } from "../schema.js";
 import { z } from "zod";
 import * as catalog from "../services/catalog.js";
@@ -138,11 +137,6 @@ export const sellerRoutes: FastifyPluginAsync = async (app) => {
     const store = request.dropshipStore!;
     await orders.reportProblem(store.id, request.customer!.id, orderId, id, note);
     return ok(await views.sellerParts(store.id, orderId));
-  });
-
-  app.get("/shipments", async (request) => {
-    const query = sellerShipmentsQuery.parse(request.query);
-    return ok(await views.sellerShipments(request.dropshipStore!.id, query));
   });
 
   // ---- The account with one supplier (Phase 5) ---------------------------------

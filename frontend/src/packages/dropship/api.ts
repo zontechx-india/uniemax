@@ -521,19 +521,6 @@ export interface SellerParts {
   parts: SellerPart[]
 }
 
-export type ShipmentState = 'in_transit' | 'delivered' | 'came_back' | 'late'
-
-export interface ShipmentRow {
-  id: string
-  orderId: string
-  orderNumber: string
-  supplier: string
-  status: SupplierOrderStatus
-  late: boolean
-  shipBy: string | null
-  parcel: ParcelInfo | null
-}
-
 export const sellerPartsApi = {
   parts: (storeId: string, orderId: string) =>
     call<SellerParts>(http.get(`${store(storeId)}/orders/${orderId}/parts`)),
@@ -541,12 +528,6 @@ export const sellerPartsApi = {
     call<SellerParts>(http.post(`${store(storeId)}/orders/${orderId}/parts/${id}/delivered`)),
   problem: (storeId: string, orderId: string, id: string, note: string) =>
     call<SellerParts>(http.post(`${store(storeId)}/orders/${orderId}/parts/${id}/problem`, { note })),
-  shipments: (storeId: string, query: { state?: ShipmentState; supplierId?: string; page: number }) =>
-    call<{
-      items: ShipmentRow[]
-      meta: { page: number; pageSize: number; total: number; totalPages: number }
-      suppliers: { id: string; name: string }[]
-    }>(http.get(`${store(storeId)}/shipments`, { params: query })),
 }
 
 export type NeedsKind = 'late' | 'cant_ship' | 'came_back' | 'problem' | 'refund' | 'split' | 'vendor_balance'

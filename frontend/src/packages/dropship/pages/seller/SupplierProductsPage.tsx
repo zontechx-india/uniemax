@@ -12,9 +12,10 @@ import type { CatalogItem } from '../../api'
 import { earnTone } from '../../pricing'
 import { dayText, money, useLoad } from '../../ui'
 import { AddSheet } from './AddSheet'
+import { SuppliersTabs } from './SuppliersTabs'
 
 /**
- * Store management → Supplier products: what the seller's suppliers offer,
+ * Store management → Suppliers → Products to add: what the seller's suppliers offer,
  * with "You earn" for this shop, and adding one or many to the shop.
  */
 export function SupplierProductsPage() {
@@ -62,9 +63,10 @@ export function SupplierProductsPage() {
     <div className="space-y-5">
       <PageHeader
         icon={BagIcon}
-        title="Supplier products"
+        title="Suppliers"
         description="Products your suppliers ship for you. Add them to your shop at your own price — no stock needed."
       />
+      <SuppliersTabs />
 
       {catalog.loading && !data && <PageSkeleton label="Loading supplier products" />}
       {catalog.error && <ErrorState message={catalog.error} onRetry={catalog.reload} />}

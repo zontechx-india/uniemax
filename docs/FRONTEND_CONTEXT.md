@@ -566,8 +566,8 @@ once-ever setting look as important as a daily job:
 | **Help** | Customer messages · Help from UnieMax |
 
 When the dropship package is on (`useDropshipRole`, below), `useSectionGroups`
-adds **Suppliers** to Catalog for every owned store (plus **Supplier products**
-once the store has a supplier) and **Shipments** under Overview for a shop that sells,
+adds one **Suppliers** row to Catalog for every owned store (two tabs, `SuppliersTabs`:
+*Your suppliers* and *Products to add*; Products also gets an **Add from suppliers** button),
 and a **Supply to sellers**
 group (Orders to ship · Products for sellers · Sellers · Supplier settings) after Catalog for a
 store that supplies. A **supply-only** store (made when its owner joined as a
@@ -2561,7 +2561,7 @@ Screens, words and rules are documented only in [`docs/dropshipping/`](./dropshi
 what the host apps see:
 
 - `index.ts` exports `dropshipPublicRoutes` (`/supplier-invite/:token`),
-  `dropshipStoreRoutes` (`suppliers`, `supplier-products`, `shipments`, `orders-to-ship`,
+  `dropshipStoreRoutes` (`suppliers`, `suppliers/products`, `orders-to-ship`,
   `orders-to-ship/slips`, `supply`, `sellers`, `supplier-settings` under `/mystores/:storeSlug`), `useDropshipRole`,
   `refreshDropshipRole`, `isDropshipEnabled` and `SupplierHome`, plus the
   product seams below.

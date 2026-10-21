@@ -194,7 +194,7 @@ test("access: the seller can't act as the supplier, and a stranger can't read th
   if (!c) return;
   assert.ok([403, 404].includes((await c.A.req("GET", `${D}/stores/${c.fx.store.id}/supplier-orders?tab=new`)).status));
   const stranger = new Client();
-  assert.ok([401, 403].includes((await stranger.req("GET", `${c.S}/shipments`, { anonymous: true })).status));
+  assert.ok([401, 403].includes((await stranger.req("GET", `${c.S}/orders/x/parts`, { anonymous: true })).status));
 });
 
 test("a supplier account can't be published: it has no shop (D-28)", async (t) => {

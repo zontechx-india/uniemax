@@ -10,6 +10,7 @@ import { BankPrompt } from '../BankPrompt'
 import { MediaImg } from '../../../../shared/media/MediaImg'
 import { useManagedStore } from '../../../../storefront/features/stores/useManagedStore'
 import type { Store } from '../../../../storefront/features/stores/storesApi'
+import { SuppliersTabs } from './SuppliersTabs'
 import { TruckIcon, UsersIcon, BoxIcon } from '../../../../storefront/layout/icons'
 import {
   BigSwitch,
@@ -92,6 +93,7 @@ export function SuppliersPage() {
         description="Sell products your suppliers ship straight to your customers. You set the price; you keep the difference."
         action={data && (data.suppliers.length > 0 || data.invites.length > 0) ? inviteButton : undefined}
       />
+      <SuppliersTabs />
       <BankPrompt audience="seller" />
 
       {overview.loading && !data && <PageSkeleton label="Loading your suppliers" />}
@@ -267,6 +269,7 @@ function InviteSheet({
   onClose: () => void
   onSent: (result: InviteSent, codTurnedOn: boolean) => void
 }) {
+  const [step, setStep] = useState<'who' | 'terms'>('who')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
@@ -280,6 +283,7 @@ function InviteSheet({
   const needsStoreCod = cod === true && !store.payments.acceptCod
 
   const reset = () => {
+    setStep('who')
     setName('')
     setPhone('')
     setEmail('')
@@ -290,11 +294,17 @@ function InviteSheet({
     setError(null)
   }
 
+  const continueToTerms = () => {
+    const found: Record<string, string> = {}
+    if (!name.trim()) found.name = "Enter the supplier's name"
+    if (!phone.trim() && !email.trim()) found.phone = 'Enter a phone number or an email'
+    if (phone.trim() && !/^\+?[0-9]{7,15}$/.test(phone.replace(/\s/g, ''))) found.phone = 'Enter a valid phone number'
+    setErrors(found)
+    if (Object.keys(found).length === 0) setStep('terms')
+  }
+
   const submit = async () => {
     const next: Record<string, string> = {}
-    if (!name.trim()) next.name = "Enter the supplier's name"
-    if (!phone.trim() && !email.trim()) next.phone = 'Enter a phone number or an email'
-    if (phone.trim() && !/^\+?[0-9]{7,15}$/.test(phone.replace(/\s/g, ''))) next.phone = 'Enter a valid phone number'
     if (cod === null) next.cod = 'Choose an answer'
     if (feePayer === null) next.feePayer = 'Choose an answer'
     if (needsStoreCod && !storeCod) {
@@ -327,99 +337,120 @@ function InviteSheet({
     <Dialog
       open={open}
       title="Invite a supplier"
-      subtitle="They get a link to join and offer you their products."
+      subtitle={
+        step === 'who'
+          ? 'They get a link to join and offer you their products.'
+          : `Two questions about ${name.trim()}'s products.`
+      }
       onClose={onClose}
       footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button loading={busy} onClick={submit}>
-            Create invite link
-          </Button>
-        </>
+        step === 'who' ? (
+          <>
+            <Button variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button onClick={continueToTerms}>Next</Button>
+          </>
+        ) : (
+          <>
+            <Button variant="ghost" onClick={() => setStep('who')}>
+              Back
+            </Button>
+            <Button loading={busy} onClick={submit}>
+              Create invite link
+            </Button>
+          </>
+        )
       }
     >
       <div className="space-y-5">
-        <TextField
-          label="Supplier's name *"
-          placeholder="Sri Textiles"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          maxLength={100}
-          error={errors.name}
-        />
-        <div className="grid gap-4 sm:grid-cols-2">
+        {step === 'who' && (
+          <>
           <TextField
-            label="WhatsApp number"
-            placeholder="98765 43210"
-            inputMode="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            error={errors.phone}
+            label="Supplier's name *"
+            placeholder="Sri Textiles"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={100}
+            error={errors.name}
           />
-          <TextField
-            label="Email (optional)"
-            type="email"
-            placeholder="supplier@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            hint="We'll email the link too."
-          />
-        </div>
-
-        <Question
-          legend="Can customers pay cash on delivery for this supplier's products?"
-          error={errors.cod}
-        >
-          <ChoiceCard
-            name="invite-cod"
-            checked={cod === true}
-            onSelect={() => setCod(true)}
-            title="Yes"
-            note="The supplier collects the cash through their courier."
-          />
-          <ChoiceCard
-            name="invite-cod"
-            checked={cod === false}
-            onSelect={() => setCod(false)}
-            title="No — online payment only"
-          />
-        </Question>
-
-        {needsStoreCod && (
-          <div className="rounded-md border border-line bg-surface-alt p-3">
-            <p className="text-sm text-fg">Your shop doesn't accept cash on delivery yet.</p>
-            <div className="mt-2">
-              <BigSwitch
-                checked={storeCod}
-                onChange={setStoreCod}
-                label="Accept cash on delivery in my shop"
-                onText="Cash on delivery on"
-                offText="Cash on delivery off"
-              />
-            </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextField
+              label="WhatsApp number"
+              placeholder="98765 43210"
+              inputMode="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              error={errors.phone}
+            />
+            <TextField
+              label="Email (optional)"
+              type="email"
+              placeholder="supplier@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              hint="We'll email the link too."
+            />
           </div>
+          </>
         )}
 
-        <Question
-          legend="If a parcel comes back undelivered, who pays the supplier's shipping fee?"
-          error={errors.feePayer}
-        >
-          <ChoiceCard
-            name="invite-fee"
-            checked={feePayer === 'SELLER'}
-            onSelect={() => setFeePayer('SELLER')}
-            title="I pay it"
-          />
-          <ChoiceCard
-            name="invite-fee"
-            checked={feePayer === 'SUPPLIER'}
-            onSelect={() => setFeePayer('SUPPLIER')}
-            title="The supplier bears it"
-          />
-        </Question>
-        <p className="text-xs text-muted">You can change both answers later.</p>
+        {step === 'terms' && (
+          <>
+          <Question
+            legend="Can customers pay cash on delivery for this supplier's products?"
+            error={errors.cod}
+          >
+            <ChoiceCard
+              name="invite-cod"
+              checked={cod === true}
+              onSelect={() => setCod(true)}
+              title="Yes"
+              note="The supplier collects the cash through their courier."
+            />
+            <ChoiceCard
+              name="invite-cod"
+              checked={cod === false}
+              onSelect={() => setCod(false)}
+              title="No — online payment only"
+            />
+          </Question>
+  
+          {needsStoreCod && (
+            <div className="rounded-md border border-line bg-surface-alt p-3">
+              <p className="text-sm text-fg">Your shop doesn't accept cash on delivery yet.</p>
+              <div className="mt-2">
+                <BigSwitch
+                  checked={storeCod}
+                  onChange={setStoreCod}
+                  label="Accept cash on delivery in my shop"
+                  onText="Cash on delivery on"
+                  offText="Cash on delivery off"
+                />
+              </div>
+            </div>
+          )}
+  
+          <Question
+            legend="If a parcel comes back undelivered, who pays the supplier's shipping fee?"
+            error={errors.feePayer}
+          >
+            <ChoiceCard
+              name="invite-fee"
+              checked={feePayer === 'SELLER'}
+              onSelect={() => setFeePayer('SELLER')}
+              title="I pay it"
+            />
+            <ChoiceCard
+              name="invite-fee"
+              checked={feePayer === 'SUPPLIER'}
+              onSelect={() => setFeePayer('SUPPLIER')}
+              title="The supplier bears it"
+            />
+          </Question>
+          <p className="text-xs text-muted">You can change both answers later.</p>
+          </>
+        )}
 
         {error && <ErrorNote>{error}</ErrorNote>}
       </div>

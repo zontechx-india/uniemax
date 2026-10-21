@@ -39,8 +39,9 @@ Status: ◐ built 20 Oct 2026 (Phase 2) — API tests pass on dev; screen walkth
 ## Flows
 
 ### The seller invites a supplier
-Store management → **Suppliers** → **Invite a supplier**:
-- The supplier's name, and a phone or an email (at least one).
+Store management → **Suppliers** → **Invite a supplier**, in two steps (*Next*, *Back*):
+1. The supplier's name, and a phone or an email (at least one).
+2. The two terms:
 - **"Can customers pay cash on delivery for this supplier's products?"** No
   answer pre-selected: *Yes — the supplier collects the cash through their
   courier* / *No — online payment only*. If Yes and the store doesn't accept
@@ -73,7 +74,8 @@ option, and "Sold by N sellers". Bulk: tick products → **Offer at shop price �
 price shows a warning but is allowed.
 
 ### Managing the link (both sides)
-- Seller: **Suppliers** page with **Invited** (resend / revoke) and **Your
+- Seller: one **Suppliers** row with two tabs, **Your suppliers** and **Products to add**
+  (the catalogue, [supplier-products](../supplier-products/context.md)). The first tab has **Invited** (resend / revoke) and **Your
   suppliers**. Supplier: **Sellers** page.
 - Each link opens a **Terms** panel showing COD, who pays the returned-parcel
   fee, the supplier's shipping fee, ship-within and returns. The seller edits

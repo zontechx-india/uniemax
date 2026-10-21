@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { ErrorNote } from '../../../shared/ui/form'
@@ -284,14 +285,21 @@ export function StoreProductsPage() {
         }
         action={
           !wizard && products.length > 0 ? (
-            <Button
-              type="button"
-              size="lg"
-              onClick={() => setWizard({ product: null, startAt: 'basics' })}
-            >
-              <PlusIcon className="h-5 w-5" />
-              Add product
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {supplied.hasSuppliers && (
+                <Link to="../suppliers/products" className={buttonClass({ variant: 'secondary', size: 'lg' })}>
+                  Add from suppliers
+                </Link>
+              )}
+              <Button
+                type="button"
+                size="lg"
+                onClick={() => setWizard({ product: null, startAt: 'basics' })}
+              >
+                <PlusIcon className="h-5 w-5" />
+                Add product
+              </Button>
+            </div>
           ) : undefined
         }
       />

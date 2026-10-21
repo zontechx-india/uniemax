@@ -44,7 +44,7 @@ Built in Phase 3 (☑): `hooks.ts`, `events.ts`, `services/{catalog,resale}.ts`,
 and in the frontend `pricing.ts` (the add sheet's sums), `supplied.ts`
 (`useSuppliedProducts`, `useSuppliedFor`) and the seller pages. Built in Phase 4 (☑):
 `services/supplierOrders.ts` (place, unplace, cancelling, paid, expire, the supplier's
-actions, the rollup), `services/orderViews.ts` (what each side sees, slips, Shipments,
+actions, the rollup), `services/orderViews.ts` (what each side sees, slips,
 Needs action), the order routes on the supplier, seller and admin routers, and the
 order screens. The rest is planned. Admin routes mount at **`/api/v1/admin/dropship`** (D-29).
 

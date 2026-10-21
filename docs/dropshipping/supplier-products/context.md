@@ -39,8 +39,9 @@ Status: ◐ built 20 Oct 2026 (Phase 3; API tests pass on dev, screen walkthroug
 
 ## Flows
 
-**Entry points:** **Supplier products** in store management, and the empty
-catalogue: *"No products yet? Sell your suppliers' products. No stock needed,
+**Entry points:** store management → **Suppliers** → the **Products to add** tab
+(`/suppliers/products`), the **Add from suppliers** button on Products once the shop
+has a supplier, and the empty product list: *"No products yet? Sell your suppliers' products. No stock needed,
 they ship for you."*
 
 **Browse card:** photo, name, supplier, **Supplier price ₹450**, **Suggested

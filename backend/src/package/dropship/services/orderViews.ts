@@ -170,7 +170,7 @@ export async function slips(supplierId: string, ids: string[]) {
 }
 
 // ===========================================================================
-// Seller: the parts of one order, and the Shipments page
+// Seller: the parts of one order
 // ===========================================================================
 
 export async function sellerParts(storeId: string, orderId: string) {
@@ -212,69 +212,6 @@ export async function sellerParts(storeId: string, orderId: string) {
     };
   });
   return { orderStatus: view.status, hasOwnItems, parts };
-}
-
-export type ShipmentState = "in_transit" | "delivered" | "came_back" | "late";
-
-const SHIPMENT_WHERE: Record<ShipmentState, Prisma.SupplierOrderWhereInput> = {
-  in_transit: { status: "SHIPPED" },
-  delivered: { status: "DELIVERED" },
-  came_back: { status: "RETURNED" },
-  late: { status: { in: ["NEW", "ACCEPTED"] }, shipBy: { lt: new Date(0) } }, // shipBy filled in per call
-};
-
-export async function sellerShipments(
-  storeId: string,
-  query: { state?: ShipmentState | undefined; supplierId?: string | undefined; page: number },
-) {
-  const base: Prisma.SupplierOrderWhereInput = query.state
-    ? query.state === "late"
-      ? { status: { in: ["NEW", "ACCEPTED"] }, shipBy: { lt: new Date() } }
-      : SHIPMENT_WHERE[query.state]
-    : { OR: [{ shipmentId: { not: null } }, { status: { in: ["NEW", "ACCEPTED"] }, shipBy: { lt: new Date() } }] };
-  const where: Prisma.SupplierOrderWhereInput = {
-    sellerStoreId: storeId,
-    ...base,
-    ...(query.supplierId ? { supplierId: query.supplierId } : {}),
-  };
-  const pageSize = 30;
-  const [total, { rows, views }] = await Promise.all([
-    deps.prisma.supplierOrder.count({ where }),
-    (async () => {
-      const rows = await deps.prisma.supplierOrder.findMany({
-        where,
-        orderBy: [{ shippedAt: { sort: "desc", nulls: "first" } }, { createdAt: "desc" }],
-        skip: (query.page - 1) * pageSize,
-        take: pageSize,
-        include: { lines: true, supplier: true },
-      });
-      const views = new Map((await deps.host.getOrderViews([...new Set(rows.map((r) => r.orderId))])).map((v) => [v.id, v]));
-      return { rows, views };
-    })(),
-  ]);
-  const suppliers = await storesById(rows.map((r) => r.supplier.storeId));
-  const linkSuppliers = await deps.prisma.supplierLink.findMany({
-    where: { sellerStoreId: storeId },
-    select: { supplierId: true, supplier: { select: { storeId: true } } },
-  });
-  const supplierNames = await storesById(linkSuppliers.map((l) => l.supplier.storeId));
-  return {
-    items: rows.map((r) => {
-      const parcel = parcelOf(views.get(r.orderId), r.shipmentId);
-      return {
-        id: r.id,
-        orderId: r.orderId,
-        orderNumber: r.orderNumber,
-        supplier: suppliers.get(r.supplier.storeId)?.name ?? "Supplier",
-        status: r.status,
-        late: isLate(r),
-        shipBy: r.shipBy,
-        parcel: shapeParcel(parcel),
-      };
-    }),
-    meta: { page: query.page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
-    suppliers: linkSuppliers.map((l) => ({ id: l.supplierId, name: supplierNames.get(l.supplier.storeId)?.name ?? "Supplier" })),
-  };
 }
 
 // ===========================================================================

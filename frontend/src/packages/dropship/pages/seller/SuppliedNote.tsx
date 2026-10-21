@@ -76,7 +76,7 @@ export function SupplierProductsEntry() {
       <p className="text-sm text-fg">
         No products yet? Sell your suppliers' products. No stock needed — they ship for you.
       </p>
-      <Link to="../supplier-products" className="mt-2 inline-block text-sm font-semibold text-brand underline">
+      <Link to="../suppliers/products" className="mt-2 inline-block text-sm font-semibold text-brand underline">
         See supplier products
       </Link>
     </div>

@@ -45,7 +45,7 @@ Phase 3 done. Check the checkout quote and placement code in
 - ☑ Rollup: confirm; auto-cancel on can't ship or came back for orders with
   no items of the seller's own; ask the seller on mixed orders.
 - ☑ Slips (one or many) with the COD amount.
-- ☑ Seller: the parts on an order, the Shipments list, mark delivered, report
+- ☑ Seller: the parts on an order, mark delivered, report
   a problem (`host.openTicket`, statement line `HELD`).
 - ☑ Admin **Needs action**, including **Refunds to make**.
 - ☑ Notifications (kind `DROPSHIP`) as listed in the orders file.
@@ -56,7 +56,7 @@ Phase 3 done. Check the checkout quote and placement code in
   Delivered (+ photo), Came back, Edit tracking, Print slips.
 - ☑ Seller order page: supplier blocks, earnings line, Report a problem; the
   mixed-order behaviour; the in-place "cancel whole order?" prompt.
-- ☑ Seller **Shipments** page.
+- ~~Seller **Shipments** page~~ — removed 22 Oct 2026: it repeated what each order shows.
 - ☑ Admin **Needs action**.
 
 ## Tests

@@ -209,11 +209,6 @@ export const problemSchema = z.object({
   note: z.string().trim().min(5, "Tell us what went wrong").max(1000),
 });
 
-export const sellerShipmentsQuery = paginationQuery.pick({ page: true }).extend({
-  state: z.enum(["in_transit", "delivered", "came_back", "late"]).optional(),
-  supplierId: z.string().min(1).optional(),
-});
-
 export const needsActionQuery = paginationQuery.pick({ page: true }).extend({
   kind: z.enum(["late", "cant_ship", "came_back", "problem", "refund", "split", "vendor_balance"]).optional(),
 });

@@ -137,9 +137,9 @@ The customer order never runs ahead of its slowest parcel.
 - The order page shows one block per supplier order: status, parcel tracking,
   the supplier's name and phone, **Report a problem**, and *"You earn ₹238 on
   this order"*.
-- **Shipments** page: every supplier parcel, with order number, supplier,
-  courier, tracking number (copy button), shipped date, status and **Track**.
-  Filters: in transit · delivered · came back · late.
+- There is no separate parcels list (removed 22 Oct 2026): each order already shows its
+  supplier's parcel, and a late or returned part is flagged on the order and on admin's
+  Needs action.
 
 **Notifications** (kind `DROPSHIP`; everything else is the existing order mail):
 - Supplier: new order to ship, cancelled, ship-by reminder, COD setting changed.
@@ -170,7 +170,6 @@ The customer order never runs ahead of its slowest parcel.
 | GET | `/stores/:storeId/orders/:orderId/parts` | `{ orderStatus, hasOwnItems, parts[] }`: status, supplier name + phone, items, parcel, **You earn**, terms line, problem, `needsDecision` |
 | POST | `/stores/:storeId/orders/:orderId/parts/:id/delivered` | Mark delivered (F-10) |
 | POST | `/stores/:storeId/orders/:orderId/parts/:id/problem` | `{ note }` (F-9) |
-| GET | `/stores/:storeId/shipments?state&supplierId&page` | Shipments page; `state` is `in_transit \| delivered \| came_back \| late`; also returns the supplier list for the filter |
 
 Every supplier action answers with the updated order. A move on an order that
 changed returns 409 *"This order was just updated — refresh."*, or *"This order
