@@ -11,6 +11,7 @@ import {
   DotsIcon,
   PaletteIcon,
   StoreIcon,
+  TruckIcon,
 } from '../../layout/icons'
 import {
   OrderBadge,
@@ -41,6 +42,8 @@ const TABS: { to: string; label: string; icon: ComponentType<{ className?: strin
   { to: 'orders', label: 'Orders', icon: CartIcon },
   { to: 'products', label: 'Products', icon: BoxIcon },
   { to: 'builder', label: 'Design', icon: PaletteIcon },
+  // A supplier account has no Orders or Design; this is its daily row (D-49).
+  { to: 'orders-to-ship', label: 'To ship', icon: TruckIcon },
 ]
 
 export function StoreMobileNav({
@@ -55,6 +58,7 @@ export function StoreMobileNav({
   // Only tabs this mode can open (an admin's mount hides some sections).
   const available = new Set(groups.flatMap((g) => g.items.map((i) => i.to)))
   const tabs = TABS.filter((tab) => available.has(tab.to))
+  const toShip = groups.flatMap((g) => g.items).find((i) => i.to === 'orders-to-ship')?.count ?? 0
   const onMore = !tabs.some((tab) => tab.to === active.item.to)
 
   return (
@@ -79,6 +83,9 @@ export function StoreMobileNav({
                 <Icon className="h-[22px] w-[22px]" />
                 {to === 'orders' && data.pendingOrders > 0 && (
                   <OrderBadge count={data.pendingOrders} className="absolute -top-1.5 right-0" />
+                )}
+                {to === 'orders-to-ship' && toShip > 0 && (
+                  <OrderBadge count={toShip} className="absolute -top-1.5 right-0" />
                 )}
               </span>
               {label}

@@ -2587,6 +2587,8 @@ what the host apps see:
     the ones you offer, under Products for sellers). Its menu row **Orders to ship** carries a badge with the
     role's `ordersToShip` count (`SectionItem.count`, refreshed after each action), and `SupplierHome` opens
     with an *"N new orders to ship"* card.
+    It has no customer **Orders** or **Customer messages** rows (it can't sell), and on mobile the "To ship"
+    tab (with the same count) takes the place of the Orders tab.
   - `ShipDialog` takes `requireTracking` (the tracking number is required and "Own
     delivery" is not offered): the supplier's Ship / Edit tracking sheet reuses it, and
     `DeliveredDialog` is reused as is.

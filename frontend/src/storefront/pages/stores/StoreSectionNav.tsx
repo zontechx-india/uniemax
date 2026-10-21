@@ -162,8 +162,11 @@ export function sectionItem(to: string): SectionItem | undefined {
   )
 }
 
-/** Settings rows a supply-only store doesn't use: it never sells to customers. */
-const SELLING_ONLY = new Set(['payments', 'shipping', 'checkout'])
+/**
+ * Rows a supply-only store doesn't use: it never sells to customers, so it has
+ * no customer orders (its work is Orders to ship) and no buyers writing in.
+ */
+const SELLING_ONLY = new Set(['payments', 'shipping', 'checkout', 'orders', 'customer-support'])
 
 /**
  * The supplier rows (docs/dropshipping/): **Suppliers** (and, once one has
@@ -191,7 +194,7 @@ function withSupplierSections(groups: SectionGroup[], role: DropshipRole): Secti
           ...(role.hasSuppliers ? [{ label: 'Supplier products', to: 'supplier-products', icon: TruckIcon }] : []),
         ],
       })
-    } else if (group.key === 'settings' && supplyOnly) {
+    } else if (supplyOnly && group.items.some((item) => SELLING_ONLY.has(item.to))) {
       out.push({ ...group, items: group.items.filter((item) => !SELLING_ONLY.has(item.to)) })
     } else {
       out.push(group)
