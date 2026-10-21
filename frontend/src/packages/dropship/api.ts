@@ -370,3 +370,196 @@ export const suppliedApi = {
   fixPrice: (storeId: string, id: string) => call<Supplied>(http.post(`${store(storeId)}/resales/${id}/fix-price`)),
   remove: (storeId: string, id: string) => call(http.delete(`${store(storeId)}/resales/${id}`)),
 }
+
+// ---- Phase 4: supplier orders ------------------------------------------------
+
+export type SupplierOrderStatus =
+  | 'AWAITING_PAYMENT'
+  | 'EXPIRED'
+  | 'NEW'
+  | 'ACCEPTED'
+  | 'SHIPPED'
+  | 'DELIVERED'
+  | 'REJECTED'
+  | 'CANCELLED'
+  | 'RETURNED'
+
+export interface ParcelInfo {
+  id: string
+  carrierCode: string | null
+  carrier: string
+  trackingNumber: string | null
+  trackingUrl: string | null
+  shippedAt: string
+  deliveredAt: string | null
+  returnedAt: string | null
+}
+
+/** One order as the supplier sees it: what to ship, collect and where. No customer email, no selling prices. */
+export interface SupplierOrder {
+  id: string
+  orderNumber: string
+  status: SupplierOrderStatus
+  createdAt: string
+  shipBy: string | null
+  late: boolean
+  paymentMode: 'PREPAID' | 'COD'
+  collectAmount: number | null
+  items: {
+    id: string
+    productName: string
+    variantName: string | null
+    sku: string | null
+    quantity: number
+    imageUrl: string | null
+  }[]
+  /** Null once the order closed long enough ago (the customer's data is hidden). */
+  delivery: { name: string | null; phone: string | null; address: string | null; pincode: string | null; state: string | null } | null
+  seller: { name: string; phone: string | null } | null
+  parcel: ParcelInfo | null
+  closeReason: string | null
+  amounts: { costTotal: number | null; shippingFee: number | null; supplierShare: number | null }
+  terms: string
+}
+
+export interface SupplierInbox {
+  items: SupplierOrder[]
+  counts: { new: number; shipped: number }
+}
+
+export type SupplierTab = 'new' | 'shipped' | 'done'
+export type CantShipReason = 'OUT_OF_STOCK' | 'DAMAGED' | 'PINCODE' | 'OTHER'
+
+export interface Slip {
+  id: string
+  orderNumber: string
+  soldBy: { name: string; logoUrl: string | null }
+  shippedBy: { name: string; returnAddress: string | null; phone: string | null }
+  items: { productName: string; variantName: string | null; sku: string | null; quantity: number }[]
+  delivery: { name: string | null; phone: string | null; address: string | null; pincode: string | null; state: string | null }
+  paymentMode: 'PREPAID' | 'COD'
+  collectAmount: number | null
+}
+
+export interface TrackingBody {
+  carrierCode: string
+  carrierName?: string | null
+  trackingNumber: string
+  trackingUrl?: string | null
+}
+
+const supplierOrders = (storeId: string) => `${store(storeId)}/supplier-orders`
+
+export const supplierOrdersApi = {
+  inbox: (storeId: string, tab: SupplierTab) =>
+    call<SupplierInbox>(http.get(supplierOrders(storeId), { params: { tab } })),
+  confirm: (storeId: string, id: string) => call<SupplierOrder>(http.post(`${supplierOrders(storeId)}/${id}/confirm`)),
+  ship: (storeId: string, id: string, tracking: TrackingBody) =>
+    call<SupplierOrder>(http.post(`${supplierOrders(storeId)}/${id}/ship`, tracking)),
+  editTracking: (storeId: string, id: string, tracking: TrackingBody) =>
+    call<SupplierOrder>(http.patch(`${supplierOrders(storeId)}/${id}/tracking`, tracking)),
+  cantShip: (storeId: string, id: string, reason: CantShipReason, note: string | null) =>
+    call<SupplierOrder>(http.post(`${supplierOrders(storeId)}/${id}/cant-ship`, { reason, note })),
+  delivered: (
+    storeId: string,
+    id: string,
+    photo: { blob: Blob; filename: string } | null,
+    onProgress?: (fraction: number) => void,
+  ) => {
+    const url = `${supplierOrders(storeId)}/${id}/delivered`
+    if (!photo) return call<SupplierOrder>(http.post(url, {}))
+    const form = new FormData()
+    form.append('file', photo.blob, photo.filename)
+    return call<SupplierOrder>(
+      http.post(url, form, {
+        onUploadProgress: (e) => {
+          if (onProgress && e.total) onProgress(e.loaded / e.total)
+        },
+      }),
+    )
+  },
+  cameBack: (storeId: string, id: string, restock: boolean) =>
+    call<SupplierOrder>(http.post(`${supplierOrders(storeId)}/${id}/came-back`, { restock })),
+  slips: (storeId: string, ids: string[]) =>
+    call<Slip[]>(http.get(`${supplierOrders(storeId)}/slips`, { params: { ids: ids.join(',') } })),
+}
+
+/** One supplier's part of an order, as the seller sees it. */
+export interface SellerPart {
+  id: string
+  status: SupplierOrderStatus
+  shipBy: string | null
+  late: boolean
+  supplier: { name: string; phone: string | null }
+  items: { orderItemId: string; productName: string; variantName: string | null; quantity: number }[]
+  parcel: ParcelInfo | null
+  closeReason: string | null
+  youEarn: number
+  supplierShare: number | null
+  terms: string
+  problem: { openedAt: string; ticketId: string | null; resolvedAt: string | null } | null
+  /** Mixed order, a part failed: the seller decides whether to cancel the whole order. */
+  needsDecision: boolean
+  canMarkDelivered: boolean
+  canReportProblem: boolean
+}
+
+export interface SellerParts {
+  orderStatus: string
+  hasOwnItems: boolean
+  parts: SellerPart[]
+}
+
+export type ShipmentState = 'in_transit' | 'delivered' | 'came_back' | 'late'
+
+export interface ShipmentRow {
+  id: string
+  orderId: string
+  orderNumber: string
+  supplier: string
+  status: SupplierOrderStatus
+  late: boolean
+  shipBy: string | null
+  parcel: ParcelInfo | null
+}
+
+export const sellerPartsApi = {
+  parts: (storeId: string, orderId: string) =>
+    call<SellerParts>(http.get(`${store(storeId)}/orders/${orderId}/parts`)),
+  delivered: (storeId: string, orderId: string, id: string) =>
+    call<SellerParts>(http.post(`${store(storeId)}/orders/${orderId}/parts/${id}/delivered`)),
+  problem: (storeId: string, orderId: string, id: string, note: string) =>
+    call<SellerParts>(http.post(`${store(storeId)}/orders/${orderId}/parts/${id}/problem`, { note })),
+  shipments: (storeId: string, query: { state?: ShipmentState; supplierId?: string; page: number }) =>
+    call<{
+      items: ShipmentRow[]
+      meta: { page: number; pageSize: number; total: number; totalPages: number }
+      suppliers: { id: string; name: string }[]
+    }>(http.get(`${store(storeId)}/shipments`, { params: query })),
+}
+
+export type NeedsKind = 'late' | 'cant_ship' | 'came_back' | 'problem' | 'refund'
+
+export interface NeedsItem {
+  key: string
+  kind: NeedsKind
+  supplierOrderId: string
+  orderId: string
+  orderNumber: string
+  status: SupplierOrderStatus
+  seller: string
+  supplier: string
+  shipBy: string | null
+  closeReason: string | null
+  ticketId: string | null
+  orderTotal: number | null
+  supplierShare: number | null
+  createdAt: string
+}
+
+export const adminNeedsApi = {
+  list: (page: number, kind?: NeedsKind) =>
+    callList<NeedsItem>(http.get(`${ADMIN}/needs-action`, { params: { page, kind } })),
+  resolve: (supplierOrderId: string, note: string) =>
+    call<{ resolved: boolean }>(http.post(`${ADMIN}/needs-action/${supplierOrderId}/resolve`, { note })),
+}

@@ -21,6 +21,10 @@ export const dropshipConfig = {
   minMarginWarnPct: num("DROPSHIP_MIN_MARGIN_WARN_PCT", 10),
   /** Platform fee, % of the order total, from the seller's share (D-20; rate: Q-5). */
   platformFeePct: num("DROPSHIP_PLATFORM_FEE_PCT", 0),
-  /** The hourly job: re-sync every copy (C-13). */
+  /** The hourly job: expire unpaid supplier orders, re-sync every copy (C-13). */
   jobIntervalMs: num("DROPSHIP_JOB_INTERVAL_MS", 60 * 60 * 1000),
+  /** How long an unpaid online checkout holds the supplier's stock (K-8). */
+  unpaidHoldHours: num("DROPSHIP_UNPAID_HOLD_HOURS", 2),
+  /** After an order closes, the supplier stops seeing the customer's phone and address (F-12). */
+  customerDataDays: num("DROPSHIP_CUSTOMER_DATA_DAYS", 30),
 };

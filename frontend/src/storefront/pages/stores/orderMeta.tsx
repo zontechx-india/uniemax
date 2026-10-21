@@ -105,6 +105,11 @@ export function SellerOrderRow({ order, to }: { order: SellerOrderSummary; to: s
           <span className="inline-flex h-6 items-center rounded-pill bg-fg/6 px-2.5 text-xs font-semibold text-muted">
             {paymentLabel(order.paymentMethod, order.paymentStatus)}
           </span>
+          {order.hasPackageLines && (
+            <span className="inline-flex h-6 items-center rounded-pill bg-brand-soft px-2.5 text-xs font-semibold text-brand">
+              Supplier ships
+            </span>
+          )}
         </div>
       </div>
       <ChevronRightIcon className="h-5 w-5 shrink-0 text-muted" />

@@ -1,9 +1,15 @@
-# Data model: supplier orders (Phase 4) ☐
+# Data model: supplier orders (Phase 4) ☑
 
 > **Read when:** working on supplier orders, their lines, status history or
 > the terms snapshot. **Update when:** these models change.
 > Conventions: [data-model](../context.md). Snapshot rule:
 > [terms](../../terms/context.md).
+
+Built 21 Oct 2026, migration `20261021140000_dropship_supplier_orders` (schema
+`dropship`, tables `supplier_orders`, `supplier_order_lines`, `supplier_order_events`).
+No foreign key to core: `orderId` and `orderItemId` are plain ids. Lines also have
+indexes on `supplierOrderId` and `supplierVariantId`. `platformFee` is the rate in
+force × this supplier's lines, not the whole order's total.
 
 ```prisma
 enum SupplierOrderStatus { AWAITING_PAYMENT EXPIRED NEW ACCEPTED SHIPPED DELIVERED REJECTED CANCELLED RETURNED }

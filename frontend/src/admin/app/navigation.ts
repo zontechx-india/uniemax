@@ -49,6 +49,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/customers', label: 'Customers' },
       { to: '/affiliates', label: 'Affiliates' },
       { to: '/suppliers', label: 'Suppliers', dropship: true },
+      { to: '/needs-action', label: 'Needs action', dropship: true },
     ],
   },
   {
@@ -78,6 +79,7 @@ const TITLES: [string, string][] = [
   ['/stores', 'Stores'],
   ['/customers', 'Customers'],
   ['/suppliers', 'Suppliers'],
+  ['/needs-action', 'Needs action'],
   ['/support', 'Support'],
   ['/whatsapp', 'WhatsApp'],
   ['/theme-templates', 'Store themes'],

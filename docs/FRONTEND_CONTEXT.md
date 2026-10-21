@@ -567,8 +567,9 @@ once-ever setting look as important as a daily job:
 
 When the dropship package is on (`useDropshipRole`, below), `useSectionGroups`
 adds **Suppliers** to Catalog for every owned store (plus **Supplier products**
-once the store has a supplier), and a **Supply to sellers**
-group (Products for sellers · Sellers · Supplier settings) after Catalog for a
+once the store has a supplier) and **Shipments** under Overview for a shop that sells,
+and a **Supply to sellers**
+group (Orders to ship · Products for sellers · Sellers · Supplier settings) after Catalog for a
 store that supplies. A **supply-only** store (made when its owner joined as a
 supplier) loses Storefront, Marketing and Payments · Delivery · Checkout; its
 layout hides the publish card and the phone strip's Publish button, and its
@@ -2559,8 +2560,8 @@ Screens, words and rules are documented only in [`docs/dropshipping/`](./dropshi
 what the host apps see:
 
 - `index.ts` exports `dropshipPublicRoutes` (`/supplier-invite/:token`),
-  `dropshipStoreRoutes` (`suppliers`, `supplier-products`, `supply`, `sellers`,
-  `supplier-settings` under `/mystores/:storeSlug`), `useDropshipRole`,
+  `dropshipStoreRoutes` (`suppliers`, `supplier-products`, `shipments`, `orders-to-ship`,
+  `orders-to-ship/slips`, `supply`, `sellers`, `supplier-settings` under `/mystores/:storeSlug`), `useDropshipRole`,
   `refreshDropshipRole`, `isDropshipEnabled` and `SupplierHome`, plus the
   product seams below.
 - **Supplier products in the core product screens** (the core imports only the
@@ -2575,6 +2576,16 @@ what the host apps see:
     `SuppliedPricingStep` / `SuppliedDeliveryStep` (D-34); while the answer
     is loading those two steps render nothing, and a 404 (package off) means
     an ordinary product.
+  - `StoreOrderDetailPage` renders the package's `SupplierParts` (status, parcel,
+    **You earn**, Mark as delivered, Report a problem, and the in-place "cancel the whole
+    order?" prompt) when any line is tagged (`fulfilledBy`); "Cancel order" opens the
+    page's own cancel dialog. The order list row (`SellerOrderRow`) shows a **Supplier
+    ships** chip from `hasPackageLines`.
+  - `ShipDialog` takes `requireTracking` (the tracking number is required and "Own
+    delivery" is not offered): the supplier's Ship / Edit tracking sheet reuses it, and
+    `DeliveredDialog` is reused as is.
+- The admin console's **Needs action** (`/needs-action`, lazy, gated like Suppliers) is
+  `pages/admin/NeedsActionPage`.
 - **The flag comes from the backend**: `GET /api/v1/dropship/status` answers only
   when the package is registered; a 404 keeps every supplier row and the admin
   **Suppliers** nav item hidden. `role.ts` caches it, and each store's role, per

@@ -32,6 +32,7 @@ import { DeliveredDialog } from './orders/DeliveredDialog'
 import type { PickedPhoto } from './orders/DeliveredDialog'
 import { ParcelCard } from './orders/ParcelCard'
 import { ShipDialog } from './orders/ShipDialog'
+import { SupplierParts } from '../../../packages/dropship'
 import { GlassCard } from './ui/GlassCard'
 import { RowMenu } from './ui/RowMenu'
 import type { RowMenuAction } from './ui/RowMenu'
@@ -505,6 +506,21 @@ export function StoreOrderDetailPage() {
                   onAddTracking={() => {
                     setSheetError(null)
                     setShipSheet({ kind: 'add' })
+                  }}
+                />
+              )}
+
+              {/* Parts another party ships (a supplier): status, parcel, earnings, problems */}
+              {hasTagged && (
+                <SupplierParts
+                  storeId={store.id}
+                  orderId={order.id}
+                  onCancelOrder={() => {
+                    setActionError(null)
+                    setConfirming('cancel')
+                  }}
+                  onChanged={() => {
+                    void sellerOrderApi.get(store.id, order.id).then(setOrder).catch(() => {})
                   }}
                 />
               )}

@@ -10,7 +10,7 @@
 | [1](phase-1-core-seams.md) | Core seams for packages (no visible change) | dev → production with the next release | 0 | ☑ built, API tests pass on dev |
 | [2](phase-2-suppliers.md) | Suppliers: invite and join; link terms | dev (`DROPSHIP_ENABLED`) | 1 | ◐ built — API tests pass on dev (flag on); dev walkthrough pending |
 | [3](phase-3-supplier-products.md) | Supplier products in the seller's store | dev (flag) | 2 | ◐ built — API tests pass on dev (flag on); dev walkthrough pending |
-| [4](phase-4-orders.md) | Orders and shipping, prepaid and COD, terms snapshot | dev (flag) | 3 | ☐ |
+| [4](phase-4-orders.md) | Orders and shipping, prepaid and COD, terms snapshot | dev (flag) | 3 | ◐ built — API suite + dev walkthrough pending |
 | [5](phase-5-money-and-jobs.md) | Statement (direct settlement), reminders, self-healing. **MVP complete** | **production, flag on** | 4 | ☐ |
 | [6](phase-6-split-payouts.md) | Easy Split pays suppliers for prepaid orders | production (`DROPSHIP_SPLIT`) | 5 + payments track (Easy Split live) | ☐ |
 | [7](phase-7-later.md) | Later | — | MVP feedback | — |

@@ -4,7 +4,7 @@
 > statement, recording payments, Easy Split payouts, refunds, or anything about
 > who owes whom. **Update when:** any money rule changes.
 
-Status: ☐ planned. Amounts are recorded from Phase 4; the statement and
+Status: ☐ planned. Amounts are recorded from Phase 4 (built 21 Oct 2026: `costTotal`, `shippingFee`, `supplierShare`, `platformFee`, `collectAmount` on each supplier order); the statement and
 payments are Phase 5 (all `DIRECT`); Easy Split is Phase 6. Decisions: D-16,
 D-17, D-18 in [decisions](../decisions.md). Every amount here comes from the
 order's snapshot ([terms](../terms/context.md)).

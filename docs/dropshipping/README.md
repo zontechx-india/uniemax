@@ -19,7 +19,7 @@ earns the difference.
 | 1 | Core seams for packages | ☑ built 20 Oct 2026, API tests pass on dev |
 | 2 | Suppliers: invite and join | ◐ built 20 Oct 2026 — API tests pass on dev (flag on); dev walkthrough pending |
 | 3 | Supplier products in the seller's store | ◐ built 20 Oct 2026 — API tests pass on dev (flag on); dev walkthrough pending |
-| 4 | Orders and shipping | ☐ not started |
+| 4 | Orders and shipping | ◐ built 21 Oct 2026 — API suite + dev walkthrough pending |
 | 5 | Money statement and background jobs. **MVP complete** | ☐ not started |
 | 6 | Easy Split pays suppliers for prepaid orders | ☐ not started |
 | 7 | Later | — |

@@ -6,7 +6,7 @@
 > **Update when:** a term is added or its rules change.
 
 Status: ◐ link terms, the change log and change notices built (Phase 2, 20 Oct
-2026; `services/terms.ts`, `domain.ts#describeChange`). Snapshots: Phase 4.
+2026; `services/terms.ts`, `domain.ts#describeChange`). Snapshots built in Phase 4 (21 Oct 2026; `services/supplierOrders.ts` `place`, shown on the order screens as "Terms for this order").
 `settleVia = SPLIT`: Phase 6.
 
 ## The rule (D-18)

@@ -175,6 +175,11 @@ function withSupplierSections(groups: SectionGroup[], role: DropshipRole): Secti
   const out: SectionGroup[] = []
   for (const group of groups) {
     if (supplyOnly && (group.key === 'storefront' || group.key === 'marketing')) continue
+    // Shipments sit with Orders: the parcels the suppliers ship for this shop.
+    if (group.key === 'overview' && !supplyOnly && role.hasSuppliers) {
+      out.push({ ...group, items: [...group.items, { label: 'Shipments', to: 'shipments', icon: TruckIcon }] })
+      continue
+    }
     if (group.key === 'catalog' && !supplyOnly) {
       out.push({
         ...group,
@@ -194,6 +199,7 @@ function withSupplierSections(groups: SectionGroup[], role: DropshipRole): Secti
         key: 'supply',
         caption: 'Supply to sellers',
         items: [
+          { label: 'Orders to ship', to: 'orders-to-ship', icon: TruckIcon },
           { label: 'Products for sellers', to: 'supply', icon: RupeeIcon },
           { label: 'Sellers', to: 'sellers', icon: BagIcon },
           { label: 'Supplier settings', to: 'supplier-settings', icon: SlidersIcon },

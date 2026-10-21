@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { toApiError } from '../../shared/auth/http'
 import { Badge } from '../../shared/ui/Badge'
 import type { BadgeTone } from '../../shared/ui/Badge'
-import type { Actor, InviteStatus, LinkStatus, ReturnFeePayer, Terms } from './api'
+import type { Actor, InviteStatus, LinkStatus, ReturnFeePayer, SupplierOrderStatus, Terms } from './api'
 
 /**
  * Small pieces every supplier screen shares. Words follow
@@ -208,4 +208,37 @@ export function whatsappHref(text: string, phone?: string | null): string {
   const digits = phone?.replace(/\D/g, '') ?? ''
   const to = digits.length === 10 ? `91${digits}` : digits
   return `https://wa.me/${to}?text=${encodeURIComponent(text)}`
+}
+
+/** Supplier order status words, per side (glossary → Supplier order status words). */
+const ORDER_WORDS: Record<SupplierOrderStatus, { supplier: string; seller: string; tone: BadgeTone }> = {
+  AWAITING_PAYMENT: { supplier: 'Waiting for payment', seller: 'Waiting for payment', tone: 'neutral' },
+  EXPIRED: { supplier: 'Not paid', seller: 'Not paid in time', tone: 'neutral' },
+  NEW: { supplier: 'New', seller: 'With supplier', tone: 'pending' },
+  ACCEPTED: { supplier: 'Confirmed', seller: 'Supplier confirmed', tone: 'brand' },
+  SHIPPED: { supplier: 'Shipped', seller: 'Shipped', tone: 'brand' },
+  DELIVERED: { supplier: 'Delivered', seller: 'Delivered', tone: 'success' },
+  REJECTED: { supplier: "Couldn't ship", seller: "Supplier couldn't ship", tone: 'danger' },
+  CANCELLED: { supplier: 'Cancelled', seller: 'Cancelled', tone: 'danger' },
+  RETURNED: { supplier: 'Came back', seller: 'Came back to supplier', tone: 'danger' },
+}
+
+export function OrderStatusBadge({ status, side }: { status: SupplierOrderStatus; side: 'supplier' | 'seller' }) {
+  const w = ORDER_WORDS[status]
+  return (
+    <Badge tone={w.tone} dot>
+      {w[side]}
+    </Badge>
+  )
+}
+
+export function orderStatusText(status: SupplierOrderStatus, side: 'supplier' | 'seller'): string {
+  return ORDER_WORDS[status][side]
+}
+
+/** "Ship by 23 Oct" — and when it has passed, it says so. */
+export function shipByText(iso: string | null, late: boolean): string | null {
+  if (!iso) return null
+  const day = new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+  return late ? `Was due ${day}` : `Ship by ${day}`
 }

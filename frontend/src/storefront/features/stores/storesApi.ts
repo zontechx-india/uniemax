@@ -2362,6 +2362,8 @@ export interface SellerOrderSummary {
   total: string
   placedAt: string
   itemCount: number
+  /** Another party (a supplier) ships some of the lines. Absent on the dashboard's recent orders. */
+  hasPackageLines?: boolean
 }
 
 export interface SellerOrderListQuery {

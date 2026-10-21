@@ -1,7 +1,8 @@
 import { HttpError } from "../../utils/httpError.js";
 import { hook } from "../events/hooks.js";
 import { deps } from "./deps.js";
-import { pauseText, priceProblem } from "./domain.js";
+import { COD_SPLIT_REFUSED, PICKUP_REFUSED, onePlace, pauseText, priceProblem } from "./domain.js";
+import * as orders from "./services/supplierOrders.js";
 
 /**
  * The core hooks this package answers (docs/dropshipping/architecture →
@@ -57,17 +58,25 @@ export function registerHooks(): void {
     }
   });
 
-  hook("order.placing", async (tx, orderId) => {
-    const items = await tx.orderItem.findMany({
-      where: { orderId },
-      select: { productId: true, productName: true },
+  // Placement, the gateway's undo and every cancel run inside the core's own
+  // transaction (services/supplierOrders.ts): stock is reserved, tagged and
+  // snapshotted together, or the whole placement is refused (K-1, K-7).
+  hook("order.placing", (tx, orderId) => orders.place(tx, orderId));
+  hook("order.unplacing", (tx, orderId) => orders.unplace(tx, orderId));
+  hook("order.cancelling", (tx, orderId) => orders.cancelling(tx, orderId));
+
+  // K-4, K-5: pickup is never offered for supplier products, and cash on
+  // delivery only when the whole order ships as one parcel (D-13).
+  hook("checkout.options", async (_storeId, lines) => {
+    const ids = lines.map((l) => l.productId);
+    if (ids.length === 0) return {};
+    const copies = await deps.prisma.resale.findMany({
+      where: { productId: { in: ids } },
+      select: { productId: true, link: { select: { supplierId: true } } },
     });
-    const ids = items.flatMap((i) => (i.productId ? [i.productId] : []));
-    if (ids.length === 0) return;
-    const copy = await tx.resale.findFirst({ where: { productId: { in: ids } }, select: { productId: true } });
-    if (!copy) return;
-    const name = items.find((i) => i.productId === copy.productId)?.productName ?? "This product";
-    // C-24: orders for supplier products are routed from Phase 4.
-    throw HttpError.conflict(`"${name}" is coming soon — it can't be ordered yet.`);
+    if (copies.length === 0) return {};
+    const supplierOf = new Map(copies.map((c) => [c.productId, c.link.supplierId]));
+    const places = lines.map((l) => ({ supplierId: supplierOf.get(l.productId) ?? null }));
+    return { pickup: PICKUP_REFUSED, cod: onePlace(places) ? null : COD_SPLIT_REFUSED };
   });
 }

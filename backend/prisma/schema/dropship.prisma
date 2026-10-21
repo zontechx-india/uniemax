@@ -72,6 +72,7 @@ model Supplier {
   statusNote     String?
   links          SupplierLink[]
   products       SupplyProduct[]
+  orders         SupplierOrder[]
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
@@ -118,6 +119,7 @@ model SupplierLink {
   /// Who paused or ended it (either side, D-19).
   statusBy       DropshipActor?
   resales        Resale[]
+  orders         SupplierOrder[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
@@ -242,5 +244,144 @@ model ResaleVariant {
   @@index([resaleId])
   @@index([supplyVariantId])
   @@map("resale_variants")
+  @@schema("dropship")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4: supplier orders (docs/dropshipping/data-model/orders)
+// ---------------------------------------------------------------------------
+
+enum SupplierOrderStatus {
+  AWAITING_PAYMENT
+  EXPIRED
+  NEW
+  ACCEPTED
+  SHIPPED
+  DELIVERED
+  REJECTED
+  CANCELLED
+  RETURNED
+
+  @@schema("dropship")
+}
+
+enum PaymentMode {
+  PREPAID
+  COD
+
+  @@schema("dropship")
+}
+
+enum StatementState {
+  PENDING
+  OWED
+  HELD
+  VOID
+
+  @@schema("dropship")
+}
+
+/// D-16: how the supplier is paid. DIRECT until Easy Split (Phase 6).
+enum SettleVia {
+  DIRECT
+  SPLIT
+
+  @@schema("dropship")
+}
+
+/// One supplier's share of one customer order. Every term is a snapshot taken
+/// inside the placement transaction (D-18); nothing later reads the current settings.
+model SupplierOrder {
+  id              String              @id @default(cuid())
+  /// The customer order (core `orders.id`).
+  orderId         String
+  orderNumber     String
+  sellerStoreId   String
+  supplierId      String
+  supplier        Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  linkId          String
+  link            SupplierLink        @relation(fields: [linkId], references: [id], onDelete: Restrict)
+  status          SupplierOrderStatus @default(AWAITING_PAYMENT)
+  paymentMode     PaymentMode
+  /// COD only: the order total (COD orders are always one parcel, D-13).
+  collectAmount   Decimal?            @db.Decimal(10, 2)
+  shipWithinDays  Int
+  returnDays      Int
+  returnFeePayer  ReturnFeePayer
+  platformFee     Decimal             @default(0) @db.Decimal(10, 2)
+  /// May only fall back SPLIT → DIRECT (T-10).
+  settleVia       SettleVia
+  shipBy          DateTime?
+  /// The core OrderShipment once shipped.
+  shipmentId      String?
+  /// Why REJECTED / CANCELLED / EXPIRED / RETURNED.
+  closeReason     String?
+  /// "Report a problem" (F-9).
+  issueOpenAt     DateTime?
+  issueTicketId   String?
+  /// Admin's Needs action → Resolve.
+  adminResolvedAt DateTime?
+  adminNote       String?
+  costTotal       Decimal             @db.Decimal(10, 2)
+  shippingFee     Decimal             @db.Decimal(10, 2)
+  /// costTotal + shippingFee.
+  supplierShare   Decimal             @db.Decimal(10, 2)
+  statementState  StatementState      @default(PENDING)
+  owedAt          DateTime?
+  acceptedAt      DateTime?
+  shippedAt       DateTime?
+  deliveredAt     DateTime?
+  closedAt        DateTime?
+  lines           SupplierOrderLine[]
+  events          SupplierOrderEvent[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([orderId, supplierId])
+  @@index([supplierId, status])
+  @@index([sellerStoreId, createdAt])
+  @@index([linkId, statementState])
+  @@index([status, createdAt])
+  @@index([status, shipBy])
+  @@map("supplier_orders")
+  @@schema("dropship")
+}
+
+model SupplierOrderLine {
+  id                String        @id @default(cuid())
+  supplierOrderId   String
+  supplierOrder     SupplierOrder @relation(fields: [supplierOrderId], references: [id], onDelete: Cascade)
+  /// The customer order line (core `order_items.id`).
+  orderItemId       String        @unique
+  /// The supplier's StoreProductVariant: the stock reserved and released.
+  supplierVariantId String
+  productName       String
+  variantName       String?
+  /// The SUPPLIER's SKU, for its packing slip.
+  supplierSku       String?
+  quantity          Int
+  /// Snapshot at placement.
+  unitCost          Decimal       @db.Decimal(10, 2)
+
+  @@index([supplierOrderId])
+  @@index([supplierVariantId])
+  @@map("supplier_order_lines")
+  @@schema("dropship")
+}
+
+/// Audit trail of every status change.
+model SupplierOrderEvent {
+  id              String               @id @default(cuid())
+  supplierOrderId String
+  supplierOrder   SupplierOrder        @relation(fields: [supplierOrderId], references: [id], onDelete: Cascade)
+  from            SupplierOrderStatus?
+  to              SupplierOrderStatus
+  actor           DropshipActor
+  actorId         String?
+  note            String?
+  createdAt       DateTime             @default(now())
+
+  @@index([supplierOrderId, createdAt])
+  @@map("supplier_order_events")
   @@schema("dropship")
 }

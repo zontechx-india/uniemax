@@ -173,3 +173,49 @@ export type SupplierProfileUpdateInput = z.infer<typeof supplierProfileUpdateSch
 export type SellerLinkUpdateInput = z.infer<typeof sellerLinkUpdateSchema>;
 export type SupplyUpdateInput = z.infer<typeof supplyUpdateSchema>;
 export type SupplyBulkInput = z.infer<typeof supplyBulkSchema>;
+
+// ---- Phase 4: supplier orders ------------------------------------------------
+
+export const orderParam = storeParam.extend({ id: z.string().min(1) });
+export const sellerOrderParam = storeParam.extend({ orderId: z.string().min(1) });
+export const sellerPartParam = sellerOrderParam.extend({ id: z.string().min(1) });
+
+export const supplierInboxQuery = z.object({ tab: z.enum(["new", "shipped", "done"]).default("new") });
+
+/** Courier and tracking; the courier list and the link rules are the core's (checked by the host). */
+export const trackingSchema = z.object({
+  carrierCode: z.string().trim().min(1, "Choose the courier").max(40),
+  carrierName: z.string().trim().max(60).nullish().transform((v) => v || null),
+  trackingNumber: z.string().trim().min(1, "Add the tracking number").max(60),
+  trackingUrl: z.string().trim().max(500).nullish().transform((v) => v || null),
+});
+
+export const cantShipSchema = z.object({
+  reason: z.enum(["OUT_OF_STOCK", "DAMAGED", "PINCODE", "OTHER"], { error: "Choose why it can't be shipped" }),
+  note: z.string().trim().max(300).nullish().transform((v) => v || null),
+});
+
+export const cameBackSchema = z.object({ restock: z.boolean({ error: "Choose whether the stock goes back" }) });
+
+export const slipsQuery = z.object({
+  ids: z
+    .string()
+    .min(1)
+    .transform((v) => v.split(",").map((s) => s.trim()).filter(Boolean))
+    .pipe(z.array(z.string().min(1)).min(1).max(200)),
+});
+
+export const problemSchema = z.object({
+  note: z.string().trim().min(5, "Tell us what went wrong").max(1000),
+});
+
+export const sellerShipmentsQuery = paginationQuery.pick({ page: true }).extend({
+  state: z.enum(["in_transit", "delivered", "came_back", "late"]).optional(),
+  supplierId: z.string().min(1).optional(),
+});
+
+export const needsActionQuery = paginationQuery.pick({ page: true }).extend({
+  kind: z.enum(["late", "cant_ship", "came_back", "problem", "refund"]).optional(),
+});
+
+export type TrackingBody = z.infer<typeof trackingSchema>;

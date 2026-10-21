@@ -52,6 +52,9 @@ const AffiliateAdminPage = lazy(
 const SuppliersAdminPage = lazy(
   () => import('../../packages/dropship/pages/admin/SuppliersAdminPage'),
 )
+const NeedsActionPage = lazy(
+  () => import('../../packages/dropship/pages/admin/NeedsActionPage'),
+)
 const NotificationsPage = lazy(() => import('../pages/NotificationsPage'))
 const ActivityPage = lazy(() => import('../pages/ActivityPage'))
 const AdminsPage = lazy(() => import('../pages/AdminsPage'))
@@ -230,6 +233,7 @@ export function AdminRouter() {
                 <Route path="banners" element={<BannersPage />} />
                 <Route path="affiliates" element={<AffiliateAdminPage />} />
                 <Route path="suppliers" element={<SuppliersAdminPage />} />
+                <Route path="needs-action" element={<NeedsActionPage />} />
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="activity" element={<ActivityPage />} />
                 <Route path="admins" element={<AdminsPage />} />

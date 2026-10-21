@@ -7,7 +7,8 @@
 
 Status: ◐ core seams built (Phase 1); the package skeleton, invites, links,
 supplier profile and supply built (Phase 2, 20 Oct 2026); supplier products,
-hooks, events and the copy re-sync job built (Phase 3, 20 Oct 2026); the rest is planned
+hooks, events and the copy re-sync job built (Phase 3, 20 Oct 2026); supplier orders,
+parcels and Needs action built (Phase 4, 21 Oct 2026); the rest is planned
 
 ## Code facts this design relies on (checked 19 Oct 2026)
 
@@ -41,7 +42,11 @@ Built in Phase 2 (☑): `index.ts`, `types.ts`, `config.ts`, `deps.ts`,
 `frontend/src/packages/dropship` (`api.ts`, `role.ts`, `ui.tsx`, `pages/`).
 Built in Phase 3 (☑): `hooks.ts`, `events.ts`, `services/{catalog,resale}.ts`,
 and in the frontend `pricing.ts` (the add sheet's sums), `supplied.ts`
-(`useSuppliedProducts`, `useSuppliedFor`) and the seller pages. The rest is planned. Admin routes mount at **`/api/v1/admin/dropship`** (D-29).
+(`useSuppliedProducts`, `useSuppliedFor`) and the seller pages. Built in Phase 4 (☑):
+`services/supplierOrders.ts` (place, unplace, cancelling, paid, expire, the supplier's
+actions, the rollup), `services/orderViews.ts` (what each side sees, slips, Shipments,
+Needs action), the order routes on the supplier, seller and admin routers, and the
+order screens. The rest is planned. Admin routes mount at **`/api/v1/admin/dropship`** (D-29).
 
 ```
 backend/src/package/dropship/
@@ -94,6 +99,7 @@ documented in the main doc the root `CLAUDE.md` names, and this table links to i
 | ☑ `API.md` pointer section + `DROPSHIP_ENABLED` in `backend/README.md` | 2 | ☑ `API.md`, `backend/README.md` |
 | ☑ `createStoreWithoutLogo` in `stores.service.ts` (the supply-only store, D-28) | 2 | ☑ `BACKEND_CONTEXT.md` (Dropshipping) |
 | ☑ Store nav rows, supply-only layout and dashboard (`StoreSectionNav`, `StoreManageLayout`, `StoreDashboardPage`); admin nav item | 2 | ☑ `FRONTEND_CONTEXT.md` |
+| ☑ `hasPackageLines` on the seller's order list rows, a `ShipDialog` `requireTracking` mode, the `SupplierParts` slot on the order page, **Orders to ship** and **Shipments** nav rows, admin **Needs action** | 4 | ☑ `FRONTEND_CONTEXT.md`, `API.md` |
 | ☑ Product list note slot (`ProductRow` `extra`) and the empty-list entry; the wizard swaps its Price / Delivery steps on a copy (D-34); **Supplier products** nav row | 3 | ☑ `FRONTEND_CONTEXT.md` |
 | Easy Split (payments track): a Cashfree vendor per store, split after payment, Defer Settlement, split refunds, adjustments, all in PaymentHub + `modules/payments` | 6 | `CASHFREE_PAYMENTS.md`, `API.md`, PaymentHub docs |
 
@@ -138,6 +144,17 @@ Added to `AppEvents` in `package/events/index.ts` and emitted after commit:
   suspension by an admin.
 
 Existing events used: `order.placed`, `order.paid`, `order.status`, `order.cancelled`.
+The package answers them in `events.ts`: `order.placed` → the supplier is told about a
+part it can ship, and other sellers' copies of the supplier's variants re-mirror;
+`order.paid` → `onPaid`; `order.cancelled` → the supplier is told *"don't ship"*.
+
+### Lock order
+
+Core placement and cancel lock a **variant row first, then its product row**. Anything
+in the package that writes a copy while a sale or cancel may run on it must take the
+locks in the same order: `updateCopy` writes the variants first and the product last.
+The other way round, a re-sync racing a sale on the same copy deadlocks (found and
+fixed in Phase 4).
 
 ## `DropshipHost` ◐
 
@@ -148,6 +165,14 @@ storeId, on)` (the core `updateStorePayments`, so its gates and
 `catalog.store.changed` apply), `listStoreProducts`, `getStoreProducts`,
 `getCustomer`, `notify`, `sendMail`, `webUrl`. `StoreRef` carries `logoUrl`,
 `suspended`, `acceptCod`, the profile `phone` / `email` and `hasAddress`.
+
+Built in Phase 4: `getPlacingOrder(tx, orderId)` (the order and its lines, with the
+variant whose stock each line took), `reserveStock` / `releaseStock` (conditional
+decrement, aggregates), `getVariantSkus`, `tagItems`, `getOrderViews`,
+`createShipment` / `updateShipmentTracking` / `markShipmentDelivered` / `markShipmentReturned`
+(the core's package parcel actions, tracking validated by the core's own schema),
+`confirmOrder`, `cancelOrder` (the core's system actions) and `openTicket`; `StoreRef`
+gained `address` (a supplier's return address on its slips).
 
 Built in Phase 3: `getProductSnapshots(ids)` (options, variants with price /
 MRP / stock / active / option values / SKU / photo, media keys, description,
@@ -198,7 +223,8 @@ UPPER_SNAKE (`DROPSHIP_INVITE_EXPIRY_DAYS`, …); `DROPSHIP_ENABLED` is in
 `backend/README.md`. Built in Phase 2: `enabled`, `inviteExpiryDays`,
 `inviteNeedsAdminApproval`, `shipWithinDaysMax`, and `returnDaysMax` (30, the
 longest returns window a supplier may offer). Built in Phase 3:
-`suggestedMarkupPct`, `minMarginWarnPct`, `platformFeePct` and `jobIntervalMs`.
+`suggestedMarkupPct`, `minMarginWarnPct`, `platformFeePct` and `jobIntervalMs`; in Phase 4:
+`unpaidHoldHours` and `customerDataDays`.
 The rest is planned.
 
 | Key | Default | Meaning |
@@ -220,8 +246,10 @@ The rest is planned.
 ## Hourly job and self-healing ◐
 
 Runs every `jobIntervalMs`, and 10 s after boot (as in affiliate). Every step
-is idempotent. Built in Phase 3 (`events.ts` `startJobs`): re-sync every copy
-(`syncAll`), the copy half of step 5. The other steps come with Phases 4–6.
+is idempotent. Built (`events.ts` `startJobs`): step 1, **expire** unpaid parts
+(Phase 4, `expireUnpaid`), then re-sync every copy (`syncAll`, Phase 3), the copy half
+of step 5. Reminders, the statement, privacy sweeps and reconcile come with Phases 5–6
+(the customer-data cut-off is already applied when a supplier's order is read).
 1. **Expire** unpaid parts older than `unpaidHoldHours` (release stock).
 2. **Reminders:** a new order not confirmed after `confirmReminderHours`; a
    parcel not shipped by `shipBy` (late flag).

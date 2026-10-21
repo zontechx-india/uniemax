@@ -23,6 +23,8 @@ export { useSuppliedFor, useSuppliedProducts } from './supplied'
 export type { Supplied } from './api'
 export { SuppliedNote, SupplierProductsEntry } from './pages/seller/SuppliedNote'
 export { SuppliedDeliveryStep, SuppliedPricingStep } from './pages/seller/SuppliedSteps'
+// The supplier parts on the seller's order page (Phase 4).
+export { SupplierParts } from './pages/seller/SupplierParts'
 
 /** /supplier-invite/:token — public, outside any layout. */
 export const dropshipPublicRoutes: RouteObject[] = [
@@ -47,6 +49,24 @@ export const dropshipStoreRoutes: RouteObject[] = [
     }),
   },
   {
+    path: 'shipments',
+    lazy: async () => ({
+      Component: (await import('./pages/seller/ShipmentsPage')).ShipmentsPage,
+    }),
+  },
+  {
+    path: 'orders-to-ship',
+    lazy: async () => ({
+      Component: (await import('./pages/supplier/OrdersToShipPage')).OrdersToShipPage,
+    }),
+  },
+  {
+    path: 'orders-to-ship/slips',
+    lazy: async () => ({
+      Component: (await import('./pages/supplier/SlipsPage')).SlipsPage,
+    }),
+  },
+  {
     path: 'supply',
     lazy: async () => ({
       Component: (await import('./pages/supplier/SupplyPage')).SupplyPage,
@@ -67,4 +87,4 @@ export const dropshipStoreRoutes: RouteObject[] = [
 ]
 
 /** The store-section `to` values above — hidden where the package has no mount (admin view). */
-export const DROPSHIP_SECTIONS = ['suppliers', 'supplier-products', 'supply', 'sellers', 'supplier-settings'] as const
+export const DROPSHIP_SECTIONS = ['suppliers', 'supplier-products', 'shipments', 'orders-to-ship', 'supply', 'sellers', 'supplier-settings'] as const

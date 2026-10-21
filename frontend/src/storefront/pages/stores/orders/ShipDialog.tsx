@@ -16,6 +16,9 @@ import type { Courier, OrderShipment, ShipmentTrackingInput } from '../../../fea
  * nudged for, because the customer gets it the moment the parcel is sent.
  * The link is whatever the courier gave the seller — UnieMax never guesses a
  * courier's tracking URL.
+ *
+ * `requireTracking` is the supplier's sheet: a supplier ships from its own place,
+ * so "Own delivery" isn't offered and the tracking number is required (D-4, D-39).
  */
 
 const NUMBER_PATTERN = /^[A-Za-z0-9-]+$/
@@ -32,6 +35,7 @@ export function ShipDialog({
   title,
   submitLabel,
   parcel = null,
+  requireTracking = false,
   busy,
   error,
   onSubmit,
@@ -42,6 +46,8 @@ export function ShipDialog({
   submitLabel: string
   /** Pre-fills the form when correcting a parcel's tracking. */
   parcel?: OrderShipment | null
+  /** A tracking number is required and "Own delivery" is not offered. */
+  requireTracking?: boolean
   busy: boolean
   error: string | null
   onSubmit: (input: ShipmentTrackingInput) => void
@@ -83,6 +89,7 @@ export function ShipDialog({
     const cleanLink = link.trim()
     if (!code) next.courier = 'Choose the courier'
     if (typed && !name.trim()) next.name = "Type the courier's name"
+    if (requireTracking && !cleanNumber) next.number = 'Add the tracking number'
     if (!own && cleanNumber) {
       if (cleanNumber.length < 4 || cleanNumber.length > 40) {
         next.number = 'A tracking number has 4 to 40 characters'
@@ -149,7 +156,7 @@ export function ShipDialog({
             <option value="" disabled>
               {couriers ? 'Choose the courier' : 'Loading couriers…'}
             </option>
-            {couriers?.map((c) => (
+            {couriers?.filter((c) => !(requireTracking && c.code === 'self')).map((c) => (
               <option key={c.code} value={c.code}>
                 {c.code === 'other' ? 'Other (type the name)' : c.name}
               </option>
@@ -192,7 +199,11 @@ export function ShipDialog({
               placeholder="As printed on the courier receipt"
               onChange={(e) => setNumber(e.target.value)}
               error={errors.number}
-              hint="Add it so your customer can follow the parcel."
+              hint={
+                requireTracking
+                  ? 'Required — your customer follows the parcel with it.'
+                  : 'Add it so your customer can follow the parcel.'
+              }
             />
             <TextField
               label="Tracking link (optional)"

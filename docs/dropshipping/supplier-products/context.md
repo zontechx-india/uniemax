@@ -34,8 +34,8 @@ Status: ◐ built 20 Oct 2026 (Phase 3; API tests pass on dev, screen walkthroug
    photos, shelf, price and the homepage flags. In the product wizard the
    **Price & choices** and **Delivery & payment** steps are the package's on a
    copy (D-34); Duplicate lives in the core Price step, so it disappears.
-6. Until Phase 4 routes orders, the `order.placing` hook refuses supplier
-   products with *"Coming soon"*.
+6. Orders for supplier products are routed from Phase 4 (the Phase 3 *"Coming
+   soon"* refusal is gone): [orders](../orders/context.md).
 
 ## Flows
 
@@ -154,4 +154,4 @@ and by the hourly job (`jobIntervalMs`). For each copy linked to the changed sto
 | C-21 | A follow-price change is applied twice (re-run, duplicate event). | Computed against `ResaleVariant.lastCost`, so the second run changes nothing. |
 | C-22 | A pickup-only store adds a supplier product. | Delivery settings are asked for in place on the add sheet. |
 | C-23 | The seller's earnings are negative after delivery charge and affiliate commission. | The result line shows red. Warns, never blocks. |
-| C-24 | Someone buys a supplier product before Phase 4 exists. | The placement hook refuses it with *"Coming soon"* (rule 6). |
+| C-24 | Someone buys a supplier product before Phase 4 exists. | **Retired in Phase 4**: the order is routed to the supplier. |

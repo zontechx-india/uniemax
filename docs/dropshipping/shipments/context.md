@@ -8,7 +8,7 @@
 > **OrderShipment**), and the screens in [`FRONTEND_CONTEXT.md`](../../FRONTEND_CONTEXT.md)
 > (Orders → **Parcels**). This file keeps the rules and failure cases.
 
-Status: ☑ all rules built — 1–6 and 8 in Phase 0, rule 7 in Phase 1 (20 Oct 2026).
+Status: ☑ all rules built — 1–6 and 8 in Phase 0, rule 7 in Phase 1 (20 Oct 2026). Supplier parcels (tracking required, "Shipped by {supplier}") are made by the dropship package from Phase 4 (21 Oct 2026).
 
 ## Why it is core
 

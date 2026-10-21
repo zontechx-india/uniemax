@@ -5,7 +5,11 @@
 > shipping, cancellations, problems, or the seller's view of all this.
 > **Update when:** any of those change.
 
-Status: ☐ planned (Phase 4). Tables: [data-model/orders](../data-model/orders/context.md).
+Status: ◐ built 21 Oct 2026 (Phase 4; API suite + dev walkthrough pending). Code:
+`backend/src/package/dropship/services/{supplierOrders,orderViews}.ts`, `hooks.ts`,
+`events.ts`; `frontend/src/packages/dropship/pages/{supplier,seller,admin}/`
+(`OrdersToShipPage`, `SlipsPage`, `SupplierParts`, `ShipmentsPage`, `NeedsActionPage`).
+Tables: [data-model/orders](../data-model/orders/context.md).
 Parcels: [shipments](../shipments/context.md).
 
 ## Checkout rules
@@ -22,8 +26,9 @@ Parcels: [shipments](../shipments/context.md).
    Otherwise COD is hidden with the reason: *"Cash on delivery isn't available
    when items ship from different places."*
 3. **`order.placing`** (inside the placement transaction):
-   - re-check each supplier line: supplier and link `ACTIVE`, product offered,
-     cost ≤ price;
+   - re-check each supplier line: supplier and link `ACTIVE`, product and option
+     offered, cost ≤ price (a refused line says *"…is no longer available — remove it
+     from your cart"*), and COD still allowed for the link (T-3);
    - reserve the supplier's stock with a conditional decrement, refusing with
      the core's *"just sold out"* wording;
    - tag the items `fulfilledBy = "dropship"`;
@@ -34,7 +39,9 @@ Parcels: [shipments](../shipments/context.md).
      `settleVia`. Read the link and supplier rows inside the transaction (T-8).
      Nothing later reads the current settings.
 
-   Status at creation:
+   The core has already taken the ordering copy's own stock in the same transaction
+   (D-36); the hook takes the supplier's. `platformFee` is the rate in force ×
+   this supplier's lines (D-20). Status at creation:
    - **COD**, or an order already `PAID` at placement (dev simulation) →
      `NEW`, with `shipBy = now + shipWithinDays`;
    - online and unpaid → `AWAITING_PAYMENT`.
@@ -101,7 +108,7 @@ The customer order never runs ahead of its slowest parcel.
   seller's own is cancelled automatically (COD: nothing to refund; prepaid:
   **Refunds to make**). A mixed order asks the seller.
 - **Cancel:** refused once any parcel has shipped, unless every shipped parcel
-  came back (core). `order.cancelling` releases the stock and closes the
+  came back (core). A supplier's parcel on its way also refuses it from our hook (F-4). `order.cancelling` releases the stock and closes the
   supplier orders in the same transaction, and tells the supplier *"Cancelled —
   don't ship"*.
 
@@ -136,30 +143,38 @@ The customer order never runs ahead of its slowest parcel.
   paused or resumed, problem resolved.
 - Customer: the core parcel messages, with tracking.
 
-## API: `/api/v1/dropship` ☐
+## API: `/api/v1/dropship` ☑ (as built)
 
 **Supplier** (`requireSupplier`)
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/stores/:storeId/supplier-orders?tab=new\|shipped\|done` | Inbox |
+| GET | `/stores/:storeId/supplier-orders?tab=new\|shipped\|done` | Inbox: `{ items, counts: { new, shipped } }`, sorted by Ship by. `done` lists finished orders the supplier had seen |
 | GET | `/stores/:storeId/supplier-orders/:id` | Detail (no customer email, no item prices) |
 | POST | `/stores/:storeId/supplier-orders/:id/confirm` | |
-| POST | `/stores/:storeId/supplier-orders/:id/ship` | `{ carrier, trackingNumber, trackingUrl? }` |
-| PATCH | `/stores/:storeId/supplier-orders/:id/tracking` | `{ carrier?, trackingNumber?, trackingUrl? }` |
-| POST | `/stores/:storeId/supplier-orders/:id/cant-ship` | `{ reason, note? }` |
+| POST | `/stores/:storeId/supplier-orders/:id/ship` | `{ carrierCode, carrierName?, trackingNumber, trackingUrl? }` — the core's courier list and link rules; "Own delivery" is refused (D-39) |
+| PATCH | `/stores/:storeId/supplier-orders/:id/tracking` | Same body as ship; only while shipped. The customer gets *Tracking updated* |
+| POST | `/stores/:storeId/supplier-orders/:id/cant-ship` | `{ reason: OUT_OF_STOCK \| DAMAGED \| PINCODE \| OTHER, note? }` |
 | POST | `/stores/:storeId/supplier-orders/:id/delivered` | multipart, optional `pod` photo |
 | POST | `/stores/:storeId/supplier-orders/:id/came-back` | `{ restock: boolean }` |
-| GET | `/stores/:storeId/supplier-orders/slips?ids=` | Printable slips |
+| GET | `/stores/:storeId/supplier-orders/slips?ids=a,b` | Slip data (up to 200): sold by, shipped by + return address, items with SKU, delivery, COD amount; no prices |
 
 **Seller** (`requireCustomer` + owns `:storeId`)
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/stores/:storeId/orders/:orderId/parts` | Supplier orders on this order, tracking, earnings |
+| GET | `/stores/:storeId/orders/:orderId/parts` | `{ orderStatus, hasOwnItems, parts[] }`: status, supplier name + phone, items, parcel, **You earn**, terms line, problem, `needsDecision` |
 | POST | `/stores/:storeId/orders/:orderId/parts/:id/delivered` | Mark delivered (F-10) |
 | POST | `/stores/:storeId/orders/:orderId/parts/:id/problem` | `{ note }` (F-9) |
-| GET | `/stores/:storeId/shipments?state&supplierId&page` | Shipments page |
+| GET | `/stores/:storeId/shipments?state&supplierId&page` | Shipments page; `state` is `in_transit \| delivered \| came_back \| late`; also returns the supplier list for the filter |
+
+Every supplier action answers with the updated order. A move on an order that
+changed returns 409 *"This order was just updated — refresh."*, or *"This order
+was cancelled."*.
+
+**Admin** (`/api/v1/admin/dropship`): `GET /needs-action?kind&page` (kinds `late ·
+cant_ship · came_back · problem · refund`) and `POST /needs-action/:supplierOrderId/resolve
+{ note }`. Forcing a status is not built (D-37).
 
 **Customer:** no dropship endpoint. Parcels come with the core order response.
 

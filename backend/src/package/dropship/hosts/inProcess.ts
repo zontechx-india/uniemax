@@ -19,7 +19,16 @@ import {
 import { resolvePayments } from "../../../modules/stores/stores.schema.js";
 import { resolveProfile } from "../../../modules/stores/storeProfile.schema.js";
 import { storeAddressSchema } from "../../../modules/stores/storeAddress.schema.js";
-import type { DropshipHost, OptionTypeRef, ProductRef, StoreRef } from "../types.js";
+import {
+  createPackageShipment,
+  markPackageShipmentDelivered,
+  markPackageShipmentReturned,
+  updatePackageShipmentTracking,
+} from "../../../modules/orders/shipments.service.js";
+import { shipmentTrackingSchema } from "../../../modules/orders/orders.schema.js";
+import { cancelOrderAsSystem, confirmOrderAsSystem } from "../../../modules/orders/orders.service.js";
+import { createTicket } from "../../../modules/support/support.service.js";
+import type { DropshipHost, OptionTypeRef, OrderView, ProductRef, StoreRef } from "../types.js";
 
 const json = (value: unknown) =>
   value === null || value === undefined ? Prisma.DbNull : (value as Prisma.InputJsonValue);
@@ -68,6 +77,16 @@ export function createInProcessHost(prisma: PrismaClient): DropshipHost {
       phone: profile.phone,
       email: profile.email,
       hasAddress: profile.address != null,
+      address: profile.address
+        ? [
+            profile.address.line1,
+            profile.address.line2,
+            profile.address.city,
+            `${profile.address.state} ${profile.address.pincode}`,
+          ]
+            .filter(Boolean)
+            .join(", ")
+        : null,
     };
   };
 
@@ -386,7 +405,6 @@ export function createInProcessHost(prisma: PrismaClient): DropshipHost {
           if (row && !row.publishedAt) data.publishedAt = new Date();
         }
       }
-      if (Object.keys(data).length > 0) await tx.storeProduct.update({ where: { id: productId }, data });
       const variants = patch.variants ?? [];
       // Names are unique per product and renames can swap labels: park them first.
       const renamed = variants.filter((v) => v.name !== undefined);
@@ -405,6 +423,10 @@ export function createInProcessHost(prisma: PrismaClient): DropshipHost {
         if (v.isActive !== undefined) d.isActive = v.isActive;
         if (Object.keys(d).length > 0) await tx.storeProductVariant.update({ where: { id: v.variantId }, data: d });
       }
+      // Lock order matters: core's placement and cancel take a variant first and the
+      // product second, so the product row is written last here too — the other
+      // way round, a re-sync racing a sale on the same copy can deadlock.
+      if (Object.keys(data).length > 0) await tx.storeProduct.update({ where: { id: productId }, data });
       await recomputeProductAggregates(productId, tx);
     },
 
@@ -472,6 +494,188 @@ export function createInProcessHost(prisma: PrismaClient): DropshipHost {
         storeId: row.storeId,
         productIds: row.items.flatMap((i) => (i.productId ? [i.productId] : [])),
       };
+    },
+
+    // ---- Phase 4: orders and parcels ---------------------------------------
+
+    async getPlacingOrder(tx, orderId) {
+      const row = await tx.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          orderNumber: true,
+          storeId: true,
+          paymentMethod: true,
+          paymentStatus: true,
+          total: true,
+          items: {
+            select: {
+              id: true,
+              productId: true,
+              variantId: true,
+              productName: true,
+              variantName: true,
+              quantity: true,
+              unitPrice: true,
+              lineTotal: true,
+            },
+          },
+        },
+      });
+      if (!row) return null;
+      // A simple product's line names no variant: its stock is the Default's.
+      const simple = row.items.filter((i) => !i.variantId && i.productId).map((i) => i.productId!);
+      const defaults = simple.length
+        ? await tx.storeProductVariant.findMany({
+            where: { productId: { in: simple }, isDefault: true },
+            select: { id: true, productId: true },
+          })
+        : [];
+      const defaultOf = new Map(defaults.map((d) => [d.productId, d.id]));
+      return {
+        id: row.id,
+        orderNumber: row.orderNumber,
+        storeId: row.storeId,
+        paymentMethod: row.paymentMethod === "COD" ? "COD" : "ONLINE",
+        paid: row.paymentStatus === "PAID",
+        total: row.total,
+        lines: row.items.map((i) => ({
+          itemId: i.id,
+          productId: i.productId,
+          stockVariantId: i.variantId ?? (i.productId ? defaultOf.get(i.productId) ?? null : null),
+          productName: i.productName,
+          variantName: i.variantName,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          lineTotal: i.lineTotal,
+        })),
+      };
+    },
+
+    async reserveStock(tx, variantId, quantity) {
+      const updated = await tx.storeProductVariant.updateMany({
+        where: { id: variantId, stockQuantity: { gte: quantity } },
+        data: { stockQuantity: { decrement: quantity } },
+      });
+      if (updated.count === 0) return false;
+      const v = await tx.storeProductVariant.findUnique({ where: { id: variantId }, select: { productId: true } });
+      if (v) await recomputeProductAggregates(v.productId, tx);
+      return true;
+    },
+
+    async releaseStock(tx, variantId, quantity) {
+      const updated = await tx.storeProductVariant.updateMany({
+        where: { id: variantId },
+        data: { stockQuantity: { increment: quantity } },
+      });
+      if (updated.count === 0) return; // the supplier deleted it since
+      const v = await tx.storeProductVariant.findUnique({ where: { id: variantId }, select: { productId: true } });
+      if (v) await recomputeProductAggregates(v.productId, tx);
+    },
+
+    async getVariantSkus(tx, variantIds) {
+      const rows = await tx.storeProductVariant.findMany({
+        where: { id: { in: variantIds } },
+        select: { id: true, sku: true },
+      });
+      return new Map(rows.map((r) => [r.id, r.sku]));
+    },
+
+    async tagItems(tx, orderItemIds) {
+      if (orderItemIds.length === 0) return;
+      await tx.orderItem.updateMany({ where: { id: { in: orderItemIds } }, data: { fulfilledBy: "dropship" } });
+    },
+
+    async getOrderViews(orderIds) {
+      if (orderIds.length === 0) return [];
+      const rows = await prisma.order.findMany({
+        where: { id: { in: orderIds } },
+        select: {
+          id: true,
+          orderNumber: true,
+          storeId: true,
+          status: true,
+          paymentStatus: true,
+          paymentMethod: true,
+          total: true,
+          shippingCharge: true,
+          customerName: true,
+          customerPhone: true,
+          addressLine: true,
+          pincode: true,
+          state: true,
+          country: true,
+          createdAt: true,
+          items: { select: { id: true, fulfilledBy: true, lineTotal: true, imageKey: true } },
+          shipments: {
+            select: {
+              id: true,
+              carrierCode: true,
+              carrier: true,
+              trackingNumber: true,
+              trackingUrl: true,
+              shippedAt: true,
+              deliveredAt: true,
+              returnedAt: true,
+            },
+            orderBy: { shippedAt: "asc" },
+          },
+        },
+      });
+      return rows.map(
+        ({ shipments, paymentMethod, ...o }): OrderView => ({
+          ...o,
+          paymentMethod: paymentMethod === "COD" ? "COD" : "ONLINE",
+          parcels: shipments,
+        }),
+      );
+    },
+
+    async createShipment(input) {
+      const { shipmentId } = await createPackageShipment({
+        orderId: input.orderId,
+        orderItemIds: input.orderItemIds,
+        // The core's own parcel rules (courier list, safe links, D-24).
+        tracking: shipmentTrackingSchema.parse(input.tracking),
+        senderName: input.senderName,
+        externalRef: input.externalRef,
+      });
+      return shipmentId;
+    },
+
+    async updateShipmentTracking(shipmentId, tracking) {
+      await updatePackageShipmentTracking(shipmentId, shipmentTrackingSchema.parse(tracking));
+    },
+
+    async markShipmentDelivered(shipmentId, podKey) {
+      await markPackageShipmentDelivered(shipmentId, podKey);
+    },
+
+    async markShipmentReturned(shipmentId) {
+      await markPackageShipmentReturned(shipmentId);
+    },
+
+    async confirmOrder(orderId) {
+      await confirmOrderAsSystem(orderId);
+    },
+
+    async cancelOrder(orderId, reason) {
+      // The supplier already chose whether its stock goes back (D-39); the
+      // copies mirror the supplier, so the core restocks nothing that came back.
+      await cancelOrderAsSystem(orderId, reason, false);
+    },
+
+    async openTicket(customerId, storeId, subject, message) {
+      const ticket = await createTicket(customerId, {
+        subject,
+        message,
+        category: "ORDERS",
+        storeId,
+        // The account's own email and phone are used when these are blank.
+        contactEmail: null,
+        contactPhone: null,
+      });
+      return ticket.id;
     },
 
     notify(customerId, message) {

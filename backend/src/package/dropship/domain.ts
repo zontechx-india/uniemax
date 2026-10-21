@@ -453,3 +453,155 @@ export function pauseText(reason: PauseReason): string {
       return "The supplier removed this product";
   }
 }
+
+// ---------------------------------------------------------------------------
+// Supplier orders (Phase 4, docs/dropshipping/orders)
+// ---------------------------------------------------------------------------
+
+export type SupplierOrderStatus =
+  | "AWAITING_PAYMENT"
+  | "EXPIRED"
+  | "NEW"
+  | "ACCEPTED"
+  | "SHIPPED"
+  | "DELIVERED"
+  | "REJECTED"
+  | "CANCELLED"
+  | "RETURNED";
+export type OrderActor = "SUPPLIER" | "SELLER" | "ADMIN" | "SYSTEM";
+
+/**
+ * Every move a supplier order can make: from which states, to which, and who
+ * may make it. The one table every write checks (the guarded update then
+ * re-checks `from` in the database).
+ */
+export const ORDER_MOVES = {
+  paid: { from: ["AWAITING_PAYMENT"], to: "NEW", who: ["SYSTEM"] },
+  expire: { from: ["AWAITING_PAYMENT"], to: "EXPIRED", who: ["SYSTEM"] },
+  repaid: { from: ["EXPIRED"], to: "NEW", who: ["SYSTEM"] },
+  repaidSoldOut: { from: ["EXPIRED"], to: "REJECTED", who: ["SYSTEM"] },
+  cancel: { from: ["AWAITING_PAYMENT", "EXPIRED", "NEW", "ACCEPTED"], to: "CANCELLED", who: ["SYSTEM"] },
+  confirm: { from: ["NEW"], to: "ACCEPTED", who: ["SUPPLIER"] },
+  ship: { from: ["NEW", "ACCEPTED"], to: "SHIPPED", who: ["SUPPLIER"] },
+  cantShip: { from: ["NEW", "ACCEPTED"], to: "REJECTED", who: ["SUPPLIER"] },
+  delivered: { from: ["SHIPPED"], to: "DELIVERED", who: ["SUPPLIER", "SELLER"] },
+  cameBack: { from: ["SHIPPED"], to: "RETURNED", who: ["SUPPLIER"] },
+} as const satisfies Record<
+  string,
+  { from: readonly SupplierOrderStatus[]; to: SupplierOrderStatus; who: readonly OrderActor[] }
+>;
+export type OrderMove = keyof typeof ORDER_MOVES;
+
+export function canMove(move: OrderMove, from: SupplierOrderStatus, who: OrderActor): boolean {
+  const m = ORDER_MOVES[move];
+  return (m.from as readonly string[]).includes(from) && (m.who as readonly string[]).includes(who);
+}
+
+/** States in which the supplier's stock is set aside for the order. */
+export const HOLDS_STOCK: readonly SupplierOrderStatus[] = ["AWAITING_PAYMENT", "NEW", "ACCEPTED"];
+/** States the supplier still has to ship from. */
+export const TO_SHIP: readonly SupplierOrderStatus[] = ["NEW", "ACCEPTED"];
+/** Finished, one way or the other. */
+export const CLOSED: readonly SupplierOrderStatus[] = ["DELIVERED", "REJECTED", "CANCELLED", "RETURNED", "EXPIRED"];
+
+/** Why a move was refused, in words a person can act on. */
+export function moveRefusal(from: SupplierOrderStatus): string {
+  if (from === "CANCELLED") return "This order was cancelled.";
+  return "This order was just updated — refresh.";
+}
+
+/** costTotal = Σ unitCost × qty; supplierShare = costTotal + shippingFee (money: Amounts). */
+export function supplierAmounts(lines: { unitCost: Money; quantity: number }[], shippingFee: Money) {
+  const costTotal = paise(lines.reduce((sum, l) => sum.add(D(l.unitCost).mul(l.quantity)), D(0)));
+  return { costTotal, shippingFee: paise(D(shippingFee)), supplierShare: paise(costTotal.add(shippingFee)) };
+}
+
+/** D-20: the platform fee on an order, from the rate in force at placement. */
+export function platformFeeFor(orderTotal: Money, pct: number): Prisma.Decimal {
+  return paise(D(orderTotal).mul(pct).div(100));
+}
+
+/** "Ship by" = when the order became NEW + the snapshotted ship-within days. */
+export function shipByDate(from: Date, shipWithinDays: number): Date {
+  return daysFromNow(shipWithinDays, from);
+}
+
+/**
+ * D-13: cash on delivery only when the whole order is one parcel — every line
+ * from one supplier, or none from suppliers. `supplierId` null = the seller's own.
+ */
+export function onePlace(lines: { supplierId: string | null }[]): boolean {
+  return new Set(lines.map((l) => l.supplierId ?? "own")).size <= 1;
+}
+
+export const PICKUP_REFUSED = "Home delivery only — some items ship from a supplier.";
+export const COD_SPLIT_REFUSED = "Cash on delivery isn't available when items ship from different places.";
+
+/** Past its "Ship by" and not on its way yet (F-2). */
+export function isLate(o: { status: SupplierOrderStatus; shipBy: Date | null }, now = new Date()): boolean {
+  return (TO_SHIP as readonly string[]).includes(o.status) && o.shipBy !== null && o.shipBy < now;
+}
+
+/** F-12: the supplier stops seeing the customer's phone and address N days after closing. */
+export function customerDataHidden(closedAt: Date | null, days: number, now = new Date()): boolean {
+  return closedAt !== null && now.getTime() - closedAt.getTime() > days * 24 * 60 * 60 * 1000;
+}
+
+export type Rollup = "confirm" | "cancel" | "askSeller" | "wait";
+
+/**
+ * What the customer order should do now that a supplier order moved
+ * ("Rolling up to the customer order"). The customer order never runs ahead
+ * of its slowest parcel:
+ * - a part failed (can't ship / came back): with no items of the seller's own
+ *   and nothing on its way or delivered → cancel; otherwise the seller (or,
+ *   once something was delivered, admin) decides → askSeller;
+ * - every part confirmed or further, no items of the seller's own → confirm;
+ * - otherwise wait.
+ */
+export function rollup(input: {
+  hasOwnItems: boolean;
+  parts: { status: SupplierOrderStatus }[];
+}): Rollup {
+  const s = input.parts.map((p) => p.status);
+  const failed = s.some((x) => x === "REJECTED" || x === "RETURNED");
+  if (failed) {
+    if (input.hasOwnItems) return "askSeller";
+    if (s.includes("SHIPPED")) return "wait"; // a parcel is still on its way
+    if (s.includes("DELIVERED")) return "askSeller"; // a partial refund — by hand (F-4)
+    return "cancel";
+  }
+  if (input.hasOwnItems) return "wait";
+  const moving = s.every((x) => x === "ACCEPTED" || x === "SHIPPED" || x === "DELIVERED");
+  return moving && s.length > 0 ? "confirm" : "wait";
+}
+
+/**
+ * "You earn ₹X on this order" (D-38): the supplier lines' total (+ the
+ * delivery charge when the order is only supplier products) − what the
+ * supplier gets − the platform fee. Affiliate commission is left to the
+ * Phase 5 statement.
+ */
+export function orderEarnings(input: {
+  linesTotal: Money;
+  deliveryCharge: Money;
+  supplierShare: Money;
+  platformFee: Money;
+}): Prisma.Decimal {
+  return paise(
+    D(input.linesTotal).add(input.deliveryCharge).sub(input.supplierShare).sub(input.platformFee),
+  );
+}
+
+export const CANT_SHIP_REASONS = {
+  OUT_OF_STOCK: "Out of stock",
+  DAMAGED: "Damaged",
+  PINCODE: "Can't deliver to this pincode",
+  OTHER: "Other",
+} as const;
+export type CantShipReason = keyof typeof CANT_SHIP_REASONS;
+
+export function cantShipText(reason: CantShipReason, note: string | null): string {
+  const base = CANT_SHIP_REASONS[reason];
+  return note ? `${base}: ${note}` : base;
+}

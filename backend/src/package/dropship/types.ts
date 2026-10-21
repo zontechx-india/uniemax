@@ -4,7 +4,7 @@ import type { Prisma, PrismaClient } from "../../generated/prisma/client.js";
  * What the dropship package needs from the platform it runs inside.
  * `hosts/inProcess.ts` answers from the core database today; a standalone
  * service would answer over HTTP and nothing above this interface changes.
- * Phase 2 subset — later phases add copies, stock, orders and parcels
+ * Phase 2 people and stores, Phase 3 copies, Phase 4 orders and parcels
  * (docs/dropshipping/architecture/context.md).
  */
 export interface DropshipHost {
@@ -48,6 +48,34 @@ export interface DropshipHost {
   getCopyState(productId: string): Promise<CopyState | null>;
   /** An order's store and the products on its lines (stock moved on a supplier's own sale). */
   getOrderLines(orderId: string): Promise<{ storeId: string | null; productIds: string[] } | null>
+
+  // ---- Phase 4: orders and parcels ---------------------------------------
+  /** The order being placed, read inside its own transaction (`order.placing`). */
+  getPlacingOrder(tx: Tx, orderId: string): Promise<PlacingOrder | null>;
+  /** Conditional decrement of a variant's stock (K-1, K-2); false = not enough left. */
+  reserveStock(tx: Tx, variantId: string, quantity: number): Promise<boolean>;
+  releaseStock(tx: Tx, variantId: string, quantity: number): Promise<void>;
+  /** The supplier's own SKUs, for its packing slips. */
+  getVariantSkus(tx: Tx, variantIds: string[]): Promise<Map<string, string | null>>;
+  /** Marks order lines as shipped by another party (`OrderItem.fulfilledBy`). */
+  tagItems(tx: Tx, orderItemIds: string[]): Promise<void>;
+  getOrderViews(orderIds: string[]): Promise<OrderView[]>;
+  /** A parcel of package lines; the customer is told at once (D-4). Returns its id. */
+  createShipment(input: {
+    orderId: string;
+    orderItemIds: string[];
+    tracking: TrackingInput;
+    senderName: string;
+    externalRef: string;
+  }): Promise<string>;
+  updateShipmentTracking(shipmentId: string, tracking: TrackingInput): Promise<void>;
+  markShipmentDelivered(shipmentId: string, podKey: string | null): Promise<void>;
+  markShipmentReturned(shipmentId: string): Promise<void>;
+  /** The customer order, confirmed / cancelled by the system (the seller's rules, no store scope). */
+  confirmOrder(orderId: string): Promise<void>;
+  cancelOrder(orderId: string, reason: string): Promise<void>;
+  /** A support ticket to UnieMax about an order (F-9). Returns its id. */
+  openTicket(customerId: string, storeId: string, subject: string, message: string): Promise<string>;
   notify(customerId: string, message: HostNotification): void;
   sendMail(message: HostMail): Promise<void>;
   /** Storefront origin used in emails and share links; null when unknown. */
@@ -67,6 +95,8 @@ export interface StoreRef {
   phone: string | null;
   email: string | null;
   hasAddress: boolean;
+  /** The business address on one line (a supplier's return address on its slips). */
+  address: string | null;
 }
 
 export interface SupplyStoreInput {
@@ -232,4 +262,67 @@ export interface CopyState {
 export interface DropshipDeps {
   prisma: PrismaClient;
   host: DropshipHost;
+}
+
+// ---- Phase 4 -------------------------------------------------------------
+
+export interface PlacingOrder {
+  id: string;
+  orderNumber: string;
+  storeId: string | null;
+  paymentMethod: "COD" | "ONLINE";
+  /** Already paid at placement (the dev build without gateway keys, K-12). */
+  paid: boolean;
+  total: Prisma.Decimal;
+  lines: {
+    itemId: string;
+    productId: string | null;
+    /** The variant whose stock the line took: its own, or the product's Default. */
+    stockVariantId: string | null;
+    productName: string;
+    variantName: string | null;
+    quantity: number;
+    unitPrice: Prisma.Decimal;
+    lineTotal: Prisma.Decimal;
+  }[];
+}
+
+/** Courier and tracking as the core's parcel form takes them (validated there). */
+export interface TrackingInput {
+  carrierCode: string;
+  carrierName?: string | null;
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
+}
+
+export interface ParcelRef {
+  id: string;
+  carrierCode: string | null;
+  carrier: string;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  shippedAt: Date;
+  deliveredAt: Date | null;
+  returnedAt: Date | null;
+}
+
+/** What the package shows of a customer order. Never the customer's email. */
+export interface OrderView {
+  id: string;
+  orderNumber: string;
+  storeId: string | null;
+  status: string;
+  paymentStatus: string;
+  paymentMethod: "COD" | "ONLINE";
+  total: Prisma.Decimal;
+  shippingCharge: Prisma.Decimal;
+  customerName: string | null;
+  customerPhone: string | null;
+  addressLine: string | null;
+  pincode: string | null;
+  state: string | null;
+  country: string | null;
+  createdAt: Date;
+  items: { id: string; fulfilledBy: string | null; lineTotal: Prisma.Decimal; imageKey: string | null }[];
+  parcels: ParcelRef[];
 }

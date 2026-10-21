@@ -439,7 +439,9 @@ has its own endpoint because it restores stock.
 | `pageSize` | int  | 20      | max 100                                      |
 
 List envelope of summary rows: `{ id, orderNumber, status, fulfilment,
-customerName, paymentMethod, paymentStatus, total, placedAt, itemCount }`.
+customerName, paymentMethod, paymentStatus, total, placedAt, itemCount,
+hasPackageLines }` — `hasPackageLines` is true when another party (a supplier)
+ships any line of the order.
 
 **`GET /api/v1/stores/:id/orders/:orderId`** — one order, full shape (same
 as order placement below, incl. the lifecycle stamps and its parcels —

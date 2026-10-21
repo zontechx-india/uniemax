@@ -3,7 +3,7 @@
 > **Read when:** working on admin screens or endpoints for dropshipping.
 > **Update when:** they change.
 
-Status: ◐ Suppliers built (Phase 2, 20 Oct 2026). Needs action: Phase 4.
+Status: ◐ Suppliers built (Phase 2, 20 Oct 2026); Needs action built (Phase 4, 21 Oct 2026); forcing a status is not built (D-37).
 
 ## Screens (`frontend/src/admin`)
 
@@ -13,7 +13,7 @@ Status: ◐ Suppliers built (Phase 2, 20 Oct 2026). Needs action: Phase 4.
   **Restore** with a note the supplier is shown. Suspending blocks the
   supplier routes now; pausing every copy of its products (SU-8) arrives with
   copies in Phase 3.
-- **Needs action:** one list with a filter by kind:
+- ☑ **Needs action** (`/needs-action` in the console, shown while the package is on): one list with a filter by kind:
   - **Late:** parcels past their "Ship by" date.
   - **Can't ship on mixed orders:** a manual partial refund may be needed (F-4).
   - **Came back:** parcels returned to the supplier.
@@ -40,6 +40,6 @@ Inside the admin subtree its session cookies are scoped to (D-29):
 | --- | --- | --- |
 | GET | `/suppliers?status&page&pageSize` | ☑ Supplier list (`list()` envelope) |
 | POST | `/suppliers/:id/suspend` · `/restore` | ☑ `{ note }` (required) |
-| GET | `/needs-action?kind&page` | The list above |
-| POST | `/needs-action/:supplierOrderId/resolve` | `{ note }` |
-| POST | `/supplier-orders/:id/status` | Force a transition, `{ to, note }` |
+| GET | `/needs-action?kind&page` | ☑ The list above (`list()` envelope) |
+| POST | `/needs-action/:supplierOrderId/resolve` | ☑ `{ note }`: marks it resolved, a held line goes back to pending, the seller is told a problem was resolved |
+| POST | `/supplier-orders/:id/status` | ☐ Force a transition, `{ to, note }` — not built (D-37) |

@@ -3,6 +3,7 @@ import { on } from "../events/index.js";
 import { dropshipConfig } from "./config.js";
 import { deps } from "./deps.js";
 import * as resale from "./services/resale.js";
+import * as supplierOrders from "./services/supplierOrders.js";
 
 const log = (what: string) => (err: unknown) => console.error(`Dropship ${what} failed:`, err);
 
@@ -55,13 +56,27 @@ export function subscribe(): void {
       await resale.syncForSupplierProduct(productId).catch(log("stock sync"));
     }
   };
-  on("order.placed", stockMoved);
-  on("order.cancelled", stockMoved);
+  on("order.placed", async (e) => {
+    await stockMoved(e);
+    await supplierOrders.afterPlaced(e.orderId).catch(log("placed"));
+  });
+  on("order.cancelled", async (e) => {
+    await stockMoved(e);
+    await supplierOrders.afterCancelled(e.orderId).catch(log("cancelled"));
+  });
+  // The customer paid: the supplier's part is now something to ship (K-9 too).
+  on("order.paid", ({ orderId }) => supplierOrders.onPaid(orderId).catch(log("paid")));
 }
 
-/** Hourly (and 10 s after boot): re-sync every copy — stock mirrors, missed events. */
+/** Hourly (and 10 s after boot): expire unpaid supplier orders, then re-sync every copy. */
 export function startJobs(logger: FastifyBaseLogger): () => void {
   const run = async () => {
+    try {
+      const expired = await supplierOrders.expireUnpaid();
+      if (expired > 0) logger.info({ orders: expired }, "dropship: unpaid supplier orders expired");
+    } catch (err) {
+      logger.error({ err }, "dropship: expiring unpaid orders failed");
+    }
     try {
       const n = await resale.syncAll();
       if (n > 0) logger.info({ copies: n }, "dropship: copies re-synced");

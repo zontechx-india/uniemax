@@ -904,6 +904,8 @@ const orderSummarySelect = {
   total: true,
   placedAt: true,
   _count: { select: { items: true } },
+  // One probe row: does a package (a supplier) ship any line of this order?
+  items: { where: { fulfilledBy: { not: null } }, select: { id: true }, take: 1 },
 } satisfies Prisma.OrderSelect;
 
 /** The store's orders, newest first — filterable by status + search. */
@@ -936,9 +938,10 @@ export async function listStoreOrders(
   ]);
 
   return {
-    rows: rows.map(({ _count, ...order }) => ({
+    rows: rows.map(({ _count, items, ...order }) => ({
       ...order,
       itemCount: _count.items,
+      hasPackageLines: items.length > 0,
     })),
     meta: buildListMeta(total, query.page, query.pageSize),
   };

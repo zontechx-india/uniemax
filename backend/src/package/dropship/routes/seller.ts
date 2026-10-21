@@ -11,12 +11,18 @@ import {
   resaleOptionSchema,
   resaleParam,
   resaleUpdateSchema,
+  problemSchema,
   sellerLinkUpdateSchema,
+  sellerPartParam,
+  sellerOrderParam,
+  sellerShipmentsQuery,
 } from "../schema.js";
 import { z } from "zod";
 import * as catalog from "../services/catalog.js";
 import * as resales from "../services/resale.js";
 import * as invites from "../services/invites.js";
+import * as orders from "../services/supplierOrders.js";
+import * as views from "../services/orderViews.js";
 import * as suppliers from "../services/suppliers.js";
 import { linkTerms } from "../services/terms.js";
 
@@ -106,5 +112,31 @@ export const sellerRoutes: FastifyPluginAsync = async (app) => {
     const { linkId } = linkParam.parse(request.params);
     await suppliers.assertSellerLink(request.dropshipStore!.id, linkId);
     return ok(await linkTerms(linkId));
+  });
+
+  // ---- Supplier parts of orders (Phase 4) -------------------------------------
+
+  app.get("/orders/:orderId/parts", async (request) => {
+    const { orderId } = sellerOrderParam.parse(request.params);
+    return ok(await views.sellerParts(request.dropshipStore!.id, orderId));
+  });
+
+  app.post("/orders/:orderId/parts/:id/delivered", async (request) => {
+    const { orderId, id } = sellerPartParam.parse(request.params);
+    await orders.sellerDelivered(request.dropshipStore!.id, orderId, id, request.customer!.id);
+    return ok(await views.sellerParts(request.dropshipStore!.id, orderId));
+  });
+
+  app.post("/orders/:orderId/parts/:id/problem", async (request) => {
+    const { orderId, id } = sellerPartParam.parse(request.params);
+    const { note } = problemSchema.parse(request.body);
+    const store = request.dropshipStore!;
+    await orders.reportProblem(store.id, request.customer!.id, orderId, id, note);
+    return ok(await views.sellerParts(store.id, orderId));
+  });
+
+  app.get("/shipments", async (request) => {
+    const query = sellerShipmentsQuery.parse(request.query);
+    return ok(await views.sellerShipments(request.dropshipStore!.id, query));
   });
 };
