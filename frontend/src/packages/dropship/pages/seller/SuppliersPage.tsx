@@ -68,6 +68,20 @@ export function SuppliersPage() {
     }
   }
 
+  const decide = async (supplier: SellerSupplier, status: 'ACTIVE' | 'ENDED') => {
+    setBusy(supplier.linkId)
+    try {
+      await sellerSuppliersApi.update(store.id, supplier.linkId, { status })
+      showToast(status === 'ACTIVE' ? `${supplier.store?.name ?? 'Supplier'} approved` : 'Request declined')
+      refreshDropshipRole(store.slug)
+      overview.reload()
+    } catch (err) {
+      showToast(toApiError(err).message, 'danger')
+    } finally {
+      setBusy(null)
+    }
+  }
+
   const revoke = async () => {
     if (!revoking) return
     setBusy(revoking.id)
@@ -120,7 +134,13 @@ export function SuppliersPage() {
           </h3>
           <ul className="space-y-3">
             {data.suppliers.map((s) => (
-              <SupplierRow key={s.linkId} supplier={s} onOpen={() => setTermsFor(s.linkId)} />
+              <SupplierRow
+                key={s.linkId}
+                supplier={s}
+                busy={busy === s.linkId}
+                onOpen={() => setTermsFor(s.linkId)}
+                onDecide={(status) => decide(s, status)}
+              />
             ))}
           </ul>
         </section>
@@ -214,9 +234,20 @@ export function SuppliersPage() {
   )
 }
 
-function SupplierRow({ supplier, onOpen }: { supplier: SellerSupplier; onOpen: () => void }) {
+function SupplierRow({
+  supplier,
+  busy,
+  onOpen,
+  onDecide,
+}: {
+  supplier: SellerSupplier
+  busy: boolean
+  onOpen: () => void
+  onDecide: (status: 'ACTIVE' | 'ENDED') => void
+}) {
   const name = supplier.store?.name ?? 'Supplier'
   const by = statusByText(supplier.statusBy, 'SELLER', name)
+  const invited = supplier.invitedAs
   return (
     <li className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4 sm:flex-row sm:items-center">
       <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -240,16 +271,33 @@ function SupplierRow({ supplier, onOpen }: { supplier: SellerSupplier; onOpen: (
             {supplier.status !== 'ACTIVE' && by ? `${supplier.status === 'PAUSED' ? 'Paused' : 'Ended'} ${by} · ` : ''}
             {codText(supplier.codAllowed)} · Ships within {dayText(supplier.profile.shipWithinDays)}
           </p>
+          {supplier.status === 'PENDING' && invited && (
+            <p className="mt-2 text-sm text-fg">
+              You invited {invited.name} ({[invited.phone, invited.email].filter(Boolean).join(' · ')}), but {name} opened
+              the link. Is this who you meant?
+            </p>
+          )}
         </div>
       </div>
-      <div className="flex gap-2">
-        <Link to={`${supplier.linkId}/account`} className={buttonClass({ variant: 'secondary', size: 'sm' })}>
-          Account
-        </Link>
-        <Button variant="secondary" size="sm" onClick={onOpen} className="sm:w-auto">
-          Terms
-        </Button>
-      </div>
+      {supplier.status === 'PENDING' ? (
+        <div className="flex gap-2">
+          <Button size="sm" loading={busy} onClick={() => onDecide('ACTIVE')}>
+            Yes, approve
+          </Button>
+          <Button variant="danger" size="sm" disabled={busy} onClick={() => onDecide('ENDED')}>
+            No, decline
+          </Button>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <Link to={`${supplier.linkId}/account`} className={buttonClass({ variant: 'secondary', size: 'sm' })}>
+            Account
+          </Link>
+          <Button variant="secondary" size="sm" onClick={onOpen} className="sm:w-auto">
+            Terms
+          </Button>
+        </div>
+      )}
     </li>
   )
 }
@@ -637,11 +685,12 @@ function TermsSheet({
 
         {!ended && (
           <section className="space-y-2 border-t border-line pt-4">
-            {supplier.status === 'ACTIVE' ? (
+            {supplier.status === 'ACTIVE' && (
               <Button variant="secondary" full loading={busy === 'pause'} onClick={() => save({ status: 'PAUSED' }, 'pause')}>
                 Pause — no new orders for now
               </Button>
-            ) : (
+            )}
+            {supplier.status === 'PAUSED' && (
               <Button variant="secondary" full loading={busy === 'resume'} onClick={() => save({ status: 'ACTIVE' }, 'resume')}>
                 Resume working together
               </Button>

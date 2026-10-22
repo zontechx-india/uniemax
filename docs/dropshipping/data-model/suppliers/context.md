@@ -14,7 +14,7 @@ snake_case via `@@map`. Relations to later models (`Resale`, `SupplierOrder`,
 enum SupplierStatus     { PENDING ACTIVE SUSPENDED }   // PENDING only if inviteNeedsAdminApproval
 enum SupplierVisibility { PRIVATE PUBLIC }             // PUBLIC = public catalogue, Phase 7
 enum InviteStatus       { SENT ACCEPTED REVOKED EXPIRED }
-enum LinkStatus         { ACTIVE PAUSED ENDED }
+enum LinkStatus         { PENDING ACTIVE PAUSED ENDED }   // PENDING: the joiner did not match the invite (D-51)
 enum ReturnFeePayer     { SELLER SUPPLIER }            // who pays the supplier's fee when a parcel comes back (D-17)
 enum DropshipActor      { SUPPLIER SELLER ADMIN SYSTEM }
 

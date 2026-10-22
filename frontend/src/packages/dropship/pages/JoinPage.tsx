@@ -313,11 +313,23 @@ function Joined({ seller, result }: { seller: string; result: JoinResult }) {
   const slug = result.storeSlug
   return (
     <div className="mt-6 space-y-4">
-      <h1 className="text-xl font-semibold text-fg">You now supply {seller}</h1>
-      <p className="text-sm text-muted">
-        Next, choose the products you'll supply and set a price for sellers. {seller} sees them
-        as soon as you offer them.
-      </p>
+      {result.needsApproval ? (
+        <>
+          <h1 className="text-xl font-semibold text-fg">Waiting for {seller} to approve you</h1>
+          <p className="text-sm text-muted">
+            You joined with a different number or email than {seller} invited, so they need to confirm it's you. We've told
+            them. You can get your products ready meanwhile; they see them once you're approved.
+          </p>
+        </>
+      ) : (
+        <>
+          <h1 className="text-xl font-semibold text-fg">You now supply {seller}</h1>
+          <p className="text-sm text-muted">
+            Next, choose the products you'll supply and set a price for sellers. {seller} sees them
+            as soon as you offer them.
+          </p>
+        </>
+      )}
       {slug && (
         <div className="space-y-2">
           {result.supplyOnly ? (

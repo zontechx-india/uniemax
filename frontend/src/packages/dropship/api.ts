@@ -9,7 +9,7 @@ import { DROPSHIP_ADMIN_API_BASE as ADMIN, DROPSHIP_API_BASE as BASE } from './c
  */
 
 export type ReturnFeePayer = 'SELLER' | 'SUPPLIER'
-export type LinkStatus = 'ACTIVE' | 'PAUSED' | 'ENDED'
+export type LinkStatus = 'PENDING' | 'ACTIVE' | 'PAUSED' | 'ENDED'
 export type InviteStatus = 'SENT' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED'
 export type SupplierStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED'
 export type Actor = 'SUPPLIER' | 'SELLER' | 'ADMIN' | 'SYSTEM'
@@ -71,6 +71,8 @@ export interface SellerSupplier {
   codAllowed: boolean
   returnFeePayer: ReturnFeePayer
   since: string
+  /** Who the seller invited, while the joiner waits for approval (D-51). */
+  invitedAs: { name: string; phone: string | null; email: string | null } | null
   supplierStatus: SupplierStatus
   store: StoreCard | null
   profile: SupplierProfile
@@ -138,6 +140,8 @@ export interface JoinResult {
   storeSlug: string | null
   supplyOnly: boolean
   alreadyJoined: boolean
+  /** The joiner is not who was invited: the seller must approve first (D-51). */
+  needsApproval: boolean
 }
 
 export interface SupplyItem {

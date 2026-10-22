@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { Prisma } from "../../src/generated/prisma/client.js";
 import {
   canMoveLink,
+  inviteMatches,
   daysFromNow,
   describeChange,
   diffTerms,
@@ -54,6 +55,11 @@ test("a link moves between ACTIVE and PAUSED; ENDED is for good (D-19)", () => {
   assert.equal(canMoveLink("ACTIVE", "PAUSED"), true);
   assert.equal(canMoveLink("PAUSED", "ACTIVE"), true);
   assert.equal(canMoveLink("ACTIVE", "ENDED"), true);
+  // D-51: a link waiting for approval is approved or declined, never paused, and never re-entered.
+  assert.equal(canMoveLink("PENDING", "ACTIVE"), true);
+  assert.equal(canMoveLink("PENDING", "ENDED"), true);
+  assert.equal(canMoveLink("PENDING", "PAUSED"), false);
+  assert.equal(canMoveLink("ACTIVE", "PENDING"), false);
   assert.equal(canMoveLink("PAUSED", "ENDED"), true);
   assert.equal(canMoveLink("ENDED", "ACTIVE"), false);
   assert.equal(canMoveLink("ENDED", "PAUSED"), false);
@@ -168,4 +174,13 @@ test("supplier terms: ship within 1…max days, returns ≥ 0, fee in paise", ()
   assert.equal(supplierProfileSchema.safeParse({ shippingFee: 0, shipWithinDays: 7, returnDays: 7 }).success, true);
   assert.equal(supplyBulkSchema.safeParse({ productIds: [], discountPct: 20 }).success, false);
   assert.equal(supplyBulkSchema.safeParse({ productIds: ["p"], discountPct: 95 }).success, false);
+});
+
+test("inviteMatches: the joiner must be who was invited, by phone or email (D-51)", () => {
+  const invited = { phone: "+91 98765 43210", email: "Ravi@Example.com" };
+  assert.equal(inviteMatches(invited, { phone: "9876543210", email: null }), true);
+  assert.equal(inviteMatches(invited, { phone: null, email: "ravi@example.com" }), true);
+  assert.equal(inviteMatches(invited, { phone: "9000000000", email: "other@example.com" }), false);
+  assert.equal(inviteMatches({ phone: null, email: null }, { phone: "9876543210", email: "a@b.c" }), false);
+  assert.equal(inviteMatches({ phone: "9876543210", email: null }, { phone: null, email: null }), false);
 });

@@ -35,7 +35,7 @@ async function joined(t) {
   const c = await setup(t);
   if (!c) return t.skip("DROPSHIP_ENABLED is off on this server");
   if (c.joined) return c;
-  const r = await invite(c);
+  const r = await invite(c, { email: need("QA_EMAIL_B") });
   assert.equal(r.status, 201, JSON.stringify(r.body));
   const acc = await c.B.req("POST", `${D}/invites/${tokenOf(r.body.data.inviteUrl)}/accept`, {
     json: {
@@ -138,4 +138,63 @@ test("D-19: the supplier pauses; ENDED is for good", async (t) => {
   assert.equal(row.statusBy, "SUPPLIER");
   assert.equal((await c.A.req("PATCH", `${c.S}/suppliers/${c.linkId}`, { json: { status: "ENDED" } })).status, 200);
   assert.equal((await c.B.req("PATCH", `${c.Sup}/sellers/${c.linkId}`, { json: { status: "ACTIVE" } })).status, 409);
+});
+
+const randomPhone = () => `9${Math.floor(100000000 + Math.random() * 899999999)}`;
+
+test("D-51: one open invite per phone or email", async (t) => {
+  const c = await setup(t);
+  if (!c) return t.skip("DROPSHIP_ENABLED is off on this server");
+  const phone = randomPhone();
+  const first = await invite(c, { name: "QA One", phone, email: undefined });
+  assert.equal(first.status, 201, JSON.stringify(first.body));
+  const sameNumber = await invite(c, { name: "QA Two", phone, email: undefined });
+  assert.equal(sameNumber.status, 409, "same number, different name");
+  assert.match(sameNumber.body.message, /already invited QA One/);
+  const email = `${uniq("qa-dup")}@example.test`;
+  assert.equal((await invite(c, { name: "QA Three", email })).status, 201);
+  assert.equal((await invite(c, { name: "QA Four", email: email.toUpperCase() })).status, 409, "same email, any case");
+  // Once the first is revoked, the number is free again.
+  assert.equal((await c.A.req("POST", `${c.S}/supplier-invites/${first.body.data.invite.id}/revoke`)).status, 200);
+  assert.equal((await invite(c, { name: "QA Five", phone, email: undefined })).status, 201);
+});
+
+test("D-51: a joiner who isn't who was invited waits for the seller's OK", async (t) => {
+  const c = await joined(t);
+  if (!c) return;
+  assert.equal(c.joined.needsApproval, false, "B's own email was invited: no approval needed");
+  const accept = async () => {
+    const r = await invite(c, { name: "QA Someone Else", phone: randomPhone(), email: undefined });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    const acc = await c.B.req("POST", `${D}/invites/${tokenOf(r.body.data.inviteUrl)}/accept`, {
+      json: {
+        newStore: { name: uniq("QA Supply"), phone: "9876543210", address: ADDRESS },
+        shippingFee: 60,
+        shipWithinDays: 2,
+        returnDays: 7,
+      },
+    });
+    assert.equal(acc.status, 200, JSON.stringify(acc.body));
+    return acc.body.data;
+  };
+  const row = async (storeId) =>
+    (await c.A.req("GET", `${c.S}/suppliers`)).body.data.suppliers.find((s) => s.store?.id === storeId);
+
+  // Approve.
+  const a = await accept();
+  assert.equal(a.needsApproval, true);
+  const pending = await row(a.storeId);
+  assert.equal(pending.status, "PENDING");
+  assert.equal(pending.invitedAs.name, "QA Someone Else");
+  // The supplier can't activate itself, and a pending link supplies nothing.
+  const own = await c.B.req("PATCH", `${D}/stores/${a.storeId}/sellers/${a.linkId}`, { json: { status: "ACTIVE" } });
+  assert.equal(own.status, 409, JSON.stringify(own.body));
+  assert.equal((await c.A.req("PATCH", `${c.S}/suppliers/${a.linkId}`, { json: { status: "PAUSED" } })).status, 409, "no pausing a pending link");
+  assert.equal((await c.A.req("PATCH", `${c.S}/suppliers/${a.linkId}`, { json: { status: "ACTIVE" } })).status, 200);
+  assert.equal((await row(a.storeId)).status, "ACTIVE");
+
+  // Decline.
+  const b = await accept();
+  assert.equal((await c.A.req("PATCH", `${c.S}/suppliers/${b.linkId}`, { json: { status: "ENDED" } })).status, 200);
+  assert.equal((await row(b.storeId)).status, "ENDED");
 });

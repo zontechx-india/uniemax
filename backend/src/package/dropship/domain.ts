@@ -6,7 +6,7 @@ import { Prisma } from "../../generated/prisma/client.js";
  * (test/unit/dropship-domain.test.ts).
  */
 
-export type LinkStatus = "ACTIVE" | "PAUSED" | "ENDED";
+export type LinkStatus = "PENDING" | "ACTIVE" | "PAUSED" | "ENDED";
 export type ReturnFeePayer = "SELLER" | "SUPPLIER";
 export type InviteStatus = "SENT" | "ACCEPTED" | "REVOKED" | "EXPIRED";
 
@@ -47,9 +47,15 @@ export function discountedCost(
   return cost.isNegative() ? new Prisma.Decimal(0) : cost;
 }
 
-/** A link moves freely between ACTIVE and PAUSED; ENDED is for good (D-19). */
+/**
+ * A link moves freely between ACTIVE and PAUSED; ENDED is for good (D-19). A PENDING link
+ * (the joiner did not match the invite, D-51) is approved (ACTIVE) or declined (ENDED), and
+ * nothing moves back into PENDING.
+ */
 export function canMoveLink(from: LinkStatus, to: LinkStatus): boolean {
-  return from !== to && from !== "ENDED";
+  if (from === to || from === "ENDED" || to === "PENDING") return false;
+  if (from === "PENDING") return to === "ACTIVE" || to === "ENDED";
+  return true;
 }
 
 export interface TermDiff {
@@ -140,6 +146,20 @@ export function describeChange(
 export function samePhone(a: string | null | undefined, b: string | null | undefined): boolean {
   const digits = (s: string) => s.replace(/\D/g, "").slice(-10);
   return !!a && !!b && digits(a).length === 10 && digits(a) === digits(b);
+}
+
+/**
+ * D-51: does the account that opened an invite match who the seller invited? Matches on the
+ * phone (last ten digits) or the email, whichever the seller entered.
+ */
+export function inviteMatches(
+  invited: { phone: string | null; email: string | null },
+  account: { phone: string | null; email: string | null },
+): boolean {
+  const email = invited.email?.toLowerCase();
+  return (
+    samePhone(invited.phone, account.phone) || (!!email && email === account.email?.toLowerCase())
+  );
 }
 
 // ===========================================================================

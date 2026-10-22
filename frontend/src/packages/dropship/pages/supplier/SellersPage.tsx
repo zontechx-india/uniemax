@@ -171,11 +171,13 @@ function SellerSheet({
         {!ended ? (
           <section className="space-y-2 border-t border-line pt-4">
             <p className="text-xs text-muted">Don't agree with a change? You can pause or stop supplying {name}.</p>
-            {seller.status === 'ACTIVE' ? (
+            {seller.status === 'PENDING' && <InfoNote>Waiting for {name} to approve you.</InfoNote>}
+            {seller.status === 'ACTIVE' && (
               <Button variant="secondary" full loading={busy === 'PAUSED'} onClick={() => move('PAUSED')}>
                 Pause — no new orders for now
               </Button>
-            ) : (
+            )}
+            {seller.status === 'PAUSED' && (
               <Button variant="secondary" full loading={busy === 'ACTIVE'} onClick={() => move('ACTIVE')}>
                 Resume supplying
               </Button>

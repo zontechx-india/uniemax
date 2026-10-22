@@ -1,7 +1,7 @@
 import { HttpError } from "../../../utils/httpError.js";
 import { dropshipConfig } from "../config.js";
 import { deps } from "../deps.js";
-import { daysFromNow, hashToken, inviteState, newInviteToken, samePhone } from "../domain.js";
+import { daysFromNow, hashToken, inviteMatches, inviteState, newInviteToken, samePhone } from "../domain.js";
 import type { InviteStatus } from "../domain.js";
 import type { InviteAcceptInput, InviteCreateInput } from "../schema.js";
 import type { StoreRef } from "../types.js";
@@ -88,9 +88,28 @@ async function existingSupplierFor(sellerStoreId: string, input: InviteCreateInp
   return null;
 }
 
+/** D-51: an open invite already goes to this phone or email. */
+async function openInviteFor(sellerStoreId: string, input: InviteCreateInput) {
+  const open = await deps.prisma.supplierInvite.findMany({
+    where: { sellerStoreId, status: "SENT", expiresAt: { gt: new Date() } },
+  });
+  const email = input.email?.toLowerCase();
+  return (
+    open.find(
+      (i) => samePhone(i.contactPhone, input.phone) || (!!email && i.contactEmail === email),
+    ) ?? null
+  );
+}
+
 export async function createInvite(store: StoreRef, customerId: string, input: InviteCreateInput) {
   if (await existingSupplierFor(store.id, input)) {
     throw HttpError.conflict("Already your supplier — you'll find them under Your suppliers");
+  }
+  const open = await openInviteFor(store.id, input);
+  if (open) {
+    throw HttpError.conflict(
+      `You already invited ${open.contactName} on this number or email — resend that invite from Invited instead`,
+    );
   }
   if (input.codAllowed && input.turnOnStoreCod && !store.acceptCod) {
     await deps.host.setStoreCod(customerId, store.id, true);
@@ -222,6 +241,7 @@ async function joinedResult(linkId: string) {
     storeId: link.supplier.storeId,
     storeSlug: store?.slug ?? null,
     supplyOnly: link.supplier.supplyOnly,
+    needsApproval: link.status === "PENDING",
   };
 }
 
@@ -301,6 +321,11 @@ export async function acceptInvite(token: string, customerId: string, input: Inv
     throw HttpError.conflict("This invite is being used right now — refresh in a moment");
   }
 
+  // D-51: the account that opened the link must match who the seller invited, else the seller approves.
+  const account = await deps.host.getCustomer(customerId);
+  const matches = !!account && inviteMatches({ phone: invite.contactPhone, email: invite.contactEmail }, account);
+  const linkStatus = matches ? "ACTIVE" : "PENDING";
+
   try {
     const store =
       existingStore ??
@@ -344,10 +369,10 @@ export async function acceptInvite(token: string, customerId: string, input: Inv
         link = current
           ? await tx.supplierLink.update({
               where: { id: current.id },
-              data: { ...terms, status: "ACTIVE", statusBy: null },
+              data: { ...terms, status: linkStatus, statusBy: null },
             })
           : await tx.supplierLink.create({
-              data: { supplierId: supplier.id, sellerStoreId: seller.id, ...terms },
+              data: { supplierId: supplier.id, sellerStoreId: seller.id, ...terms, status: linkStatus },
             });
         await logChanges(tx, {
           supplierId: supplier.id,
@@ -364,11 +389,20 @@ export async function acceptInvite(token: string, customerId: string, input: Inv
       return link.id;
     });
 
-    deps.host.notify(seller.ownerId, {
-      title: "Your supplier joined",
-      body: `${store.name} accepted your invite and can now offer you products.`,
-      url: `/mystores/${seller.slug}/suppliers`,
-    });
+    deps.host.notify(
+      seller.ownerId,
+      matches
+        ? {
+            title: "Your supplier joined",
+            body: `${store.name} accepted your invite and can now offer you products.`,
+            url: `/mystores/${seller.slug}/suppliers`,
+          }
+        : {
+            title: "Approve your new supplier?",
+            body: `${store.name} used your link, but not the number or email you invited (${invite.contactName}). Check it is who you meant.`,
+            url: `/mystores/${seller.slug}/suppliers`,
+          },
+    );
     return { ...(await joinedResult(linkId)), alreadyJoined: false };
   } catch (err) {
     // Give the invite back so the supplier can try again.

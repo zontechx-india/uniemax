@@ -35,7 +35,7 @@ async function setup(t) {
   const S = `${D}/stores/${fx.store.id}`;
 
   const inv = await A.req("POST", `${S}/supplier-invites`, {
-    json: { name: "QA Supplier", email: `${uniq("qa-sup")}@example.test`, codAllowed: true, returnFeePayer: "SELLER" },
+    json: { name: "QA Supplier", email: need("QA_EMAIL_B"), codAllowed: true, returnFeePayer: "SELLER" },
   });
   assert.equal(inv.status, 201, JSON.stringify(inv.body));
   const join = await B.req("POST", `${D}/invites/${inv.body.data.inviteUrl.split("/").pop()}/accept`, {

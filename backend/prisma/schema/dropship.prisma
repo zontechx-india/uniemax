@@ -28,6 +28,8 @@ enum InviteStatus {
 }
 
 enum LinkStatus {
+  /// A supplier joined with an account that does not match the invite; the seller must approve (D-51).
+  PENDING
   ACTIVE
   PAUSED
   ENDED

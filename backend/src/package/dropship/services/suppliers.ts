@@ -86,7 +86,15 @@ export async function sellerOverview(storeId: string) {
   ]);
   const stores = await deps.host.getStores(links.map((l) => l.supplier.storeId));
   const byId = new Map(stores.map((s) => [s.id, s]));
-  const rank: Record<LinkStatus, number> = { ACTIVE: 0, PAUSED: 1, ENDED: 2 };
+  // Who the seller invited, for a supplier waiting for approval (D-51).
+  const pending = links.filter((l) => l.status === "PENDING").map((l) => l.id);
+  const invitedAs = new Map(
+    (await deps.prisma.supplierInvite.findMany({ where: { linkId: { in: pending } } })).map((i) => [
+      i.linkId,
+      { name: i.contactName, phone: i.contactPhone, email: i.contactEmail },
+    ]),
+  );
+  const rank: Record<LinkStatus, number> = { PENDING: 0, ACTIVE: 1, PAUSED: 2, ENDED: 3 };
   return {
     invites: invites.map(shapeInvite),
     suppliers: links
@@ -98,6 +106,7 @@ export async function sellerOverview(storeId: string) {
         codAllowed: link.codAllowed,
         returnFeePayer: link.returnFeePayer,
         since: link.createdAt,
+        invitedAs: invitedAs.get(link.id) ?? null,
         supplierStatus: link.supplier.status,
         store: storeCard(byId.get(link.supplier.storeId)),
         profile: shapeProfile(link.supplier),
@@ -175,7 +184,7 @@ export async function updateLinkAsSeller(
       });
     }
     if (statusChange) {
-      deps.host.notify(supplierStore.ownerId, statusNotice(store.name, statusChange, url));
+      deps.host.notify(supplierStore.ownerId, statusNotice(store.name, statusChange, url, link.status));
     }
   }
   // Copies follow: COD re-synced (SU-5), paused / resumed (SU-7).
@@ -188,7 +197,12 @@ async function sellerLinkView(storeId: string, linkId: string) {
   return suppliers.find((s) => s.linkId === linkId)!;
 }
 
-function statusNotice(otherName: string, status: LinkStatus, url: string) {
+function statusNotice(otherName: string, status: LinkStatus, url: string, from?: LinkStatus) {
+  if (from === "PENDING") {
+    return status === "ACTIVE"
+      ? { title: "You can supply this seller", body: `${otherName} approved you. You can now offer them products.`, url }
+      : { title: "Your request was declined", body: `${otherName} did not approve you as a supplier.`, url };
+  }
   const body =
     status === "PAUSED"
       ? `${otherName} paused working with you. No new orders until it's resumed; open orders still complete.`
@@ -282,6 +296,9 @@ export async function updateLinkAsSupplier(
 ) {
   const link = await assertSupplierLink(supplierId, linkId);
   if (status === link.status) return;
+  if (link.status === "PENDING" && status !== "ENDED") {
+    throw HttpError.conflict("Waiting for the seller to approve you");
+  }
   if (!canMoveLink(link.status, status)) {
     throw HttpError.conflict("You've stopped supplying this seller");
   }
