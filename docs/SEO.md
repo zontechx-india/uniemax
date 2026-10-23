@@ -479,7 +479,10 @@ Product feed.
 - One item per product, not per variant: a variant has no URL of its own
   (the page cannot open on a chosen variant), and an item whose page shows a
   different price is the mismatch above.
-- 1 h in-process cache; Merchant Center fetches it once a day.
+- **`g:id` is the product id**, and the Meta Pixel / GA4 report the same id
+  as `content_ids` / `item_id` (`shared/analytics/metaPixel.ts`), so Meta
+  can match ad events to catalogue items. Change one → change the other.
+- 1 h in-process cache; Merchant Center fetches it once a day, Meta hourly.
 
 ---
 
@@ -645,3 +648,4 @@ search/filter URLs get indexed, mass-produced pages with nothing on them.
 | 15 Oct 2026 | Store homepage with no products renders its banners, hero (an `<h1>` with the store name) and footer around a "Products coming soon" band, instead of that card alone. New `<MediaImg>`s for the hero's fallback art, `lg`+ only: a banner at `(min-width: 1440px) 576px, 40vw`, the logo at `320px`. A banner with no image renders as a brand-colour slide with no `<img>`. `useMediaConfig` gains a server snapshot (render tests only). Head tags, JSON-LD and page shells unchanged |
 | 15 Oct 2026 | Welcome Hero removed from store homepages. The page's one `<h1>` is now the store name, visually hidden (`sr-only`) — it was the hero's visible name; the hero's `<MediaImg>`s (product-art triptych, fallback banner/logo art) are gone. Head tags, JSON-LD and page shells unchanged |
 | 23 Oct 2026 | Search Console: sitemap submitted (`sc-domain:uniemax.com`). Product feed `GET /api/v1/public/feeds/products.xml` for Merchant Center + Meta (landing variant's price/stock, page's shipping rate; unit tests `test/unit/product-feed.test.ts`). Page shells for `/about`, `/contact`, `/refund-policy`, `/shipping-policy`, `/privacy`, `/terms` (own title, description, canonical; privacy/terms `noindex` while holding pages) and the matching `useSeo` in `InfoComingSoonPage`. New `/refund-policy` (7-day returns) and `/shipping-policy` pages, linked from the marketplace footer. `www` → apex redirect documented in `DEPLOYMENT.md`, not applied |
+| 24 Oct 2026 | Meta Pixel `content_ids` and GA4 `item_id` switched from the product slug to the product id, matching the feed's `g:id` (Meta catalogue reported "products not matching ad events"); placed-order lines now carry `productId`. Feed live on prod: Merchant Center (371 products, return policy under review) and Meta catalogue "UnieMax" (371 eligible, hourly fetch) |

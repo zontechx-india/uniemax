@@ -68,10 +68,11 @@ const CURRENCY = 'INR'
 /**
  * One purchasable line, in the shape every funnel event needs.
  *
- * `id` is the **product slug**: `Product.slug` is `@unique` platform-wide, and
- * it is the only product identifier carried by BOTH cart lines and placed-order
- * lines. Using it everywhere keeps `content_ids` consistent across the funnel,
- * which is what a catalog feed (and therefore dynamic product ads) will need.
+ * `id` is the **product id** (`StoreProduct.id`) — the `g:id` of the product
+ * feed (`/api/v1/public/feeds/products.xml`) that fills the Meta catalogue and
+ * Google Merchant Center, so every event matches a catalogue item. Not the
+ * slug: a slug is unique only within its store. Cart lines and placed-order
+ * lines both carry the product id.
  */
 export interface PixelLine {
   id: string
