@@ -249,11 +249,11 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
   // same view and deliberately does not re-fire.
   useEffect(() => {
     trackViewContent(
-      { id: product.slug, price: Number(price), quantity: 1 },
+      { id: product.id, price: Number(price), quantity: 1 },
       product.name,
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per product, not per variant
-  }, [product.slug])
+  }, [product.id])
 
   const trail: Crumb[] = [
     ...product.category.ancestors.map((crumb) => ({

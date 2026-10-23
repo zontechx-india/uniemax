@@ -155,6 +155,8 @@ const orderSelect = {
       productName: true,
       variantName: true,
       sku: true,
+      // The catalogue id (feed `g:id`) — what the Meta Pixel and GA4 report.
+      productId: true,
       productSlug: true,
       imageKey: true,
       unitPrice: true,

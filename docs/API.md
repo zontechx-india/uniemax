@@ -1894,7 +1894,9 @@ Response: the full order —
   "placedAt",
   "confirmedAt", "packedAt", "shippedAt",         // lifecycle stamps — null
   "deliveredAt", "cancelledAt", "cancelReason",   // until the seller gets there
-  "items": [ { "id", "productName", "variantName", "sku", "productSlug",
+  "items": [ { "id", "productName", "variantName", "sku",
+               "productId",         // null once the product is deleted; the feed's g:id
+               "productSlug",
                "imageUrl",          // snapshot: the variant's photo, else the cover (key-derived)
                "unitPrice", "quantity", "lineTotal",
                "shipmentId",        // the parcel it went out in — null until sent
