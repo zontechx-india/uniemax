@@ -91,6 +91,8 @@ export interface PlatformStats {
   products: number
   /** Orders placed platform-wide (cancelled excluded). */
   orders: number
+  /** Registered (not blocked) customer accounts. */
+  users: number
 }
 
 /** One marketplace banner as a shopper sees it — active only, link resolved. */

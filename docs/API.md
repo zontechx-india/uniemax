@@ -2082,12 +2082,14 @@ a 60 s in-process cache.
 ### `GET /api/v1/public/stats`
 
 Marketplace trust counters — published stores, publicly visible products,
-and orders placed (all statuses except `CANCELLED`; orders survive store
-deletion, so the count never shrinks). Served from a 60 s in-process cache,
-so homepage traffic costs one count-scan per minute.
+orders placed (all statuses except `CANCELLED`; orders survive store
+deletion, so the count never shrinks) and registered users (customer accounts
+that are not blocked). Served from a 60 s in-process cache, so homepage
+traffic costs one count-scan per minute. The homepage's Become a Seller panel
+shows stores, products and users (orders are served but not shown).
 
 ```jsonc
-{ "success": true, "data": { "stores": 18, "products": 642, "orders": 97 } }
+{ "success": true, "data": { "stores": 18, "products": 642, "orders": 97, "users": 1240 } }
 ```
 
 ### `GET /api/v1/public/browse`

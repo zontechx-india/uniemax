@@ -30,6 +30,7 @@ import { useCart } from '../features/cart/cart'
 import { BannerCarousel } from '../features/banners/BannerCarousel'
 import { discoveryApi } from '../features/discovery/discoveryApi'
 import type {
+  PlatformStats,
   MarketBanner,
   MarketProduct,
   MarketStore,
@@ -1470,21 +1471,51 @@ function MyStoresSection({ stores }: { stores: Store[] }) {
 // Become a Seller — the growth pitch (one of the largest sections by design)
 // ---------------------------------------------------------------------------
 
+const compactCountFormat = new Intl.NumberFormat('en-IN', {
+  notation: 'compact',
+  maximumFractionDigits: 1,
+})
+
+/** Short form for a big count: 1,240 → "1.2K", 18,500 → "18.5K". */
+function compactCount(value: number): string {
+  return compactCountFormat.format(value)
+}
+
 /**
  * The growth pitch — the page's closing argument, and the largest panel on it.
  *
- * Split: the offer and the CTA on the left, **how it actually works** on the
- * right. That right-hand column used to hold live platform counters, and on a
- * marketplace this young they argued against the pitch they were decorating:
- * "3 Stores · 11 Products · 0 Orders" is not what a prospective seller should
- * read first. Three steps are true on day one and still true at ten thousand
- * stores, and they answer the question a seller actually has — what am I
- * signing up to do?
- *
- * The counters are not gone from the platform, only from this panel:
- * `GET /public/stats` still serves them for a surface where a number helps.
+ * Split: the offer and the CTA on the left; on the right, live platform
+ * counters (Stores · Products · Users, in short form — "1.2K") above **how it
+ * actually works**. The counters come from `GET /public/stats`, fail silently
+ * and hide any zero. Orders are deliberately not shown. The three steps stay
+ * because they are true on day one and still at ten thousand stores.
  */
 function BecomeSellerSection({ ownsStores }: { ownsStores: boolean }) {
+  const [stats, setStats] = useState<PlatformStats | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    discoveryApi
+      .stats()
+      .then((data) => {
+        if (!cancelled) setStats(data)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // A pitch never shows an error state, and a zero would undermine the trust
+  // the numbers exist to build — so failures and zeros simply drop out.
+  const counters = stats
+    ? [
+        { value: stats.stores, label: 'Stores' },
+        { value: stats.products, label: 'Products' },
+        { value: stats.users, label: 'Users' },
+      ].filter((counter) => counter.value > 0)
+    : []
+
   return (
     <section className="scroll-mt-20">
       <div className={`${CONTENT_COLUMN} ${SECTION_PADDING}`}>
@@ -1521,7 +1552,22 @@ function BecomeSellerSection({ ownsStores }: { ownsStores: boolean }) {
               </CreateStoreLink>
             </div>
 
-            <ol className="space-y-4 border-t border-brand-contrast/25 pt-8 lg:border-l lg:border-t-0 lg:pl-16 lg:pt-0">
+            <div className="border-t border-brand-contrast/25 pt-8 lg:border-l lg:border-t-0 lg:pl-16 lg:pt-0">
+              {counters.length > 0 && (
+                <dl className="mb-8 flex gap-10 sm:gap-14">
+                  {counters.map(({ value, label }) => (
+                    <div key={label}>
+                      <dd className="font-figure text-3xl font-bold sm:text-4xl">
+                        {compactCount(value)}
+                      </dd>
+                      <dt className="mt-1 text-xs font-semibold uppercase tracking-widest text-brand-contrast/80">
+                        {label}
+                      </dt>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            <ol className="space-y-4">
               {SELLER_STEPS.map((step, index) => (
                 <li key={step.title} className="flex gap-4">
                   <span
@@ -1541,6 +1587,7 @@ function BecomeSellerSection({ ownsStores }: { ownsStores: boolean }) {
                 </li>
               ))}
             </ol>
+            </div>
           </div>
         </div>
       </div>
