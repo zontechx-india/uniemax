@@ -46,8 +46,11 @@ import {
  * not-found screen).
  */
 
-/** `home` = `/`, `sell` = `/sell`, `store` = `/store/**`, `browse` = `/c/**`. */
-export type PageKind = "home" | "sell" | "store" | "browse";
+/**
+ * `home` = `/`, `sell` = `/sell`, `store` = `/store/**`, `browse` = `/c/**`,
+ * `info` = the marketplace footer pages (`INFO_PAGES`).
+ */
+export type PageKind = "home" | "sell" | "store" | "browse" | "info";
 
 export interface ResolvedPage {
   status: 200 | 404;
@@ -122,7 +125,7 @@ export async function resolvePage(
   });
 
   try {
-    const result = await Promise.race([pageFor(kind, segments, query, origin), timeout]);
+    const result = await Promise.race([pageFor(kind, segments, query, origin, path), timeout]);
     if (result === "timeout") {
       log.warn({ path }, "page shell: page data was too slow — serving the default head");
       return null;
@@ -145,8 +148,11 @@ function pageFor(
   segments: string[],
   query: PageShellQuery,
   origin: string,
+  path: string,
 ): Promise<ResolvedPage> {
   switch (kind) {
+    case "info":
+      return Promise.resolve(infoPage(path));
     case "home":
       return Promise.resolve(homePage(origin));
     case "sell":
@@ -214,6 +220,47 @@ const sellPage: ResolvedPage = {
     canonical: "/sell",
   },
 };
+
+// ---------------------------------------------------------------------------
+// The footer info pages
+// ---------------------------------------------------------------------------
+
+/**
+ * `InfoComingSoonPage` — title, description and robots per path. Must match
+ * `PAGES` in `frontend/src/storefront/pages/InfoComingSoonPage.tsx`. Privacy
+ * and Terms are `noindex` while they are holding pages: a page that says
+ * "we're finalising this" is thin content, and it lets the two be told apart
+ * from each other and from the homepage.
+ */
+export const INFO_PAGES: Record<string, PageHead> = {
+  "/about": {
+    title: ["About"],
+    description:
+      "UnieMax is a marketplace of independent stores. Buy directly from each seller with Cash on Delivery or secure online payment — or open your own store for free.",
+  },
+  "/contact": {
+    title: ["Contact us"],
+    description:
+      "Contact UnieMax support by email or phone, Monday to Saturday, 10 AM to 7 PM IST — for questions about your account, an order or selling on UnieMax.",
+  },
+  "/refund-policy": {
+    title: ["Refund & Returns Policy"],
+    description:
+      "UnieMax refund and returns policy: return eligible products within 7 days of delivery, free returns for damaged or wrong items, and refunds within 7 working days.",
+  },
+  "/shipping-policy": {
+    title: ["Shipping Policy"],
+    description:
+      "How shipping works on UnieMax: each store ships its own orders within India, sets its own delivery areas and charges, and shows the exact charge before you pay.",
+  },
+  "/privacy": { title: ["Privacy Policy"], robots: NOINDEX },
+  "/terms": { title: ["Terms & Conditions"], robots: NOINDEX },
+};
+
+function infoPage(path: string): ResolvedPage {
+  const head = INFO_PAGES[path.replace(/\/+$/, "") || "/"];
+  return head ? { status: 200, head: { ...head, canonical: path.replace(/\/+$/, "") } } : pageNotFound;
+}
 
 // ---------------------------------------------------------------------------
 // /store/{slug}/…

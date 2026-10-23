@@ -312,10 +312,13 @@ for guests and signed-in customers alike and adapts per session state.
   argued against the pitch they decorated, and three steps are as true on day
   one as at ten thousand stores. The endpoint is untouched). The
   **footer** is a structured 4-column block: brand + tagline, Marketplace
-  (About / Support / Contact) and Legal (Privacy / Terms) columns
-  (→ `pages/InfoComingSoonPage.tsx`: About and Contact with real content — Contact
-  shows the live `SupportContactCard` — Privacy and Terms a holding page with the
-  support contact until the legal text is supplied), and a Sell on
+  (About / Support / Contact) and Legal (Privacy / Terms / Refund & Returns /
+  Shipping Policy) columns
+  (→ `pages/InfoComingSoonPage.tsx`: About, Contact and the two policies with
+  real content — Contact shows the live `SupportContactCard` — Privacy and
+  Terms a holding page with the support contact until the legal text is
+  supplied; each page's head matches `INFO_PAGES` in the backend's page
+  shells, see `SEO.md`), and a Sell on
   UnieMax column with a Become a Seller button. Every section still
   fetches independently with its own skeleton and retry — one failed API
   never blanks the page, and a skeleton's `count` is **the minimum the section
@@ -2927,7 +2930,7 @@ frontend/
     │       │                     #   grid), Fresh Finds and Recently Viewed (rails),
     │       │                     #   My Stores, seller CTA
     │       ├── SellPage.tsx      # /sell — seller landing page (where seller ads point)
-    │       ├── InfoComingSoonPage.tsx # /about /contact (real) · /privacy /terms (holding page + support contact)
+    │       ├── InfoComingSoonPage.tsx # /about /contact /refund-policy /shipping-policy (real) · /privacy /terms (holding page + support contact)
     │       ├── ProfilePage.tsx   # /profile — account details + mobile-number linking (SMS OTP)
     │       ├── AddressesPage.tsx # /addresses — saved delivery addresses (one primary)
     │       ├── SupportPage.tsx   # /support — shopper → UnieMax (contact + tickets)

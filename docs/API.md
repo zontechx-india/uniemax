@@ -2093,6 +2093,35 @@ home lists the logo, each product its photos in gallery order — one
 
 Capped at 50,000 URLs per file (the protocol limit).
 
+## Product feed — `/api/v1/public` (no auth)
+
+> What each field means and why it must match the product page:
+> [`SEO.md`](./SEO.md) → Product feed.
+
+### `GET /api/v1/public/feeds/products.xml`
+Every publicly visible product on the marketplace in Google's RSS 2.0
+product-data format (`xmlns:g="http://base.google.com/ns/1.0"`), read by
+**Google Merchant Center** and the **Meta catalogue**. Same visibility as the
+sitemaps (published, unsuspended store; active product with an active shelf
+chain and a price), minus "Hide from Search" products and products with no
+photo. One `<item>` per product:
+
+| Field | Value |
+| ----- | ----- |
+| `g:id` | The product id |
+| `g:title` / `g:description` | Name (≤ 150 chars) / the product page's meta description (≤ 5,000) |
+| `g:link` | Absolute product page URL |
+| `g:image_link` / `g:additional_image_link` | Cover photo / up to 10 more, full-size originals |
+| `g:price` / `g:sale_price` | The price of the variant the page opens on (first in-stock in option order, else the first); with an MRP above it, `g:price` = MRP and `g:sale_price` = the selling price. `"1299.00 INR"` |
+| `g:availability` | `in_stock` / `out_of_stock` — that variant's stock |
+| `g:shipping` | `country` `IN`, `price` = the rate the page advertises (product override, else the store rate; `0.00` when free or at/above `freeAbove`) |
+| `g:brand` | The store name (no brand field yet) |
+| `g:condition` / `g:identifier_exists` | `new` / `no` |
+| `g:product_type` | `{global category} > {store shelf}` (either alone when only one exists) |
+
+**Response** — `application/xml; charset=utf-8`, `cache-control: public,
+max-age=3600`; built at most once an hour per origin. Up to 100,000 items.
+
 ---
 
 ## Image derivatives — `/api/v1/public/images` (no auth)
@@ -2177,6 +2206,7 @@ calls — the SPA boots from the response exactly as from the static file.
 | `GET /sell` | The seller landing page |
 | `GET /store/*` | `/store/{slug}` · `/category/{slug}` · `/product/{slug}` · `/shop[?q=][?section=]` · `/support[/{ticketId}]` |
 | `GET /c/*` | `/c/{slug}[?page=][&sort=]` |
+| `GET /about` · `/contact` · `/refund-policy` · `/shipping-policy` · `/privacy` · `/terms` | The marketplace footer pages. `/privacy` and `/terms` are `noindex, follow` while they are holding pages |
 
 Every URL in the head (`canonical`, `og:url`, `og:image`) is absolute, built
 from `PUBLIC_WEB_URL` (else the request's host).

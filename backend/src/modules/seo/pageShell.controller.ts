@@ -5,8 +5,8 @@ import { resolvePage, type PageKind } from "./pageShell.service.js";
 import { siteOrigin } from "./siteOrigin.js";
 
 /**
- * Page shells — the storefront's `index.html` for `/`, `/sell`, `/store/**`
- * and `/c/**`, with the page's own head written in and a real status code.
+ * Page shells — the storefront's `index.html` for `/`, `/sell`, `/store/**`,
+ * `/c/**` and the footer info pages, with the page's own head written in and a real status code.
  *
  * Every failure short of "there is no frontend build" still answers the
  * shell: a slow or failed lookup serves it unmodified (what nginx served
@@ -25,6 +25,9 @@ export const storePage = (request: FastifyRequest, reply: FastifyReply) =>
 
 export const browsePage = (request: FastifyRequest, reply: FastifyReply) =>
   sendPage("browse", request, reply);
+
+export const infoPage = (request: FastifyRequest, reply: FastifyReply) =>
+  sendPage("info", request, reply);
 
 async function sendPage(kind: PageKind, request: FastifyRequest, reply: FastifyReply) {
   const shell = await loadShell(request.log);

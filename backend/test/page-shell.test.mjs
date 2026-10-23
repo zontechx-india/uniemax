@@ -1,4 +1,4 @@
-// Page shells: /, /sell, /store/** and /c/** come back as the storefront's index.html
+// Page shells: /, /sell, /store/**, /c/** and the footer info pages come back as the storefront's index.html
 // with THAT page's head written in (what WhatsApp/Facebook/non-JS crawlers
 // read), and a dead slug is a real 404 instead of the SPA fallback's 200.
 //
@@ -97,6 +97,22 @@ test("platform pages: / and /sell carry their own head with absolute URLs", asyn
   // Scrapers cannot resolve a relative og:image; every shell makes it absolute.
   for (const p of [home, sell]) {
     assert.match(p.html, /<meta property="og:image" content="https?:\/\/[^"]+"/);
+  }
+});
+
+test("footer info pages: own title + canonical; holding pages are noindex", async () => {
+  const refund = await page("/refund-policy?utm_source=gmc");
+  assert.equal(refund.status, 200);
+  assert.match(refund.title, /^Refund & (amp;)?Returns Policy · UnieMax/);
+  assert.match(refund.canonical, /^https?:\/\/[^/]+\/refund-policy$/);
+  assert.equal(refund.robots, "index, follow");
+
+  const about = await page("/about");
+  assert.match(about.title, /^About · UnieMax/);
+  assert.match(about.canonical, /\/about$/);
+
+  for (const path of ["/privacy", "/terms"]) {
+    assert.equal((await page(path)).robots, "noindex, follow");
   }
 });
 

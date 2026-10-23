@@ -1,6 +1,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import * as service from "./sitemap.service.js";
+import { buildProductFeed } from "./productFeed.service.js";
 import { siteOrigin } from "./siteOrigin.js";
 
 /**
@@ -51,4 +52,12 @@ export async function categorySitemap(
   reply: FastifyReply,
 ) {
   return sendXml(reply, await service.buildCategorySitemap(siteOrigin(request)));
+}
+
+/**
+ * `/feeds/products.xml` — every public product in Google's RSS product format,
+ * read by Merchant Center and the Meta catalogue (`productFeed.service.ts`).
+ */
+export async function productFeed(request: FastifyRequest, reply: FastifyReply) {
+  return sendXml(reply, await buildProductFeed(siteOrigin(request)));
 }

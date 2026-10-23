@@ -97,12 +97,12 @@ export const router = createBrowserRouter([
           Component: (await import('../pages/BrowseCategoryPage')).BrowseCategoryPage,
         }),
       },
-      // Footer info pages — public routes: About and Contact have real content,
-      // Privacy and Terms a holding page with the support contact until the
-      // business supplies the legal text.
+      // Footer info pages — public routes: About, Contact and the Refund and
+      // Shipping policies have real content, Privacy and Terms a holding page
+      // with the support contact until the business supplies the legal text.
       // `support` is NOT among them: it is a real page in the account subtree
       // below, since a ticket needs to know who is writing.
-      ...['about', 'privacy', 'terms', 'contact'].map((page) => ({
+      ...['about', 'privacy', 'terms', 'contact', 'refund-policy', 'shipping-policy'].map((page) => ({
         path: `/${page}`,
         lazy: async () => ({
           Component: (await import('../pages/InfoComingSoonPage')).InfoComingSoonPage,
