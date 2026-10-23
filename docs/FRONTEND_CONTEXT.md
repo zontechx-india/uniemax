@@ -306,11 +306,11 @@ for guests and signed-in customers alike and adapts per session state.
   prime real estate); and a **Become a Seller** gradient panel (two equal
   columns from `lg`: pitch + 3 check-mark proof points + CTA on the left —
   label flips to "Create another store" for owners; for guests the CTA opens the
-  auth dialog and navigates to `/mystores/new` via `onSignedIn` — and **how it
-  works**, three numbered steps, on the right. That column used to hold the live
-  platform counters from `GET /public/stats`; on a marketplace this size they
-  argued against the pitch they decorated, and three steps are as true on day
-  one as at ten thousand stores. The endpoint is untouched). The
+  auth dialog and navigates to `/mystores/new` via `onSignedIn` — and, on the
+  right, the live **counters** (Stores · Products · Users from
+  `GET /public/stats`, short form via `Intl.NumberFormat` compact — "1.2K";
+  zeros and a failed fetch simply drop out) above **how it works**, three
+  numbered steps). The
   **footer** is a structured 4-column block: brand + tagline, Marketplace
   (About / Support / Contact) and Legal (Privacy / Terms) columns
   (→ `pages/InfoComingSoonPage.tsx`: About and Contact with real content — Contact
@@ -346,11 +346,9 @@ for guests and signed-in customers alike and adapts per session state.
   state invites the visitor to be the first seller. **Fresh Finds** —
   `GET /api/v1/public/products`. **Category chips** —
   `GET /api/v1/public/categories`. **Platform counters** —
-  `GET /api/v1/public/stats` — **not rendered on the homepage any more**; the
-  Become a Seller panel shows three how-it-works steps where the counters were,
-  because "3 Stores · 11 Products · 0 Orders" argued against the pitch it was
-  decorating. The endpoint is unchanged and the numbers are a one-component
-  change away if a surface wants them. Trust on the homepage is carried by
+  `GET /api/v1/public/stats` — rendered in the Become a Seller panel as
+  Stores · Products · Users in short form (orders are served but not shown;
+  zeros hidden). Trust on the homepage is carried by
   `MarketIdentityBar`'s trust row instead, and the footer's bottom bar
   (COD available · Secure checkout).
 

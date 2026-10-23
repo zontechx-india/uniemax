@@ -263,27 +263,31 @@ export interface PlatformStats {
   stores: number;
   products: number;
   orders: number;
+  users: number;
 }
 
 /**
- * Published-store count + publicly visible product count + orders placed.
- * Cancelled orders are excluded — a trust counter must reflect real trade,
- * and orders survive store deletion (SetNull + snapshots), so the count
- * never shrinks when a seller leaves.
+ * Published-store count + publicly visible product count + orders placed +
+ * registered users. Cancelled orders are excluded — a trust counter must
+ * reflect real trade, and orders survive store deletion (SetNull +
+ * snapshots), so the count never shrinks when a seller leaves. Users are
+ * customer accounts that are not blocked (every account can open a store,
+ * so this is the platform's whole sign-up base).
  */
 export async function getPlatformStats(): Promise<PlatformStats> {
   const now = Date.now();
   if (statsCache && statsCache.expiresAt > now) return statsCache.data;
 
-  const [stores, products, orders] = await Promise.all([
+  const [stores, products, orders, users] = await Promise.all([
     prisma.store.count({ where: publishedStore }),
     prisma.storeProduct.count({
       where: { ...PUBLIC_PRODUCT_VISIBILITY, store: publishedStore },
     }),
     prisma.order.count({ where: { status: { not: "CANCELLED" } } }),
+    prisma.customer.count({ where: { blockedAt: null } }),
   ]);
 
-  const data = { stores, products, orders };
+  const data = { stores, products, orders, users };
   statsCache = { data, expiresAt: now + STATS_TTL_MS };
   return data;
 }
