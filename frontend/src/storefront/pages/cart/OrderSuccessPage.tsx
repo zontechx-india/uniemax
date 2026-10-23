@@ -170,13 +170,13 @@ export function OrderSuccessPage({
     trackPurchase(
       order.id,
       Number(order.total),
-      // A line whose product has since been deleted carries no slug, so it has
-      // no content id to report — the order total still accounts for it.
+      // A line whose product has since been deleted carries no product id, so
+      // it has no content id to report — the order total still accounts for it.
       order.items.flatMap((item) =>
-        item.productSlug
+        item.productId
           ? [
               {
-                id: item.productSlug,
+                id: item.productId,
                 price: Number(item.unitPrice),
                 quantity: item.quantity,
               },

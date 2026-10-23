@@ -2121,6 +2121,8 @@ export interface PlacedOrderItem {
   variantName: string | null
   /** The variant's SKU when the order was placed. */
   sku: string | null
+  /** Null once the product has been deleted. */
+  productId: string | null
   productSlug: string | null
   imageUrl: string | null
   /** Decimal strings on the wire. */

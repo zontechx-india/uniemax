@@ -2628,10 +2628,12 @@ never break a page.
 | `InitiateCheckout` | `pages/cart/CheckoutPage.tsx` | Once per visit, ref-guarded — cart revalidation re-renders with fresh prices, and `group` is a new object each render. Carries only the store's own group: orders are placed per store. |
 | `Purchase` | `pages/cart/OrderSuccessPage.tsx` | See below. |
 
-`content_ids` is the **product slug** everywhere. `Product.slug` is `@unique`
-platform-wide and is the only product identifier present on both cart lines
-and placed-order lines, so it is what keeps ids consistent across the funnel —
-and what a future catalog feed (dynamic product ads) will have to match.
+`content_ids` is the **product id** (`StoreProduct.id`) everywhere — the same
+id as `g:id` in the product feed that fills the Meta catalogue and Google
+Merchant Center (`SEO.md` → Product feed), so Meta can match every event to a
+catalogue item. Cart lines and placed-order lines (`PlacedOrderItem.productId`)
+both carry it. (It was the slug until 24 Oct 2026; a slug is unique only within
+its store, and Meta reported the mismatch.)
 
 `Purchase` is the one with teeth:
 
@@ -2672,7 +2674,8 @@ before the app boots.
 | `seller_cta_click` (`placement`, `store_name_entered`) | — | every seller CTA, via `useStartSelling` / `CreateStoreLink` (`sell_hero`, `sell_final`, `sell_header`, `sell_sticky`, `home_header`, `home_seller_panel`, `home_new_stores_empty`, `home_footer`); `store_name_entered` says whether a name was typed first |
 | `store_created` | — | `CreateStorePage`, after `storesApi.create` succeeds |
 
-Items use the product slug as `item_id`, like Meta's `content_ids`; currency
+Items use the product id as `item_id`, like Meta's `content_ids` (and the
+feed's `g:id`, which lets GA4 join Merchant Center data); currency
 is `INR`. `sign_up`, `store_created` and `purchase` are the ones to mark as
 **Key events** in GA4 (Admin → Events).
 
