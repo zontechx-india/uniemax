@@ -638,6 +638,18 @@ location ^~ /c/ {
     proxy_intercept_errors on;
     error_page 400 429 500 502 503 504 = @uniemax_static_shell;
 }
+# Footer info pages (About, Contact, policies) — fixed pages, so a 404 can
+# only be a backend that predates their routes: fall back like `/` and /sell.
+location ~ ^/(about|contact|refund-policy|shipping-policy|privacy|terms)$ {
+    proxy_pass http://127.0.0.1:__PORT__;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 10s;
+    proxy_intercept_errors on;
+    error_page 400 404 429 500 502 503 504 = @uniemax_static_shell;
+}
 # Re-enters `location = /index.html` from the SPA cache snippet (no-cache).
 location @uniemax_static_shell {
     rewrite ^ /index.html last;
@@ -662,6 +674,14 @@ shells prod 4000 && include_in prod uniemax-com uniemax-prod
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
+The footer info-pages location (`/about`, `/contact`, `/refund-policy`,
+`/shipping-policy`, `/privacy`, `/terms`) was added to the snippet with the
+release that brought their page shells — **not yet applied** on either
+environment; to apply, add that one `location` block to both
+`/etc/nginx/snippets/uniemax-page-shells-{dev,prod}.conf` (with the env's
+port) and `nginx -t && systemctl reload nginx`. Until then those pages are
+the static `index.html`, as before.
+
 `404` is deliberately **not** in `error_page` for `/store/` and `/c/`: the
 API's 404 is the point (same HTML, `noindex`), and intercepting it would turn
 every dead product back into a `200`. `/` and `/sell` never 404 legitimately,
@@ -677,6 +697,37 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8081/store/no-such-sto
 curl -s http://127.0.0.1:8081/ | grep -o '<link rel="canonical"[^>]*>'                         # absolute canonical (home is a page shell)
 curl -s http://127.0.0.1:8081/sell | grep -o 'og:image" content="[^"]*'                         # https://…/og-image.jpg (absolute)
 ```
+
+### `www.uniemax.com` → `uniemax.com` (301)
+
+**Status: not applied.** `https://www.uniemax.com/` serves the whole site
+itself, so Google sees two copies of every page (Search Console, 23 Oct 2026:
+`www` URLs reported as duplicates, and Google picked a different canonical
+than ours for `https://www.uniemax.com/`). Every canonical already says
+`https://uniemax.com/…`; the redirect makes the host agree. In the
+`uniemax-com` vhost, give `www` its own HTTPS `server` block that only
+redirects (the certificate already covers both names):
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name www.uniemax.com;
+    ssl_certificate     /etc/letsencrypt/live/uniemax.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/uniemax.com/privkey.pem;
+    return 301 https://uniemax.com$request_uri;
+}
+```
+
+…and remove `www.uniemax.com` from the main block's `server_name` (the HTTP
+→ HTTPS block may keep it; it will then hop `http://www` → `https://www` →
+`https://uniemax.com`). Check the certificate path with
+`sudo certbot certificates` first. Verify:
+
+```bash
+curl -sI https://www.uniemax.com/store/x | grep -i '^location'   # https://uniemax.com/store/x
+curl -sI https://uniemax.com/ | head -1                           # HTTP/1.1 200 OK
+```
+
 
 Then from outside: paste a product URL into Meta's Sharing Debugger
 (<https://developers.facebook.com/tools/debug/>) — it must show the product's

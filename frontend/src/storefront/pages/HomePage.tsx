@@ -1566,6 +1566,8 @@ const FOOTER_COLUMNS = [
     links: [
       { label: 'Privacy Policy', to: '/privacy' },
       { label: 'Terms & Conditions', to: '/terms' },
+      { label: 'Refund & Returns', to: '/refund-policy' },
+      { label: 'Shipping Policy', to: '/shipping-policy' },
     ],
   },
 ] as const
