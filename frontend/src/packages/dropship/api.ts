@@ -9,7 +9,7 @@ import { DROPSHIP_ADMIN_API_BASE as ADMIN, DROPSHIP_API_BASE as BASE } from './c
  */
 
 export type ReturnFeePayer = 'SELLER' | 'SUPPLIER'
-export type LinkStatus = 'PENDING' | 'ACTIVE' | 'PAUSED' | 'ENDED'
+export type LinkStatus = 'ACTIVE' | 'PAUSED' | 'ENDED'
 export type InviteStatus = 'SENT' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED'
 export type SupplierStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED'
 export type Actor = 'SUPPLIER' | 'SELLER' | 'ADMIN' | 'SYSTEM'
@@ -71,8 +71,6 @@ export interface SellerSupplier {
   codAllowed: boolean
   returnFeePayer: ReturnFeePayer
   since: string
-  /** Who the seller invited, while the joiner waits for approval (D-51). */
-  invitedAs: { name: string; phone: string | null; email: string | null } | null
   supplierStatus: SupplierStatus
   store: StoreCard | null
   profile: SupplierProfile
@@ -111,6 +109,8 @@ export interface InvitePreview {
   sellerName: string
   sellerLogoUrl: string | null
   name: string
+  /** Who it is for, half hidden: "98••••••10" or "ra•••@gmail.com" (D-52). */
+  sentTo: string
   codAllowed: boolean
   returnFeePayer: ReturnFeePayer
   status: InviteStatus
@@ -134,14 +134,18 @@ export interface JoinStore {
   } | null
 }
 
+export interface JoinStores {
+  /** False when the signed-in account isn't the invited phone or email (D-52); `stores` is then empty. */
+  forYou: boolean
+  stores: JoinStore[]
+}
+
 export interface JoinResult {
   linkId: string
   storeId: string
   storeSlug: string | null
   supplyOnly: boolean
   alreadyJoined: boolean
-  /** The joiner is not who was invited: the seller must approve first (D-51). */
-  needsApproval: boolean
 }
 
 export interface SupplyItem {
@@ -248,7 +252,7 @@ export const supplierApi = {
 
 export const inviteApi = {
   preview: (token: string) => call<InvitePreview>(http.get(`${BASE}/invites/${token}`)),
-  stores: (token: string) => call<JoinStore[]>(http.get(`${BASE}/invites/${token}/stores`)),
+  stores: (token: string) => call<JoinStores>(http.get(`${BASE}/invites/${token}/stores`)),
   accept: (
     token: string,
     input: Partial<ProfileInput> & {

@@ -56,13 +56,12 @@ Store management → **Suppliers** → **Invite a supplier**, in two steps (*Nex
   Kit already uses.
 
 ### The supplier joins
-The link is a one-time secret, and the name, phone and email the seller typed are **not** a lock on it.
-Whoever opens it can join, so the join is checked against the invite (D-51): if the account that
-opened the link has the invited phone (last ten digits) or email, the link is **Active** at once.
-Otherwise it is **Waiting for approval** (`PENDING`): the seller is told, sees *"You invited X (number), but
-Y opened the link. Is this who you meant?"* with **Yes, approve** / **No, decline**, and the joiner sees
-*Waiting for {seller} to approve you*. A pending link supplies nothing (no catalogue, no orders). The seller
-approves (→ Active) or declines (→ Ended); the supplier can only withdraw (→ Ended).
+The invite is **personal** (D-52): only the account with the invited phone (last ten digits) or email
+can join, and the link is **Active** at once. Before sign-in the page says who it is for, half hidden:
+*"This invite is for 98••••••10. Sign in with it."* Anyone else who signs in sees *"This invite isn't for
+this account"* with **Sign in with 98••••••10** (signs out, opens sign-in) and *"Not yours? Ask {seller}
+to send a new invite to your number."*, and no join sheet; `accept` refuses them (403) before anything is
+created, and the invite stays open for the right person. There is no seller approval step.
 
 Open the link → sign in (OTP) → **Join {seller} as a supplier**:
 - What it means, with the seller's terms: *"{Seller} sells your products in
@@ -121,9 +120,9 @@ when `DROPSHIP_ENABLED=true`. `:storeId` is the store's id or slug.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/invites/:token` | Public preview: seller name + logo, both terms, effective status, expiry, the ship-within / returns limits |
-| GET | `/invites/:token/stores` | `requireCustomer`. The caller's **supplier accounts** for the join sheet (shops that sell are left out, SU-21): `hasAddress`, `isSeller` (the inviting store), existing supplier terms |
-| POST | `/invites/:token/accept` | `requireCustomer`. `storeId` must be a supplier account — a shop that sells is refused 400 "can't also be a supplier" (SU-21). → the link is `PENDING` unless the account matches the invite (D-51). `{ storeId \| newStore: { name, phone, address }, shippingFee?, shipWithinDays?, returnDays? }` — the three terms are required unless that store already supplies. → `{ linkId, storeId, storeSlug, supplyOnly, alreadyJoined, needsApproval }` |
+| GET | `/invites/:token` | Public preview: seller name + logo, both terms, effective status, expiry, the ship-within / returns limits, `sentTo` (the invited phone or email half hidden, D-52) |
+| GET | `/invites/:token/stores` | `requireCustomer`. `{ forYou, stores }`: `forYou: false` and no stores when the caller isn't the invited phone or email (D-52); otherwise the caller's **supplier accounts** for the join sheet (shops that sell are left out, SU-21): `hasAddress`, `isSeller` (the inviting store), existing supplier terms |
+| POST | `/invites/:token/accept` | `requireCustomer`. Not the invited phone or email → 403 *"This invite was sent to 98••••••10…"*, nothing created (D-52). `storeId` must be a supplier account — a shop that sells is refused 400 "can't also be a supplier" (SU-21). `{ storeId \| newStore: { name, phone, address }, shippingFee?, shipWithinDays?, returnDays? }` — the three terms are required unless that store already supplies. → `{ linkId, storeId, storeSlug, supplyOnly, alreadyJoined }` |
 
 **Supplier** (`requireCustomer` + owns `:storeId` + `requireSupplier` = an `ACTIVE` Supplier; otherwise 403, SU-9)
 
@@ -159,7 +158,7 @@ Admin routes: [admin](../admin/context.md).
 | # | What goes wrong | Solution |
 | --- | --- | --- |
 | SU-1 | Invite sent to the wrong person. | **Revoke**. Links are one-time and expire after `inviteExpiryDays`. |
-| SU-2 | The link is forwarded to someone else. | The token is the authority. The seller sees who joined (business name, phone) and can **End**. |
+| SU-2 | The link is forwarded to someone else. | They can't join: the invite is personal (D-52), see SU-22. |
 | SU-3 | The supplier already has a UnieMax store. | It chooses that store, or creates a supplier account. |
 | SU-4 | The same supplier is invited by two sellers. | One `Supplier`, two links, each with its own COD setting and statement. |
 | SU-5 | The seller changes COD or who pays the returned-parcel fee. | New orders only: each order keeps its snapshot ([terms](../terms/context.md)). The change is logged and the supplier notified. Copies' `codAvailable` re-syncs (built). |
@@ -170,13 +169,14 @@ Admin routes: [admin](../admin/context.md).
 | SU-10 | A seller reads another store's suppliers. | Every seller route resolves the store through `host.getOwnedStore`. |
 | SU-11 | A supplier offers a product that is itself a copy. | Refused: only the supplier store's own products can be offered, and never a copy (`isCopy` in `services/supply.ts` checks `Resale`) (built). |
 | SU-12 | Price for sellers above the shop price. | Warning, not blocked. |
-| SU-13 | The invite is accepted twice (double tap, two devices). | A guarded claim (`SENT → ACCEPTED`) runs before anything is created; the same supplier gets the link already made (`alreadyJoined`), anyone else 409. A failure after the claim gives the invite back. |
+| SU-13 | The invite is accepted twice (double tap, two devices). | A guarded claim (`SENT → ACCEPTED`) runs before anything is created; the same supplier gets the link already made (`alreadyJoined`), anyone else 409. A failure after the claim gives the invite back and removes the supplier account made for that attempt (`host.discardSupplyStore`, only while it has no products or orders), so a retry leaves no "Name-2". |
 | SU-14 | The seller invites a supplier they already have. | *"Already your supplier"*, with a link to it. |
 | SU-15 | The seller invites their own store. | Refused at accept: the inviting store can't be chosen (400). Another store of the same owner may supply it. |
 | SU-16 | The supplier's address is missing. | Asked on the join sheet itself. |
 | SU-17 | The supplier no longer wants to supply a seller (for example, it disagrees with changed terms). | It can **Pause** or **End** too (D-19); the seller is told. Copies pause (`LINK_INACTIVE`) (built); open orders complete. |
 | SU-19 | A supplier account is put on the marketplace (its owner taps Publish on the products page). | **Refused** (`store.publishing` hook, 409): a supplier account has no shop (D-28), so it is never listed or searchable, and its stock can't be bought from there. The Publish prompt is hidden for it, and its Products page says only the offered products reach sellers. To sell to customers it needs a store of its own. |
-| SU-22 | Someone other than the invited person opens the link. | The link is `PENDING` until the seller approves; see *The supplier joins* (D-51). Declined = `ENDED` (a new invite starts again). |
+| SU-22 | Someone other than the invited person opens the link. | Stopped before the join sheet; `accept` → 403, nothing created; the invite stays open (D-52, *The supplier joins*). |
+| SU-24 | The seller typed the supplier's number wrong, or the supplier signs in with another number. | The page shows which number the invite is for. The seller revokes and invites the right number or email. |
 | SU-23 | The seller invites the same number or email twice (any name). | Refused while the first invite is open (SENT, not expired); revoke it or wait for it to expire. |
 | SU-20 | A supplier account uses a seller feature (suppliers list, invites, resales, catalog…). | **Refused** with 403 on the seller routes (`requireSellingStore`); only `/role` answers. |
 | SU-21 | A seller opens an invite and tries to join with a shop that sells. | The join sheet lists supplier accounts only; `accept` with a shop's id is refused (400 "can't also be a supplier"). They create a supplier account instead. |

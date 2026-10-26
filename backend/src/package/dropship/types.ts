@@ -15,6 +15,8 @@ export interface DropshipHost {
   listOwnedStores(customerId: string): Promise<StoreRef[]>;
   /** An unpublished store with no logo, for a supplier joining without one (D-28). */
   createSupplyStore(customerId: string, input: SupplyStoreInput): Promise<StoreRef>;
+  /** Removes a store `createSupplyStore` just made when the join fails after it; only while it has no products or orders. */
+  discardSupplyStore(storeId: string): Promise<void>;
   /** The store's own COD switch, turned on in place from the invite sheet (SU-6). */
   setStoreCod(customerId: string, storeId: string, on: boolean): Promise<void>;
   /** The store's own products with their options' shop prices. */

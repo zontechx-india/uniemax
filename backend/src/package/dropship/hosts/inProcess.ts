@@ -191,6 +191,10 @@ export function createInProcessHost(prisma: PrismaClient): DropshipHost {
       return (await getStore(created.id))!;
     },
 
+    async discardSupplyStore(storeId) {
+      await prisma.store.deleteMany({ where: { id: storeId, products: { none: {} }, orders: { none: {} } } });
+    },
+
     async setStoreCod(customerId, storeId, on) {
       // The core's own path, so the readiness gates and the catalog event apply.
       await updateStorePayments({ kind: "owner", customerId }, storeId, { acceptCod: on });

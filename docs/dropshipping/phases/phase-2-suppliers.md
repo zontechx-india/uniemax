@@ -84,6 +84,13 @@ Both term answers are required.
 - Frontend: `tsc -b`, `vite build`, `check:ui` (no budget rises); the
   screens checked at 390 px with mocked data (no overflow, no console errors).
 - `npm run test:api` against dev (flag on, `DROPSHIP_ENABLED=true` in the dev server's `.env.development`): 61 of 64 pass; the 3 failures are `page-shell` (2) and `images` (1), none dropship. `test/dropship-suppliers.test.mjs` passes in full.
+- D-52 personal invites (26 Oct 2026): `typecheck`, `test:unit` (147 pass), frontend `tsc -b` /
+  `vite build` / `check:ui`; the real services run on the dev database with throwaway accounts
+  (deleted after), 15 checks: preview `sentTo`, wrong phone → no sheet + 403 + nothing created +
+  invite still open, right phone joins Active, email invites match only that email. The updated
+  `test/dropship-suppliers.test.mjs` (D-52 test) is not yet run over HTTP (no QA logins on hand).
+  A forced failure after the store is made leaves no store and gives the invite back (3 more checks). All dev dropship data was cleared the same day (suppliers, invites, links, supplier stores, copies,
+  DROPSHIP notifications).
 
 ## Done when
 

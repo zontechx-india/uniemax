@@ -6,7 +6,7 @@ import { Prisma } from "../../generated/prisma/client.js";
  * (test/unit/dropship-domain.test.ts).
  */
 
-export type LinkStatus = "PENDING" | "ACTIVE" | "PAUSED" | "ENDED";
+export type LinkStatus = "ACTIVE" | "PAUSED" | "ENDED";
 export type ReturnFeePayer = "SELLER" | "SUPPLIER";
 export type InviteStatus = "SENT" | "ACCEPTED" | "REVOKED" | "EXPIRED";
 
@@ -47,15 +47,9 @@ export function discountedCost(
   return cost.isNegative() ? new Prisma.Decimal(0) : cost;
 }
 
-/**
- * A link moves freely between ACTIVE and PAUSED; ENDED is for good (D-19). A PENDING link
- * (the joiner did not match the invite, D-51) is approved (ACTIVE) or declined (ENDED), and
- * nothing moves back into PENDING.
- */
+/** A link moves freely between ACTIVE and PAUSED; ENDED is for good (D-19). */
 export function canMoveLink(from: LinkStatus, to: LinkStatus): boolean {
-  if (from === to || from === "ENDED" || to === "PENDING") return false;
-  if (from === "PENDING") return to === "ACTIVE" || to === "ENDED";
-  return true;
+  return from !== to && from !== "ENDED";
 }
 
 export interface TermDiff {
@@ -149,8 +143,8 @@ export function samePhone(a: string | null | undefined, b: string | null | undef
 }
 
 /**
- * D-51: does the account that opened an invite match who the seller invited? Matches on the
- * phone (last ten digits) or the email, whichever the seller entered.
+ * D-52: an invite is personal — only the account with the phone (last ten digits) or the
+ * email the seller entered may use it.
  */
 export function inviteMatches(
   invited: { phone: string | null; email: string | null },
@@ -160,6 +154,17 @@ export function inviteMatches(
   return (
     samePhone(invited.phone, account.phone) || (!!email && email === account.email?.toLowerCase())
   );
+}
+
+/**
+ * Who an invite is for, half hidden ("98••••••10", "ra•••@gmail.com"), so the right person
+ * knows which number or email to sign in with (D-52). The phone wins when both were entered.
+ */
+export function maskContact(invited: { phone: string | null; email: string | null }): string {
+  const digits = invited.phone?.replace(/\D/g, "").slice(-10);
+  if (digits && digits.length === 10) return `${digits.slice(0, 2)}••••••${digits.slice(-2)}`;
+  const [local = "", domain = ""] = (invited.email ?? "").split("@");
+  return `${local.slice(0, local.length > 2 ? 2 : 1)}•••@${domain}`;
 }
 
 // ===========================================================================

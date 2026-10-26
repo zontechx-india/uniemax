@@ -23,7 +23,9 @@ const NEW = 'new'
  * sign-in dialog opens in place. Then the join sheet: one of the supplier
  * accounts they already have, or a short form for a new one (a shop that sells
  * can't also be a supplier, D-49), and the supplier's own terms, none pre-selected
- * (docs/dropshipping/suppliers/context.md → "The supplier joins").
+ * (docs/dropshipping/suppliers/context.md → "The supplier joins"). The invite is
+ * personal (D-52): an account that isn't the invited phone or email gets no join
+ * sheet, only "sign in with the invited number".
  */
 export function JoinPage() {
   const { token = '' } = useParams()
@@ -79,9 +81,12 @@ export function JoinPage() {
                 <Button full onClick={() => openAuthDialog()}>
                   Sign in to join
                 </Button>
+                <p className="text-center text-sm text-muted">
+                  This invite is for <span className="font-semibold text-fg">{data.sentTo}</span>. Sign in with it.
+                </p>
                 <p className="text-center text-xs text-muted">
-                  New to UnieMax? Signing in with your phone creates your account. This link
-                  works until {shortDate(data.expiresAt)}.
+                  New to UnieMax? Signing in creates your account. This link works until{' '}
+                  {shortDate(data.expiresAt)}.
                 </p>
               </div>
             )}
@@ -124,10 +129,10 @@ function JoinForm({
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const usable = (stores.data ?? []).filter((s) => !s.isSeller)
+  const usable = (stores.data?.stores ?? []).filter((s) => !s.isSeller)
   // With no store of their own, the short form is the only way in.
   useEffect(() => {
-    if (stores.data && usable.length === 0) setChoice(NEW)
+    if (stores.data?.forYou && usable.length === 0) setChoice(NEW)
   }, [stores.data, usable.length])
 
   const chosen: JoinStore | undefined = usable.find((s) => s.id === choice)
@@ -181,6 +186,7 @@ function JoinForm({
 
   if (stores.loading && !stores.data) return <p className="mt-6 text-sm text-muted">Loading…</p>
   if (stores.error) return <div className="mt-6"><ErrorNote>{stores.error}</ErrorNote></div>
+  if (stores.data && !stores.data.forYou) return <NotForYou invite={invite} />
 
   return (
     <div className="mt-6 space-y-6">
@@ -309,27 +315,47 @@ function JoinForm({
   )
 }
 
+/** D-52: signed in, but not as the person invited — stop here, with the way forward. */
+function NotForYou({ invite }: { invite: InvitePreview }) {
+  const { signOut } = useMarketSession()
+  const [busy, setBusy] = useState(false)
+  const switchAccount = async () => {
+    setBusy(true)
+    try {
+      await signOut()
+      openAuthDialog()
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="mt-6 space-y-4">
+      <div className="rounded-md bg-surface-alt p-4">
+        <h2 className="text-base font-semibold text-fg">This invite isn't for this account</h2>
+        <p className="mt-1 text-sm text-muted">
+          {invite.sellerName} sent it to <span className="font-semibold text-fg">{invite.sentTo}</span>. Only
+          that number or email can join.
+        </p>
+      </div>
+      <Button full loading={busy} onClick={switchAccount}>
+        Sign in with {invite.sentTo}
+      </Button>
+      <p className="text-center text-xs text-muted">
+        Not yours? Ask {invite.sellerName} to send a new invite to your number.
+      </p>
+    </div>
+  )
+}
+
 function Joined({ seller, result }: { seller: string; result: JoinResult }) {
   const slug = result.storeSlug
   return (
     <div className="mt-6 space-y-4">
-      {result.needsApproval ? (
-        <>
-          <h1 className="text-xl font-semibold text-fg">Waiting for {seller} to approve you</h1>
-          <p className="text-sm text-muted">
-            You joined with a different number or email than {seller} invited, so they need to confirm it's you. We've told
-            them. You can get your products ready meanwhile; they see them once you're approved.
-          </p>
-        </>
-      ) : (
-        <>
-          <h1 className="text-xl font-semibold text-fg">You now supply {seller}</h1>
-          <p className="text-sm text-muted">
-            Next, choose the products you'll supply and set a price for sellers. {seller} sees them
-            as soon as you offer them.
-          </p>
-        </>
-      )}
+      <h1 className="text-xl font-semibold text-fg">You now supply {seller}</h1>
+      <p className="text-sm text-muted">
+        Next, choose the products you'll supply and set a price for sellers. {seller} sees them
+        as soon as you offer them.
+      </p>
       {slug && (
         <div className="space-y-2">
           {result.supplyOnly ? (

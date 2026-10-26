@@ -1,7 +1,7 @@
 import { HttpError } from "../../../utils/httpError.js";
 import { dropshipConfig } from "../config.js";
 import { deps } from "../deps.js";
-import { daysFromNow, hashToken, inviteMatches, inviteState, newInviteToken, samePhone } from "../domain.js";
+import { daysFromNow, hashToken, inviteMatches, inviteState, maskContact, newInviteToken, samePhone } from "../domain.js";
 import type { InviteStatus } from "../domain.js";
 import type { InviteAcceptInput, InviteCreateInput } from "../schema.js";
 import type { StoreRef } from "../types.js";
@@ -178,7 +178,19 @@ async function findByToken(token: string) {
   return invite;
 }
 
-/** Public preview: who is inviting, on what terms, until when. */
+type Invitee = { contactPhone: string | null; contactEmail: string | null };
+const sentTo = (invite: Invitee) => maskContact({ phone: invite.contactPhone, email: invite.contactEmail });
+
+/**
+ * D-52: an invite is personal. Only the account that has the phone or email the seller entered
+ * may use it; anyone else is stopped before the join sheet, and `accept` refuses them (403).
+ */
+async function isInvitee(invite: Invitee, customerId: string) {
+  const account = await deps.host.getCustomer(customerId);
+  return !!account && inviteMatches({ phone: invite.contactPhone, email: invite.contactEmail }, account);
+}
+
+/** Public preview: who is inviting, on what terms, until when, and who it is for. */
 export async function previewInvite(token: string) {
   const invite = await findByToken(token);
   const seller = await deps.host.getStore(invite.sellerStoreId);
@@ -187,6 +199,7 @@ export async function previewInvite(token: string) {
     sellerName: seller.name,
     sellerLogoUrl: seller.logoUrl,
     name: invite.contactName,
+    sentTo: sentTo(invite),
     codAllowed: invite.codAllowed,
     returnFeePayer: invite.returnFeePayer,
     status: inviteState(invite),
@@ -199,9 +212,15 @@ export async function previewInvite(token: string) {
 /**
  * The signed-in invitee's stores for the join sheet: which can be used, and
  * the supplier terms of any that already supply (so they aren't asked again).
+ * `forYou: false` (no stores) when the account isn't the one invited (D-52).
  */
 export async function inviteStores(token: string, customerId: string) {
   const invite = await findByToken(token);
+  if (!(await isInvitee(invite, customerId))) return { forYou: false, stores: [] };
+  return { forYou: true, stores: await joinStores(invite.sellerStoreId, customerId) };
+}
+
+async function joinStores(sellerStoreId: string, customerId: string) {
   const stores = await deps.host.listOwnedStores(customerId);
   const suppliers = await deps.prisma.supplier.findMany({
     where: { storeId: { in: stores.map((s) => s.id) } },
@@ -217,7 +236,7 @@ export async function inviteStores(token: string, customerId: string) {
       slug: store.slug,
       logoUrl: store.logoUrl,
       hasAddress: store.hasAddress,
-      isSeller: store.id === invite.sellerStoreId,
+      isSeller: store.id === sellerStoreId,
       supplier: supplier
         ? {
             status: supplier.status,
@@ -241,7 +260,6 @@ async function joinedResult(linkId: string) {
     storeId: link.supplier.storeId,
     storeSlug: store?.slug ?? null,
     supplyOnly: link.supplier.supplyOnly,
-    needsApproval: link.status === "PENDING",
   };
 }
 
@@ -269,6 +287,9 @@ export async function acceptInvite(token: string, customerId: string, input: Inv
       data: { status: "EXPIRED" },
     });
     throw HttpError.conflict("This invite has expired — ask the seller to send it again");
+  }
+  if (!(await isInvitee(invite, customerId))) {
+    throw HttpError.forbidden(`This invite was sent to ${sentTo(invite)}. Sign in with it to join.`);
   }
 
   const seller = await deps.host.getStore(invite.sellerStoreId);
@@ -321,11 +342,7 @@ export async function acceptInvite(token: string, customerId: string, input: Inv
     throw HttpError.conflict("This invite is being used right now — refresh in a moment");
   }
 
-  // D-51: the account that opened the link must match who the seller invited, else the seller approves.
-  const account = await deps.host.getCustomer(customerId);
-  const matches = !!account && inviteMatches({ phone: invite.contactPhone, email: invite.contactEmail }, account);
-  const linkStatus = matches ? "ACTIVE" : "PENDING";
-
+  let madeStoreId: string | null = null;
   try {
     const store =
       existingStore ??
@@ -334,6 +351,7 @@ export async function acceptInvite(token: string, customerId: string, input: Inv
         phone: input.newStore!.phone,
         address: input.newStore!.address,
       }));
+    if (!existingStore) madeStoreId = store.id;
 
     const linkId = await deps.prisma.$transaction(async (tx) => {
       let supplier = existingSupplier;
@@ -369,10 +387,10 @@ export async function acceptInvite(token: string, customerId: string, input: Inv
         link = current
           ? await tx.supplierLink.update({
               where: { id: current.id },
-              data: { ...terms, status: linkStatus, statusBy: null },
+              data: { ...terms, status: "ACTIVE", statusBy: null },
             })
           : await tx.supplierLink.create({
-              data: { supplierId: supplier.id, sellerStoreId: seller.id, ...terms, status: linkStatus },
+              data: { supplierId: supplier.id, sellerStoreId: seller.id, ...terms },
             });
         await logChanges(tx, {
           supplierId: supplier.id,
@@ -389,26 +407,19 @@ export async function acceptInvite(token: string, customerId: string, input: Inv
       return link.id;
     });
 
-    deps.host.notify(
-      seller.ownerId,
-      matches
-        ? {
-            title: "Your supplier joined",
-            body: `${store.name} accepted your invite and can now offer you products.`,
-            url: `/mystores/${seller.slug}/suppliers`,
-          }
-        : {
-            title: "Approve your new supplier?",
-            body: `${store.name} used your link, but not the number or email you invited (${invite.contactName}). Check it is who you meant.`,
-            url: `/mystores/${seller.slug}/suppliers`,
-          },
-    );
+    deps.host.notify(seller.ownerId, {
+      title: "Your supplier joined",
+      body: `${store.name} accepted your invite and can now offer you products.`,
+      url: `/mystores/${seller.slug}/suppliers`,
+    });
     return { ...(await joinedResult(linkId)), alreadyJoined: false };
   } catch (err) {
-    // Give the invite back so the supplier can try again.
-    await deps.prisma.supplierInvite
+    // Give the invite back so the supplier can try again, and drop the store made for this
+    // attempt, so a retry doesn't leave "Name" and "Name-2" behind.
+    const givenBack = await deps.prisma.supplierInvite
       .updateMany({ where: { id: invite.id, linkId: null }, data: { status: "SENT" } })
-      .catch(() => {});
+      .catch(() => ({ count: 0 }));
+    if (givenBack.count > 0 && madeStoreId) await deps.host.discardSupplyStore(madeStoreId).catch(() => {});
     throw err;
   }
 }

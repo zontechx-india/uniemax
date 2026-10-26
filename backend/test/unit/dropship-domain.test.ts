@@ -6,6 +6,7 @@ import { Prisma } from "../../src/generated/prisma/client.js";
 import {
   canMoveLink,
   inviteMatches,
+  maskContact,
   daysFromNow,
   describeChange,
   diffTerms,
@@ -55,11 +56,6 @@ test("a link moves between ACTIVE and PAUSED; ENDED is for good (D-19)", () => {
   assert.equal(canMoveLink("ACTIVE", "PAUSED"), true);
   assert.equal(canMoveLink("PAUSED", "ACTIVE"), true);
   assert.equal(canMoveLink("ACTIVE", "ENDED"), true);
-  // D-51: a link waiting for approval is approved or declined, never paused, and never re-entered.
-  assert.equal(canMoveLink("PENDING", "ACTIVE"), true);
-  assert.equal(canMoveLink("PENDING", "ENDED"), true);
-  assert.equal(canMoveLink("PENDING", "PAUSED"), false);
-  assert.equal(canMoveLink("ACTIVE", "PENDING"), false);
   assert.equal(canMoveLink("PAUSED", "ENDED"), true);
   assert.equal(canMoveLink("ENDED", "ACTIVE"), false);
   assert.equal(canMoveLink("ENDED", "PAUSED"), false);
@@ -176,11 +172,17 @@ test("supplier terms: ship within 1…max days, returns ≥ 0, fee in paise", ()
   assert.equal(supplyBulkSchema.safeParse({ productIds: ["p"], discountPct: 95 }).success, false);
 });
 
-test("inviteMatches: the joiner must be who was invited, by phone or email (D-51)", () => {
+test("inviteMatches: the joiner must be who was invited, by phone or email (D-52)", () => {
   const invited = { phone: "+91 98765 43210", email: "Ravi@Example.com" };
   assert.equal(inviteMatches(invited, { phone: "9876543210", email: null }), true);
   assert.equal(inviteMatches(invited, { phone: null, email: "ravi@example.com" }), true);
   assert.equal(inviteMatches(invited, { phone: "9000000000", email: "other@example.com" }), false);
   assert.equal(inviteMatches({ phone: null, email: null }, { phone: "9876543210", email: "a@b.c" }), false);
   assert.equal(inviteMatches({ phone: "9876543210", email: null }, { phone: null, email: null }), false);
+});
+
+test("maskContact: who an invite is for, half hidden (D-52)", () => {
+  assert.equal(maskContact({ phone: "+91 98765 43210", email: "ravi@example.com" }), "98••••••10");
+  assert.equal(maskContact({ phone: null, email: "ravi@example.com" }), "ra•••@example.com");
+  assert.equal(maskContact({ phone: null, email: "ab@x.in" }), "a•••@x.in");
 });

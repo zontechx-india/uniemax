@@ -159,42 +159,41 @@ test("D-51: one open invite per phone or email", async (t) => {
   assert.equal((await invite(c, { name: "QA Five", phone, email: undefined })).status, 201);
 });
 
-test("D-51: a joiner who isn't who was invited waits for the seller's OK", async (t) => {
+test("D-52: only the invited person can use an invite; anyone else is stopped", async (t) => {
   const c = await joined(t);
   if (!c) return;
-  assert.equal(c.joined.needsApproval, false, "B's own email was invited: no approval needed");
-  const accept = async () => {
-    const r = await invite(c, { name: "QA Someone Else", phone: randomPhone(), email: undefined });
-    assert.equal(r.status, 201, JSON.stringify(r.body));
-    const acc = await c.B.req("POST", `${D}/invites/${tokenOf(r.body.data.inviteUrl)}/accept`, {
-      json: {
-        newStore: { name: uniq("QA Supply"), phone: "9876543210", address: ADDRESS },
-        shippingFee: 60,
-        shipWithinDays: 2,
-        returnDays: 7,
-      },
-    });
-    assert.equal(acc.status, 200, JSON.stringify(acc.body));
-    return acc.body.data;
-  };
-  const row = async (storeId) =>
-    (await c.A.req("GET", `${c.S}/suppliers`)).body.data.suppliers.find((s) => s.store?.id === storeId);
+  const r = await invite(c, { name: "QA Someone Else", phone: randomPhone(), email: undefined });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const token = tokenOf(r.body.data.inviteUrl);
+  const phone = r.body.data.invite.phone.replace(/\D/g, "").slice(-10);
+  const preview = await new Client().req("GET", `${D}/invites/${token}`);
+  assert.equal(preview.body.data.sentTo, `${phone.slice(0, 2)}••••••${phone.slice(-2)}`, "says who it is for, half hidden");
 
-  // Approve.
-  const a = await accept();
-  assert.equal(a.needsApproval, true);
-  const pending = await row(a.storeId);
-  assert.equal(pending.status, "PENDING");
-  assert.equal(pending.invitedAs.name, "QA Someone Else");
-  // The supplier can't activate itself, and a pending link supplies nothing.
-  const own = await c.B.req("PATCH", `${D}/stores/${a.storeId}/sellers/${a.linkId}`, { json: { status: "ACTIVE" } });
-  assert.equal(own.status, 409, JSON.stringify(own.body));
-  assert.equal((await c.A.req("PATCH", `${c.S}/suppliers/${a.linkId}`, { json: { status: "PAUSED" } })).status, 409, "no pausing a pending link");
-  assert.equal((await c.A.req("PATCH", `${c.S}/suppliers/${a.linkId}`, { json: { status: "ACTIVE" } })).status, 200);
-  assert.equal((await row(a.storeId)).status, "ACTIVE");
+  // B is not the invited number: no join sheet, and accept is refused before anything is made.
+  const stores = await c.B.req("GET", `${D}/invites/${token}/stores`);
+  assert.equal(stores.status, 200, JSON.stringify(stores.body));
+  assert.deepEqual(stores.body.data, { forYou: false, stores: [] });
+  const before = (await c.A.req("GET", `${c.S}/suppliers`)).body.data.suppliers.length;
+  const acc = await c.B.req("POST", `${D}/invites/${token}/accept`, {
+    json: {
+      newStore: { name: uniq("QA Supply"), phone: "9876543210", address: ADDRESS },
+      shippingFee: 60,
+      shipWithinDays: 2,
+      returnDays: 7,
+    },
+  });
+  assert.equal(acc.status, 403, JSON.stringify(acc.body));
+  assert.match(acc.body.message, /sent to \d\d••••••\d\d/);
+  assert.equal((await c.A.req("GET", `${c.S}/suppliers`)).body.data.suppliers.length, before, "no link made");
+  // The invite stays open for the right person.
+  assert.equal((await new Client().req("GET", `${D}/invites/${token}`)).body.data.status, "SENT");
 
-  // Decline.
-  const b = await accept();
-  assert.equal((await c.A.req("PATCH", `${c.S}/suppliers/${b.linkId}`, { json: { status: "ENDED" } })).status, 200);
-  assert.equal((await row(b.storeId)).status, "ENDED");
+  // The invited person (B's own email) gets the sheet.
+  const mine = await invite(c, { name: "QA Me", email: need("QA_EMAIL_B") });
+  if (mine.status === 201) {
+    const own = await c.B.req("GET", `${D}/invites/${tokenOf(mine.body.data.inviteUrl)}/stores`);
+    assert.equal(own.body.data.forYou, true);
+  } else {
+    assert.equal(mine.status, 409, "B already supplies this seller (SU-14)");
+  }
 });

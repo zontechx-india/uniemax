@@ -76,7 +76,6 @@ export const feePayerText = (who: ReturnFeePayer, side: 'seller' | 'supplier', o
       : 'You bear it'
 
 const LINK_WORDS: Record<LinkStatus, { text: string; tone: BadgeTone }> = {
-  PENDING: { text: 'Waiting for approval', tone: 'pending' },
   ACTIVE: { text: 'Active', tone: 'success' },
   PAUSED: { text: 'Paused', tone: 'warning' },
   ENDED: { text: 'Ended', tone: 'neutral' },
