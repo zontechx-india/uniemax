@@ -27,6 +27,10 @@ import { ChoiceCard, Hint, StepButtons, StepError, StepShell } from './shared'
  * store. So the step is one sentence saying what those settings are and a
  * single "change for this product" switch; the detailed editors only appear
  * for the rare product that needs its own rule.
+ *
+ * A supplier account is asked only where it delivers: that area is what its
+ * sellers' copies follow. The shipping charge customers pay is each seller's,
+ * and cash on delivery is set per seller in their terms (D-28).
  */
 export function DeliveryStep({
   storeId,
@@ -34,12 +38,14 @@ export function DeliveryStep({
   onSaved,
   onBack,
   onNext,
+  supplyOnly = false,
 }: {
   storeId: string
   product: StoreProduct
   onSaved: (product: StoreProduct) => void
   onBack: () => void
   onNext: () => void
+  supplyOnly?: boolean
 }) {
   const { store } = useManagedStore()
   const [custom, setCustom] = useState(
@@ -97,26 +103,38 @@ export function DeliveryStep({
 
   return (
     <StepShell
-      title="Delivery & payment"
-      lead="Most products simply follow your shop's settings. Change them here only if this product is different."
+      title={supplyOnly ? 'Where you deliver' : 'Delivery & payment'}
+      lead={
+        supplyOnly
+          ? "Your sellers' customers can order this wherever you deliver. Most products simply follow your delivery settings."
+          : "Most products simply follow your shop's settings. Change them here only if this product is different."
+      }
     >
       <div className="rounded-2xl border border-line bg-surface/70 p-4">
-        <p className="text-base font-semibold text-fg">Your shop's settings</p>
+        <p className="text-base font-semibold text-fg">{supplyOnly ? 'Your delivery settings' : "Your shop's settings"}</p>
         <ul className="mt-2 space-y-1.5 text-base text-muted">
           <li>
             Delivers to:{' '}
             <span className="text-fg">{describeDeliveryRule(store.shipping.deliveryRule)}</span>
           </li>
-          <li>
-            Shipping charge:{' '}
-            <span className="text-fg">{describeShippingRate(store.shipping.rate)}</span>
-          </li>
-          <li>
-            Cash on delivery:{' '}
-            <span className="text-fg">{store.payments.acceptCod ? 'accepted' : 'switched off'}</span>
-          </li>
+          {!supplyOnly && (
+            <>
+              <li>
+                Shipping charge:{' '}
+                <span className="text-fg">{describeShippingRate(store.shipping.rate)}</span>
+              </li>
+              <li>
+                Cash on delivery:{' '}
+                <span className="text-fg">{store.payments.acceptCod ? 'accepted' : 'switched off'}</span>
+              </li>
+            </>
+          )}
         </ul>
-        <Hint>Change your shop's settings any time under Delivery and Payments.</Hint>
+        <Hint>
+          {supplyOnly
+            ? 'Change them any time under Delivery and Payments. Cash on delivery is agreed with each seller, and your shipping fee is in Supplier settings.'
+            : "Change your shop's settings any time under Delivery and Payments."}
+        </Hint>
       </div>
 
       <div
@@ -127,7 +145,7 @@ export function DeliveryStep({
         <ChoiceCard
           active={!custom}
           icon={TruckIcon}
-          title="Same as my shop"
+          title={supplyOnly ? 'Same as my settings' : 'Same as my shop'}
           body="Nothing to change. Most products."
           onClick={useStoreSettings}
         />
@@ -135,7 +153,7 @@ export function DeliveryStep({
           active={custom}
           icon={SlidersIcon}
           title="Different for this product"
-          body="Its own delivery area or charge, or no cash on delivery."
+          body={supplyOnly ? 'Its own delivery area.' : 'Its own delivery area or charge, or no cash on delivery.'}
           onClick={() => setCustom(true)}
         />
       </div>
@@ -151,32 +169,36 @@ export function DeliveryStep({
             }}
             disabled={busy}
           />
-          <ProductShippingField
-            storeRate={store.shipping.rate}
-            value={shippingOverride}
-            onChange={(next) => {
-              setShippingOverride(next)
-              setError(null)
-            }}
-            disabled={busy}
-          />
-          <label className="flex min-h-tap cursor-pointer items-start gap-3 rounded-xl py-1">
-            <input
-              type="checkbox"
-              checked={codAvailable}
-              onChange={(e) => setCodAvailable(e.target.checked)}
-              disabled={busy}
-              className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-[var(--brand)]"
-            />
-            <span className="text-base">
-              <span className="font-medium text-fg">Cash on delivery for this product</span>
-              <span className="mt-0.5 block text-hint text-muted">
-                {store.payments.acceptCod
-                  ? 'Untick for items you only sell prepaid.'
-                  : 'Your store has cash on delivery switched off; this applies once you turn it on.'}
-              </span>
-            </span>
-          </label>
+          {!supplyOnly && (
+            <>
+              <ProductShippingField
+                storeRate={store.shipping.rate}
+                value={shippingOverride}
+                onChange={(next) => {
+                  setShippingOverride(next)
+                  setError(null)
+                }}
+                disabled={busy}
+              />
+              <label className="flex min-h-tap cursor-pointer items-start gap-3 rounded-xl py-1">
+                <input
+                  type="checkbox"
+                  checked={codAvailable}
+                  onChange={(e) => setCodAvailable(e.target.checked)}
+                  disabled={busy}
+                  className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-[var(--brand)]"
+                />
+                <span className="text-base">
+                  <span className="font-medium text-fg">Cash on delivery for this product</span>
+                  <span className="mt-0.5 block text-hint text-muted">
+                    {store.payments.acceptCod
+                      ? 'Untick for items you only sell prepaid.'
+                      : 'Your store has cash on delivery switched off; this applies once you turn it on.'}
+                  </span>
+                </span>
+              </label>
+            </>
+          )}
         </div>
       )}
 

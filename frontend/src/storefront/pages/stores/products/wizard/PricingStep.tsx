@@ -75,10 +75,16 @@ export function PricingStep({
   onSwitchProduct,
   onBack,
   onNext,
+  supplyOnly = false,
 }: {
   storeId: string
   categories: StoreCategory[]
   product: StoreProduct
+  /**
+   * A supplier account: its price is the suggested price sellers start from;
+   * its price for sellers is asked on the last step (D-28).
+   */
+  supplyOnly?: boolean
   /** Step 1's answer, if the seller gave one. */
   plan: VersionPlan
   onSaved: (product: StoreProduct) => void
@@ -186,7 +192,9 @@ export function PricingStep({
       return {
         error: price.trim()
           ? 'Enter the price in numbers only, e.g. 1299.'
-          : 'Enter the selling price.',
+          : supplyOnly
+            ? 'Enter the suggested price.'
+            : 'Enter the selling price.',
       }
     }
     const compareAtValue = compareAt.trim() === '' ? null : Number(compareAt)
@@ -399,7 +407,14 @@ export function PricingStep({
 
   const singleFields = (
     <div className="grid gap-4 sm:grid-cols-2">
-      <Field label="Selling price (₹)" hint="What the customer pays you.">
+      <Field
+        label={supplyOnly ? 'Suggested price (₹)' : 'Selling price (₹)'}
+        hint={
+          supplyOnly
+            ? 'What a customer usually pays. Sellers start from this; your price for sellers is asked in the last step.'
+            : 'What the customer pays you.'
+        }
+      >
         <input
           value={price}
           onChange={(e) => setPrice(cleanAmount(e.target.value))}
@@ -454,7 +469,9 @@ export function PricingStep({
       title={mode === 'options' && part === 'prices' ? 'Price for each choice' : 'Price'}
       lead={
         mode === 'options' && part === 'prices'
-          ? 'Type a price and how many you have for each one. Use “Same price for all” if most are the same.'
+          ? supplyOnly
+            ? 'Type the suggested price and how many you have for each one. Your price for sellers is asked in the last step.'
+            : 'Type a price and how many you have for each one. Use “Same price for all” if most are the same.'
           : 'Same product in different colours, sizes or weights? Put them all in this one product — don’t make a new product for each.'
       }
     >

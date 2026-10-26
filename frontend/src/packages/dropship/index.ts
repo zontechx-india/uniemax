@@ -19,6 +19,10 @@ export {
 export type { DropshipRole } from './role'
 export { SupplierHome } from './pages/supplier/SupplierHome'
 export { SupplyOnlyNote } from './pages/supplier/SupplyOnlyNote'
+// A supplier account's own products: offered to sellers from the editor's last step (no shop, D-28).
+export { isOffered, offerDraftOf, offerProblem, saveOffer, useSupplyItem, useSupplyOffers } from './offers'
+export type { OfferDraft } from './offers'
+export { OfferPrices } from './pages/supplier/OfferPrices'
 // Seams in the seller's product list and product editor (supplier products, D-34).
 export { useSuppliedFor, useSuppliedProducts } from './supplied'
 export type { Supplied } from './api'

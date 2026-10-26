@@ -38,7 +38,15 @@ import { ProductWizard } from './products/wizard/ProductWizard'
 import type { StepKey } from './products/wizard/shared'
 import { Button, buttonClass } from '../../../shared/ui/Button'
 import { MediaImg } from '../../../shared/media/MediaImg'
-import { SuppliedNote, SupplierProductsEntry, SupplyOnlyNote, useDropshipRole, useSuppliedProducts } from '../../../packages/dropship'
+import {
+  isOffered,
+  SuppliedNote,
+  SupplierProductsEntry,
+  SupplyOnlyNote,
+  useDropshipRole,
+  useSuppliedProducts,
+  useSupplyOffers,
+} from '../../../packages/dropship'
 import type { Supplied } from '../../../packages/dropship'
 
 /**
@@ -57,6 +65,11 @@ import type { Supplied } from '../../../packages/dropship'
  * Showing / Hidden switch, and "⋯ More" for the rarer actions (home-page
  * placement, delete) — so Delete is never a stray tap beside the switch.
  * Search and filter chips appear once a shop has enough products to need them.
+ *
+ * A supplier account (no shop, D-28) sees the same list in its own words: the
+ * switch is Available / Paused for its sellers, each row says whether it is
+ * offered to sellers (with **Offer to sellers** when not), and there is no
+ * home-page placement.
  */
 export function StoreProductsPage() {
   const { store, onStoreChange, refreshStore } = useManagedStore()
@@ -85,6 +98,7 @@ export function StoreProductsPage() {
   const supplied = useSuppliedProducts(store.id, store.slug)
   // A supplier account has no shop: nothing to publish, and its products are offered to sellers instead.
   const supplyOnly = useDropshipRole(store.slug)?.supplier?.supplyOnly ?? false
+  const offers = useSupplyOffers(store.id, supplyOnly)
 
   useEffect(() => {
     let cancelled = false
@@ -156,7 +170,15 @@ export function StoreProductsPage() {
         }),
       )
       refreshStore?.()
-      showToast(next ? 'Showing in your shop' : 'Hidden from your shop')
+      showToast(
+        supplyOnly
+          ? next
+            ? 'Available to your sellers again'
+            : 'Paused — your sellers can’t sell it for now'
+          : next
+            ? 'Showing in your shop'
+            : 'Hidden from your shop',
+      )
     } catch (err) {
       setError(toApiError(err).message)
       showToast('Could not save — try again', 'danger')
@@ -328,14 +350,20 @@ export function StoreProductsPage() {
           onClose={() => {
             setWizard(null)
             refreshStore?.()
+            offers.reload()
           }}
+          supplyOnly={supplyOnly}
         />
       ) : products.length === 0 ? (
         <GlassCard>
           <EmptyState
             icon={BoxIcon}
             title="Add your first product"
-            description="A name, a photo and a price are enough to start selling. You can add more details later."
+            description={
+              supplyOnly
+                ? 'A name, a photo and a price are enough to offer it to your sellers. You can add more details later.'
+                : 'A name, a photo and a price are enough to start selling. You can add more details later.'
+            }
             steps={[
               { icon: TagIcon, label: 'Name it' },
               { icon: CameraIcon, label: 'Add a photo' },
@@ -374,6 +402,7 @@ export function StoreProductsPage() {
           onPlacement={setPlacementId}
           supplied={supplied.byProduct}
           suppliedNote={(row) => <SuppliedNote storeId={store.id} supplied={row} onChanged={reload} />}
+          offered={supplyOnly ? (id) => (offers.byProduct ? isOffered(offers.byProduct.get(id)) : null) : undefined}
         />
       )}
 
@@ -391,10 +420,10 @@ export function StoreProductsPage() {
           toDelete ? (
             <>
               <span className="font-medium text-fg">{toDelete.name}</span>{' '}
-              will be removed from your shop
+              will be {supplyOnly ? 'deleted' : 'removed from your shop'}
               {toDelete.variants.length > 0 &&
                 ` along with its ${toDelete.variants.length} choice${toDelete.variants.length === 1 ? '' : 's'}`}
-              . You cannot undo this.
+              .{supplyOnly && ' Sellers who sell it can’t sell it any more.'} You cannot undo this.
             </>
           ) : null
         }
@@ -439,6 +468,9 @@ const FILTERS: { key: Filter; label: string; test: (p: StoreProduct) => boolean 
   { key: 'draft', label: 'Not finished', test: (p) => p.isDraft },
 ]
 
+/** A supplier account's names for the same filters: it has no shop to show in. */
+const SUPPLIER_FILTER_LABELS: Partial<Record<Filter, string>> = { showing: 'Available', hidden: 'Paused' }
+
 /** Search + filter chips (once there are enough products), then the rows. */
 function ProductList({
   products,
@@ -455,6 +487,7 @@ function ProductList({
   onPlacement,
   supplied,
   suppliedNote,
+  offered,
 }: {
   products: StoreProduct[]
   categories: StoreCategory[]
@@ -470,7 +503,13 @@ function ProductList({
   onPlacement: (id: string) => void
   supplied: Map<string, Supplied>
   suppliedNote: (row: Supplied) => ReactNode
+  /**
+   * Set only for a supplier account: is this product offered to sellers?
+   * `null` while the offers load.
+   */
+  offered?: (productId: string) => boolean | null
 }) {
+  const supplyOnly = offered !== undefined
   // A handful of products needs no search; past that, finding one does.
   const searchable = products.length > 5
   const visible = useMemo(() => {
@@ -511,7 +550,7 @@ function ProductList({
                       : 'border-line bg-surface/70 text-fg hover:border-brand/50'
                   }`}
                 >
-                  {label}
+                  {(supplyOnly ? SUPPLIER_FILTER_LABELS[key] : undefined) ?? label}
                   <span className={on ? 'opacity-85' : 'text-muted'}>{count}</span>
                 </button>
               )
@@ -523,7 +562,7 @@ function ProductList({
       {drafts > 0 && filter === 'all' && !query && (
         <p className="text-hint text-muted">
           {drafts} product{drafts === 1 ? ' is' : 's are'} not finished — open one
-          and add what it still needs to put it in your shop.
+          and add what it still needs to {supplyOnly ? 'offer it to your sellers' : 'put it in your shop'}.
         </p>
       )}
 
@@ -544,6 +583,7 @@ function ProductList({
                 onDelete={() => onDelete(product)}
                 onPlacement={() => onPlacement(product.id)}
                 extra={supplied.has(product.id) ? suppliedNote(supplied.get(product.id)!) : null}
+                offered={offered ? offered(product.id) : undefined}
               />
             </li>
           ))}
@@ -604,6 +644,7 @@ function ProductRow({
   onDelete,
   onPlacement,
   extra,
+  offered,
 }: {
   product: StoreProduct
   categories: StoreCategory[]
@@ -616,7 +657,10 @@ function ProductRow({
   onPlacement: () => void
   /** A package's note under the row (a supplier product's badge and paused reason). */
   extra?: ReactNode
+  /** A supplier account only: offered to sellers? `null` while loading. */
+  offered?: boolean | null
 }) {
+  const supplyOnly = offered !== undefined
   const cover = product.media.find((m) => m.type === 'IMAGE')?.url ?? null
   const stock = product.stockQuantity
   const nextUp = product.completeness.missing[0]
@@ -624,6 +668,8 @@ function ProductRow({
     : null
   const complete = product.completeness.percent
   const placed = MERCHANDISING.filter(({ key }) => key !== 'hideFromSearch' && product[key])
+  // Ready, but sellers can't see it yet: the supplier's one next thing.
+  const toOffer = supplyOnly && !product.isDraft && product.isActive && offered === false
 
   return (
     <ActionRow
@@ -651,6 +697,14 @@ function ProductRow({
       status={
         product.isDraft ? (
           <StatusPill tone="pending">Not finished</StatusPill>
+        ) : supplyOnly ? (
+          !product.isActive ? (
+            <StatusPill>Paused</StatusPill>
+          ) : offered ? (
+            <StatusPill tone="success">Offered to sellers</StatusPill>
+          ) : offered === false ? (
+            <StatusPill tone="pending">Not offered yet</StatusPill>
+          ) : null
         ) : product.isActive ? (
           <StatusPill tone="success">Showing</StatusPill>
         ) : (
@@ -670,21 +724,26 @@ function ProductRow({
       below={
         <div className="space-y-2">
           {extra}
-          {/* How complete, and the one next thing — the nudge that fills a shop gradually. */}
-          {nextUp && (
+          {/* How complete, and the one next thing — the nudge that fills a shop gradually.
+              A supplier's ready product that sellers can't see yet gets "offer it" as its next thing. */}
+          {(nextUp || toOffer) && (
             <button
               type="button"
-              onClick={() => onEdit(nextUp.step)}
+              onClick={() => onEdit(nextUp ? nextUp.step : 'review')}
               className="flex min-h-tap w-full items-center gap-2.5 rounded-xl bg-pending-soft px-3 text-left transition hover:brightness-95"
             >
-              <span className="h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-fg/10">
-                <span
-                  className="block h-full rounded-full bg-pending"
-                  style={{ width: `${complete}%` }}
-                />
-              </span>
+              {nextUp && (
+                <span className="h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-fg/10">
+                  <span
+                    className="block h-full rounded-full bg-pending"
+                    style={{ width: `${complete}%` }}
+                  />
+                </span>
+              )}
               <span className="text-hint font-semibold text-pending">
-                {complete}% done — next: {nextUp.label}
+                {nextUp
+                  ? `${complete}% done — next: ${nextUp.label}`
+                  : 'Sellers can’t see it yet — next: set your price for sellers and offer it'}
               </span>
             </button>
           )}
@@ -738,23 +797,28 @@ function ProductRow({
         <BigSwitch
           checked={product.isActive}
           disabled={toggling}
-          label={`Show ${product.name} in your shop`}
-          onText="Showing"
-          offText="Hidden"
+          label={supplyOnly ? `${product.name} available to your sellers` : `Show ${product.name} in your shop`}
+          onText={supplyOnly ? 'Available' : 'Showing'}
+          offText={supplyOnly ? 'Paused' : 'Hidden'}
           onChange={onToggleActive}
         />
       }
       menu={[
-        {
-          label: 'Home page & search',
-          icon: StarIcon,
-          note: 'Feature it on your home page, or hide it from search',
-          onSelect: onPlacement,
-        },
+        // A supplier account has no home page or search to place it in.
+        ...(supplyOnly
+          ? []
+          : [
+              {
+                label: 'Home page & search',
+                icon: StarIcon,
+                note: 'Feature it on your home page, or hide it from search',
+                onSelect: onPlacement,
+              },
+            ]),
         {
           label: 'Delete product',
           icon: TrashIcon,
-          note: 'Removes it from your shop for good',
+          note: supplyOnly ? 'Deletes it for good' : 'Removes it from your shop for good',
           danger: true,
           onSelect: onDelete,
         },

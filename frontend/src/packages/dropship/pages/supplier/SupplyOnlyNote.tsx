@@ -12,12 +12,12 @@ export function SupplyOnlyNote() {
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-fg">These are your own products. Sellers only see the ones you offer.</p>
         <p className="mt-1 text-sm text-muted">
-          Offer a product, with your price for sellers, and your sellers can add it to their shop. Customers never see
-          this list: a supplier account has no shop.
+          The last step of adding a product asks your price for sellers and offers it. Customers never see this list:
+          a supplier account has no shop.
         </p>
       </div>
-      <Link to="../supply" className={buttonClass({ variant: 'primary', size: 'sm' })}>
-        Offer products to sellers
+      <Link to="../supply" className={buttonClass({ variant: 'secondary', size: 'sm' })}>
+        Change many prices at once
       </Link>
     </section>
   )

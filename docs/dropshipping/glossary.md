@@ -20,6 +20,8 @@ margin, RTO, dropship, resale, copy, link*.
 | `OrderShipment` (core) | **Parcel** | One package with a courier and tracking number. |
 | proof of delivery (`podKey`) | **Proof of delivery** | An optional photo of the courier's delivery proof. |
 | `cost` | **Supplier price** (seller) / **Price for sellers** (supplier) | What the seller pays the supplier per unit. |
+| a supplier account's own `price` | **Suggested price** (supplier) | What customers usually pay; sellers' copies start from it. Never "shop price" or "selling price" — a supplier account has no shop. |
+| `isActive` on a supplier account's product | **Available** / **Paused** (supplier) | Whether sellers can sell it at all; never "Showing" / "Hidden" or "publish". |
 | `supplierShare` | **Supplier gets** (seller) / **You get** (supplier) | `cost × qty + shipping fee` for one supplier order. |
 | earnings | **You earn** | What the seller keeps on a sale. |
 | `collectAmount` | **Collect ₹X cash** | What the supplier's courier collects on a COD parcel. |

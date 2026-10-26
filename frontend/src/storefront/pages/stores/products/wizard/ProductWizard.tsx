@@ -15,12 +15,25 @@ import { DeliveryStep } from './DeliveryStep'
 import { DetailsStep } from './DetailsStep'
 import { PhotosStep } from './PhotosStep'
 import { PricingStep } from './PricingStep'
-import { categoryOptions, StepButtons, StepError, STEPS, StepShell } from './shared'
+import { categoryOptions, StepButtons, StepError, stepLabel, STEPS, StepShell } from './shared'
 import { buttonClass } from '../../../../../shared/ui/Button'
 import type { StepKey, VersionPlan } from './shared'
 import { MediaImg } from '../../../../../shared/media/MediaImg'
 import { Button } from '../../../../../shared/ui/Button'
-import { SuppliedDeliveryStep, SuppliedPricingStep, useSuppliedFor } from '../../../../../packages/dropship'
+import { ErrorNote } from '../../../../../shared/ui/form'
+import { showToast } from '../../ui'
+import {
+  isOffered,
+  OfferPrices,
+  offerDraftOf,
+  offerProblem,
+  saveOffer,
+  SuppliedDeliveryStep,
+  SuppliedPricingStep,
+  useSuppliedFor,
+  useSupplyItem,
+} from '../../../../../packages/dropship'
+import type { OfferDraft } from '../../../../../packages/dropship'
 
 /**
  * Adding — or finishing — a product, one question at a time.
@@ -48,6 +61,7 @@ export function ProductWizard({
   onCatalogChanged,
   onCategoriesChange,
   onClose,
+  supplyOnly = false,
 }: {
   storeId: string
   categories: StoreCategory[]
@@ -60,6 +74,8 @@ export function ProductWizard({
   /** A category was added from inside the wizard. */
   onCategoriesChange?: (categories: StoreCategory[]) => void
   onClose: () => void
+  /** A supplier account: no shop to publish to — the last step offers the product to sellers (D-28). */
+  supplyOnly?: boolean
 }) {
   const [product, setProduct] = useState<StoreProduct | null>(initial)
   const [step, setStep] = useState<StepKey>(initial ? startAt : 'basics')
@@ -132,7 +148,7 @@ export function ProductWizard({
               >
                 {isDone && !current ? <CheckIcon className="h-4 w-4" /> : i + 1}
               </span>
-              {s.label}
+              {stepLabel(s.key, supplyOnly)}
             </button>
           </li>
         )
@@ -204,6 +220,7 @@ export function ProductWizard({
               onSwitchProduct={switchTo}
               onBack={() => go(-1)}
               onNext={() => go(1)}
+              supplyOnly={supplyOnly}
             />
           )
         )}
@@ -232,6 +249,7 @@ export function ProductWizard({
               onSaved={saved}
               onBack={() => go(-1)}
               onNext={() => go(1)}
+              supplyOnly={supplyOnly}
             />
           )
         )}
@@ -244,6 +262,7 @@ export function ProductWizard({
             onBack={() => go(-1)}
             onJump={setStep}
             onDone={onClose}
+            supplyOnly={supplyOnly}
           />
         )}
 
@@ -280,7 +299,7 @@ export function ProductWizard({
                 {/* One line always — a wrapped step name pushed the chevron
                     off on its own and doubled the header's height. */}
                 <span className="truncate">
-                  Step {index + 1} of {STEPS.length} · {STEPS[index]!.label}
+                  Step {index + 1} of {STEPS.length} · {stepLabel(STEPS[index]!.key, supplyOnly)}
                 </span>
                 <ChevronDownIcon className="h-4 w-4 shrink-0" />
               </button>
@@ -356,7 +375,7 @@ export function ProductWizard({
                   >
                     {isDone && !current ? <CheckIcon className="h-3.5 w-3.5" /> : i + 1}
                   </span>
-                  {s.label}
+                  {stepLabel(s.key, supplyOnly)}
                 </button>
               </li>
             )
@@ -418,6 +437,10 @@ const CHECKS: { key: StoreProduct['completeness']['missing'][number]; label: str
  * Step 6 — the product as a customer will see it, what is still missing, and
  * the button that makes it live. Publishing needs a photo and a price;
  * everything else is a nudge for later.
+ *
+ * A supplier account has no shop (D-28), so for it this step is "Review &
+ * offer": it asks the price for sellers in place, and one button switches the
+ * product on and offers it — sellers only see a product once it is offered.
  */
 function ReviewStep({
   storeId,
@@ -427,6 +450,7 @@ function ReviewStep({
   onBack,
   onJump,
   onDone,
+  supplyOnly,
 }: {
   storeId: string
   categories: StoreCategory[]
@@ -435,14 +459,21 @@ function ReviewStep({
   onBack: () => void
   onJump: (step: StepKey) => void
   onDone: () => void
+  supplyOnly: boolean
 }) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const offer = useSupplyItem(storeId, product.id, supplyOnly)
+  const [draft, setDraft] = useState<OfferDraft | null>(null)
+  if (offer.item && draft === null) setDraft(offerDraftOf(offer.item))
 
   const cover = product.media.find((m) => m.type === 'IMAGE')?.url ?? null
   const category = categoryOptions(categories).find((c) => c.id === product.category.id)
   const missing = new Set(product.completeness.missing)
   const canPublish = !missing.has('photo') && !missing.has('price')
+  const offered = product.isActive && isOffered(offer.item)
+  const offerChanged =
+    !!offer.item && !!draft && JSON.stringify(draft) !== JSON.stringify(offerDraftOf(offer.item))
 
   const publish = async () => {
     setError(null)
@@ -456,15 +487,52 @@ function ReviewStep({
     }
   }
 
-  return (
-    <StepShell
-      title={product.isActive ? 'All set' : 'Review & publish'}
-      lead={
-        product.isActive
-          ? 'This product is live. Anything you changed is already saved.'
-          : 'Here is how it will look. Publish when you are happy — you can keep improving it afterwards.'
+  /** Switch the product on (if it isn't) and offer it at the typed prices. */
+  const offerToSellers = async () => {
+    if (!offer.item || !draft) return
+    const problem = offerProblem(offer.item, draft)
+    if (problem) return setError(problem)
+    setError(null)
+    setBusy(true)
+    try {
+      if (!product.isActive) {
+        onSaved(await storeCatalogApi.updateProduct(storeId, product.id, { isActive: true }))
       }
-    >
+      const saved = await saveOffer(storeId, offer.item, draft)
+      offer.setItem(saved)
+      setDraft(offerDraftOf(saved))
+      showToast(offered ? 'Saved — your sellers see the new prices' : 'Offered — your sellers can add it to their shops')
+      onDone()
+    } catch (err) {
+      setError(toApiError(err).message)
+      setBusy(false)
+    }
+  }
+
+  const words = supplyOnly
+    ? {
+        title: offered ? 'Offered to sellers' : 'Review & offer to sellers',
+        lead: offered
+          ? 'Your sellers can add this product to their shops. You can change your price for sellers below.'
+          : 'Set the price you charge sellers, then offer it. Customers never see your account — sellers add the product to their own shops.',
+        needed: 'Still needed before you can offer it',
+        required: 'Needed to offer it',
+        price: 'A suggested price',
+        footnote: 'only a photo and a suggested price are needed to offer it to sellers.',
+      }
+    : {
+        title: product.isActive ? 'All set' : 'Review & publish',
+        lead: product.isActive
+          ? 'This product is live. Anything you changed is already saved.'
+          : 'Here is how it will look. Publish when you are happy — you can keep improving it afterwards.',
+        needed: 'Still needed before it can go live',
+        required: 'Needed to publish',
+        price: 'A selling price',
+        footnote: 'only a photo and a price are needed to go live.',
+      }
+
+  return (
+    <StepShell title={words.title} lead={words.lead}>
       <div className="grid gap-5 lg:grid-cols-[16rem_1fr]">
         {/* The storefront card, honestly. A compact row on a phone — a
             full-width square (empty, before a photo) pushed the checklist
@@ -499,7 +567,7 @@ function ReviewStep({
             greyed-out Publish button always has its reason in view. */}
         <div className={!canPublish && !product.isActive ? 'order-first lg:order-none' : ''}>
           <p className="text-base font-semibold text-fg">
-            {canPublish || product.isActive ? 'Checklist' : 'Still needed before it can go live'}
+            {canPublish || product.isActive ? 'Checklist' : words.needed}
           </p>
           <ul className="mt-2 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
             {CHECKS.map((check) => {
@@ -514,10 +582,10 @@ function ReviewStep({
                     {done ? <CheckIcon className="h-4 w-4" /> : '·'}
                   </span>
                   <span className={`min-w-0 flex-1 text-base ${done ? 'text-fg' : 'text-muted'}`}>
-                    {check.label}
+                    {check.key === 'price' ? words.price : check.label}
                     {!done && (
                       <span className="block text-hint">
-                        {check.required ? 'Needed to publish' : 'Optional'}
+                        {check.required ? words.required : 'Optional'}
                       </span>
                     )}
                   </span>
@@ -540,15 +608,43 @@ function ReviewStep({
           </ul>
           <p className="mt-2 text-hint text-muted">
             {product.completeness.percent}% complete. Products with photos, a
-            description and a few facts get noticed more — but only a photo
-            and a price are needed to go live.
+            description and a few facts get noticed more — but {words.footnote}
           </p>
         </div>
       </div>
 
+      {supplyOnly && canPublish && (
+        offer.item && draft ? (
+          <OfferPrices item={offer.item} draft={draft} onChange={setDraft} disabled={busy} />
+        ) : offer.item === undefined ? (
+          <p className="text-sm text-muted">Loading your price for sellers…</p>
+        ) : (
+          <ErrorNote>{offer.error ?? 'This product can’t be offered right now — refresh and try again.'}</ErrorNote>
+        )
+      )}
+
       {error && <StepError>{error}</StepError>}
 
-      {product.isActive ? (
+      {supplyOnly ? (
+        offered ? (
+          <StepButtons
+            onBack={onBack}
+            onNext={() => (offerChanged ? void offerToSellers() : onDone())}
+            nextLabel={offerChanged ? 'Save prices' : 'Done'}
+            busy={busy}
+          />
+        ) : (
+          <StepButtons
+            onBack={onBack}
+            onNext={() => void offerToSellers()}
+            nextLabel="Offer to sellers"
+            busy={busy}
+            canNext={canPublish && !!offer.item}
+            skip={onDone}
+            skipLabel={product.isActive ? 'Finish later' : 'Save as draft'}
+          />
+        )
+      ) : product.isActive ? (
         <StepButtons onBack={onBack} onNext={onDone} nextLabel="Done" />
       ) : (
         <StepButtons

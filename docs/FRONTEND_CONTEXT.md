@@ -2585,7 +2585,12 @@ what the host apps see:
     ships** chip from `hasPackageLines`.
   - A **supplier account** (`supplier.supplyOnly`) is not a shop: `StoreProductsPage` hides the "shop isn't
     live" Publish prompt and shows the package's `SupplyOnlyNote` (these are your products; sellers only see
-    the ones you offer, under Products for sellers). Its menu row **Orders to ship** carries a badge with the
+    the ones you offer). It passes `supplyOnly` to `ProductWizard`, which then speaks to a supplier (D-53):
+    pricing asks the **Suggested price**, the delivery step asks only the delivery area, and the last step is
+    **Review & offer** — the package's `OfferPrices` asks the price for sellers in place and **Offer to
+    sellers** switches the product on and offers it. Its rows say **Offered to sellers** / **Not offered yet**
+    (with an "offer it" nudge) / **Paused**, the switch is Available / Paused, there is no Home page & search
+    action, and `StoreManageLayout` shows no launch "Pending" marks. Its menu row **Orders to ship** carries a badge with the
     role's `ordersToShip` count (`SectionItem.count`, refreshed after each action), and `SupplierHome` opens
     with an *"N new orders to ship"* card.
     It has no customer **Orders** or **Customer messages** rows (it can't sell), and on mobile the "To ship"

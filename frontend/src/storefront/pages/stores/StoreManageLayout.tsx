@@ -143,7 +143,8 @@ export function StoreManageLayout() {
    * Dashboard's "Accept online payments" card and enforced where they apply.
    */
   const setupSteps = new Map<string, StepState[]>()
-  if (!store.isPublished) {
+  // A supplier account never launches (D-28), so its rows never wait on launch steps.
+  if (!store.isPublished && !supplyOnly) {
     for (const step of store.readiness.steps) {
       if (step.totalCount === 0 || !isLaunchStep(step)) continue
       setupSteps.set(step.href, [...(setupSteps.get(step.href) ?? []), step])

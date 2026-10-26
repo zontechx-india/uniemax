@@ -27,7 +27,7 @@ const costText = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2))
 /**
  * Products for sellers: the supplier's own products, each with an on/off
  * switch and a price for sellers per option (SU-11, SU-12). Bulk: tick
- * products → "Offer at shop price − N %", which fills the prices, still
+ * products → "Offer at suggested price − N %", which fills the prices, still
  * editable after.
  */
 export function SupplyPage() {
@@ -94,7 +94,7 @@ export function SupplyPage() {
             <div className="flex-1">
               <p className="text-sm font-semibold text-fg">Offer many at once</p>
               <p className="text-xs text-muted">
-                Tick products below, then set every option to your shop price minus a discount.
+                Tick products below, then set every option to your suggested price minus a discount.
               </p>
             </div>
             <div className="w-full sm:w-36">
@@ -106,7 +106,7 @@ export function SupplyPage() {
               />
             </div>
             <Button disabled={selected.size === 0} loading={bulkBusy} onClick={bulk}>
-              {selected.size === 0 ? 'Tick products to offer' : `Offer ${selected.size} at shop price − ${pct || 0}%`}
+              {selected.size === 0 ? 'Tick products to offer' : `Offer ${selected.size} at suggested price − ${pct || 0}%`}
             </Button>
           </div>
 
@@ -200,7 +200,7 @@ function SupplyRow({
         </span>
         <div className="min-w-0 flex-1">
           <p className="line-clamp-2 text-sm font-semibold text-fg">{item.name}</p>
-          {!item.isActive && <p className="text-xs text-muted">Hidden in your shop</p>}
+          {!item.isActive && <p className="text-xs text-muted">Paused — turn it on in Products first</p>}
           <BigSwitch
             checked={draft.isOpen}
             onChange={(on) => setDraft((d) => ({ ...d, isOpen: on }))}
@@ -222,7 +222,7 @@ function SupplyRow({
                 <div className="min-w-0 flex-1">
                   {!single && <p className="text-sm font-medium text-fg">{v.name}</p>}
                   <p className="text-xs text-muted">
-                    Shop price {money(v.price)} · {v.stock} in stock
+                    Suggested price {money(v.price)} · {v.stock} in stock
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -246,7 +246,7 @@ function SupplyRow({
                 </div>
                 {above && (
                   <p className="text-xs text-warning sm:basis-full">
-                    Above your shop price — sellers will earn less selling it.
+                    Above your suggested price — sellers earn less selling it.
                   </p>
                 )}
               </div>

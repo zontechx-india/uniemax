@@ -78,10 +78,17 @@ Open the link → sign in (OTP) → **Join {seller} as a supplier**:
   existing supplier account.
 
 ### The supplier offers products
-**Products for sellers**: a switch per product, a **Price for sellers** per
-option, and "Sold by N sellers". Bulk: tick products → **Offer at shop price −
-[20] %**, which fills the prices (still editable). A price above the shop
-price shows a warning but is allowed.
+A supplier account has no shop, so it never publishes a product (D-53). It adds one in the same
+product editor, which asks its **Suggested price** (what customers usually pay; sellers' copies
+start from it, MRP caps them) and only its delivery area (shipping charge and COD are each seller's).
+The last step is **Review & offer**: the **Price for sellers** per option is asked in place (nothing
+prefilled; an empty option isn't offered; "Same price for all" with several options), and **Offer to
+sellers** switches the product on and offers it in one go. Its Products list says **Offered to
+sellers**, **Not offered yet** (with a nudge to offer it) or **Paused**.
+
+**Products for sellers** stays for many at once: a switch per product, a **Price for sellers** per
+option, and "Sold by N sellers". Bulk: tick products → **Offer at suggested price − [20] %**, which
+fills the prices (still editable). A price above the suggested price shows a warning but is allowed.
 
 ### Managing the link (both sides)
 - Seller: one **Suppliers** row with two tabs, **Your suppliers** and **Products to add**

@@ -21,6 +21,19 @@ export const STEPS = [
 export type StepKey = (typeof STEPS)[number]['key']
 
 /**
+ * A supplier account's names for the same steps: it has no shop, so it never
+ * publishes — it offers the product to its sellers — and only its delivery
+ * area reaches them (shipping charge and COD are each seller's).
+ */
+const SUPPLIER_LABELS: Partial<Record<StepKey, string>> = {
+  delivery: 'Delivery area',
+  review: 'Review & offer',
+}
+
+export const stepLabel = (key: StepKey, supplyOnly: boolean): string =>
+  (supplyOnly ? SUPPLIER_LABELS[key] : undefined) ?? STEPS.find((s) => s.key === key)!.label
+
+/**
  * The seller's step-1 answer to "more than one colour or size?", carried to
  * the photo and price steps so they can speak to it. Null = not answered
  * (skipped, or an existing product) — step 3 asks again.
