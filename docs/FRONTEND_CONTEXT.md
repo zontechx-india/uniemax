@@ -537,7 +537,15 @@ two actions, **Manage** and **Share** (labelled **Publish** until live; opens
 the same `StoreShareSheet` as the store strip, and publishing from it updates
 the card in place). Phones get a floating **+ New shop** button instead of the
 header one; first-run is an `EmptyState` with three numbered picture steps;
-loading shows card skeletons), `/mystores/new` (the **Create Store wizard**
+loading shows card skeletons. **Supplier accounts** (dropship, D-28 / D-54) are
+not shops: `useOwnedSupplierStores()` (dropship package, `GET
+/dropship/my-stores`) names them, and the page waits for it so a card never
+flashes "Not live yet". When any exist the grid splits into **Shops** and
+**Supplier accounts**; a supplier card has a truck tile, the supplier's own
+status — **Supplying** / **Waiting for approval** / **Paused by UnieMax**
+(`supplierStatusPill`) — "Supplies N sellers · N orders to ship", and only
+**Manage** — no setup ring, no Publish. The store strip inside management shows
+the same status), `/mystores/new` (the **Create Store wizard**
 — name → logo → about you, see below), and
 `/mystores/:storeSlug` — **desktop**: a split inside the main outlet —
 `StoreManageLayout` renders a sticky left **glass** section card (it scrolls
@@ -3052,7 +3060,8 @@ frontend/
     │       │   └── CartLine.tsx       # Shared line row (stepper, remove, total)
     │       └── stores/
     │           ├── StoresPage.tsx       # "My shops": glass cards (Live pill, setup ring,
-    │           │                        #   Manage + Share/Publish sheet), FAB, empty state
+    │           │                        #   Manage + Share/Publish sheet), FAB, empty state;
+    │           │                        #   supplier accounts in their own group
     │           ├── CreateStorePage.tsx  # Wizard: name → logo → about you
     │           │                        #   (store created on the logo screen, so it
     │           │                        #   is resumable; address/tax gate

@@ -27,6 +27,16 @@ export interface StoreRole {
   payout: { active: boolean } | null
 }
 
+/** One of the caller's stores that supplies sellers — the "My shops" list (D-54). */
+export interface OwnedSupplierStore {
+  storeId: string
+  status: SupplierStatus
+  /** A supplier account: no shop, never published (D-28). */
+  supplyOnly: boolean
+  activeSellers: number
+  ordersToShip: number
+}
+
 export interface StoreCard {
   id: string
   name: string
@@ -197,6 +207,7 @@ export const dropshipApi = {
   /** 200 when the package is on; a 404 (thrown) when it isn't (D-30). */
   status: () => call<{ enabled: boolean }>(http.get(`${BASE}/status`)),
   role: (storeId: string) => call<StoreRole>(http.get(`${store(storeId)}/role`)),
+  myStores: () => call<OwnedSupplierStore[]>(http.get(`${BASE}/my-stores`)),
 }
 
 export const sellerSuppliersApi = {

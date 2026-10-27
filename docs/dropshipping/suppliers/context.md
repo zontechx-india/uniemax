@@ -110,6 +110,7 @@ when `DROPSHIP_ENABLED=true`. `:storeId` is the store's id or slug.
 | Method | Path | Guard | Purpose |
 | --- | --- | --- | --- |
 | GET | `/status` | — | `{ enabled: true }`; a 404 means the package is off (D-30) |
+| GET | `/my-stores` | `requireCustomer` | The caller's stores that supply: `[{ storeId, status, supplyOnly, activeSellers, ordersToShip }]` (stores that don't supply are left out) — the "My shops" list tells supplier accounts apart with it (D-54). `services/suppliers.ts#ownedSupplierStores` |
 | GET | `/stores/:storeId/role` | owner (the only seller-side route a supplier account may call; every other `/stores/:storeId/**` seller route answers it **403**, SU-20) | `{ supplier: { status, supplyOnly } \| null, hasSuppliers }` — drives the nav |
 
 **Seller** (`requireCustomer` + owns `:storeId`; another store → 404, SU-10)

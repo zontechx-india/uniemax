@@ -1,5 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { ok } from "../../utils/response.js";
+import { requireCustomer } from "../auth/index.js";
+import { ownedSupplierStores } from "./services/suppliers.js";
 import { deps } from "./deps.js";
 import { startJobs, subscribe } from "./events.js";
 import { registerHooks } from "./hooks.js";
@@ -29,6 +31,10 @@ export async function registerDropship(
     async (dropship) => {
       // The frontend shows the Suppliers screens only when this answers (D-30).
       dropship.get("/status", async () => ok({ enabled: true }));
+      // Which of the caller's stores are supplier accounts — the "My shops" list (D-54).
+      dropship.get("/my-stores", { preHandler: requireCustomer }, async (request) =>
+        ok(await ownedSupplierStores(request.customer!.id)),
+      );
       await dropship.register(inviteRoutes, { prefix: "/invites" });
       await dropship.register(sellerRoutes, { prefix: "/stores/:storeId" });
       await dropship.register(supplierRoutes, { prefix: "/stores/:storeId" });

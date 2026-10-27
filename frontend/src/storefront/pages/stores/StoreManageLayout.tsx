@@ -22,7 +22,14 @@ import {
 import { useStoreManageScope } from '../../features/stores/storeManageScope'
 import { MediaImg } from '../../../shared/media/MediaImg'
 import { ToastHost } from './ui/Toast'
-import { useDropshipRole } from '../../../packages/dropship'
+import { supplierStatusPill, useDropshipRole } from '../../../packages/dropship'
+
+/** The phone strip's status colours (full class names, so Tailwind keeps them). */
+const STRIP_TONE = {
+  success: { text: 'text-success', dot: 'bg-success' },
+  pending: { text: 'text-pending', dot: 'bg-pending' },
+  danger: { text: 'text-danger', dot: 'bg-danger' },
+} as const
 
 /**
  * Store management — Flipkart-account style split inside the app's main
@@ -49,8 +56,10 @@ export function StoreManageLayout() {
   const scope = useStoreManageScope()
   // A supply-only store (made when its owner joined as a supplier) has no
   // storefront: nothing to publish or share.
-  const supplyOnly =
-    useDropshipRole(scope.mode === 'owner' ? storeSlug : null)?.supplier?.supplyOnly ?? false
+  const supplier = useDropshipRole(scope.mode === 'owner' ? storeSlug : null)?.supplier ?? null
+  const supplyOnly = supplier?.supplyOnly ?? false
+  // Its status is the supplier's own (supplying / waiting / paused), never "Not live yet".
+  const supplierPill = supplier && supplyOnly ? supplierStatusPill(supplier.status) : null
 
   // Minimised-nav preference. Owned here because the grid track width is this
   // file's; the nav renders the icons.
@@ -127,6 +136,7 @@ export function StoreManageLayout() {
   if (store === null) return <Navigate to={scope.indexPath} replace />
 
   const pendingOrders = dashboard?.stats.pending ?? 0
+  const stripTone = STRIP_TONE[supplierPill?.tone ?? (store.isPublished ? 'success' : 'pending')]
 
   /**
    * Setup marks per nav row.
@@ -193,16 +203,13 @@ export function StoreManageLayout() {
         )}
         <div className="min-w-0 flex-1">
           <p className="truncate font-heading text-base font-bold text-fg">{store.name}</p>
-          <span
-            className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-              supplyOnly ? 'text-muted' : store.isPublished ? 'text-success' : 'text-pending'
-            }`}
-          >
-            <span
-              aria-hidden
-              className={`h-1.5 w-1.5 rounded-full ${supplyOnly ? 'bg-muted' : store.isPublished ? 'bg-success' : 'bg-pending'}`}
-            />
-            {supplyOnly ? 'Supplier account' : store.isPublished ? 'Live' : 'Not live yet'}
+          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${stripTone.text}`}>
+            <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${stripTone.dot}`} />
+            {supplierPill
+              ? `${supplierPill.label} · Supplier account`
+              : store.isPublished
+                ? 'Live'
+                : 'Not live yet'}
           </span>
         </div>
         {!supplyOnly && (

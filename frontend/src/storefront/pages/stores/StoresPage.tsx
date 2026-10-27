@@ -1,10 +1,13 @@
 import { usePrivatePageTitle } from '../../../shared/seo'
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useStores } from '../../features/stores/useStores'
 import { launchSteps } from './setupSteps'
 import type { Store } from '../../features/stores/storesApi'
-import { BoxIcon, ChevronRightIcon, PlusIcon, ShareIcon, StoreIcon } from '../../layout/icons'
+import { BoxIcon, ChevronRightIcon, PlusIcon, ShareIcon, StoreIcon, TruckIcon } from '../../layout/icons'
+import { supplierStatusPill, useOwnedSupplierStores } from '../../../packages/dropship'
+import type { OwnedSupplierStore } from '../../../packages/dropship'
 import { buttonClass } from '../../../shared/ui/Button'
 import { MediaImg } from '../../../shared/media/MediaImg'
 import { StoreShareSheet } from './StorePublishCard'
@@ -28,13 +31,22 @@ export function StoresPage() {
   const [fresh, setFresh] = useState<Record<string, Store>>({})
   const [sharing, setSharing] = useState<string | null>(null)
 
+  // Supplier accounts (D-28) have no shop to publish; the dropship package
+  // says which they are. Waited for, so a card never flashes "Not live yet".
+  const suppliers = useOwnedSupplierStores()
+
   const list = stores?.map((store) => fresh[store.id] ?? store) ?? null
   const shared = list?.find((store) => store.id === sharing) ?? null
+  const supplyOnly = (store: Store) => suppliers?.get(store.id)?.supplyOnly ?? false
+  const shops = list?.filter((store) => !supplyOnly(store)) ?? []
+  const supplierAccounts = list?.filter(supplyOnly) ?? []
+  // Headings only when there is something to tell apart.
+  const grouped = supplierAccounts.length > 0
 
   return (
     // Room at the bottom on phones for the floating New shop button.
     <div className="mx-auto max-w-6xl space-y-5 pb-24 sm:pb-6">
-      {list === null ? (
+      {list === null || suppliers === null ? (
         <LoadingCards />
       ) : list.length === 0 ? (
         <div className="glass mx-auto max-w-2xl rounded-glass">
@@ -73,11 +85,24 @@ export function StoresPage() {
             }
           />
 
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {list.map((store) => (
-              <StoreCard key={store.id} store={store} onShare={() => setSharing(store.id)} />
-            ))}
-          </section>
+          {shops.length > 0 && (
+            <StoreGroup
+              title={grouped ? 'Shops' : null}
+              hint="Sell to customers"
+            >
+              {shops.map((store) => (
+                <StoreCard key={store.id} store={store} onShare={() => setSharing(store.id)} />
+              ))}
+            </StoreGroup>
+          )}
+
+          {supplierAccounts.length > 0 && (
+            <StoreGroup title="Supplier accounts" hint="Supply goods to sellers">
+              {supplierAccounts.map((store) => (
+                <SupplierCard key={store.id} store={store} supplier={suppliers.get(store.id)!} />
+              ))}
+            </StoreGroup>
+          )}
 
           {/* Phone: the create action floats under the thumb instead of
               sitting above the list, where it pushed the shops down. */}
@@ -119,7 +144,7 @@ function StoreCard({ store, onShare }: { store: Store; onShare: () => void }) {
   const showProgress = !store.isPublished && total > 0
 
   return (
-    <article className="glass flex flex-col rounded-glass p-4 sm:p-5">
+    <CardShell>
       <div className="flex items-start gap-3.5">
         {store.logoUrl ? (
           <MediaImg
@@ -189,7 +214,91 @@ function StoreCard({ store, onShare }: { store: Store; onShare: () => void }) {
           {store.isPublished ? 'Share' : 'Publish'}
         </button>
       </div>
-    </article>
+    </CardShell>
+  )
+}
+
+/** The glass frame both kinds of card sit in. */
+function CardShell({ children }: { children: ReactNode }) {
+  return <article className="glass flex flex-col rounded-glass p-4 sm:p-5">{children}</article>
+}
+
+/** A titled grid of cards; untitled when the list has only one kind. */
+function StoreGroup({
+  title,
+  hint,
+  children,
+}: {
+  title: string | null
+  hint: string
+  children: ReactNode
+}) {
+  return (
+    <section aria-label={title ?? undefined} className="space-y-3">
+      {title && (
+        <h2 className="flex flex-wrap items-baseline gap-x-2 font-body text-base font-bold tracking-normal text-fg">
+          {title}
+          <span className="text-hint font-normal text-muted">{hint}</span>
+        </h2>
+      )}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{children}</div>
+    </section>
+  )
+}
+
+/**
+ * A supplier account (D-28): no shop, so no "live" state, setup steps or
+ * Publish. Its status is the supplier's own — supplying, waiting for
+ * approval, or paused — and the card says who it supplies.
+ */
+function SupplierCard({ store, supplier }: { store: Store; supplier: OwnedSupplierStore }) {
+  const pill = supplierStatusPill(supplier.status)
+  const sellers = supplier.activeSellers
+  const toShip = supplier.ordersToShip
+
+  return (
+    <CardShell>
+      <div className="flex items-start gap-3.5">
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-fg/[0.06] text-fg">
+          <TruckIcon className="h-7 w-7" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="line-clamp-2 font-body text-base leading-snug font-bold tracking-normal break-words text-fg">
+            {store.name}
+          </h2>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <StatusPill tone={pill.tone}>{pill.label}</StatusPill>
+            <span className="text-hint text-muted">Supplier account</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 flex min-h-[52px] items-center gap-3 rounded-xl bg-fg/[0.04] px-3 py-2.5">
+        <p className="min-w-0 text-hint text-fg">
+          <span className="font-semibold">
+            {sellers === 1 ? 'Supplies 1 seller' : `Supplies ${sellers} sellers`}
+            {toShip > 0 && ` · ${toShip === 1 ? '1 order' : `${toShip} orders`} to ship`}
+          </span>
+          <span className="block text-muted">
+            {supplier.status !== 'ACTIVE'
+              ? 'Sellers can’t order from you right now.'
+              : sellers === 0
+                ? 'No seller is linked right now.'
+                : 'Your sellers can add the products you offer.'}
+          </span>
+        </p>
+      </div>
+
+      <div className="mt-4">
+        <Link
+          to={`/mystores/${store.slug}`}
+          className={buttonClass({ size: 'lg', full: true })}
+        >
+          Manage
+          <ChevronRightIcon className="h-4 w-4" />
+        </Link>
+      </div>
+    </CardShell>
   )
 }
 

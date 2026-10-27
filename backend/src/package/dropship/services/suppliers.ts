@@ -60,6 +60,43 @@ export async function storeRole(storeId: string) {
   };
 }
 
+/**
+ * The supplier side of every store the caller owns, for the "My shops" list:
+ * which are supplier accounts (no shop to publish, D-28) and how each is doing.
+ * Stores that don't supply are left out — they are ordinary shops.
+ */
+export async function ownedSupplierStores(customerId: string) {
+  const stores = await deps.host.listOwnedStores(customerId);
+  if (stores.length === 0) return [];
+  const suppliers = await deps.prisma.supplier.findMany({
+    where: { storeId: { in: stores.map((s) => s.id) } },
+    select: { id: true, storeId: true, status: true, supplyOnly: true },
+  });
+  if (suppliers.length === 0) return [];
+  const ids = suppliers.map((s) => s.id);
+  const [sellers, toShip] = await Promise.all([
+    deps.prisma.supplierLink.groupBy({
+      by: ["supplierId"],
+      where: { supplierId: { in: ids }, status: "ACTIVE" },
+      _count: { _all: true },
+    }),
+    deps.prisma.supplierOrder.groupBy({
+      by: ["supplierId"],
+      where: { supplierId: { in: ids }, status: { in: ["NEW", "ACCEPTED"] } },
+      _count: { _all: true },
+    }),
+  ]);
+  const sellersOf = new Map(sellers.map((row) => [row.supplierId, row._count._all]));
+  const toShipOf = new Map(toShip.map((row) => [row.supplierId, row._count._all]));
+  return suppliers.map((s) => ({
+    storeId: s.storeId,
+    status: s.status,
+    supplyOnly: s.supplyOnly,
+    activeSellers: sellersOf.get(s.id) ?? 0,
+    ordersToShip: toShipOf.get(s.id) ?? 0,
+  }));
+}
+
 /** `off` · `sandbox` (simulated, no money moves — D-44) · `live` (the real provider). */
 export function splitMode(): "off" | "sandbox" | "live" {
   if (!dropshipConfig.splitEnabled || !deps.host.splitLive()) return "off";

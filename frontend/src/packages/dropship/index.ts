@@ -14,9 +14,12 @@ import type { RouteObject } from 'react-router-dom'
 export {
   isEnabled as isDropshipEnabled,
   refreshDropshipRole,
+  supplierStatusPill,
   useDropshipRole,
+  useOwnedSupplierStores,
 } from './role'
 export type { DropshipRole } from './role'
+export type { OwnedSupplierStore } from './api'
 export { SupplierHome } from './pages/supplier/SupplierHome'
 export { SupplyOnlyNote } from './pages/supplier/SupplyOnlyNote'
 // A supplier account's own products: offered to sellers from the editor's last step (no shop, D-28).
