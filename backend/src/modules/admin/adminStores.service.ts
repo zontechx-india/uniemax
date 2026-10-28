@@ -21,6 +21,7 @@ import type {
   BankVerificationInput,
   StoreListQuery,
   StoreSuspendInput,
+  StoreVerificationInput,
 } from "./admin.schema.js";
 
 /**
@@ -45,6 +46,7 @@ const listSelect = {
   publishedAt: true,
   suspendedAt: true,
   suspendedReason: true,
+  verifiedAt: true,
   createdAt: true,
   owner: { select: { id: true, name: true, email: true, phone: true } },
   _count: { select: { products: true, categories: true, orders: true } },
@@ -202,6 +204,8 @@ export async function getStore(storeRef: string) {
       checkout: true,
       footer: true,
       updatedAt: true,
+      verifiedBy: true,
+      verifiedGstin: true,
       bankAccounts: {
         orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
         select: {
@@ -224,7 +228,7 @@ export async function getStore(storeRef: string) {
   });
   if (!store) throw HttpError.notFound("Store not found");
 
-  const [readiness, revenue, orderStatus, recentOrders] = await Promise.all([
+  const [readiness, revenue, orderStatus, recentOrders, verifier] = await Promise.all([
     readinessFor([store as StoreListRow]),
     prisma.order.aggregate({
       where: { storeId: store.id, status: { not: "CANCELLED" } },
@@ -250,10 +254,26 @@ export async function getStore(storeRef: string) {
         placedAt: true,
       },
     }),
+    store.verifiedBy
+      ? prisma.admin.findUnique({
+          where: { id: store.verifiedBy },
+          select: { name: true, email: true },
+        })
+      : null,
   ]);
 
-  const { bankAccounts, theme, payments, shipping, checkout, footer, ...rest } =
-    store;
+  const {
+    bankAccounts,
+    theme,
+    payments,
+    shipping,
+    checkout,
+    footer,
+    verifiedBy: _verifiedBy,
+    verifiedGstin,
+    ...rest
+  } = store;
+  const profile = resolveProfile(store.profile);
   return {
     ...shapeListRow(rest as StoreListRow, revenue._sum.total ?? new Prisma.Decimal(0)),
     // Both shapes: `setup` so the detail page renders the same chip the list
@@ -261,6 +281,19 @@ export async function getStore(storeRef: string) {
     // requirements ("Contact email", "PAN") rather than only the step.
     setup: summariseReadiness(readiness.get(store.id)!),
     readiness: readiness.get(store.id)!,
+    // What the admin checks on the GST portal before marking the store
+    // verified — the one place the console sees these profile fields.
+    verification: {
+      verifiedAt: store.verifiedAt,
+      verifiedGstin,
+      verifiedBy: verifier ? (verifier.name ?? verifier.email) : null,
+      businessName: profile.businessName,
+      sellerName: profile.sellerName,
+      gstin: profile.tax.gstin,
+      gstExempt: profile.tax.gstExempt,
+      pan: profile.tax.pan,
+      address: profile.address,
+    },
     theme,
     footer,
     // Resolved rather than raw, so the console reads the same effective
@@ -321,6 +354,59 @@ export async function setSuspended(storeRef: string, input: StoreSuspendInput) {
     body: input.suspended
       ? `"${store.name}" has been suspended and is no longer visible to customers.`
       : `"${store.name}" is live again.`,
+    url: `/stores/${store.id}`,
+  });
+
+  return getStore(store.id);
+}
+
+/**
+ * Manual store verification: an admin has checked the store's GSTIN on the
+ * GST portal and that the legal name there matches the profile. Only a store
+ * WITH a GSTIN can be verified — that is the thing being vouched for. The
+ * GSTIN checked is saved with the decision; editing the GSTIN or business
+ * name later clears it (`updateStoreProfile`).
+ */
+export async function setStoreVerification(
+  storeRef: string,
+  adminId: string,
+  input: StoreVerificationInput,
+) {
+  const store = await prisma.store.findFirst({
+    where: { OR: [{ id: storeRef }, { slug: storeRef }] },
+    select: { id: true, name: true, ownerId: true, profile: true, verifiedAt: true },
+  });
+  if (!store) throw HttpError.notFound("Store not found");
+
+  if ((store.verifiedAt !== null) === input.verified) {
+    throw HttpError.conflict(
+      input.verified ? "This store is already verified" : "This store is not verified",
+    );
+  }
+
+  const gstin = resolveProfile(store.profile).tax.gstin;
+  if (input.verified && !gstin) {
+    throw HttpError.badRequest(
+      "This store has no GSTIN — ask the seller to add it in Business Details first",
+    );
+  }
+
+  await prisma.store.update({
+    where: { id: store.id },
+    data: input.verified
+      ? { verifiedAt: new Date(), verifiedBy: adminId, verifiedGstin: gstin }
+      : { verifiedAt: null, verifiedBy: null, verifiedGstin: null },
+  });
+  emit("catalog.store.changed", { storeId: store.id });
+
+  notify({
+    principalType: "CUSTOMER",
+    principalId: store.ownerId,
+    kind: "STORE",
+    title: input.verified ? "Store verified" : "Store verification removed",
+    body: input.verified
+      ? `"${store.name}" is now a verified store — shoppers see the Verified badge.`
+      : `"${store.name}" is no longer verified.${input.note ? ` ${input.note}` : ""}`,
     url: `/stores/${store.id}`,
   });
 

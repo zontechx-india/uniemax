@@ -445,6 +445,16 @@ model Store {
   bankAccounts   StoreBankAccount[]
   orders         Order[]
   supportTickets SupportTicket[]
+  /// Set when a platform admin has checked the store BY HAND — its GSTIN on
+  /// the GST portal and that the legal name there matches the profile. Null =
+  /// not verified. `verifiedBy` is the admin; `verifiedGstin` the GSTIN they
+  /// checked. Changing the GSTIN or business name in the profile clears all
+  /// three (`updateStoreProfile`), so the badge never vouches for details
+  /// nobody looked at. Verified stores lead the marketplace "Top Stores".
+  verifiedAt    DateTime?
+  verifiedBy    String?
+  verifiedGstin String?
+
   cartLines      CartLine[]
   productGroups  ProductGroup[]
   banners        StoreBanner[]
@@ -454,7 +464,7 @@ model Store {
 
   @@index([ownerId])
   @@index([isPublished])
-  // Marketplace "New Stores" listing: published stores by publish recency.
+  // Published stores by publish recency (the "Top Stores" tie-break).
   @@index([isPublished, publishedAt])
   @@map("stores")
   @@schema("public")

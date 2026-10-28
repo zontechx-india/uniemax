@@ -45,9 +45,9 @@ export const publicProductQuerySchema = paginationQuery.extend({
 });
 
 /**
- * Marketplace store index (`GET /public/stores`) — newest published first.
+ * Marketplace store index (`GET /public/stores`) — listed stores, best first.
  * Deliberately minimal: pagination only. Discovery search lives at
- * /public/search; this endpoint just feeds "New Stores" style rails.
+ * /public/search; this endpoint just feeds the "Top Stores" rail.
  */
 export const publicStoreListQuerySchema = paginationQuery;
 

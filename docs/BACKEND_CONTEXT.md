@@ -1118,8 +1118,8 @@ White-label design — one codebase, any business:
   And `isPublished` (default false) —
   the switch that makes the public storefront page live — plus `publishedAt`,
   stamped on the **first** publish only (never reset), so the marketplace
-  "New Stores" index ranks by real publish time and re-publishing an old
-  store doesn't bump it back to the top. Module: `modules/stores`
+  "Top Stores" index breaks ties by real publish time and re-publishing an
+  old store doesn't bump it. Module: `modules/stores`
   (owner routes behind `requireCustomer`, ownership enforced in the service —
   foreign ids 404; `:id` params accept id or slug). A separate unauthenticated
   surface under `/api/v1/public/stores/:slug` serves **published** stores only
@@ -1581,7 +1581,11 @@ White-label design — one codebase, any business:
   `meta` (previous value, reason, affected counts), `ip` and `userAgent`.
 - **Store** additions: `suspendedAt` / `suspendedReason` — the admin
   moderation switch, independent of the owner's `isPublished` (see "The
-  platform admin console").
+  platform admin console"). `verifiedAt` / `verifiedBy` / `verifiedGstin` —
+  **manual store verification**: an admin checked the GSTIN by hand
+  (`setStoreVerification` in `adminStores.service.ts`; a store needs a GSTIN to
+  be verified). `updateStoreProfile` clears all three when the GSTIN or
+  business name changes. Verified stores rank first in `GET /public/stores`.
 - **Customer** additions: `blockedAt` / `blockedReason` — set when an admin
   blocks the account; every sign-in strategy checks it and blocking revokes
   all sessions.
@@ -1807,8 +1811,8 @@ tags, quick replies, linked seller/customer). Off unless `WA_ENABLED`.
 
 Also done: **marketplace discovery** (`modules/discovery` + the public store
 index in `modules/stores`) powering the marketplace homepage —
-`GET /public/stores` (published stores, newest publish first via
-`Store.publishedAt`), `GET /public/search` (grouped stores/categories/products;
+`GET /public/stores` (stores with ≥ 3 photographed products, ranked in
+`rankListedStores` — rules in API.md), `GET /public/search` (grouped stores/categories/products;
 capped per group; category/product hits carry their owning store) and
 `GET /public/stats` (60 s in-process cache). All three reuse the storefront's
 exported `PUBLIC_PRODUCT_VISIBILITY` rule (`publicStore.service.ts`), so

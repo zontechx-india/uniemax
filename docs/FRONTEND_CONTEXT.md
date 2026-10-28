@@ -230,7 +230,7 @@ for guests and signed-in customers alike and adapts per session state.
   > to be the heading, it has to be the true one.
 
   The chips are **one scrolling line at every width** (`CHIP_SCROLLER`) — eleven
-  of them wrapped to four rows on a phone. Then **New Stores** — **storefront-preview cards**, each a
+  of them wrapped to four rows on a phone. Then **Top Stores** — **storefront-preview cards**, each a
   `StorePreview` mosaic over one footer row (logo · name · Visit store).
 
   **The card is portrait — `aspect-[9/14]` artwork on a ~220px tile**, so a
@@ -344,7 +344,8 @@ for guests and signed-in customers alike and adapts per session state.
   homepage section displays at most the same 12 — recorded
   by `PublicStoreLayout` for **published** stores only — a draft preview is
   not a shopping visit).
-- **New Stores** rail — `GET /api/v1/public/stores` (newest publish first,
+- **Top Stores** rail (`TopStoresSection`) — `GET /api/v1/public/stores` (the
+  server's ranking; the page never re-sorts,
   `pageSize=12`, cards use its `productCount` + `previewImages`); empty
   state invites the visitor to be the first seller. **Fresh Finds** —
   `GET /api/v1/public/products`. **Category chips** —
@@ -2481,6 +2482,15 @@ in hand), so the card's whole job is making the chase easy: each unfinished
 step lists its **missing requirements by name** — "2 of 4" is not something
 you can put in a message — shows the path (`/mystores/{slug}/business`), and
 carries a **Copy link** button giving the absolute URL. A **Copy message for
+**Store verification (`VerificationCard`, `StoreDetailPage`)** — shows the
+details an admin checks on the GST portal (business name, seller name, GSTIN,
+PAN, business address), with **Copy GSTIN**, **Open GST portal** and **Mark
+verified** / **Remove verification** (confirmed; removal takes an optional note
+for the seller). Mark verified is disabled when the store has no GSTIN. A
+verified store shows a **Verified** chip in the page header. On the
+marketplace homepage, a verified store's card shows **Verified seller**
+(`StoreCard`, from `isVerified`); unverified cards show nothing.
+
 the seller** button assembles the whole note: what is outstanding, with the
 links de-duplicated (business, address and tax all live on one page, so the
 same URL three times would read as a mistake). Confirmation lands **on the
@@ -3034,7 +3044,7 @@ frontend/
     │       ├── LoginPage.tsx     # /login fallback page: split-screen frame around CustomerAuthPanel
     │       ├── LoginRoute.tsx    # /login route: ?next= handling + already-authed redirect
     │       ├── HomePage.tsx      # Marketplace homepage: banner, identity bar
-    │       │                     #   (h1 + trust + chips), New Stores (count-capped
+    │       │                     #   (h1 + trust + chips), Top Stores (count-capped
     │       │                     #   grid), Fresh Finds and Recently Viewed (rails),
     │       │                     #   My Stores, seller CTA
     │       ├── SellPage.tsx      # /sell — seller landing page (where seller ads point)

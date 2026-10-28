@@ -813,7 +813,9 @@ The store's **business identity** — the legal entity, the accountable seller,
 the business contact, the structured addresses and the tax IDs. Stored as the
 `Store.profile` JSON column. The body carries any subset of the keys below; a
 present key replaces that key wholesale, absent keys are untouched. At least
-one key is required (`422` otherwise). Returns the full store.
+one key is required (`422` otherwise). Returns the full store. A change to
+`tax.gstin` or `businessName` **clears the store's admin verification**
+(`PATCH /admin/stores/:id/verification`) until an admin checks it again.
 
 ```jsonc
 {
@@ -1539,10 +1541,21 @@ category chain is active (a disabled root hides its subcategories' products
 too). Decimals serialize as strings.
 
 ### `GET /api/v1/public/stores`
-Marketplace store **index** — published stores only, newest publish first
-(feeds the homepage "New Stores" rail). Ordered by `publishedAt` (stamped on
-a store's **first** publish — re-publishing an old store doesn't bump it),
-nulls last, then `createdAt`. Each card carries a taste of the catalog:
+Marketplace store **index** — feeds the homepage "Top Stores" rail. A
+published store is **listed** only when it has at least **3 visible products
+with a photo**; a store below that bar is skipped here (its own page stays
+public). Listed stores are ranked, best first, by:
+1. **verified** — an admin checked its GSTIN by hand
+   (`PATCH /admin/stores/:id/verification`);
+2. **delivered orders** — `DELIVERED` orders whose customer is not the store's
+   owner (owner test orders never count);
+3. **has a logo** before no logo;
+4. **visible products with a photo** — more first;
+5. `publishedAt` (stamped on a store's **first** publish), newest first, then
+   `createdAt`.
+
+`meta.total` counts listed stores only. `isVerified` drives the card's
+Verified badge (when and by whom stay admin-only). Each card carries a taste of the catalog:
 `productCount` (publicly visible products), `previewImages` (cover-image URLs
 of the newest visible products that have a photo, max 4) — both follow the same
 visibility rule the store page enforces — and `categories`, the names of the
@@ -1559,7 +1572,7 @@ array for a store with no such shelves.
 
 ```jsonc
 { "success": true,
-  "data": [ { "id", "name", "slug", "logoUrl", "publishedAt",
+  "data": [ { "id", "name", "slug", "logoUrl", "isVerified": true, "publishedAt",
               "productCount": 12, "previewImages": ["https://…", …],
               "categories": ["Mobiles", "Accessories"] } ],
   "meta": { "total", "page", "pageSize", "totalPages" } }
@@ -3212,7 +3225,23 @@ checkout — the same effective values the storefront sees), `bankAccounts`
 `footer`, the 10 latest orders, and `readiness` — the **full** evaluation
 (every step with its individual requirements), not just the `setup` summary,
 so the console can name what is missing ("Contact email", "Business address") in the
-message an admin sends the seller.
+message an admin sends the seller. Also `verification` — `{ verifiedAt,
+verifiedGstin, verifiedBy (admin name or email), businessName, sellerName,
+gstin, gstExempt, pan, address }`, the profile fields an admin checks on the
+GST portal. List rows carry `verifiedAt` too.
+
+### `PATCH /api/v1/admin/stores/:id/verification`
+
+Body `{ "verified": true | false, "note"?: "…" }` — **manual** store
+verification. The admin checks the GSTIN on the GST portal (active, legal name
+matches the business name) and marks the store verified; this stamps
+`verifiedAt`, `verifiedBy` (the acting admin) and `verifiedGstin` (the GSTIN
+checked). A store **without a GSTIN** → `400`. Already in that state → `409`.
+`note` goes to the seller when verification is removed. The seller is
+notified; audit action `store.verify` / `store.unverify`. Verification is
+**cleared automatically** when the seller changes their GSTIN or business
+name (`PATCH /stores/:id/profile`). Verified stores lead
+`GET /public/stores`. → the full store.
 
 ### `PATCH /api/v1/admin/stores/:id/suspend`
 

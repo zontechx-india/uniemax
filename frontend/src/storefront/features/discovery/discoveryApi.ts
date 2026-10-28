@@ -3,7 +3,7 @@ import type { ListMeta } from '../../../shared/auth/http'
 
 /**
  * Marketplace discovery — the anonymous, platform-wide surface behind the
- * homepage (`/`): global search, the "New Stores" rail and the trust stats.
+ * homepage (`/`): global search, the "Top Stores" rail and the trust stats.
  * Backed by `/api/v1/public/*` (see docs/API.md).
  */
 
@@ -15,7 +15,9 @@ export interface MarketStore {
   name: string
   slug: string
   logoUrl: string | null
-  /** Stamped on first publish; drives the "New Stores" ordering. */
+  /** An admin checked the store's GSTIN by hand — the card's Verified badge. */
+  isVerified: boolean
+  /** Stamped on first publish; drives the card's "New" chip. */
   publishedAt: string | null
   /** Publicly visible products in the store. */
   productCount: number
@@ -147,7 +149,7 @@ export const discoveryApi = {
     return call<MarketBanner[]>(http.get(`${PUBLIC}/banners`))
   },
 
-  /** Published stores, newest publish first (homepage "New Stores"). */
+  /** Listed stores, best first (homepage "Top Stores"). */
   async listStores(
     query: { page?: number; pageSize?: number } = {},
   ): Promise<{ items: MarketStore[]; meta: ListMeta }> {

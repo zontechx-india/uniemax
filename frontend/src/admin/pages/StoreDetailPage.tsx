@@ -52,10 +52,12 @@ import { MediaImg } from '../../shared/media/MediaImg'
  * One store, in full — the page an admin lands on from a support ticket or a
  * dashboard row.
  *
- * It carries the platform's two store-level powers:
+ * It carries the platform's store-level powers:
  *   - **Suspension** — takes the store off the marketplace and blocks new
  *     orders, while leaving the owner's own management access alone so they
  *     can fix whatever caused it.
+ *   - **Store verification** — the admin checks the GSTIN by hand and marks
+ *     the store verified (`VerificationCard`).
  *   - **Payout verification** — the MANUAL half of bank-account verification
  *     (the other being a third-party validator). Money settles to a verified
  *     account, so a failure must carry a note the seller can act on.
@@ -154,6 +156,7 @@ export default function StoreDetailPage() {
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
             <StoreStatusChip isPublished={store.isPublished} suspendedAt={store.suspendedAt} />
+            {store.verifiedAt ? <Chip tone="success">Verified</Chip> : null}
             <a
               href={`/store/${store.slug}`}
               target="_blank"
@@ -287,6 +290,8 @@ export default function StoreDetailPage() {
           </dl>
         </Card>
       </div>
+
+      <VerificationCard store={store} onChanged={refresh} />
 
       <SellerSetupCard store={store} />
 
@@ -533,6 +538,161 @@ export default function StoreDetailPage() {
         onChanged={products.refresh}
       />
     </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Store verification
+// ---------------------------------------------------------------------------
+
+/** The GST portal's public taxpayer search — where the admin checks a GSTIN. */
+const GST_PORTAL_SEARCH = 'https://services.gst.gov.in/services/searchtp'
+
+/**
+ * Manual store verification. The admin checks the GSTIN on the GST portal —
+ * that it is active and that its legal name matches the business name here —
+ * then marks the store verified. Verified stores lead the homepage "Top
+ * Stores" and wear a Verified badge there.
+ *
+ * Only a store with a GSTIN can be verified; that is what the badge vouches
+ * for. If the seller later changes the GSTIN or business name, the server
+ * clears the verification by itself.
+ */
+function VerificationCard({
+  store,
+  onChanged,
+}: {
+  store: StoreDetail
+  onChanged: () => void
+}) {
+  const v = store.verification
+  const verified = v.verifiedAt !== null
+  const [open, setOpen] = useState(false)
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const run = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await adminApi.verifyStore(store.id, {
+        verified: !verified,
+        note: note.trim() || null,
+      })
+      setOpen(false)
+      setNote('')
+      onChanged()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update the store')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const address = v.address
+    ? [v.address.line1, v.address.line2, v.address.city, v.address.state, v.address.pincode]
+        .filter(Boolean)
+        .join(', ')
+    : null
+
+  return (
+    <Card className="mt-4">
+      <CardHeader
+        title="Store verification"
+        subtitle={
+          verified
+            ? 'GSTIN checked by an admin — this store leads Top Stores with a Verified badge.'
+            : 'Check the GSTIN on the GST portal, then mark the store verified.'
+        }
+        action={verified ? <Chip tone="success">Verified</Chip> : <Chip>Not verified</Chip>}
+      />
+      <dl>
+        <Detail label="Business name">{v.businessName ?? '—'}</Detail>
+        <Detail label="Seller name">{v.sellerName ?? '—'}</Detail>
+        <Detail label="GSTIN">
+          {v.gstin ? (
+            <span className="font-mono">{v.gstin}</span>
+          ) : v.gstExempt ? (
+            'Not GST-registered (seller declared exempt)'
+          ) : (
+            'Not added'
+          )}
+        </Detail>
+        <Detail label="PAN">{v.pan ? <span className="font-mono">{v.pan}</span> : '—'}</Detail>
+        <Detail label="Business address">{address ?? '—'}</Detail>
+        {verified ? (
+          <Detail label="Verified">
+            {formatDateTime(v.verifiedAt)}
+            {v.verifiedBy ? ` by ${v.verifiedBy}` : ''}
+          </Detail>
+        ) : null}
+      </dl>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {v.gstin ? (
+          <>
+            <CopyButton text={v.gstin} label="Copy GSTIN" />
+            <a
+              href={GST_PORTAL_SEARCH}
+              target="_blank"
+              rel="noreferrer"
+              className={buttonClass({ variant: 'secondary' })}
+            >
+              Open GST portal
+              <ExternalIcon />
+            </a>
+          </>
+        ) : null}
+        <Button
+          variant={verified ? 'danger' : 'primary'}
+          disabled={!verified && !v.gstin}
+          onClick={() => {
+            setOpen(true)
+            setNote('')
+            setError(null)
+          }}
+        >
+          {verified ? 'Remove verification' : 'Mark verified'}
+        </Button>
+      </div>
+      {!verified && !v.gstin ? (
+        <p className="mt-2 text-xs text-muted">
+          A store needs a GSTIN to be verified. The seller adds it in Business Details.
+        </p>
+      ) : null}
+
+      <ConfirmDialog
+        open={open}
+        busy={busy}
+        title={verified ? 'Remove verification?' : 'Mark this store verified?'}
+        tone={verified ? 'danger' : 'neutral'}
+        confirmLabel={verified ? 'Remove verification' : 'Mark verified'}
+        description={
+          <div className="space-y-3">
+            <p>
+              {verified
+                ? `${store.name} loses the Verified badge and its top place in Top Stores. The seller is notified.`
+                : `You checked GSTIN ${v.gstin ?? ''} on the GST portal and its legal name matches "${
+                    v.businessName ?? store.name
+                  }". ${store.name} gets the Verified badge and leads Top Stores. The seller is notified.`}
+            </p>
+            {verified ? (
+              <TextArea
+                label="Note for the seller (optional)"
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+                placeholder="e.g. GSTIN shows as cancelled on the GST portal"
+                maxLength={300}
+              />
+            ) : null}
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
+          </div>
+        }
+        onCancel={() => setOpen(false)}
+        onConfirm={() => void run()}
+      />
+    </Card>
   )
 }
 

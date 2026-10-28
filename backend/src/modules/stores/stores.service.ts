@@ -553,11 +553,22 @@ export async function updateStoreProfile(
   const contact = await assertVerifiedContact(ownerId, patch);
 
   const merged = { ...store.profile, ...patch, ...contact };
+  // An admin's verification vouches for one GSTIN and legal name. A change to
+  // either means nobody has checked the new ones, so it is cleared until an
+  // admin looks again (`setStoreVerification`).
+  const identityChanged =
+    (merged.tax?.gstin ?? null) !== store.profile.tax.gstin ||
+    (merged.businessName ?? null) !== store.profile.businessName;
   const row = await prisma.store.update({
     where: { id: store.id },
     // Cast for the same reason as the footer write: a typed object literal
     // without an index signature doesn't satisfy Prisma's InputJsonValue.
-    data: { profile: merged as unknown as Prisma.InputJsonValue },
+    data: {
+      profile: merged as unknown as Prisma.InputJsonValue,
+      ...(identityChanged
+        ? { verifiedAt: null, verifiedBy: null, verifiedGstin: null }
+        : {}),
+    },
     select: storeSelect,
   });
   return withReadiness(row);

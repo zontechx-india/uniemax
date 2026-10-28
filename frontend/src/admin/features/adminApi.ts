@@ -160,6 +160,8 @@ export interface StoreRow {
   publishedAt: string | null
   suspendedAt: string | null
   suspendedReason: string | null
+  /** Set when an admin has checked the store's GSTIN by hand. */
+  verifiedAt: string | null
   createdAt: string
   owner: { id: string; name: string | null; email: string | null; phone: string | null }
   counts: { products: number; categories: number; orders: number }
@@ -232,6 +234,27 @@ export interface StoreDetail extends StoreRow {
     complete: boolean
     metCount: number
     totalCount: number
+  }
+  /** The details an admin checks on the GST portal, plus the decision. */
+  verification: {
+    verifiedAt: string | null
+    /** The GSTIN that was checked when the store was verified. */
+    verifiedGstin: string | null
+    /** Name (or email) of the admin who verified it. */
+    verifiedBy: string | null
+    businessName: string | null
+    sellerName: string | null
+    gstin: string | null
+    gstExempt: boolean
+    pan: string | null
+    address: {
+      line1: string
+      line2: string | null
+      city: string
+      state: string
+      pincode: string
+      country: string
+    } | null
   }
   settings: {
     payments: { acceptOnlinePayment: boolean; acceptCod: boolean }
@@ -940,6 +963,9 @@ export const adminApi = {
   },
   suspendStore(id: string, body: { suspended: boolean; reason?: string | null }) {
     return call<StoreDetail>(http.patch(`${BASE}/stores/${id}/suspend`, body))
+  },
+  verifyStore(id: string, body: { verified: boolean; note?: string | null }) {
+    return call<StoreDetail>(http.patch(`${BASE}/stores/${id}/verification`, body))
   },
   verifyBankAccount(
     storeId: string,

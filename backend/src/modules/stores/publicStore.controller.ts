@@ -11,7 +11,7 @@ import {
 } from "./publicStore.schema.js";
 import * as service from "./publicStore.service.js";
 
-/** Marketplace store index — published stores, newest publish first. */
+/** Marketplace store index — listed stores, best first (`rankListedStores`). */
 export async function listStores(request: FastifyRequest) {
   const query = publicStoreListQuerySchema.parse(request.query);
   const { total, stores } = await service.listPublicStores(query);

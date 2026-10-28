@@ -7,7 +7,7 @@ import * as controller from "./admin.controller.js";
  * guarded, so none of them repeats the guard.
  *
  * Read endpoints are plain GETs; the handful of writes are moderation levers
- * (suspend a store, block a customer, verify a payout account, hide a
+ * (suspend or verify a store, block a customer, verify a payout account, hide a
  * product) and admin-account management. Fulfilment stays with the seller.
  */
 export const adminConsoleRoutes: FastifyPluginAsync = async (app) => {
@@ -17,6 +17,7 @@ export const adminConsoleRoutes: FastifyPluginAsync = async (app) => {
   app.get("/stores", controller.listStores);
   app.get("/stores/:id", controller.getStore);
   app.patch("/stores/:id/suspend", controller.suspendStore);
+  app.patch("/stores/:id/verification", controller.verifyStore);
   app.patch(
     "/stores/:id/bank-accounts/:accountId/verification",
     controller.verifyBankAccount,

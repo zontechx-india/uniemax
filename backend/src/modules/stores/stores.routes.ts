@@ -219,8 +219,8 @@ export const storeRoutes: FastifyPluginAsync<StoreRoutesOptions> = async (
  * server-side filtering, sorting and pagination.
  */
 export const publicStoreRoutes: FastifyPluginAsync = async (app) => {
-  // Marketplace index — published stores, newest publish first (homepage
-  // "New Stores" rail). Static path registered before the :slug matcher.
+  // Marketplace index — listed stores, best first (homepage "Top Stores"
+  // rail). Static path registered before the :slug matcher.
   app.get("/", publicController.listStores);
   app.get("/:slug", publicController.getStore);
   app.get("/:slug/home", publicController.getHome);

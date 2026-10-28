@@ -231,7 +231,7 @@ function shapeListProduct(row: ListProductRow) {
 }
 
 // ---------------------------------------------------------------------------
-// Marketplace store index — "New Stores" on the platform homepage
+// Marketplace store index — "Top Stores" on the platform homepage
 // ---------------------------------------------------------------------------
 
 /** How many product thumbnails a marketplace store card previews. */
@@ -249,74 +249,152 @@ const STORE_PREVIEW_IMAGES = 4;
 const STORE_CARD_CATEGORIES = 2;
 
 /**
- * Published stores, newest publish first. Card-sized payload: branding plus
- * a taste of the catalog — the visible-product count, up to
+ * The bar a published store must clear to be LISTED: this many visible
+ * products with a photo. A shop opened "just to try it" rarely gets past one
+ * or two products, and a card without pictures has nothing to show a shopper.
+ * The store page itself stays public — only the index skips the store.
+ */
+const MIN_LISTED_PRODUCTS = 3;
+
+/** A product that counts towards the bar — visible, with a photo. */
+const LISTED_PRODUCT = {
+  ...PUBLIC_PRODUCT_VISIBILITY,
+  media: { some: { type: "IMAGE" } },
+} satisfies Prisma.StoreProductWhereInput;
+
+/**
+ * Every listed store's id, best first. The signals are ones a fun shop does
+ * not have and cannot fake cheaply:
+ *
+ *  1. **Verified** — an admin checked its GSTIN by hand (`verifiedAt`).
+ *  2. **Delivered orders** to someone other than the owner — a real customer
+ *     received something. The owner's own test orders never count.
+ *  3. **A logo** — the owner took the time to brand the shop.
+ *  4. **Products with a photo** — a fuller shop first.
+ *  5. **First publish**, newest first — the old "New Stores" order, now only
+ *     the tie-break.
+ *
+ * Ranked per request with three grouped queries (no per-store loop). Fine
+ * while the marketplace has hundreds of stores; past that, keep the rank on
+ * `Store` and refresh it when these signals change.
+ */
+async function rankListedStores(): Promise<string[]> {
+  const listed = await prisma.storeProduct.groupBy({
+    by: ["storeId"],
+    where: { ...LISTED_PRODUCT, store: PUBLIC_STORE_VISIBILITY },
+    _count: { _all: true },
+    having: { storeId: { _count: { gte: MIN_LISTED_PRODUCTS } } },
+  });
+  if (listed.length === 0) return [];
+  const ids = listed.map((row) => row.storeId);
+
+  const [stores, deliveries] = await Promise.all([
+    prisma.store.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        ownerId: true,
+        logoKey: true,
+        verifiedAt: true,
+        publishedAt: true,
+        createdAt: true,
+      },
+    }),
+    // Grouped by buyer as well, so the owner's own orders can be dropped.
+    prisma.order.groupBy({
+      by: ["storeId", "customerId"],
+      where: { storeId: { in: ids }, status: "DELIVERED" },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const photographed = new Map(listed.map((row) => [row.storeId, row._count._all]));
+  const ownerOf = new Map(stores.map((store) => [store.id, store.ownerId]));
+  const delivered = new Map<string, number>();
+  for (const row of deliveries) {
+    if (!row.storeId || row.customerId === ownerOf.get(row.storeId)) continue;
+    delivered.set(row.storeId, (delivered.get(row.storeId) ?? 0) + row._count._all);
+  }
+
+  const time = (date: Date | null) => date?.getTime() ?? 0;
+  return stores
+    .sort(
+      (a, b) =>
+        Number(b.verifiedAt !== null) - Number(a.verifiedAt !== null) ||
+        (delivered.get(b.id) ?? 0) - (delivered.get(a.id) ?? 0) ||
+        Number(b.logoKey !== null) - Number(a.logoKey !== null) ||
+        (photographed.get(b.id) ?? 0) - (photographed.get(a.id) ?? 0) ||
+        time(b.publishedAt) - time(a.publishedAt) ||
+        b.createdAt.getTime() - a.createdAt.getTime(),
+    )
+    .map((store) => store.id);
+}
+
+/**
+ * Listed stores, best first (`rankListedStores`). Card-sized payload: branding
+ * plus a taste of the catalog — the visible-product count, up to
  * `STORE_PREVIEW_IMAGES` cover thumbnails and the names of its first couple of
  * shelves — so a marketplace card can show real merchandise, and say what kind
  * of shop it is, without shipping catalog data. Products use
  * `PUBLIC_PRODUCT_VISIBILITY`, so the card never previews (or counts) anything
  * the store page would hide, and only shelves the store page shows (active,
-with a visible product beneath them) are named.
+ * with a visible product beneath them) are named.
  */
 export async function listPublicStores(query: PublicStoreListQuery) {
-  const where: Prisma.StoreWhereInput = { ...PUBLIC_STORE_VISIBILITY };
+  const ranked = await rankListedStores();
+  const start = (query.page - 1) * query.pageSize;
+  const pageIds = ranked.slice(start, start + query.pageSize);
+  if (pageIds.length === 0) return { total: ranked.length, stores: [] };
 
-  const [total, rows] = await Promise.all([
-    prisma.store.count({ where }),
-    prisma.store.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        logoKey: true,
-        publishedAt: true,
-        _count: { select: { products: { where: PUBLIC_PRODUCT_VISIBILITY } } },
-        // Top-level shelves only: a card says "Fashion", not "Fashion ›
-        // Women › Sarees". Same shelves, same order as the store's own menu
-        // (`getPublicStoreShell`): empty ones are skipped, so a card never
-        // names a shelf the store page doesn't show, and the shelf the owner
-        // leads with is the one the card names.
-        categories: {
-          where: { parentId: null, ...shoppableShelf() },
-          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-          take: STORE_CARD_CATEGORIES,
-          select: { name: true },
-        },
-        // Newest visible products that HAVE a photo — each contributes its
-        // cover image to the card's preview strip.
-        products: {
-          where: {
-            ...PUBLIC_PRODUCT_VISIBILITY,
-            media: { some: { type: "IMAGE" } },
-          },
-          orderBy: { createdAt: "desc" },
-          take: STORE_PREVIEW_IMAGES,
-          select: {
-            media: {
-              where: { type: "IMAGE" },
-              orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
-              take: 1,
-              select: { key: true },
-            },
+  const rows = await prisma.store.findMany({
+    where: { id: { in: pageIds }, ...PUBLIC_STORE_VISIBILITY },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      logoKey: true,
+      publishedAt: true,
+      verifiedAt: true,
+      _count: { select: { products: { where: PUBLIC_PRODUCT_VISIBILITY } } },
+      // Top-level shelves only: a card says "Fashion", not "Fashion ›
+      // Women › Sarees". Same shelves, same order as the store's own menu
+      // (`getPublicStoreShell`): empty ones are skipped, so a card never
+      // names a shelf the store page doesn't show, and the shelf the owner
+      // leads with is the one the card names.
+      categories: {
+        where: { parentId: null, ...shoppableShelf() },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        take: STORE_CARD_CATEGORIES,
+        select: { name: true },
+      },
+      // Newest visible products that HAVE a photo — each contributes its
+      // cover image to the card's preview strip.
+      products: {
+        where: LISTED_PRODUCT,
+        orderBy: { createdAt: "desc" },
+        take: STORE_PREVIEW_IMAGES,
+        select: {
+          media: {
+            where: { type: "IMAGE" },
+            orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+            take: 1,
+            select: { key: true },
           },
         },
       },
-      // publishedAt is stamped on first publish; nulls sink to the end.
-      orderBy: [
-        { publishedAt: { sort: "desc", nulls: "last" } },
-        { createdAt: "desc" },
-      ],
-      skip: (query.page - 1) * query.pageSize,
-      take: query.pageSize,
-    }),
-  ]);
+    },
+  });
+  // `findMany` ignores the order of `in`; put the page back in rank order.
+  const position = new Map(pageIds.map((id, index) => [id, index]));
+  rows.sort((a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0));
 
   return {
-    total,
-    stores: rows.map(({ logoKey, _count, products, categories, ...store }) => ({
+    total: ranked.length,
+    stores: rows.map(({ logoKey, verifiedAt, _count, products, categories, ...store }) => ({
       ...store,
       logoUrl: mediaUrl("logo", logoKey),
+      // A yes/no for the badge — when, and by whom, stays in the console.
+      isVerified: verifiedAt !== null,
       productCount: _count.products,
       categories: categories.map((category) => category.name),
       previewImages: products

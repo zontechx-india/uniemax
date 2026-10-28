@@ -16,6 +16,7 @@ import {
   LockIcon,
   PlusIcon,
   SearchIcon,
+  ShieldCheckIcon,
   StoreIcon,
   TagIcon,
   TruckIcon,
@@ -56,7 +57,7 @@ import { ErrorState } from '../../shared/ui/states'
 
 /**
  * Marketplace homepage (`/`) — the platform's public entry point. Not a
- * shopping page: it helps visitors find stores (global search, New Stores,
+ * shopping page: it helps visitors find stores (global search, Top Stores,
  * Recently Viewed), gives owners a shortcut to theirs, and sells the
  * "become a seller" story. Shopping happens inside `/store/{slug}`.
  *
@@ -85,7 +86,7 @@ import { ErrorState } from '../../shared/ui/states'
  * the same 1440px column the storefront uses. See `layout/contentWidth`.
  */
 
-const NEW_STORES_PAGE_SIZE = 12
+const TOP_STORES_PAGE_SIZE = 12
 const SEARCH_DEBOUNCE_MS = 300
 const SEARCH_MIN_CHARS = 2
 
@@ -149,7 +150,7 @@ export function HomePage() {
       <main className="flex-1">
         <MarketBanners />
         <MarketIdentityBar />
-        <NewStoresSection />
+        <TopStoresSection />
         <FreshFindsSection {...newProducts} />
         <RecentlyViewedSection />
         {authed && myStores && myStores.length > 0 && (
@@ -275,7 +276,7 @@ export function MarketHeader() {
 // team can change without a deploy.
 //
 // It renders nothing at all until a banner exists, so a morning with no
-// campaign simply opens on New Stores rather than on an empty frame.
+// campaign simply opens on Top Stores rather than on an empty frame.
 // ---------------------------------------------------------------------------
 
 function MarketBanners() {
@@ -921,11 +922,13 @@ function StoreLogoTile({
 }
 
 // ---------------------------------------------------------------------------
-// New Stores — newest published stores (the platform is young; this replaces
-// Trending until real activity data exists)
+// Top Stores — the server's ranking, not ours: only stores with at least three
+// photographed products, verified then real deliveries first (see
+// `GET /public/stores`). A
+// shop opened "just to try it" never leads the homepage.
 // ---------------------------------------------------------------------------
 
-function NewStoresSection() {
+function TopStoresSection() {
   const [stores, setStores] = useState<MarketStore[] | null>(null)
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -935,7 +938,7 @@ function NewStoresSection() {
     setFailed(false)
     setStores(null)
     discoveryApi
-      .listStores({ pageSize: NEW_STORES_PAGE_SIZE })
+      .listStores({ pageSize: TOP_STORES_PAGE_SIZE })
       .then(({ items }) => {
         if (!cancelled) setStores(items)
       })
@@ -949,9 +952,9 @@ function NewStoresSection() {
 
   return (
     <Section
-      id="new-stores"
-      title="New Stores"
-      subtitle="Recently opened on the marketplace — take a look around."
+      id="top-stores"
+      title="Top Stores"
+      subtitle="Stocked shops, ready to order from — take a look around."
     >
       {failed ? (
         <SectionError onRetry={() => setAttempt((n) => n + 1)} />
@@ -963,7 +966,7 @@ function NewStoresSection() {
             <StoreIcon className="h-4 w-4" />
           </IconTile>
           <p className="mt-3 text-sm font-medium text-fg">
-            No stores have been published yet.
+            No stores to show yet.
           </p>
           <p className="mt-1 text-sm text-muted">Be the first seller!</p>
           <CreateStoreLink placement="home_new_stores_empty" className={buttonClass({ size: 'md', className: 'mt-4' })}>
@@ -1039,6 +1042,16 @@ function StoreCard({ store }: { store: MarketStore }) {
             <span className="line-clamp-2 block font-heading text-base font-semibold leading-tight text-fg">
               {store.name}
             </span>
+
+            {/* Real, not decoration: an admin checked this store's GSTIN by
+                hand. Absent for every other store — never a "not verified"
+                label, which would read as a warning against honest new shops. */}
+            {store.isVerified && (
+              <span className="mt-1 flex items-center gap-1 text-xs font-semibold text-success">
+                <ShieldCheckIcon className="h-3.5 w-3.5" />
+                Verified seller
+              </span>
+            )}
 
             {/* What the shop actually sells, from its own top-level shelves.
                 "Poorvika", "MotoCore", "ZUNO HUB" are names a shopper cannot
@@ -1281,7 +1294,7 @@ function FreshFindsSection({
 }) {
   const { scroller, sync, arrows } = useRail()
 
-  // Nothing to merchandise yet — the New Stores empty state already carries
+  // Nothing to merchandise yet — the Top Stores empty state already carries
   // the "be the first seller" message, so this section simply steps aside.
   if (products !== null && products.length === 0) return null
 

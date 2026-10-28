@@ -43,6 +43,12 @@ export const storeSuspendSchema = z.object({
   reason: z.string().trim().max(300).optional().nullable(),
 });
 
+export const storeVerificationSchema = z.object({
+  verified: z.boolean(),
+  /** Sent to the seller when verification is removed — what to fix. */
+  note: z.string().trim().max(300).optional().nullable(),
+});
+
 export const bankVerificationSchema = z.object({
   status: z.enum(["PENDING", "VERIFIED", "FAILED"]),
   /** Required on FAILED so the seller learns what to fix. */
@@ -157,6 +163,7 @@ export const adminPasswordSchema = z.object({ password: adminPassword });
 
 export type StoreListQuery = z.infer<typeof storeListQuery>;
 export type StoreSuspendInput = z.infer<typeof storeSuspendSchema>;
+export type StoreVerificationInput = z.infer<typeof storeVerificationSchema>;
 export type BankVerificationInput = z.infer<typeof bankVerificationSchema>;
 export type CustomerListQuery = z.infer<typeof customerListQuery>;
 export type CustomerBlockInput = z.infer<typeof customerBlockSchema>;

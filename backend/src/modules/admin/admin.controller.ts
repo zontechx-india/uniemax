@@ -64,6 +64,23 @@ export async function suspendStore(request: FastifyRequest) {
   return ok(store);
 }
 
+export async function verifyStore(request: FastifyRequest) {
+  const { id } = storeParams.parse(request.params);
+  const input = schema.storeVerificationSchema.parse(request.body);
+  const store = await stores.setStoreVerification(id, actor(request).id, input);
+  recordAudit(request, {
+    action: input.verified ? "store.verify" : "store.unverify",
+    entityType: "store",
+    entityId: store.id,
+    meta: {
+      name: store.name,
+      gstin: store.verification.verifiedGstin,
+      note: input.note ?? null,
+    },
+  });
+  return ok(store);
+}
+
 export async function verifyBankAccount(request: FastifyRequest) {
   const { id, accountId } = bankParams.parse(request.params);
   const input = schema.bankVerificationSchema.parse(request.body);

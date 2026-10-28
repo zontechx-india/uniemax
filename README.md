@@ -31,7 +31,7 @@ never ships to a shopper.
 
 ### For shoppers
 
-- Marketplace homepage: newest published stores, global search across stores /
+- Marketplace homepage: top stores (real deliveries first; fun/empty shops skipped), global search across stores /
   categories / products, platform stats.
 - Per-store storefronts with the seller's own colors, logo, footer and homepage
   section order.
@@ -274,8 +274,8 @@ env config — see [`backend/docs/PACKAGE_AUTH.md`](./backend/docs/PACKAGE_AUTH.
 - **Store** — owned by a Customer (a customer may own several), unique stable
   slug, logo object key (responses expose a derived URL, never the key), the JSON
   config columns above, `isPublished` + `publishedAt`. `publishedAt` is stamped on
-  the **first** publish only, so re-publishing an old store doesn't bump it back
-  to the top of "New Stores".
+  the **first** publish only, so re-publishing an old store doesn't bump it up
+  "Top Stores" (where it is the tie-break).
 - **StoreCategory / StoreProduct / StoreProductVariant** — the catalog *inside* a
   seller's store, classified against the admin's global `Category` taxonomy.
   Categories nest as deep as the taxonomy (≤ 5 levels); products require a
