@@ -176,6 +176,19 @@ export const discoveryApi = {
     return items
   },
 
+  /** One page of the same newest-first list — the `/new` listing page. */
+  async newProductsPage(
+    query: { page?: number; pageSize?: number } = {},
+  ): Promise<{ items: MarketProduct[]; meta: ListMeta }> {
+    const params = new URLSearchParams()
+    if (query.page) params.set('page', String(query.page))
+    if (query.pageSize) params.set('pageSize', String(query.pageSize))
+    const qs = params.toString()
+    return callList<MarketProduct>(
+      http.get(`${PUBLIC}/products${qs ? `?${qs}` : ''}`),
+    )
+  },
+
   /** Most common category names across published stores (homepage chips). */
   async popularCategories(): Promise<PopularCategory[]> {
     return call<PopularCategory[]>(http.get(`${PUBLIC}/categories`))

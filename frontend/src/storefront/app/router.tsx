@@ -98,6 +98,27 @@ export const router = createBrowserRouter([
           Component: (await import('../pages/BrowseCategoryPage')).BrowseCategoryPage,
         }),
       },
+      // Marketplace "View all" pages — the full lists behind the homepage's
+      // capped rows (Popular categories, Top Stores, Fresh Finds). `/shops`,
+      // not `/stores`: that prefix still redirects old seller links below.
+      {
+        path: '/categories',
+        lazy: async () => ({
+          Component: (await import('../pages/AllCategoriesPage')).AllCategoriesPage,
+        }),
+      },
+      {
+        path: '/shops',
+        lazy: async () => ({
+          Component: (await import('../pages/AllShopsPage')).AllShopsPage,
+        }),
+      },
+      {
+        path: '/new',
+        lazy: async () => ({
+          Component: (await import('../pages/NewArrivalsPage')).NewArrivalsPage,
+        }),
+      },
       // Footer info pages — public routes: About, Contact and the Refund and
       // Shipping policies have real content, Privacy and Terms a holding page
       // with the support contact until the business supplies the legal text.

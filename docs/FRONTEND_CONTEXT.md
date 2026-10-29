@@ -230,7 +230,10 @@ for guests and signed-in customers alike and adapts per session state.
   > to be the heading, it has to be the true one.
 
   The chips are **one scrolling line at every width** (`CHIP_SCROLLER`) — eleven
-  of them wrapped to four rows on a phone. Then **Top Stores** — **storefront-preview cards**, each a
+  of them wrapped to four rows on a phone. The "Popular" label stays put, the
+  first 12 chips scroll, arrows appear from `lg` (a mouse cannot swipe), and an
+  **"All categories →"** link ("All" on phones) closes the row → `/categories`.
+  While the names load the row holds its height with placeholder chips. Then **Top Stores** — **storefront-preview cards**, each a
   `StorePreview` mosaic over one footer row (logo · name · Visit store).
 
   **The card is portrait — `aspect-[9/14]` artwork on a ~220px tile**, so a
@@ -301,7 +304,11 @@ for guests and signed-in customers alike and adapts per session state.
   **Recently Viewed** (local, hidden when empty), both **rails** —
   percentage-width cards in a snapping scroller with arrows from `lg` that grey
   out at each end, since eleven products in a five-column grid end in four
-  holes; **My Stores** (owners only, compact auto-fill row — logo, body-face
+  holes. `useRail` measures the rail when it mounts and on resize (a callback
+  ref + `ResizeObserver`), not only on scroll — otherwise both arrows start
+  greyed out and a desktop user can never move it. Top Stores carries a
+  **"View all →"** link to `/shops` and Fresh Finds one to `/new`
+  (`ViewAllLink`); **My Stores** (owners only, compact auto-fill row — logo, body-face
   name, Published/Draft chip — deliberately slim so consumer sections keep the
   prime real estate); and a **Become a Seller** gradient panel (two equal
   columns from `lg`: pitch + 3 check-mark proof points + CTA on the left —
@@ -325,6 +332,20 @@ for guests and signed-in customers alike and adapts per session state.
   will occupy, not the maximum it might**: twelve placeholders resolving to
   three stores collapses the page upward, moving whatever the visitor was about
   to click.
+- **Marketplace "View all" pages** — the full lists behind the homepage's
+  capped rows, each in `MarketChrome`, with its own skeleton, retry and empty
+  state: **`/categories`** (`AllCategoriesPage` — every `GET /public/browse`
+  node as a tile with its product count, client-side "Find a category" filter
+  from 9 tiles up), **`/shops`** (`AllShopsPage` — `GET /public/stores` in the
+  server's Top Stores order, 24 per page, `?page=`) and **`/new`**
+  (`NewArrivalsPage` — `GET /public/products`, newest first, 24 per page).
+  `/shops`, not `/stores`: that prefix still redirects old seller links to
+  `/mystores`. Shared pieces: `features/discovery/MarketCards.tsx` (store
+  card, `gridFor`, `CardSkeletons`, `RAIL_SCROLLER` — moved out of
+  `HomePage`) and `features/discovery/MarketListing.tsx` (`ListingHeader`
+  breadcrumb + `<h1>`, `MarketProductCard`, `ListingPagination`,
+  `ListingSkeleton` — also used by `/c/{slug}`, whose breadcrumb now starts
+  UnieMax › All categories).
 - **Global search** (`features/discovery/discoveryApi.ts` →
   `GET /api/v1/public/search`) — starts at 2 characters, 300 ms debounce,
   stale-response guard; results are **always grouped** (Stores / Categories

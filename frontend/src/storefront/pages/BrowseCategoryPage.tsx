@@ -5,14 +5,17 @@ import { discoveryApi } from '../features/discovery/discoveryApi'
 import type {
   BrowseCategoryPage as BrowsePage,
   BrowseSort,
-  MarketProduct,
 } from '../features/discovery/discoveryApi'
-import { formatPrice } from '../features/stores/storesApi'
+import {
+  ListingHeader,
+  ListingPagination,
+  ListingSkeleton,
+  MarketProductCard,
+  PRODUCT_LISTING_GRID,
+} from '../features/discovery/MarketListing'
 import { CONTENT_COLUMN } from '../layout/contentWidth'
 import { MarketChrome } from '../layout/MarketChrome'
-import { BoxIcon } from '../layout/icons'
 import { buttonClass } from '../../shared/ui/Button'
-import { MediaImg } from '../../shared/media/MediaImg'
 
 /**
  * `/c/{slug}` — a **global category landing page**.
@@ -85,7 +88,7 @@ export function BrowseCategoryPage() {
   return (
     <MarketChrome>
       <div className={`${CONTENT_COLUMN} py-6 sm:py-8`}>
-        {data === undefined && <Skeleton />}
+        {data === undefined && <ListingSkeleton />}
         {data === null && <NotFound />}
         {data && <Loaded data={data} sort={sort} onSort={setParams} />}
       </div>
@@ -182,44 +185,30 @@ function Loaded({
 
   return (
     <>
-      <nav aria-label="Breadcrumb" className="mb-3">
-        <ol className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
-          <li>
-            <Link to="/" className="transition-colors hover:text-brand">
-              UnieMax
-            </Link>
-          </li>
-          {ancestors.map((crumb) => (
-            <li key={crumb.slug} className="flex items-center gap-1.5">
-              <span aria-hidden>›</span>
-              <Link
-                to={`/c/${crumb.slug}`}
-                className="transition-colors hover:text-brand"
-              >
-                {crumb.name}
-              </Link>
-            </li>
-          ))}
-        </ol>
-      </nav>
-
-      <h1 className="font-heading text-2xl font-semibold text-fg sm:text-3xl">
-        {category.name}
-      </h1>
-      <p className="mt-1.5 max-w-2xl text-sm text-muted">
-        {meta.total > 0 ? (
-          <>
-            {meta.total} product{meta.total === 1 ? '' : 's'}
-            {shops > 1 ? ` from ${shops} independent shops` : ''} on UnieMax —
-            buy direct from the seller.
-          </>
-        ) : (
-          <>
-            Nothing listed under {category.name} yet. Browse the rest of the
-            marketplace, or check back soon.
-          </>
-        )}
-      </p>
+      <ListingHeader
+        title={category.name}
+        crumbs={[
+          { name: 'All categories', to: '/categories' },
+          ...ancestors.map((crumb) => ({
+            name: crumb.name,
+            to: `/c/${crumb.slug}`,
+          })),
+        ]}
+        lead={
+          meta.total > 0 ? (
+            <>
+              {meta.total} product{meta.total === 1 ? '' : 's'}
+              {shops > 1 ? ` from ${shops} independent shops` : ''} on UnieMax —
+              buy direct from the seller.
+            </>
+          ) : (
+            <>
+              Nothing listed under {category.name} yet. Browse the rest of the
+              marketplace, or check back soon.
+            </>
+          )
+        }
+      />
 
       {children.length > 0 && (
         // Real links, not filter buttons: this row is how a crawler walks the
@@ -266,142 +255,24 @@ function Loaded({
             </label>
           </div>
 
-          <ul className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <ul className={`mt-4 ${PRODUCT_LISTING_GRID}`}>
             {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <MarketProductCard key={product.id} product={product} />
             ))}
           </ul>
 
-          <Pagination meta={meta} sort={sort} />
+          <ListingPagination
+            meta={meta}
+            href={(target) => {
+              const params = new URLSearchParams()
+              if (target > 1) params.set('page', String(target))
+              if (sort !== 'newest') params.set('sort', sort)
+              const qs = params.toString()
+              return qs ? `?${qs}` : ''
+            }}
+          />
         </>
       )}
-    </>
-  )
-}
-
-/**
- * A card links to the product **inside its store** — that is the product's
- * only address, and sending a shopper through the seller's storefront is what
- * makes the sale the seller's rather than an anonymous marketplace's.
- *
- * A plain `<a href>`, not a router `<Link>`: `/store/**` belongs to the
- * public router, which is picked per page load. This page runs on the
- * marketplace router, where a client-side hop to `/store/**` falls through to
- * the `*` route and lands on `/`.
- */
-function ProductCard({ product }: { product: MarketProduct }) {
-  const soldOut = product.stockQuantity <= 0
-  return (
-    <li className="group">
-      <a
-        href={`/store/${product.store.slug}/product/${product.slug}`}
-        className="flex h-full flex-col overflow-hidden rounded-lg border border-line bg-surface transition-colors hover:border-accent"
-      >
-        <div className="flex aspect-square items-center justify-center overflow-hidden bg-bg">
-          {product.image?.url ? (
-            <MediaImg
-              sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
-              src={product.image.url}
-              alt={product.image.altText ?? product.name}
-              loading="lazy"
-              decoding="async"
-              className={`h-full w-full object-contain p-2 transition-transform duration-300 group-hover:scale-105 ${
-                soldOut ? 'opacity-60' : ''
-              }`}
-            />
-          ) : (
-            <BoxIcon className="h-8 w-8 text-muted" />
-          )}
-        </div>
-        <div className="flex flex-1 flex-col gap-1 p-3">
-          <span className="truncate text-xs font-semibold uppercase tracking-wide text-muted">
-            {product.store.name}
-          </span>
-          <h2 className="line-clamp-2 font-heading text-sm font-medium leading-tight text-fg transition-colors group-hover:text-brand sm:text-base">
-            {product.name}
-          </h2>
-          <div className="mt-auto flex items-baseline gap-2 pt-1.5">
-            {product.price && (
-              <span className="font-figure font-semibold text-fg">
-                {formatPrice(product.price)}
-              </span>
-            )}
-            {product.compareAtPrice && (
-              <s className="text-xs text-muted">
-                {formatPrice(product.compareAtPrice)}
-              </s>
-            )}
-          </div>
-          {soldOut && <span className="text-xs text-muted">Sold out</span>}
-        </div>
-      </a>
-    </li>
-  )
-}
-
-/**
- * Prev/next as real `<a href>` rather than a Load More button. A crawler
- * cannot press a button, so an infinite-scroll listing is a listing whose
- * second page does not exist as far as search is concerned — which is exactly
- * the reason the in-store listings need a sitemap to be discovered at all.
- */
-function Pagination({
-  meta,
-  sort,
-}: {
-  meta: BrowsePage['meta']
-  sort: BrowseSort
-}) {
-  if (meta.totalPages <= 1) return null
-
-  const href = (page: number) => {
-    const params = new URLSearchParams()
-    if (page > 1) params.set('page', String(page))
-    if (sort !== 'newest') params.set('sort', sort)
-    const qs = params.toString()
-    return qs ? `?${qs}` : ''
-  }
-
-  return (
-    <nav
-      aria-label="Pagination"
-      className="mt-8 flex items-center justify-center gap-3"
-    >
-      {meta.page > 1 && (
-        <Link
-          to={href(meta.page - 1)}
-          rel="prev"
-          className="rounded-md border border-line px-4 py-2 text-sm font-medium text-fg transition-colors hover:border-accent hover:text-brand"
-        >
-          Previous
-        </Link>
-      )}
-      {meta.page < meta.totalPages && (
-        <Link
-          to={href(meta.page + 1)}
-          rel="next"
-          className="rounded-md border border-line px-4 py-2 text-sm font-medium text-fg transition-colors hover:border-accent hover:text-brand"
-        >
-          Next
-        </Link>
-      )}
-    </nav>
-  )
-}
-
-function Skeleton() {
-  return (
-    <>
-      <div className="h-8 w-56 animate-pulse rounded-md bg-surface" />
-      <div className="mt-2 h-4 w-80 animate-pulse rounded-md bg-surface" />
-      <ul className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        {Array.from({ length: 10 }).map((_, index) => (
-          <li
-            key={index}
-            className="aspect-[3/4] animate-pulse rounded-lg bg-surface"
-          />
-        ))}
-      </ul>
     </>
   )
 }
