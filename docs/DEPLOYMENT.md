@@ -688,13 +688,13 @@ sudo nginx -t && sudo systemctl reload nginx
 The footer info-pages location (`/about`, `/contact`, `/refund-policy`,
 `/shipping-policy`, `/privacy`, `/terms`) and the "View all" location
 (`/categories`, `/shops`, `/new`, page shells since `v1.65.0`) were added to
-the snippet with the releases that brought their page shells — **neither is
-applied yet** on either environment. To apply, add those two `location`
-blocks to both `/etc/nginx/snippets/uniemax-page-shells-{dev,prod}.conf`
-(with the env's port: dev `4001`, prod `4000`), then
-`sudo nginx -t && sudo systemctl reload nginx`. Both fall back to the static
-shell on any error, so their order relative to a backend release does not
-matter. Until then those pages are the static `index.html`, as before.
+the snippet with the releases that brought their page shells — **both
+applied 2026-10-30** on dev and prod (inserted above the
+`@uniemax_static_shell` block of `/etc/nginx/snippets/uniemax-page-shells-{dev,prod}.conf`,
+`nginx -t` + reload; backups `*.conf.pre-listing-20261030*`). Both fall back
+to the static shell on any error, so their order relative to a backend
+release does not matter. Right after a backend restart the first request or
+two can still get the default head (warm-up) — check again before worrying.
 Verify: `curl -s http://127.0.0.1:8081/shops | grep -o '<title[^<]*</title>'`
 → `All shops · UnieMax`.
 

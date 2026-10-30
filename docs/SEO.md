@@ -532,13 +532,6 @@ Automated tests: `backend/test/page-shell.test.mjs` (read-only; part of
   still gets WhatsApp's compact card; it is kept as is on purpose — the photo
   itself, large, is what sells, and padding it onto a wide canvas would shrink
   it. Store pages use wide store cards ([§4.7](#47-store-cards-wide-link-previews)).
-- **`/categories`, `/shops` and `/new`: page shells exist (`LISTING_PAGES`,
-  `v1.65.0`) but nginx does not forward them yet** — the regex `location` in
-  [`DEPLOYMENT.md`](./DEPLOYMENT.md) → Page shells is not applied on either
-  server (same for the footer info pages). Until it is, they are the static
-  `index.html`: the head exists only after the JavaScript runs, so
-  link-preview scrapers see the platform defaults. All three are in
-  `sitemap-stores.xml` (page 1 only).
 - **Static fallback.** Any page served as the static `index.html` (backend
   down) carries the relative `og:image` `/og-image.jpg`, which some scrapers
   cannot load.
@@ -657,5 +650,6 @@ search/filter URLs get indexed, mass-produced pages with nothing on them.
 | 15 Oct 2026 | Welcome Hero removed from store homepages. The page's one `<h1>` is now the store name, visually hidden (`sr-only`) — it was the hero's visible name; the hero's `<MediaImg>`s (product-art triptych, fallback banner/logo art) are gone. Head tags, JSON-LD and page shells unchanged |
 | 23 Oct 2026 | Search Console: sitemap submitted (`sc-domain:uniemax.com`). Product feed `GET /api/v1/public/feeds/products.xml` for Merchant Center + Meta (landing variant's price/stock, page's shipping rate; unit tests `test/unit/product-feed.test.ts`). Page shells for `/about`, `/contact`, `/refund-policy`, `/shipping-policy`, `/privacy`, `/terms` (own title, description, canonical; privacy/terms `noindex` while holding pages) and the matching `useSeo` in `InfoComingSoonPage`. New `/refund-policy` (7-day returns) and `/shipping-policy` pages, linked from the marketplace footer. `www` → apex redirect documented in `DEPLOYMENT.md`, not applied |
 | 30 Oct 2026 | Marketplace "View all" pages `/categories`, `/shops`, `/new` (browser-only head; `?page=` > 1 noindex, follow). Homepage Popular row links to `/categories`; `/c/{slug}` breadcrumb starts UnieMax › All categories. No page shells or sitemap entries for them yet ([§10](#10-known-gaps-and-caveats)) |
-| 30 Oct 2026 | Page shells for `/categories`, `/shops`, `/new` (`LISTING_PAGES`; nginx not applied yet) and all three in `sitemap-stores.xml`. New `/search?q=` results page — `noindex, follow`, canonical `/search`, browser-only head. Released as `v1.65.0` |
+| 30 Oct 2026 | Page shells for `/categories`, `/shops`, `/new` (`LISTING_PAGES`; nginx applied the same day — see below) and all three in `sitemap-stores.xml`. New `/search?q=` results page — `noindex, follow`, canonical `/search`, browser-only head. Released as `v1.65.0` |
 | 30 Oct 2026 | `/saved` (wishlist, per-customer) is `noindex` and disallowed in `robots.txt`. `GET /public/browse` gains `parentSlug` + `imageUrl` (homepage "Shop by category" tiles); no head or structured-data change. Released as `v1.66.0` |
+| 30 Oct 2026 | nginx now forwards the footer info pages (`/about`, `/contact`, `/refund-policy`, `/shipping-policy`, `/privacy`, `/terms`) and `/categories`, `/shops`, `/new` to their page shells on dev and prod — their own title, description and canonical are in the first byte |
