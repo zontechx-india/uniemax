@@ -1,10 +1,11 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { Outlet, useParams } from 'react-router-dom'
+import { Outlet, useMatch, useParams } from 'react-router-dom'
 import { customerAuth } from '../../../shared/auth/authApi'
 import { toApiError } from '../../../shared/auth/http'
 import { resetFavicon, setFavicon } from '../../../shared/favicon'
 import { publicStoreApi, type PublicStore } from '../stores/storesApi'
 import { StoreIcon } from '../../layout/icons'
+import { BackToTop } from '../../layout/BackToTop'
 import { StoreFooter } from './StoreFooter'
 import { StoreHeader } from './StoreHeader'
 import { SKIN, storeVars, type Skin } from './storeTheme'
@@ -50,6 +51,8 @@ export function PublicStoreLayout() {
   // Non-null only inside the Store Builder's preview frame, and only while the
   // seller has colors they have not saved yet — see `builderBridge`.
   const draftTheme = useBuilderPreviewBridge()
+  // The product page's buy bar owns the bottom of the screen there.
+  const onProductPage = useMatch('/store/:storeSlug/product/:productSlug') !== null
   // A save in the builder repaints the chrome (theme, footer, store details)
   // without reloading the frame. `reload` counts saves; the fetch effect
   // already keys on it, so bumping it is the whole implementation.
@@ -136,6 +139,7 @@ export function PublicStoreLayout() {
           <Outlet />
         </main>
         <StoreFooter store={store} skin={SKIN} />
+        {!onProductPage && <BackToTop />}
       </div>
     </Ctx.Provider>
   )

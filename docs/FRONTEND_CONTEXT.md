@@ -174,7 +174,7 @@ for guests and signed-in customers alike and adapts per session state.
   don't exist in the marketplace router, so a client-side navigate would
   hit its catch-all.
 - **`pages/HomePage.tsx`** (marketplace, replaces the old dashboard landing):
-  own chrome — a sticky header (`h-16`, `md:h-20`) laid out as four zones:
+  own chrome — a header (`h-16`, `md:h-20`, sticky from `md`) laid out as four zones:
   brand · **global search centred in the toolbar** on md+, dropping to its own
   row under the bar below md · "Sell on UnieMax" link (lg+) · then the
   utilities (theme toggle · cart link with count · Sign in — a button that
@@ -182,7 +182,10 @@ for guests and signed-in customers alike and adapts per session state.
   at the smallest widths as well as up at the largest (`gap-3` → `lg:gap-10`,
   logo `h-8` → `md:h-11`, the 40px controls to 36px below `sm`): fixed at their
   comfortable desktop values those four zones needed 339px of a 320px screen and
-  overflowed the bar rather than anything giving way.
+  overflowed the bar rather than anything giving way. **On a phone only the
+  search row is sticky**: it is a sibling of `<header>` (`MarketHeader` returns
+  both), so the brand row scrolls away and gives ~64px back to the page while
+  search stays pinned at the top.
 
   **Everything on the page sits in `CONTENT_COLUMN`** — the same 1440px column
   the storefront uses, from `layout/contentWidth.ts`. It was `max-w-[1920px]`,
@@ -235,7 +238,11 @@ for guests and signed-in customers alike and adapts per session state.
   of them wrapped to four rows on a phone. The "Popular" label stays put, the
   first 12 chips scroll, arrows appear from `lg` (a mouse cannot swipe), and an
   **"All categories →"** link ("All" on phones) closes the row → `/categories`.
-  While the names load the row holds its height with placeholder chips. Then **Top Stores** — **storefront-preview cards**, each a
+  While the names load the row holds its height with placeholder chips. Under
+  the bar, **Continue shopping** (`ContinueShoppingStrip`) — only when the
+  local cart has active, in-stock lines: one card per store (up to 4; three
+  thumbnails, item count, subtotal from `groupByStore`) linking to that store's
+  basket `/cart/{store}`, plus "View cart"; no request of its own. Then **Top Stores** — **storefront-preview cards**, each a
   `StorePreview` mosaic over one footer row (logo · name · Visit store).
 
   **The card is portrait — `aspect-[9/14]` artwork on a ~220px tile**, so a
@@ -364,6 +371,11 @@ for guests and signed-in customers alike and adapts per session state.
   breadcrumb + `<h1>`, `MarketProductCard`, `ListingPagination`,
   `ListingSkeleton` — also used by `/c/{slug}`, whose breadcrumb now starts
   UnieMax › All categories).
+- **Back to top** (`layout/BackToTop.tsx`) — "↑ Top", the shared secondary
+  `Button` fixed bottom-right once the page is scrolled two screens down;
+  smooth scroll unless reduced motion. Mounted by `HomePage`, `MarketChrome`
+  (every marketplace page) and `PublicStoreLayout` — except on a store's
+  product page, whose buy bar owns the bottom of the screen.
 - **Saved / wishlist** (`features/wishlist/`) — `wishlist.ts` keeps the
   signed-in customer's saved product ids in memory (`useWishlistSync` in
   `StorefrontApp`, beside the cart sync: loads `GET /wishlist/ids` on
@@ -395,8 +407,8 @@ for guests and signed-in customers alike and adapts per session state.
   product rows show their owning store ("in Power Sports"). **Enter** and the
   dropdown's **"See all results for “q”"** button open the `/search` page
   (Enter used to jump to the first hit); Escape/outside-tap closes. On
-  `/search` the box starts filled with the page's `q`. The box lives in the sticky header,
-  so it stays reachable while scrolling; focusing it while empty opens the
+  `/search` the box starts filled with the page's `q`. The box stays pinned
+  while scrolling (in the sticky header from `md`, its own sticky row on a phone); focusing it while empty opens the
   dropdown with recent-search chips.
 - **Local memory** (`features/discovery/recentActivity.ts`, localStorage +
   `useSyncExternalStore`, cross-tab): recent searches

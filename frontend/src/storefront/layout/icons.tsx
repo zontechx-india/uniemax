@@ -538,6 +538,14 @@ export function ArrowRightIcon({ className }: { className?: string }) {
 }
 
 /** Up-right arrow — "go in" on a picture card. */
+export function ArrowUpIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" />
+    </Svg>
+  )
+}
+
 export function ArrowUpRightIcon({ className }: { className?: string }) {
   return (
     <Svg className={className}>

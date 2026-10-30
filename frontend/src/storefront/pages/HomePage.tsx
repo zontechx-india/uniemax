@@ -26,7 +26,8 @@ import {
   SELLER_PROOF_POINTS,
   SELLER_STEPS,
 } from '../features/selling/sellerPitch'
-import { useCart } from '../features/cart/cart'
+import { groupByStore, useCart } from '../features/cart/cart'
+import { BackToTop } from '../layout/BackToTop'
 import { SaveButton } from '../features/wishlist/SaveButton'
 import { BannerCarousel } from '../features/banners/BannerCarousel'
 import { discoveryApi } from '../features/discovery/discoveryApi'
@@ -159,6 +160,7 @@ export function HomePage() {
       <main className="flex-1">
         <MarketBanners />
         <MarketIdentityBar />
+        <ContinueShoppingStrip />
         <TopStoresSection />
         <FreshFindsSection {...newProducts} />
         <ShopByCategorySection />
@@ -170,6 +172,7 @@ export function HomePage() {
         <BecomeSellerSection ownsStores={(myStores?.length ?? 0) > 0} />
       </main>
       <MarketFooter />
+      <BackToTop />
     </div>
   )
 }
@@ -211,73 +214,83 @@ export function MarketHeader() {
   const cartCount = items.reduce((sum, item) => sum + item.qty, 0)
 
   return (
-    <header className="sticky top-0 z-20 border-b border-line bg-bg">
-      {/* Airy, but inside the same column as the page. Left full-width, the
-          four zones (brand · search · sell · utilities) drifted apart until a
-          2560 monitor put the logo and the account menu a screen apart with
-          the search box marooned between them. */}
-      {/* The gaps and the brand step DOWN at the smallest widths as well as up
-          at the largest. Fixed at their comfortable desktop values, the logo,
-          the theme toggle, the cart and Sign in together needed 339px of a
-          320px screen — and the group overflowed the bar rather than any of it
-          giving way. */}
-      <div className={`flex h-16 items-center gap-3 sm:gap-6 md:h-20 md:gap-8 lg:gap-10 ${CONTENT_COLUMN}`}>
-        {/* Brand never wraps or shrinks — it's the anchor of the bar. */}
-        <Link to="/" aria-label="UnieMax home" className="flex shrink-0 items-center">
-          <AppLogoLockup className="h-8 sm:h-9 md:h-11" />
-        </Link>
+    <>
+      {/* Sticky from `md`. On a phone only the search row below stays pinned:
+          the brand row scrolls away with the page, which hands ~64px of a small
+          screen back to the products while search stays one tap away. */}
+      <header className="z-20 bg-bg md:sticky md:top-0 md:border-b md:border-line">
+        {/* Airy, but inside the same column as the page. Left full-width, the
+            four zones (brand · search · sell · utilities) drifted apart until a
+            2560 monitor put the logo and the account menu a screen apart with
+            the search box marooned between them. */}
+        {/* The gaps and the brand step DOWN at the smallest widths as well as up
+            at the largest. Fixed at their comfortable desktop values, the logo,
+            the theme toggle, the cart and Sign in together needed 339px of a
+            320px screen — and the group overflowed the bar rather than any of it
+            giving way. */}
+        <div className={`flex h-16 items-center gap-3 sm:gap-6 md:h-20 md:gap-8 lg:gap-10 ${CONTENT_COLUMN}`}>
+          {/* Brand never wraps or shrinks — it's the anchor of the bar. */}
+          <Link to="/" aria-label="UnieMax home" className="flex shrink-0 items-center">
+            <AppLogoLockup className="h-8 sm:h-9 md:h-11" />
+          </Link>
 
-        {/* Global search lives in the toolbar (md+); below md it gets its
-            own row underneath. Wide on purpose — search is the page's
-            primary action, so it owns the header's center. */}
-        <div className="mx-auto hidden w-full max-w-3xl md:block">
-          <GlobalSearchBox />
-        </div>
+          {/* Global search lives in the toolbar (md+); below md it gets its
+              own row underneath. Wide on purpose — search is the page's
+              primary action, so it owns the header's center. */}
+          <div className="mx-auto hidden w-full max-w-3xl md:block">
+            <GlobalSearchBox />
+          </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-3 md:ml-0 md:gap-4 lg:gap-6">
-          <CreateStoreLink placement="home_header" className="hidden whitespace-nowrap text-sm font-semibold text-muted transition-colors hover:text-fg lg:block">
-            Sell on UnieMax
-          </CreateStoreLink>
-          <ThemeToggle className="h-9 w-9 sm:h-10 sm:w-10" />
-          {/* Plain <a>: /cart lives in the public router (full page load). */}
-          <a
-            href="/cart"
-            aria-label={`Cart${cartCount > 0 ? ` (${cartCount} items)` : ''}`}
-            className="relative flex h-9 w-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-alt hover:text-fg sm:h-10 sm:w-10"
-          >
-            <CartIcon className="h-5 w-5" />
-            {cartCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-pill bg-brand px-1 text-xs font-bold text-brand-contrast">
-                {cartCount > 99 ? '99+' : cartCount}
-              </span>
-            )}
-          </a>
-
-          {state.status === 'loading' && (
-            <div className="h-9 w-9 animate-pulse rounded-full bg-surface-alt sm:h-10 sm:w-10" />
-          )}
-          {state.status === 'guest' && (
-            <Button variant="primary" size="sm"
-              onClick={() => openAuthDialog()}
-              className="sm:h-tap sm:px-5"
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-3 md:ml-0 md:gap-4 lg:gap-6">
+            <CreateStoreLink placement="home_header" className="hidden whitespace-nowrap text-sm font-semibold text-muted transition-colors hover:text-fg lg:block">
+              Sell on UnieMax
+            </CreateStoreLink>
+            <ThemeToggle className="h-9 w-9 sm:h-10 sm:w-10" />
+            {/* Plain <a>: /cart lives in the public router (full page load). */}
+            <a
+              href="/cart"
+              aria-label={`Cart${cartCount > 0 ? ` (${cartCount} items)` : ''}`}
+              className="relative flex h-9 w-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-alt hover:text-fg sm:h-10 sm:w-10"
             >
-              Sign in
-            </Button>
-          )}
-          {state.status === 'authed' && (
-            <SessionProvider customer={state.user} signOut={signOut}>
-              <AccountMenu />
-            </SessionProvider>
-          )}
+              <CartIcon className="h-5 w-5" />
+              {cartCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-pill bg-brand px-1 text-xs font-bold text-brand-contrast">
+                  {cartCount > 99 ? '99+' : cartCount}
+                </span>
+              )}
+            </a>
+
+            {state.status === 'loading' && (
+              <div className="h-9 w-9 animate-pulse rounded-full bg-surface-alt sm:h-10 sm:w-10" />
+            )}
+            {state.status === 'guest' && (
+              <Button variant="primary" size="sm"
+                onClick={() => openAuthDialog()}
+                className="sm:h-tap sm:px-5"
+              >
+                Sign in
+              </Button>
+            )}
+            {state.status === 'authed' && (
+              <SessionProvider customer={state.user} signOut={signOut}>
+                <AccountMenu />
+              </SessionProvider>
+            )}
+          </div>
         </div>
-      </div>
+
+      </header>
 
       {/* Mobile search row — same component, own state; the md+ instance
-          above is display-hidden so only one is ever interacted with. */}
-      <div className={`pb-3 md:hidden ${CONTENT_COLUMN}`}>
-        <GlobalSearchBox />
+          above is display-hidden so only one is ever interacted with. A
+          sibling of the header (not inside it), so it can stay stuck after
+          the header has scrolled away. */}
+      <div className="sticky top-0 z-20 border-b border-line bg-bg pb-3 pt-1 md:hidden">
+        <div className={CONTENT_COLUMN}>
+          <GlobalSearchBox />
+        </div>
       </div>
-    </header>
+    </>
   )
 }
 
@@ -915,6 +928,92 @@ function TopStoresSection() {
     </Section>
   )
 }
+
+// ---------------------------------------------------------------------------
+// Continue shopping — the visitor's own cart, one card per store
+// ---------------------------------------------------------------------------
+
+/** Stores the strip shows; the rest are one tap away in the cart. */
+const CONTINUE_STORES = 4
+
+/**
+ * A slim band under the identity bar for someone who left items in their
+ * cart: one card per store (thumbnails, item count, subtotal) leading
+ * straight to that store's basket (`/cart/{store}`), where Place Order is.
+ * Reads the local cart (`groupByStore` — active lines only, sold-out lines
+ * not counted), so it costs no request and is absent for an empty cart. The
+ * subtotal is the cart's own display figure; checkout re-prices as always.
+ */
+function ContinueShoppingStrip() {
+  const groups = groupByStore(useCart()).filter((group) => group.itemCount > 0)
+  if (groups.length === 0) return null
+
+  return (
+    <section aria-labelledby="continue-shopping" className="border-b border-line bg-bg">
+      <div className={`${CONTENT_COLUMN} py-4`}>
+        <div className="flex items-center justify-between gap-4">
+          <h2 id="continue-shopping" className="text-base font-semibold text-fg">
+            Continue shopping
+          </h2>
+          {/* Plain <a>: /cart lives in the public router (full page load). */}
+          <a
+            href="/cart"
+            className="inline-flex min-h-tap items-center gap-1 text-sm font-semibold text-fg underline decoration-line decoration-1 underline-offset-[6px] transition-colors hover:text-brand hover:decoration-current"
+          >
+            View cart <span aria-hidden>→</span>
+          </a>
+        </div>
+        <ul className={`mt-2 flex gap-3 ${CHIP_SCROLLER_BLEED}`}>
+          {groups.slice(0, CONTINUE_STORES).map((group) => (
+            <li key={group.storeSlug} className="w-[85%] shrink-0 sm:w-80">
+              <a
+                href={`/cart/${group.storeSlug}`}
+                className="group flex items-center gap-3 rounded-lg border border-line bg-surface p-3 transition-colors hover:border-accent"
+              >
+                <span className="flex shrink-0 -space-x-3">
+                  {group.items.slice(0, 3).map((item) =>
+                    item.imageUrl ? (
+                      <MediaImg
+                        key={`${item.productId}:${item.variantId ?? ''}`}
+                        sizes="44px"
+                        src={item.imageUrl}
+                        alt=""
+                        className="h-11 w-11 rounded-md border-2 border-surface bg-surface-alt object-contain"
+                      />
+                    ) : (
+                      <span
+                        key={`${item.productId}:${item.variantId ?? ''}`}
+                        className="flex h-11 w-11 items-center justify-center rounded-md border-2 border-surface bg-surface-alt text-muted"
+                      >
+                        <BoxIcon className="h-4 w-4" />
+                      </span>
+                    ),
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-fg">
+                    {group.storeName}
+                  </span>
+                  <span className="block truncate text-xs text-muted">
+                    {group.itemCount} item{group.itemCount === 1 ? '' : 's'} ·{' '}
+                    <span className="font-figure">{formatPrice(group.subtotal)}</span>
+                  </span>
+                </span>
+                <span className="shrink-0 text-sm font-semibold text-brand">
+                  Checkout <span aria-hidden className="inline-block transition-transform group-hover:translate-x-0.5">→</span>
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  )
+}
+
+/** A card row that scrolls on a phone (edge-bleed, last card cut) and fits on wider screens. */
+const CHIP_SCROLLER_BLEED =
+  '-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'
 
 // ---------------------------------------------------------------------------
 // Identity bar — who this is and why it can be trusted, in one slim row

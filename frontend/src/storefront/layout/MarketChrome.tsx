@@ -1,4 +1,5 @@
 import { MarketFooter, MarketHeader } from '../pages/HomePage'
+import { BackToTop } from './BackToTop'
 
 /**
  * The marketplace shell — sticky header (brand · global search · theme ·
@@ -17,6 +18,7 @@ export function MarketChrome({ children }: { children: React.ReactNode }) {
       <MarketHeader />
       <main className="flex-1">{children}</main>
       <MarketFooter />
+      <BackToTop />
     </div>
   )
 }
