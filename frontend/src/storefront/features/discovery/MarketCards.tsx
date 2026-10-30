@@ -44,6 +44,43 @@ export function gridFor(count: number): string {
 export const CARD_GRID = gridFor(CARD_RAMP.length)
 
 /**
+ * Column count per breakpoint of a full grid (`CARD_GRID`'s top rung): 2 · 3
+ * · 4 · 5 · 6. A grid capped by `gridFor` has `min(cols, total)` columns.
+ * Shown cells are `grid`, so a card stretches to its row's height. Literal
+ * class strings, because Tailwind scans source text.
+ */
+const WHOLE_ROW_STEPS = [
+  { cols: 2, show: 'grid', hide: 'hidden' },
+  { cols: 3, show: 'sm:grid', hide: 'sm:hidden' },
+  { cols: 4, show: 'md:grid', hide: 'md:hidden' },
+  { cols: 5, show: 'lg:grid', hide: 'lg:hidden' },
+  { cols: 6, show: 'xl:grid', hide: 'xl:hidden' },
+] as const
+
+/**
+ * Classes for grid cell `index` (of `total`) that hide it wherever it would
+ * start an unfinished row, so a grid never ends in holes (twelve stores in
+ * five columns show ten). `maxRows` caps the rows per breakpoint, phone first.
+ * Fewer items than one row are all shown — a short row reads as deliberate.
+ */
+export function wholeRowsClass(
+  index: number,
+  total: number,
+  maxRows: readonly number[] = [],
+): string {
+  let shown: boolean | null = null
+  const classes: string[] = []
+  WHOLE_ROW_STEPS.forEach(({ cols, show, hide }, step) => {
+    const width = Math.min(cols, total)
+    const rows = Math.min(maxRows[step] ?? Infinity, Math.floor(total / width))
+    const next = index < rows * width
+    if (next !== shown) classes.push(next ? show : hide)
+    shown = next
+  })
+  return classes.join(' ')
+}
+
+/**
  * The scroller itself. Bleeds to the screen edge on phones (so the last card
  * is visibly cut off) and tucks back into the content column from `sm`.
  */

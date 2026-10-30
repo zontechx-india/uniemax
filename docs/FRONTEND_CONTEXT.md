@@ -204,8 +204,10 @@ for guests and signed-in customers alike and adapts per session state.
      guarantees, not from how big it is.
   2. **No grid ends in holes.** `gridFor(count)` caps the column ramp at the
      number of items actually present (so three stores are a deliberate
-     three-up, not a four-up with a gap), and anything whose length nobody
-     controls is a **rail** rather than a grid.
+     three-up, not a four-up with a gap); a homepage grid holding more than one
+     row shows **whole rows only** (`wholeRowsClass` hides any card that would
+     start an unfinished row — 12 stores in 5 columns show 10); and Recently
+     Viewed is a **rail**.
 
   Sections, in order: the **banner carousel** (`GET /public/banners`, the
   platform's own promo images from `/admin/banners`, the shared
@@ -300,11 +302,13 @@ for guests and signed-in customers alike and adapts per session state.
   drawing five muted stars and "No reviews yet" on *every* card, which does not
   hold space for a future feature so much as tell a visitor that nothing on the
   platform has ever been rated. Then
-  **Fresh Finds** (`GET /public/products`, newest 12 platform-wide) and
-  **Recently Viewed** (local, hidden when empty), both **rails** —
-  percentage-width cards in a snapping scroller with arrows from `lg` that grey
-  out at each end, since eleven products in a five-column grid end in four
-  holes. `useRail` measures the rail when it mounts and on resize (a callback
+  **Fresh Finds** (`GET /public/products`, newest 12 platform-wide) — a
+  **grid that shows only whole rows** (`wholeRowsClass`): 2 columns × 3
+  rows on a phone, then 3 / 4 / 5 / 6 columns × 2 rows from `sm` / `md` /
+  `lg` / `xl`, so it never ends in holes; a phone also gets a full-width
+  "View all new products" button under it. **Recently Viewed** (local, hidden
+  when empty) is a **rail** — percentage-width cards in a snapping scroller
+  with arrows from `lg` that grey out at each end. `useRail` measures the rail when it mounts and on resize (a callback
   ref + `ResizeObserver`), not only on scroll — otherwise both arrows start
   greyed out and a desktop user can never move it. Top Stores carries a
   **"View all →"** link to `/shops` and Fresh Finds one to `/new`
@@ -341,7 +345,7 @@ for guests and signed-in customers alike and adapts per session state.
   (`NewArrivalsPage` — `GET /public/products`, newest first, 24 per page).
   `/shops`, not `/stores`: that prefix still redirects old seller links to
   `/mystores`. Shared pieces: `features/discovery/MarketCards.tsx` (store
-  card, `gridFor`, `CardSkeletons`, `RAIL_SCROLLER` — moved out of
+  card, `gridFor`, `wholeRowsClass`, `CardSkeletons`, `RAIL_SCROLLER` — moved out of
   `HomePage`) and `features/discovery/MarketListing.tsx` (`ListingHeader`
   breadcrumb + `<h1>`, `MarketProductCard`, `ListingPagination`,
   `ListingSkeleton` — also used by `/c/{slug}`, whose breadcrumb now starts
@@ -3065,8 +3069,8 @@ frontend/
     │       ├── LoginPage.tsx     # /login fallback page: split-screen frame around CustomerAuthPanel
     │       ├── LoginRoute.tsx    # /login route: ?next= handling + already-authed redirect
     │       ├── HomePage.tsx      # Marketplace homepage: banner, identity bar
-    │       │                     #   (h1 + trust + chips), Top Stores (count-capped
-    │       │                     #   grid), Fresh Finds and Recently Viewed (rails),
+    │       │                     #   (h1 + trust + chips), Top Stores (count-capped,
+    │       │                     #   whole-row grid), Fresh Finds (whole-row grid), Recently Viewed (rail),
     │       │                     #   My Stores, seller CTA
     │       ├── SellPage.tsx      # /sell — seller landing page (where seller ads point)
     │       ├── InfoComingSoonPage.tsx # /about /contact /refund-policy /shipping-policy (real) · /privacy /terms (holding page + support contact)

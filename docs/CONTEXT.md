@@ -663,7 +663,7 @@ follow from that, and they decide most of what is on the page:
   no global category page).
 - **Recent searches** — local to the browser, shown as chips, hidden when
   empty.
-- **Top Stores** — published stores with at least 3 products with a photo;
+- **Top Stores** — published stores with at least 2 products with a photo;
   admin-**verified** stores (GSTIN checked by hand, "Verified seller" badge)
   first, then real deliveries, logo, catalog size and newest publish (rules in
   `docs/API.md`, `GET /public/stores`), shown

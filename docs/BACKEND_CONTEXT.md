@@ -1811,7 +1811,7 @@ tags, quick replies, linked seller/customer). Off unless `WA_ENABLED`.
 
 Also done: **marketplace discovery** (`modules/discovery` + the public store
 index in `modules/stores`) powering the marketplace homepage —
-`GET /public/stores` (stores with ≥ 3 photographed products, ranked in
+`GET /public/stores` (stores with ≥ 2 photographed products, ranked in
 `rankListedStores` — rules in API.md), `GET /public/search` (grouped stores/categories/products;
 capped per group; category/product hits carry their owning store) and
 `GET /public/stats` (60 s in-process cache). All three reuse the storefront's

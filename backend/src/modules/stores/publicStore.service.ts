@@ -251,10 +251,13 @@ const STORE_CARD_CATEGORIES = 2;
 /**
  * The bar a published store must clear to be LISTED: this many visible
  * products with a photo. A shop opened "just to try it" rarely gets past one
- * or two products, and a card without pictures has nothing to show a shopper.
- * The store page itself stays public — only the index skips the store.
+ * product, and a card without pictures has nothing to show a shopper. The
+ * store page itself stays public — only the index skips the store.
+ *
+ * Two, not three: at three only 8 of 44 prod stores were listed (Oct 2026);
+ * at two, 19 are. The ranking below still puts the fuller shops first.
  */
-const MIN_LISTED_PRODUCTS = 3;
+const MIN_LISTED_PRODUCTS = 2;
 
 /** A product that counts towards the bar — visible, with a photo. */
 const LISTED_PRODUCT = {

@@ -1542,7 +1542,7 @@ too). Decimals serialize as strings.
 
 ### `GET /api/v1/public/stores`
 Marketplace store **index** — feeds the homepage "Top Stores" rail. A
-published store is **listed** only when it has at least **3 visible products
+published store is **listed** only when it has at least **2 visible products
 with a photo**; a store below that bar is skipped here (its own page stays
 public). Listed stores are ranked, best first, by:
 1. **verified** — an admin checked its GSTIN by hand

@@ -43,11 +43,13 @@ import {
   useRecentStores,
 } from '../features/discovery/recentActivity'
 import {
+  CARD_GRID,
   CardSkeletons,
   gridFor,
   RAIL_SCROLLER,
   StoreCard,
   StoreLogoTile,
+  wholeRowsClass,
 } from '../features/discovery/MarketCards'
 import { storesApi, formatPrice } from '../features/stores/storesApi'
 import type { Store } from '../features/stores/storesApi'
@@ -82,8 +84,8 @@ import { ErrorState } from '../../shared/ui/states'
  *    payment — not on how many stores it has. A counter reading "3" argues
  *    against the page it sits on.
  *  - **No grid can end in holes.** Columns are capped by the number of items
- *    actually present (`gridFor`), and anything that arrives in an awkward
- *    count is a rail rather than a grid, so three stores read as a deliberate
+ *    actually present (`gridFor`), or the grid shows only whole rows (Fresh
+ *    Finds), or the row is a rail, so three stores read as a deliberate
  *    three-up instead of a four-up with a gap in it.
  *
  * ## Width
@@ -180,7 +182,7 @@ function useNewProducts() {
     setFailed(false)
     setProducts(null)
     discoveryApi
-      .listNewProducts(12)
+      .listNewProducts(FRESH_FINDS_COUNT)
       .then((items) => {
         if (!cancelled) setProducts(items)
       })
@@ -704,11 +706,6 @@ function SectionError({ onRetry }: { onRetry: () => void }) {
 }
 
 /**
- * Product rows are rails, not grids (see Fresh Finds), so there is no product
- * ramp: the card width lives in the rail's own percentage classes.
- */
-
-/**
  * A horizontal rail — the shape for a row whose length nobody controls.
  *
  * A grid has to end somewhere, and eleven products in a five-column grid end
@@ -833,7 +830,7 @@ function ViewAllLink({
 }
 
 // ---------------------------------------------------------------------------
-// Top Stores — the server's ranking, not ours: only stores with at least three
+// Top Stores — the server's ranking, not ours: only stores with at least two
 // photographed products, verified then real deliveries first (see
 // `GET /public/stores`). A
 // shop opened "just to try it" never leads the homepage.
@@ -891,8 +888,11 @@ function TopStoresSection() {
         </div>
       ) : (
         <div className={gridFor(stores.length)}>
-          {stores.map((store) => (
-            <StoreCard key={store.id} store={store} />
+          {stores.map((store, index) => (
+            // Whole rows only: twelve stores in five columns show ten.
+            <div key={store.id} className={wholeRowsClass(index, stores.length)}>
+              <StoreCard store={store} />
+            </div>
           ))}
         </div>
       )}
@@ -1060,10 +1060,19 @@ function MarketIdentityBar() {
 // Fresh Finds — newest products platform-wide (recency-based, like New
 // Stores). Hidden entirely while the platform has no products to show.
 //
-// A RAIL, not a grid: the platform decides how many products are new, and a
-// number nobody controls cannot be laid out in fixed columns without
-// eventually ending in a row of holes (eleven products, five columns).
+// A GRID that shows only WHOLE rows. A one-line rail showed five products on
+// a desktop and two on a phone; this shows two rows on a wide screen (10–12)
+// and a 2-column, three-row block on a phone (6) — the usual shopping-app
+// home feed — with "View all" for the rest. The rail existed to avoid a grid
+// ending in holes (eleven products, five columns); trimming each breakpoint
+// to whole rows (`wholeRowsClass`) solves that without the rail.
 // ---------------------------------------------------------------------------
+
+/** Enough for two full rows at the widest (six-column) breakpoint. */
+const FRESH_FINDS_COUNT = 12
+
+/** Rows per breakpoint (phone first): a phone row is only two cards wide. */
+const FRESH_FINDS_ROWS = [3, 2, 2, 2, 2] as const
 
 function FreshFindsSection({
   products,
@@ -1074,8 +1083,6 @@ function FreshFindsSection({
   failed: boolean
   retry: () => void
 }) {
-  const { scroller, sync, arrows } = useRail()
-
   // Nothing to merchandise yet — the Top Stores empty state already carries
   // the "be the first seller" message, so this section simply steps aside.
   if (products !== null && products.length === 0) return null
@@ -1087,30 +1094,40 @@ function FreshFindsSection({
       tone="alt"
       action={
         products !== null && products.length > 0 ? (
-          <span className="flex shrink-0 items-center gap-3">
-            {arrows}
-            <ViewAllLink to="/new" name="View all new products" />
-          </span>
+          <ViewAllLink to="/new" name="View all new products" />
         ) : undefined
       }
     >
       {failed ? (
         <SectionError onRetry={retry} />
       ) : products === null ? (
-        <CardSkeletons count={5} media="square" layout="rail" />
+        <CardSkeletons count={6} media="square" />
       ) : (
-        <ul ref={scroller} onScroll={sync} className={RAIL_SCROLLER}>
-          {products.map((product) => (
-            <li
-              key={product.id}
-              // Percentages, so the last card is always part-cut at the right
-              // edge — the cue that tells a thumb there is more to the right.
-              className="w-[46%] shrink-0 snap-start sm:w-[31%] lg:w-[23%] xl:w-[19%]"
-            >
-              <ProductCard product={product} />
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className={CARD_GRID}>
+            {products.map((product, index) => (
+              <li
+                key={product.id}
+                className={wholeRowsClass(index, products.length, FRESH_FINDS_ROWS)}
+              >
+                <ProductCard product={product} />
+              </li>
+            ))}
+          </ul>
+          {/* On a phone the heading link sits far above the end of a
+              three-row block; this is where the thumb is when it runs out. */}
+          <Link
+            to="/new"
+            className={buttonClass({
+              variant: 'secondary',
+              size: 'md',
+              full: true,
+              className: 'mt-5 sm:hidden',
+            })}
+          >
+            View all new products
+          </Link>
+        </>
       )}
     </Section>
   )
