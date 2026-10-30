@@ -26,6 +26,7 @@ import {
   updatePackageShipmentTracking,
 } from "../../../modules/orders/shipments.service.js";
 import { shipmentTrackingSchema } from "../../../modules/orders/orders.schema.js";
+import { readOrderCustomFields } from "../../../modules/orders/customFields.js";
 import { cancelOrderAsSystem, confirmOrderAsSystem } from "../../../modules/orders/orders.service.js";
 import { createTicket } from "../../../modules/support/support.service.js";
 import { dropshipConfig } from "../config.js";
@@ -681,6 +682,7 @@ export function createInProcessHost(prisma: PrismaClient): DropshipHost {
           pincode: true,
           state: true,
           country: true,
+          customFields: true,
           createdAt: true,
           items: { select: { id: true, fulfilledBy: true, shipmentId: true, lineTotal: true, imageKey: true } },
           shipments: {
@@ -699,8 +701,11 @@ export function createInProcessHost(prisma: PrismaClient): DropshipHost {
         },
       });
       return rows.map(
-        ({ shipments, paymentMethod, ...o }): OrderView => ({
+        ({ shipments, paymentMethod, customFields, ...o }): OrderView => ({
           ...o,
+          deliveryNotes: readOrderCustomFields(customFields)
+            .filter((answer) => answer.section === "DELIVERY")
+            .map(({ label, value }) => ({ label, value })),
           paymentMethod: paymentMethod === "COD" ? "COD" : "ONLINE",
           parcels: shipments,
         }),

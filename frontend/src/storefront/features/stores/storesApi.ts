@@ -495,7 +495,33 @@ export const CHECKOUT_FIELD_KEYS = [
 
 export type CheckoutFieldKey = (typeof CHECKOUT_FIELD_KEYS)[number]
 
-export type StoreCheckoutFields = Record<CheckoutFieldKey, boolean>
+/**
+ * The seller's own checkout question — Post Office, Tehsil, District, a GST
+ * number… CONTACT ones are asked on every order, DELIVERY ones only when the
+ * order is delivered. Answers are sent under `id`; the label can be renamed.
+ */
+export type CustomFieldType = 'TEXT' | 'NUMBER' | 'CHOICE'
+export type CustomFieldSection = 'CONTACT' | 'DELIVERY'
+
+export interface CheckoutCustomField {
+  id: string
+  label: string
+  description: string | null
+  type: CustomFieldType
+  section: CustomFieldSection
+  required: boolean
+  /** CHOICE only — what the customer picks from. */
+  choices: string[]
+}
+
+/** Limits — mirror the backend's stores.schema.ts. */
+export const MAX_CUSTOM_FIELDS = 10
+export const MAX_CUSTOM_FIELD_CHOICES = 20
+export const MAX_CUSTOM_ANSWER = 200
+
+export type StoreCheckoutFields = Record<CheckoutFieldKey, boolean> & {
+  customFields: CheckoutCustomField[]
+}
 
 export const DEFAULT_CHECKOUT_FIELDS: StoreCheckoutFields = {
   name: true,
@@ -505,6 +531,7 @@ export const DEFAULT_CHECKOUT_FIELDS: StoreCheckoutFields = {
   pincode: true,
   state: true,
   country: true,
+  customFields: [],
 }
 
 export interface Store {
@@ -2060,6 +2087,8 @@ export interface OrderCreateInput {
     country?: string | null
   }
   items: OrderItemInput[]
+  /** Answers to the store's own questions, keyed by question id. */
+  customFields?: Record<string, string>
   /** Attribution token from an affiliate link, if the visitor arrived through one. */
   affiliateRef?: string | null
 }
@@ -2112,6 +2141,14 @@ export type ShippingBasis =
   | { kind: 'PRODUCT_RATE'; amount: number; productName: string }
 
 /** Billing snapshot on a placed order (null = same as delivery). */
+/** One answer to a store's own checkout question, as it was asked. */
+export interface OrderCustomAnswer {
+  id: string
+  label: string
+  section: CustomFieldSection
+  value: string
+}
+
 export interface OrderBillingAddress {
   name: string
   phone: string | null
@@ -2222,6 +2259,8 @@ export interface PlacedOrder {
   state: string | null
   country: string | null
   billingAddress: OrderBillingAddress | null
+  /** Answers to the store's own checkout questions. */
+  customFields: OrderCustomAnswer[]
   subtotal: string
   shippingCharge: string
   /** Null on orders placed before shipping rates existed. */

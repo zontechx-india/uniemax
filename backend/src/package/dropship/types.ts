@@ -339,6 +339,9 @@ export interface OrderView {
   pincode: string | null;
   state: string | null;
   country: string | null;
+  /** The store's own "Where to deliver" questions the customer answered
+   *  (Post Office, Tehsil…) — label as asked, value as typed. */
+  deliveryNotes: { label: string; value: string }[];
   createdAt: Date;
   items: { id: string; fulfilledBy: string | null; shipmentId: string | null; lineTotal: Prisma.Decimal; imageKey: string | null }[];
   parcels: ParcelRef[];

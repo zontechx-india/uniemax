@@ -423,6 +423,13 @@ export interface ParcelInfo {
 }
 
 /** One order as the supplier sees it: what to ship, collect and where. No customer email, no selling prices. */
+/** A seller's own "Where to deliver" question the customer answered
+ *  (Post Office, Tehsil…) — print it with the address. */
+export interface DeliveryNote {
+  label: string
+  value: string
+}
+
 export interface SupplierOrder {
   id: string
   orderNumber: string
@@ -441,7 +448,7 @@ export interface SupplierOrder {
     imageUrl: string | null
   }[]
   /** Null once the order closed long enough ago (the customer's data is hidden). */
-  delivery: { name: string | null; phone: string | null; address: string | null; pincode: string | null; state: string | null } | null
+  delivery: { name: string | null; phone: string | null; address: string | null; pincode: string | null; state: string | null; notes: DeliveryNote[] } | null
   seller: { name: string; phone: string | null } | null
   parcel: ParcelInfo | null
   closeReason: string | null
@@ -466,7 +473,7 @@ export interface Slip {
   soldBy: { name: string; logoUrl: string | null }
   shippedBy: { name: string; returnAddress: string | null; phone: string | null }
   items: { productName: string; variantName: string | null; sku: string | null; quantity: number }[]
-  delivery: { name: string | null; phone: string | null; address: string | null; pincode: string | null; state: string | null }
+  delivery: { name: string | null; phone: string | null; address: string | null; pincode: string | null; state: string | null; notes: DeliveryNote[] }
   paymentMode: 'PREPAID' | 'COD'
   collectAmount: number | null
 }

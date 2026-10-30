@@ -1733,7 +1733,15 @@ store collects email but the chosen address has none (the plain-form
 fallback only renders if the addresses probe fails — the page itself
 already required sign-in). The form renders **only the fields
 the store collects** (`shell.checkout`, seller-toggled) and validates
-exactly those. Confirming collapses the step to a summary with a Change
+exactly those. The store's **own questions** (`shell.checkout.customFields`
+— Post Office, Tehsil…) render just above the confirm button in both the
+saved-address and plain-form paths (`StoreQuestions`: text / numeric-keypad
+number / select for a list; "(optional)" when not required; DELIVERY ones
+only for delivery), are checked on confirm, appear in the step summary and
+travel as `customFields` on Place Order. Order pages show the answers with
+`features/stores/OrderAnswerList.tsx` (seller: delivery answers under
+"Send to" and in **Copy address**, the rest under "More details"; customer
+order page; admin order detail). Confirming collapses the step to a summary with a Change
 button. Delivery orders also get a **billing address** section above the
 form ("same as delivery" by default; untick for a compact name/address form
 validated on the step's confirm). **Step 2 — Choose Payment Method**: radio
@@ -2190,7 +2198,14 @@ is never shown a pickup-address item.
   `shippingRateProblem`, `parseAmount`) in
   `features/stores/shippingRates.ts`. The page never computes a charge),
   `StoreCheckoutPage` (**Checkout** — which customer details the checkout
-  asks for: seven Asked / Not asked switches (Name / Mobile number / Email /
+  asks for; below the switches, `CustomQuestionsCard` — "Your own
+  questions": one-tap presets Post Office / Tehsil / District / Landmark
+  (pre-titled, renamable — e.g. "Taluka"), "Write my own question", each
+  with title, help text, answer type (Text / Number only / Pick from a list
+  with ChipInput options), when to ask (only when I deliver / every order;
+  hidden for pickup-only shops), a Must/Optional switch, Up / Remove and a
+  live "Customer sees" preview; problems show on the question after a save
+  attempt. Seven Asked / Not asked switches (Name / Mobile number / Email /
   Address / Pincode / State / Country, all on by default) in two glass
   cards — "About the customer" and "Where to deliver" — drafted locally and
   saved through the shared sticky `SaveBar` (appears on change, warns before

@@ -11,6 +11,7 @@ import type {
   PlacedOrder,
   ShipmentTrackingInput,
 } from '../../features/stores/storesApi'
+import { OrderAnswerList } from '../../features/stores/OrderAnswerList'
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import {
   ArrowLeftIcon,
@@ -301,10 +302,21 @@ export function StoreOrderDetailPage() {
   const address = order
     ? [order.addressLine, order.state, order.pincode, order.country].filter(Boolean).join(', ')
     : ''
+  // The store's own questions: delivery ones (Post Office, Tehsil…) belong
+  // with the address — and in what "Copy address" copies; the rest stand apart.
+  const deliveryAnswers = order?.customFields.filter((a) => a.section === 'DELIVERY') ?? []
+  const contactAnswers = order?.customFields.filter((a) => a.section === 'CONTACT') ?? []
 
   const copyAddress = async () => {
     if (!order) return
-    const text = [order.customerName, address, order.customerPhone].filter(Boolean).join('\n')
+    const text = [
+      order.customerName,
+      address,
+      ...deliveryAnswers.map((a) => `${a.label}: ${a.value}`),
+      order.customerPhone,
+    ]
+      .filter(Boolean)
+      .join('\n')
     try {
       await copyToClipboard(text)
       showToast('Address copied')
@@ -461,6 +473,7 @@ export function StoreOrderDetailPage() {
                         <p className="mt-1 text-base leading-relaxed text-fg">
                           {address || 'No address was given.'}
                         </p>
+                        <OrderAnswerList answers={deliveryAnswers} className="text-base" />
                         {address && (
                           <button
                             type="button"
@@ -490,6 +503,21 @@ export function StoreOrderDetailPage() {
                           .join(', ')}
                         {order.billingAddress.phone && <> · {order.billingAddress.phone}</>}
                       </p>
+                    </div>
+                  )}
+
+                  {(contactAnswers.length > 0 ||
+                    (order.fulfilment === 'PICKUP' && deliveryAnswers.length > 0)) && (
+                    <div className="border-t border-line pt-3">
+                      <p className="text-sm font-semibold text-fg">More details</p>
+                      <OrderAnswerList
+                        className="text-base"
+                        answers={
+                          order.fulfilment === 'PICKUP'
+                            ? order.customFields
+                            : contactAnswers
+                        }
+                      />
                     </div>
                   )}
                 </div>

@@ -132,6 +132,12 @@ export const orderCreateSchema = z.object({
       pincode: c.pincode ? normalizePincode(c.pincode, c.country) : null,
     })),
   items: orderItemsSchema,
+  /** Answers to the store's own checkout questions, keyed by question id.
+   *  Checked against the store's questions by the service. */
+  customFields: z
+    .record(z.string().max(32), z.string().max(500))
+    .nullish()
+    .transform((v) => v ?? {}),
   /** Affiliate attribution token the storefront picked up from /a/:token. */
   affiliateRef: z
     .string()

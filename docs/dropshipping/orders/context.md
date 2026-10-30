@@ -129,7 +129,9 @@ The customer order never runs ahead of its slowest parcel.
   the stock back?*) and **Edit tracking**.
 - **Print slips** for one order or all new orders. Each slip: *Sold by {store}*
   (with its logo), *Shipped by {supplier}*, order number, items with the
-  supplier's SKU, delivery name, address and phone, **COD ₹X** or **Prepaid**,
+  supplier's SKU, delivery name, address and phone (plus the seller's own
+  delivery questions — Post Office, Tehsil… — as `delivery.notes`, also on
+  the inbox card), **COD ₹X** or **Prepaid**,
   and the supplier's return address. No item prices.
 
 **Seller:**

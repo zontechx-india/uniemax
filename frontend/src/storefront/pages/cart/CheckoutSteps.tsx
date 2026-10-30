@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { toApiError } from '../../../shared/auth/http'
 import { customerAuth } from '../../../shared/auth/authApi'
 import {
@@ -8,7 +8,8 @@ import {
   isValidPhone,
   isValidPincode,
 } from '../../features/addresses/pincode'
-import { ErrorNote, InfoNote, TextField } from '../../../shared/ui/form'
+import { ErrorNote, InfoNote, Select, TextField } from '../../../shared/ui/form'
+import { FIELD_LABEL } from '../../../shared/ui/field'
 import { buttonClass } from '../../../shared/ui/Button'
 import {
   addressesApi,
@@ -20,8 +21,10 @@ import type {
 } from '../../features/addresses/addressesApi'
 import { useMarketSession } from '../../app/marketSession'
 import { AddressForm, readAddressDraft } from '../../features/addresses/AddressForm'
+import { MAX_CUSTOM_ANSWER } from '../../features/stores/storesApi'
 import type {
   BillingAddressInput,
+  CheckoutCustomField,
   CheckoutFieldKey,
   OrderQuote,
   PublicStore,
@@ -48,6 +51,11 @@ import { Button } from '../../../shared/ui/Button'
  * disabled field is neither shown nor validated. Contact fields
  * (name/phone/email) are asked even for store pickup; the address fields
  * only when the order is delivered.
+ *
+ * The store's OWN questions (`shell.checkout.customFields` — Post Office,
+ * Tehsil…) follow the address: contact-section ones on every order,
+ * delivery-section ones only when delivered. Answers travel with the order
+ * keyed by question id.
  *
  * Signed-in customers see their saved addresses as selectable rows (primary
  * first) with an inline "Add new address" that saves to the address book;
@@ -125,6 +133,48 @@ function validate(
   return null
 }
 
+/** The store's own questions that apply to this fulfilment. */
+function questionsFor(
+  fields: StoreCheckoutFields,
+  withAddress: boolean,
+): CheckoutCustomField[] {
+  return fields.customFields.filter((f) => withAddress || f.section === 'CONTACT')
+}
+
+/** Mirrors the server's `collectCustomAnswers` check. */
+function validateAnswers(
+  questions: CheckoutCustomField[],
+  answers: Record<string, string>,
+): string | null {
+  for (const q of questions) {
+    const value = (answers[q.id] ?? '').trim()
+    if (!value) {
+      if (q.required) return `${q.label} is required.`
+      continue
+    }
+    if (q.type === 'NUMBER' && !/^-?\d+(\.\d+)?$/.test(value)) {
+      return `${q.label} must be a number.`
+    }
+    if (q.type === 'CHOICE' && !q.choices.includes(value)) {
+      return `Pick one of the options for ${q.label}.`
+    }
+  }
+  return null
+}
+
+/** The answers worth sending — applicable, trimmed, non-empty. */
+function cleanAnswers(
+  questions: CheckoutCustomField[],
+  answers: Record<string, string>,
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const q of questions) {
+    const value = (answers[q.id] ?? '').trim()
+    if (value) out[q.id] = value
+  }
+  return out
+}
+
 /** What the summary line shows once the step is confirmed. */
 function summarize(values: CheckoutForm, withAddress: boolean): string {
   const parts = [
@@ -141,6 +191,8 @@ export interface DeliveryDetails {
   values: CheckoutForm
   /** A billing address that differs from delivery; null = same. */
   billing: BillingAddressInput | null
+  /** Answers to the store's own questions, keyed by question id. */
+  answers: Record<string, string>
 }
 
 /** What the summary panel needs to enable + submit Place Order. */
@@ -220,15 +272,22 @@ export function CheckoutSteps({
   const [billingSame, setBillingSame] = useState(true)
   const [billingValues, setBillingValues] = useState<BillingForm>(EMPTY_BILLING)
   const [billingProblem, setBillingProblem] = useState<string | null>(null)
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [answersProblem, setAnswersProblem] = useState<string | null>(null)
 
   useEffect(() => {
     onStateChange({ delivery, payment, fulfilment })
   }, [delivery, payment, fulfilment, onStateChange])
 
   const withAddress = fulfilment === 'DELIVERY'
+  const questions = questionsFor(fields, withAddress)
 
-  /** Step 1 completes only once the billing section (if used) is valid too. */
+  /** Step 1 completes only once the billing section (if used) and the
+   *  store's own questions are valid too. */
   const completeDelivery = (values: CheckoutForm) => {
+    const answersFailure = validateAnswers(questions, answers)
+    if (answersFailure) return setAnswersProblem(answersFailure)
+    setAnswersProblem(null)
     let billing: BillingAddressInput | null = null
     if (withAddress && !billingSame) {
       const failure = validateBilling(billingValues)
@@ -236,7 +295,7 @@ export function CheckoutSteps({
       billing = toBillingInput(billingValues)
     }
     setBillingProblem(null)
-    setDelivery({ fulfilment, values, billing })
+    setDelivery({ fulfilment, values, billing, answers: cleanAnswers(questions, answers) })
   }
 
   return (
@@ -261,6 +320,14 @@ export function CheckoutSteps({
                 {summarize(delivery.values, delivery.fulfilment === 'DELIVERY') ||
                   'Details recorded.'}
               </p>
+              {questions.some((q) => delivery.answers[q.id]) && (
+                <p className="mt-1 text-xs text-muted [overflow-wrap:anywhere]">
+                  {questions
+                    .filter((q) => delivery.answers[q.id])
+                    .map((q) => `${q.label}: ${delivery.answers[q.id]}`)
+                    .join(' · ')}
+                </p>
+              )}
               {delivery.billing && (
                 <p className="mt-1 text-xs text-muted">
                   Billed to {delivery.billing.name} · {delivery.billing.address}{' '}
@@ -305,6 +372,19 @@ export function CheckoutSteps({
               fields={fields}
               withAddress={withAddress}
               onDone={completeDelivery}
+              questions={
+                questions.length > 0 ? (
+                  <StoreQuestions
+                    questions={questions}
+                    answers={answers}
+                    onChange={(id, value) => {
+                      setAnswers((a) => ({ ...a, [id]: value }))
+                      setAnswersProblem(null)
+                    }}
+                    problem={answersProblem}
+                  />
+                ) : null
+              }
             />
           </div>
         )}
@@ -527,10 +607,13 @@ function DeliveryStep({
   fields,
   withAddress,
   onDone,
+  questions,
 }: {
   fields: StoreCheckoutFields
   withAddress: boolean
   onDone: (values: CheckoutForm) => void
+  /** The store's own questions, placed just above the confirm button. */
+  questions: ReactNode
 }) {
   // undefined = probing the session · 'guest' = not signed in
   const [addresses, setAddresses] = useState<
@@ -570,6 +653,7 @@ function DeliveryStep({
             : undefined
         }
         onDone={onDone}
+        questions={questions}
       />
     )
   }
@@ -580,6 +664,7 @@ function DeliveryStep({
       addresses={addresses}
       onAddressesChange={setAddresses}
       onDone={onDone}
+      questions={questions}
     />
   )
 }
@@ -594,11 +679,13 @@ function SavedAddressPicker({
   addresses,
   onAddressesChange,
   onDone,
+  questions,
 }: {
   fields: StoreCheckoutFields
   addresses: CustomerAddress[]
   onAddressesChange: (next: CustomerAddress[]) => void
   onDone: (values: CheckoutForm) => void
+  questions: ReactNode
 }) {
   const { state: session } = useMarketSession()
   const [selectedId, setSelectedId] = useState<string | null>(
@@ -768,6 +855,8 @@ function SavedAddressPicker({
         />
       )}
 
+      {!adding && questions}
+
       {problem && <ErrorNote>{problem}</ErrorNote>}
 
       {!adding && (
@@ -804,11 +893,13 @@ function ManualDetailsForm({
   withAddress,
   prefill,
   onDone,
+  questions,
 }: {
   fields: StoreCheckoutFields
   withAddress: boolean
   prefill?: CustomerAddress | undefined
   onDone: (values: CheckoutForm) => void
+  questions: ReactNode
 }) {
   const [values, setValues] = useState<CheckoutForm>({
     name: prefill?.name ?? '',
@@ -887,6 +978,8 @@ function ManualDetailsForm({
         </>
       )}
 
+      {questions}
+
       {problem && <ErrorNote>{problem}</ErrorNote>}
 
       <div className="flex sm:justify-end">
@@ -898,6 +991,67 @@ function ManualDetailsForm({
         </button>
       </div>
     </form>
+  )
+}
+
+/**
+ * The store's own questions (Post Office, Tehsil…) as inputs. Text and
+ * number answers are free-typed (numbers get the numeric keypad); a list
+ * question is a select. The problem sits under them, next to the cause.
+ */
+function StoreQuestions({
+  questions,
+  answers,
+  onChange,
+  problem,
+}: {
+  questions: CheckoutCustomField[]
+  answers: Record<string, string>
+  onChange: (id: string, value: string) => void
+  problem: string | null
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        {questions.map((q) => {
+          const label = q.required ? q.label : `${q.label} (optional)`
+          if (q.type === 'CHOICE') {
+            return (
+              <label key={q.id} className="block">
+                <span className={FIELD_LABEL}>{label}</span>
+                <Select
+                  value={answers[q.id] ?? ''}
+                  onChange={(e) => onChange(q.id, e.target.value)}
+                  className="h-12"
+                >
+                  <option value="">Choose…</option>
+                  {q.choices.map((choice) => (
+                    <option key={choice} value={choice}>
+                      {choice}
+                    </option>
+                  ))}
+                </Select>
+                {q.description && (
+                  <span className="mt-1.5 block text-xs text-muted">{q.description}</span>
+                )}
+              </label>
+            )
+          }
+          return (
+            <TextField
+              key={q.id}
+              label={label}
+              value={answers[q.id] ?? ''}
+              onChange={(e) => onChange(q.id, e.target.value)}
+              inputMode={q.type === 'NUMBER' ? 'decimal' : undefined}
+              hint={q.description ?? undefined}
+              maxLength={MAX_CUSTOM_ANSWER}
+            />
+          )
+        })}
+      </div>
+      {problem && <ErrorNote>{problem}</ErrorNote>}
+    </div>
   )
 }
 

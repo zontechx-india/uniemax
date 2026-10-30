@@ -27,6 +27,7 @@ import {
   resolveShipping,
 } from "../stores/stores.schema.js";
 import type { CheckoutFieldKey } from "../stores/stores.schema.js";
+import { collectCustomAnswers, readOrderCustomFields } from "./customFields.js";
 import {
   effectiveDeliveryRule,
   isDeliverable,
@@ -129,6 +130,7 @@ const orderSelect = {
   state: true,
   country: true,
   billingAddress: true,
+  customFields: true,
   subtotal: true,
   shippingCharge: true,
   shippingMethod: true,
@@ -177,9 +179,10 @@ type OrderRow = Prisma.OrderGetPayload<{ select: typeof orderSelect }>;
  * contact redaction for the public link is `getPublicOrder`'s job.
  */
 function shapeOrder(row: OrderRow, audience: OrderAudience = "customer") {
-  const { items, shipments, ...rest } = row;
+  const { items, shipments, customFields, ...rest } = row;
   return {
     ...rest,
+    customFields: readOrderCustomFields(customFields),
     items: items.map(({ imageKey, ...item }) => ({
       ...item,
       imageUrl: mediaUrl("media", imageKey),
@@ -547,6 +550,11 @@ export async function createOrder(
   const checkout = resolveCheckoutFields(store.checkout);
   const withAddress = input.fulfilment === "DELIVERY";
   validateCustomerFields(checkout, input.customer, withAddress);
+  const customAnswers = collectCustomAnswers(
+    checkout.customFields,
+    input.customFields,
+    withAddress,
+  );
 
   // --- re-price every line from the live catalog ---------------------------
   // One line per product+variant; duplicate references are rejected rather
@@ -677,6 +685,9 @@ export async function createOrder(
           state: withAddress ? input.customer.state : null,
           country: withAddress ? input.customer.country : null,
           billingAddress: billingAddress ?? Prisma.DbNull,
+          customFields: customAnswers.length
+            ? (customAnswers as unknown as Prisma.InputJsonValue)
+            : Prisma.DbNull,
           subtotal: money.subtotal,
           shippingCharge: money.shippingCharge,
           shippingMethod: money.shippingMethod,
@@ -1430,6 +1441,7 @@ export async function getPublicOrder(
     addressLine: null,
     pincode: null,
     billingAddress: null,
+    customFields: [],
     // The success page only needs to know a payment was simulated; a real
     // gateway reference is the buyer's business.
     paymentRef: shaped.paymentRef === "DEV-SIMULATED" ? shaped.paymentRef : null,

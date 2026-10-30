@@ -16,6 +16,7 @@ import {
 } from '../../features/stores/storesApi'
 import type { PlacedOrder } from '../../features/stores/storesApi'
 import { ParcelTracking } from '../../features/stores/ParcelTracking'
+import { OrderAnswerList } from '../../features/stores/OrderAnswerList'
 import {
   formatStepTime,
   orderProgress,
@@ -479,6 +480,7 @@ export function OrderSuccessPage({
                       .join('\n')}
                   </p>
                 )}
+                <OrderAnswerList answers={order.customFields} />
                 {order.redacted && (
                   <p className="mt-2 text-xs">
                     Sign in with the account that placed this order to see

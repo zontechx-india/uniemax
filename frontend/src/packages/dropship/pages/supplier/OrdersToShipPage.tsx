@@ -231,6 +231,12 @@ function OrderCard({
               {[d.name, d.phone].filter(Boolean).join(' · ')}
               <br />
               {[d.address, d.state, d.pincode].filter(Boolean).join(', ')}
+              {d.notes.length > 0 && (
+                <>
+                  <br />
+                  {d.notes.map((n) => `${n.label}: ${n.value}`).join(' · ')}
+                </>
+              )}
             </dd>
           </div>
         ) : (

@@ -67,6 +67,8 @@ export interface OrderDetail extends OrderRow {
     state: string | null
     country: string | null
   } | null
+  /** Answers to the store's own checkout questions. */
+  customFields: { id: string; label: string; section: 'CONTACT' | 'DELIVERY'; value: string }[]
   cfOrderId: string | null
   paymentIntentId: string | null
   confirmedAt: string | null

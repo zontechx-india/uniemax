@@ -4,6 +4,7 @@ import { HttpError } from "../../utils/httpError.js";
 import { buildListMeta } from "../../utils/response.js";
 import { mediaUrl } from "../../package/storage/index.js";
 import { shapeShipment, shipmentSelect } from "../orders/shipments.shape.js";
+import { readOrderCustomFields } from "../orders/customFields.js";
 import type { OrderListQuery, PaymentListQuery } from "./admin.schema.js";
 
 /**
@@ -113,6 +114,7 @@ export async function getOrder(orderId: string) {
       tax: true,
       discount: true,
       billingAddress: true,
+      customFields: true,
       cfOrderId: true,
       paymentIntentId: true,
       confirmedAt: true,
@@ -144,9 +146,10 @@ export async function getOrder(orderId: string) {
   });
   if (!order) throw HttpError.notFound("Order not found");
 
-  const { _count, items, shipments, ...rest } = order;
+  const { _count, items, shipments, customFields, ...rest } = order;
   return {
     ...rest,
+    customFields: readOrderCustomFields(customFields),
     itemCount: _count.items,
     items: items.map(({ imageKey, ...item }) => ({
       ...item,

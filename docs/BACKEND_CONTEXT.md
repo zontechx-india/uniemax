@@ -1083,7 +1083,10 @@ White-label design — one codebase, any business:
   `{ name, phone, email, address, pincode, state, country }` — which
   customer details the checkout collects (`resolveCheckoutFields`, all
   default true; disabled = hidden from the customer and excluded from
-  validation), updated via `PATCH /stores/:id/checkout`. All three are
+  validation), plus `customFields` — the seller's own questions (Post
+  Office, Tehsil…; `checkoutCustomFieldSchema`: id, label, description,
+  type TEXT/NUMBER/CHOICE, section CONTACT/DELIVERY, required, choices; max
+  10) — updated via `PATCH /stores/:id/checkout`. All three are
   included resolved in the owner responses and the public shell so the
   checkout knows what a store offers/asks. A `profile` JSON column holds the
   **business identity** — `businessName`, `sellerName`, contact `phone` /
@@ -1427,7 +1430,10 @@ White-label design — one codebase, any business:
   (`storeId` SetNull + `storeName`/`storeSlug`), fulfilment
   (`OrderFulfilment`: DELIVERY/PICKUP), the contact + delivery fields (all
   **nullable** — sellers choose what their checkout collects), an optional
-  `billingAddress` JSON snapshot (null = same as delivery), money
+  `billingAddress` JSON snapshot (null = same as delivery), a
+  `customFields` JSON snapshot of the answers to the store's own questions
+  (`[{ id, label, section, value }]`, checked by
+  `orders/customFields.ts#collectCustomAnswers`; null = none), money
   (`subtotal`, `shippingCharge` + its customer-facing `shippingMethod`
   label + a `shippingBasis` JSON explaining the charge, `tax` and
   `discount` — reserved columns held at 0 until tax config and coupons

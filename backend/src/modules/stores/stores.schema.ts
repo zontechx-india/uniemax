@@ -454,33 +454,101 @@ export const CHECKOUT_FIELD_KEYS = [
 
 export type CheckoutFieldKey = (typeof CHECKOUT_FIELD_KEYS)[number];
 
-export type StoreCheckoutFields = Record<CheckoutFieldKey, boolean>;
+/**
+ * The seller's own checkout questions (`checkout.customFields`) — Post
+ * Office, Tehsil, District, a GST number… whatever their deliveries need.
+ * `section` places it: CONTACT is asked on every order, DELIVERY only when
+ * the order is delivered. `id` is a stable key the answers are sent under;
+ * the label may be renamed freely (orders snapshot the label they were
+ * answered under).
+ */
+export const CUSTOM_FIELD_TYPES = ["TEXT", "NUMBER", "CHOICE"] as const;
+export const CUSTOM_FIELD_SECTIONS = ["CONTACT", "DELIVERY"] as const;
+export const MAX_CUSTOM_FIELDS = 10;
+export const MAX_CUSTOM_FIELD_CHOICES = 20;
+/** Longest answer a customer may type into a custom field. */
+export const MAX_CUSTOM_ANSWER = 200;
 
-export const storeCheckoutFieldsSchema = z.object(
-  Object.fromEntries(
-    CHECKOUT_FIELD_KEYS.map((key) => [key, z.boolean()]),
-  ) as Record<CheckoutFieldKey, z.ZodBoolean>,
-);
+export const checkoutCustomFieldSchema = z
+  .object({
+    id: z.string().regex(/^[A-Za-z0-9_-]{4,32}$/, "Invalid question id"),
+    label: z.string().trim().min(1, "Every question needs a title").max(40),
+    description: z
+      .string()
+      .trim()
+      .max(120)
+      .nullish()
+      .transform((v) => v || null),
+    type: z.enum(CUSTOM_FIELD_TYPES),
+    section: z.enum(CUSTOM_FIELD_SECTIONS),
+    required: z.boolean(),
+    /** CHOICE only — the options the customer picks from. */
+    choices: z
+      .array(z.string().trim().min(1).max(40))
+      .max(MAX_CUSTOM_FIELD_CHOICES)
+      .default([]),
+  })
+  .transform((f) => ({
+    ...f,
+    choices: f.type === "CHOICE" ? [...new Set(f.choices)] : [],
+  }))
+  .refine((f) => f.type !== "CHOICE" || f.choices.length >= 2, {
+    message: "A list question needs at least 2 options",
+  });
 
-export const storeCheckoutUpdateSchema = storeCheckoutFieldsSchema
-  .partial()
+export type CheckoutCustomField = z.infer<typeof checkoutCustomFieldSchema>;
+
+const checkoutCustomFieldsSchema = z
+  .array(checkoutCustomFieldSchema)
+  .max(MAX_CUSTOM_FIELDS, `Up to ${MAX_CUSTOM_FIELDS} questions`)
+  .refine((list) => new Set(list.map((f) => f.id)).size === list.length, {
+    message: "Question ids must be unique",
+  });
+
+export type StoreCheckoutFields = Record<CheckoutFieldKey, boolean> & {
+  customFields: CheckoutCustomField[];
+};
+
+export const storeCheckoutUpdateSchema = z
+  .object({
+    ...(Object.fromEntries(
+      CHECKOUT_FIELD_KEYS.map((key) => [key, z.boolean().optional()]),
+    ) as Record<CheckoutFieldKey, z.ZodOptional<z.ZodBoolean>>),
+    /** Replaces the whole list (order = the order customers see). */
+    customFields: checkoutCustomFieldsSchema.optional(),
+  })
   .refine((val) => Object.keys(val).length > 0, {
     message: "Provide at least one checkout field to update",
   });
 
 export type StoreCheckoutUpdateInput = z.infer<typeof storeCheckoutUpdateSchema>;
 
-export const DEFAULT_CHECKOUT_FIELDS: StoreCheckoutFields = Object.fromEntries(
-  CHECKOUT_FIELD_KEYS.map((key) => [key, true]),
-) as StoreCheckoutFields;
+export const DEFAULT_CHECKOUT_FIELDS: StoreCheckoutFields = {
+  ...(Object.fromEntries(
+    CHECKOUT_FIELD_KEYS.map((key) => [key, true]),
+  ) as Record<CheckoutFieldKey, boolean>),
+  customFields: [],
+};
 
-/** Normalise the stored `checkout` JSON — missing/garbage keys → true. */
+/**
+ * Normalise the stored `checkout` JSON — missing/garbage keys → true, and a
+ * custom question that no longer parses is dropped rather than failing the
+ * whole checkout.
+ */
 export function resolveCheckoutFields(raw: unknown): StoreCheckoutFields {
-  const base = { ...DEFAULT_CHECKOUT_FIELDS };
+  const base: StoreCheckoutFields = { ...DEFAULT_CHECKOUT_FIELDS, customFields: [] };
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return base;
   const obj = raw as Record<string, unknown>;
   for (const key of CHECKOUT_FIELD_KEYS) {
     if (typeof obj[key] === "boolean") base[key] = obj[key];
+  }
+  if (Array.isArray(obj.customFields)) {
+    for (const item of obj.customFields.slice(0, MAX_CUSTOM_FIELDS)) {
+      const parsed = checkoutCustomFieldSchema.safeParse(item);
+      if (parsed.success && !base.customFields.some((f) => f.id === parsed.data.id)) {
+        base.customFields.push(parsed.data);
+      }
+    }
   }
   return base;
 }

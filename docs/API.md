@@ -936,7 +936,16 @@ Returns the full store.
 ### `PATCH /api/v1/stores/:id/checkout`
 ```jsonc
 { "name": true, "phone": true, "email": false, "address": true,
-  "pincode": true, "state": true, "country": false }
+  "pincode": true, "state": true, "country": false,
+  "customFields": [                 // optional — REPLACES the whole list
+    { "id": "qpost1a2b3c",          // 4–32 of A–Z a–z 0–9 _ -, unique; answers are keyed by it
+      "label": "Post Office",       // 1–40 chars, renamable
+      "description": "Your nearest post office", // ≤ 120, optional
+      "type": "TEXT",               // TEXT | NUMBER | CHOICE
+      "section": "DELIVERY",        // CONTACT (every order) | DELIVERY (delivered orders only)
+      "required": true,
+      "choices": [] }               // CHOICE only: 2–20 options (ignored otherwise)
+  ] }
 // any subset (≥ 1 key) — absent keys are kept
 ```
 Which customer fields this store's **checkout collects** — stored as the
@@ -944,8 +953,11 @@ Which customer fields this store's **checkout collects** — stored as the
 is hidden from the customer and excluded from checkout validation.
 `name`/`phone`/`email` are contact fields (asked even for store pickup);
 `address`/`pincode`/`state`/`country` are delivery fields (skipped for
-pickup orders). Returned resolved on every store response and in the
-public shell. Returns the full store.
+pickup orders). `customFields` are the seller's **own questions** (Post
+Office, Tehsil, District, a GST number…) — up to 10, in the order customers
+see them; a stored question that no longer parses is dropped on read.
+Returned resolved on every store response and in the public shell (old
+stores: `customFields: []`). Returns the full store.
 
 ### `PATCH /api/v1/stores/:id/publish`
 ```json
@@ -1853,6 +1865,9 @@ owns re-opening a gateway session).
     "address": "12/4 MG Road, Kochi", // config: enabled fields are required
     "pincode": "682016", "state": "Kerala", "country": "India"
   },                                 // (address fields skipped for PICKUP)
+  "customFields": {                  // optional — answers to the store's own
+    "qpost1a2b3c": "Kalady"          // questions, keyed by question id
+  },
   "items": [                         // references + quantities ONLY — prices
     { "productId": "cmr…", "variantId": null, "quantity": 2 }
   ]                                  // are re-read from the live catalog
@@ -1875,6 +1890,14 @@ Vase" — choose another payment method"` when any line's product has
 `codAvailable: false` (the quote's `paymentMethods.cod` said so already).
 `billingAddress` is stored only on DELIVERY orders (null = same as the
 delivery details).
+
+**Store questions:** `customFields` answers are checked against the store's
+`checkout.customFields` — a required one left blank is `400 "Post Office is
+required"`, a NUMBER must be a number, a CHOICE must be one of its options,
+answers are ≤ 200 chars; DELIVERY questions are skipped for PICKUP and
+unknown ids are ignored. They are stored as `Order.customFields` with the
+label they were asked under, so renaming a question never rewrites old
+orders.
 
 **PIN codes:** `customer.pincode` and `billingAddress.pincode` must be a
 6-digit PIN not starting with 0 when the country is India (or not given) —
@@ -1918,6 +1941,7 @@ Response: the full order —
   "addressLine", "pincode", "state", "country",   // null when not collected
   "billingAddress": { "name", "phone", "addressLine",
                       "pincode", "state", "country" } | null,   // null = same as delivery
+  "customFields": [ { "id", "label", "section", "value" } ],    // store-question answers; [] when none
   "subtotal", "shippingCharge", "tax", "discount", "total",     // decimal strings
   "shippingMethod",                 // "Free delivery" · "Standard delivery" · "Store pickup" (null on legacy orders)
   "shippingBasis",                  // why the charge is what it is (see the quote endpoint)
@@ -1947,7 +1971,7 @@ opens in a fresh session. Same shape as above (never includes `payment`) plus
 `redacted`: **only the customer who placed the order** gets `redacted: false`
 and the full contact + delivery snapshot. Anyone else (anonymous, another
 account) gets `redacted: true` with `customerPhone`, `customerEmail`,
-`addressLine`, `pincode`, `billingAddress` and a real `paymentRef` nulled,
+`addressLine`, `pincode`, `billingAddress` and a real `paymentRef` nulled (`customFields` → `[]`),
 each parcel's `trackingNumber` / `trackingUrl` nulled (a courier's site can
 show the delivery address), and `customerName` cut to the first name — a
 cuid is time-ordered and leaks through shared links, so it must not unlock

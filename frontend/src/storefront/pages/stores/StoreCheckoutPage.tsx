@@ -3,9 +3,13 @@ import type { FormEvent } from 'react'
 import { toApiError } from '../../../shared/auth/http'
 import { ErrorNote, InfoNote } from '../../../shared/ui/form'
 import { CHECKOUT_FIELD_KEYS, storesApi } from '../../features/stores/storesApi'
-import type { CheckoutFieldKey } from '../../features/stores/storesApi'
+import type {
+  CheckoutFieldKey,
+  StoreCheckoutFields,
+} from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import { ClipboardIcon, MapPinIcon, UserIcon } from '../../layout/icons'
+import { CustomQuestionsCard, customQuestionProblems } from './CustomQuestionsCard'
 import { BigSwitch } from './ui/BigSwitch'
 import { GlassCard } from './ui/GlassCard'
 import { PageHeader } from './ui/PageHeader'
@@ -15,11 +19,13 @@ import { showToast } from './ui/Toast'
 /**
  * Checkout section of Store Management — which customer details the
  * store's checkout asks for. All seven are on by default; a field switched
- * off is hidden from the customer and skipped in checkout validation.
+ * off is hidden from the customer and skipped in checkout validation. Below
+ * them, the seller's own questions (CustomQuestionsCard).
  *
- * Switches are drafted locally and saved together through the shared
- * SaveBar (`PATCH /stores/:id/checkout` sends only the changed keys) — it
- * appears once something changes and warns before leaving unsaved.
+ * Everything is drafted locally and saved together through the shared
+ * SaveBar (`PATCH /stores/:id/checkout` sends only the changed keys; the
+ * question list goes whole) — it appears once something changes and warns
+ * before leaving unsaved.
  */
 
 const FIELD_META: Record<CheckoutFieldKey, { title: string; description: string }> = {
@@ -38,25 +44,37 @@ const CONTACT_KEYS: CheckoutFieldKey[] = ['name', 'phone', 'email']
 export function StoreCheckoutPage() {
   const { store, onStoreChange } = useManagedStore()
 
-  const [draft, setDraft] = useState({ ...store.checkout })
+  const [draft, setDraft] = useState<StoreCheckoutFields>({ ...store.checkout })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showProblems, setShowProblems] = useState(false)
 
-  const dirty = CHECKOUT_FIELD_KEYS.some((key) => draft[key] !== store.checkout[key])
+  const questionsChanged =
+    JSON.stringify(draft.customFields) !== JSON.stringify(store.checkout.customFields)
+  const dirty =
+    questionsChanged ||
+    CHECKOUT_FIELD_KEYS.some((key) => draft[key] !== store.checkout[key])
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    const patch = Object.fromEntries(
+    if (Object.keys(customQuestionProblems(draft.customFields)).length > 0) {
+      setShowProblems(true)
+      setError('Fix the question marked in red, then save again.')
+      return
+    }
+    const patch: Partial<StoreCheckoutFields> = Object.fromEntries(
       CHECKOUT_FIELD_KEYS.filter((key) => draft[key] !== store.checkout[key]).map(
         (key) => [key, draft[key]],
       ),
     )
+    if (questionsChanged) patch.customFields = draft.customFields
     setBusy(true)
     setError(null)
     try {
       const updated = await storesApi.updateCheckout(store.id, patch)
       onStoreChange(updated)
       setDraft({ ...updated.checkout })
+      setShowProblems(false)
       showToast('Checkout saved')
     } catch (err) {
       setError(toApiError(err).message)
@@ -116,9 +134,28 @@ export function StoreCheckoutPage() {
         </InfoNote>
       )}
 
+      <CustomQuestionsCard
+        fields={draft.customFields}
+        onChange={(customFields) => {
+          setDraft((d) => ({ ...d, customFields }))
+          setError(null)
+        }}
+        disabled={busy}
+        showProblems={showProblems}
+        pickupOnly={store.shipping.mode === 'PICKUP'}
+      />
+
       {error && <ErrorNote>{error}</ErrorNote>}
 
-      <SaveBar dirty={dirty} saving={busy} onDiscard={() => setDraft({ ...store.checkout })} />
+      <SaveBar
+        dirty={dirty}
+        saving={busy}
+        onDiscard={() => {
+          setDraft({ ...store.checkout })
+          setShowProblems(false)
+          setError(null)
+        }}
+      />
     </form>
   )
 }

@@ -445,6 +445,8 @@ model Store {
   /// { name, phone, email, address, pincode, state, country } — booleans,
   /// all default TRUE via `resolveCheckoutFields`. A disabled field is
   /// hidden from the customer and excluded from checkout validation.
+  /// Plus `customFields`: the seller's own questions (Post Office, Tehsil…)
+  /// — see `checkoutCustomFieldSchema` in stores.schema.ts.
   checkout    Json?
   isPublished Boolean   @default(false)
   /// Set the FIRST time the store is published (never reset), so marketplace
@@ -1009,6 +1011,11 @@ model Order {
   /// country } when the customer gave one that differs from the delivery
   /// address; null = same as the delivery/contact details above.
   billingAddress Json?
+
+  /// Answers to the store's own checkout questions (Store.checkout
+  /// .customFields), snapshotted with the label they were asked under:
+  /// [{ id, label, section: CONTACT | DELIVERY, value }]. Null = none.
+  customFields Json?
 
   // Money (all snapshots at time of order). Computed SERVER-SIDE only:
   //   total (grand total) = subtotal - discount + shippingCharge + tax

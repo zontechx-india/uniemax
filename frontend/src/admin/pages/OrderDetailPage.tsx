@@ -199,6 +199,12 @@ export default function OrderDetailPage() {
               ) : (
                 <Detail label="Fulfilment">Customer collects from the store</Detail>
               )}
+              {/* The store's own checkout questions (Post Office, Tehsil…). */}
+              {order.customFields.map((answer) => (
+                <Detail key={answer.id} label={answer.label}>
+                  {answer.value}
+                </Detail>
+              ))}
             </dl>
           </Card>
 

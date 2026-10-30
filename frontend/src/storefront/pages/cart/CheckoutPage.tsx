@@ -173,6 +173,7 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
           state: delivery.values.state ?? null,
           country: delivery.values.country ?? null,
         },
+        customFields: delivery.answers,
         items: sellable.map((item) => ({
           productId: item.productId,
           variantId: item.variantId,

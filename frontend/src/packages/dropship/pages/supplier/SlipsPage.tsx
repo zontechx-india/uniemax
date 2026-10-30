@@ -71,6 +71,9 @@ function SlipSheet({ slip: s }: { slip: Slip }) {
         <p className="text-xs uppercase tracking-wide opacity-60">Deliver to</p>
         <p className="text-base font-semibold">{d.name}</p>
         <p className="text-base">{[d.address, d.state, d.pincode].filter(Boolean).join(', ')}</p>
+        {d.notes.length > 0 && (
+          <p className="text-base">{d.notes.map((n) => `${n.label}: ${n.value}`).join(' · ')}</p>
+        )}
         {d.phone && <p className="text-base">Phone {d.phone}</p>}
       </section>
 
