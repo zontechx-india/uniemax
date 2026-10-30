@@ -33,7 +33,8 @@ never ships to a shopper.
 
 - Marketplace homepage: top stores (real deliveries first; fun/empty shops skipped), global search across stores /
   categories / products with a full `/search` results page, "View all" pages (`/categories`, `/shops`, `/new`),
-  platform stats.
+  "Shop by category" picture tiles and per-category rails, platform stats.
+- Saved (wishlist): a heart on every product card and product page; "Saved" (`/saved`) in the account menu.
 - Per-store storefronts with the seller's own colors, logo, footer and homepage
   section order.
 - Browse by category (nested as deep as the taxonomy), product detail with a

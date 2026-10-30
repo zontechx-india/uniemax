@@ -213,7 +213,11 @@ let rootsCache: { data: BrowsableCategory[]; expiresAt: number } | null = null;
 export interface BrowsableCategory {
   name: string;
   slug: string;
+  /** `null` for a top-level node — how a client keeps "Sports" and its child "Team Sports" apart. */
+  parentSlug: string | null;
   productCount: number;
+  /** Cover of the newest discoverable product with a photo in this branch, if any. */
+  imageUrl: string | null;
 }
 
 /**
@@ -230,13 +234,34 @@ export async function listBrowsableCategories(): Promise<BrowsableCategory[]> {
   const now = Date.now();
   if (rootsCache && rootsCache.expiresAt > now) return rootsCache.data;
 
-  const [grouped, nodes] = await Promise.all([
+  const [grouped, nodes, covers] = await Promise.all([
     prisma.storeProduct.groupBy({
       by: ["globalCategoryId"],
       where: { ...DISCOVERABLE_PRODUCT, globalCategoryId: { not: null } },
       _count: { _all: true },
     }),
     getActiveCategoryNodes(),
+    // The newest photographed product per tagged node — one row per node,
+    // newest first, so the roll-up below can keep the first it meets.
+    prisma.storeProduct.findMany({
+      where: {
+        ...DISCOVERABLE_PRODUCT,
+        globalCategoryId: { not: null },
+        media: { some: { type: "IMAGE" } },
+      },
+      distinct: ["globalCategoryId"],
+      orderBy: { createdAt: "desc" },
+      select: {
+        globalCategoryId: true,
+        createdAt: true,
+        media: {
+          where: { type: "IMAGE" },
+          orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+          take: 1,
+          select: { key: true },
+        },
+      },
+    }),
   ]);
 
   // Direct counts, then rolled UP the tree: a product tagged on a leaf counts
@@ -257,12 +282,32 @@ export async function listBrowsableCategories(): Promise<BrowsableCategory[]> {
     }
   }
 
+  // Pictures roll up the same way: a node shows the newest cover anywhere
+  // in its branch. `covers` is newest-first, so the first one to reach a
+  // node is the one it keeps.
+  const cover = new Map<string, { at: number; key: string }>();
+  for (const row of covers) {
+    const key = row.media[0]?.key;
+    if (!key) continue;
+    const at = row.createdAt.getTime();
+    let cursor = byId.get(row.globalCategoryId!);
+    const guard = new Set<string>();
+    while (cursor && !guard.has(cursor.id)) {
+      guard.add(cursor.id);
+      const held = cover.get(cursor.id);
+      if (!held || held.at < at) cover.set(cursor.id, { at, key });
+      cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
+    }
+  }
+
   const data = nodes
     .filter((node) => (totals.get(node.id) ?? 0) > 0)
     .map((node) => ({
       name: node.name,
       slug: node.slug,
+      parentSlug: node.parentId ? (byId.get(node.parentId)?.slug ?? null) : null,
       productCount: totals.get(node.id)!,
+      imageUrl: mediaUrl("media", cover.get(node.id)?.key ?? null),
     }))
     .sort((a, b) => b.productCount - a.productCount || a.name.localeCompare(b.name));
 

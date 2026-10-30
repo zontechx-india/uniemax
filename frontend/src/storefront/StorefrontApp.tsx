@@ -9,6 +9,7 @@ import { publicRouter } from './app/publicRouter'
 import { AuthDialog } from './features/auth/AuthDialog'
 import { cart } from './features/cart/cart'
 import { stopCartSync, useCartSync } from './features/cart/cartSync'
+import { useWishlistSync } from './features/wishlist/wishlist'
 
 /**
  * Storefront root.
@@ -64,6 +65,9 @@ export function StorefrontApp() {
    * (`null`) shop from localStorage alone, exactly as before.
    */
   useCartSync(state.status === 'authed' ? state.user.id : null)
+
+  /** The hearts on every card read one in-memory set of saved product ids. */
+  useWishlistSync(state.status === 'authed' ? state.user.id : null)
 
   /**
    * Logging out empties the cart in THIS BROWSER — not the account's.

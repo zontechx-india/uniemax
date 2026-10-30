@@ -118,8 +118,12 @@ export interface MarketBanner {
 export interface BrowsableCategory {
   name: string
   slug: string
+  /** `null` for a top-level node. */
+  parentSlug: string | null
   /** Products at or beneath this node, across every published store. */
   productCount: number
+  /** Cover of the newest photographed product in the branch, if any. */
+  imageUrl: string | null
 }
 
 /** One `/c/{slug}` landing page. */
@@ -138,6 +142,9 @@ export interface BrowseCategoryPage {
 }
 
 export type BrowseSort = 'newest' | 'priceAsc' | 'priceDesc'
+
+/** One fetch per page load for the browsable set — several homepage sections read it. */
+let browsableOnce: Promise<BrowsableCategory[]> | null = null
 
 export const discoveryApi = {
   /**
@@ -220,6 +227,15 @@ export const discoveryApi = {
    */
   async browsableCategories(): Promise<BrowsableCategory[]> {
     return call<BrowsableCategory[]>(http.get(`${PUBLIC}/browse`))
+  },
+
+  /** `browsableCategories`, shared — a failure is not cached, so a retry refetches. */
+  browsableCategoriesShared(): Promise<BrowsableCategory[]> {
+    browsableOnce ??= discoveryApi.browsableCategories().catch((error: unknown) => {
+      browsableOnce = null
+      throw error
+    })
+    return browsableOnce
   },
 
   /**

@@ -306,7 +306,17 @@ for guests and signed-in customers alike and adapts per session state.
   **grid that shows only whole rows** (`wholeRowsClass`): 2 columns × 3
   rows on a phone, then 3 / 4 / 5 / 6 columns × 2 rows from `sm` / `md` /
   `lg` / `xl`, so it never ends in holes; a phone also gets a full-width
-  "View all new products" button under it. **Recently Viewed** (local, hidden
+  "View all new products" button under it. Then two category bands:
+  **Shop by category** (`ShopByCategorySection`, base tone) — picture tiles
+  of the top-level global categories (`parentSlug === null` from
+  `GET /public/browse`, photo = `imageUrl`, tag glyph without one), whole rows
+  only (4 or 8 tiles; 2–3 in a row of their own; fewer → hidden), "View all" →
+  `/categories`, no counts; and **More to explore** (`MoreToExploreSection`,
+  alt tone) — one rail per top-level category with 6+ products (up to 3),
+  each its newest 12 from `GET /public/browse/{slug}` with its own heading,
+  arrows and "View all" → `/c/{slug}`. Both share one browse fetch with the
+  Popular row (`discoveryApi.browsableCategoriesShared`) and hide silently
+  on failure. **Recently Viewed** (local, hidden
   when empty) is a **rail** — percentage-width cards in a snapping scroller
   with arrows from `lg` that grey out at each end. `useRail` measures the rail when it mounts and on resize (a callback
   ref + `ResizeObserver`), not only on scroll — otherwise both arrows start
@@ -350,6 +360,19 @@ for guests and signed-in customers alike and adapts per session state.
   breadcrumb + `<h1>`, `MarketProductCard`, `ListingPagination`,
   `ListingSkeleton` — also used by `/c/{slug}`, whose breadcrumb now starts
   UnieMax › All categories).
+- **Saved / wishlist** (`features/wishlist/`) — `wishlist.ts` keeps the
+  signed-in customer's saved product ids in memory (`useWishlistSync` in
+  `StorefrontApp`, beside the cart sync: loads `GET /wishlist/ids` on
+  sign-in, empties on sign-out) and `toggleSaved` flips a heart
+  optimistically (reverted if the request fails); a guest's tap opens the
+  sign-in dialog and saves after. `SaveButton` is the round heart — always a
+  **sibling** of the card link, never inside it — on `MarketProductCard`
+  (`/new`, `/c/`, `/search`, `/saved`), the homepage product card (Fresh
+  Finds, More to explore), the store `ProductCard` (store palette, store
+  sign-in look via `storeAuthRequest`) and beside Share on the product page.
+  **`/saved`** (`SavedPage`, account subtree, `noindex`) lists them newest
+  first; an un-hearted product stays until the page is left, so a mis-tap is
+  one tap to undo.
 - **Search results page `/search?q=&page=&sort=`** (`SearchPage`) — page 1
   shows matching **categories** (global `/c/` nodes from `GET /public/browse`
   filtered by name, then store shelves from the grouped search), matching
@@ -463,7 +486,7 @@ Signed-in account pages mount inside `RequireCustomer` → `AppLayout`
   navigation lives: Flipkart-style dropdown on the top-bar avatar, opens on
   hover (click/tap on touch), closes on Escape / outside tap / item click.
   Items come from `ACCOUNT_MENU_ITEMS` in `app/navigation.ts` (My Profile,
-  Orders, Saved Addresses, Help & Support — Help last, because it is where
+  Orders, Saved, Saved Addresses, Help & Support — Help last, because it is where
   someone goes when one of the rows above has gone wrong) plus the dynamic
   store row and a Logout row using
   the shared confirm flow (`layout/useSignOutConfirm.ts`); Logout always

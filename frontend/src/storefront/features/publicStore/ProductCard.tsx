@@ -8,6 +8,8 @@ import {
 } from '../stores/storesApi'
 import { ImageIcon } from '../../layout/icons'
 import { CardAction } from './CartControls'
+import { storeAuthRequest } from '../auth/authDialogStore'
+import { SaveButton } from '../wishlist/SaveButton'
 import { stockLevel } from './catalog'
 import type { Skin } from './storeTheme'
 import { MediaImg } from '../../../shared/media/MediaImg'
@@ -66,7 +68,15 @@ export function ProductCard({
 }) {
   const large = size === 'lg'
   return (
-    <li className={`group flex flex-col ${className}`}>
+    <li className={`group relative flex flex-col ${className}`}>
+      {/* The heart sits on the photo's corner, beside the link rather than
+          inside it; a guest's tap signs in with the store's own look. */}
+      <SaveButton
+        productId={product.id}
+        productName={product.name}
+        auth={storeAuthRequest(store)}
+        className="absolute right-2 top-2 z-10"
+      />
       <Link
         to={storeProductUrl(store.slug, product.slug)}
         className="flex flex-1 flex-col rounded-lg"

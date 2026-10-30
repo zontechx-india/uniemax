@@ -529,6 +529,10 @@ A single account can own multiple stores and switch between them.
   dedicated policy/About pages (policy links can point at external
   documents meanwhile). These are deliberately absent from the nav rather
   than shown as dead links.*
+- **Saved (wishlist)** — a heart on every product card (marketplace and
+  store) and on the product page saves the product to the shopper's account;
+  "Saved" in the account menu (`/saved`) lists them across all stores. A
+  guest's tap asks them to sign in, then saves.
 - **Shopping cart (grouped by store)** — visitors shop without an account;
   the cart (at `/cart`) groups items **by store** (store **logo** when one
   is uploaded, name, item count, subtotal, a "Continue shopping" link back

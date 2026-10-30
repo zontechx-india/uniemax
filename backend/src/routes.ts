@@ -27,6 +27,7 @@ import {
 } from "./modules/banners/banners.routes.js";
 import { addressRoutes } from "./modules/addresses/addresses.routes.js";
 import { cartRoutes } from "./modules/cart/cart.routes.js";
+import { wishlistRoutes } from "./modules/wishlist/wishlist.routes.js";
 import {
   publicOrderRoutes,
   customerOrderRoutes,
@@ -84,6 +85,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       // Durable cart for signed-in customers (guarded — requireCustomer).
       // Guests shop from a localStorage cart that is merged in at sign-in.
       await api.register(cartRoutes, { prefix: "/cart" });
+      // Saved products (heart button) — signed-in customers only.
+      await api.register(wishlistRoutes, { prefix: "/wishlist" });
       // Customer order history (guarded inside the plugin — requireCustomer).
       await api.register(customerOrderRoutes, { prefix: "/orders" });
       // Notification feed + push subscriptions (guarded — requireCustomer).

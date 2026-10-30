@@ -16,6 +16,7 @@ Disallow: /login
 Disallow: /orders
 Disallow: /profile
 Disallow: /addresses
+Disallow: /saved
 Disallow: /notifications
 Disallow: /support
 

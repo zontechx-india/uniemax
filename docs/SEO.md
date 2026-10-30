@@ -396,7 +396,7 @@ canonical it is the current path **without** the query string.
 | All shops `/shops` **S** | `All shops` | "Every independent shop on UnieMax in one place …" | `/shops` | `?page=` > 1 → noindex, follow | platform | — | — |
 | New products `/new` **S** | `Fresh Finds`, `New products` | "The newest products from independent shops …" | `/new` | `?page=` > 1 → noindex, follow | platform | — | — |
 | Search results `/search?q=` **B** | `Search “{q}”` (no `q`: `Search`) | platform | `/search` | **noindex, follow** (every `q`) | platform | — | — |
-| Cart, checkout, order confirmation, account, addresses, marketplace support **B** | page name | platform | path | **noindex** (`usePrivatePageTitle`) + `robots.txt` disallow | platform | — | — |
+| Cart, checkout, order confirmation, account, addresses, saved (`/saved`), marketplace support **B** | page name | platform | path | **noindex** (`usePrivatePageTitle`) + `robots.txt` disallow | platform | — | — |
 
 ---
 
@@ -658,3 +658,4 @@ search/filter URLs get indexed, mass-produced pages with nothing on them.
 | 23 Oct 2026 | Search Console: sitemap submitted (`sc-domain:uniemax.com`). Product feed `GET /api/v1/public/feeds/products.xml` for Merchant Center + Meta (landing variant's price/stock, page's shipping rate; unit tests `test/unit/product-feed.test.ts`). Page shells for `/about`, `/contact`, `/refund-policy`, `/shipping-policy`, `/privacy`, `/terms` (own title, description, canonical; privacy/terms `noindex` while holding pages) and the matching `useSeo` in `InfoComingSoonPage`. New `/refund-policy` (7-day returns) and `/shipping-policy` pages, linked from the marketplace footer. `www` → apex redirect documented in `DEPLOYMENT.md`, not applied |
 | 30 Oct 2026 | Marketplace "View all" pages `/categories`, `/shops`, `/new` (browser-only head; `?page=` > 1 noindex, follow). Homepage Popular row links to `/categories`; `/c/{slug}` breadcrumb starts UnieMax › All categories. No page shells or sitemap entries for them yet ([§10](#10-known-gaps-and-caveats)) |
 | 30 Oct 2026 | Page shells for `/categories`, `/shops`, `/new` (`LISTING_PAGES`; nginx not applied yet) and all three in `sitemap-stores.xml`. New `/search?q=` results page — `noindex, follow`, canonical `/search`, browser-only head. Released as `v1.65.0` |
+| 30 Oct 2026 | `/saved` (wishlist, per-customer) is `noindex` and disallowed in `robots.txt`. `GET /public/browse` gains `parentSlug` + `imageUrl` (homepage "Shop by category" tiles); no head or structured-data change. Released as `v1.66.0` |

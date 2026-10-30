@@ -45,8 +45,8 @@ const discoverableProduct = {
   store: publishedStore,
 } satisfies Prisma.StoreProductWhereInput;
 
-/** Card-sized product hit — shared by search and the new-products rail. */
-const marketProductSelect = {
+/** Card-sized product hit — shared by search, the new-products rail and the wishlist. */
+export const marketProductSelect = {
   id: true,
   name: true,
   slug: true,
@@ -70,7 +70,7 @@ type MarketProductRow = Prisma.StoreProductGetPayload<{
   select: typeof marketProductSelect;
 }>;
 
-function shapeMarketProduct(product: MarketProductRow) {
+export function shapeMarketProduct(product: MarketProductRow) {
   const cover = product.media[0] ?? null;
   return {
     id: product.id,

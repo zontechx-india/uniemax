@@ -1519,6 +1519,24 @@ intact), and never fails an order.
 
 ---
 
+## Customer Wishlist — `/api/v1/wishlist` 🔒 customer
+
+Products the customer saved with the heart button ("Saved"). One row per
+customer per **product** (not variant). There is no guest wishlist: a
+guest's heart tap signs in first, then saves.
+
+| Route | Does |
+| ----- | ---- |
+| `GET /api/v1/wishlist` | Saved products, newest save first — the marketplace product-card shape (as `/public/products`) plus `savedAt`. Only products a shopper can see (store-page visibility on a published store); a hidden one keeps its row and reappears when visible again |
+| `GET /api/v1/wishlist/ids` | `string[]` of every saved product id (hidden ones too) — what the hearts read |
+| `PUT /api/v1/wishlist/:productId` | Save. Idempotent. `404` if the product is not visible; `409` past 500 saved products. → `{ productId, saved: true }` |
+| `DELETE /api/v1/wishlist/:productId` | Un-save. Idempotent. → `{ productId, saved: false }` |
+
+Writes are rate-limited (120/min). Deleting the customer or the product
+deletes the row.
+
+---
+
 ## Public Stores — `/api/v1/public/stores` (no auth)
 
 The storefront is **multi-page**, so this surface is split per page rather
@@ -2132,8 +2150,14 @@ so this is one grouped query regardless of taxonomy size. 5 min cache.
 ```jsonc
 { "success": true,
   "data": [ { "name": "Sports & Fitness", "slug": "sports-fitness",
-              "productCount": 10 }, … ] }
+              "parentSlug": null,          // null = top-level node
+              "productCount": 10,
+              "imageUrl": "https://…" | null }, … ] }
 ```
+
+`imageUrl` is the cover of the newest photographed discoverable product
+anywhere in the node's branch (rolled up the same way as the counts) — the
+homepage's "Shop by category" tiles.
 
 ### `GET /api/v1/public/browse/:slug`
 

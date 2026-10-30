@@ -134,6 +134,9 @@ backend/
 │   │   │                      #   (requireCustomer): read / replace / merge
 │   │   │                      #   / clear; the browser owns the cart, this
 │   │   │                      #   module keeps it
+│   │   ├── wishlist/          # saved products ("heart") for signed-in
+│   │   │                      #   customers (requireCustomer): list / ids /
+│   │   │                      #   save / un-save
 │   │   ├── orders/            # storefront order placement (requireCustomer)
 │   │   │                      #   + confirmation lookup (public) + history
 │   │   │                      #   + seller order management (list/detail/
@@ -1403,6 +1406,13 @@ White-label design — one codebase, any business:
     (best-effort, after the placement fully succeeds), so the basket empties
     on every signed-in device. Module: `modules/cart` behind
     `requireCustomer` at `/api/v1/cart`.
+- **WishlistItem** — a product the customer saved with the heart button.
+  `customerId` + `productId` (unique together — one row per customer per
+  product, not per variant) + `createdAt`; cascades from both sides; indexed
+  on `productId` for a future "saved by N shoppers" count. Hidden products
+  keep their row (the list omits them until visible again). Capped at 500
+  per customer in the service. Module: `modules/wishlist` behind
+  `requireCustomer` at `/api/v1/wishlist`.
 - **OAuthAccount** — social identity linked to a Customer; unique on
   `(provider, providerAccountId)` (the provider's stable `sub`). Supports Google now,
   Apple later (enum value already present).

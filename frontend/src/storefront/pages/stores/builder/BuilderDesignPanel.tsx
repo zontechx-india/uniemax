@@ -151,14 +151,10 @@ export function BuilderDesignPanel({
           </div>
         </section>
       ) : (
-        <button
-          type="button"
-          onClick={startCustomizing}
-          className="inline-flex items-center gap-2 rounded-md border border-line px-4 py-2.5 text-sm font-semibold text-fg transition-colors hover:border-brand"
-        >
+        <Button type="button" variant="secondary" size="md" onClick={startCustomizing}>
           <PaletteIcon className="h-4 w-4" />
           Customize colors
-        </button>
+        </Button>
       )}
 
       {error && <ErrorNote>{error}</ErrorNote>}

@@ -157,6 +157,12 @@ export const router = createBrowserRouter([
                 }),
               },
               {
+                path: 'saved',
+                lazy: async () => ({
+                  Component: (await import('../pages/SavedPage')).SavedPage,
+                }),
+              },
+              {
                 path: 'profile',
                 lazy: async () => ({
                   Component: (await import('../pages/ProfilePage')).ProfilePage,

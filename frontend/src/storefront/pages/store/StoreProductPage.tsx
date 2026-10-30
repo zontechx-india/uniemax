@@ -23,6 +23,8 @@ import {
 import { trackViewContent } from '../../../shared/analytics/track'
 import { ProductGrid } from '../../features/publicStore/ProductCard'
 import { ShareButton } from '../../features/publicStore/ShareButton'
+import { SaveButton } from '../../features/wishlist/SaveButton'
+import { storeAuthRequest } from '../../features/auth/authDialogStore'
 import {
   PurchaseActions,
   StockBadge,
@@ -302,13 +304,20 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
                 {displayName(product.name)}
               </h1>
             </div>
-            {/* Share this product — permanent public URL, opens directly. */}
-            <ShareButton
-              title={`${product.name} · ${store.name}`}
-              url={`${window.location.origin}${storeProductUrl(store.slug, product.slug)}`}
-              skin={skin}
-              ariaLabel="Share this product"
-            />
+            {/* Save for later + share — permanent public URL, opens directly. */}
+            <div className="flex shrink-0 items-center gap-2">
+              <SaveButton
+                productId={product.id}
+                productName={product.name}
+                auth={storeAuthRequest(store)}
+              />
+              <ShareButton
+                title={`${product.name} · ${store.name}`}
+                url={`${window.location.origin}${storeProductUrl(store.slug, product.slug)}`}
+                skin={skin}
+                ariaLabel="Share this product"
+              />
+            </div>
           </div>
 
           <div className={`mt-5 flex flex-wrap items-center gap-3 border-b pb-6 ${skin.border}`}>

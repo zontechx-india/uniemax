@@ -225,6 +225,7 @@ model Customer {
   addresses      CustomerAddress[]
   supportTickets SupportTicket[]
   cart           Cart?
+  wishlist       WishlistItem[]
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -307,6 +308,28 @@ model Cart {
   /// Abandoned-cart sweeps ("carts untouched for N days") scan by recency.
   @@index([updatedAt])
   @@map("carts")
+  @@schema("public")
+}
+
+/// A product the customer saved with the heart button ("Saved" in the
+/// account menu). One row per customer per PRODUCT — not per variant: saving
+/// is "I like this", and the size or colour is chosen when they come back to
+/// buy. Deleting the customer or the product deletes the row; a product that
+/// is merely hidden or out of stock keeps it, and the list simply omits it
+/// until it is visible again.
+model WishlistItem {
+  id         String       @id @default(cuid())
+  customerId String
+  customer   Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  productId  String
+  product    StoreProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([customerId, productId])
+  /// "How many shoppers saved this" — for the seller, later.
+  @@index([productId])
+  @@map("wishlist_items")
   @@schema("public")
 }
 
@@ -623,6 +646,7 @@ model StoreProduct {
   media            StoreProductMedia[]
   orderItems       OrderItem[]
   cartLines        CartLine[]
+  wishlistedBy     WishlistItem[]
   groupMemberships ProductGroupMember[]
 
   createdAt DateTime @default(now())

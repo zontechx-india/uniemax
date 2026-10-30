@@ -4,6 +4,7 @@ import { MediaImg } from '../../../shared/media/MediaImg'
 import { buttonClass } from '../../../shared/ui/Button'
 import { BoxIcon } from '../../layout/icons'
 import { formatPrice } from '../stores/storesApi'
+import { SaveButton } from '../wishlist/SaveButton'
 import type { BrowseSort, MarketProduct } from './discoveryApi'
 
 /**
@@ -71,7 +72,12 @@ export function ListingHeader({
 export function MarketProductCard({ product }: { product: MarketProduct }) {
   const soldOut = product.stockQuantity <= 0
   return (
-    <li className="group">
+    <li className="group relative">
+      <SaveButton
+        productId={product.id}
+        productName={product.name}
+        className="absolute right-2 top-2 z-10"
+      />
       <a
         href={`/store/${product.store.slug}/product/${product.slug}`}
         className="flex h-full flex-col overflow-hidden rounded-lg border border-line bg-surface transition-colors hover:border-accent"

@@ -27,6 +27,7 @@ import {
   SELLER_STEPS,
 } from '../features/selling/sellerPitch'
 import { useCart } from '../features/cart/cart'
+import { SaveButton } from '../features/wishlist/SaveButton'
 import { BannerCarousel } from '../features/banners/BannerCarousel'
 import { discoveryApi } from '../features/discovery/discoveryApi'
 import type {
@@ -160,6 +161,8 @@ export function HomePage() {
         <MarketIdentityBar />
         <TopStoresSection />
         <FreshFindsSection {...newProducts} />
+        <ShopByCategorySection />
+        <MoreToExploreSection />
         <RecentlyViewedSection />
         {authed && myStores && myStores.length > 0 && (
           <MyStoresSection stores={myStores} />
@@ -969,7 +972,7 @@ function MarketIdentityBar() {
   useEffect(() => {
     let cancelled = false
     discoveryApi
-      .browsableCategories()
+      .browsableCategoriesShared()
       // A nice-to-have strip never earns an error state — on failure the
       // chips simply do not appear.
       .then((items) => {
@@ -1146,57 +1149,257 @@ function FreshFindsSection({
   )
 }
 
+// ---------------------------------------------------------------------------
+// Shop by Category + More to Explore — the global taxonomy, in pictures and
+// in rails. Two bands (base, then alt) so the page keeps alternating between
+// Fresh Finds (alt) and Recently Viewed (base). Both read the one shared
+// `GET /public/browse` fetch the Popular row makes, and both step aside
+// silently when there is too little to show — a decorative band never earns
+// an error state.
+// ---------------------------------------------------------------------------
+
+/** Most category tiles shown — two rows of four. */
+const CATEGORY_TILES_MAX = 8
+
+/** Top-level categories, biggest first — "Sports", never also "Team Sports". */
+function useTopCategories(): BrowsableCategory[] | null {
+  const [top, setTop] = useState<BrowsableCategory[] | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    discoveryApi
+      .browsableCategoriesShared()
+      .then((items) => {
+        if (!cancelled) setTop(items.filter((item) => item.parentSlug === null))
+      })
+      .catch(() => {
+        if (!cancelled) setTop([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  return top
+}
+
 /**
- * Marketplace product card — image, store, name, price. One link, no CTA.
+ * How many tiles make only whole rows: the grid is 2 columns on a phone and 4
+ * from `sm`, so 4 or 8 tiles; under four, all of them in a row of their own.
+ * One tile is not a section — the Popular row already links it.
+ */
+function tileCount(available: number): number {
+  const n = Math.min(available, CATEGORY_TILES_MAX)
+  if (n < 2) return 0
+  return n < 4 ? n : Math.floor(n / 4) * 4
+}
+
+const SHORT_TILE_GRID: Record<number, string> = {
+  2: 'grid-cols-2 sm:max-w-[50%]',
+  3: 'grid-cols-3 sm:max-w-[75%]',
+}
+
+function ShopByCategorySection() {
+  const top = useTopCategories()
+  const count = top === null ? 0 : tileCount(top.length)
+  if (top !== null && count === 0) return null
+
+  return (
+    <Section
+      title="Shop by category"
+      subtitle="Every shop that sells it, on one page."
+      action={<ViewAllLink to="/categories" name="All categories" />}
+    >
+      {top === null ? (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-5" aria-hidden>
+          {Array.from({ length: 4 }, (_, i) => (
+            <div key={i} className="aspect-[4/3] animate-pulse rounded-lg bg-surface-alt" />
+          ))}
+        </div>
+      ) : (
+        <ul className={`grid gap-4 sm:gap-5 ${SHORT_TILE_GRID[count] ?? 'grid-cols-2 sm:grid-cols-4'}`}>
+          {top.slice(0, count).map((category) => (
+            <li key={category.slug}>
+              <Link
+                to={`/c/${category.slug}`}
+                className="group block overflow-hidden rounded-lg border border-line bg-surface shadow-floating transition duration-200 hover:-translate-y-1 hover:border-accent hover:shadow-lifted"
+              >
+                <div className="aspect-[4/3] overflow-hidden bg-surface-alt">
+                  {category.imageUrl ? (
+                    <MediaImg
+                      sizes="(min-width: 640px) 25vw, 50vw"
+                      src={category.imageUrl}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-contain p-3 transition-transform duration-500 ease-out group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-brand">
+                      <TagIcon className="h-9 w-9 opacity-40" />
+                    </div>
+                  )}
+                </div>
+                <p className="flex items-center justify-between gap-2 border-t border-line px-4 py-3 text-sm font-semibold text-fg transition-colors group-hover:text-brand">
+                  <span className="truncate">{category.name}</span>
+                  <ChevronRightIcon className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
+                </p>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
+  )
+}
+
+/** Category rails in the More to Explore band. */
+const EXPLORE_RAILS = 3
+/** Products per rail, and the fewest a category needs to get one. */
+const EXPLORE_RAIL_SIZE = 12
+const EXPLORE_RAIL_MIN = 6
+
+/**
+ * One rail per big top-level category: its newest products from every shop.
+ * A category with fewer than `EXPLORE_RAIL_MIN` products gets no rail — a
+ * rail that cannot scroll is a short row pretending to be a carousel.
+ */
+function MoreToExploreSection() {
+  const top = useTopCategories()
+  const picks = (top ?? [])
+    .filter((category) => category.productCount >= EXPLORE_RAIL_MIN)
+    .slice(0, EXPLORE_RAILS)
+  if (top !== null && picks.length === 0) return null
+
+  return (
+    <Section
+      title="More to explore"
+      subtitle="The newest from each top category."
+      tone="alt"
+    >
+      {top === null ? (
+        <CardSkeletons count={5} media="square" layout="rail" />
+      ) : (
+        <div className="space-y-8">
+          {picks.map((category) => (
+            <CategoryRail key={category.slug} category={category} />
+          ))}
+        </div>
+      )}
+    </Section>
+  )
+}
+
+function CategoryRail({ category }: { category: BrowsableCategory }) {
+  const { scroller, sync, arrows } = useRail()
+  const [products, setProducts] = useState<MarketProduct[] | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    discoveryApi
+      .browseCategory(category.slug, { pageSize: EXPLORE_RAIL_SIZE })
+      .then((page) => {
+        if (!cancelled) setProducts(page.products)
+      })
+      .catch(() => {
+        if (!cancelled) setProducts([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [category.slug])
+
+  if (products !== null && products.length === 0) return null
+
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between gap-4">
+        <h3 className="truncate font-heading text-lg font-semibold text-fg sm:text-xl">
+          {category.name}
+        </h3>
+        <span className="flex shrink-0 items-center gap-3">
+          {products !== null && arrows}
+          <ViewAllLink to={`/c/${category.slug}`} name={`View all ${category.name}`} />
+        </span>
+      </div>
+      {products === null ? (
+        <CardSkeletons count={5} media="square" layout="rail" />
+      ) : (
+        <ul ref={scroller} onScroll={sync} className={RAIL_SCROLLER}>
+          {products.map((product) => (
+            <li
+              key={product.id}
+              // Percentages, so the last card is always part-cut at the right
+              // edge — the cue that tells a thumb there is more to the right.
+              className="w-[46%] shrink-0 snap-start sm:w-[31%] lg:w-[23%] xl:w-[19%]"
+            >
+              <ProductCard product={product} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Marketplace product card — image, store, name, price. One link, no CTA,
+ * plus the save heart on the photo (a sibling of the link, not inside it).
  * Shares the store card's hover language (4px lift, deeper halo, image zoom)
- * so the two grids on this page feel like one system.
+ * so the two grids on this page feel like one system — the lift is on the
+ * wrapper, so the heart rides up with the card.
  */
 function ProductCard({ product }: { product: MarketProduct }) {
   return (
-    <a
-      href={`/store/${product.store.slug}/product/${product.slug}`}
-      className="group flex h-full flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-floating transition duration-200 hover:-translate-y-1 hover:border-accent hover:shadow-lifted"
-    >
-      {/* Own overflow context, so the zoom is clipped by the image frame and
-          the divider below it doesn't scale along. */}
-      <div className="aspect-square w-full overflow-hidden border-b border-line bg-surface-alt">
-        {product.image?.url ? (
-          <MediaImg
-            sizes="(min-width: 1024px) 20vw, (min-width: 640px) 33vw, 50vw"
-            src={product.image.url}
-            alt={product.image.altText ?? product.name}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-contain transition-transform duration-500 ease-out group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-muted">
-            <BoxIcon className="h-8 w-8 opacity-40" />
-          </div>
-        )}
-      </div>
-      <div className="p-4">
-        <p className="truncate text-xs text-muted">{product.store.name}</p>
-        <p className="mt-1 truncate font-heading text-lg font-medium leading-tight text-fg transition-colors group-hover:text-brand">
-          {product.name}
-        </p>
-        {product.price !== null && (
-          <p className="mt-1.5 flex flex-wrap items-center gap-1.5 font-figure text-sm font-semibold text-brand">
-            {formatPrice(product.price)}
-            {product.compareAtPrice && (
-              <>
-                <s className="text-xs font-normal text-muted">
-                  {formatPrice(product.compareAtPrice)}
-                </s>
-                <span className="rounded-full bg-brand px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide text-brand-contrast">
-                  Sale
-                </span>
-              </>
-            )}
+    <div className="relative h-full min-w-0 transition duration-200 hover:-translate-y-1">
+      <SaveButton
+        productId={product.id}
+        productName={product.name}
+        className="absolute right-2 top-2 z-10"
+      />
+      <a
+        href={`/store/${product.store.slug}/product/${product.slug}`}
+        className="group flex h-full flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-floating transition duration-200 hover:border-accent hover:shadow-lifted"
+      >
+        {/* Own overflow context, so the zoom is clipped by the image frame and
+            the divider below it doesn't scale along. */}
+        <div className="aspect-square w-full overflow-hidden border-b border-line bg-surface-alt">
+          {product.image?.url ? (
+            <MediaImg
+              sizes="(min-width: 1024px) 20vw, (min-width: 640px) 33vw, 50vw"
+              src={product.image.url}
+              alt={product.image.altText ?? product.name}
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-contain transition-transform duration-500 ease-out group-hover:scale-105"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-muted">
+              <BoxIcon className="h-8 w-8 opacity-40" />
+            </div>
+          )}
+        </div>
+        <div className="p-4">
+          <p className="truncate text-xs text-muted">{product.store.name}</p>
+          <p className="mt-1 truncate font-heading text-lg font-medium leading-tight text-fg transition-colors group-hover:text-brand">
+            {product.name}
           </p>
-        )}
-      </div>
-    </a>
+          {product.price !== null && (
+            <p className="mt-1.5 flex flex-wrap items-center gap-1.5 font-figure text-sm font-semibold text-brand">
+              {formatPrice(product.price)}
+              {product.compareAtPrice && (
+                <>
+                  <s className="text-xs font-normal text-muted">
+                    {formatPrice(product.compareAtPrice)}
+                  </s>
+                  <span className="rounded-full bg-brand px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide text-brand-contrast">
+                    Sale
+                  </span>
+                </>
+              )}
+            </p>
+          )}
+        </div>
+      </a>
+    </div>
   )
 }
 

@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { BagIcon, LifebuoyIcon, MapPinIcon, MegaphoneIcon, UserIcon } from '../layout/icons'
+import { BagIcon, HeartIcon, LifebuoyIcon, MapPinIcon, MegaphoneIcon, UserIcon } from '../layout/icons'
 
 /**
  * Single source of truth for the account navigation (the top-bar avatar
@@ -24,6 +24,7 @@ export interface NavItem {
 export const ACCOUNT_MENU_ITEMS: NavItem[] = [
   { label: 'My Profile', to: '/profile', icon: UserIcon },
   { label: 'Orders', to: '/orders', icon: BagIcon },
+  { label: 'Saved', to: '/saved', icon: HeartIcon },
   { label: 'Saved Addresses', to: '/addresses', icon: MapPinIcon },
   { label: 'Affiliate Partner', to: '/affiliate', icon: MegaphoneIcon },
   // Last, because it is where someone goes when one of the rows above has
