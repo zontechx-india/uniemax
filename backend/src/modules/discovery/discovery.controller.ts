@@ -5,6 +5,7 @@ import { slugParamSchema } from "../../utils/zodHelpers.js";
 import {
   browseQuerySchema,
   newProductsQuerySchema,
+  searchProductsQuerySchema,
   searchQuerySchema,
 } from "./discovery.schema.js";
 import * as browse from "./browse.service.js";
@@ -14,6 +15,13 @@ import * as service from "./discovery.service.js";
 export async function search(request: FastifyRequest) {
   const query = searchQuerySchema.parse(request.query);
   return ok(await service.searchPlatform(query));
+}
+
+/** Paged, sortable product results for the `/search` page. */
+export async function searchProducts(request: FastifyRequest) {
+  const query = searchProductsQuerySchema.parse(request.query);
+  const { total, products } = await service.searchProducts(query);
+  return list(products, buildListMeta(total, query.page, query.pageSize));
 }
 
 /** Newest discoverable products platform-wide (homepage rail). */

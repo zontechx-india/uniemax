@@ -173,8 +173,9 @@ export function buildSitemapIndex(origin: string): Promise<string> {
 }
 
 /**
- * The marketplace surface: the platform's own pages (the homepage and the
- * seller landing page) and every published store's front page.
+ * The marketplace surface: the platform's own pages (the homepage, the
+ * seller landing page and the "View all" lists) and every published store's
+ * front page.
  */
 export function buildMarketplaceSitemap(origin: string): Promise<string> {
   return cached(`stores:${origin}`, async () => {
@@ -182,12 +183,16 @@ export function buildMarketplaceSitemap(origin: string): Promise<string> {
       where: PUBLIC_STORE_VISIBILITY,
       select: { slug: true, updatedAt: true },
       orderBy: { publishedAt: "desc" },
-      take: MAX_URLS - 1,
+      take: MAX_URLS - 5, // room for the five fixed pages below
     });
 
     return urlSet([
       { loc: `${origin}/`, priority: 1 },
       { loc: `${origin}/sell`, priority: 0.8 },
+      // The "View all" pages — page 1 only; later pages are noindex.
+      { loc: `${origin}/categories`, priority: 0.7 },
+      { loc: `${origin}/shops`, priority: 0.7 },
+      { loc: `${origin}/new`, priority: 0.6 },
       ...stores.map((store) => ({
         loc: `${origin}/store/${store.slug}`,
         lastmod: store.updatedAt,

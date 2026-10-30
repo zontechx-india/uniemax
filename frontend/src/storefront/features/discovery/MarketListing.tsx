@@ -4,7 +4,7 @@ import { MediaImg } from '../../../shared/media/MediaImg'
 import { buttonClass } from '../../../shared/ui/Button'
 import { BoxIcon } from '../../layout/icons'
 import { formatPrice } from '../stores/storesApi'
-import type { MarketProduct } from './discoveryApi'
+import type { BrowseSort, MarketProduct } from './discoveryApi'
 
 /**
  * The pieces every marketplace listing page shares — `/c/{slug}`, `/new`,
@@ -160,6 +160,45 @@ export function ListingPagination({
         </Link>
       )}
     </nav>
+  )
+}
+
+export const LISTING_SORTS: { value: BrowseSort; label: string }[] = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'priceAsc', label: 'Price: low to high' },
+  { value: 'priceDesc', label: 'Price: high to low' },
+]
+
+/** `raw` from the URL → a known sort, else the default. */
+export function parseListingSort(raw: string | null): BrowseSort {
+  return LISTING_SORTS.some((option) => option.value === raw)
+    ? (raw as BrowseSort)
+    : 'newest'
+}
+
+/** The product-list sort control (`/c/{slug}`, `/search`). */
+export function ListingSort({
+  value,
+  onChange,
+}: {
+  value: BrowseSort
+  onChange: (sort: BrowseSort) => void
+}) {
+  return (
+    <label className="flex items-center gap-2 text-xs text-muted">
+      Sort
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value as BrowseSort)}
+        className="rounded-md border border-line bg-bg px-2 py-1.5 text-sm text-fg"
+      >
+        {LISTING_SORTS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   )
 }
 

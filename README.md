@@ -32,7 +32,8 @@ never ships to a shopper.
 ### For shoppers
 
 - Marketplace homepage: top stores (real deliveries first; fun/empty shops skipped), global search across stores /
-  categories / products, platform stats.
+  categories / products with a full `/search` results page, "View all" pages (`/categories`, `/shops`, `/new`),
+  platform stats.
 - Per-store storefronts with the seller's own colors, logo, footer and homepage
   section order.
 - Browse by category (nested as deep as the taxonomy), product detail with a

@@ -650,6 +650,17 @@ location ~ ^/(about|contact|refund-policy|shipping-policy|privacy|terms)$ {
     proxy_intercept_errors on;
     error_page 400 404 429 500 502 503 504 = @uniemax_static_shell;
 }
+# Marketplace "View all" pages — fixed pages too: same fallback.
+location ~ ^/(categories|shops|new)$ {
+    proxy_pass http://127.0.0.1:__PORT__;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 10s;
+    proxy_intercept_errors on;
+    error_page 400 404 429 500 502 503 504 = @uniemax_static_shell;
+}
 # Re-enters `location = /index.html` from the SPA cache snippet (no-cache).
 location @uniemax_static_shell {
     rewrite ^ /index.html last;
@@ -675,12 +686,17 @@ sudo nginx -t && sudo systemctl reload nginx
 ```
 
 The footer info-pages location (`/about`, `/contact`, `/refund-policy`,
-`/shipping-policy`, `/privacy`, `/terms`) was added to the snippet with the
-release that brought their page shells — **not yet applied** on either
-environment; to apply, add that one `location` block to both
-`/etc/nginx/snippets/uniemax-page-shells-{dev,prod}.conf` (with the env's
-port) and `nginx -t && systemctl reload nginx`. Until then those pages are
-the static `index.html`, as before.
+`/shipping-policy`, `/privacy`, `/terms`) and the "View all" location
+(`/categories`, `/shops`, `/new`, page shells since `v1.65.0`) were added to
+the snippet with the releases that brought their page shells — **neither is
+applied yet** on either environment. To apply, add those two `location`
+blocks to both `/etc/nginx/snippets/uniemax-page-shells-{dev,prod}.conf`
+(with the env's port: dev `4001`, prod `4000`), then
+`sudo nginx -t && sudo systemctl reload nginx`. Both fall back to the static
+shell on any error, so their order relative to a backend release does not
+matter. Until then those pages are the static `index.html`, as before.
+Verify: `curl -s http://127.0.0.1:8081/shops | grep -o '<title[^<]*</title>'`
+→ `All shops · UnieMax`.
 
 `404` is deliberately **not** in `error_page` for `/store/` and `/c/`: the
 API's 404 is the point (same HTML, `noindex`), and intercepting it would turn

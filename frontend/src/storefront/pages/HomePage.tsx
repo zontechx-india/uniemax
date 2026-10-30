@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useSeo } from '../../shared/seo'
 import { ThemeToggle } from '../../shared/theme/ThemeToggle'
 import { AppLogoLockup } from '../../shared/ui/AppLogo'
@@ -322,7 +322,14 @@ function MarketBanners() {
 }
 
 function GlobalSearchBox() {
-  const [q, setQ] = useState('')
+  const location = useLocation()
+  const navigate = useNavigate()
+  // On `/search` the box shows the term the page is showing results for.
+  const [q, setQ] = useState(() =>
+    location.pathname === '/search'
+      ? (new URLSearchParams(location.search).get('q') ?? '')
+      : '',
+  )
   const [focused, setFocused] = useState(false)
   const [results, setResults] = useState<SearchResults | null>(null)
   const [searching, setSearching] = useState(false)
@@ -382,18 +389,18 @@ function GlobalSearchBox() {
     }
   }, [focused])
 
-  /** First hit in display order — the Enter target. */
-  const firstHitUrl = useCallback((): string | null => {
-    if (!results) return null
-    const store = results.stores[0]
-    if (store) return `/store/${store.slug}`
-    const category = results.categories[0]
-    if (category)
-      return `/store/${category.store.slug}/category/${category.slug}`
-    const product = results.products[0]
-    if (product) return `/store/${product.store.slug}/product/${product.slug}`
-    return null
-  }, [results])
+  /**
+   * Enter and "See all results" open the full results page. Enter used to
+   * jump to the first hit, which took a shopper typing "shoes" straight into
+   * whichever shop happened to be named Shoe-something.
+   */
+  const seeAll = () => {
+    if (!active) return
+    rememberSearch(query)
+    setFocused(false)
+    inputRef.current?.blur()
+    navigate(`/search?q=${encodeURIComponent(query)}`)
+  }
 
   const go = (url: string) => {
     rememberSearch(query)
@@ -416,10 +423,9 @@ function GlobalSearchBox() {
           onChange={(e) => setQ(e.target.value)}
           onFocus={() => setFocused(true)}
           onKeyDown={(e) => {
-            if (e.key !== 'Enter') return
-            const url = firstHitUrl()
-            if (url) go(url)
+            if (e.key === 'Enter') seeAll()
           }}
+          enterKeyHint="search"
           placeholder="Search stores, products, or categories..."
           aria-label="Search stores, products, or categories"
           className="w-full bg-transparent text-sm text-fg outline-none placeholder:text-muted"
@@ -468,7 +474,14 @@ function GlobalSearchBox() {
                 </p>
               )}
               {results && !failed && (
-                <SearchResultsPanel results={results} onPick={go} />
+                <>
+                  <SearchResultsPanel results={results} onPick={go} />
+                  <div className="mt-1 border-t border-line px-3 pt-2">
+                    <Button variant="ghost" size="sm" full onClick={seeAll}>
+                      See all results for “{query}”
+                    </Button>
+                  </div>
+                </>
               )}
             </>
           )}
@@ -1422,6 +1435,9 @@ const FOOTER_COLUMNS = [
   {
     title: 'Marketplace',
     links: [
+      { label: 'All categories', to: '/categories' },
+      { label: 'All shops', to: '/shops' },
+      { label: 'Fresh Finds', to: '/new' },
       { label: 'About', to: '/about' },
       { label: 'Support', to: '/support' },
       { label: 'Contact', to: '/contact' },

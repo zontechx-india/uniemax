@@ -97,8 +97,11 @@ function shape(product: BrowseProductRow) {
   };
 }
 
-/** `price` sorts on the denormalised `priceMin`, which is what listings show. */
-const ORDER_BY: Record<
+/**
+ * `price` sorts on the denormalised `priceMin`, which is what listings show.
+ * Shared with the `/search` page's product results.
+ */
+export const ORDER_BY: Record<
   BrowseQuery["sort"],
   Prisma.StoreProductOrderByWithRelationInput[]
 > = {

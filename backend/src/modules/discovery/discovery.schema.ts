@@ -19,6 +19,18 @@ export const searchQuerySchema = z.object({
 export type SearchQuery = z.infer<typeof searchQuerySchema>;
 
 /**
+ * Full product results (`GET /public/search/products`) — the `/search` page.
+ * Paged and sortable like a category page; same 2-character minimum as the
+ * grouped search above.
+ */
+export const searchProductsQuerySchema = paginationQuery.extend({
+  q: z.string().trim().min(2).max(120),
+  sort: z.enum(["newest", "priceAsc", "priceDesc"]).default("newest"),
+});
+
+export type SearchProductsQuery = z.infer<typeof searchProductsQuerySchema>;
+
+/**
  * Platform-wide product rail (`GET /public/products`) — newest visible
  * products across all published stores (the homepage "Fresh Finds" row).
  * Recency-only by design: no popularity/analytics sort exists yet, so the

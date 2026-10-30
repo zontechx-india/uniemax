@@ -168,6 +168,21 @@ export const discoveryApi = {
     return call<SearchResults>(http.get(`${PUBLIC}/search?${params}`))
   },
 
+  /**
+   * One page of products matching `q` (name or shelf name) — the `/search`
+   * page's main list. `q` needs 2+ characters.
+   */
+  async searchProducts(
+    q: string,
+    query: { page?: number; pageSize?: number; sort?: BrowseSort } = {},
+  ): Promise<{ items: MarketProduct[]; meta: ListMeta }> {
+    const params = new URLSearchParams({ q })
+    if (query.page) params.set('page', String(query.page))
+    if (query.pageSize) params.set('pageSize', String(query.pageSize))
+    if (query.sort) params.set('sort', query.sort)
+    return callList<MarketProduct>(http.get(`${PUBLIC}/search/products?${params}`))
+  },
+
   /** Newest discoverable products platform-wide (homepage "Fresh Finds"). */
   async listNewProducts(pageSize = 12): Promise<MarketProduct[]> {
     const { items } = await callList<MarketProduct>(

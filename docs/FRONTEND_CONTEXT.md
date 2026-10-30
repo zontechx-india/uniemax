@@ -323,7 +323,7 @@ for guests and signed-in customers alike and adapts per session state.
   zeros and a failed fetch simply drop out) above **how it works**, three
   numbered steps). The
   **footer** is a structured 4-column block: brand + tagline, Marketplace
-  (About / Support / Contact) and Legal (Privacy / Terms / Refund & Returns /
+  (All categories / All shops / Fresh Finds / About / Support / Contact) and Legal (Privacy / Terms / Refund & Returns /
   Shipping Policy) columns
   (→ `pages/InfoComingSoonPage.tsx`: About, Contact and the two policies with
   real content — Contact shows the live `SupportContactCard` — Privacy and
@@ -350,14 +350,25 @@ for guests and signed-in customers alike and adapts per session state.
   breadcrumb + `<h1>`, `MarketProductCard`, `ListingPagination`,
   `ListingSkeleton` — also used by `/c/{slug}`, whose breadcrumb now starts
   UnieMax › All categories).
+- **Search results page `/search?q=&page=&sort=`** (`SearchPage`) — page 1
+  shows matching **categories** (global `/c/` nodes from `GET /public/browse`
+  filtered by name, then store shelves from the grouped search), matching
+  **shops** (grouped search, up to 10), then **products** from
+  `GET /public/search/products` (name or shelf name, 24 per page, sortable
+  with the shared `ListingSort`; later pages are products only). The side
+  panels fail soft — only a product failure shows the error state. Under 2
+  characters it shows a "Search UnieMax" prompt; no hits at all → "No results
+  found" with a link to `/categories`. `noindex, follow`.
 - **Global search** (`features/discovery/discoveryApi.ts` →
   `GET /api/v1/public/search`) — starts at 2 characters, 300 ms debounce,
   stale-response guard; results are **always grouped** (Stores / Categories
   / Products, never interleaved) with store/category/product hits navigating
   to `/store/{slug}`, `…/category/{slug}`, `…/product/{slug}` (full page
   loads — the shopping surface lives in the public router). Category and
-  product rows show their owning store ("in Power Sports"). Enter opens the
-  first hit; Escape/outside-tap closes. The box lives in the sticky header,
+  product rows show their owning store ("in Power Sports"). **Enter** and the
+  dropdown's **"See all results for “q”"** button open the `/search` page
+  (Enter used to jump to the first hit); Escape/outside-tap closes. On
+  `/search` the box starts filled with the page's `q`. The box lives in the sticky header,
   so it stays reachable while scrolling; focusing it while empty opens the
   dropdown with recent-search chips.
 - **Local memory** (`features/discovery/recentActivity.ts`, localStorage +

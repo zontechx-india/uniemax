@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import * as controller from "./pageShell.controller.js";
-import { INFO_PAGES } from "./pageShell.service.js";
+import { INFO_PAGES, LISTING_PAGES } from "./pageShell.service.js";
 
 /**
  * Storefront pages served as HTML — mounted at the ROOT, on the pages' own
@@ -22,5 +22,8 @@ export const pageShellRoutes: FastifyPluginAsync = async (app) => {
   app.get("/c/*", { helmet: false }, controller.browsePage);
   for (const path of Object.keys(INFO_PAGES)) {
     app.get(path, { helmet: false }, controller.infoPage);
+  }
+  for (const path of Object.keys(LISTING_PAGES)) {
+    app.get(path, { helmet: false }, controller.listingPage);
   }
 };

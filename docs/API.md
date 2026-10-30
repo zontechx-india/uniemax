@@ -2058,6 +2058,21 @@ product hits respect the owner's `hideFromSearch` flag. Matching is
 name-`contains` (categories/products) — the upgrade path at large scale is a
 pg_trgm/FTS index behind the same contract.
 
+### `GET /api/v1/public/search/products`
+
+Every product matching `q`, a page at a time — the storefront `/search`
+page. Matches the product **name or the name of the shelf it sits on**
+(the grouped search above stays name-only). Same visibility rules as
+`/public/products`; items share the search product-hit shape; standard list
+envelope (`data` + `meta`).
+
+| Query      | Type   | Default  | Notes                                   |
+| ---------- | ------ | -------- | --------------------------------------- |
+| `q`        | string | —        | **required**, 2–120 chars               |
+| `page`     | int    | 1        |                                         |
+| `pageSize` | int    | 20       | max 100                                 |
+| `sort`     | enum   | `newest` | `newest` · `priceAsc` · `priceDesc` (on `priceMin`) |
+
 ### `GET /api/v1/public/products`
 
 Platform-wide product rail — the **newest** discoverable products across all
@@ -2194,7 +2209,8 @@ coverage per sitemap, so this shape answers "how much of this seller's
 catalog is indexed" without any extra reporting.
 
 ### `GET /api/v1/public/sitemap-stores.xml`
-The marketplace homepage (`/`), the seller landing page (`/sell`) and every
+The marketplace homepage (`/`), the seller landing page (`/sell`), the
+"View all" pages (`/categories`, `/shops`, `/new`) and every
 published store's front page (`/store/{slug}`), `lastmod` from the store's
 `updatedAt`.
 
@@ -2334,6 +2350,7 @@ calls — the SPA boots from the response exactly as from the static file.
 | `GET /store/*` | `/store/{slug}` · `/category/{slug}` · `/product/{slug}` · `/shop[?q=][?section=]` · `/support[/{ticketId}]` |
 | `GET /c/*` | `/c/{slug}[?page=][&sort=]` |
 | `GET /about` · `/contact` · `/refund-policy` · `/shipping-policy` · `/privacy` · `/terms` | The marketplace footer pages. `/privacy` and `/terms` are `noindex, follow` while they are holding pages |
+| `GET /categories` · `/shops[?page=]` · `/new[?page=]` | The marketplace "View all" pages (`LISTING_PAGES`). `?page=` > 1 is `noindex, follow` |
 
 Every URL in the head (`canonical`, `og:url`, `og:image`) is absolute, built
 from `PUBLIC_WEB_URL` (else the request's host).

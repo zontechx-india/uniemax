@@ -119,6 +119,14 @@ export const router = createBrowserRouter([
           Component: (await import('../pages/NewArrivalsPage')).NewArrivalsPage,
         }),
       },
+      // Full search results — where the header search box's Enter and
+      // "See all results" go. `noindex, follow`.
+      {
+        path: '/search',
+        lazy: async () => ({
+          Component: (await import('../pages/SearchPage')).SearchPage,
+        }),
+      },
       // Footer info pages — public routes: About, Contact and the Refund and
       // Shipping policies have real content, Privacy and Terms a holding page
       // with the support contact until the business supplies the legal text.

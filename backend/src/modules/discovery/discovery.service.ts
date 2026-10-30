@@ -7,7 +7,12 @@ import {
   saleCompareAt,
 } from "../stores/publicStore.service.js";
 import { activeShelfChain } from "../stores/shelfTree.js";
-import type { NewProductsQuery, SearchQuery } from "./discovery.schema.js";
+import { ORDER_BY } from "./browse.service.js";
+import type {
+  NewProductsQuery,
+  SearchProductsQuery,
+  SearchQuery,
+} from "./discovery.schema.js";
 
 /**
  * Platform-wide discovery: global search + trust stats for the marketplace
@@ -152,6 +157,35 @@ export async function searchPlatform({ q, limit }: SearchQuery) {
     })),
     products: products.map(shapeMarketProduct),
   };
+}
+
+/**
+ * Every product matching `q`, a page at a time — the `/search` page's main
+ * list. Matches the product name **or the shelf it sits on**, so "shoes"
+ * also finds a "Runner X" filed under a store's Shoes shelf; the dropdown
+ * (`searchPlatform`) stays name-only because it shows only a handful.
+ */
+export async function searchProducts({ q, page, pageSize, sort }: SearchProductsQuery) {
+  const where: Prisma.StoreProductWhereInput = {
+    ...discoverableProduct,
+    OR: [
+      { name: { contains: q, mode: "insensitive" } },
+      { category: { name: { contains: q, mode: "insensitive" } } },
+    ],
+  };
+
+  const [total, products] = await Promise.all([
+    prisma.storeProduct.count({ where }),
+    prisma.storeProduct.findMany({
+      where,
+      select: marketProductSelect,
+      orderBy: ORDER_BY[sort],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+
+  return { total, products: products.map(shapeMarketProduct) };
 }
 
 // ---------------------------------------------------------------------------

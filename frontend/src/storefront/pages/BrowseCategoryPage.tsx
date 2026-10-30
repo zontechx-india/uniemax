@@ -10,7 +10,9 @@ import {
   ListingHeader,
   ListingPagination,
   ListingSkeleton,
+  ListingSort,
   MarketProductCard,
+  parseListingSort,
   PRODUCT_LISTING_GRID,
 } from '../features/discovery/MarketListing'
 import { CONTENT_COLUMN } from '../layout/contentWidth'
@@ -49,21 +51,12 @@ import { buttonClass } from '../../shared/ui/Button'
  */
 const PAGE_SIZE = 24
 
-const SORTS: { value: BrowseSort; label: string }[] = [
-  { value: 'newest', label: 'Newest' },
-  { value: 'priceAsc', label: 'Price: low to high' },
-  { value: 'priceDesc', label: 'Price: high to low' },
-]
-
 export function BrowseCategoryPage() {
   const { slug = '' } = useParams()
   const [params, setParams] = useSearchParams()
 
   const page = Math.max(1, Number(params.get('page') ?? 1) || 1)
-  const rawSort = params.get('sort') ?? ''
-  const sort: BrowseSort = SORTS.some((option) => option.value === rawSort)
-    ? (rawSort as BrowseSort)
-    : 'newest'
+  const sort = parseListingSort(params.get('sort'))
 
   const [data, setData] = useState<BrowsePage | null | undefined>(undefined)
 
@@ -234,25 +227,14 @@ function Loaded({
             <p className="text-xs text-muted">
               Page {meta.page} of {meta.totalPages}
             </p>
-            <label className="flex items-center gap-2 text-xs text-muted">
-              Sort
-              <select
-                value={sort}
-                onChange={(event) => {
-                  const next = new URLSearchParams()
-                  if (event.target.value !== 'newest')
-                    next.set('sort', event.target.value)
-                  onSort(next)
-                }}
-                className="rounded-md border border-line bg-bg px-2 py-1.5 text-sm text-fg"
-              >
-                {SORTS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <ListingSort
+              value={sort}
+              onChange={(value) => {
+                const next = new URLSearchParams()
+                if (value !== 'newest') next.set('sort', value)
+                onSort(next)
+              }}
+            />
           </div>
 
           <ul className={`mt-4 ${PRODUCT_LISTING_GRID}`}>

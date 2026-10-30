@@ -48,9 +48,10 @@ import {
 
 /**
  * `home` = `/`, `sell` = `/sell`, `store` = `/store/**`, `browse` = `/c/**`,
- * `info` = the marketplace footer pages (`INFO_PAGES`).
+ * `info` = the marketplace footer pages (`INFO_PAGES`), `listing` = the
+ * "View all" pages (`LISTING_PAGES`).
  */
-export type PageKind = "home" | "sell" | "store" | "browse" | "info";
+export type PageKind = "home" | "sell" | "store" | "browse" | "info" | "listing";
 
 export interface ResolvedPage {
   status: 200 | 404;
@@ -153,6 +154,8 @@ function pageFor(
   switch (kind) {
     case "info":
       return Promise.resolve(infoPage(path));
+    case "listing":
+      return Promise.resolve(listingPage(path, query));
     case "home":
       return Promise.resolve(homePage(origin));
     case "sell":
@@ -260,6 +263,56 @@ export const INFO_PAGES: Record<string, PageHead> = {
 function infoPage(path: string): ResolvedPage {
   const head = INFO_PAGES[path.replace(/\/+$/, "") || "/"];
   return head ? { status: 200, head: { ...head, canonical: path.replace(/\/+$/, "") } } : pageNotFound;
+}
+
+// ---------------------------------------------------------------------------
+// The marketplace "View all" pages
+// ---------------------------------------------------------------------------
+
+/**
+ * `AllCategoriesPage`, `AllShopsPage`, `NewArrivalsPage` — fixed heads. Must
+ * match their `useSeo` calls. `paged` pages are the same list re-cut from
+ * `?page=2` on, so those pages are `noindex, follow`.
+ */
+export const LISTING_PAGES: Record<string, { head: PageHead; paged: boolean }> = {
+  "/categories": {
+    paged: false,
+    head: {
+      title: ["All categories"],
+      description:
+        "Browse every product category on UnieMax and shop it from independent sellers — cash on delivery or secure online payment.",
+    },
+  },
+  "/shops": {
+    paged: true,
+    head: {
+      title: ["All shops"],
+      description:
+        "Every independent shop on UnieMax in one place — browse their stores and buy direct from the seller with cash on delivery or secure online payment.",
+    },
+  },
+  "/new": {
+    paged: true,
+    head: {
+      title: ["Fresh Finds", "New products"],
+      description:
+        "The newest products from independent shops on UnieMax — buy direct from the seller with cash on delivery or secure online payment.",
+    },
+  },
+};
+
+function listingPage(path: string, query: PageShellQuery): ResolvedPage {
+  const canonical = path.replace(/\/+$/, "");
+  const listing = LISTING_PAGES[canonical];
+  if (!listing) return pageNotFound;
+  return {
+    status: 200,
+    head: {
+      ...listing.head,
+      canonical,
+      ...(listing.paged && query.page > 1 ? { robots: NOINDEX } : {}),
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------

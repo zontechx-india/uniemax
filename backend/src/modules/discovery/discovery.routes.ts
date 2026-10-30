@@ -7,6 +7,7 @@ import * as controller from "./discovery.controller.js";
  */
 export const publicDiscoveryRoutes: FastifyPluginAsync = async (app) => {
   app.get("/search", controller.search);
+  app.get("/search/products", controller.searchProducts);
   app.get("/products", controller.newProducts);
   app.get("/categories", controller.popularCategories);
   app.get("/stats", controller.stats);

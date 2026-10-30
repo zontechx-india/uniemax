@@ -29,6 +29,9 @@ export const browsePage = (request: FastifyRequest, reply: FastifyReply) =>
 export const infoPage = (request: FastifyRequest, reply: FastifyReply) =>
   sendPage("info", request, reply);
 
+export const listingPage = (request: FastifyRequest, reply: FastifyReply) =>
+  sendPage("listing", request, reply);
+
 async function sendPage(kind: PageKind, request: FastifyRequest, reply: FastifyReply) {
   const shell = await loadShell(request.log);
   if (!shell) {
