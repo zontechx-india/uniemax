@@ -127,6 +127,10 @@ Avoid excessive colors.
 Do not use gradients, glowing effects, or colorful backgrounds unless
 they have a clear purpose and fit the product identity.
 
+The one allowed colour field on the marketplace is the homepage's Become a
+Seller panel (`seller-aurora` in `index.css`): it is the page's closing
+pitch. Its CTA is still the flat shared button. Do not reuse it elsewhere.
+
 ---
 
 ## 7. Components

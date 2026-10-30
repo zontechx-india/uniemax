@@ -1554,74 +1554,80 @@ function BecomeSellerSection({ ownsStores }: { ownsStores: boolean }) {
   return (
     <section className="scroll-mt-20">
       <div className={`${CONTENT_COLUMN} ${SECTION_PADDING}`}>
-        <div className="overflow-hidden rounded-lg bg-brand text-brand-contrast">
+        {/* The aurora panel — fixed colours (see `seller-aurora` in index.css),
+            so the panel and its white text look the same in either scheme. */}
+        <div className="seller-aurora rounded-lg">
           {/* Two real columns from `lg`, each `minmax(0,1fr)` — the old
               `1fr auto` sized the right column to three short numbers and left
               the middle of a 1400px panel empty. */}
-          <div className="grid gap-10 px-6 py-12 sm:px-10 sm:py-14 lg:grid-cols-2 lg:items-center lg:gap-16 lg:px-14">
+          <div className="grid gap-10 px-5 py-12 sm:px-10 sm:py-14 lg:grid-cols-2 lg:items-center lg:gap-14 lg:px-14">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-brand-contrast/80">
+              <p className="text-xs font-semibold uppercase tracking-widest text-white/80">
                 Become a Seller
               </p>
               <h2 className="mt-3 font-heading text-3xl font-bold leading-[1.1] sm:text-4xl lg:text-5xl">
                 Start selling online
               </h2>
-              <p className="mt-3 max-w-md text-sm text-brand-contrast/90 sm:text-base">
+              <p className="mt-3 max-w-md text-sm text-white/90 sm:text-base">
                 Create your own professional online store in minutes. No
                 technical knowledge required.
               </p>
               <ul className="mt-6 space-y-2.5">
                 {SELLER_PROOF_POINTS.map((point) => (
-                  <li key={point} className="flex items-start gap-2.5 text-sm">
-                    <CheckIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                  <li key={point} className="flex items-start gap-2.5 text-sm text-white/90">
+                    <span className="aurora-frost mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-full">
+                      <CheckIcon className="h-3 w-3" />
+                    </span>
                     {point}
                   </li>
                 ))}
               </ul>
-              {/* Inverted button — it paints in the panel's own label color
-                  with the brand as its text, so it separates from the brand
-                  gradient in either scheme (white/purple in light,
-                  near-black/purple in dark) without a third color. */}
-              <CreateStoreLink placement="home_seller_panel" className="mt-8 inline-block rounded-md bg-brand-contrast px-8 py-3 text-sm font-bold text-brand transition hover:opacity-90">
+              {/* The shared primary button — `seller-aurora` re-points
+                  `--cta` to white with brand text, so it stays flat and
+                  still separates from the colour field. */}
+              <CreateStoreLink
+                placement="home_seller_panel"
+                className={buttonClass({ size: 'lg', className: 'mt-8' })}
+              >
                 {ownsStores ? 'Create another store' : 'Create your store'}
               </CreateStoreLink>
             </div>
 
-            <div className="border-t border-brand-contrast/25 pt-8 lg:border-l lg:border-t-0 lg:pl-16 lg:pt-0">
+            <div className="aurora-pane min-w-0 rounded-lg p-4 sm:p-6">
               {counters.length > 0 && (
-                <dl className="mb-8 flex gap-10 sm:gap-14">
+                <dl className="mb-7 grid auto-cols-fr grid-flow-col gap-2 sm:gap-3">
                   {counters.map(({ value, label }) => (
-                    <div key={label}>
-                      <dd className="font-figure text-3xl font-bold sm:text-4xl">
+                    <div key={label} className="aurora-frost min-w-0 rounded-lg px-2.5 py-3.5 sm:px-4 sm:py-4">
+                      <dd className="aurora-figure font-figure text-xl font-bold leading-tight sm:text-3xl">
                         {compactCount(value)}
                       </dd>
-                      <dt className="mt-1 text-xs font-semibold uppercase tracking-widest text-brand-contrast/80">
+                      <dt className="mt-1 truncate text-xs font-semibold text-white/80 sm:uppercase sm:tracking-wider">
                         {label}
                       </dt>
                     </div>
                   ))}
                 </dl>
               )}
-            <ol className="space-y-4">
-              {SELLER_STEPS.map((step, index) => (
-                <li key={step.title} className="flex gap-4">
-                  <span
-                    aria-hidden="true"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-brand-contrast/40 font-heading text-sm font-bold"
-                  >
-                    {index + 1}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-semibold">
-                      {step.title}
+              <ol className="space-y-4">
+                {SELLER_STEPS.map((step, index) => (
+                  <li key={step.title} className="flex gap-4">
+                    <span
+                      aria-hidden="true"
+                      className="aurora-frost flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-heading text-sm font-bold"
+                    >
+                      {index + 1}
                     </span>
-                    <span className="mt-0.5 block text-sm leading-relaxed text-brand-contrast/80">
-                      {step.body}
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold">
+                        {step.title}
+                      </span>
+                      <span className="mt-0.5 block text-sm leading-relaxed text-white/80">
+                        {step.body}
+                      </span>
                     </span>
-                  </span>
-                </li>
-              ))}
-            </ol>
+                  </li>
+                ))}
+              </ol>
             </div>
           </div>
         </div>

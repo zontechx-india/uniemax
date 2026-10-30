@@ -324,14 +324,18 @@ for guests and signed-in customers alike and adapts per session state.
   **"View all →"** link to `/shops` and Fresh Finds one to `/new`
   (`ViewAllLink`); **My Stores** (owners only, compact auto-fill row — logo, body-face
   name, Published/Draft chip — deliberately slim so consumer sections keep the
-  prime real estate); and a **Become a Seller** gradient panel (two equal
+  prime real estate); and a **Become a Seller** "aurora" panel (`seller-aurora`:
+  deep base lit by purple / blue / magenta washes, fixed colours so it looks
+  the same in both schemes; CTA is the shared primary button with `--cta`
+  re-pointed to white; two equal
   columns from `lg`: pitch + 3 check-mark proof points + CTA on the left —
   label flips to "Create another store" for owners; for guests the CTA opens the
   auth dialog and navigates to `/mystores/new` via `onSignedIn` — and, on the
   right, the live **counters** (Stores · Products · Users from
   `GET /public/stats`, short form via `Intl.NumberFormat` compact — "1.2K";
-  zeros and a failed fetch simply drop out) above **how it works**, three
-  numbered steps). The
+  zeros and a failed fetch simply drop out; each in a frosted `aurora-frost`
+  tile — labels are normal case on phones so "Products" fits) above **how it
+  works**, three numbered steps, both inside one blurred `aurora-pane`). The
   **footer** is a structured 4-column block: brand + tagline, Marketplace
   (All categories / All shops / Fresh Finds / About / Support / Contact) and Legal (Privacy / Terms / Refund & Returns /
   Shipping Policy) columns
@@ -3688,6 +3692,8 @@ lighter `#25d366` was ~2:1).
 | `glass-tint` | The featured card (Dashboard hero): `glass-card` plus a 16% brand wash (top-right) and 10% accent wash (bottom-left) — muted text stays 4.8:1 at the brand corner. Colour utility `border-glass-border` for its inner panes. |
 | `glass-card` | A card INSIDE a glass panel: glass fill, edge, highlight and the glass-safe text steps, but **no** `backdrop-filter` (the panel already blurred the canvas) |
 | `seller-canvas` | On the workspace root: ONE fixed layer of radial brand light behind everything (painted once, no `filter: blur`) |
+| `seller-aurora` | Homepage Become a Seller panel only: fixed deep base + purple / blue / magenta radial washes, a slow-drifting light (`::before`, frozen by reduced motion) and grain (`::after`). Re-points `--cta` to white (brand text) and `--accent` (focus ring) to white inside it |
+| `aurora-pane` · `aurora-frost` · `aurora-figure` | Inside `seller-aurora`: the ONE blurred pane · frosted tiles/chips (fill only, no second blur) · white→lavender counter numbers |
 | `animate-sheet-in` | 200ms rise for sheets, bars, toasts |
 
 Rules that keep it legible and fast:
