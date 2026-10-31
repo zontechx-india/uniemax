@@ -160,7 +160,11 @@ model Category {
   name            String
   slug            String          @unique
   description     String?
+  /// A pasted image link (legacy). `imageKey` wins when both are set.
   imageUrl        String?
+  /// Admin-uploaded picture in the `media` bucket — the category's tile on
+  /// the marketplace homepage. Read models expose it as `imageUrl`.
+  imageKey        String?
   /// Suggested option types for products filed here, offered to sellers as
   /// one-tap presets: [{ name: "Size", values: ["S","M","L"] }]. Inherited
   /// down the tree — the nearest ancestor with a value wins. Admin-edited.

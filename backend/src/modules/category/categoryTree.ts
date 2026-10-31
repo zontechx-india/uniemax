@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma.js";
+import { mediaUrl } from "../../package/storage/index.js";
 import { expandEverydayTerms } from "./everydayWords.js";
 import { resolveOptionTemplates, resolveSpecTemplates } from "./categoryTemplates.js";
 import type { OptionTemplate } from "./categoryTemplates.js";
@@ -61,14 +62,27 @@ export function invalidateCategoryCache() {
   cache = null;
 }
 
+/**
+ * A category's picture as one URL: the uploaded file (`imageKey`) wins over a
+ * pasted link (`imageUrl`). Every read model returns `imageUrl` only, with
+ * `imageKey` folded in here, so no client ever sees a bucket key.
+ */
+export function withCategoryImage<T extends { imageKey: string | null; imageUrl: string | null }>(
+  row: T,
+): Omit<T, "imageKey"> {
+  const { imageKey, ...rest } = row;
+  return { ...rest, imageUrl: mediaUrl("media", imageKey) ?? row.imageUrl };
+}
+
 async function allCategories(): Promise<CategoryRow[]> {
   if (cache && Date.now() - cache.loadedAt < CACHE_TTL_MS) return cache.rows;
-  const rows = await prisma.category.findMany({
+  const found = await prisma.category.findMany({
     select: {
       id: true,
       name: true,
       slug: true,
       imageUrl: true,
+      imageKey: true,
       displayOrder: true,
       isActive: true,
       parentId: true,
@@ -77,6 +91,7 @@ async function allCategories(): Promise<CategoryRow[]> {
     },
     orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
   });
+  const rows = found.map(withCategoryImage);
   cache = { rows, loadedAt: Date.now() };
   return rows;
 }
@@ -347,7 +362,7 @@ export async function getCategoryBranch(
  * sitemap, which asks "which taxonomy nodes are worth a URL" in one pass.
  */
 export async function getActiveCategoryNodes(): Promise<
-  { id: string; name: string; slug: string; parentId: string | null }[]
+  { id: string; name: string; slug: string; parentId: string | null; imageUrl: string | null }[]
 > {
   const idx = await index(true);
   return idx.rows.map((row) => ({
@@ -355,5 +370,6 @@ export async function getActiveCategoryNodes(): Promise<
     name: row.name,
     slug: row.slug,
     parentId: row.parentId,
+    imageUrl: row.imageUrl,
   }));
 }

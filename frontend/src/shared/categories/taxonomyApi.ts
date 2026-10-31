@@ -133,6 +133,17 @@ export const taxonomyApi = {
   async remove(id: string): Promise<void> {
     await call(http.delete(`${ADMIN}/${id}`))
   },
+
+  /** Upload or replace the category's picture (its homepage tile). */
+  async setImage(id: string, file: Blob, filename: string): Promise<void> {
+    const form = new FormData()
+    form.append('file', file, filename)
+    await call(http.put(`${ADMIN}/${id}/image`, form))
+  },
+
+  async removeImage(id: string): Promise<void> {
+    await call(http.delete(`${ADMIN}/${id}/image`))
+  },
 }
 
 /** Depth-first flatten of a tree — the order a nested list renders in. */

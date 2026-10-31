@@ -1,5 +1,6 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { ok, list } from "../../utils/response.js";
+import { readUpload } from "../../package/storage/index.js";
 import { idParamSchema, slugParamSchema } from "../../utils/zodHelpers.js";
 import {
   categoryCreateSchema,
@@ -67,6 +68,18 @@ export async function adminUpdateCategory(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   const input = categoryUpdateSchema.parse(request.body);
   return ok(await service.updateCategory(id, input));
+}
+
+/** Multipart, one `image` file — the category's homepage tile picture. */
+export async function adminSetCategoryImage(request: FastifyRequest) {
+  const { id } = idParamSchema.parse(request.params);
+  const file = await readUpload(request, "image");
+  return ok(await service.setCategoryImage(id, file));
+}
+
+export async function adminRemoveCategoryImage(request: FastifyRequest) {
+  const { id } = idParamSchema.parse(request.params);
+  return ok(await service.removeCategoryImage(id));
 }
 
 export async function adminDeleteCategory(request: FastifyRequest) {

@@ -31,6 +31,7 @@ import { BackToTop } from '../layout/BackToTop'
 import { SaveButton } from '../features/wishlist/SaveButton'
 import { BannerCarousel } from '../features/banners/BannerCarousel'
 import { discoveryApi } from '../features/discovery/discoveryApi'
+import { CategoryIcon } from '../features/discovery/CategoryIcon'
 import type {
   PlatformStats,
   MarketBanner,
@@ -1350,9 +1351,10 @@ function ShopByCategorySection() {
                 to={`/c/${category.slug}`}
                 className="category-well group grid h-full content-start justify-items-center gap-4 px-3 pt-5 pb-4 text-center"
               >
-                {/* Category photos are rectangles with their own backdrop, so
-                    the photo fills the plate (cover) — a contained one shows
-                    as a hard square inside the circle. */}
+                {/* The category's own picture (uploaded in admin → Categories),
+                    filling the plate; a contained one shows as a hard square
+                    inside the circle. Without one, the category's icon — never
+                    a seller's product photo, which read as random here. */}
                 <span className="category-plate grid aspect-square w-[72%] max-w-44 place-items-center overflow-hidden">
                   {category.imageUrl ? (
                     <MediaImg
@@ -1364,7 +1366,7 @@ function ShopByCategorySection() {
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <TagIcon className="h-9 w-9 text-brand opacity-40" />
+                    <CategoryIcon slug={category.slug} className="h-[38%] w-[38%] text-brand" />
                   )}
                 </span>
                 <span className="line-clamp-2 max-w-full text-sm font-semibold text-balance text-fg transition-colors group-hover:text-brand">

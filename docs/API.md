@@ -2179,9 +2179,10 @@ so this is one grouped query regardless of taxonomy size. 5 min cache.
               "imageUrl": "https://…" | null }, … ] }
 ```
 
-`imageUrl` is the cover of the newest photographed discoverable product
-anywhere in the node's branch (rolled up the same way as the counts) — the
-homepage's "Shop by category" tiles.
+`imageUrl` is the category's **own picture** (uploaded in the admin console,
+`PUT /admin/categories/:id/image`), or `null` — never a product photo. It is
+the homepage's "Shop by category" tile; `null` draws the category's icon.
+This list is cached for 5 minutes, so a new picture can take that long to show.
 
 ### `GET /api/v1/public/browse/:slug`
 
@@ -2513,7 +2514,7 @@ is how the console shows a node an admin wants to re-enable.
 {
   "name": "Hard Tennis Bats",   // required
   "description": "…",            // optional
-  "imageUrl": "https://…",       // optional (must be a URL)
+  "imageUrl": "https://…",       // optional pasted link (legacy); an uploaded picture wins
   "displayOrder": 0,             // optional
   "isActive": true,              // optional (default true)
   "parentId": "cmr…"             // optional (null/omit for root)
@@ -2541,6 +2542,18 @@ Partial update (any create field). A category cannot be its own parent (`400`).
 
 ### `DELETE /api/v1/admin/categories/:id`
 `409` if any store still uses the category (a shelf or a product) or it has sub-categories — disable it instead. → `{ "data": { "id" } }`
+Also deletes its uploaded picture.
+
+### `PUT /api/v1/admin/categories/:id/image`
+Multipart, one image file. Uploads or replaces the category's picture (the
+homepage "Shop by category" tile), clears any pasted `imageUrl`, and deletes
+the previous file. → `{ "data": Category }` with `imageUrl` pointing at the
+upload. Every category read returns the picture as `imageUrl` (upload first,
+else the pasted link); the storage key itself is never returned. `404` if the
+category does not exist.
+
+### `DELETE /api/v1/admin/categories/:id/image`
+Removes the picture — uploaded file and pasted link alike. → `{ "data": Category }`
 
 ---
 

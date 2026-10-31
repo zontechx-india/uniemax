@@ -4,10 +4,17 @@ import { slugify } from "../../utils/slug.js";
 import { buildListMeta } from "../../utils/response.js";
 import { HttpError } from "../../utils/httpError.js";
 import {
+  newObjectKey,
+  storage,
+  storeUpload,
+  type UploadedFile,
+} from "../../package/storage/index.js";
+import {
   MAX_CATEGORY_DEPTH,
   getCategoryHeight,
   getCategoryPath,
   invalidateCategoryCache,
+  withCategoryImage,
 } from "./categoryTree.js";
 import type {
   CategoryCreateInput,
@@ -21,6 +28,7 @@ const categorySelect = {
   slug: true,
   description: true,
   imageUrl: true,
+  imageKey: true,
   displayOrder: true,
   isActive: true,
   parentId: true,
@@ -68,7 +76,7 @@ export async function listCategories(query: CategoryListQuery) {
     prisma.category.count({ where }),
   ]);
 
-  return { items, meta: buildListMeta(total, page, pageSize) };
+  return { items: items.map(withCategoryImage), meta: buildListMeta(total, page, pageSize) };
 }
 
 export async function getCategoryBySlug(slug: string) {
@@ -85,7 +93,10 @@ export async function getCategoryBySlug(slug: string) {
     },
   });
   if (!category) throw HttpError.notFound("Category not found");
-  return category;
+  return {
+    ...withCategoryImage(category),
+    children: category.children.map(withCategoryImage),
+  };
 }
 
 export async function getCategoryById(id: string) {
@@ -94,7 +105,7 @@ export async function getCategoryById(id: string) {
     select: categorySelect,
   });
   if (!category) throw HttpError.notFound("Category not found");
-  return category;
+  return withCategoryImage(category);
 }
 
 export async function createCategory(input: CategoryCreateInput) {
@@ -119,7 +130,7 @@ export async function createCategory(input: CategoryCreateInput) {
 
   const category = await prisma.category.create({ data, select: categorySelect });
   invalidateCategoryCache();
-  return category;
+  return withCategoryImage(category);
 }
 
 /**
@@ -191,13 +202,58 @@ export async function updateCategory(id: string, input: CategoryUpdateInput) {
     select: categorySelect,
   });
   invalidateCategoryCache();
-  return category;
+  return withCategoryImage(category);
+}
+
+/**
+ * Upload (or replace) the category's picture. It takes over from any pasted
+ * link, and the previous file is deleted only AFTER the row points at the new
+ * one, so a failed delete never leaves a category without its picture.
+ */
+export async function setCategoryImage(id: string, file: UploadedFile) {
+  const current = await prisma.category.findUnique({
+    where: { id },
+    select: { imageKey: true },
+  });
+  if (!current) throw HttpError.notFound("Category not found");
+
+  const key = newObjectKey("categories", file.contentType);
+  await storeUpload("media", key, file);
+  const category = await prisma.category.update({
+    where: { id },
+    data: { imageKey: key, imageUrl: null },
+    select: categorySelect,
+  });
+  if (current.imageKey) await storage.remove("media", current.imageKey).catch(() => {});
+  invalidateCategoryCache();
+  return withCategoryImage(category);
+}
+
+/** Remove the picture — uploaded file and pasted link alike. */
+export async function removeCategoryImage(id: string) {
+  const current = await prisma.category.findUnique({
+    where: { id },
+    select: { imageKey: true },
+  });
+  if (!current) throw HttpError.notFound("Category not found");
+
+  const category = await prisma.category.update({
+    where: { id },
+    data: { imageKey: null, imageUrl: null },
+    select: categorySelect,
+  });
+  if (current.imageKey) await storage.remove("media", current.imageKey).catch(() => {});
+  invalidateCategoryCache();
+  return withCategoryImage(category);
 }
 
 export async function deleteCategory(id: string) {
   const category = await prisma.category.findUnique({
     where: { id },
-    select: { _count: { select: { storeCategories: true, storeProducts: true, children: true } } },
+    select: {
+      imageKey: true,
+      _count: { select: { storeCategories: true, storeProducts: true, children: true } },
+    },
   });
   if (!category) throw HttpError.notFound("Category not found");
 
@@ -213,6 +269,7 @@ export async function deleteCategory(id: string) {
   }
 
   await prisma.category.delete({ where: { id } });
+  if (category.imageKey) await storage.remove("media", category.imageKey).catch(() => {});
   invalidateCategoryCache();
   return { id };
 }

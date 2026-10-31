@@ -970,6 +970,9 @@ White-label design — one codebase, any business:
 - **StoreSetting** — single-row branding/contact/defaults.
 - **Category** — self-relation (`parentId`) → arbitrary trees (Sports > Cricket Bat),
   `displayOrder`, `isActive`. Add categories without code changes.
+  Its picture is `imageKey` (admin upload, `media` bucket) or the legacy
+  pasted `imageUrl`; every read model folds both into one `imageUrl`
+  (`withCategoryImage` in `categoryTree.ts`, upload wins).
   Ships with a seeded global taxonomy — 29 top-level categories, 125
   subcategories, source of truth in `scripts/data/globalCategories.ts`, applied
   by `npm run seed-categories` (upsert by unique `slug`, so re-running is a

@@ -35,5 +35,8 @@ export const adminCategoryRoutes: FastifyPluginAsync = async (app) => {
   app.post("/", controller.adminCreateCategory);
   app.get("/:id", controller.adminGetCategory);
   app.patch("/:id", controller.adminUpdateCategory);
+  // Multipart upload / replace; DELETE clears the picture.
+  app.put("/:id/image", controller.adminSetCategoryImage);
+  app.delete("/:id/image", controller.adminRemoveCategoryImage);
   app.delete("/:id", controller.adminDeleteCategory);
 };

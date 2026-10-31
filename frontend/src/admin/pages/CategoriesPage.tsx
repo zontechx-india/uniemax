@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toApiError } from '../../shared/auth/http'
 import { taxonomyApi, flattenTree } from '../../shared/categories/taxonomyApi'
 import type { CategoryNode } from '../../shared/categories/taxonomyApi'
@@ -39,7 +39,10 @@ interface DraftState {
   node: CategoryNode | null
   name: string
   parentId: string
-  imageUrl: string
+  /** A newly picked picture, uploaded after the category itself saves. */
+  image: File | null
+  /** Clear the current picture on save. */
+  removeImage: boolean
   displayOrder: string
   isActive: boolean
   /** One option per line — `Size: S, M, L`. Empty = inherit from the parent. */
@@ -52,7 +55,8 @@ const BLANK: DraftState = {
   node: null,
   name: '',
   parentId: '',
-  imageUrl: '',
+  image: null,
+  removeImage: false,
   displayOrder: '0',
   isActive: true,
   optionTemplates: '',
@@ -113,7 +117,8 @@ export default function CategoriesPage() {
       node,
       name: node.name,
       parentId: node.parentId ?? '',
-      imageUrl: node.imageUrl ?? '',
+      image: null,
+      removeImage: false,
       displayOrder: String(node.displayOrder),
       isActive: node.isActive,
       // Inherited suggestions stay blank here (and show as a hint) so saving
@@ -133,14 +138,16 @@ export default function CategoriesPage() {
       const payload = {
         name: draft.name.trim(),
         parentId: draft.parentId || null,
-        // An emptied field means "no image", not an empty string.
-        ...(draft.imageUrl.trim() ? { imageUrl: draft.imageUrl.trim() } : {}),
         ...(Number.isFinite(order) && order >= 0 ? { displayOrder: order } : {}),
         isActive: draft.isActive,
         ...templatePayload(draft),
       }
-      if (draft.node) await taxonomyApi.update(draft.node.id, payload)
-      else await taxonomyApi.create(payload)
+      const saved = draft.node
+        ? await taxonomyApi.update(draft.node.id, payload)
+        : await taxonomyApi.create(payload)
+      // The picture is its own request (multipart), after the row exists.
+      if (draft.image) await taxonomyApi.setImage(saved.id, draft.image, draft.image.name)
+      else if (draft.removeImage && draft.node?.imageUrl) await taxonomyApi.removeImage(saved.id)
       setDraft(null)
       load()
     } catch (err) {
@@ -252,12 +259,11 @@ export default function CategoriesPage() {
                   setDraft({ ...draft, displayOrder: e.target.value })
                 }
               />
-              <TextInput
-                label="Image URL"
-                value={draft.imageUrl}
-                placeholder="https://…"
-                hint="Optional. A link only — there is no upload here."
-                onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })}
+              <CategoryImageField
+                current={draft.removeImage ? null : (draft.node?.imageUrl ?? null)}
+                picked={draft.image}
+                onPick={(image) => setDraft({ ...draft, image, removeImage: false })}
+                onRemove={() => setDraft({ ...draft, image: null, removeImage: true })}
               />
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-fg">
@@ -520,4 +526,71 @@ function templatePayload(draft: DraftState) {
         ? { specTemplates: null }
         : {}),
   }
+}
+
+/**
+ * The category's picture — its tile under "Shop by category" on the
+ * marketplace homepage. Picked here, uploaded on Save. Without one the tile
+ * shows an icon; it never borrows a seller's product photo.
+ */
+function CategoryImageField({
+  current,
+  picked,
+  onPick,
+  onRemove,
+}: {
+  current: string | null
+  picked: File | null
+  onPick: (file: File) => void
+  onRemove: () => void
+}) {
+  const input = useRef<HTMLInputElement>(null)
+  const preview = useMemo(() => (picked ? URL.createObjectURL(picked) : null), [picked])
+  useEffect(() => {
+    if (!preview) return
+    return () => URL.revokeObjectURL(preview)
+  }, [preview])
+  const hasImage = Boolean(preview ?? current)
+
+  return (
+    <div>
+      <span className="mb-1 block text-xs font-medium text-fg">Picture</span>
+      <div className="flex items-center gap-3">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line bg-surface-alt">
+          {preview ? (
+            <img src={preview} alt="" className="h-full w-full object-cover" />
+          ) : current ? (
+            <MediaImg sizes="64px" src={current} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="text-xs text-muted">None</span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => input.current?.click()}>
+            {hasImage ? 'Replace' : 'Upload'}
+          </Button>
+          {hasImage && (
+            <Button size="sm" variant="ghost" onClick={onRemove}>
+              Remove
+            </Button>
+          )}
+        </div>
+        <input
+          ref={input}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            e.target.value = '' // re-picking the same file must still fire
+            if (file) onPick(file)
+          }}
+        />
+      </div>
+      <p className="mt-1 text-xs text-muted">
+        Square, object centred with space around it. Shown on the homepage tile
+        (top-level categories); saved when you press Save.
+      </p>
+    </div>
+  )
 }
