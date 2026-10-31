@@ -226,7 +226,10 @@ Use cards intentionally to create structure.
 The one relief (soft neumorphic) surface is the homepage's Shop by category
 tile (`category-well` / `category-plate` in `index.css`): a well pressed into
 the page canvas with the photo on a raised round plate. It only works on the
-canvas colour (`--bg`), never on a card. Do not reuse it elsewhere.
+canvas colour (`--bg`), never on a card. Do not reuse it elsewhere. The well
+also has a tray fill (`--well`, a shade below `--bg`) and a `--line`
+hairline: on a near-white or near-black canvas the relief alone draws only two
+edges, so the fill and hairline close the other two.
 
 ---
 

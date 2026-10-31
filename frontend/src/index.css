@@ -312,6 +312,10 @@
    * `--bg`, so the shape only reads on the canvas, never on a card. */
   --relief-hi: #ffffff;
   --relief-lo: rgba(40, 30, 80, 0.16);
+  /* The well's own fill — a shade below `--bg`. On a near-white canvas the
+   * white highlight cannot show, so the darker tray (plus a `--line` edge)
+   * is what closes the bottom-right of the shape. */
+  --well: #f0f0f3;
   /* Lighter, tinted overlay for glass sheets — the frosted panel needs some
    * page left behind it to frost, which a 60% black leaves too little of. */
   --overlay-soft: rgba(17, 12, 46, 0.4);
@@ -418,6 +422,9 @@
   --logo-lockup: url('/app_logo_with_name_dark.png');
   --relief-hi: rgba(255, 255, 255, 0.09);
   --relief-lo: rgba(0, 0, 0, 0.7);
+  /* Darker than `--bg` here too: on a near-black canvas it is the black
+   * shadow that cannot show, so the tray and edge close the top-left. */
+  --well: #0b0b0b;
 
   /* Dark chart steps — SELECTED against the #1e1e1e card surface and
    * validated there, not derived from the light values. */
@@ -648,6 +655,11 @@
    * shadow per frame. */
   .category-well {
     border-radius: 16px;
+    /* Relief alone only draws two edges on a near-white (or near-black)
+     * canvas — the highlight (or shadow) matches the page and vanishes. The
+     * tray fill and hairline give the shape all four sides in both modes. */
+    background: var(--well);
+    border: 1px solid var(--line);
     box-shadow:
       inset 5px 5px 12px var(--relief-lo),
       inset -5px -5px 12px var(--relief-hi);

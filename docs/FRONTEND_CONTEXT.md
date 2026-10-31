@@ -322,7 +322,8 @@ for guests and signed-in customers alike and adapts per session state.
   raised round plate — never a product photo — and without one its line icon
   (`features/discovery/CategoryIcon.tsx`, keyed by root slug, tag glyph for an
   unknown slug); `category-well` / `category-plate` in `index.css`, shadows from
-  `--relief-hi` / `--relief-lo`, which are tuned to `--bg`; hover lifts the
+  `--relief-hi` / `--relief-lo`, which are tuned to `--bg`, plus a `--well` tray fill
+  and `--line` hairline so the well has four edges in both modes; hover lifts the
   plate 3px, a press sinks it), compact tiles in whole rows
   only — 3 per row on a phone, 4 from `sm`, 8 from `lg` (8 categories = 6 tiles on
   a phone, one row of 8 on a desktop; fewer than a row keeps the full-row tile
