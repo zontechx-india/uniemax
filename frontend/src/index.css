@@ -307,6 +307,11 @@
   --danger: #ef443b;
   --info: #0000ee;
   --overlay: rgba(0, 0, 0, 0.6);
+  /* Soft relief (homepage Shop by category only): the light and dark edge of
+   * a shape pressed into / raised out of the page canvas. Both are tuned to
+   * `--bg`, so the shape only reads on the canvas, never on a card. */
+  --relief-hi: #ffffff;
+  --relief-lo: rgba(40, 30, 80, 0.16);
   /* Lighter, tinted overlay for glass sheets — the frosted panel needs some
    * page left behind it to frost, which a 60% black leaves too little of. */
   --overlay-soft: rgba(17, 12, 46, 0.4);
@@ -411,6 +416,8 @@
   --brand-gradient: linear-gradient(135deg, #aa90f9 0%, #9574f7 100%);
 
   --logo-lockup: url('/app_logo_with_name_dark.png');
+  --relief-hi: rgba(255, 255, 255, 0.09);
+  --relief-lo: rgba(0, 0, 0, 0.7);
 
   /* Dark chart steps — SELECTED against the #1e1e1e card surface and
    * validated there, not derived from the light values. */
@@ -632,6 +639,35 @@
   .card-hover:hover {
     border-color: color-mix(in oklab, var(--fg) 22%, transparent);
     box-shadow: var(--shadow-lifted);
+  }
+
+  /* Homepage Shop by category tile — the "pressed well" (DESIGN_GUIDELINES
+   * §10 names it as the one relief surface). The tile is pressed INTO the
+   * canvas and the photo rises out of it on a round plate; hover lifts the
+   * plate, a press sinks it. Only transform animates, so phones repaint no
+   * shadow per frame. */
+  .category-well {
+    border-radius: 16px;
+    box-shadow:
+      inset 5px 5px 12px var(--relief-lo),
+      inset -5px -5px 12px var(--relief-hi);
+  }
+  .category-plate {
+    border-radius: 9999px;
+    background: var(--bg);
+    box-shadow:
+      6px 6px 14px var(--relief-lo),
+      -6px -6px 14px var(--relief-hi);
+    transition: transform 250ms ease-out;
+  }
+  .category-well:hover .category-plate {
+    transform: translateY(-3px);
+  }
+  .category-well:active .category-plate {
+    transform: none;
+    box-shadow:
+      inset 3px 3px 8px var(--relief-lo),
+      inset -3px -3px 8px var(--relief-hi);
   }
 
   /* The heading face sits a touch tight wherever it is used as a utility —

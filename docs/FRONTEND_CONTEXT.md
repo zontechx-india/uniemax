@@ -317,9 +317,12 @@ for guests and signed-in customers alike and adapts per session state.
   rows on a phone, then 3 / 4 / 5 / 6 columns × 2 rows from `sm` / `md` /
   `lg` / `xl`, so it never ends in holes; a phone also gets a full-width
   "View all new products" button under it. Then two category bands:
-  **Shop by category** (`ShopByCategorySection`, base tone) — picture tiles
-  of the top-level global categories (`parentSlug === null` from
-  `GET /public/browse`, photo = `imageUrl`, tag glyph without one), whole rows
+  **Shop by category** (`ShopByCategorySection`, base tone) — "pressed well"
+  tiles of the top-level global categories (`parentSlug === null` from
+  `GET /public/browse`, photo = `imageUrl` on a raised round plate, tag glyph
+  without one; `category-well` / `category-plate` in `index.css`, shadows from
+  `--relief-hi` / `--relief-lo`, which are tuned to `--bg`; hover lifts the
+  plate 3px, a press sinks it), whole rows
   only (4 or 8 tiles; 2–3 in a row of their own; fewer → hidden), "View all" →
   `/categories`, no counts; and **More to explore** (`MoreToExploreSection`,
   alt tone) — one rail per top-level category with 6+ products (up to 3),

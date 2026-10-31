@@ -1335,37 +1335,41 @@ function ShopByCategorySection() {
       {top === null ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-5" aria-hidden>
           {Array.from({ length: 4 }, (_, i) => (
-            <div key={i} className="aspect-[4/3] animate-pulse rounded-lg bg-surface-alt" />
+            <div key={i} className="category-well grid justify-items-center gap-4 px-3 pt-5 pb-4">
+              <div className="aspect-square w-[72%] max-w-44 animate-pulse rounded-full bg-surface-alt" />
+              <div className="h-4 w-2/3 animate-pulse rounded-full bg-surface-alt" />
+            </div>
           ))}
         </div>
       ) : (
         <ul className={`grid gap-4 sm:gap-5 ${SHORT_TILE_GRID[count] ?? 'grid-cols-2 sm:grid-cols-4'}`}>
           {top.slice(0, count).map((category) => (
             <li key={category.slug}>
+              {/* The "pressed well" tile: see `.category-well` in index.css. */}
               <Link
                 to={`/c/${category.slug}`}
-                className="group block overflow-hidden rounded-lg border border-line bg-surface shadow-floating transition duration-200 hover:-translate-y-1 hover:border-accent hover:shadow-lifted"
+                className="category-well group grid h-full content-start justify-items-center gap-4 px-3 pt-5 pb-4 text-center"
               >
-                <div className="aspect-[4/3] overflow-hidden bg-surface-alt">
+                {/* Category photos are rectangles with their own backdrop, so
+                    the photo fills the plate (cover) — a contained one shows
+                    as a hard square inside the circle. */}
+                <span className="category-plate grid aspect-square w-[72%] max-w-44 place-items-center overflow-hidden">
                   {category.imageUrl ? (
                     <MediaImg
-                      sizes="(min-width: 640px) 25vw, 50vw"
+                      sizes="(min-width: 640px) 176px, 36vw"
                       src={category.imageUrl}
                       alt=""
                       loading="lazy"
                       decoding="async"
-                      className="h-full w-full object-contain p-3 transition-transform duration-500 ease-out group-hover:scale-105"
+                      className="h-full w-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-brand">
-                      <TagIcon className="h-9 w-9 opacity-40" />
-                    </div>
+                    <TagIcon className="h-9 w-9 text-brand opacity-40" />
                   )}
-                </div>
-                <p className="flex items-center justify-between gap-2 border-t border-line px-4 py-3 text-sm font-semibold text-fg transition-colors group-hover:text-brand">
-                  <span className="truncate">{category.name}</span>
-                  <ChevronRightIcon className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
-                </p>
+                </span>
+                <span className="line-clamp-2 max-w-full text-sm font-semibold text-balance text-fg transition-colors group-hover:text-brand">
+                  {category.name}
+                </span>
               </Link>
             </li>
           ))}
