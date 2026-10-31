@@ -174,18 +174,19 @@ for guests and signed-in customers alike and adapts per session state.
   don't exist in the marketplace router, so a client-side navigate would
   hit its catch-all.
 - **`pages/HomePage.tsx`** (marketplace, replaces the old dashboard landing):
-  own chrome — a header (`h-16`, `md:h-20`, sticky from `md`) laid out as four zones:
-  brand · **global search centred in the toolbar** on md+, dropping to its own
-  row under the bar below md · "Sell on UnieMax" link (lg+) · then the
+  own chrome — a header (`h-14`, `sm:h-16`, `md:h-20`, sticky at every width) laid
+  out as four zones: brand · **global search centred in the toolbar** on md+;
+  below md a **search icon** in the bar instead · "Sell on UnieMax" link (lg+) · then the
   utilities (theme toggle · cart link with count · Sign in — a button that
   opens the auth dialog — / `AccountMenu`). Its gaps and its brand step **down**
   at the smallest widths as well as up at the largest (`gap-3` → `lg:gap-10`,
   logo `h-8` → `md:h-11`, the 40px controls to 36px below `sm`): fixed at their
   comfortable desktop values those four zones needed 339px of a 320px screen and
-  overflowed the bar rather than anything giving way. **On a phone only the
-  search row is sticky**: it is a sibling of `<header>` (`MarketHeader` returns
-  both), so the brand row scrolls away and gives ~64px back to the page while
-  search stays pinned at the top.
+  overflowed the bar rather than anything giving way. **On a phone the bar is
+  the only pinned row**: the search row is hidden until the search icon is
+  tapped, then opens under the bar inside the sticky `<header>` with the input
+  focused (keyboard up in one tap); the icon turns into ✕ to close it. On
+  `/search` it starts open (showing the term) and is not auto-focused.
 
   **Everything on the page sits in `CONTENT_COLUMN`** — the same 1440px column
   the storefront uses, from `layout/contentWidth.ts`. It was `max-w-[1920px]`,
@@ -196,7 +197,7 @@ for guests and signed-in customers alike and adapts per session state.
 
   Sections render as **full-bleed alternating bands** (base canvas / `alt`
   surface tone + a bottom `border-line` divider, `SECTION_PADDING`
-  `py-9`→`lg:py-14`) — the band lives inside each section component so a hidden
+  `py-6`→`lg:py-14`) — the band lives inside each section component so a hidden
   section leaves no empty band; separation comes from background changes rather
   than large gaps.
 
@@ -234,10 +235,12 @@ for guests and signed-in customers alike and adapts per session state.
   > visually hidden**: a heading does not have to be the largest thing on screen
   > to be the heading, it has to be the true one.
 
-  The chips are **one scrolling line at every width** (`CHIP_SCROLLER`) — eleven
-  of them wrapped to four rows on a phone. The "Popular" label stays put, the
-  first 12 chips scroll, arrows appear from `lg` (a mouse cannot swipe), and an
-  **"All categories →"** link ("All" on phones) closes the row → `/categories`.
+  The chips **scroll sideways, never wrap** (`CHIP_SCROLLER_TWO_ROWS`) — eleven
+  of them wrapped to four rows on a phone. On a phone it is a "Popular … All →"
+  line over **two scrolling chip rows** (one row showed only two names); from
+  `sm` it is one line: the "Popular" label, the first 12 chips scrolling, arrows
+  from `lg` (a mouse cannot swipe), and an **"All categories →"** link ("All"
+  on phones) → `/categories`.
   While the names load the row holds its height with placeholder chips. Under
   the bar, **Continue shopping** (`ContinueShoppingStrip`) — only when the
   local cart has active, in-stock lines: one card per store (up to 4; three
@@ -408,7 +411,7 @@ for guests and signed-in customers alike and adapts per session state.
   dropdown's **"See all results for “q”"** button open the `/search` page
   (Enter used to jump to the first hit); Escape/outside-tap closes. On
   `/search` the box starts filled with the page's `q`. The box stays pinned
-  while scrolling (in the sticky header from `md`, its own sticky row on a phone); focusing it while empty opens the
+  while scrolling (in the sticky header; on a phone behind the bar's search icon); focusing it while empty opens the
   dropdown with recent-search chips.
 - **Local memory** (`features/discovery/recentActivity.ts`, localStorage +
   `useSyncExternalStore`, cross-tab): recent searches
@@ -3651,7 +3654,7 @@ surfaces read them:
 | `CONTENT_MAX`     | `max-w-[1440px]` — the cap on its own                           |
 | `CONTENT_GUTTER`  | `px-4 sm:px-6 lg:px-10` — 16 / 24 / 40px side gutters           |
 | `CONTENT_COLUMN`  | the two together, centred — what the marketplace homepage uses  |
-| `SECTION_PADDING` | `py-9 sm:py-11 lg:py-14` — vertical rhythm for a full-bleed band |
+| `SECTION_PADDING` | `py-6 sm:py-11 lg:py-14` — vertical rhythm for a full-bleed band (tight on a phone) |
 
 `STORE_CONTAINER` is a **re-export** of `CONTENT_COLUMN`, not a second
 declaration. The storefront was capped at 1440 and the marketplace around it at

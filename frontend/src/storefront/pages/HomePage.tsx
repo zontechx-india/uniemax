@@ -212,13 +212,17 @@ export function MarketHeader() {
   const { state, signOut } = useMarketSession()
   const items = useCart()
   const cartCount = items.reduce((sum, item) => sum + item.qty, 0)
+  // Phone only: the search row is hidden behind an icon in the bar, so the
+  // pinned header costs one row, not two. Open by default on `/search`,
+  // where the box shows the term the results are for.
+  const onSearchPage = useLocation().pathname === '/search'
+  const [searchOpen, setSearchOpen] = useState(onSearchPage)
 
   return (
     <>
-      {/* Sticky from `md`. On a phone only the search row below stays pinned:
-          the brand row scrolls away with the page, which hands ~64px of a small
-          screen back to the products while search stays one tap away. */}
-      <header className="z-20 bg-bg md:sticky md:top-0 md:border-b md:border-line">
+      {/* Sticky at every width. On a phone the bar is the only row — search
+          opens under it from the icon, and closes again from the same icon. */}
+      <header className="sticky top-0 z-20 border-b border-line bg-bg">
         {/* Airy, but inside the same column as the page. Left full-width, the
             four zones (brand · search · sell · utilities) drifted apart until a
             2560 monitor put the logo and the account menu a screen apart with
@@ -228,7 +232,7 @@ export function MarketHeader() {
             the theme toggle, the cart and Sign in together needed 339px of a
             320px screen — and the group overflowed the bar rather than any of it
             giving way. */}
-        <div className={`flex h-16 items-center gap-3 sm:gap-6 md:h-20 md:gap-8 lg:gap-10 ${CONTENT_COLUMN}`}>
+        <div className={`flex h-14 items-center gap-3 sm:h-16 sm:gap-6 md:h-20 md:gap-8 lg:gap-10 ${CONTENT_COLUMN}`}>
           {/* Brand never wraps or shrinks — it's the anchor of the bar. */}
           <Link to="/" aria-label="UnieMax home" className="flex shrink-0 items-center">
             <AppLogoLockup className="h-8 sm:h-9 md:h-11" />
@@ -245,6 +249,17 @@ export function MarketHeader() {
             <CreateStoreLink placement="home_header" className="hidden whitespace-nowrap text-sm font-semibold text-muted transition-colors hover:text-fg lg:block">
               Sell on UnieMax
             </CreateStoreLink>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSearchOpen((open) => !open)}
+              aria-label={searchOpen ? 'Close search' : 'Search'}
+              aria-expanded={searchOpen}
+              aria-controls="mobile-search"
+              className="w-9 px-0! text-muted hover:text-fg sm:h-10 sm:w-10 md:hidden"
+            >
+              {searchOpen ? <CloseIcon className="h-5 w-5" /> : <SearchIcon className="h-5 w-5" />}
+            </Button>
             <ThemeToggle className="h-9 w-9 sm:h-10 sm:w-10" />
             {/* Plain <a>: /cart lives in the public router (full page load). */}
             <a
@@ -279,17 +294,18 @@ export function MarketHeader() {
           </div>
         </div>
 
+        {/* Mobile search row — same component, own state; the md+ instance
+            above is display-hidden so only one is ever interacted with.
+            Inside the header so it stays pinned with the bar. Focused on
+            open, so one tap on the icon brings up the keyboard. */}
+        {searchOpen && (
+          <div id="mobile-search" className="pb-3 md:hidden">
+            <div className={CONTENT_COLUMN}>
+              <GlobalSearchBox autoFocus={!onSearchPage} />
+            </div>
+          </div>
+        )}
       </header>
-
-      {/* Mobile search row — same component, own state; the md+ instance
-          above is display-hidden so only one is ever interacted with. A
-          sibling of the header (not inside it), so it can stay stuck after
-          the header has scrolled away. */}
-      <div className="sticky top-0 z-20 border-b border-line bg-bg pb-3 pt-1 md:hidden">
-        <div className={CONTENT_COLUMN}>
-          <GlobalSearchBox />
-        </div>
-      </div>
     </>
   )
 }
@@ -330,14 +346,15 @@ function MarketBanners() {
       // its own. Edge-to-edge, a 16:5 banner is a function of the SCREEN: 600px
       // tall on a 1920 monitor and 800px on a 2560 one, so the platform's
       // advert became the tallest thing on the page for the people with the
-      // most screen to fill.
-      containerClassName={`${CONTENT_COLUMN} py-6 sm:py-8`}
+      // most screen to fill. Tight on a phone, where every row of air pushes
+      // the stores further down.
+      containerClassName={`${CONTENT_COLUMN} py-3 sm:py-6 lg:py-8`}
       frameClassName="overflow-hidden rounded-lg border border-line"
     />
   )
 }
 
-function GlobalSearchBox() {
+function GlobalSearchBox({ autoFocus = false }: { autoFocus?: boolean }) {
   const location = useLocation()
   const navigate = useNavigate()
   // On `/search` the box shows the term the page is showing results for.
@@ -435,6 +452,7 @@ function GlobalSearchBox() {
         <SearchIcon className="h-4 w-4 shrink-0 text-muted" />
         <input
           ref={inputRef}
+          autoFocus={autoFocus}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onFocus={() => setFocused(true)}
@@ -711,7 +729,7 @@ function Section({
       className={`scroll-mt-20 border-b border-line ${tone === 'alt' ? 'bg-surface' : ''}`}
     >
       <div className={`${CONTENT_COLUMN} ${SECTION_PADDING}`}>
-        <div className="mb-5 flex items-end justify-between gap-4">
+        <div className="mb-4 flex items-end justify-between gap-4 sm:mb-5">
           <div className="min-w-0">
             <h2 className="font-heading text-2xl font-semibold text-fg sm:text-3xl">
               {title}
@@ -825,9 +843,12 @@ function RailArrow({
  * the row's own controls, so it clips at its own edge rather than bleeding to
  * the screen's — the last chip is visibly cut off, which is the cue that
  * there is more to the right.
+ *
+ * Two chip rows on a phone (one row showed only two names there), one line
+ * from `sm`. Either way it scrolls sideways and never wraps.
  */
-const CHIP_SCROLLER =
-  'flex min-w-0 flex-1 items-center gap-2.5 overflow-x-auto py-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'
+const CHIP_SCROLLER_TWO_ROWS =
+  'grid min-w-0 flex-1 basis-full auto-cols-max grid-flow-col grid-rows-2 gap-2 overflow-x-auto py-1 sm:flex sm:basis-auto sm:items-center sm:gap-2.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'
 
 /**
  * "View all →" beside a section heading — the way out of a row that only
@@ -1109,11 +1130,11 @@ function MarketIdentityBar() {
         </div>
 
         {categories === null ? (
-          <div className="mt-2 flex items-center gap-3" aria-hidden>
-            <span className="shrink-0 text-xs font-semibold uppercase tracking-widest text-muted">
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 sm:flex-nowrap" aria-hidden>
+            <span className="flex min-h-tap shrink-0 items-center text-xs font-semibold uppercase tracking-widest text-muted sm:min-h-0">
               Popular
             </span>
-            <div className={CHIP_SCROLLER}>
+            <div className={CHIP_SCROLLER_TWO_ROWS}>
               {Array.from({ length: 6 }, (_, i) => (
                 <span
                   key={i}
@@ -1123,17 +1144,19 @@ function MarketIdentityBar() {
             </div>
           </div>
         ) : categories.length > 0 && (
-          // ONE scrolling line at every width, never a wrapping block. The
-          // platform decides how many category names are popular, and eleven of
-          // them wrapped to four rows on a phone. A row that scrolls holds any
-          // number in the same height, and sideways is the natural gesture
-          // there anyway. Arrows from `lg` (a mouse cannot swipe), and "All"
-          // at every width — the row is capped, the taxonomy is not.
-          <nav aria-label="Popular categories" className="mt-2 flex items-center gap-3">
+          // A scrolling row, never a wrapping block. The platform decides how
+          // many category names are popular, and eleven of them wrapped to
+          // four rows on a phone. A row that scrolls holds any number in the
+          // same height, and sideways is the natural gesture there anyway.
+          // On a phone it is TWO scrolling rows under a "Popular … All" line
+          // (one row showed only two names); one line from `sm`. Arrows from
+          // `lg` (a mouse cannot swipe), and "All" at every width — the row
+          // is capped, the taxonomy is not.
+          <nav aria-label="Popular categories" className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 sm:flex-nowrap">
             <span className="shrink-0 text-xs font-semibold uppercase tracking-widest text-muted">
               Popular
             </span>
-            <ul ref={scroller} onScroll={sync} className={CHIP_SCROLLER}>
+            <ul ref={scroller} onScroll={sync} className={`order-last sm:order-none ${CHIP_SCROLLER_TWO_ROWS}`}>
               {/*
                 Links, not buttons. These were `onClick → prefill the search
                 box`, which is invisible to a crawler: the row sat in the most
@@ -1154,16 +1177,18 @@ function MarketIdentityBar() {
               ))}
             </ul>
             {arrows}
-            <ViewAllLink
-              to="/categories"
-              name="All categories"
-              label={
-                <>
-                  <span className="sm:hidden">All</span>
-                  <span className="hidden sm:inline">All categories</span>
-                </>
-              }
-            />
+            <span className="ml-auto sm:ml-0">
+              <ViewAllLink
+                to="/categories"
+                name="All categories"
+                label={
+                  <>
+                    <span className="sm:hidden">All</span>
+                    <span className="hidden sm:inline">All categories</span>
+                  </>
+                }
+              />
+            </span>
           </nav>
         )}
       </div>

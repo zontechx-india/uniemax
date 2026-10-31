@@ -37,6 +37,8 @@ export const CONTENT_COLUMN = `mx-auto w-full ${CONTENT_MAX} ${CONTENT_GUTTER}`
  *
  * It keeps growing to `lg` on purpose. Padding that is right at 1280 leaves a
  * 2560 monitor looking like a stack of tight strips, because the bands got
- * wider while the air between their contents did not.
+ * wider while the air between their contents did not. On a phone it is
+ * tight (24px): there the band change already separates sections, and extra
+ * air only pushes the content below the fold.
  */
-export const SECTION_PADDING = 'py-9 sm:py-11 lg:py-14'
+export const SECTION_PADDING = 'py-6 sm:py-11 lg:py-14'
