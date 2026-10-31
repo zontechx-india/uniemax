@@ -213,7 +213,20 @@ for guests and signed-in customers alike and adapts per session state.
      start an unfinished row — 12 stores in 5 columns show 10); and Recently
      Viewed is a **rail**.
 
-  Sections, in order: the **banner carousel** (`GET /public/banners`, the
+  **Section order and on/off come from the admin console** (Homepage
+  sections, `admin/pages/HomeSectionsPage.tsx` → `GET /public/home-sections`).
+  Keys, labels and the default order live in
+  `features/discovery/marketHomeSections.ts`, shared by both builds;
+  `HomePage` maps each enabled key to its component. The list is cached in
+  `localStorage` (`um_home_sections`) so a repeat visit draws at once; a first
+  visit waits for it (no default-then-reshuffle), and a failed request falls
+  back to the default order. The admin page reuses the seller builder's row
+  pattern (drag + up/down + `BigSwitch`), saves each change at once, and pins
+  Header/Footer rows; the welcome bar (`intro`) can move but not switch off.
+  Band tones are fixed per section, so a reorder can put two same-tone bands
+  together (the bottom divider still separates them).
+
+  Sections, in default order: the **banner carousel** (`GET /public/banners`, the
   platform's own promo images from `/admin/banners`, the shared
   `features/banners/BannerCarousel`) — **the banner is the hero**, and it is now
   **framed inside the content column** exactly as the storefront frames its own,

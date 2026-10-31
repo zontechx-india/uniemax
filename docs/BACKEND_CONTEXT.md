@@ -968,6 +968,14 @@ without touching auth logic.
 
 White-label design — one codebase, any business:
 - **StoreSetting** — single-row branding/contact/defaults.
+- **PlatformSetting** — platform-wide settings the admin console edits, one
+  JSON `value` per `key` (no row = platform default). Keys in use:
+  `marketHomeSections` — the marketplace homepage's ordered
+  `{ key, enabled }[]`, module `modules/marketHome/` (admin
+  `/admin/home-sections`, public `/public/home-sections`). Normalised on read
+  by `resolveMarketHome` (unknown keys dropped, new keys inserted at their
+  default position, `intro` forced on). Keys mirror the frontend's
+  `features/discovery/marketHomeSections.ts`.
 - **Category** — self-relation (`parentId`) → arbitrary trees (Sports > Cricket Bat),
   `displayOrder`, `isActive`. Add categories without code changes.
   Its picture is `imageKey` (admin upload, `media` bucket) or the legacy

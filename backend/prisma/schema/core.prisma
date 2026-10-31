@@ -152,6 +152,21 @@ model StoreSetting {
 }
 
 // ---------------------------------------------------------------------------
+// Platform-wide settings the admin console edits — one JSON value per key.
+// Keys in use: "marketHomeSections" (the marketplace homepage's section order
+// + on/off flags, see modules/marketHome). A missing row = platform default.
+// ---------------------------------------------------------------------------
+
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("platform_settings")
+  @@schema("public")
+}
+
+// ---------------------------------------------------------------------------
 // Catalog
 // ---------------------------------------------------------------------------
 

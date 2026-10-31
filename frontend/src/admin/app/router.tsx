@@ -46,6 +46,7 @@ const WhatsAppAudiencesPage = lazy(() => import('../pages/whatsapp/WhatsAppAudie
 const WhatsAppAutomationsPage = lazy(() => import('../pages/whatsapp/WhatsAppAutomationsPage'))
 const ThemeTemplatesPage = lazy(() => import('../pages/ThemeTemplatesPage'))
 const BannersPage = lazy(() => import('../pages/BannersPage'))
+const HomeSectionsPage = lazy(() => import('../pages/HomeSectionsPage'))
 const AffiliateAdminPage = lazy(
   () => import('../../packages/affiliate/pages/admin/AffiliateAdminPage'),
 )
@@ -234,6 +235,7 @@ export function AdminRouter() {
                 <Route path="whatsapp/templates" element={<WhatsAppTemplatesPage />} />
                 <Route path="theme-templates" element={<ThemeTemplatesPage />} />
                 <Route path="banners" element={<BannersPage />} />
+                <Route path="home-sections" element={<HomeSectionsPage />} />
                 <Route path="affiliates" element={<AffiliateAdminPage />} />
                 <Route path="suppliers" element={<SuppliersAdminPage />} />
                 <Route path="needs-action" element={<NeedsActionPage />} />

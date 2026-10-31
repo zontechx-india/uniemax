@@ -1,5 +1,6 @@
 import { call, callEnvelope, callList, http } from '../../../shared/auth/http'
 import type { ListMeta } from '../../../shared/auth/http'
+import type { MarketHomeSection } from './marketHomeSections'
 
 /**
  * Marketplace discovery — the anonymous, platform-wide surface behind the
@@ -154,6 +155,11 @@ export const discoveryApi = {
    */
   async listBanners(): Promise<MarketBanner[]> {
     return call<MarketBanner[]>(http.get(`${PUBLIC}/banners`))
+  },
+
+  /** Homepage section order + on/off flags, as set in the admin console. */
+  async homeSections(): Promise<MarketHomeSection[]> {
+    return call<MarketHomeSection[]>(http.get(`${PUBLIC}/home-sections`))
   },
 
   /** Listed stores, best first (homepage "Top Stores"). */

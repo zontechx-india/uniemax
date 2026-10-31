@@ -1680,6 +1680,25 @@ suspended or deleted arrives as `href: null` so the banner renders as a plain
 image rather than a dead link. Managed through `/admin/banners` (below); the
 per-store equivalent is `/stores/:id/banners`.
 
+### `GET /api/v1/public/home-sections`
+The **marketplace** homepage's section order and on/off flags, as set in the
+admin console (`/admin/home-sections`, below). Anonymous. Always the complete
+list in display order — the platform default (below) until an admin saves.
+```jsonc
+{ "success": true, "data": [
+  { "key": "banners", "enabled": true },
+  { "key": "intro", "enabled": true },            // always true — holds the <h1>
+  { "key": "continueShopping", "enabled": true },
+  { "key": "topStores", "enabled": false },       // hidden from `/`
+  …                                               // every key, once
+] }
+```
+Keys, in default order: `banners` · `intro` (welcome bar: `<h1>`, trust points,
+popular categories) · `continueShopping` · `topStores` · `shopByCategory` ·
+`freshFinds` · `moreToExplore` · `recentlyViewed` · `myStores` ·
+`becomeSeller`. Header and footer are not sections. A key added later lands in
+its default position, switched on; a retired key is dropped.
+
 ### `GET /api/v1/public/stores/:slug/home`
 Homepage merchandising payload — each product section capped at 12, `catalog` at 24.
 ```jsonc
@@ -3538,6 +3557,19 @@ Actions: `store.suspend` · `store.restore` · `customer.block` ·
 `customer.unblock` · `product.hide` · `product.show` ·
 `bankAccount.verified|failed|pending` · `admin.create` · `admin.update` ·
 `admin.passwordReset`.
+
+### Marketplace homepage sections 🔒 admin — `/api/v1/admin/home-sections`
+
+Order and on/off for the sections of the marketplace homepage (`/`). Same
+shape as `GET /public/home-sections` (above). Stored as one
+`platform_settings` row (`marketHomeSections`).
+
+- `GET /api/v1/admin/home-sections` — the current list.
+- `PUT /api/v1/admin/home-sections` — body `{ "sections": [{ "key", "enabled" }, …] }`,
+  the **full** list: every key exactly once, in the wanted order (wrong length
+  or a repeated key → `400`). A reorder and a toggle are the same write.
+  `intro` is stored as on whatever is sent. Answers with the stored list.
+  Audited as `marketHome.sections.update` (meta: `order`, `hidden`).
 
 ### Marketplace banners 🔒 admin — `/api/v1/admin/banners`
 

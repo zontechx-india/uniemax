@@ -1,6 +1,7 @@
 import { call, callList, http } from '../../shared/auth/http'
 import type { ListMeta } from '../../shared/auth/http'
 import type { Admin } from '../../shared/auth/authApi'
+import type { MarketHomeSection } from '../../storefront/features/discovery/marketHomeSections'
 
 /**
  * Typed client for `/api/v1/admin/**` — the ONE place the console knows the
@@ -1083,6 +1084,17 @@ export const adminApi = {
   deleteThemeTemplate(id: string) {
     return call<{ id: string; deleted: boolean }>(
       http.delete(`${BASE}/theme-templates/${id}`),
+    )
+  },
+
+  // Marketplace homepage sections — order + on/off. The PUT takes and
+  // returns the FULL list.
+  getHomeSections() {
+    return call<MarketHomeSection[]>(http.get(`${BASE}/home-sections`))
+  },
+  saveHomeSections(sections: MarketHomeSection[]) {
+    return call<MarketHomeSection[]>(
+      http.put(`${BASE}/home-sections`, { sections }),
     )
   },
 

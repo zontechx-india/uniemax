@@ -25,6 +25,10 @@ import {
   adminBannerRoutes,
   publicBannerRoutes,
 } from "./modules/banners/banners.routes.js";
+import {
+  adminMarketHomeRoutes,
+  publicMarketHomeRoutes,
+} from "./modules/marketHome/marketHome.routes.js";
 import { addressRoutes } from "./modules/addresses/addresses.routes.js";
 import { cartRoutes } from "./modules/cart/cart.routes.js";
 import { wishlistRoutes } from "./modules/wishlist/wishlist.routes.js";
@@ -114,6 +118,10 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       await api.register(publicMediaRoutes, { prefix: "/public/images" });
       // Marketplace homepage banners — anonymous read of the active set.
       await api.register(publicBannerRoutes, { prefix: "/public/banners" });
+      // Marketplace homepage section order + on/off flags (admin-managed).
+      await api.register(publicMarketHomeRoutes, {
+        prefix: "/public/home-sections",
+      });
       // Payment gateway callbacks (Cashfree webhook — signature-guarded).
       await api.register(paymentRoutes, { prefix: "/payments" });
       // WhatsApp Cloud API webhook (Meta → us — signature-guarded).
@@ -162,6 +170,10 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
             // Marketplace homepage banners — the platform's own carousel,
             // distinct from the per-store banners sellers manage.
             await guarded.register(adminBannerRoutes, { prefix: "/banners" });
+            // Marketplace homepage sections — reorder and switch on/off.
+            await guarded.register(adminMarketHomeRoutes, {
+              prefix: "/home-sections",
+            });
             // WhatsApp sends, campaigns and conversations (Cloud API).
             await guarded.register(adminWhatsAppRoutes, { prefix: "/whatsapp" });
             // Store appearance templates — the palettes sellers pick from.

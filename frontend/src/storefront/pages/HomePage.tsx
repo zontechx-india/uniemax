@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useSeo } from '../../shared/seo'
 import { ThemeToggle } from '../../shared/theme/ThemeToggle'
@@ -32,6 +32,12 @@ import { SaveButton } from '../features/wishlist/SaveButton'
 import { BannerCarousel } from '../features/banners/BannerCarousel'
 import { discoveryApi } from '../features/discovery/discoveryApi'
 import { CategoryIcon } from '../features/discovery/CategoryIcon'
+import {
+  DEFAULT_MARKET_HOME_SECTIONS,
+  MARKET_HOME_SECTION_KEYS,
+  type MarketHomeSection,
+  type MarketHomeSectionKey,
+} from '../features/discovery/marketHomeSections'
 import type {
   PlatformStats,
   MarketBanner,
@@ -152,33 +158,95 @@ export function HomePage() {
   }, [authed])
 
   const newProducts = useNewProducts()
+  const sections = useHomeSections()
+
+  const render: Record<MarketHomeSectionKey, () => React.ReactNode> = {
+    banners: () => <MarketBanners />,
+    intro: () => <MarketIdentityBar />,
+    continueShopping: () => <ContinueShoppingStrip />,
+    topStores: () => <TopStoresSection />,
+    // On the page canvas like Top Stores — its pressed wells need --bg
+    // behind them (on white the highlight half of the relief vanishes).
+    shopByCategory: () => <ShopByCategorySection />,
+    freshFinds: () => <FreshFindsSection {...newProducts} />,
+    moreToExplore: () => <MoreToExploreSection />,
+    recentlyViewed: () => <RecentlyViewedSection />,
+    myStores: () =>
+      authed && myStores && myStores.length > 0 ? (
+        <MyStoresSection stores={myStores} />
+      ) : null,
+    becomeSeller: () => (
+      <BecomeSellerSection ownsStores={(myStores?.length ?? 0) > 0} />
+    ),
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-bg">
       <MarketHeader />
-      {/* Sections are full-bleed alternating bands (base/alt tone + bottom
-          divider) — separation comes from background changes, not gaps. */}
+      {/* Sections are full-bleed bands (base/alt tone + bottom divider) —
+          separation comes from background changes, not gaps. Order and
+          on/off come from the admin console (Homepage sections). */}
       <main className="flex-1">
-        <MarketBanners />
-        <MarketIdentityBar />
-        <ContinueShoppingStrip />
-        <TopStoresSection />
-        {/* On the page canvas like Top Stores — its pressed wells need --bg
-            behind them (on white the highlight half of the relief vanishes),
-            so the bands after it swap tone to keep alternating. */}
-        <ShopByCategorySection />
-        <FreshFindsSection {...newProducts} />
-        <MoreToExploreSection />
-        <RecentlyViewedSection />
-        {authed && myStores && myStores.length > 0 && (
-          <MyStoresSection stores={myStores} />
-        )}
-        <BecomeSellerSection ownsStores={(myStores?.length ?? 0) > 0} />
+        {sections
+          ?.filter((section) => section.enabled)
+          .map((section) => (
+            <Fragment key={section.key}>{render[section.key]()}</Fragment>
+          ))}
       </main>
       <MarketFooter />
       <BackToTop />
     </div>
   )
+}
+
+/** Last layout seen, so a repeat visit draws at once instead of after a request. */
+const HOME_SECTIONS_CACHE = 'um_home_sections'
+
+/**
+ * The admin-set section order and on/off flags. `null` only on a first visit
+ * while the request is in flight — the page shows header and footer and fills
+ * in, rather than drawing the default order and then reshuffling it. A repeat
+ * visit draws from the cached copy and refreshes it quietly; a failed request
+ * falls back to the default order, so `/` is never left empty.
+ */
+function useHomeSections(): MarketHomeSection[] | null {
+  const [sections, setSections] = useState<MarketHomeSection[] | null>(() => {
+    try {
+      const cached = localStorage.getItem(HOME_SECTIONS_CACHE)
+      return cached ? (JSON.parse(cached) as MarketHomeSection[]) : null
+    } catch {
+      return null
+    }
+  })
+
+  useEffect(() => {
+    let cancelled = false
+    discoveryApi
+      .homeSections()
+      .then((items) => {
+        if (cancelled) return
+        setSections(items)
+        try {
+          localStorage.setItem(HOME_SECTIONS_CACHE, JSON.stringify(items))
+        } catch {
+          // Storage blocked (private mode) — the next visit just waits again.
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setSections((now) => now ?? DEFAULT_MARKET_HOME_SECTIONS)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // A cached copy from an older build may name a section that no longer
+  // exists; drop it rather than crash on a missing renderer.
+  return Array.isArray(sections)
+    ? sections.filter((s) =>
+        (MARKET_HOME_SECTION_KEYS as readonly string[]).includes(s?.key),
+      )
+    : null
 }
 
 /** Newest discoverable products platform-wide — the Fresh Finds rail. */
