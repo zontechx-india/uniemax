@@ -24,8 +24,8 @@ import type {
  *
  * Images live in the `media` bucket under `banners/marketplace/`, and the DB
  * holds OBJECT KEYS only; public URLs are derived at read time so the bucket
- * or CDN can move without a data migration. One image per banner, always 16:5
- * — the marketplace scales it by width, matching the store banners.
+ * or CDN can move without a data migration. One image per banner, always 16:9
+ * — the homepage shows them as cards in a swipeable row (`BannerCardRail`).
  */
 
 /** Enough for a campaign rotation without burying the page under a slideshow. */

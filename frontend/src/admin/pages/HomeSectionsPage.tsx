@@ -91,7 +91,8 @@ export default function HomeSectionsPage() {
     sections !== null &&
     sections.every(
       (s, i) =>
-        s.enabled && s.key === DEFAULT_MARKET_HOME_SECTIONS[i]?.key,
+        s.key === DEFAULT_MARKET_HOME_SECTIONS[i]?.key &&
+        s.enabled === DEFAULT_MARKET_HOME_SECTIONS[i]?.enabled,
     )
 
   return (
@@ -107,7 +108,7 @@ export default function HomeSectionsPage() {
               onClick={() => {
                 if (
                   window.confirm(
-                    'Put every section back in the original order and switch them all on?',
+                    'Put every section back in the original order and on/off setting?',
                   )
                 ) {
                   void save(DEFAULT_MARKET_HOME_SECTIONS)

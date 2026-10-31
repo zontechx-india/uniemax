@@ -1664,13 +1664,13 @@ represented by a **count**, never sent in full:
 there is no sales data yet; they become real orderings when orders ship.
 
 ### `GET /api/v1/public/banners`
-Active **marketplace** banners in admin order — the carousel at the top of the
+Active **marketplace** banners in admin order — the swipeable 16:9 card row at the top of the
 marketplace homepage. Anonymous. Empty until an admin uploads one, and the
 homepage then simply opens on Shop by Category.
 ```jsonc
 { "success": true, "data": [
   { "id": "cmu0…", "title": "Festive sale",
-    "imageUrl": "https://…/x.png",              // the one 16:5 image
+    "imageUrl": "https://…/x.png",              // the one 16:9 image
     "href": "/store/acme",                      // null = render unlinked
     "external": false }                         // true only for a URL banner
 ] }
@@ -1688,16 +1688,18 @@ list in display order — the platform default (below) until an admin saves.
 { "success": true, "data": [
   { "key": "banners", "enabled": true },
   { "key": "intro", "enabled": true },            // always true — holds the <h1>
+  { "key": "popularCategories", "enabled": false }, // off by default
   { "key": "continueShopping", "enabled": true },
   { "key": "topStores", "enabled": false },       // hidden from `/`
   …                                               // every key, once
 ] }
 ```
-Keys, in default order: `banners` · `intro` (welcome bar: `<h1>`, trust points,
-popular categories) · `continueShopping` · `topStores` · `shopByCategory` ·
-`freshFinds` · `moreToExplore` · `recentlyViewed` · `myStores` ·
-`becomeSeller`. Header and footer are not sections. A key added later lands in
-its default position, switched on; a retired key is dropped.
+Keys, in default order: `banners` · `intro` (welcome bar: `<h1>`, trust
+points) · `popularCategories` (category chips; **off by default**) ·
+`continueShopping` · `topStores` · `shopByCategory` · `freshFinds` ·
+`moreToExplore` · `recentlyViewed` · `myStores` · `becomeSeller`. Header and
+footer are not sections. A key added later lands in its default position,
+switched on (`popularCategories`: off); a retired key is dropped.
 
 ### `GET /api/v1/public/stores/:slug/home`
 Homepage merchandising payload — each product section capped at 12, `catalog` at 24.
@@ -3579,7 +3581,7 @@ different owner, different page, and a narrower set of link kinds — the
 marketplace homepage has no store context, so "a category" and "a product"
 would be ambiguous across stores.
 
-**One image per banner, always 16:5**, scaled by width at every breakpoint.
+**One image per banner, always 16:9** — the homepage shows them as cards, several side by side in a swipeable row.
 Max **10** banners. Every endpoint answers with the FULL list in
 `displayOrder`:
 

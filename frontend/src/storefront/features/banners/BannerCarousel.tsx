@@ -197,9 +197,50 @@ function BannerSlide({
   hidden: boolean
   eager: boolean
 }) {
-  const image = banner.imageUrl ? (
-    <MediaImg
+  const image = (
+    <BannerArtwork
+      banner={banner}
       sizes="100vw"
+      eager={eager}
+      fallbackLabel={fallbackLabel}
+    />
+  )
+
+  return (
+    <div
+      // The ratio comes from the shared contract quoted to uploaders, so what
+      // they export is exactly what renders. No max-height: a cap would crop a
+      // correctly-sized upload on a wide monitor.
+      className={`${BANNER_FORMAT.aspect} w-full shrink-0 grow-0 basis-full ${wellClassName}`}
+      aria-hidden={hidden}
+      // Keeps a slide off the tab order without display:none, which would
+      // break the translated track.
+      inert={hidden}
+    >
+      {banner.href ? <BannerLink banner={banner}>{image}</BannerLink> : image}
+    </div>
+  )
+}
+
+/**
+ * The picture inside a banner frame, filling it. Shared with the marketplace's
+ * card rail (`BannerCardRail`), which frames it at its own ratio.
+ */
+export function BannerArtwork({
+  banner,
+  sizes,
+  eager,
+  fallbackLabel,
+}: {
+  banner: CarouselBanner
+  /** How wide the frame is drawn — see `MediaImg`. */
+  sizes: string
+  eager: boolean
+  fallbackLabel?: string
+}) {
+  return banner.imageUrl ? (
+    <MediaImg
+      sizes={sizes}
       src={banner.imageUrl}
       alt={banner.title ?? ''}
       // The first banner is above the fold on every screen — lazy-loading it
@@ -222,28 +263,13 @@ function BannerSlide({
       </span>
     </span>
   )
-
-  return (
-    <div
-      // The ratio comes from the shared contract quoted to uploaders, so what
-      // they export is exactly what renders. No max-height: a cap would crop a
-      // correctly-sized upload on a wide monitor.
-      className={`${BANNER_FORMAT.aspect} w-full shrink-0 grow-0 basis-full ${wellClassName}`}
-      aria-hidden={hidden}
-      // Keeps a slide off the tab order without display:none, which would
-      // break the translated track.
-      inert={hidden}
-    >
-      {banner.href ? <BannerLink banner={banner}>{image}</BannerLink> : image}
-    </div>
-  )
 }
 
 /**
  * Internal destinations route through the SPA; an off-site banner gets a plain
  * anchor plus `noopener` — the address came from an uploader, not from us.
  */
-function BannerLink({
+export function BannerLink({
   banner,
   children,
 }: {
@@ -275,7 +301,7 @@ function BannerLink({
  * neutral scrim in both directions — no palette can be trusted to contrast
  * with an arbitrary photograph.
  */
-function BannerArrow({
+export function BannerArrow({
   side,
   onClick,
 }: {
@@ -301,7 +327,7 @@ function BannerArrow({
  * Whether the viewer asked for less motion. Read live rather than once, so
  * toggling the OS setting takes effect without a reload.
  */
-function usePrefersReducedMotion(): boolean {
+export function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false)
   useEffect(() => {
     const query = window.matchMedia('(prefers-reduced-motion: reduce)')

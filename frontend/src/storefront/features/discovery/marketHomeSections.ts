@@ -23,6 +23,7 @@ import {
 export const MARKET_HOME_SECTION_KEYS = [
   'banners',
   'intro',
+  'popularCategories',
   'continueShopping',
   'topStores',
   'shopByCategory',
@@ -40,9 +41,19 @@ export interface MarketHomeSection {
   enabled: boolean
 }
 
+/**
+ * Sections that start switched off. Mirrors `DEFAULT_OFF_SECTIONS` in the
+ * backend: the Popular row waits for its new design, but an admin can turn
+ * it on.
+ */
+const DEFAULT_OFF_SECTIONS: readonly MarketHomeSectionKey[] = ['popularCategories']
+
 /** What `/` shows before an admin has saved anything. */
 export const DEFAULT_MARKET_HOME_SECTIONS: MarketHomeSection[] =
-  MARKET_HOME_SECTION_KEYS.map((key) => ({ key, enabled: true }))
+  MARKET_HOME_SECTION_KEYS.map((key) => ({
+    key,
+    enabled: !DEFAULT_OFF_SECTIONS.includes(key),
+  }))
 
 export interface MarketHomeSectionMeta {
   label: string
@@ -64,9 +75,14 @@ export const MARKET_HOME_SECTION_META: Record<
   },
   intro: {
     label: 'Welcome bar',
-    hint: 'Page heading, trust points and popular categories',
+    hint: 'Page heading and trust points',
     icon: HomeIcon,
     alwaysOn: "Holds the page's main heading, so it is always shown",
+  },
+  popularCategories: {
+    label: 'Popular categories',
+    hint: 'Category chips with a link to all categories',
+    icon: TagIcon,
   },
   continueShopping: {
     label: 'Continue shopping',

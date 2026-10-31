@@ -18,8 +18,8 @@ import {
   TextInput,
 } from '../ui/primitives'
 import {
-  BANNER_ASPECT,
-  BANNER_FORMAT,
+  MARKET_BANNER_FORMAT as FORMAT,
+  bannerAspect,
   bannerSizeLabel,
   checkBannerImage,
   needsBannerCrop,
@@ -60,7 +60,7 @@ export default function BannersPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
-  /** A picked file that is not 16:5 yet — held until it is cropped. */
+  /** A picked file that is not 16:9 yet — held until it is cropped. */
   const [cropping, setCropping] = useState<{
     file: File
     bannerId?: string
@@ -104,15 +104,15 @@ export default function BannersPage() {
   }
 
   /**
-   * A picked file, measured. Already 16:5 → uploaded untouched, so a correctly
+   * A picked file, measured. Already 16:9 → uploaded untouched, so a correctly
    * exported banner is never re-encoded. Anything else goes to the crop dialog
    * FIRST: a banner fills a fixed frame, so an off-ratio image has to lose
    * something, and the admin should be the one deciding what.
    */
   const pick = async (file: File, bannerId?: string) => {
     const [width, height] = await measure(file)
-    setNotice(checkBannerImage(width, height))
-    if (needsBannerCrop(width, height)) {
+    setNotice(checkBannerImage(width, height, FORMAT))
+    if (needsBannerCrop(width, height, FORMAT)) {
       setCropping(bannerId === undefined ? { file } : { file, bannerId })
       return
     }
@@ -160,7 +160,7 @@ export default function BannersPage() {
     <div className="space-y-4">
       <PageHeader
         title="Homepage banners"
-        subtitle="The promo carousel at the top of the marketplace homepage. With more than one they rotate automatically, in the order below."
+        subtitle="The promo cards at the top of the marketplace homepage. Shoppers see several side by side and can swipe through them; the row also moves on by itself, in the order below."
         actions={
           <>
             <input
@@ -187,15 +187,14 @@ export default function BannersPage() {
 
       <Card>
         <p className="text-sm font-medium text-fg">
-          {bannerSizeLabel()} — one image, used on every screen
+          {bannerSizeLabel(FORMAT)} — one image, used on every screen
         </p>
         <p className="mt-1 text-xs text-muted">
-          The banner keeps its {BANNER_FORMAT.ratio} shape everywhere and is
-          scaled to the screen's width, so its height shrinks on smaller screens
-          and the whole image always stays visible — nothing is cropped or
-          letterboxed. On a 1920px monitor it is 600px tall, on a laptop about
-          450px, and on a phone about 122px. Keep text large and near the
-          centre, or it will be unreadable on a phone.
+          Banners show as {FORMAT.ratio} cards in a row that shoppers can
+          swipe — about one card on a phone, two on a tablet and two and a half
+          on a computer. The whole image always stays visible. A card is about
+          340px wide on a phone and 540px on a computer, so keep text large and
+          keep logos away from the edges.
         </p>
         {uploadPct !== null && (
           <p className="mt-2 text-xs text-muted">Uploading… {uploadPct}%</p>
@@ -215,7 +214,7 @@ export default function BannersPage() {
       ) : banners.length === 0 ? (
         <EmptyState
           title="No banners yet"
-          description={`Add a ${bannerSizeLabel()} image and it appears at the top of the marketplace homepage. Until then the homepage opens on Shop by Category.`}
+          description={`Add a ${bannerSizeLabel(FORMAT)} image and it appears at the top of the marketplace homepage. Until then the homepage opens on Shop by Category.`}
         />
       ) : (
         <ul
@@ -272,10 +271,10 @@ export default function BannersPage() {
       {cropping && (
         <ImageEditDialog
           file={cropping.file}
-          aspects={[{ label: BANNER_FORMAT.ratio, value: BANNER_ASPECT }]}
+          aspects={[{ label: FORMAT.ratio, value: bannerAspect(FORMAT) }]}
           allowOriginal={false}
-          maxEdge={BANNER_FORMAT.width}
-          title={`Crop to ${BANNER_FORMAT.ratio}`}
+          maxEdge={FORMAT.width}
+          title={`Crop to ${FORMAT.ratio}`}
           confirmLabel="Use this crop"
           busy={busy}
           onCancel={() => setCropping(null)}
@@ -366,7 +365,7 @@ function BannerCard({
       } ${dragging ? 'opacity-50' : ''}`}
     >
       <div
-        className={`group relative ${BANNER_FORMAT.aspect} w-full bg-surface-alt`}
+        className={`group relative ${FORMAT.aspect} w-full bg-surface-alt`}
       >
         {banner.imageUrl ? (
           <MediaImg

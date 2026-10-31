@@ -974,7 +974,8 @@ White-label design — one codebase, any business:
   `{ key, enabled }[]`, module `modules/marketHome/` (admin
   `/admin/home-sections`, public `/public/home-sections`). Normalised on read
   by `resolveMarketHome` (unknown keys dropped, new keys inserted at their
-  default position, `intro` forced on). Keys mirror the frontend's
+  default position — on, except `DEFAULT_OFF_SECTIONS` (`popularCategories`)
+  — and `intro` forced on). Keys mirror the frontend's
   `features/discovery/marketHomeSections.ts`.
 - **Category** — self-relation (`parentId`) → arbitrary trees (Sports > Cricket Bat),
   `displayOrder`, `isActive`. Add categories without code changes.
@@ -1314,8 +1315,8 @@ White-label design — one codebase, any business:
   the public listing sends only the cover, the product page the full gallery.
 - **Banner** — a platform-wide promo banner on the **marketplace** homepage,
   managed by admins (`/admin/banners`) and read anonymously at
-  `/public/banners`. Same shape rules as `StoreBanner` — one `imageKey`
-  (object key, never a URL), always 16:5, scaled by width — but a narrower
+  `/public/banners`. Like `StoreBanner` it holds one `imageKey`
+  (object key, never a URL), always **16:9** (shown as cards in a swipeable row, not one wide strip) — and a narrower
   `BannerLinkType` (NONE · STORE · URL): the marketplace homepage has no store
   context, so "a category" and "a product" would be ambiguous across stores.
   STORE holds a `Store.id` and resolves to that shop, reporting `missing`

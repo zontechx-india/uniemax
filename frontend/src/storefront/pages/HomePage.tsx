@@ -7,6 +7,7 @@ import { SessionProvider } from '../app/SessionProvider'
 import { useMarketSession } from '../app/marketSession'
 import { AccountMenu } from '../layout/AccountMenu'
 import {
+  ArrowRightIcon,
   BoxIcon,
   CartIcon,
   CheckIcon,
@@ -29,7 +30,7 @@ import {
 import { groupByStore, useCart } from '../features/cart/cart'
 import { BackToTop } from '../layout/BackToTop'
 import { SaveButton } from '../features/wishlist/SaveButton'
-import { BannerCarousel } from '../features/banners/BannerCarousel'
+import { BannerCardRail } from '../features/banners/BannerCardRail'
 import { discoveryApi } from '../features/discovery/discoveryApi'
 import { CategoryIcon } from '../features/discovery/CategoryIcon'
 import {
@@ -163,6 +164,7 @@ export function HomePage() {
   const render: Record<MarketHomeSectionKey, () => React.ReactNode> = {
     banners: () => <MarketBanners />,
     intro: () => <MarketIdentityBar />,
+    popularCategories: () => <PopularCategoriesBar />,
     continueShopping: () => <ContinueShoppingStrip />,
     topStores: () => <TopStoresSection />,
     // On the page canvas like Top Stores — its pressed wells need --bg
@@ -410,18 +412,14 @@ function MarketBanners() {
   }, [])
 
   return (
-    <BannerCarousel
+    <BannerCardRail
       banners={banners}
       id="banners"
       className="bg-bg"
-      // Framed inside the content column, exactly as the storefront frames
-      // its own. Edge-to-edge, a 16:5 banner is a function of the SCREEN: 600px
-      // tall on a 1920 monitor and 800px on a 2560 one, so the platform's
-      // advert became the tallest thing on the page for the people with the
-      // most screen to fill. Tight on a phone, where every row of air pushes
-      // the stores further down.
-      containerClassName={`${CONTENT_COLUMN} py-3 sm:py-6 lg:py-8`}
-      frameClassName="overflow-hidden rounded-lg border border-line"
+      // 16:9 cards, several per screen, inside the content column. Tight on a
+      // phone, where every row of air pushes the stores further down — and
+      // only a little more on wider screens.
+      containerClassName={`${CONTENT_COLUMN} py-1.5 sm:py-3 lg:py-4`}
     />
   )
 }
@@ -988,6 +986,9 @@ function TopStoresSection() {
       id="top-stores"
       title="Top Stores"
       subtitle="Stocked shops, ready to order from — take a look around."
+      // Tighter than the default band, like Shop by category — it opens the
+      // feed right under the slim top bands.
+      padding="py-5 sm:py-7 lg:py-8"
       action={
         stores && stores.length > 0 ? (
           <ViewAllLink to="/shops" name="View all shops" />
@@ -1029,13 +1030,22 @@ function TopStoresSection() {
 // Continue shopping — the visitor's own cart, one card per store
 // ---------------------------------------------------------------------------
 
-/** Stores the strip shows; the rest are one tap away in the cart. */
-const CONTINUE_STORES = 4
+/**
+ * Store pills the strip shows; the rest collapse into one "+N more" pill. Three
+ * plus that pill fit the desktop row at 1366px — four already overflowed it,
+ * which pushed the "more" pill out of sight.
+ */
+const CONTINUE_STORES = 3
 
 /**
- * A slim band under the identity bar for someone who left items in their
- * cart: one card per store (thumbnails, item count, subtotal) leading
- * straight to that store's basket (`/cart/{store}`), where Place Order is.
+ * The soft basket bar for someone who left items in their cart: one raised
+ * neumorphic panel (`ti-*` classes in `index.css` — light gray in the light
+ * scheme, dark gray in the dark one) headed "N baskets waiting", one pill per
+ * store (a product photo filling a white plate, item count, subtotal) leading
+ * straight to that store's basket (`/cart/{store}`, where Place Order is), a
+ * "+N more" pill when there are more baskets than pills, and a View cart key.
+ * Stacked on a phone with the pills scrolling sideways; one row from `lg`.
+ *
  * Reads the local cart (`groupByStore` — active lines only, sold-out lines
  * not counted), so it costs no request and is absent for an empty cart. The
  * subtotal is the cart's own display figure; checkout re-prices as always.
@@ -1043,73 +1053,107 @@ const CONTINUE_STORES = 4
 function ContinueShoppingStrip() {
   const groups = groupByStore(useCart()).filter((group) => group.itemCount > 0)
   if (groups.length === 0) return null
+  const hidden = groups.length - CONTINUE_STORES
 
   return (
+    // On the page canvas: the panel's raised edge is tuned to `--bg`.
     <section aria-labelledby="continue-shopping" className="border-b border-line bg-bg">
-      <div className={`${CONTENT_COLUMN} py-4`}>
-        <div className="flex items-center justify-between gap-4">
-          <h2 id="continue-shopping" className="text-base font-semibold text-fg">
-            Continue shopping
-          </h2>
+      <div className={`${CONTENT_COLUMN} py-3 sm:py-4`}>
+        <div className="ti-face flex flex-col gap-3.5 rounded-2xl p-4 lg:flex-row lg:items-center lg:gap-5 lg:py-3.5 lg:pl-5">
+          <div className="flex shrink-0 items-center gap-3">
+            <span className="ti-inset flex size-tap shrink-0 items-center justify-center rounded-pill text-ti-ink">
+              <CartIcon className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-widest text-ti-ink">
+                Continue shopping
+              </p>
+              <h2 id="continue-shopping" className="whitespace-nowrap text-lg font-bold">
+                {groups.length} basket{groups.length === 1 ? '' : 's'} waiting
+              </h2>
+            </div>
+          </div>
+
+          <span aria-hidden className="hidden h-11 w-px shrink-0 bg-ti-hairline lg:block" />
+
+          {/* Edge-bleed scroller on a phone (the last pill is cut — the cue
+              that there are more); inside the row from `lg`. */}
+          <ul className="ti-scroller -mx-4 flex min-w-0 gap-2.5 overflow-x-auto px-4 py-1 lg:mx-0 lg:flex-1 lg:px-1">
+            {groups.slice(0, CONTINUE_STORES).map((group) => {
+              const photo = group.items.find((item) => item.imageUrl)?.imageUrl
+              const count = `${group.itemCount} item${group.itemCount === 1 ? '' : 's'}`
+              return (
+                <li key={group.storeSlug} className="shrink-0">
+                  {/* Plain <a>: /cart lives in the public router (full page load). */}
+                  <a
+                    href={`/cart/${group.storeSlug}`}
+                    aria-label={`Checkout at ${group.storeName}, ${count}, ${formatPrice(group.subtotal)}`}
+                    className="ti-pill flex min-h-16 items-center gap-2.5 rounded-2xl py-2 pl-2 pr-3"
+                  >
+                    {/* The photo fills its plate: a small thumbnail shrunk to
+                        fit (`contain`) left tall products as thin slivers. */}
+                    <span className="ti-plate flex h-12 w-12 shrink-0 items-center justify-center rounded-xl">
+                      {photo ? (
+                        <MediaImg
+                          sizes="48px"
+                          src={photo}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <BoxIcon className="h-5 w-5 text-muted" />
+                      )}
+                    </span>
+                    {/* Ink hierarchy: name, then the price in full-strength
+                        bold; the count is quiet. Purple stays for the label
+                        and the View cart key, so the key keeps its pull. */}
+                    <span className="min-w-0">
+                      <span className="block max-w-36 truncate text-sm font-semibold lg:max-w-48">
+                        {group.storeName}
+                      </span>
+                      <span className="block whitespace-nowrap text-sm text-ti-muted">
+                        {count} ·{' '}
+                        <span className="font-figure font-bold text-fg">
+                          {formatPrice(group.subtotal)}
+                        </span>
+                      </span>
+                    </span>
+                    <ChevronRightIcon className="h-4 w-4 shrink-0 text-ti-muted" />
+                  </a>
+                </li>
+              )
+            })}
+            {/* The heading counts every basket; when some do not fit, say so
+                here rather than letting "5 baskets" sit over four pills. */}
+            {hidden > 0 && (
+              <li className="shrink-0">
+                <a
+                  href="/cart"
+                  aria-label={`${hidden} more basket${hidden === 1 ? '' : 's'} in your cart`}
+                  className="ti-pill flex min-h-16 items-center gap-2.5 rounded-2xl py-2 pl-2 pr-3"
+                >
+                  <span className="ti-plate flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-base font-bold text-ti-plate-ink">
+                    +{hidden}
+                  </span>
+                  <span className="whitespace-nowrap text-sm font-semibold">
+                    more
+                    <span className="block font-normal text-ti-muted">in your cart</span>
+                  </span>
+                  <ChevronRightIcon className="h-4 w-4 shrink-0 text-ti-muted" />
+                </a>
+              </li>
+            )}
+          </ul>
+
           {/* Plain <a>: /cart lives in the public router (full page load). */}
-          <a
-            href="/cart"
-            className="inline-flex min-h-tap items-center gap-1 text-sm font-semibold text-fg underline decoration-line decoration-1 underline-offset-[6px] transition-colors hover:text-brand hover:decoration-current"
-          >
-            View cart <span aria-hidden>→</span>
+          <a href="/cart" className={buttonClass({ size: 'md', full: true, className: 'ti-key gap-1.5 lg:w-auto' })}>
+            View cart <ArrowRightIcon className="h-4 w-4" />
           </a>
         </div>
-        <ul className={`mt-2 flex gap-3 ${CHIP_SCROLLER_BLEED}`}>
-          {groups.slice(0, CONTINUE_STORES).map((group) => (
-            <li key={group.storeSlug} className="w-[85%] shrink-0 sm:w-80">
-              <a
-                href={`/cart/${group.storeSlug}`}
-                className="group flex items-center gap-3 rounded-lg border border-line bg-surface p-3 transition-colors hover:border-accent"
-              >
-                <span className="flex shrink-0 -space-x-3">
-                  {group.items.slice(0, 3).map((item) =>
-                    item.imageUrl ? (
-                      <MediaImg
-                        key={`${item.productId}:${item.variantId ?? ''}`}
-                        sizes="44px"
-                        src={item.imageUrl}
-                        alt=""
-                        className="h-11 w-11 rounded-md border-2 border-surface bg-surface-alt object-contain"
-                      />
-                    ) : (
-                      <span
-                        key={`${item.productId}:${item.variantId ?? ''}`}
-                        className="flex h-11 w-11 items-center justify-center rounded-md border-2 border-surface bg-surface-alt text-muted"
-                      >
-                        <BoxIcon className="h-4 w-4" />
-                      </span>
-                    ),
-                  )}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-fg">
-                    {group.storeName}
-                  </span>
-                  <span className="block truncate text-xs text-muted">
-                    {group.itemCount} item{group.itemCount === 1 ? '' : 's'} ·{' '}
-                    <span className="font-figure">{formatPrice(group.subtotal)}</span>
-                  </span>
-                </span>
-                <span className="shrink-0 text-sm font-semibold text-brand">
-                  Checkout <span aria-hidden className="inline-block transition-transform group-hover:translate-x-0.5">→</span>
-                </span>
-              </a>
-            </li>
-          ))}
-        </ul>
       </div>
     </section>
   )
 }
-
-/** A card row that scrolls on a phone (edge-bleed, last card cut) and fits on wider screens. */
-const CHIP_SCROLLER_BLEED =
-  '-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'
 
 // ---------------------------------------------------------------------------
 // Identity bar — who this is and why it can be trusted, in one slim row
@@ -1143,8 +1187,10 @@ const TRUST_POINTS = [
 ] as const
 
 /**
- * The bar under the banner: the page's `<h1>`, the trust row and the popular
- * categories — three things that each need one line, in one band.
+ * The bar under the banner: the page's `<h1>` and the trust row — two things
+ * that each need one line, in one band. The popular categories were a third
+ * line here; they are their own section now (`PopularCategoriesBar`), so the
+ * admin can hide them without losing the heading.
  *
  * **The banner is the hero.** An earlier revision put a full text hero above
  * it — headline, sub-line, chips and a three-column trust grid — which gave
@@ -1159,6 +1205,36 @@ const TRUST_POINTS = [
  * heading — it has to be the true one.
  */
 function MarketIdentityBar() {
+  return (
+    <section className="border-b border-line bg-surface">
+      <div className={`${CONTENT_COLUMN} py-2.5`}>
+        <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-2">
+          <h1 className="text-sm font-semibold text-fg sm:text-base">
+            UnieMax — shop directly from independent stores
+          </h1>
+          <ul className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
+            {TRUST_POINTS.map(({ icon: Icon, label }) => (
+              <li
+                key={label}
+                className="flex items-center gap-1.5 text-xs text-muted"
+              >
+                <Icon className="h-4 w-4 shrink-0 text-brand" />
+                {label}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/**
+ * The popular-category chips, split out of the welcome bar so the admin can
+ * switch them off on their own (Homepage sections → Popular categories). Off
+ * by default for now: two chip rows took too much of a phone screen.
+ */
+function PopularCategoriesBar() {
   // `null` while loading — the row holds its height with placeholder chips,
   // so the sections below do not jump down when the names arrive.
   const [categories, setCategories] = useState<BrowsableCategory[] | null>(null)
@@ -1181,31 +1257,14 @@ function MarketIdentityBar() {
     }
   }, [])
 
+  // Nothing to show (failed or empty) — no empty band either.
+  if (categories !== null && categories.length === 0) return null
+
   return (
     <section className="border-b border-line bg-surface">
-      {/* One band, two rows — not two bands. Stacked, each with its own
-          divider, three hairlines landed in 150px of page and the top of the
-          document read as ruled paper. */}
-      <div className={`${CONTENT_COLUMN} py-3.5`}>
-        <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-2">
-          <h1 className="text-sm font-semibold text-fg sm:text-base">
-            UnieMax — shop directly from independent stores
-          </h1>
-          <ul className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
-            {TRUST_POINTS.map(({ icon: Icon, label }) => (
-              <li
-                key={label}
-                className="flex items-center gap-1.5 text-xs text-muted"
-              >
-                <Icon className="h-4 w-4 shrink-0 text-brand" />
-                {label}
-              </li>
-            ))}
-          </ul>
-        </div>
-
+      <div className={`${CONTENT_COLUMN} py-3`}>
         {categories === null ? (
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 sm:flex-nowrap" aria-hidden>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:flex-nowrap" aria-hidden>
             <span className="flex min-h-tap shrink-0 items-center text-xs font-semibold uppercase tracking-widest text-muted sm:min-h-0">
               Popular
             </span>
@@ -1218,7 +1277,7 @@ function MarketIdentityBar() {
               ))}
             </div>
           </div>
-        ) : categories.length > 0 && (
+        ) : (
           // A scrolling row, never a wrapping block. The platform decides how
           // many category names are popular, and eleven of them wrapped to
           // four rows on a phone. A row that scrolls holds any number in the
@@ -1227,7 +1286,7 @@ function MarketIdentityBar() {
           // (one row showed only two names); one line from `sm`. Arrows from
           // `lg` (a mouse cannot swipe), and "All" at every width — the row
           // is capped, the taxonomy is not.
-          <nav aria-label="Popular categories" className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 sm:flex-nowrap">
+          <nav aria-label="Popular categories" className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:flex-nowrap">
             <span className="shrink-0 text-xs font-semibold uppercase tracking-widest text-muted">
               Popular
             </span>

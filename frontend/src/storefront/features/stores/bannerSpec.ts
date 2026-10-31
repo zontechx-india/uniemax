@@ -15,6 +15,10 @@
  * that most would skip only meant the *fallback* (a hard centre-crop of the
  * wide image) became the common case on phones — the worst outcome of the
  * three.
+ *
+ * The marketplace homepage is the exception: its platform banners are 16:9
+ * cards in a rail (`MARKET_BANNER_FORMAT`), not one strip. Same rule — one
+ * image, one ratio — just a different ratio.
  */
 
 export interface BannerFormat {
@@ -29,13 +33,32 @@ export interface BannerFormat {
   minWidth: number
 }
 
-/** The only banner format. */
+/** A STORE banner — one wide strip across the shop's content column. */
 export const BANNER_FORMAT: BannerFormat = {
   aspect: 'aspect-[16/5]',
   ratio: '16:5',
   width: 1920,
   height: 600,
   minWidth: 1280,
+}
+
+/**
+ * A MARKETPLACE banner — a 16:9 card, several side by side in a scrolling rail
+ * (`BannerCardRail`): about one card on a phone, two on a tablet, two and a
+ * half on a desktop. Even the widest card is drawn under 560px wide, so 1280
+ * covers a 2× screen; under 960 it starts to look soft there.
+ */
+export const MARKET_BANNER_FORMAT: BannerFormat = {
+  aspect: 'aspect-video',
+  ratio: '16:9',
+  width: 1280,
+  height: 720,
+  minWidth: 960,
+}
+
+/** The crop frame for a format — width over height. */
+export function bannerAspect(format: BannerFormat = BANNER_FORMAT): number {
+  return format.width / format.height
 }
 
 /**

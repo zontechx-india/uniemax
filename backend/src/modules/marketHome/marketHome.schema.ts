@@ -15,6 +15,7 @@ import { z } from "zod";
 export const MARKET_HOME_SECTION_KEYS = [
   "banners",
   "intro",
+  "popularCategories",
   "continueShopping",
   "topStores",
   "shopByCategory",
@@ -32,6 +33,16 @@ export type MarketHomeSectionKey = (typeof MARKET_HOME_SECTION_KEYS)[number];
  * only `<h1>` — hiding it would cost the homepage its main heading.
  */
 export const ALWAYS_ON_SECTIONS: readonly MarketHomeSectionKey[] = ["intro"];
+
+/**
+ * Sections that start switched off — in the default list, and when a saved
+ * list predates them. `popularCategories` was split out of the welcome bar
+ * (its two chip rows cost too much of a phone screen) and stays hidden until
+ * it gets a new design; an admin can still turn it on.
+ */
+export const DEFAULT_OFF_SECTIONS: readonly MarketHomeSectionKey[] = [
+  "popularCategories",
+];
 
 export interface MarketHomeSection {
   key: MarketHomeSectionKey;
@@ -71,10 +82,11 @@ export type MarketHomeSectionsInput = z.infer<typeof marketHomeSectionsSchema>;
 
 /**
  * Normalise the stored JSON into a complete, ordered list:
- *   - null / garbage → default order, all on
+ *   - null / garbage → default order, all on except `DEFAULT_OFF_SECTIONS`
  *   - unknown keys (a retired section) are dropped
  *   - a key missing from the stored list (a section added since the last
- *     save) is inserted where the default order puts it, switched on
+ *     save) is inserted where the default order puts it, switched on unless
+ *     it is in `DEFAULT_OFF_SECTIONS`
  *   - an always-on section is on whatever the stored flag says
  */
 export function resolveMarketHome(raw: unknown): MarketHomeSection[] {
@@ -109,7 +121,7 @@ export function resolveMarketHome(raw: unknown): MarketHomeSection[] {
     const at = out.findIndex(
       (s) => MARKET_HOME_SECTION_KEYS.indexOf(s.key) > canonical,
     );
-    const entry = { key, enabled: true };
+    const entry = { key, enabled: !DEFAULT_OFF_SECTIONS.includes(key) };
     if (at === -1) out.push(entry);
     else out.splice(at, 0, entry);
   }

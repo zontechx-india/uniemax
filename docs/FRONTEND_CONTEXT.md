@@ -223,21 +223,35 @@ for guests and signed-in customers alike and adapts per session state.
   back to the default order. The admin page reuses the seller builder's row
   pattern (drag + up/down + `BigSwitch`), saves each change at once, and pins
   Header/Footer rows; the welcome bar (`intro`) can move but not switch off.
+  Popular categories (`popularCategories`) starts **off** (`DEFAULT_OFF_SECTIONS`)
+  until it gets a new design; "Restore default" puts it back to off.
   Band tones are fixed per section, so a reorder can put two same-tone bands
   together (the bottom divider still separates them).
 
-  Sections, in default order: the **banner carousel** (`GET /public/banners`, the
-  platform's own promo images from `/admin/banners`, the shared
-  `features/banners/BannerCarousel`) — **the banner is the hero**, and it is now
-  **framed inside the content column** exactly as the storefront frames its own,
-  because edge-to-edge a 16:5 banner is a function of the screen rather than of
-  the page. It renders nothing until a banner exists and fails silently — a
-  decorative strip never earns an error state. Under it, the **identity bar**
-  (`MarketIdentityBar`) — one slim band carrying three things that each need one
-  line: the page's real `<h1>`, the trust row (straight from the seller · cash
-  on delivery · secure online payment, each a checkable property of the product,
-  **labels only** — a sentence under each read as fine print) and the
-  popular-category chips.
+  Sections, in default order: the **banner card rail** (`GET /public/banners`, the
+  platform's own promo images from `/admin/banners`,
+  `features/banners/BannerCardRail`) — **16:9 cards, several on one screen**
+  (`MARKET_BANNER_FORMAT` in `bannerSpec.ts`): ~86% wide on a phone so the next
+  card peeks in (the rail bleeds to the screen edge), 46% from `sm`, 38% from
+  `lg` (two and a half cards). Native scroll-snap does swipe/trackpad; it
+  auto-advances one card every 5 s and wraps at the end, pausing on hover,
+  focus, for 8 s after the shopper scrolls it, and always under
+  `prefers-reduced-motion`. Arrows (from `sm`) appear only when the row
+  overflows; no position dots (the peeking card already signals more, and the
+  dot row cost a line of a phone screen). Store homepages keep the one-strip 16:5
+  `BannerCarousel`; the rail reuses its `BannerArtwork`, `BannerLink` and
+  `BannerArrow`. It renders nothing until a banner exists and fails silently — a
+  decorative strip never earns an error state. The top bands are kept tight:
+  banners `py-1.5 sm:py-3 lg:py-4`, identity bar `py-2.5`, Continue shopping
+  `py-3 sm:py-4`, Top Stores `py-5 sm:py-7 lg:py-8` (instead of the default
+  `SECTION_PADDING`). Under it, the **identity bar**
+  (`MarketIdentityBar`) — one slim band carrying two things that each need one
+  line: the page's real `<h1>` and the trust row (straight from the seller ·
+  cash on delivery · secure online payment, each a checkable property of the
+  product, **labels only** — a sentence under each read as fine print). The
+  popular-category chips are their own section, **`PopularCategoriesBar`**
+  (key `popularCategories`, off by default — two chip rows cost too much of a
+  phone screen); it draws nothing when there are no categories.
 
   > An intermediate revision put a full text hero *above* the banner —
   > headline, sub-line, chips and a three-column trust grid. It gave the page
@@ -254,11 +268,16 @@ for guests and signed-in customers alike and adapts per session state.
   `sm` it is one line: the "Popular" label, the first 12 chips scrolling, arrows
   from `lg` (a mouse cannot swipe), and an **"All categories →"** link ("All"
   on phones) → `/categories`.
-  While the names load the row holds its height with placeholder chips. Under
-  the bar, **Continue shopping** (`ContinueShoppingStrip`) — only when the
-  local cart has active, in-stock lines: one card per store (up to 4; three
-  thumbnails, item count, subtotal from `groupByStore`) linking to that store's
-  basket `/cart/{store}`, plus "View cart"; no request of its own. Then **Top Stores** — **storefront-preview cards**, each a
+  While the names load the row holds its height with placeholder chips. Next,
+  **Continue shopping** (`ContinueShoppingStrip`) — only when the
+  local cart has active, in-stock lines: the **soft basket bar** (`ti-*`
+  classes, see DESIGN_GUIDELINES §10) — "N baskets waiting", one pill per store
+  (up to 3; first product photo filling a white plate, item count in quiet
+  grey, subtotal in bold full-strength ink, from `groupByStore`) linking to
+  that store's basket `/cart/{store}`, a "+N more" pill (→ `/cart`) when there
+  are more baskets than pills, and a "View cart" key — the only purple fill. Stacked on a phone (pills scroll
+  sideways), one row from `lg`; a light gray panel in light mode and a dark
+  gray one in dark mode (every `--ti-*` token flips). No request of its own. Then **Top Stores** — **storefront-preview cards**, each a
   `StorePreview` mosaic over one footer row (logo · name · Visit store).
 
   **The card is portrait — `aspect-[9/14]` artwork on a ~220px tile**, so a
@@ -2586,7 +2605,7 @@ Rules they follow (constraints, not taste):
 | `/customers`, `/customers/:id` | Buyers and sellers (same account type), with blocking. The dialog states both effects: no future sign-in **and** every session revoked. |
 | `/support`, `/support/:ticketId` | The support queue — **sellers and shoppers in one list** (never a shopper's thread with a shop: those are the seller's to answer), filterable by `scope` (two pages would just mean one of them going unread), each row carrying a Seller/Shopper chip. Defaults to the **Needs reply** tab (open + in progress) sorted **oldest activity first** — a queue's job is to show what is still owed, which is the opposite of every other table here. The detail page carries the thread, the reply box (replying moves OPEN → IN_PROGRESS on its own) and triage: status saves on change and notifies the reporter, priority is internal and silent. |
 | `/whatsapp`, `/whatsapp/inbox`, `/whatsapp/chats/:waId`, `/whatsapp/campaigns`, `/whatsapp/campaigns/new`, `/whatsapp/campaigns/:id`, `/whatsapp/audiences`, `/whatsapp/automations`, `/whatsapp/templates` | **WhatsApp** (`pages/whatsapp/`) — six tabs (Overview · Inbox · Campaigns · Audiences · Automations · Templates) under one `WhatsAppShell`, which reads `GET /admin/whatsapp/status` first: with the integration off it shows a "not switched on" notice instead of tabs of 503s, and outside production a **Test mode** banner lists the allowlisted numbers (plus a warning if Meta has never delivered a webhook). **Overview** leads with the number's quality rating and messaging limit from Meta (with what a Medium/Low rating means to do), then 30-day tiles (sent, delivered %, read %, failed, replies, clicks, consent, opt-outs), a messages-per-day `TrendChart` and recent campaigns. **Inbox** is contacts, newest conversation first, filterable by unread / open / done / reply window / consent / opted out and by tag; an unread count shows on the row. A **thread** marks itself read when opened, polls every 15 s, has **Mark done / Reopen**, a contact card (consent checkbox — refused for a STOP contact — and `ChipInput` tags) and an **On UnieMax** card linking the seller's store or customer matched by phone. Its composer follows Meta's rules instead of letting the operator meet them as errors: free text or a photo/video (upload or link, `MediaInput`) only while the 24 h window is open (a chip counts down), a template otherwise, nothing once opted out; **quick replies** insert saved text and are managed in a dialog. A failed message carries its reason in the bubble (`FailureReason`: plain words for the common Meta codes, then the code, Meta's detail and a "Resolve in Meta" link). One-person template sends use `TemplatePicker` + `DirectTemplateFields` (body values, a value per link button shown after its fixed prefix, the media header), with a live `TemplatePreview`. **New campaign** is one page in five sections — Who (`AudienceEditor`: sellers by setup / publishing / products / orders / quiet days / joined / state / hand-picked stores, contacts by tag and consent, a saved segment, or a pasted/uploaded CSV whose columns become fields; a debounced server preview shows the count, consent, opt-outs and a sample), Message (`MappingEditor`: per slot a value with field chips that insert `{field}`, a fallback once a field is used, "Count clicks" on buttons whose template link is the `/api/v1/r/{{1}}` redirect; the preview fills example values), Rules (consent required and a 48 h cap default on for marketing templates, with a warning when consent is switched off), When (now or a time), and Check and send — **Check campaign** asks the server who gets it, who is skipped and why, and shows real filled-in messages; **Send me a test** goes to the admin's phone; the primary button reads "Send to N" / "Schedule for N" and stays disabled until a fresh check. `?segment=` and `?retarget=&filter=` pre-fill it. A **campaign** page polls every 5 s while scheduled or sending, has Pause / Resume / Cancel (confirmed), tiles for sent / delivered / read / clicked / replied / failed / still to send, the delivery breakdown, why people were skipped and why messages failed, **Follow up** buttons (didn't read, failed, read, clicked, didn't click, replied → New campaign retargeting them) and a recipients table filterable by stage with **Export CSV**. **Audiences** holds saved segments (live size, edit with the same builder, "Use in campaign"), the tags in use, and **Import contacts** (CSV `phone,name,tags,opted_in`, tags for the whole import, an "everyone agreed" consent checkbox). **Automations** lists the seller triggers as cards (on/off, template, last 7 days, last fired) with a settings dialog (switch, day settings, template, mapping, preview) and an activity log. **Templates** is read-only from Meta, with what each needs (values, links, media) and how to make a button count clicks. |
-| `/banners` | **Homepage banners** — the marketplace homepage carousel, which replaced the old hand-written hero, so the platform's opening pitch is now content rather than code. A grid of preview cards at the homepage's own 16:5, each with the image (click to replace), a **Live** checkbox, a title, and a destination: no link · a store (picked from a list, stored as an **id** so a rename cannot break it) · a web address. Reordering is drag-and-drop with ←/→ for keyboard and touch. Max 10. A banner whose store is unpublished, suspended or deleted is flagged in red here, because the console showing a healthy row while the homepage renders a dead banner is the failure worth preventing. Uploads are measured in the browser: an already-16:5 file goes up untouched, anything else **must be cropped first** in the shared `ImageEditDialog` locked to that ratio (no "use original"), so the admin frames it rather than the browser silently trimming the top and bottom. |
+| `/banners` | **Homepage banners** — the marketplace homepage's swipeable 16:9 card row (`BannerCardRail`), which replaced the old hand-written hero, so the platform's opening pitch is now content rather than code. A grid of preview cards at the homepage's own 16:9 (`MARKET_BANNER_FORMAT`, 1280 × 720), each with the image (click to replace), a **Live** checkbox, a title, and a destination: no link · a store (picked from a list, stored as an **id** so a rename cannot break it) · a web address. Reordering is drag-and-drop with ←/→ for keyboard and touch. Max 10. A banner whose store is unpublished, suspended or deleted is flagged in red here, because the console showing a healthy row while the homepage renders a dead banner is the failure worth preventing. Uploads are measured in the browser: an already-16:9 file goes up untouched, anything else **must be cropped first** in the shared `ImageEditDialog` locked to that ratio (no "use original"), so the admin frames it rather than the browser silently trimming the top and bottom. |
 | `/notifications` | This admin's feed, the per-device push toggle, and the platform broadcast (confirm-with-preview — a broadcast can't be recalled). |
 | `/activity` | The append-only admin audit trail, filterable by action and record type. |
 | `/admins` | SUPER_ADMIN only: create, promote/demote, deactivate, reset password. |
