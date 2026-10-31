@@ -312,12 +312,11 @@ for guests and signed-in customers alike and adapts per session state.
   drawing five muted stars and "No reviews yet" on *every* card, which does not
   hold space for a future feature so much as tell a visitor that nothing on the
   platform has ever been rated. Then
-  **Fresh Finds** (`GET /public/products`, newest 12 platform-wide) — a
-  **grid that shows only whole rows** (`wholeRowsClass`): 2 columns × 3
-  rows on a phone, then 3 / 4 / 5 / 6 columns × 2 rows from `sm` / `md` /
-  `lg` / `xl`, so it never ends in holes; a phone also gets a full-width
-  "View all new products" button under it. Then two category bands:
-  **Shop by category** (`ShopByCategorySection`, base tone) — "pressed well"
+  **Shop by category** (`ShopByCategorySection`, base tone, straight under
+  Top Stores and above Fresh Finds; a slimmer band, `py-5` → `lg:py-8`
+  through `Section`'s `padding`. It stays on the canvas although Top Stores
+  is too, because its relief shadows are tuned to `--bg` — on white the
+  highlight half vanishes — so the bands after it swap tone instead) — "pressed well"
   tiles of the top-level global categories (`parentSlug === null` from
   `GET /public/browse`, the category's own uploaded picture = `imageUrl` on a
   raised round plate — never a product photo — and without one its line icon
@@ -328,18 +327,22 @@ for guests and signed-in customers alike and adapts per session state.
   only — 3 per row on a phone, 4 from `sm`, 8 from `lg` (8 categories = 6 tiles on
   a phone, one row of 8 on a desktop; fewer than a row keeps the full-row tile
   size and leaves the line short; under 2 → hidden; `categoryTiles`), "View all" →
-  `/categories`, no counts; and **More to explore** (`MoreToExploreSection`,
-  alt tone) — one rail per top-level category with 6+ products (up to 3),
+  `/categories`, no counts. Then **Fresh Finds** (`GET /public/products`, newest 12 platform-wide) — a
+  **grid that shows only whole rows** (`wholeRowsClass`): 2 columns × 3
+  rows on a phone, then 3 / 4 / 5 / 6 columns × 2 rows from `sm` / `md` /
+  `lg` / `xl`, so it never ends in holes; a phone also gets a full-width
+  "View all new products" button under it. Then
+  **More to explore** (`MoreToExploreSection`, base tone) — one rail per top-level category with 6+ products (up to 3),
   each its newest 12 from `GET /public/browse/{slug}` with its own heading,
-  arrows and "View all" → `/c/{slug}`. Both share one browse fetch with the
+  arrows and "View all" → `/c/{slug}`. The two category bands share one browse fetch with the
   Popular row (`discoveryApi.browsableCategoriesShared`) and hide silently
-  on failure. **Recently Viewed** (local, hidden
+  on failure. **Recently Viewed** (alt tone; local, hidden
   when empty) is a **rail** — percentage-width cards in a snapping scroller
   with arrows from `lg` that grey out at each end. `useRail` measures the rail when it mounts and on resize (a callback
   ref + `ResizeObserver`), not only on scroll — otherwise both arrows start
   greyed out and a desktop user can never move it. Top Stores carries a
   **"View all →"** link to `/shops` and Fresh Finds one to `/new`
-  (`ViewAllLink`); **My Stores** (owners only, compact auto-fill row — logo, body-face
+  (`ViewAllLink`); **My Stores** (base tone; owners only, compact auto-fill row — logo, body-face
   name, Published/Draft chip — deliberately slim so consumer sections keep the
   prime real estate); and a **Become a Seller** "aurora" panel (`seller-aurora`:
   deep base lit by purple / blue / magenta washes, fixed colours so it looks

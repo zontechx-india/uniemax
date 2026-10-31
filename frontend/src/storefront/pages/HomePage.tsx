@@ -163,8 +163,11 @@ export function HomePage() {
         <MarketIdentityBar />
         <ContinueShoppingStrip />
         <TopStoresSection />
-        <FreshFindsSection {...newProducts} />
+        {/* On the page canvas like Top Stores — its pressed wells need --bg
+            behind them (on white the highlight half of the relief vanishes),
+            so the bands after it swap tone to keep alternating. */}
         <ShopByCategorySection />
+        <FreshFindsSection {...newProducts} />
         <MoreToExploreSection />
         <RecentlyViewedSection />
         {authed && myStores && myStores.length > 0 && (
@@ -713,6 +716,7 @@ function Section({
   title,
   subtitle,
   tone = 'base',
+  padding = SECTION_PADDING,
   action,
   children,
 }: {
@@ -720,6 +724,8 @@ function Section({
   title: string
   subtitle?: string
   tone?: 'base' | 'alt'
+  /** Vertical padding; a slim strip of tiles passes a tighter one. */
+  padding?: string
   /** Optional control parked opposite the heading — a rail's arrows. */
   action?: React.ReactNode
   children: React.ReactNode
@@ -729,7 +735,7 @@ function Section({
       id={id}
       className={`scroll-mt-20 border-b border-line ${tone === 'alt' ? 'bg-surface' : ''}`}
     >
-      <div className={`${CONTENT_COLUMN} ${SECTION_PADDING}`}>
+      <div className={`${CONTENT_COLUMN} ${padding}`}>
         <div className="mb-4 flex items-end justify-between gap-4 sm:mb-5">
           <div className="min-w-0">
             <h2 className="font-heading text-2xl font-semibold text-fg sm:text-3xl">
@@ -1357,6 +1363,7 @@ function ShopByCategorySection() {
     <Section
       title="Shop by category"
       subtitle="Every shop that sells it, on one page."
+      padding="py-5 sm:py-7 lg:py-8"
       action={<ViewAllLink to="/categories" name="All categories" />}
     >
       {top === null || tiles === null ? (
@@ -1431,7 +1438,6 @@ function MoreToExploreSection() {
     <Section
       title="More to explore"
       subtitle="The newest from each top category."
-      tone="alt"
     >
       {top === null ? (
         <CardSkeletons count={5} media="square" layout="rail" />
@@ -1578,6 +1584,7 @@ function RecentlyViewedSection() {
     <Section
       title="Recently Viewed"
       subtitle="Pick up where you left off."
+      tone="alt"
       action={arrows}
     >
       {/* A rail rather than a grid: this is a "where was I" strip, not
@@ -1621,7 +1628,6 @@ function MyStoresSection({ stores }: { stores: Store[] }) {
     <Section
       title="My Stores"
       subtitle="Jump straight into managing a store."
-      tone="alt"
     >
       {/* Same auto-fill grid as Recently Viewed — no dead space at row end. */}
       <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(240px,1fr))]">
