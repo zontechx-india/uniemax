@@ -1283,7 +1283,7 @@ function FreshFindsSection({
 // an error state.
 // ---------------------------------------------------------------------------
 
-/** Most category tiles shown — two rows of four. */
+/** Most category tiles shown — one desktop row of eight. */
 const CATEGORY_TILES_MAX = 8
 
 /** Top-level categories, biggest first — "Sports", never also "Team Sports". */
@@ -1307,25 +1307,51 @@ function useTopCategories(): BrowsableCategory[] | null {
 }
 
 /**
- * How many tiles make only whole rows: the grid is 2 columns on a phone and 4
- * from `sm`, so 4 or 8 tiles; under four, all of them in a row of their own.
+ * Whole rows only, per width: 3 columns on a phone, 4 from `sm`, 8 from `lg`.
+ * Eight categories show six tiles on a phone (two rows of three), two rows of
+ * four on a tablet and one row of eight on a desktop. Under a full row the
+ * grid keeps the full-row tile size and leaves the rest of the line empty
+ * (`lg:max-w-*`) rather than stretching a few tiles across the screen.
  * One tile is not a section — the Popular row already links it.
  */
-function tileCount(available: number): number {
+function categoryTiles(available: number) {
   const n = Math.min(available, CATEGORY_TILES_MAX)
-  if (n < 2) return 0
-  return n < 4 ? n : Math.floor(n / 4) * 4
+  if (n < 2) return null
+  const phone = n < 3 ? n : Math.floor(n / 3) * 3
+  const web = n < 4 ? n : Math.floor(n / 4) * 4
+  return { phone, web, total: Math.max(phone, web) }
 }
 
-const SHORT_TILE_GRID: Record<number, string> = {
-  2: 'grid-cols-2 sm:max-w-[50%]',
-  3: 'grid-cols-3 sm:max-w-[75%]',
+const TILE_GRID_PHONE: Record<number, string> = { 2: 'grid-cols-2' }
+const TILE_GRID_WEB: Record<number, string> = {
+  2: 'sm:grid-cols-2 sm:max-w-[50%] lg:max-w-[25%]',
+  3: 'sm:grid-cols-3 sm:max-w-[75%] lg:max-w-[37.5%]',
+  4: 'sm:grid-cols-4 lg:max-w-[50%]',
+  8: 'sm:grid-cols-4 lg:grid-cols-8',
 }
+
+/** Show tile `index` only at the widths whose whole rows include it. */
+function tileVisibility(index: number, phone: number, web: number): string {
+  const onPhone = index < phone
+  const onWeb = index < web
+  if (onPhone && onWeb) return ''
+  return onPhone ? 'sm:hidden' : 'hidden sm:block'
+}
+
+/** Skeleton tiles: a full row at each width (3 · 4 · 8). */
+function skeletonVisibility(index: number): string {
+  if (index >= 4) return 'hidden lg:grid'
+  if (index >= 3) return 'hidden sm:grid'
+  return ''
+}
+
+const TILE_WELL = 'category-well grid justify-items-center gap-2.5 px-2 pt-3 pb-3 sm:gap-3 sm:pt-4'
+const TILE_PLATE = 'aspect-square w-[78%] max-w-28'
 
 function ShopByCategorySection() {
   const top = useTopCategories()
-  const count = top === null ? 0 : tileCount(top.length)
-  if (top !== null && count === 0) return null
+  const tiles = top === null ? null : categoryTiles(top.length)
+  if (top !== null && tiles === null) return null
 
   return (
     <Section
@@ -1333,32 +1359,34 @@ function ShopByCategorySection() {
       subtitle="Every shop that sells it, on one page."
       action={<ViewAllLink to="/categories" name="All categories" />}
     >
-      {top === null ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-5" aria-hidden>
-          {Array.from({ length: 4 }, (_, i) => (
-            <div key={i} className="category-well grid justify-items-center gap-4 px-3 pt-5 pb-4">
-              <div className="aspect-square w-[72%] max-w-44 animate-pulse rounded-full bg-surface-alt" />
-              <div className="h-4 w-2/3 animate-pulse rounded-full bg-surface-alt" />
+      {top === null || tiles === null ? (
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 sm:gap-4 lg:grid-cols-8" aria-hidden>
+          {Array.from({ length: CATEGORY_TILES_MAX }, (_, i) => (
+            <div key={i} className={`${TILE_WELL} ${skeletonVisibility(i)}`}>
+              <div className={`${TILE_PLATE} animate-pulse rounded-full bg-surface-alt`} />
+              <div className="h-3.5 w-2/3 animate-pulse rounded-full bg-surface-alt" />
             </div>
           ))}
         </div>
       ) : (
-        <ul className={`grid gap-4 sm:gap-5 ${SHORT_TILE_GRID[count] ?? 'grid-cols-2 sm:grid-cols-4'}`}>
-          {top.slice(0, count).map((category) => (
-            <li key={category.slug}>
+        <ul
+          className={`grid gap-3 sm:gap-4 ${TILE_GRID_PHONE[tiles.phone] ?? 'grid-cols-3'} ${TILE_GRID_WEB[tiles.web]}`}
+        >
+          {top.slice(0, tiles.total).map((category, index) => (
+            <li key={category.slug} className={tileVisibility(index, tiles.phone, tiles.web)}>
               {/* The "pressed well" tile: see `.category-well` in index.css. */}
               <Link
                 to={`/c/${category.slug}`}
-                className="category-well group grid h-full content-start justify-items-center gap-4 px-3 pt-5 pb-4 text-center"
+                className={`${TILE_WELL} group h-full content-start text-center`}
               >
                 {/* The category's own picture (uploaded in admin → Categories),
                     filling the plate; a contained one shows as a hard square
                     inside the circle. Without one, the category's icon — never
                     a seller's product photo, which read as random here. */}
-                <span className="category-plate grid aspect-square w-[72%] max-w-44 place-items-center overflow-hidden">
+                <span className={`category-plate grid ${TILE_PLATE} place-items-center overflow-hidden`}>
                   {category.imageUrl ? (
                     <MediaImg
-                      sizes="(min-width: 640px) 176px, 36vw"
+                      sizes="(min-width: 640px) 112px, 25vw"
                       src={category.imageUrl}
                       alt=""
                       loading="lazy"
@@ -1369,7 +1397,7 @@ function ShopByCategorySection() {
                     <CategoryIcon slug={category.slug} className="h-[38%] w-[38%] text-brand" />
                   )}
                 </span>
-                <span className="line-clamp-2 max-w-full text-sm font-semibold text-balance text-fg transition-colors group-hover:text-brand">
+                <span className="line-clamp-2 max-w-full text-xs font-semibold text-balance text-fg transition-colors group-hover:text-brand sm:text-sm">
                   {category.name}
                 </span>
               </Link>

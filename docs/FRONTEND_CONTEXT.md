@@ -324,8 +324,10 @@ for guests and signed-in customers alike and adapts per session state.
   (`features/discovery/CategoryIcon.tsx`, keyed by root slug, tag glyph for an
   unknown slug); `category-well` / `category-plate` in `index.css`, shadows from
   `--relief-hi` / `--relief-lo`, which are tuned to `--bg`; hover lifts the
-  plate 3px, a press sinks it), whole rows
-  only (4 or 8 tiles; 2–3 in a row of their own; fewer → hidden), "View all" →
+  plate 3px, a press sinks it), compact tiles in whole rows
+  only — 3 per row on a phone, 4 from `sm`, 8 from `lg` (8 categories = 6 tiles on
+  a phone, one row of 8 on a desktop; fewer than a row keeps the full-row tile
+  size and leaves the line short; under 2 → hidden; `categoryTiles`), "View all" →
   `/categories`, no counts; and **More to explore** (`MoreToExploreSection`,
   alt tone) — one rail per top-level category with 6+ products (up to 3),
   each its newest 12 from `GET /public/browse/{slug}` with its own heading,
