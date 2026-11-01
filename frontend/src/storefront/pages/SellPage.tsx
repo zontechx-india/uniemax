@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ComponentType, MouseEvent, ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Pal } from '../../packages/animations'
 import { useSeo } from '../../shared/seo'
 import { AppLogoLockup } from '../../shared/ui/AppLogo'
 import { Button } from '../../shared/ui/Button'
@@ -485,6 +486,10 @@ function SellFooter() {
         </nav>
         <p>© {new Date().getFullYear()} UnieMax</p>
       </div>
+      {/* Hops along the footer's top edge; loads only when the footer is near.
+          Low energy keeps even its biggest hop (~55px) clear of the closing
+          "Create my store" button just above — at 1 it jumps ~270px. */}
+      <Pal name="boing" energy={0.45} />
     </footer>
   )
 }

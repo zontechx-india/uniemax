@@ -2802,6 +2802,37 @@ what the host apps see:
   only to ask `isDropshipEnabled`), so neither app's entry bundle carries it;
   `/suppliers` in the console is a lazy route.
 
+## Animations (`src/packages/animations/`)
+
+Decorative motion that pages drop in. It is the only place that imports an
+animation library — today **`piixpal`**, pinned to an exact version
+(`0.4.0`, MIT) — and it imports nothing from `storefront/` or `admin/`. Hosts
+import `Pal` from `index.ts`; swapping or vendoring the library touches only
+this folder.
+
+- **`<Pal name at? energy? />`** — a Piixpal character living on the element
+  it is placed in. Put it **directly inside** the host element (a pal hops
+  along its parent), never in a wrapper. It renders a hidden marker and
+  watches the marker's parent with an IntersectionObserver (200px margin).
+- **Costs nothing until needed:** the engine (`piixpal/core`, ≈18 KB gzip)
+  and the pal (Boing ≈2 KB gzip) are lazy chunks, downloaded only when the
+  host first comes near the screen. When the host scrolls away the
+  `<piix-pal>` is removed — the library's loop keeps ticking while any pal is
+  on the page, even off screen, so removing it is what stops the CPU use.
+- **Never shown with "reduce motion"** (`useReducedMotion`, live).
+- **Engine before pal, always** (`pals.ts → loadPal`): a pal file that finds
+  no engine fetches one from the jsdelivr CDN; loading the engine first means
+  no third-party script ever runs.
+- New pals: add a loader to `PALS` in `pals.ts` (one explicit `import()` per
+  pal, so only listed pals are bundled).
+
+Where it appears: **`/sell` footer** — Boing at `energy={0.45}`, which keeps
+its highest hop ~55px above the footer edge, clear of the closing "Create my
+store" button (at the default 1 it jumps ~270px, over the button). Measured on
+a 4×-throttled phone emulation: ~0% CPU before the footer is reached, ~22%
+while it is on screen (mostly the browser repainting; its own JS ≈2–3%),
+back to ~1% after scrolling away.
+
 ## Notifications & push (both apps)
 
 Shared plumbing, one bell per app:
@@ -3116,6 +3147,12 @@ frontend/
     │       ├── VerifyPhoneForm.tsx # Phone → OTP → verified (shared, form-free)
     │       └── useSession.ts     # Cookie-session hook (loading/guest/authed)
     ├── packages/
+    │   ├── animations/          # Decorative motion (Piixpal pals) — see "Animations"
+    │   │   ├── index.ts         #   public facade: Pal
+    │   │   ├── Pal.tsx          #   lazy, on-screen-only, reduce-motion-aware <piix-pal>
+    │   │   ├── pals.ts          #   PALS loaders + loadPal (engine first, never the CDN)
+    │   │   ├── hooks.ts         #   useReducedMotion · useHostNearScreen
+    │   │   └── piixpal.d.ts     #   module types for the side-effect bundles
     │   └── affiliate/           # Affiliate marketing UI — see "Affiliate marketing"
     │       ├── index.ts         #   route arrays the host routers spread in + attribution helpers
     │       ├── config.ts        #   AFFILIATE_API_BASE — the one constant to repoint on extraction

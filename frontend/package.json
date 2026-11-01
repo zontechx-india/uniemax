@@ -15,6 +15,7 @@
     "@cashfreepayments/cashfree-js": "^1.0.7",
     "@tailwindcss/vite": "^4.3.2",
     "axios": "^1.18.1",
+    "piixpal": "0.4.0",
     "qrcode-generator": "^2.0.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
