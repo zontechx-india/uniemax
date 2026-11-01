@@ -7,7 +7,6 @@ import { SessionProvider } from '../app/SessionProvider'
 import { useMarketSession } from '../app/marketSession'
 import { AccountMenu } from '../layout/AccountMenu'
 import {
-  ArrowRightIcon,
   BoxIcon,
   CartIcon,
   CheckIcon,
@@ -27,7 +26,8 @@ import {
   SELLER_PROOF_POINTS,
   SELLER_STEPS,
 } from '../features/selling/sellerPitch'
-import { groupByStore, useCart } from '../features/cart/cart'
+import { useCart } from '../features/cart/cart'
+import { ContinueShoppingBar } from '../features/cart/ContinueShoppingBar'
 import { BackToTop } from '../layout/BackToTop'
 import { SaveButton } from '../features/wishlist/SaveButton'
 import { BannerCardRail } from '../features/banners/BannerCardRail'
@@ -165,7 +165,7 @@ export function HomePage() {
     banners: () => <MarketBanners />,
     intro: () => <MarketIdentityBar />,
     popularCategories: () => <PopularCategoriesBar />,
-    continueShopping: () => <ContinueShoppingStrip />,
+    continueShopping: () => <ContinueShoppingBar />,
     topStores: () => <TopStoresSection />,
     // On the page canvas like Top Stores — its pressed wells need --bg
     // behind them (on white the highlight half of the relief vanishes).
@@ -1027,141 +1027,6 @@ function TopStoresSection() {
 }
 
 // ---------------------------------------------------------------------------
-// Continue shopping — the visitor's own cart, one card per store
-// ---------------------------------------------------------------------------
-
-/**
- * Store pills the strip shows; the rest collapse into one "+N more" pill. Three
- * plus that pill fit the desktop row at 1366px — four already overflowed it,
- * which pushed the "more" pill out of sight.
- */
-const CONTINUE_STORES = 3
-
-/**
- * The basket bar for someone who left items in their cart: a flat band on the
- * canvas, flush between the welcome bar and Top Stores (no panel, no radius).
- * Headed "N baskets waiting" in the welcome bar's type, one pressed pill per
- * store (a product photo filling a white plate, item count, subtotal) leading
- * straight to that store's basket (`/cart/{store}`, where Place Order is), a
- * "+N more" pill when there are more baskets than pills, and a View cart key
- * (`ti-*` classes in `index.css`). On a phone the key ends the heading row and
- * the pills scroll sideways on the row below; one row from `lg`.
- *
- * Reads the local cart (`groupByStore` — active lines only, sold-out lines
- * not counted), so it costs no request and is absent for an empty cart. The
- * subtotal is the cart's own display figure; checkout re-prices as always.
- */
-function ContinueShoppingStrip() {
-  const groups = groupByStore(useCart()).filter((group) => group.itemCount > 0)
-  if (groups.length === 0) return null
-  const hidden = groups.length - CONTINUE_STORES
-
-  return (
-    // On the page canvas: the pills' pressed insets are tuned to `--bg`.
-    <section aria-labelledby="continue-shopping" className="border-b border-line bg-bg">
-      {/* One wrapping row. On a phone: heading + View cart on the first line,
-          the pills (`order-last`, full width) on the second. From `lg`
-          everything sits in one line, pills between heading and key. */}
-      <div className={`${CONTENT_COLUMN} flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5 lg:flex-nowrap lg:gap-5`}>
-        <div className="flex min-w-0 flex-1 items-center gap-3 lg:flex-none">
-          <span className="ti-inset flex size-9 shrink-0 items-center justify-center rounded-pill text-ti-ink">
-            <CartIcon className="h-4 w-4" />
-          </span>
-          {/* Same type as the welcome bar's heading. */}
-          <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-ti-ink">
-              Continue shopping
-            </p>
-            <h2 id="continue-shopping" className="truncate text-sm font-semibold sm:text-base">
-              {groups.length} basket{groups.length === 1 ? '' : 's'} waiting
-            </h2>
-          </div>
-        </div>
-
-        <span aria-hidden className="hidden h-10 w-px shrink-0 bg-ti-hairline lg:block" />
-
-        {/* Edge-bleed scroller on a phone (the last pill is cut — the cue
-            that there are more); inside the row from `lg`. The wrapper takes
-            the flex sizing so the list's negative margins stay simple. */}
-        <div className="order-last min-w-0 basis-full lg:order-none lg:flex-1 lg:basis-auto">
-          <ul className="ti-scroller -mx-4 flex gap-2.5 overflow-x-auto px-4 py-1 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-1">
-            {groups.slice(0, CONTINUE_STORES).map((group) => {
-              const photo = group.items.find((item) => item.imageUrl)?.imageUrl
-              const count = `${group.itemCount} item${group.itemCount === 1 ? '' : 's'}`
-              return (
-                <li key={group.storeSlug} className="shrink-0">
-                  {/* Plain <a>: /cart lives in the public router (full page load). */}
-                  <a
-                    href={`/cart/${group.storeSlug}`}
-                    aria-label={`Checkout at ${group.storeName}, ${count}, ${formatPrice(group.subtotal)}`}
-                    className="ti-pill flex min-h-16 items-center gap-2.5 rounded-2xl py-2 pl-2 pr-3"
-                  >
-                    {/* The photo fills its plate: a small thumbnail shrunk to
-                        fit (`contain`) left tall products as thin slivers. */}
-                    <span className="ti-plate flex h-12 w-12 shrink-0 items-center justify-center rounded-xl">
-                      {photo ? (
-                        <MediaImg
-                          sizes="48px"
-                          src={photo}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <BoxIcon className="h-5 w-5 text-muted" />
-                      )}
-                    </span>
-                    {/* Ink hierarchy: name, then the price in full-strength
-                        ink; the count is quiet. Purple stays for the label
-                        and the View cart key, so the key keeps its pull. */}
-                    <span className="min-w-0">
-                      <span className="block max-w-36 truncate text-sm font-medium lg:max-w-48">
-                        {group.storeName}
-                      </span>
-                      <span className="block whitespace-nowrap text-sm text-ti-muted">
-                        {count} ·{' '}
-                        <span className="font-figure font-semibold text-fg">
-                          {formatPrice(group.subtotal)}
-                        </span>
-                      </span>
-                    </span>
-                    <ChevronRightIcon className="h-4 w-4 shrink-0 text-ti-muted" />
-                  </a>
-                </li>
-              )
-            })}
-            {/* The heading counts every basket; when some do not fit, say so
-                here rather than letting "5 baskets" sit over four pills. */}
-            {hidden > 0 && (
-              <li className="shrink-0">
-                <a
-                  href="/cart"
-                  aria-label={`${hidden} more basket${hidden === 1 ? '' : 's'} in your cart`}
-                  className="ti-pill flex min-h-16 items-center gap-2.5 rounded-2xl py-2 pl-2 pr-3"
-                >
-                  <span className="ti-plate flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-base font-semibold text-ti-plate-ink">
-                    +{hidden}
-                  </span>
-                  <span className="whitespace-nowrap text-sm font-medium">
-                    more
-                    <span className="block font-normal text-ti-muted">in your cart</span>
-                  </span>
-                  <ChevronRightIcon className="h-4 w-4 shrink-0 text-ti-muted" />
-                </a>
-              </li>
-            )}
-          </ul>
-        </div>
-
-        {/* Plain <a>: /cart lives in the public router (full page load). */}
-        <a href="/cart" className={buttonClass({ size: 'sm', className: 'ti-key gap-1' })}>
-          View cart <ArrowRightIcon className="h-4 w-4" />
-        </a>
-      </div>
-    </section>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // Identity bar — who this is and why it can be trusted, in one slim row
 // ---------------------------------------------------------------------------
 
@@ -1187,9 +1052,9 @@ function ContinueShoppingStrip() {
 const CATEGORY_CHIPS = 12
 
 const TRUST_POINTS = [
-  { icon: StoreIcon, label: 'Straight from the seller' },
+  { icon: StoreIcon, label: 'Seller direct' },
   { icon: TruckIcon, label: 'Cash on delivery' },
-  { icon: LockIcon, label: 'Secure online payment' },
+  { icon: LockIcon, label: 'Secure payment' },
 ] as const
 
 /**
@@ -1218,13 +1083,14 @@ function MarketIdentityBar() {
           <h1 className="text-sm font-semibold text-fg sm:text-base">
             UnieMax — shop directly from independent stores
           </h1>
-          <ul className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
+          {/* One line on a phone: short labels, spread edge to edge. */}
+          <ul className="flex w-full items-center justify-between gap-x-3 sm:w-auto sm:justify-start sm:gap-x-5">
             {TRUST_POINTS.map(({ icon: Icon, label }) => (
               <li
                 key={label}
-                className="flex items-center gap-1.5 text-xs text-muted"
+                className="flex items-center gap-1 whitespace-nowrap text-xs text-muted sm:gap-1.5"
               >
-                <Icon className="h-4 w-4 shrink-0 text-brand" />
+                <Icon className="h-3.5 w-3.5 shrink-0 text-brand sm:h-4 sm:w-4" />
                 {label}
               </li>
             ))}

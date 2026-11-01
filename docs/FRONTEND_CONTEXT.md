@@ -243,12 +243,13 @@ for guests and signed-in customers alike and adapts per session state.
   `BannerArrow`. It renders nothing until a banner exists and fails silently — a
   decorative strip never earns an error state. The top bands are kept tight:
   banners `py-1.5 sm:py-3 lg:py-4`, identity bar `py-2.5`, Continue shopping
-  `py-2.5`, Top Stores `py-5 sm:py-7 lg:py-8` (instead of the default
+  `py-3`, Top Stores `py-5 sm:py-7 lg:py-8` (instead of the default
   `SECTION_PADDING`). Under it, the **identity bar**
   (`MarketIdentityBar`) — one slim band carrying two things that each need one
-  line: the page's real `<h1>` and the trust row (straight from the seller ·
-  cash on delivery · secure online payment, each a checkable property of the
-  product, **labels only** — a sentence under each read as fine print). The
+  line: the page's real `<h1>` and the trust row (seller direct · cash on
+  delivery · secure payment, each a checkable property of the product,
+  **labels only** — a sentence under each read as fine print; short enough
+  to stay on one line on a phone, spread edge to edge). The
   popular-category chips are their own section, **`PopularCategoriesBar`**
   (key `popularCategories`, off by default — two chip rows cost too much of a
   phone screen); it draws nothing when there are no categories.
@@ -269,19 +270,15 @@ for guests and signed-in customers alike and adapts per session state.
   from `lg` (a mouse cannot swipe), and an **"All categories →"** link ("All"
   on phones) → `/categories`.
   While the names load the row holds its height with placeholder chips. Next,
-  **Continue shopping** (`ContinueShoppingStrip`) — only when the
-  local cart has active, in-stock lines: the **basket bar** (`ti-*`
-  classes, see DESIGN_GUIDELINES §10) — "N baskets waiting", one pill per store
-  (up to 3; first product photo filling a white plate, item count in quiet
-  grey, subtotal in full-strength ink, from `groupByStore`) linking to
-  that store's basket `/cart/{store}`, a "+N more" pill (→ `/cart`) when there
-  are more baskets than pills, and a "View cart" key — the only purple fill. A flat band at
-  every width, flush between the identity bar and Top Stores (no panel,
-  radius or card padding), the heading in the identity bar's type (`text-sm
-  font-semibold sm:text-base`, lighter weights throughout), one small (`sm`)
-  View cart key. On a phone the key ends the heading row and the pills
-  scroll sideways on the row below; from `lg` it is one row (every `--ti-*`
-  token flips in dark mode). No request of its own. Then **Top Stores** — **storefront-preview cards**, each a
+  **Continue shopping** (`ContinueShoppingBar`, in `features/cart/`) — only
+  when the local cart has active, in-stock lines: **one slim row at every
+  width** on `--surface` with a hairline below. A stack of up to 3
+  overlapping product photos (40px discs, a "+N" disc for the other items),
+  "N items waiting" over "N stores · ₹total", and a primary `md` **View cart**
+  button (→ `/cart`). From `lg` a chip per store (up to 3: name · subtotal)
+  sits between the text and the button, linking to that store's basket
+  `/cart/{store}`. Counts and totals come from `groupByStore`, memoised on the
+  cart snapshot; no request of its own. Then **Top Stores** — **storefront-preview cards**, each a
   `StorePreview` mosaic over one footer row (logo · name · Visit store).
 
   **The card is portrait — `aspect-[9/14]` artwork on a ~220px tile**, so a
@@ -3128,6 +3125,7 @@ frontend/
     │   │   │   └── recentActivity.ts # localStorage recent searches + recently viewed stores
     │   │   ├── cart/
     │   │   │   ├── cart.ts       # Client-side cart: localStorage store + hooks + sync()
+    │   │   │   ├── ContinueShoppingBar.tsx # Homepage "N items waiting" bar
     │   │   │   ├── useCartRevalidation.ts # Cart-open price/stock refresh
     │   │   │   ├── useCheckoutQuote.ts # Checkout: server-priced summary (subtotal/shipping/tax/total)
     │   │   │   └── useDeliveryCheck.ts # Checkout: which lines reach the chosen pincode

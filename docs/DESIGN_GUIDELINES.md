@@ -231,15 +231,6 @@ also has a tray fill (`--well`, a shade below `--bg`) and a `--line`
 hairline: on a near-white or near-black canvas the relief alone draws only two
 edges, so the fill and hairline close the other two.
 
-The second relief surface is the homepage's Continue shopping bar
-(`ti-inset`, `ti-pill`, `ti-plate`, `ti-key` in `index.css`, colours from
-the `--ti-*` tokens): a flat band on the canvas — no raised panel, radius
-or card padding, at every width — attached to the bands above and below,
-with the badge and store pills pressed into the page, product photos filling
-white plates and one raised key. Insets stay tight: wide soft shadows read as
-fog rather than depth. `ti-key` sits on `buttonClass` (size and radius stay there)
-and only adds the raised gradient in `--cta`. Do not reuse it elsewhere.
-
 ---
 
 ## 11. Responsive Design
