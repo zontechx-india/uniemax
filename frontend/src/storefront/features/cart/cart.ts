@@ -195,7 +195,7 @@ export const cart = {
     // future caller can put something in the cart without being counted.
     trackAddToCart(
       {
-        id: item.productSlug,
+        id: item.productId,
         price: Number(item.price),
         quantity: Math.max(1, Math.min(qty, item.stockQuantity)),
       },

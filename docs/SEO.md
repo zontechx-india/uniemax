@@ -483,7 +483,10 @@ Product feed.
 - One item per product, not per variant: a variant has no URL of its own
   (the page cannot open on a chosen variant), and an item whose page shows a
   different price is the mismatch above.
-- 1 h in-process cache; Merchant Center fetches it once a day.
+- **`g:id` is the product id**, and the Meta Pixel / GA4 report the same id
+  as `content_ids` / `item_id` (`shared/analytics/metaPixel.ts`), so Meta
+  can match ad events to catalogue items. Change one → change the other.
+- 1 h in-process cache; Merchant Center fetches it once a day, Meta hourly.
 
 ---
 
@@ -654,3 +657,4 @@ search/filter URLs get indexed, mass-produced pages with nothing on them.
 | 30 Oct 2026 | `/saved` (wishlist, per-customer) is `noindex` and disallowed in `robots.txt`. `GET /public/browse` gains `parentSlug` + `imageUrl` (homepage "Shop by category" tiles); no head or structured-data change. Released as `v1.66.0` |
 | 30 Oct 2026 | nginx now forwards the footer info pages (`/about`, `/contact`, `/refund-policy`, `/shipping-policy`, `/privacy`, `/terms`) and `/categories`, `/shops`, `/new` to their page shells on dev and prod — their own title, description and canonical are in the first byte |
 | 1 Nov 2026 | Homepage Popular row split out of the welcome bar into its own section (`popularCategories`), **off by default**. The `<h1>` stays in the always-on welcome bar; "Shop by category" still links to `/categories` and every `/c/{slug}`, so no internal link is lost |
+| 1 Nov 2026 | Meta Pixel `content_ids` and GA4 `item_id` switched from the product slug to the product id, matching the feed's `g:id` (Meta catalogue reported "products not matching ad events"); placed-order lines now carry `productId`. Feed live on prod since 24 Oct: Merchant Center (371 products, return policy under review) and Meta catalogue "UnieMax" (371 eligible, hourly fetch). Released as `v1.78.0` |

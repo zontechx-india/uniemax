@@ -26,7 +26,7 @@ const CURRENCY = 'INR'
 
 /** One purchasable line — the same shape the Meta Pixel events use. */
 export interface GaLine {
-  /** Product slug — unique platform-wide, carried by cart AND order lines. */
+  /** Product id — the feed's `g:id`, carried by cart AND order lines. */
   id: string
   /** Unit price in rupees. */
   price: number

@@ -83,7 +83,7 @@ export function CheckoutPage({ storeSlug }: { storeSlug: string }) {
     checkoutReported.current = true
     trackInitiateCheckout(
       group.items.map((item) => ({
-        id: item.productSlug,
+        id: item.productId,
         price: Number(item.price),
         quantity: item.qty,
       })),
