@@ -47,6 +47,10 @@ export interface MarketHomeSection {
 export const SHOP_BY_CATEGORY_DESIGNS = ['tiles', 'circles', 'chips'] as const
 export type ShopByCategoryDesign = (typeof SHOP_BY_CATEGORY_DESIGNS)[number]
 
+/** The ways Top Stores can be drawn; the first is the default. */
+export const TOP_STORES_DESIGNS = ['list', 'cards', 'grid', 'story'] as const
+export type TopStoresDesign = (typeof TOP_STORES_DESIGNS)[number]
+
 export interface SectionDesignOption {
   value: string
   label: string
@@ -60,6 +64,12 @@ export interface SectionDesignOption {
 export const MARKET_HOME_SECTION_DESIGNS: Partial<
   Record<MarketHomeSectionKey, readonly SectionDesignOption[]>
 > = {
+  topStores: [
+    { value: 'list', label: 'List', hint: 'Compact rows — logo, name, photos' },
+    { value: 'cards', label: 'Cards', hint: 'Photo-strip cards in a row' },
+    { value: 'grid', label: 'Grid', hint: 'Photo cards, two per row on phones' },
+    { value: 'story', label: 'Story', hint: 'Tall photo cards in a row' },
+  ],
   shopByCategory: [
     { value: 'tiles', label: 'Tiles', hint: 'Large picture tiles' },
     { value: 'circles', label: 'Circles', hint: 'Round icons, name below' },

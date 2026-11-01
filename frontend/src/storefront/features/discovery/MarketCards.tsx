@@ -194,7 +194,7 @@ export function StoreLogoTile({
 /** Published within this window → the card wears a "New" chip. */
 const NEW_STORE_DAYS = 30
 
-function isNewlyOpened(publishedAt: string | null): boolean {
+export function isNewlyOpened(publishedAt: string | null): boolean {
   if (!publishedAt) return false
   const opened = new Date(publishedAt).getTime()
   if (Number.isNaN(opened)) return false

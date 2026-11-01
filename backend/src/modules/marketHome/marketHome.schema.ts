@@ -52,6 +52,7 @@ export const DEFAULT_OFF_SECTIONS: readonly MarketHomeSectionKey[] = [
 export const SECTION_DESIGNS: Partial<
   Record<MarketHomeSectionKey, readonly string[]>
 > = {
+  topStores: ["list", "cards", "grid", "story"],
   shopByCategory: ["tiles", "circles", "chips"],
 };
 

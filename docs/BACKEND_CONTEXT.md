@@ -976,7 +976,8 @@ White-label design — one codebase, any business:
   by `resolveMarketHome` (unknown keys dropped, new keys inserted at their
   default position — on, except `DEFAULT_OFF_SECTIONS` (`popularCategories`)
   — `intro` forced on, and a section in `SECTION_DESIGNS`
-  (`shopByCategory`: tiles · circles · chips) always given a valid `design`,
+  (`topStores`: list · cards · grid · story; `shopByCategory`: tiles ·
+  circles · chips) always given a valid `design`,
   the first by default; other sections carry none). Keys and designs mirror
   the frontend's `features/discovery/marketHomeSections.ts`.
 - **Category** — self-relation (`parentId`) → arbitrary trees (Sports > Cricket Bat),

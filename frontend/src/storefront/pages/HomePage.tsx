@@ -40,7 +40,9 @@ import {
   type MarketHomeSection,
   type MarketHomeSectionKey,
   type ShopByCategoryDesign,
+  type TopStoresDesign,
 } from '../features/discovery/marketHomeSections'
+import { TopStoresShelf } from '../features/discovery/TopStoresShelf'
 import type {
   PlatformStats,
   MarketBanner,
@@ -57,9 +59,7 @@ import {
 import {
   CARD_GRID,
   CardSkeletons,
-  gridFor,
   RAIL_SCROLLER,
-  StoreCard,
   StoreLogoTile,
   wholeRowsClass,
 } from '../features/discovery/MarketCards'
@@ -106,7 +106,8 @@ import { ErrorState } from '../../shared/ui/states'
  * the same 1440px column the storefront uses. See `layout/contentWidth`.
  */
 
-const TOP_STORES_PAGE_SIZE = 12
+/** The most any Top Stores design shows; the full list lives on /shops. */
+const TOP_STORES_PAGE_SIZE = 8
 const SEARCH_DEBOUNCE_MS = 300
 const SEARCH_MIN_CHARS = 2
 
@@ -171,7 +172,9 @@ export function HomePage() {
     intro: () => <MarketIdentityBar />,
     popularCategories: () => <PopularCategoriesBar />,
     continueShopping: () => <ContinueShoppingBar />,
-    topStores: () => <TopStoresSection />,
+    topStores: (section) => (
+      <TopStoresSection design={sectionDesign(section) as TopStoresDesign} />
+    ),
     // On the page canvas like Top Stores — the tiles design's pressed wells
     // need --bg behind them (on white the highlight half of the relief vanishes).
     shopByCategory: (section) => (
@@ -966,7 +969,7 @@ function ViewAllLink({
 // shop opened "just to try it" never leads the homepage.
 // ---------------------------------------------------------------------------
 
-function TopStoresSection() {
+function TopStoresSection({ design }: { design: TopStoresDesign }) {
   const [stores, setStores] = useState<MarketStore[] | null>(null)
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -992,10 +995,9 @@ function TopStoresSection() {
     <Section
       id="top-stores"
       title="Top Stores"
-      subtitle="Stocked shops, ready to order from — take a look around."
       // Tighter than the default band, like Shop by category — it opens the
       // feed right under the slim top bands.
-      padding="py-5 sm:py-7 lg:py-8"
+      padding="py-4 sm:py-6 lg:py-7"
       action={
         stores && stores.length > 0 ? (
           <ViewAllLink to="/shops" name="View all shops" />
@@ -1005,7 +1007,7 @@ function TopStoresSection() {
       {failed ? (
         <SectionError onRetry={() => setAttempt((n) => n + 1)} />
       ) : stores === null ? (
-        <CardSkeletons count={4} />
+        <TopStoresShelf stores={null} design={design} />
       ) : stores.length === 0 ? (
         <div className="flex flex-col items-center rounded-lg border border-line bg-surface px-6 py-12 text-center shadow-floating">
           <IconTile>
@@ -1020,14 +1022,7 @@ function TopStoresSection() {
           </CreateStoreLink>
         </div>
       ) : (
-        <div className={gridFor(stores.length)}>
-          {stores.map((store, index) => (
-            // Whole rows only: twelve stores in five columns show ten.
-            <div key={store.id} className={wholeRowsClass(index, stores.length)}>
-              <StoreCard store={store} />
-            </div>
-          ))}
-        </div>
+        <TopStoresShelf stores={stores} design={design} />
       )}
     </Section>
   )

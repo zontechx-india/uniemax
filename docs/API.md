@@ -1697,6 +1697,7 @@ list in display order — the platform default (below) until an admin saves.
 ```
 `design` appears **only** on sections that can be drawn more than one way,
 and always on those (missing or unknown → the default, the first listed):
+`topStores` — `list` (default) · `cards` · `grid` · `story`;
 `shopByCategory` — `tiles` (default) · `circles` · `chips`.
 Keys, in default order: `banners` · `intro` (welcome bar: `<h1>`, trust
 points) · `popularCategories` (category chips; **off by default**) ·

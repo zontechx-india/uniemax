@@ -228,8 +228,8 @@ for guests and signed-in customers alike and adapts per session state.
   A section listed in `MARKET_HOME_SECTION_DESIGNS` also has a **design**:
   when it is on, the admin row shows a "Design" radio-pill picker under it
   (`DesignPicker`) that saves on pick; `sectionDesign()` resolves the saved
-  value or the first (default) option. Only Shop by category has designs
-  today (tiles · circles · chips).
+  value or the first (default) option. Sections with designs: Top Stores
+  (list · cards · grid · story) and Shop by category (tiles · circles · chips).
   Band tones are fixed per section, so a reorder can put two same-tone bands
   together (the bottom divider still separates them).
 
@@ -283,8 +283,26 @@ for guests and signed-in customers alike and adapts per session state.
   button (→ `/cart`). From `lg` a chip per store (up to 3: name · subtotal)
   sits between the text and the button, linking to that store's basket
   `/cart/{store}`. Counts and totals come from `groupByStore`, memoised on the
-  cart snapshot; no request of its own. Then **Top Stores** — **storefront-preview cards**, each a
-  `StorePreview` mosaic over one footer row (logo · name · Visit store).
+  cart snapshot; no request of its own. Then **Top Stores**
+  (`GET /public/stores`, the server's ranking, 8 stores at most; no subtitle,
+  padding `py-4 sm:py-6 lg:py-7`, "View all" → `/shops` in the heading) drawn
+  by `features/discovery/TopStoresShelf.tsx` in the design the admin picked:
+  **list** (default — logo-led rows with 2 product photos, 3 from `lg`, a
+  chevron on phones; one bordered panel with hairlines on a phone, separate
+  cards from `sm`; grid 1 · 2 · 3 columns, at most 4 · 6 · 6), **cards**
+  (landscape cards topped by a strip of 3 photos; a sideways rail of up to 8 on
+  phones, one row of 5 from `lg`), **grid** (portrait cards: 2 photos, the logo
+  overlapping their bottom edge; 2 · 3 · 6 columns, at most 4 · 6 · 6) or
+  **story** (tall cards led by one photo, logo overlapping; rail of up to 8,
+  one row of 6 from `lg`). The two grids show **whole rows only** at every
+  width (`wholeRows` + per-width `visibility`). Each card shows only real
+  facts — logo (`StoreLogoTile`), name, Verified, New (`isNewlyOpened`, 30
+  days), top shelves and the shop's own `previewImages`; an empty photo cell
+  stays `bg-surface-alt`, no photos at all gives a store-glyph panel.
+
+  The marketplace listing `/shops` keeps the **storefront-preview card**
+  (`StoreCard` in `MarketCards.tsx`), each a `StorePreview` mosaic over one
+  footer row (logo · name · Visit store):
 
   **The card is portrait — `aspect-[9/14]` artwork on a ~220px tile**, so a
   1440px row holds six shops rather than four (see `CARD_RAMP`). Landscape
