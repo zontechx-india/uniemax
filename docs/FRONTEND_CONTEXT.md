@@ -285,7 +285,8 @@ for guests and signed-in customers alike and adapts per session state.
   `/cart/{store}`. Counts and totals come from `groupByStore`, memoised on the
   cart snapshot; no request of its own. Then **Top Stores**
   (`GET /public/stores`, the server's ranking, 8 stores at most; no subtitle,
-  padding `py-4 sm:py-6 lg:py-7`, "View all" → `/shops` in the heading) drawn
+  padding `pt-2 pb-4 sm:pt-4 sm:pb-6 lg:pt-5 lg:pb-7`, "View all" → `/shops`
+  in the heading) drawn
   by `features/discovery/TopStoresShelf.tsx` in the design the admin picked:
   **list** (default — logo-led rows with 2 product photos, 3 from `lg`, a
   chevron on phones; one bordered panel with hairlines on a phone, separate

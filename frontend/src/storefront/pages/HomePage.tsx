@@ -997,7 +997,7 @@ function TopStoresSection({ design }: { design: TopStoresDesign }) {
       title="Top Stores"
       // Tighter than the default band, like Shop by category — it opens the
       // feed right under the slim top bands.
-      padding="py-4 sm:py-6 lg:py-7"
+      padding="pt-2 pb-4 sm:pt-4 sm:pb-6 lg:pt-5 lg:pb-7"
       action={
         stores && stores.length > 0 ? (
           <ViewAllLink to="/shops" name="View all shops" />

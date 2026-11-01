@@ -137,7 +137,7 @@ function Shot({ src, sizes }: { src: string | undefined; sizes: string }) {
       alt=""
       loading="lazy"
       decoding="async"
-      className="h-full w-full bg-surface object-cover"
+      className="block h-full w-full bg-surface object-cover"
     />
   )
 }
@@ -151,11 +151,16 @@ function NoShots() {
   )
 }
 
-/** `count` photos side by side, hairline-separated. */
+/**
+ * `count` photos side by side, hairline-separated. `grid-rows-1` pins the row
+ * to the frame's height — an auto row grows to each photo's natural height
+ * and spills over the card's text. Clipped here, not on the frame, so the
+ * overlapping logo can still hang below it.
+ */
 function ShotStrip({ images, count, sizes }: { images: string[]; count: number; sizes: string }) {
   if (images.length === 0) return <NoShots />
   return (
-    <span className={`grid h-full gap-px bg-line ${count === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+    <span className={`grid h-full grid-rows-1 gap-px overflow-hidden bg-line ${count === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
       {Array.from({ length: count }, (_, i) => (
         <Shot key={i} src={images[i]} sizes={sizes} />
       ))}
@@ -197,7 +202,7 @@ function StoreShelves({ store }: { store: MarketStore }) {
 /** The logo overlapping a photo's bottom edge (grid and story cards). */
 function OverlapLogo({ store }: { store: MarketStore }) {
   return (
-    <span className="absolute -bottom-4 left-2.5 rounded-lg bg-surface p-0.5 lg:left-3">
+    <span className="absolute -bottom-4 left-2.5 flex rounded-lg bg-surface p-0.5 lg:left-3">
       <StoreLogoTile logoUrl={store.logoUrl} className="h-9 w-9" />
     </span>
   )
