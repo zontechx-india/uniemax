@@ -225,6 +225,11 @@ for guests and signed-in customers alike and adapts per session state.
   Header/Footer rows; the welcome bar (`intro`) can move but not switch off.
   Popular categories (`popularCategories`) starts **off** (`DEFAULT_OFF_SECTIONS`)
   until it gets a new design; "Restore default" puts it back to off.
+  A section listed in `MARKET_HOME_SECTION_DESIGNS` also has a **design**:
+  when it is on, the admin row shows a "Design" radio-pill picker under it
+  (`DesignPicker`) that saves on pick; `sectionDesign()` resolves the saved
+  value or the first (default) option. Only Shop by category has designs
+  today (tiles · circles · chips).
   Band tones are fixed per section, so a reorder can put two same-tone bands
   together (the bottom divider still separates them).
 
@@ -346,22 +351,33 @@ for guests and signed-in customers alike and adapts per session state.
   hold space for a future feature so much as tell a visitor that nothing on the
   platform has ever been rated. Then
   **Shop by category** (`ShopByCategorySection`, base tone, straight under
-  Top Stores and above Fresh Finds; a slimmer band, `py-5` → `lg:py-8`
-  through `Section`'s `padding`. It stays on the canvas although Top Stores
+  Top Stores and above Fresh Finds. It stays on the canvas although Top Stores
   is too, because its relief shadows are tuned to `--bg` — on white the
-  highlight half vanishes — so the bands after it swap tone instead) — "pressed well"
-  tiles of the top-level global categories (`parentSlug === null` from
-  `GET /public/browse`, the category's own uploaded picture = `imageUrl` on a
-  raised round plate — never a product photo — and without one its line icon
+  highlight half vanishes — so the bands after it swap tone instead) — the
+  top-level global categories (`parentSlug === null` from `GET /public/browse`)
+  as **one row** drawn by `features/discovery/CategoryShelf.tsx` in the design
+  the admin picked: **tiles** (default — the "pressed well":
+  `category-well` / `category-plate` in `index.css`, shadows from
+  `--relief-hi` / `--relief-lo`, tuned to `--bg`, plus a `--well` tray fill and
+  `--line` hairline so the well has four edges in both modes; hover lifts the
+  plate 3px, a press sinks it; 96px wide on a phone), **circles** (56px round
+  pictures, 80px from `lg`, name below) or **chips** (40px pills, 32px
+  picture beside the name, **two lines** filled column by column until `lg`).
+  Its own band (not `Section`), padding `py-2 sm:py-4 lg:py-5`. **On a phone
+  the heading is a vertical "CATEGORIES" tag** (`writing-mode: vertical-rl`,
+  turned 180° to read bottom-to-top, brand-soft fill) flush on the screen's
+  left edge with only its two right corners rounded, at the start of the row,
+  so the band has no heading line; from `sm` the same `<h2>` is the usual
+  "Shop by category" title above the row.
+  Each shows the category's own uploaded picture (`imageUrl`) — never a
+  product photo — and without one its line icon
   (`features/discovery/CategoryIcon.tsx`, keyed by root slug, tag glyph for an
-  unknown slug); `category-well` / `category-plate` in `index.css`, shadows from
-  `--relief-hi` / `--relief-lo`, which are tuned to `--bg`, plus a `--well` tray fill
-  and `--line` hairline so the well has four edges in both modes; hover lifts the
-  plate 3px, a press sinks it), compact tiles in whole rows
-  only — 3 per row on a phone, 4 from `sm`, 8 from `lg` (8 categories = 6 tiles on
-  a phone, one row of 8 on a desktop; fewer than a row keeps the full-row tile
-  size and leaves the line short; under 2 → hidden; `categoryTiles`), "View all" →
-  `/categories`, no counts. Then **Fresh Finds** (`GET /public/products`, newest 12 platform-wide) — a
+  unknown slug). Up to 10 categories, then a **View all** item (→
+  `/categories`) in the row's own shape; no heading link, no subtitle, no
+  counts; under 2 categories → hidden. On a phone the row scrolls sideways and
+  bleeds off the right edge (snap, hidden scrollbar), the cut last item the cue
+  for more; from `lg` it stops scrolling — circles one grid row of 11, tiles
+  one row of 9 (8 + View all), chips wrap. Then **Fresh Finds** (`GET /public/products`, newest 12 platform-wide) — a
   **grid that shows only whole rows** (`wholeRowsClass`): 2 columns × 3
   rows on a phone, then 3 / 4 / 5 / 6 columns × 2 rows from `sm` / `md` /
   `lg` / `xl`, so it never ends in holes; a phone also gets a full-width

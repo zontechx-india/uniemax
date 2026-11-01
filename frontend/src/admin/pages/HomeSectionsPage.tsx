@@ -9,8 +9,11 @@ import {
 } from '../ui/primitives'
 import {
   DEFAULT_MARKET_HOME_SECTIONS,
+  MARKET_HOME_SECTION_DESIGNS,
   MARKET_HOME_SECTION_META,
+  sectionDesign,
   type MarketHomeSection,
+  type SectionDesignOption,
 } from '../../storefront/features/discovery/marketHomeSections'
 import {
   ChevronDownIcon,
@@ -92,7 +95,8 @@ export default function HomeSectionsPage() {
     sections.every(
       (s, i) =>
         s.key === DEFAULT_MARKET_HOME_SECTIONS[i]?.key &&
-        s.enabled === DEFAULT_MARKET_HOME_SECTIONS[i]?.enabled,
+        s.enabled === DEFAULT_MARKET_HOME_SECTIONS[i]?.enabled &&
+        s.design === DEFAULT_MARKET_HOME_SECTIONS[i]?.design,
     )
 
   return (
@@ -150,6 +154,7 @@ export default function HomeSectionsPage() {
               <ul className="space-y-1.5">
                 {sections.map((section, index) => {
                   const meta = MARKET_HOME_SECTION_META[section.key]
+                  const designs = MARKET_HOME_SECTION_DESIGNS[section.key]
                   const Icon = meta.icon
                   const isOver =
                     overKey === section.key && dragKey !== section.key
@@ -239,6 +244,23 @@ export default function HomeSectionsPage() {
                           }
                         />
                       </div>
+
+                      {designs && section.enabled && (
+                        <DesignPicker
+                          name={`${section.key}-design`}
+                          label={`${meta.label} design`}
+                          options={designs}
+                          value={sectionDesign(section)}
+                          disabled={busy}
+                          onChange={(design) =>
+                            void save(
+                              sections.map((s) =>
+                                s.key === section.key ? { ...s, design } : s,
+                              ),
+                            )
+                          }
+                        />
+                      )}
                     </li>
                   )
                 })}
@@ -262,6 +284,53 @@ export default function HomeSectionsPage() {
         </Card>
       )}
     </div>
+  )
+}
+
+/**
+ * The look of a section that can be drawn more than one way — a row of radio
+ * pills under its list row. Saves on pick, like every other change here.
+ */
+function DesignPicker({
+  name,
+  label,
+  options,
+  value,
+  disabled,
+  onChange,
+}: {
+  name: string
+  label: string
+  options: readonly SectionDesignOption[]
+  value: string | undefined
+  disabled: boolean
+  onChange: (design: string) => void
+}) {
+  return (
+    <fieldset className="mt-1.5 rounded-lg border border-line bg-surface/70 px-3 py-2.5" disabled={disabled}>
+      <legend className="sr-only">{label}</legend>
+      <p className="mb-2 text-xs font-semibold text-muted" aria-hidden>
+        Design
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {options.map((option) => (
+          <label key={option.value} className="cursor-pointer">
+            <input
+              type="radio"
+              name={name}
+              value={option.value}
+              checked={value === option.value}
+              onChange={() => onChange(option.value)}
+              className="peer sr-only"
+            />
+            <span className="flex min-h-tap flex-col justify-center rounded-lg border border-line px-3 py-1.5 transition-colors peer-checked:border-brand peer-checked:bg-brand-soft peer-focus-visible:ring-2 peer-focus-visible:ring-brand hover:border-fg/30">
+              <span className="text-sm font-semibold text-fg">{option.label}</span>
+              <span className="text-xs text-muted">{option.hint}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
   )
 }
 

@@ -24,7 +24,9 @@ export async function saveSections(
   input: MarketHomeSectionsInput,
 ): Promise<MarketHomeSection[]> {
   const sections = resolveMarketHome(input);
-  const value = { sections: sections.map(({ key, enabled }) => ({ key, enabled })) };
+  const value = {
+    sections: sections.map(({ key, enabled, design }) => ({ key, enabled, design })),
+  };
   await prisma.platformSetting.upsert({
     where: { key: MARKET_HOME_SETTING_KEY },
     create: { key: MARKET_HOME_SETTING_KEY, value },

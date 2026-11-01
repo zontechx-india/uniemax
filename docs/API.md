@@ -1691,9 +1691,13 @@ list in display order — the platform default (below) until an admin saves.
   { "key": "popularCategories", "enabled": false }, // off by default
   { "key": "continueShopping", "enabled": true },
   { "key": "topStores", "enabled": false },       // hidden from `/`
+  { "key": "shopByCategory", "enabled": true, "design": "circles" },
   …                                               // every key, once
 ] }
 ```
+`design` appears **only** on sections that can be drawn more than one way,
+and always on those (missing or unknown → the default, the first listed):
+`shopByCategory` — `tiles` (default) · `circles` · `chips`.
 Keys, in default order: `banners` · `intro` (welcome bar: `<h1>`, trust
 points) · `popularCategories` (category chips; **off by default**) ·
 `continueShopping` · `topStores` · `shopByCategory` · `freshFinds` ·
@@ -3569,11 +3573,13 @@ shape as `GET /public/home-sections` (above). Stored as one
 `platform_settings` row (`marketHomeSections`).
 
 - `GET /api/v1/admin/home-sections` — the current list.
-- `PUT /api/v1/admin/home-sections` — body `{ "sections": [{ "key", "enabled" }, …] }`,
+- `PUT /api/v1/admin/home-sections` — body `{ "sections": [{ "key", "enabled", "design"? }, …] }`,
   the **full** list: every key exactly once, in the wanted order (wrong length
-  or a repeated key → `400`). A reorder and a toggle are the same write.
-  `intro` is stored as on whatever is sent. Answers with the stored list.
-  Audited as `marketHome.sections.update` (meta: `order`, `hidden`).
+  or a repeated key → `400`). A reorder, a toggle and a design change are the
+  same write. `design` is optional; one a section does not offer → `400`
+  (left out → the section keeps its default). `intro` is stored as on
+  whatever is sent. Answers with the stored list. Audited as
+  `marketHome.sections.update` (meta: `order`, `hidden`, `designs`).
 
 ### Marketplace banners 🔒 admin — `/api/v1/admin/banners`
 

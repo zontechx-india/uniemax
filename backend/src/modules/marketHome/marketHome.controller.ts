@@ -23,6 +23,9 @@ export async function updateSections(request: FastifyRequest) {
     meta: {
       order: sections.map((s) => s.key),
       hidden: sections.filter((s) => !s.enabled).map((s) => s.key),
+      designs: Object.fromEntries(
+        sections.filter((s) => s.design).map((s) => [s.key, s.design]),
+      ),
     },
   });
   return ok(sections);

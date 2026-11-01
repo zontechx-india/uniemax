@@ -44,9 +44,22 @@ export const DEFAULT_OFF_SECTIONS: readonly MarketHomeSectionKey[] = [
   "popularCategories",
 ];
 
+/**
+ * Sections an admin can draw in more than one way, and the designs each
+ * offers — the first is the default. Keep in step with
+ * `MARKET_HOME_SECTION_DESIGNS` in the frontend.
+ */
+export const SECTION_DESIGNS: Partial<
+  Record<MarketHomeSectionKey, readonly string[]>
+> = {
+  shopByCategory: ["tiles", "circles", "chips"],
+};
+
 export interface MarketHomeSection {
   key: MarketHomeSectionKey;
   enabled: boolean;
+  /** Only on sections listed in `SECTION_DESIGNS`. */
+  design?: string;
 }
 
 /** `PlatformSetting.key` the list is stored under. */
@@ -63,6 +76,7 @@ export const marketHomeSectionsSchema = z
         z.object({
           key: z.enum(MARKET_HOME_SECTION_KEYS),
           enabled: z.boolean(),
+          design: z.string().max(32).optional(),
         }),
       )
       .length(MARKET_HOME_SECTION_KEYS.length),
@@ -76,6 +90,16 @@ export const marketHomeSectionsSchema = z
         message: "A section is listed more than once",
       });
     }
+    val.sections.forEach((s, i) => {
+      if (s.design === undefined) return;
+      if (!SECTION_DESIGNS[s.key]?.includes(s.design)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["sections", i, "design"],
+          message: `"${s.design}" is not a design for this section`,
+        });
+      }
+    });
   });
 
 export type MarketHomeSectionsInput = z.infer<typeof marketHomeSectionsSchema>;
@@ -88,6 +112,8 @@ export type MarketHomeSectionsInput = z.infer<typeof marketHomeSectionsSchema>;
  *     save) is inserted where the default order puts it, switched on unless
  *     it is in `DEFAULT_OFF_SECTIONS`
  *   - an always-on section is on whatever the stored flag says
+ *   - a section with designs always carries one (an unknown or missing
+ *     design falls back to its default); other sections carry none
  */
 export function resolveMarketHome(raw: unknown): MarketHomeSection[] {
   const stored =
@@ -96,7 +122,8 @@ export function resolveMarketHome(raw: unknown): MarketHomeSection[] {
       : undefined;
 
   const seen = new Set<MarketHomeSectionKey>();
-  const out: MarketHomeSection[] = [];
+  // `design` stays raw here; the final pass keeps it only when it is valid.
+  const out: { key: MarketHomeSectionKey; enabled: boolean; design?: unknown }[] = [];
   if (Array.isArray(stored)) {
     for (const item of stored) {
       const key = (item as { key?: unknown } | null)?.key;
@@ -111,6 +138,7 @@ export function resolveMarketHome(raw: unknown): MarketHomeSection[] {
       out.push({
         key: key as MarketHomeSectionKey,
         enabled: (item as { enabled?: unknown }).enabled !== false,
+        design: (item as { design?: unknown }).design,
       });
     }
   }
@@ -126,7 +154,17 @@ export function resolveMarketHome(raw: unknown): MarketHomeSection[] {
     else out.splice(at, 0, entry);
   }
 
-  return out.map((s) =>
-    ALWAYS_ON_SECTIONS.includes(s.key) ? { ...s, enabled: true } : s,
-  );
+  return out.map(({ key, enabled, design }) => {
+    const section: MarketHomeSection = {
+      key,
+      enabled: enabled || ALWAYS_ON_SECTIONS.includes(key),
+    };
+    const designs = SECTION_DESIGNS[key];
+    const fallback = designs?.[0];
+    if (designs && fallback) {
+      section.design =
+        typeof design === "string" && designs.includes(design) ? design : fallback;
+    }
+    return section;
+  });
 }

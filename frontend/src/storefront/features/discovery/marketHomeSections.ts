@@ -39,6 +39,41 @@ export type MarketHomeSectionKey = (typeof MARKET_HOME_SECTION_KEYS)[number]
 export interface MarketHomeSection {
   key: MarketHomeSectionKey
   enabled: boolean
+  /** Only on sections listed in `MARKET_HOME_SECTION_DESIGNS`. */
+  design?: string
+}
+
+/** The ways Shop by category can be drawn (admin → Homepage sections). */
+export const SHOP_BY_CATEGORY_DESIGNS = ['tiles', 'circles', 'chips'] as const
+export type ShopByCategoryDesign = (typeof SHOP_BY_CATEGORY_DESIGNS)[number]
+
+export interface SectionDesignOption {
+  value: string
+  label: string
+  hint: string
+}
+
+/**
+ * Sections an admin can draw in more than one way; the first option is the
+ * default. Mirrors `SECTION_DESIGNS` in the backend's `marketHome.schema.ts`.
+ */
+export const MARKET_HOME_SECTION_DESIGNS: Partial<
+  Record<MarketHomeSectionKey, readonly SectionDesignOption[]>
+> = {
+  shopByCategory: [
+    { value: 'tiles', label: 'Tiles', hint: 'Large picture tiles' },
+    { value: 'circles', label: 'Circles', hint: 'Round icons, name below' },
+    { value: 'chips', label: 'Chips', hint: 'Small pills — the slimmest' },
+  ],
+}
+
+/** The design a section should draw — its saved one, else the default. */
+export function sectionDesign(section: MarketHomeSection): string | undefined {
+  const options = MARKET_HOME_SECTION_DESIGNS[section.key]
+  if (!options) return undefined
+  return options.some((o) => o.value === section.design)
+    ? section.design
+    : options[0]!.value
 }
 
 /**
@@ -50,10 +85,14 @@ const DEFAULT_OFF_SECTIONS: readonly MarketHomeSectionKey[] = ['popularCategorie
 
 /** What `/` shows before an admin has saved anything. */
 export const DEFAULT_MARKET_HOME_SECTIONS: MarketHomeSection[] =
-  MARKET_HOME_SECTION_KEYS.map((key) => ({
-    key,
-    enabled: !DEFAULT_OFF_SECTIONS.includes(key),
-  }))
+  MARKET_HOME_SECTION_KEYS.map((key) => {
+    const section: MarketHomeSection = {
+      key,
+      enabled: !DEFAULT_OFF_SECTIONS.includes(key),
+    }
+    const design = MARKET_HOME_SECTION_DESIGNS[key]?.[0]?.value
+    return design ? { ...section, design } : section
+  })
 
 export interface MarketHomeSectionMeta {
   label: string
@@ -86,7 +125,7 @@ export const MARKET_HOME_SECTION_META: Record<
   },
   continueShopping: {
     label: 'Continue shopping',
-    hint: "The visitor's cart, one card per store — only when it has items",
+    hint: "The visitor's cart in one slim bar — only when it has items",
     icon: CartIcon,
   },
   topStores: {
@@ -96,7 +135,7 @@ export const MARKET_HOME_SECTION_META: Record<
   },
   shopByCategory: {
     label: 'Shop by category',
-    hint: 'A tile for each top category',
+    hint: 'Top categories in one scrolling row, then View all',
     icon: TagIcon,
   },
   freshFinds: {

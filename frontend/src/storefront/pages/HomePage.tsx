@@ -32,12 +32,14 @@ import { BackToTop } from '../layout/BackToTop'
 import { SaveButton } from '../features/wishlist/SaveButton'
 import { BannerCardRail } from '../features/banners/BannerCardRail'
 import { discoveryApi } from '../features/discovery/discoveryApi'
-import { CategoryIcon } from '../features/discovery/CategoryIcon'
+import { CategoryShelf } from '../features/discovery/CategoryShelf'
 import {
   DEFAULT_MARKET_HOME_SECTIONS,
   MARKET_HOME_SECTION_KEYS,
+  sectionDesign,
   type MarketHomeSection,
   type MarketHomeSectionKey,
+  type ShopByCategoryDesign,
 } from '../features/discovery/marketHomeSections'
 import type {
   PlatformStats,
@@ -161,15 +163,20 @@ export function HomePage() {
   const newProducts = useNewProducts()
   const sections = useHomeSections()
 
-  const render: Record<MarketHomeSectionKey, () => React.ReactNode> = {
+  const render: Record<
+    MarketHomeSectionKey,
+    (section: MarketHomeSection) => React.ReactNode
+  > = {
     banners: () => <MarketBanners />,
     intro: () => <MarketIdentityBar />,
     popularCategories: () => <PopularCategoriesBar />,
     continueShopping: () => <ContinueShoppingBar />,
     topStores: () => <TopStoresSection />,
-    // On the page canvas like Top Stores — its pressed wells need --bg
-    // behind them (on white the highlight half of the relief vanishes).
-    shopByCategory: () => <ShopByCategorySection />,
+    // On the page canvas like Top Stores — the tiles design's pressed wells
+    // need --bg behind them (on white the highlight half of the relief vanishes).
+    shopByCategory: (section) => (
+      <ShopByCategorySection design={sectionDesign(section) as ShopByCategoryDesign} />
+    ),
     freshFinds: () => <FreshFindsSection {...newProducts} />,
     moreToExplore: () => <MoreToExploreSection />,
     recentlyViewed: () => <RecentlyViewedSection />,
@@ -192,7 +199,7 @@ export function HomePage() {
         {sections
           ?.filter((section) => section.enabled)
           .map((section) => (
-            <Fragment key={section.key}>{render[section.key]()}</Fragment>
+            <Fragment key={section.key}>{render[section.key](section)}</Fragment>
           ))}
       </main>
       <MarketFooter />
@@ -1288,9 +1295,6 @@ function FreshFindsSection({
 // an error state.
 // ---------------------------------------------------------------------------
 
-/** Most category tiles shown — one desktop row of eight. */
-const CATEGORY_TILES_MAX = 8
-
 /** Top-level categories, biggest first — "Sports", never also "Team Sports". */
 function useTopCategories(): BrowsableCategory[] | null {
   const [top, setTop] = useState<BrowsableCategory[] | null>(null)
@@ -1312,106 +1316,22 @@ function useTopCategories(): BrowsableCategory[] | null {
 }
 
 /**
- * Whole rows only, per width: 3 columns on a phone, 4 from `sm`, 8 from `lg`.
- * Eight categories show six tiles on a phone (two rows of three), two rows of
- * four on a tablet and one row of eight on a desktop. Under a full row the
- * grid keeps the full-row tile size and leaves the rest of the line empty
- * (`lg:max-w-*`) rather than stretching a few tiles across the screen.
- * One tile is not a section — the Popular row already links it.
+ * Shop by category: one compact row of top categories ending in View all,
+ * drawn in the design the admin picked (Homepage sections → Shop by
+ * category). Its own band rather than `Section`, because on a phone the
+ * heading is a vertical tag inside the row (`CategoryShelf`), not a line
+ * above it. One category is not a section — the Popular row already links it.
  */
-function categoryTiles(available: number) {
-  const n = Math.min(available, CATEGORY_TILES_MAX)
-  if (n < 2) return null
-  const phone = n < 3 ? n : Math.floor(n / 3) * 3
-  const web = n < 4 ? n : Math.floor(n / 4) * 4
-  return { phone, web, total: Math.max(phone, web) }
-}
-
-const TILE_GRID_PHONE: Record<number, string> = { 2: 'grid-cols-2' }
-const TILE_GRID_WEB: Record<number, string> = {
-  2: 'sm:grid-cols-2 sm:max-w-[50%] lg:max-w-[25%]',
-  3: 'sm:grid-cols-3 sm:max-w-[75%] lg:max-w-[37.5%]',
-  4: 'sm:grid-cols-4 lg:max-w-[50%]',
-  8: 'sm:grid-cols-4 lg:grid-cols-8',
-}
-
-/** Show tile `index` only at the widths whose whole rows include it. */
-function tileVisibility(index: number, phone: number, web: number): string {
-  const onPhone = index < phone
-  const onWeb = index < web
-  if (onPhone && onWeb) return ''
-  return onPhone ? 'sm:hidden' : 'hidden sm:block'
-}
-
-/** Skeleton tiles: a full row at each width (3 · 4 · 8). */
-function skeletonVisibility(index: number): string {
-  if (index >= 4) return 'hidden lg:grid'
-  if (index >= 3) return 'hidden sm:grid'
-  return ''
-}
-
-const TILE_WELL = 'category-well grid justify-items-center gap-2.5 px-2 pt-3 pb-3 sm:gap-3 sm:pt-4'
-const TILE_PLATE = 'aspect-square w-[78%] max-w-28'
-
-function ShopByCategorySection() {
+function ShopByCategorySection({ design }: { design: ShopByCategoryDesign }) {
   const top = useTopCategories()
-  const tiles = top === null ? null : categoryTiles(top.length)
-  if (top !== null && tiles === null) return null
+  if (top !== null && top.length < 2) return null
 
   return (
-    <Section
-      title="Shop by category"
-      subtitle="Every shop that sells it, on one page."
-      padding="py-5 sm:py-7 lg:py-8"
-      action={<ViewAllLink to="/categories" name="All categories" />}
-    >
-      {top === null || tiles === null ? (
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 sm:gap-4 lg:grid-cols-8" aria-hidden>
-          {Array.from({ length: CATEGORY_TILES_MAX }, (_, i) => (
-            <div key={i} className={`${TILE_WELL} ${skeletonVisibility(i)}`}>
-              <div className={`${TILE_PLATE} animate-pulse rounded-full bg-surface-alt`} />
-              <div className="h-3.5 w-2/3 animate-pulse rounded-full bg-surface-alt" />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <ul
-          className={`grid gap-3 sm:gap-4 ${TILE_GRID_PHONE[tiles.phone] ?? 'grid-cols-3'} ${TILE_GRID_WEB[tiles.web]}`}
-        >
-          {top.slice(0, tiles.total).map((category, index) => (
-            <li key={category.slug} className={tileVisibility(index, tiles.phone, tiles.web)}>
-              {/* The "pressed well" tile: see `.category-well` in index.css. */}
-              <Link
-                to={`/c/${category.slug}`}
-                className={`${TILE_WELL} group h-full content-start text-center`}
-              >
-                {/* The category's own picture (uploaded in admin → Categories),
-                    filling the plate; a contained one shows as a hard square
-                    inside the circle. Without one, the category's icon — never
-                    a seller's product photo, which read as random here. */}
-                <span className={`category-plate grid ${TILE_PLATE} place-items-center overflow-hidden`}>
-                  {category.imageUrl ? (
-                    <MediaImg
-                      sizes="(min-width: 640px) 112px, 25vw"
-                      src={category.imageUrl}
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <CategoryIcon slug={category.slug} className="h-[38%] w-[38%] text-brand" />
-                  )}
-                </span>
-                <span className="line-clamp-2 max-w-full text-xs font-semibold text-balance text-fg transition-colors group-hover:text-brand sm:text-sm">
-                  {category.name}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Section>
+    <section aria-labelledby="shop-by-category" className="border-b border-line">
+      <div className={`${CONTENT_COLUMN} py-2 sm:py-4 lg:py-5`}>
+        <CategoryShelf categories={top} design={design} headingId="shop-by-category" />
+      </div>
+    </section>
   )
 }
 
