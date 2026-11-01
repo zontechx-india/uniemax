@@ -232,12 +232,12 @@ hairline: on a near-white or near-black canvas the relief alone draws only two
 edges, so the fill and hairline close the other two.
 
 The second relief surface is the homepage's Continue shopping bar
-(`ti-face`, `ti-inset`, `ti-pill`, `ti-plate`, `ti-key` in `index.css`,
-colours from the `--ti-*` tokens): a soft panel raised off the canvas in the
-scheme's own tone — light gray in light mode, dark gray in dark mode — with
-the badge and store pills pressed into it, product photos filling white
-plates and one raised key. It keeps a 1px edge (`--ti-edge`) and tight insets:
-relief alone, with wide soft shadows, read as fog rather than depth. `ti-key` sits on `buttonClass` (size and radius stay there)
+(`ti-inset`, `ti-pill`, `ti-plate`, `ti-key` in `index.css`, colours from
+the `--ti-*` tokens): a flat band on the canvas — no raised panel, radius
+or card padding, at every width — attached to the bands above and below,
+with the badge and store pills pressed into the page, product photos filling
+white plates and one raised key. Insets stay tight: wide soft shadows read as
+fog rather than depth. `ti-key` sits on `buttonClass` (size and radius stay there)
 and only adds the raised gradient in `--cta`. Do not reuse it elsewhere.
 
 ---

@@ -322,25 +322,16 @@
    * white highlight cannot show, so the darker tray (plus a `--line` edge)
    * is what closes the bottom-right of the shape. */
   --well: #f0f0f3;
-  /* Soft basket bar (homepage Continue shopping only): a raised neumorphic
-   * panel in the scheme's own tone — light gray here, dark gray in the dark
-   * scheme (the dark block overrides every `--ti-*` value). Light comes from
-   * the top-left: light edge there, dark edge bottom-right. */
-  /* Both stops sit a tone below the #f8f8f8 canvas: a near-white start
-   * melted into the page and the panel lost its top-left edge. */
-  --ti-face: linear-gradient(145deg, #eeeef3 0%, #e7e7ec 100%);
-  --ti-shadow:
-    6px 6px 14px rgba(28, 28, 30, 0.14), -6px -6px 14px rgba(255, 255, 255, 0.95),
-    inset 1px 1px 0 rgba(255, 255, 255, 0.9), inset -1px -1px 0 rgba(0, 0, 0, 0.04);
-  /* Shapes pressed into the panel (icon badge, store pills). */
+  /* Basket bar (homepage Continue shopping only), pressed into the canvas;
+   * the dark block overrides every `--ti-*` value. Light comes from the
+   * top-left: light edge there, dark edge bottom-right. */
+  /* Shapes pressed into the page (icon badge, store pills). */
   /* Pills are a clear step below the face and their insets are tight (small
    * offset, small blur) — wide soft shadows read as fog, not depth. */
   --ti-inset-fill: #dedee5;
   --ti-inset: inset 2px 2px 4px rgba(28, 28, 30, 0.16), inset -2px -2px 4px rgba(255, 255, 255, 0.9);
   --ti-inset-deep: inset 3px 3px 6px rgba(28, 28, 30, 0.22), inset -3px -3px 6px rgba(255, 255, 255, 0.9);
   --ti-plate-shadow: 1px 1px 3px rgba(28, 28, 30, 0.18);
-  /* One hard line around the panel: relief alone has no crisp edge. */
-  --ti-edge: rgba(28, 28, 30, 0.08);
   /* Secondary ink (item counts): 5.5:1 on the pill fill. */
   --ti-ink-muted: #55555c;
   /* Ink ON a white plate ("+N more") — the plate is white in both schemes,
@@ -462,23 +453,16 @@
   /* Darker than `--bg` here too: on a near-black canvas it is the black
    * shadow that cannot show, so the tray and edge close the top-left. */
   --well: #0b0b0b;
-  /* Dark gray panel — a card tone, since soft shadows do not show on the
-   * near-black canvas itself. */
-  --ti-face: linear-gradient(145deg, #373739 0%, #1c1c1e 100%);
-  --ti-shadow:
-    5px 5px 12px rgba(0, 0, 0, 0.9), -4px -4px 10px rgba(255, 255, 255, 0.06),
-    inset 1px 1px 0 rgba(255, 255, 255, 0.08);
   --ti-inset-fill: #1c1c1e;
   --ti-inset: inset 3px 3px 6px rgba(0, 0, 0, 0.9), inset -3px -3px 6px rgba(255, 255, 255, 0.06);
   --ti-inset-deep: inset 4px 4px 9px rgba(0, 0, 0, 0.95), inset -4px -4px 9px rgba(255, 255, 255, 0.06);
   --ti-plate-shadow: 1px 1px 4px rgba(0, 0, 0, 0.6);
-  --ti-edge: rgba(255, 255, 255, 0.06);
   /* 6:1 on the pill fill. */
   --ti-ink-muted: #a1a1a8;
   --ti-key-shadow:
     4px 4px 10px rgba(0, 0, 0, 0.6), -3px -3px 8px rgba(255, 255, 255, 0.05),
     inset 1px 1px 0 rgba(255, 255, 255, 0.4);
-  /* Light Purple: ≥5:1 even on the face's lightest corner (#373739). */
+  /* Light Purple: ≥5:1 on the pill fill. */
   --ti-ink-accent: #c9b8ff;
   --ti-hairline: rgba(255, 255, 255, 0.1);
 
@@ -704,17 +688,11 @@
     box-shadow: var(--shadow-lifted);
   }
 
-  /* Homepage Continue shopping — the soft basket bar (DESIGN_GUIDELINES
-   * §10). A panel raised off the canvas in the scheme's own tone; the icon
-   * badge and the store pills are pressed into it, each product photo sits
-   * on a white plate (seller photos are shot on white), and the one action
-   * is a raised key in the CTA colour. Colours come from the `--ti-*` tokens. */
-  .ti-face {
-    background: var(--ti-face);
-    border: 1px solid var(--ti-edge);
-    box-shadow: var(--ti-shadow);
-    color: var(--fg);
-  }
+  /* Homepage Continue shopping — the basket bar (DESIGN_GUIDELINES §10). A
+   * flat band on the canvas (no panel); the icon badge and the store pills
+   * are pressed into the page, each product photo sits on a white plate
+   * (seller photos are shot on white), and the one action is a raised key
+   * in the CTA colour. Colours come from the `--ti-*` tokens. */
   .ti-inset {
     background: var(--ti-inset-fill);
     box-shadow: var(--ti-inset);

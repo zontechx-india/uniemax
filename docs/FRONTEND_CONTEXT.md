@@ -243,7 +243,7 @@ for guests and signed-in customers alike and adapts per session state.
   `BannerArrow`. It renders nothing until a banner exists and fails silently — a
   decorative strip never earns an error state. The top bands are kept tight:
   banners `py-1.5 sm:py-3 lg:py-4`, identity bar `py-2.5`, Continue shopping
-  `py-3 sm:py-4`, Top Stores `py-5 sm:py-7 lg:py-8` (instead of the default
+  `py-2.5`, Top Stores `py-5 sm:py-7 lg:py-8` (instead of the default
   `SECTION_PADDING`). Under it, the **identity bar**
   (`MarketIdentityBar`) — one slim band carrying two things that each need one
   line: the page's real `<h1>` and the trust row (straight from the seller ·
@@ -270,14 +270,18 @@ for guests and signed-in customers alike and adapts per session state.
   on phones) → `/categories`.
   While the names load the row holds its height with placeholder chips. Next,
   **Continue shopping** (`ContinueShoppingStrip`) — only when the
-  local cart has active, in-stock lines: the **soft basket bar** (`ti-*`
+  local cart has active, in-stock lines: the **basket bar** (`ti-*`
   classes, see DESIGN_GUIDELINES §10) — "N baskets waiting", one pill per store
   (up to 3; first product photo filling a white plate, item count in quiet
-  grey, subtotal in bold full-strength ink, from `groupByStore`) linking to
+  grey, subtotal in full-strength ink, from `groupByStore`) linking to
   that store's basket `/cart/{store}`, a "+N more" pill (→ `/cart`) when there
-  are more baskets than pills, and a "View cart" key — the only purple fill. Stacked on a phone (pills scroll
-  sideways), one row from `lg`; a light gray panel in light mode and a dark
-  gray one in dark mode (every `--ti-*` token flips). No request of its own. Then **Top Stores** — **storefront-preview cards**, each a
+  are more baskets than pills, and a "View cart" key — the only purple fill. A flat band at
+  every width, flush between the identity bar and Top Stores (no panel,
+  radius or card padding), the heading in the identity bar's type (`text-sm
+  font-semibold sm:text-base`, lighter weights throughout), one small (`sm`)
+  View cart key. On a phone the key ends the heading row and the pills
+  scroll sideways on the row below; from `lg` it is one row (every `--ti-*`
+  token flips in dark mode). No request of its own. Then **Top Stores** — **storefront-preview cards**, each a
   `StorePreview` mosaic over one footer row (logo · name · Visit store).
 
   **The card is portrait — `aspect-[9/14]` artwork on a ~220px tile**, so a

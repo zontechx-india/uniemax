@@ -1038,13 +1038,14 @@ function TopStoresSection() {
 const CONTINUE_STORES = 3
 
 /**
- * The soft basket bar for someone who left items in their cart: one raised
- * neumorphic panel (`ti-*` classes in `index.css` — light gray in the light
- * scheme, dark gray in the dark one) headed "N baskets waiting", one pill per
+ * The basket bar for someone who left items in their cart: a flat band on the
+ * canvas, flush between the welcome bar and Top Stores (no panel, no radius).
+ * Headed "N baskets waiting" in the welcome bar's type, one pressed pill per
  * store (a product photo filling a white plate, item count, subtotal) leading
  * straight to that store's basket (`/cart/{store}`, where Place Order is), a
- * "+N more" pill when there are more baskets than pills, and a View cart key.
- * Stacked on a phone with the pills scrolling sideways; one row from `lg`.
+ * "+N more" pill when there are more baskets than pills, and a View cart key
+ * (`ti-*` classes in `index.css`). On a phone the key ends the heading row and
+ * the pills scroll sideways on the row below; one row from `lg`.
  *
  * Reads the local cart (`groupByStore` — active lines only, sold-out lines
  * not counted), so it costs no request and is absent for an empty cart. The
@@ -1056,29 +1057,34 @@ function ContinueShoppingStrip() {
   const hidden = groups.length - CONTINUE_STORES
 
   return (
-    // On the page canvas: the panel's raised edge is tuned to `--bg`.
+    // On the page canvas: the pills' pressed insets are tuned to `--bg`.
     <section aria-labelledby="continue-shopping" className="border-b border-line bg-bg">
-      <div className={`${CONTENT_COLUMN} py-3 sm:py-4`}>
-        <div className="ti-face flex flex-col gap-3.5 rounded-2xl p-4 lg:flex-row lg:items-center lg:gap-5 lg:py-3.5 lg:pl-5">
-          <div className="flex shrink-0 items-center gap-3">
-            <span className="ti-inset flex size-tap shrink-0 items-center justify-center rounded-pill text-ti-ink">
-              <CartIcon className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-bold uppercase tracking-widest text-ti-ink">
-                Continue shopping
-              </p>
-              <h2 id="continue-shopping" className="whitespace-nowrap text-lg font-bold">
-                {groups.length} basket{groups.length === 1 ? '' : 's'} waiting
-              </h2>
-            </div>
+      {/* One wrapping row. On a phone: heading + View cart on the first line,
+          the pills (`order-last`, full width) on the second. From `lg`
+          everything sits in one line, pills between heading and key. */}
+      <div className={`${CONTENT_COLUMN} flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5 lg:flex-nowrap lg:gap-5`}>
+        <div className="flex min-w-0 flex-1 items-center gap-3 lg:flex-none">
+          <span className="ti-inset flex size-9 shrink-0 items-center justify-center rounded-pill text-ti-ink">
+            <CartIcon className="h-4 w-4" />
+          </span>
+          {/* Same type as the welcome bar's heading. */}
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-wide text-ti-ink">
+              Continue shopping
+            </p>
+            <h2 id="continue-shopping" className="truncate text-sm font-semibold sm:text-base">
+              {groups.length} basket{groups.length === 1 ? '' : 's'} waiting
+            </h2>
           </div>
+        </div>
 
-          <span aria-hidden className="hidden h-11 w-px shrink-0 bg-ti-hairline lg:block" />
+        <span aria-hidden className="hidden h-10 w-px shrink-0 bg-ti-hairline lg:block" />
 
-          {/* Edge-bleed scroller on a phone (the last pill is cut — the cue
-              that there are more); inside the row from `lg`. */}
-          <ul className="ti-scroller -mx-4 flex min-w-0 gap-2.5 overflow-x-auto px-4 py-1 lg:mx-0 lg:flex-1 lg:px-1">
+        {/* Edge-bleed scroller on a phone (the last pill is cut — the cue
+            that there are more); inside the row from `lg`. The wrapper takes
+            the flex sizing so the list's negative margins stay simple. */}
+        <div className="order-last min-w-0 basis-full lg:order-none lg:flex-1 lg:basis-auto">
+          <ul className="ti-scroller -mx-4 flex gap-2.5 overflow-x-auto px-4 py-1 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-1">
             {groups.slice(0, CONTINUE_STORES).map((group) => {
               const photo = group.items.find((item) => item.imageUrl)?.imageUrl
               const count = `${group.itemCount} item${group.itemCount === 1 ? '' : 's'}`
@@ -1105,15 +1111,15 @@ function ContinueShoppingStrip() {
                       )}
                     </span>
                     {/* Ink hierarchy: name, then the price in full-strength
-                        bold; the count is quiet. Purple stays for the label
+                        ink; the count is quiet. Purple stays for the label
                         and the View cart key, so the key keeps its pull. */}
                     <span className="min-w-0">
-                      <span className="block max-w-36 truncate text-sm font-semibold lg:max-w-48">
+                      <span className="block max-w-36 truncate text-sm font-medium lg:max-w-48">
                         {group.storeName}
                       </span>
                       <span className="block whitespace-nowrap text-sm text-ti-muted">
                         {count} ·{' '}
-                        <span className="font-figure font-bold text-fg">
+                        <span className="font-figure font-semibold text-fg">
                           {formatPrice(group.subtotal)}
                         </span>
                       </span>
@@ -1132,10 +1138,10 @@ function ContinueShoppingStrip() {
                   aria-label={`${hidden} more basket${hidden === 1 ? '' : 's'} in your cart`}
                   className="ti-pill flex min-h-16 items-center gap-2.5 rounded-2xl py-2 pl-2 pr-3"
                 >
-                  <span className="ti-plate flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-base font-bold text-ti-plate-ink">
+                  <span className="ti-plate flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-base font-semibold text-ti-plate-ink">
                     +{hidden}
                   </span>
-                  <span className="whitespace-nowrap text-sm font-semibold">
+                  <span className="whitespace-nowrap text-sm font-medium">
                     more
                     <span className="block font-normal text-ti-muted">in your cart</span>
                   </span>
@@ -1144,12 +1150,12 @@ function ContinueShoppingStrip() {
               </li>
             )}
           </ul>
-
-          {/* Plain <a>: /cart lives in the public router (full page load). */}
-          <a href="/cart" className={buttonClass({ size: 'md', full: true, className: 'ti-key gap-1.5 lg:w-auto' })}>
-            View cart <ArrowRightIcon className="h-4 w-4" />
-          </a>
         </div>
+
+        {/* Plain <a>: /cart lives in the public router (full page load). */}
+        <a href="/cart" className={buttonClass({ size: 'sm', className: 'ti-key gap-1' })}>
+          View cart <ArrowRightIcon className="h-4 w-4" />
+        </a>
       </div>
     </section>
   )
