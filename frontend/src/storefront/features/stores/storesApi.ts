@@ -1270,33 +1270,58 @@ export interface StoreDashboard {
 // ---------------------------------------------------------------------------
 
 /**
- * Verification lifecycle of a payout account. Accounts start PENDING; the
- * third-party account-validation and the UnieMax admin panel (both future)
- * move them to VERIFIED/FAILED. Editing a verified account's bank details
- * resets it to PENDING.
+ * Verification lifecycle of a payout account. Saving runs a PaymentHub bank
+ * check; VALID → VERIFIED, INVALID → FAILED, anything else stays PENDING. A
+ * UnieMax admin can also decide by hand.
  */
 export type BankVerificationStatus = 'PENDING' | 'VERIFIED' | 'FAILED'
 export type BankVerificationMethod = 'THIRD_PARTY' | 'MANUAL'
+/** The last bank check. UNAVAILABLE = the check could not run (never "invalid"). */
+export type BankCheckStatus = 'VALID' | 'NEEDS_REVIEW' | 'INVALID' | 'RETRY_LATER' | 'UNAVAILABLE'
 
-/**
- * A seller payout account. Exactly one per store is `isPrimary` — that
- * account alone receives payouts from UnieMax when customers pay through
- * the platform.
- */
-export interface StoreBankAccount {
+/** New details for a VERIFIED account, waiting for their check. */
+export interface BankPendingChange {
   id: string
   accountHolderName: string
-  accountNumber: string
+  accountNumberLast4: string
   ifsc: string
   bankName: string
   branch: string
   upiId: string | null
+  phone: string | null
+  checkStatus: BankCheckStatus | null
+  checkRegisteredName: string | null
+  checkedAt: string | null
+  createdAt: string
+}
+
+/**
+ * A seller payout account. Exactly one per store is `isPrimary` — that
+ * account alone receives payouts from UnieMax when customers pay through
+ * the platform. The full account number is never sent back — only the last 4.
+ */
+export interface StoreBankAccount {
+  id: string
+  accountHolderName: string
+  accountNumberLast4: string
+  ifsc: string
+  bankName: string
+  branch: string
+  upiId: string | null
+  phone: string | null
   isPrimary: boolean
+  /** Becomes the main account once its own check is VALID. */
+  promoteWhenVerified: boolean
   verificationStatus: BankVerificationStatus
   verificationMethod: BankVerificationMethod | null
-  /** Failure reason / admin note — set by the (future) verification flows. */
+  /** Why a check failed — written for the seller. */
   verificationNote: string | null
   verifiedAt: string | null
+  checkStatus: BankCheckStatus | null
+  /** The name the bank holds — only after a VALID check. */
+  checkRegisteredName: string | null
+  checkedAt: string | null
+  pendingChange: BankPendingChange | null
   createdAt: string
   updatedAt: string
 }
@@ -1308,16 +1333,66 @@ export interface BankAccountDetails {
   bankName: string
   branch: string
   upiId: string | null
+  phone: string | null
 }
 
 export interface BankAccountInput extends BankAccountDetails {
   /** Make this the payout account (the first account is primary automatically). */
   isPrimary?: boolean
+  /** The code from `requestCode` — every change but the first account. */
+  otp?: string
+}
+
+/** Why a check gave no answer (nothing is ever marked invalid for these). */
+export interface BankCheckOutcome {
+  status: BankCheckStatus | null
+  error: {
+    reason: 'LIMIT' | 'INPUT' | 'TIMEOUT' | 'UNAVAILABLE' | 'NAME'
+    message: string
+  } | null
+  reused: boolean
+}
+
+export interface BankSaveResult {
+  account: StoreBankAccount
+  check: BankCheckOutcome | null
+}
+
+export interface BankCodeSent {
+  channel: 'SMS' | 'EMAIL'
+  /** Masked — "+91•••••3210" / "ra•••@gmail.com". */
+  destination: string
+  expiresInMinutes: number
+  /** Dev only (SMS bypass). */
+  devCode?: string
+}
+
+export interface BankHistoryEvent {
+  id: string
+  accountId: string
+  action:
+    | 'ACCOUNT_ADDED'
+    | 'DETAILS_CHANGED'
+    | 'CHANGE_REQUESTED'
+    | 'CHANGE_APPLIED'
+    | 'CHANGE_DISCARDED'
+    | 'PRIMARY_CHANGED'
+    | 'PRIMARY_QUEUED'
+    | 'ACCOUNT_DELETED'
+    | 'CHECK_RESULT'
+    | 'MANUAL_VERIFIED'
+    | 'MANUAL_FAILED'
+    | 'MANUAL_RESET'
+  actor: 'SELLER' | 'ADMIN' | 'SYSTEM'
+  details: { holder: string; last4: string; ifsc: string; bankName: string; branch: string } | null
+  checkStatus: BankCheckStatus | null
+  createdAt: string
 }
 
 /**
- * Payout bank accounts of one store (`storeRef` = id or slug). Capped at 5;
- * updating any bank detail resets the account's verification to PENDING.
+ * Payout bank accounts of one store (`storeRef` = id or slug). Capped at 5.
+ * Saving runs a bank check (up to ~50 s) and answers `{ account, check }`.
+ * Every change but the first account needs a code from `requestCode`.
  */
 export const storeBankApi = {
   async list(storeRef: string): Promise<StoreBankAccount[]> {
@@ -1326,31 +1401,51 @@ export const storeBankApi = {
     )
   },
 
-  async create(
-    storeRef: string,
-    input: BankAccountInput,
-  ): Promise<StoreBankAccount> {
-    return call<StoreBankAccount>(
+  async history(storeRef: string): Promise<BankHistoryEvent[]> {
+    return call<BankHistoryEvent[]>(
+      http.get(`${base()}/${storeRef}/bank-accounts/history`),
+    )
+  },
+
+  /** Send the confirmation code (verified phone, else email). */
+  async requestCode(storeRef: string): Promise<BankCodeSent> {
+    return call<BankCodeSent>(http.post(`${base()}/${storeRef}/bank-accounts/otp`))
+  },
+
+  async create(storeRef: string, input: BankAccountInput): Promise<BankSaveResult> {
+    return call<BankSaveResult>(
       http.post(`${base()}/${storeRef}/bank-accounts`, input),
     )
   },
 
+  /** Left-out fields stay as they are — including the account number. */
   async update(
     storeRef: string,
     accountId: string,
-    patch: Partial<BankAccountDetails> & { isPrimary?: true },
-  ): Promise<StoreBankAccount> {
-    return call<StoreBankAccount>(
+    patch: Partial<BankAccountDetails> & { isPrimary?: true; otp: string },
+  ): Promise<BankSaveResult> {
+    return call<BankSaveResult>(
       http.patch(`${base()}/${storeRef}/bank-accounts/${accountId}`, patch),
     )
   },
 
   /** Promote an account to primary (the only way to demote the current one). */
-  async setPrimary(
-    storeRef: string,
-    accountId: string,
-  ): Promise<StoreBankAccount> {
-    return this.update(storeRef, accountId, { isPrimary: true })
+  async setPrimary(storeRef: string, accountId: string, otp: string): Promise<BankSaveResult> {
+    return this.update(storeRef, accountId, { isPrimary: true, otp })
+  },
+
+  /** Run the check again (after "bank didn't answer" / "unavailable"). */
+  async recheck(storeRef: string, accountId: string): Promise<BankSaveResult> {
+    return call<BankSaveResult>(
+      http.post(`${base()}/${storeRef}/bank-accounts/${accountId}/check`),
+    )
+  },
+
+  /** Withdraw new details that are waiting for their check. */
+  async discardChange(storeRef: string, accountId: string): Promise<StoreBankAccount> {
+    return call<StoreBankAccount>(
+      http.delete(`${base()}/${storeRef}/bank-accounts/${accountId}/change`),
+    )
   },
 
   async remove(storeRef: string, accountId: string): Promise<void> {

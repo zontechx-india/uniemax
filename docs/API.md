@@ -973,53 +973,126 @@ that have published before are grandfathered past the check.
 
 The seller's payout accounts (max **5** per store). Exactly one account is
 **primary** — the only account that receives payouts from UnieMax when
-customers pay through the platform. Every account carries a
-**verification** state: it starts `PENDING` and will be verified by a
-third-party account validator or manually by a UnieMax admin (admin panel
-is a future module — the fields are provisioned now, the verification
-endpoints arrive with it). Editing any bank detail of a verified account
-resets it to `PENDING`.
+customers pay through the platform. Dropship suppliers use the same
+endpoints. Owner only (`403` for any other actor; not on the admin mount).
+
+- **Saving runs a bank check** through PaymentHub (`POST /v1/verifications/
+  bank-account`, ONBOARDING.md §4.6) and answers `{ account, check }` — up to
+  ~50 s. `payeeRef` is `store_<storeId>` from the store row; a `payeeRef` in
+  the body is ignored. Idempotency key `bank-verify:<storeId>:<accountId or
+  changeId>.<updatedAt ms>` — retried with the same key on timeout / `5xx` /
+  `409 IDEMPOTENCY_IN_PROGRESS` (max 3 tries, 45 s each, 52 s in total).
+- **Every write but the first account needs a step-up code** (`otp` in the
+  body, from `POST …/bank-accounts/otp`). Missing → `428`; wrong / used /
+  expired → `403`. After the change the owner gets an in-app notification and
+  an email.
+- **A VERIFIED account is never edited in place.** New details are held as a
+  pending change (`pendingChange`) and checked; only `VALID` copies them onto
+  the account — until then payouts stay on the verified details. Likewise
+  making an unverified account main while a VERIFIED account is main sets
+  `promoteWhenVerified` instead; it takes over once verified.
+- **The full account number is never returned** — `accountNumberLast4`.
+- **Writes that can run a check** (`POST`, `PATCH`, `…/check`) are limited
+  to **10 per 10 min per store** (`429`), on top of the hub's 5 new checks a
+  day per store.
+- Every write is recorded in the history (`GET …/history`).
+
+`check` (null when nothing was checked, e.g. only `isPrimary` changed):
+```jsonc
+{ "status": "VALID | NEEDS_REVIEW | INVALID | RETRY_LATER | UNAVAILABLE | null",
+  "error": null | { "reason": "LIMIT | INPUT | TIMEOUT | UNAVAILABLE | NAME", "message" },
+  "reused": false }   // true = the hub returned a recent result for free
+```
+
+| Hub answer | Account / change | Seller sees |
+| --- | --- | --- |
+| `VALID` | `VERIFIED` (`THIRD_PARTY`); a change is applied; bank name + branch take the hub's values | "Verified", the name the bank holds |
+| `NEEDS_REVIEW` | stays `PENDING`; `verification.updated` settles it later | "Under review" |
+| `INVALID` | `FAILED`, fixed note (a change stays pending as INVALID) | "Could not verify" — edit and save again |
+| `RETRY_LATER` | stays `PENDING` | "Bank didn't answer" — Check again |
+| `502 VERIFIER_ERROR` · `503 VERIFIER_NOT_CONFIGURED` · `429 VERIFICATION_APP_LIMIT` · key refused · hub not configured | `checkStatus: UNAVAILABLE`, status unchanged — **never** `FAILED`; admins alerted (max once per 30 min) | "Unavailable" — Check again later |
+| `429 VERIFICATION_LIMIT` | nothing saved | `error.reason: LIMIT` — "Too many attempts today" |
+| `422 VALIDATION_ERROR` / `VERIFICATION_INPUT_INVALID` | nothing saved | `error.reason: INPUT` with the hub's message |
+| timeout / unreachable | nothing saved (the next try reuses the key) | `error.reason: TIMEOUT` |
+| holder name with no English letters (old data) | not sent | `error.reason: NAME` — UnieMax checks by hand |
 
 **`GET /api/v1/stores/:id/bank-accounts`** — the store's accounts, oldest
 first. Each:
 ```jsonc
-{ "id", "accountHolderName", "accountNumber", "ifsc", "bankName", "branch",
-  "upiId",                        // null when not provided
+{ "id", "accountHolderName", "accountNumberLast4", "ifsc", "bankName", "branch",
+  "upiId", "phone",               // null when not provided
   "isPrimary",                    // the payout target — at most one true
+  "promoteWhenVerified",          // becomes main once verified
   "verificationStatus": "PENDING | VERIFIED | FAILED",
   "verificationMethod": "THIRD_PARTY | MANUAL | null",
-  "verificationNote": null,       // failure reason / admin note
-  "verifiedAt": null, "createdAt", "updatedAt" }
+  "verificationNote": null,       // why it failed — written for the seller
+  "verifiedAt": null,
+  "checkStatus": null,            // last check (see table) — no reason code
+  "checkRegisteredName": null,    // the name the bank holds, VALID only
+  "checkedAt": null,
+  "pendingChange": null | { "id", "accountHolderName", "accountNumberLast4", "ifsc",
+    "bankName", "branch", "upiId", "phone", "checkStatus", "checkRegisteredName",
+    "checkedAt", "createdAt" },
+  "createdAt", "updatedAt" }
 ```
 
-**`POST /api/v1/stores/:id/bank-accounts`** → `201`
+**`POST /api/v1/stores/:id/bank-accounts/otp`** — send the step-up code
+(`BANK_CHANGE`) to the owner's **verified phone** (SMS), else their email.
+→ `{ channel: "SMS" | "EMAIL", destination (masked), expiresInMinutes,
+devCode? }` (`devCode` only for SMS outside production). 30 s cooldown per
+destination; 5 requests per 10 min.
+
+**`POST /api/v1/stores/:id/bank-accounts`** → `201 { account, check }`
 ```jsonc
 {
-  "accountHolderName": "Anwin Paulji",   // required (1–100)
+  "accountHolderName": "Anwin Paulji",   // required — letters, digits, spaces, . - / & (≤100)
   "accountNumber": "50100123456789",     // required — 9–18 digits
   "ifsc": "HDFC0001234",                 // required — [A-Z]{4}0[A-Z0-9]{6} (uppercased)
   "bankName": "HDFC Bank",               // required (1–100)
   "branch": "MG Road, Kochi",            // required (1–100)
   "upiId": "name@okhdfcbank",            // optional (VPA shape)
-  "isPrimary": true                       // optional — the FIRST account is
-                                          // primary automatically regardless
+  "phone": "9876543210",                 // optional — 8–13 digits, sent to the check
+  "isPrimary": true,                     // optional — the FIRST account is
+                                         // primary automatically regardless
+  "otp": "123456"                        // required unless this is the first account
 }
 ```
 `400` while the `PAYOUT_SETUP` gate is blocked (see *Store readiness*) —
 the business address must be in first (the seller's bank page asks for it in
 place); the message names every missing one. `409` on the 6th account or when the same
-`accountNumber` + `ifsc` is already saved for this store. Created `PENDING`.
+`accountNumber` + `ifsc` is already saved for this store.
 
-**`PATCH /api/v1/stores/:id/bank-accounts/:accountId`** — partial update
-(≥ 1 field). Any changed bank detail resets the verification to `PENDING`.
-`isPrimary` accepts **only `true`** — promoting an account demotes the
-current primary in the same transaction, so the payout target can never be
-silently unset. Returns the updated account.
+**`PATCH /api/v1/stores/:id/bank-accounts/:accountId`** → `{ account, check }`
+— partial update (≥ 1 field besides `otp`; `otp` always required). A left-out
+`accountNumber` keeps the current one. Changed details on an unverified
+account: edited in place, reset to `PENDING`, checked. On a VERIFIED account:
+held as a pending change (any older pending change is `SUPERSEDED`) and
+checked. `isPrimary` accepts **only `true`** — promoting demotes the current
+primary in the same transaction (or queues it, see above).
+
+**`POST /api/v1/stores/:id/bank-accounts/:accountId/check`** →
+`{ account, check }` — run the check again (after `RETRY_LATER`,
+`UNAVAILABLE`, a timeout, or for an account saved before checks existed).
+Checks the pending change if there is one. No code needed. `409` when the
+account is already verified and nothing is pending.
+
+**`DELETE /api/v1/stores/:id/bank-accounts/:accountId/change`** → the
+account — withdraw pending new details (the account keeps its verified ones).
+`404` when nothing is pending.
 
 **`DELETE /api/v1/stores/:id/bank-accounts/:accountId`** →
-`{ "data": { "id" } }`. Deleting the primary does **not** auto-promote
+`{ "data": { "id" } }`. No code needed (it cannot redirect money); the
+owner is still alerted. Deleting the primary does **not** auto-promote
 another account (payouts must never silently retarget) — the seller picks
 the next primary explicitly, and payouts stay on hold until they do.
+
+**`GET /api/v1/stores/:id/bank-accounts/history`** — newest first (50):
+`{ id, accountId, action, actor: "SELLER" | "ADMIN" | "SYSTEM", details:
+{ holder, last4, ifsc, bankName, branch } | null, checkStatus, createdAt }`.
+`action` is one of `ACCOUNT_ADDED · DETAILS_CHANGED · CHANGE_REQUESTED ·
+CHANGE_APPLIED · CHANGE_DISCARDED · PRIMARY_CHANGED · PRIMARY_QUEUED ·
+ACCOUNT_DELETED · CHECK_RESULT · MANUAL_VERIFIED · MANUAL_FAILED ·
+MANUAL_RESET`. Admin notes and reason codes are left out.
 
 ### Store catalog — categories, products & variants
 
@@ -2075,6 +2148,7 @@ carries `{ orderId, storeSlug }`.
 | `payment.succeeded` | `PENDING`/`FAILED` → `PAID`, `paymentRef = gatewayPaymentId` (or the intent id), then the usual `order.paid` event + placement notifications (refund-required alert if the order was already cancelled). Requires `amountMinor` = order `total` in paise (string maths), `INR`, matching reference/store and an `ONLINE` order — otherwise logged as an error and left alone. `lateCapture: true` is logged for ops review. |
 | `payment.failed` / `payment.expired` / `payment.cancelled` | `PENDING` → `FAILED` (retryable, like the Cashfree path). No-op if the order is past `PENDING` or the event is for an intent other than the order's current `paymentIntentId`. |
 | `refund.succeeded` / `refund.failed` | Logged and acknowledged — UnieMax has no refund records yet. |
+| `verification.updated` | A hub admin settled a `NEEDS_REVIEW` bank check. Applied to the payout account — or the OPEN pending change — whose `verificationRef` is `data.verification.id` (and `payeeRef` = `store_<storeId>`), with the same mapping as a [save](#payout-bank-accounts--apiv1storesidbank-accounts); `VALID` on a change applies it. Ignored when it is no longer the latest check (the seller sent new details, the change was superseded/withdrawn) or an admin decided manually meanwhile. The seller is notified. |
 | anything else | Logged and acknowledged. |
 
 The order is found by `Order.paymentIntentId`, then `metadata.orderId`; no
@@ -3327,7 +3401,11 @@ seller count, not the order or product count.
 
 `:id` accepts an id or a slug. Adds `settings` (resolved payments / shipping /
 checkout — the same effective values the storefront sees), `bankAccounts`
-(**account numbers masked to the last 4**), `orderStatus` counts, `theme`,
+(**account numbers masked to the last 4**; each with the admin-only check
+fields and its `pendingChange` — new details waiting for their check —
+including `checkReasonCode`), `bankHistory` (the last 30 payout-account
+events, newest first, **with** `actorId` and `note` — reason codes, manual
+notes), `orderStatus` counts, `theme`,
 `footer`, the 10 latest orders, and `readiness` — the **full** evaluation
 (every step with its individual requirements), not just the `setup` summary,
 so the console can name what is missing ("Contact email", "Business address") in the
@@ -3362,8 +3440,26 @@ notified. Already in that state → `409`. → the full store.
 Body `{ "status": "VERIFIED" | "FAILED" | "PENDING", "note"?: "…" }` — the
 **MANUAL** half of payout verification (the other being a third-party
 validator). `FAILED` **requires** a note: a failure the seller can't act on is
-worse than no answer. Stamps `verifiedBy` with the acting admin. The seller is
+worse than no answer. Stamps `verifiedBy` with the acting admin and records a
+`MANUAL_*` history event (with the note). A manual `VERIFIED` also performs a
+queued main-account switch (`promoteWhenVerified`). Acts on the account's
+current details only — a pending change is not affected. The seller is
 notified. → the full store.
+
+### `POST /api/v1/admin/stores/:id/bank-accounts/:accountId/bank-check`
+
+No body — runs the same PaymentHub check the seller's save runs (see
+[Payout bank accounts](#payout-bank-accounts--apiv1storesidbank-accounts)),
+on the account's **current** details (not a pending change). Same
+`payeeRef`, idempotency key, retries, mapping and history event
+(`actor: ADMIN`).
+
+→ `{ store: <full store>, check: { status, reused } }`. A no-answer is an
+error here, shown in the console's dialog: `429` the store used today's 5
+checks · `422` the hub rejected a field, or the saved holder name has no
+English letters (verify by hand) · `503` unavailable (the account is saved
+as `UNAVAILABLE`, never `FAILED`) or the bank too slow (click again — same
+key, not charged twice). Audit action `bankAccount.bankCheck`.
 
 ### Store management as an admin — `/api/v1/admin/manage/stores` 🔒 **super admin**
 
@@ -3391,7 +3487,7 @@ own.
 | Missing | Why |
 | --- | --- |
 | `GET` / `POST /api/v1/stores` | "My stores" and "create me a store" have no admin meaning. Admins browse stores via `GET /api/v1/admin/stores`. |
-| `…/:id/bank-accounts/**` | Where the store's money lands. No support task needs to change it, and it is the platform's highest-value target. Admins **verify** accounts via `PATCH /api/v1/admin/stores/:id/bank-accounts/:accountId/verification` — approve, never edit. The service refuses an admin actor as a second lock. |
+| `…/:id/bank-accounts/**` | Where the store's money lands. No support task needs to change it, and it is the platform's highest-value target. Admins **verify** accounts via `POST /api/v1/admin/stores/:id/bank-accounts/:accountId/bank-check` (bank check) or `PATCH …/verification` (by hand) — approve, never edit. The service refuses an admin actor as a second lock. |
 | `PATCH …/:id/profile` | The seller's business identity — legal/trading name, the accountable person, registered address, PAN/GSTIN. Their own declaration, and what the platform holds them to; not support's to restate on their behalf. Admins **read** it on `GET /api/v1/admin/stores/:id`. |
 | `…/:id/support/**` | Both inboxes attribute messages to the seller, so an admin posting there would be writing in the seller's name. The platform side of those threads is `/api/v1/admin/support`. |
 

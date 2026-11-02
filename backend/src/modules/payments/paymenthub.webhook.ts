@@ -111,6 +111,15 @@ const refundSchema = z.object({
   status: z.string(),
 });
 
+const verificationSchema = z.object({
+  id: z.string().min(1),
+  payeeRef: z.string().min(1),
+  status: z.enum(["VALID", "NEEDS_REVIEW", "INVALID", "RETRY_LATER"]),
+  registeredName: z.string().nullish().transform((v) => v ?? null),
+  nameMatch: z.string().nullish().transform((v) => v ?? null),
+  reasonCode: z.string().nullish().transform((v) => v ?? null),
+});
+
 export const PAYMENT_EVENTS = [
   "payment.succeeded",
   "payment.failed",
@@ -122,6 +131,7 @@ export const REFUND_EVENTS = ["refund.succeeded", "refund.failed"] as const;
 export type HubEvent =
   | { kind: "payment"; type: (typeof PAYMENT_EVENTS)[number]; intent: HubIntent }
   | { kind: "refund"; type: (typeof REFUND_EVENTS)[number]; refund: z.infer<typeof refundSchema> }
+  | { kind: "verification"; type: "verification.updated"; verification: z.infer<typeof verificationSchema> }
   | { kind: "unknown"; type: string };
 
 /** Envelope `data` → typed event. Throws ZodError on a malformed known type. */
@@ -134,6 +144,10 @@ export function parseEventData(envelope: HubEnvelope): HubEvent {
   if ((REFUND_EVENTS as readonly string[]).includes(type)) {
     const { refund } = z.object({ refund: refundSchema }).parse(envelope.data);
     return { kind: "refund", type: type as (typeof REFUND_EVENTS)[number], refund };
+  }
+  if (type === "verification.updated") {
+    const { verification } = z.object({ verification: verificationSchema }).parse(envelope.data);
+    return { kind: "verification", type, verification };
   }
   return { kind: "unknown", type };
 }

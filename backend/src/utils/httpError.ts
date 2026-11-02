@@ -10,8 +10,10 @@ const REASON_PHRASES: Record<number, string> = {
   404: "Not Found",
   409: "Conflict",
   422: "Unprocessable Entity",
+  428: "Precondition Required",
   429: "Too Many Requests",
   502: "Bad Gateway",
+  503: "Service Unavailable",
 };
 
 export class HttpError extends Error {

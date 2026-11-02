@@ -2203,12 +2203,27 @@ is never shown a pickup-address item.
   `StoreBankPage` (**Bank account** — the seller's payout accounts over
   `/stores/:id/bank-accounts`: up to 5 accounts as `ActionRow`s in one
   glass card (bank + masked ····last-4, holder, branch, IFSC, optional UPI),
-  each with a verification pill — Being checked / Verified / Check failed
-  (with the failure note) — and a **Main account** pill; **Edit** on the row,
-  "⋯" with **Make this my main account** and **Delete account** (deleting
-  the main account warns that payouts hold until another is chosen; nothing
-  auto-promotes); editing warns that changing a verified account sends it
-  back for checking. The add / edit form (a `GlassCard`) asks in the order
+  each with a check pill — Verified ("Name at bank: …") / Under review /
+  Could not verify / Bank didn't answer / Unavailable / Not checked yet —
+  and a **Main account** pill; **Edit** on the row (or **Check again** when
+  the bank or service didn't answer, with Edit moved into "⋯"), "⋯" with
+  **Make this my main account**, **Remove the new details** and **Delete
+  account** (deleting the main account warns that payouts hold until
+  another is chosen; nothing auto-promotes). Saving runs the PaymentHub bank
+  check (the button reads "Checking with your bank…", up to a minute) and
+  the answer shows above the list. Every change but the first account goes
+  through **`BankCodeDialog`** (`useBankCode(storeId).run(action, {
+  needsCode })`): it sends the `BANK_CHANGE` code, asks for it, and retries
+  the action with it; a server `428` opens it when the page could not know
+  (the dropship prompt), a `403` (wrong code) keeps it open. New details for
+  a verified account show under the row as "New details: … — Under review.
+  Payouts still go to ····1234 until the new details are verified."; a
+  queued main account reads "Becomes your main account once it is
+  verified". The full number is never shown after saving: the edit form
+  starts with both number fields empty ("Leave empty to keep ····1234").
+  **Change history** (a `GlassCard`, loaded on "Show history") lists every
+  event, newest first, with who did it (You / UnieMax / Automatic). The
+  add / edit form (a `GlassCard`) asks in the order
   a seller holds the details — name on the account, then **Bank branch code
   (IFSC)** with an ⓘ sheet ("printed on your cheque book or passbook"),
   which **looks the branch up** (`useIfscLookup`: once the code has the
@@ -2218,8 +2233,10 @@ is never shown a pickup-address item.
   Branch ("Bank, Branch, City", title-cased) unless the seller typed them;
   a failed / unknown lookup just leaves the fields to type), then the
   9–18-digit account number with a **"Type the account number again"**
-  field that flags a mismatch as you type, and an optional UPI ID with its
-  own ⓘ sheet. Errors are plain sentences ("The two account numbers are not
+  field that flags a mismatch as you type, an optional UPI ID with its
+  own ⓘ sheet and an optional phone. The holder name is checked against the
+  bank check's characters (English letters, digits, spaces, `. - / &`)
+  before saving. Errors are plain sentences ("The two account numbers are not
   the same"). A banner flags "no primary selected" whenever accounts exist
   without one. Adding needs the **business address**
   (`store.readiness.gates.PAYOUT_SETUP`), which moved out of the signup
@@ -2794,6 +2811,8 @@ what the host apps see:
 - **Easy Split bank prompt**: `StoreBankPage` exports its `AccountForm`, and the package's `BankPrompt`
   (Orders to ship, Supplier settings, the seller's Suppliers page) shows it in a dialog when payouts are on
   and the store has no payout account, so a supplier adds its bank account without leaving the page.
+  The save runs the same bank check, and `useBankCode` asks for a confirmation code only when the
+  server answers `428` (the store already has an account).
 - **The flag comes from the backend**: `GET /api/v1/dropship/status` answers only
   when the package is registered; a 404 keeps every supplier row and the admin
   **Suppliers** nav item hidden. `role.ts` caches it, and each store's role, per

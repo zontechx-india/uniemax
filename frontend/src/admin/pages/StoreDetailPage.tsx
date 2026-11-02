@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { adminApi } from '../features/adminApi'
 import type {
   BankAccount,
+  BankCheckStatus,
   BankVerificationStatus,
   SellerReminder,
   SellerReminders,
@@ -58,8 +59,9 @@ import { MediaImg } from '../../shared/media/MediaImg'
  *     can fix whatever caused it.
  *   - **Store verification** — the admin checks the GSTIN by hand and marks
  *     the store verified (`VerificationCard`).
- *   - **Payout verification** — the MANUAL half of bank-account verification
- *     (the other being a third-party validator). Money settles to a verified
+ *   - **Payout verification** — "Verify with bank" asks PaymentHub to check
+ *     the account with the bank (a paid check, 5 a day per store); "Mark
+ *     verified / failed" is the MANUAL fallback. Money settles to a verified
  *     account, so a failure must carry a note the seller can act on.
  *
  * It also shows the store's catalog — the first listings inline, each
@@ -70,6 +72,31 @@ import { MediaImg } from '../../shared/media/MediaImg'
 
 /** Listings shown inline before handing over to the filtered catalog page. */
 const PRODUCT_PREVIEW = 6
+
+/** PaymentHub's answer, in the admin's words. */
+const BANK_CHECK_LABEL: Record<BankCheckStatus, string> = {
+  VALID: 'Valid',
+  NEEDS_REVIEW: 'Under review at PaymentHub',
+  INVALID: 'Invalid',
+  RETRY_LATER: "Bank didn't answer — try again later",
+  UNAVAILABLE: 'Unavailable — PaymentHub could not run the check',
+}
+
+/** One line per history action, admin wording. */
+const BANK_EVENT_LABEL: Record<string, string> = {
+  ACCOUNT_ADDED: 'Account added',
+  DETAILS_CHANGED: 'Details changed (unverified account)',
+  CHANGE_REQUESTED: 'New details submitted (held until verified)',
+  CHANGE_APPLIED: 'New details verified and applied',
+  CHANGE_DISCARDED: 'New details withdrawn',
+  PRIMARY_CHANGED: 'Made main account',
+  PRIMARY_QUEUED: 'Main account once verified',
+  ACCOUNT_DELETED: 'Account deleted',
+  CHECK_RESULT: 'Bank check',
+  MANUAL_VERIFIED: 'Marked verified',
+  MANUAL_FAILED: 'Marked failed',
+  MANUAL_RESET: 'Verification reset',
+}
 
 export default function StoreDetailPage() {
   const { storeId = '' } = useParams()
@@ -95,6 +122,7 @@ export default function StoreDetailPage() {
     status: BankVerificationStatus
   } | null>(null)
   const [note, setNote] = useState('')
+  const [checkTarget, setCheckTarget] = useState<BankAccount | null>(null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
 
@@ -135,6 +163,21 @@ export default function StoreDetailPage() {
       refresh()
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Could not update the account')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const runBankCheck = async () => {
+    if (!checkTarget) return
+    setBusy(true)
+    setActionError(null)
+    try {
+      await adminApi.checkBankAccount(store.id, checkTarget.id)
+      setCheckTarget(null)
+      refresh()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Could not check the account')
     } finally {
       setBusy(false)
     }
@@ -326,8 +369,55 @@ export default function StoreDetailPage() {
                       Verified {formatDateTime(account.verifiedAt)}
                     </p>
                   ) : null}
+                  {account.checkStatus ? (
+                    <p className="mt-1 text-xs text-muted">
+                      Bank check: {BANK_CHECK_LABEL[account.checkStatus]}
+                      {account.checkRegisteredName
+                        ? ` · Name at bank: ${account.checkRegisteredName}`
+                        : ''}
+                      {account.checkNameMatch ? ` · Match: ${account.checkNameMatch}` : ''}
+                      {account.checkReasonCode ? ` · Code: ${account.checkReasonCode}` : ''}
+                      {account.checkedAt ? ` · ${formatDateTime(account.checkedAt)}` : ''}
+                    </p>
+                  ) : null}
+                  {account.promoteWhenVerified ? (
+                    <p className="mt-1 text-xs text-muted">Becomes the main account once verified.</p>
+                  ) : null}
+                  {account.pendingChange ? (
+                    <div className="mt-2 rounded-md bg-surface-alt p-2 text-xs text-muted">
+                      <p className="font-medium text-fg">
+                        New details waiting: {account.pendingChange.bankName} ····
+                        {account.pendingChange.accountNumberLast4} ·{' '}
+                        {account.pendingChange.accountHolderName} · {account.pendingChange.ifsc}
+                      </p>
+                      <p>
+                        Bank check:{' '}
+                        {account.pendingChange.checkStatus
+                          ? BANK_CHECK_LABEL[account.pendingChange.checkStatus]
+                          : 'not run yet'}
+                        {account.pendingChange.checkNameMatch
+                          ? ` · Match: ${account.pendingChange.checkNameMatch}`
+                          : ''}
+                        {account.pendingChange.checkReasonCode
+                          ? ` · Code: ${account.pendingChange.checkReasonCode}`
+                          : ''}
+                        {' · '}submitted {formatDateTime(account.pendingChange.createdAt)}. Payouts stay
+                        on ····{account.accountNumberLast4} until these are verified.
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                  {account.checkStatus !== 'VALID' ? (
+                    <Button
+                      onClick={() => {
+                        setCheckTarget(account)
+                        setActionError(null)
+                      }}
+                    >
+                      Verify with bank
+                    </Button>
+                  ) : null}
                   {account.verificationStatus !== 'VERIFIED' ? (
                     <Button
                       onClick={() => {
@@ -356,6 +446,31 @@ export default function StoreDetailPage() {
             ))}
           </ul>
         )}
+        {store.bankHistory.length > 0 ? (
+          <details className="mt-3 border-t border-line pt-3">
+            <summary className="cursor-pointer text-sm font-medium text-fg">
+              Change history ({store.bankHistory.length})
+            </summary>
+            <ul className="mt-2 divide-y divide-line">
+              {store.bankHistory.map((event) => (
+                <li key={event.id} className="py-2 text-xs text-muted">
+                  <span className="font-medium text-fg">
+                    {BANK_EVENT_LABEL[event.action] ?? event.action}
+                    {event.checkStatus ? `: ${BANK_CHECK_LABEL[event.checkStatus]}` : ''}
+                  </span>
+                  {event.details
+                    ? ` · ${event.details.bankName} ····${event.details.last4} · ${event.details.holder} · ${event.details.ifsc}`
+                    : ''}
+                  <span className="block">
+                    {event.actor === 'SELLER' ? 'Seller' : event.actor === 'ADMIN' ? 'Admin' : 'System'} ·{' '}
+                    {formatDateTime(event.createdAt)}
+                    {event.note ? ` · ${event.note}` : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </Card>
 
       <Card className="mt-4">
@@ -530,6 +645,29 @@ export default function StoreDetailPage() {
         }
         onCancel={() => setBankTarget(null)}
         onConfirm={() => void runVerification()}
+      />
+
+      <ConfirmDialog
+        open={checkTarget !== null}
+        busy={busy}
+        title="Check this account with the bank?"
+        confirmLabel="Verify with bank"
+        description={
+          <div className="space-y-3">
+            <p>
+              PaymentHub asks {checkTarget?.bankName} whether ····
+              {checkTarget?.accountNumberLast4} is open and held by{' '}
+              {checkTarget?.accountHolderName}. It can take up to a minute.
+            </p>
+            <p className="text-sm text-muted">
+              Each store gets 5 new checks a day. Repeating a recent check is free. The seller is
+              told only if the account is verified or fails.
+            </p>
+            {actionError ? <p className="text-sm text-danger">{actionError}</p> : null}
+          </div>
+        }
+        onCancel={() => setCheckTarget(null)}
+        onConfirm={() => void runBankCheck()}
       />
 
       <ProductDetailDialog

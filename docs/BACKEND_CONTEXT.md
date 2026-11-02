@@ -1292,20 +1292,47 @@ White-label design — one codebase, any business:
   `catalogSlug.ts` and the anonymous storefront surface in `publicStore.*`.
 - **StoreBankAccount** — a seller **payout account** (cascade delete with its
   store; unique per store on `accountNumber + ifsc`; service caps at 5).
-  Fields: holder name, account number (9–18 digits), IFSC, bank name,
-  branch, optional UPI id. Exactly **one per store is `isPrimary`** — the
-  only account that receives payouts from UnieMax (first saved account is
-  primary automatically; promoting one demotes the current primary in the
-  same transaction; deleting the primary never auto-promotes — the payout
-  target must be an explicit choice, payouts hold until one is picked).
-  **Verification is provisioned, not wired**: `verificationStatus`
-  (`PENDING`/`VERIFIED`/`FAILED`, default `PENDING`), `verificationMethod`
-  (`THIRD_PARTY` account-validation provider / `MANUAL` by a UnieMax admin
-  from the future admin panel), `verificationRef` (provider check id),
-  `verifiedBy` (admin id), `verificationNote`, `verifiedAt`. Editing any
-  bank detail of a verified account resets it to `PENDING`
-  (service-enforced). Handled by the `storeBank.*` files in
-  `modules/stores` (owner routes under `/stores/:id/bank-accounts`).
+  Fields: holder name (hub characters only), account number (9–18 digits,
+  stored in plain text — encryption is planned, see
+  `docs/BANK_VERIFICATION_TODO.md`), IFSC, bank name, branch, optional UPI
+  id and phone. Exactly **one per store is `isPrimary`** — the only account
+  that receives payouts from UnieMax (first saved account is primary
+  automatically; promoting one demotes the current primary in the same
+  transaction — unless the current primary is VERIFIED and the new one is
+  not, which sets `promoteWhenVerified` instead; deleting the primary never
+  auto-promotes — payouts hold until one is picked).
+  **Verification**: `verificationStatus` (`PENDING`/`VERIFIED`/`FAILED`,
+  default `PENDING`), `verificationMethod` (`THIRD_PARTY` = a PaymentHub
+  bank check / `MANUAL` = an admin's decision), `verificationRef` (latest hub
+  check id `vf_…`, indexed for the `verification.updated` webhook),
+  `verifiedBy` (admin id, manual only), `verificationNote` (seller-visible),
+  `verifiedAt`. The last check: `checkStatus` (enum **BankCheckStatus**
+  `VALID`/`NEEDS_REVIEW`/`INVALID`/`RETRY_LATER`, plus our `UNAVAILABLE` =
+  the check could not run), `checkReasonCode` (admin-only), `checkRegisteredName`,
+  `checkNameMatch`, `checkedAt`. Handled by the `storeBank.*` files in
+  `modules/stores` (owner routes under `/stores/:id/bank-accounts`); the
+  check by `bankCheck.ts` (pure rules), `bankCheck.hub.ts` (the hub call +
+  retries, no Prisma) and `bankCheck.service.ts` (saving answers, the admin
+  "Verify with bank", the webhook).
+- **StoreBankAccountChange** — new details for a **VERIFIED** payout account,
+  held aside (cascade with the account): the same detail fields + its own
+  `verificationRef` / `check*` fields, `status` (enum **BankChangeStatus**
+  `OPEN`/`APPLIED`/`DISCARDED`/`SUPERSEDED`), `resolvedAt`. At most one
+  `OPEN` per account (service-enforced). A VALID check copies it onto the
+  account in one transaction; until then payouts stay on the verified
+  details. Unverified accounts are edited in place instead.
+- **StoreBankAccountEvent** — append-only payout-account history (cascade
+  with the store; `accountId` has **no** FK so it outlives a deleted
+  account): `action` (enum **BankEventAction**), `actor` (enum
+  **BankEventActor** `SELLER`/`ADMIN`/`SYSTEM`) + `actorId`, `details`
+  (masked JSON `{ holder, last4, ifsc, bankName, branch }` — never the full
+  number), `checkStatus`, `note` (admin-only: reason code / manual note).
+  Written by `storeBank.history.ts` in the same transaction as the change.
+- **OtpPurpose `BANK_CHANGE`** — the step-up code for payout-bank changes,
+  issued by the auth package's `requestActionCode` / `confirmActionCode`
+  (`package/auth/customer/actionCode.ts`, exported from the facade): verified
+  phone (SMS) first, else email; a wrong code is `403` (not `401`, which web
+  clients answer with a session refresh + replay).
 - **StoreProductMedia** — media attached to a store product (cascade delete):
   up to **8 IMAGEs + 1 VIDEO** (service-enforced), each holding a storage
   **object key** (never a URL), optional `altText` (accessibility) and

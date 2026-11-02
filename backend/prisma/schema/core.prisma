@@ -76,6 +76,7 @@ enum OtpChannel {
 enum OtpPurpose {
   LOGIN // phone OTP sign-in
   LINK // linking a second identifier to an existing account
+  BANK_CHANGE // confirming a payout bank account change
   EMAIL_VERIFY // verifying a customer's email address
   PASSWORD_RESET // forgot-password reset code
   ORDER_PLACEMENT // guest checkout verification
@@ -487,6 +488,7 @@ model Store {
   categories     StoreCategory[]
   products       StoreProduct[]
   bankAccounts   StoreBankAccount[]
+  bankEvents     StoreBankAccountEvent[]
   orders         Order[]
   supportTickets SupportTicket[]
   /// Set when a platform admin has checked the store BY HAND — its GSTIN on
@@ -820,12 +822,31 @@ enum BankVerificationMethod {
   @@schema("public")
 }
 
+/// The last bank check of an account (or of a pending change). The first
+/// four are PaymentHub's answers (`POST /v1/verifications/bank-account`):
+/// only VALID and INVALID settle anything; NEEDS_REVIEW waits for a hub admin
+/// (`verification.updated` webhook); RETRY_LATER says nothing about the
+/// account. UNAVAILABLE is ours: the hub or its verifier could not run the
+/// check (502/503/app limit) — never a verdict on the account.
+enum BankCheckStatus {
+  VALID
+  NEEDS_REVIEW
+  INVALID
+  RETRY_LATER
+  UNAVAILABLE
+
+  @@schema("public")
+}
+
 /// A seller's payout bank account (a store can save several). Exactly ONE
 /// may be primary — that account alone receives payouts from UnieMax when
-/// customers pay through the platform. Verification fields are provisioned
-/// ahead of the integrations: `verificationRef` stores the third-party
-/// provider's check id, `verifiedBy` the admin who manually verified
-/// (future admin panel), `verificationNote` a failure reason / admin note.
+/// customers pay through the platform. `verificationRef` stores the latest
+/// PaymentHub check id (`vf_…`), `verifiedBy` the admin who manually
+/// verified, `verificationNote` a failure reason the SELLER sees. The
+/// `check*` fields hold the last check of THESE details; `checkReasonCode`
+/// is admin-only (it can say the provider flagged the account as fraud).
+/// New details for a VERIFIED account wait in `StoreBankAccountChange`, so
+/// payouts keep going to the verified details until the new ones are VALID.
 model StoreBankAccount {
   id      String @id @default(cuid())
   storeId String
@@ -837,9 +858,14 @@ model StoreBankAccount {
   bankName          String
   branch            String
   upiId             String?
+  /// Optional — sent to the bank check with the details.
+  phone             String?
 
   /// The payout target. At most one per store (service-enforced).
   isPrimary Boolean @default(false)
+  /// The seller asked for this to be the main account while another,
+  /// VERIFIED account was main: it takes over once its own check is VALID.
+  promoteWhenVerified Boolean @default(false)
 
   verificationStatus BankVerificationStatus  @default(PENDING)
   verificationMethod BankVerificationMethod?
@@ -848,13 +874,118 @@ model StoreBankAccount {
   verifiedAt         DateTime?
   verifiedBy         String?
 
+  checkStatus         BankCheckStatus?
+  checkReasonCode     String?
+  /// The name the bank holds — the hub fills it only on VALID.
+  checkRegisteredName String?
+  checkNameMatch      String?
+  checkedAt           DateTime?
+
+  changes StoreBankAccountChange[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // The same account can't be added to one store twice.
   @@unique([storeId, accountNumber, ifsc])
   @@index([storeId])
+  // The `verification.updated` webhook finds its account by check id.
+  @@index([verificationRef])
   @@map("store_bank_accounts")
+  @@schema("public")
+}
+
+enum BankChangeStatus {
+  OPEN // waiting for its bank check to come back VALID
+  APPLIED // VALID — copied onto the account
+  DISCARDED // the seller withdrew it
+  SUPERSEDED // newer details were submitted
+
+  @@schema("public")
+}
+
+/// New details for a VERIFIED payout account, held aside until a bank check
+/// says VALID — then copied onto the account (`APPLIED`). Until then the
+/// account keeps its verified details, so payouts never move to unchecked
+/// ones. At most one `OPEN` change per account (service-enforced).
+model StoreBankAccountChange {
+  id        String           @id @default(cuid())
+  accountId String
+  account   StoreBankAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  storeId   String
+
+  accountHolderName String
+  accountNumber     String
+  ifsc              String
+  bankName          String
+  branch            String
+  upiId             String?
+  phone             String?
+
+  status     BankChangeStatus @default(OPEN)
+  resolvedAt DateTime?
+
+  verificationRef     String?
+  checkStatus         BankCheckStatus?
+  checkReasonCode     String?
+  checkRegisteredName String?
+  checkNameMatch      String?
+  checkedAt           DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([accountId, status])
+  @@index([verificationRef])
+  @@map("store_bank_account_changes")
+  @@schema("public")
+}
+
+enum BankEventAction {
+  ACCOUNT_ADDED
+  DETAILS_CHANGED // an unverified account edited in place
+  CHANGE_REQUESTED // new details for a verified account, held aside
+  CHANGE_APPLIED
+  CHANGE_DISCARDED
+  PRIMARY_CHANGED
+  PRIMARY_QUEUED // becomes main once verified
+  ACCOUNT_DELETED
+  CHECK_RESULT // a PaymentHub answer (or UNAVAILABLE)
+  MANUAL_VERIFIED
+  MANUAL_FAILED
+  MANUAL_RESET
+
+  @@schema("public")
+}
+
+enum BankEventActor {
+  SELLER
+  ADMIN
+  SYSTEM // PaymentHub webhook, automatic promotion
+
+  @@schema("public")
+}
+
+/// Append-only history of a store's payout accounts — who changed what and
+/// when. `details` is a MASKED snapshot (`{ holder, last4, ifsc, bankName,
+/// branch }`), never the full account number. `accountId` has no foreign key
+/// so the history outlives a deleted account.
+model StoreBankAccountEvent {
+  id          String          @id @default(cuid())
+  storeId     String
+  store       Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  accountId   String
+  action      BankEventAction
+  actor       BankEventActor
+  actorId     String?
+  details     Json?
+  checkStatus BankCheckStatus?
+  /// Admin-only context (reasonCode, manual note). Never sent to sellers.
+  note        String?
+  createdAt   DateTime        @default(now())
+
+  @@index([storeId, createdAt])
+  @@map("store_bank_account_events")
   @@schema("public")
 }
 

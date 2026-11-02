@@ -22,6 +22,11 @@ export const adminConsoleRoutes: FastifyPluginAsync = async (app) => {
     "/stores/:id/bank-accounts/:accountId/verification",
     controller.verifyBankAccount,
   );
+  // Ask the bank through PaymentHub (a paid check — not on every view).
+  app.post(
+    "/stores/:id/bank-accounts/:accountId/bank-check",
+    controller.checkBankAccount,
+  );
 
   // Customers (buyers and sellers are the same account type)
   app.get("/customers", controller.listCustomers);

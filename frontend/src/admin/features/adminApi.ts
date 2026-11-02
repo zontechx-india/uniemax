@@ -219,6 +219,47 @@ export interface BankAccount {
   verificationStatus: BankVerificationStatus
   verificationNote: string | null
   verifiedAt: string | null
+  /** PaymentHub's last answer — admin-only; reasonCode can say fraud. */
+  checkStatus: BankCheckStatus | null
+  checkReasonCode: string | null
+  /** The name the bank holds — filled only on VALID. */
+  checkRegisteredName: string | null
+  checkNameMatch: string | null
+  checkedAt: string | null
+  phone: string | null
+  /** Becomes the main account once verified. */
+  promoteWhenVerified: boolean
+  /** New details waiting for their check — payouts stay on the above. */
+  pendingChange: {
+    id: string
+    accountHolderName: string
+    accountNumberLast4: string
+    ifsc: string
+    bankName: string
+    branch: string
+    checkStatus: BankCheckStatus | null
+    checkReasonCode: string | null
+    checkRegisteredName: string | null
+    checkNameMatch: string | null
+    checkedAt: string | null
+    createdAt: string
+  } | null
+  createdAt: string
+}
+
+/** UNAVAILABLE = the check could not run (hub/verifier) — never a verdict. */
+export type BankCheckStatus = 'VALID' | 'NEEDS_REVIEW' | 'INVALID' | 'RETRY_LATER' | 'UNAVAILABLE'
+
+/** One line of a store's payout-account history (masked; `note` is admin-only). */
+export interface BankHistoryEvent {
+  id: string
+  accountId: string
+  action: string
+  actor: 'SELLER' | 'ADMIN' | 'SYSTEM'
+  actorId: string | null
+  details: { holder: string; last4: string; ifsc: string; bankName: string; branch: string } | null
+  checkStatus: BankCheckStatus | null
+  note: string | null
   createdAt: string
 }
 
@@ -268,6 +309,8 @@ export interface StoreDetail extends StoreRow {
     checkout: Record<string, boolean>
   }
   bankAccounts: BankAccount[]
+  /** Newest first, last 30. */
+  bankHistory: BankHistoryEvent[]
   orderStatus: Partial<Record<OrderStatus, number>>
   recentOrders: Pick<
     OrderRow,
@@ -977,6 +1020,12 @@ export const adminApi = {
   ) {
     return call<StoreDetail>(
       http.patch(`${BASE}/stores/${storeId}/bank-accounts/${accountId}/verification`, body),
+    )
+  },
+  /** PaymentHub asks the bank — up to ~50 s, and a paid check. */
+  checkBankAccount(storeId: string, accountId: string) {
+    return call<{ store: StoreDetail; check: { status: BankCheckStatus; reused: boolean } }>(
+      http.post(`${BASE}/stores/${storeId}/bank-accounts/${accountId}/bank-check`),
     )
   },
 

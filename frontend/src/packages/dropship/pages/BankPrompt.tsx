@@ -8,6 +8,7 @@ import { storeBankApi } from '../../../storefront/features/stores/storesApi'
 import type { BankAccountDetails } from '../../../storefront/features/stores/storesApi'
 import { useManagedStore } from '../../../storefront/features/stores/useManagedStore'
 import { AccountForm } from '../../../storefront/pages/stores/StoreBankPage'
+import { CodeCancelled, useBankCode } from '../../../storefront/pages/stores/BankCodeDialog'
 import { showToast } from '../../../storefront/pages/stores/ui'
 import { refreshDropshipRole, useDropshipRole } from '../role'
 
@@ -16,7 +17,9 @@ import { refreshDropshipRole, useDropshipRole } from '../role'
  * UnieMax (Easy Split, PS-1): the supplier for prepaid orders, the seller for
  * its share. Shown only while payouts are on and this store has no payout
  * account; it disappears the moment one is added. The form is the store's own
- * bank form, so nothing is retyped elsewhere.
+ * bank form, so nothing is retyped elsewhere — and the account goes through
+ * the same bank check (and, if the store already has accounts, the same
+ * confirmation code) as on the Bank account page.
  */
 export function BankPrompt({ audience }: { audience: 'supplier' | 'seller' }) {
   const { store } = useManagedStore()
@@ -24,6 +27,7 @@ export function BankPrompt({ audience }: { audience: 'supplier' | 'seller' }) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const bankCode = useBankCode(store.id)
 
   if (!role || role.split === 'off' || !role.payout || role.payout.active) return null
 
@@ -31,12 +35,26 @@ export function BankPrompt({ audience }: { audience: 'supplier' | 'seller' }) {
     setBusy(true)
     setError(null)
     try {
-      await storeBankApi.create(store.id, input)
-      refreshDropshipRole(store.slug)
-      setOpen(false)
-      showToast(role.split === 'sandbox' ? 'Bank account added (sandbox: no money moves)' : 'Bank account added')
+      // This prompt can't tell whether earlier accounts exist; the server's
+      // 428 says when a code is needed.
+      await bankCode.run(
+        async (otp) => {
+          const saved = await storeBankApi.create(store.id, { ...input, ...(otp ? { otp } : {}) })
+          const verified = saved.check?.status === 'VALID'
+          refreshDropshipRole(store.slug)
+          setOpen(false)
+          showToast(
+            role.split === 'sandbox'
+              ? 'Bank account added (sandbox: no money moves)'
+              : verified
+                ? 'Bank account added and verified'
+                : 'Bank account added — see Bank account for its check',
+          )
+        },
+        { needsCode: false },
+      )
     } catch (err) {
-      setError(toApiError(err).message)
+      if (!(err instanceof CodeCancelled)) setError(toApiError(err).message)
     } finally {
       setBusy(false)
     }
@@ -69,9 +87,10 @@ export function BankPrompt({ audience }: { audience: 'supplier' | 'seller' }) {
               </Link>
             </ErrorNote>
           )}
-          <AccountForm busy={busy} onSubmit={(input) => void add(input)} onCancel={() => setOpen(false)} />
+          <AccountForm busy={busy} onSubmit={(input) => void add(input as BankAccountDetails)} onCancel={() => setOpen(false)} />
         </div>
       </Dialog>
+      {bankCode.dialog}
     </>
   )
 }

@@ -236,17 +236,21 @@ A single account can own multiple stores and switch between them.
 - **Bank accounts (payouts)** — the seller registers the bank account(s)
   UnieMax pays their sales earnings into (used when customers pay through
   the platform; the payments module itself is a later release). Up to 5
-  accounts, each with account holder name, account number (entered twice to
-  confirm), IFSC, bank name, branch and an optional UPI ID. Adding the first
-  account needs the business address — asked for on the same page, as step 1,
-  when it is missing. Exactly **one
+  accounts, each with account holder name (as on the passbook), account
+  number (entered twice to confirm), IFSC, bank name, branch and an optional
+  UPI ID and phone. Adding the first account needs the business address —
+  asked for on the same page, as step 1, when it is missing. Exactly **one
   account is primary** — only it receives payouts; deleting the primary
   never silently retargets payouts (they hold until the seller explicitly
-  picks another). Every account carries a **verification status** (pending
-  → verified / failed): verification will be performed by a third-party
-  account validator and can also be done manually by a UnieMax admin from
-  the future admin panel — the data model and statuses are provisioned now.
-  Editing a verified account's details resets it to pending.
+  picks another). **Saving checks the account with the bank** through
+  PaymentHub: Verified (with the name the bank holds), Under review, Could
+  not verify, Bank didn't answer, or Unavailable (never treated as invalid);
+  a UnieMax admin can also check or decide by hand. **Every change after the
+  first account needs a code** sent to the seller's phone (or email), and
+  the seller is emailed after each change. New details for a verified
+  account are checked first — payouts keep going to the verified details
+  until the new ones are verified. A **change history** shows who changed
+  what and when. Dropship suppliers use the same flow.
 - **Payment settings** — Yes/No switches deciding how customers **pay**:
   **Accept Online Payment** (paid through UnieMax, settled to the seller's
   primary bank account — the gateway itself ships with the payments module)
@@ -1014,8 +1018,9 @@ revoked from anywhere else.
 - **Stores & sellers** — every store, published, draft or suspended, with its
   owner, catalog size, orders and revenue. Two powers: **suspend a store**
   (removes it from the marketplace and stops new orders, while the owner
-  keeps access to fix the cause) and **verify a payout account** manually —
-  the admin half of bank verification, with a required note on failure.
+  keeps access to fix the cause) and **verify a payout account** — "Verify
+  with bank" has PaymentHub check it with the bank (5 checks a day per
+  store), or the admin decides by hand, with a required note on failure.
 - **Customers** — buyers and sellers together (they are the same account
   type), with **blocking**: no future sign-in by any method, and every signed-in
   device logged out at once.

@@ -2,6 +2,7 @@ import type { FastifyBaseLogger } from "fastify";
 import { prisma } from "../../config/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { afterOrderPaid } from "./payments.service.js";
+import { applyVerificationUpdate } from "../stores/bankCheck.service.js";
 import {
   decide,
   FAILED_FROM,
@@ -106,6 +107,18 @@ export async function handlePaymentHubEvent(
     );
     await markProcessed(envelope.id);
     return "ignored";
+  }
+
+  if (event.kind === "verification") {
+    // A hub admin settled a NEEDS_REVIEW bank check (bankCheck.service.ts).
+    const { verification } = event;
+    const result = await applyVerificationUpdate(verification);
+    log[result === "unknown" ? "warn" : "info"](
+      { ...ctx, verificationId: verification.id, status: verification.status, result },
+      "PaymentHub webhook: bank verification update",
+    );
+    await markProcessed(envelope.id);
+    return result === "applied" ? "processed" : "ignored";
   }
 
   const { intent } = event;

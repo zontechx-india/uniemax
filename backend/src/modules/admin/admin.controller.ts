@@ -11,6 +11,7 @@ import * as orders from "./adminOrders.service.js";
 import * as products from "./adminProducts.service.js";
 import * as accounts from "./adminAccounts.service.js";
 import * as categoryMapping from "./adminCategoryMapping.service.js";
+import * as bankCheck from "../stores/bankCheck.service.js";
 import { listAudit, recordAudit } from "./adminAudit.js";
 
 /**
@@ -97,6 +98,20 @@ export async function verifyBankAccount(request: FastifyRequest) {
     meta: { storeId: store.id, note: input.note ?? null },
   });
   return ok(store);
+}
+
+/** "Verify with bank" — PaymentHub checks the saved details; no body. */
+export async function checkBankAccount(request: FastifyRequest) {
+  const { id, accountId } = bankParams.parse(request.params);
+  const check = await bankCheck.runAdminBankCheck(id, accountId, actor(request).id, request.log);
+  const store = await stores.getStore(id);
+  recordAudit(request, {
+    action: "bankAccount.bankCheck",
+    entityType: "storeBankAccount",
+    entityId: accountId,
+    meta: { storeId: store.id, status: check.status, reused: check.reused },
+  });
+  return ok({ store, check });
 }
 
 // ---- Customers ------------------------------------------------------------

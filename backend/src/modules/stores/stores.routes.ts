@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync, onResponseHookHandler } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest, onResponseHookHandler } from "fastify";
 import { requireCustomer, requireSuperAdmin } from "../../package/auth/index.js";
 import * as controller from "./stores.controller.js";
 import * as catalogController from "./storeCatalog.controller.js";
@@ -135,8 +135,10 @@ export const storeRoutes: FastifyPluginAsync<StoreRoutesOptions> = async (
   app.delete("/:id/banners/:bannerId", bannerController.deleteBanner);
 
   // Payout bank accounts — several per store, exactly one primary (the
-  // payout target). Verification (third-party + admin) is provisioned in
-  // the model; those endpoints arrive with the payments/admin modules.
+  // payout target). Saving runs a PaymentHub bank check; every change but
+  // the first account needs a step-up code (POST …/bank-accounts/otp).
+  // Writes that can run a (paid) check are limited per store, on top of the
+  // hub's own 5-a-day: CHECK_LIMIT below.
   //
   // Owner mount only, and deliberately so: this is where a store's money
   // lands, the highest-value target on the platform, and no support task
@@ -144,9 +146,28 @@ export const storeRoutes: FastifyPluginAsync<StoreRoutesOptions> = async (
   // as well, so this stays closed even if someone registers it here later.
   // Admins verify (never edit) accounts via /api/v1/admin/stores/:id/...
   if (!isAdmin) {
+    const CHECK_LIMIT = {
+      config: {
+        rateLimit: {
+          // Room for a 428 (code needed) + the real save, a few times over.
+          max: 10,
+          timeWindow: "10 minutes",
+          keyGenerator: (request: FastifyRequest) =>
+            `bank-check:${(request.params as { id?: string }).id ?? request.ip}`,
+        },
+      },
+    };
     app.get("/:id/bank-accounts", bankController.listBankAccounts);
-    app.post("/:id/bank-accounts", bankController.createBankAccount);
-    app.patch("/:id/bank-accounts/:accountId", bankController.updateBankAccount);
+    app.get("/:id/bank-accounts/history", bankController.listBankHistory);
+    app.post(
+      "/:id/bank-accounts/otp",
+      { config: { rateLimit: { max: 5, timeWindow: "10 minutes" } } },
+      bankController.requestBankChangeCode,
+    );
+    app.post("/:id/bank-accounts", CHECK_LIMIT, bankController.createBankAccount);
+    app.patch("/:id/bank-accounts/:accountId", CHECK_LIMIT, bankController.updateBankAccount);
+    app.post("/:id/bank-accounts/:accountId/check", CHECK_LIMIT, bankController.recheckBankAccount);
+    app.delete("/:id/bank-accounts/:accountId/change", bankController.discardBankChange);
     app.delete("/:id/bank-accounts/:accountId", bankController.deleteBankAccount);
   }
 

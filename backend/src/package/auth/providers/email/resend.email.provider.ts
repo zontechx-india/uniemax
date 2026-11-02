@@ -15,6 +15,7 @@ const SUBJECT: Record<CodePurpose, string> = {
   LINK: "Confirm your contact details",
   EMAIL_VERIFY: "Verify your email address",
   PASSWORD_RESET: "Reset your password",
+  BANK_CHANGE: "Confirm your bank account change",
 };
 
 function renderHtml({ code, purpose, expiresInMinutes }: CodeMessage): string {

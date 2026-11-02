@@ -37,6 +37,12 @@ export {
 export { revokeAllSessions } from "./core/session.service.js";
 
 /**
+ * Step-up code for a sensitive action by a signed-in customer (payout bank
+ * changes) — sent to their verified phone, else their email.
+ */
+export { confirmActionCode, requestActionCode } from "./customer/actionCode.js";
+
+/**
  * Registers the plugins the auth package needs. Currently just cookie parsing
  * (web clients authenticate via httpOnly cookies). Call once at app boot.
  */

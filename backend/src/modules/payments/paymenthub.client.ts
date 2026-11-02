@@ -2,7 +2,8 @@ import { env } from "../../config/env.js";
 import { HttpError } from "../../utils/httpError.js";
 
 /**
- * Thin client for PaymentHub's client API (`/v1/payment-intents`) — the
+ * Thin client for PaymentHub's client API (`/v1/payment-intents`,
+ * `/v1/verifications/bank-account`) — the
  * hub's docs/API.md §1. Server-to-server only; the API key never leaves this
  * process. Each environment talks to its own hub (dev → pay.dev, TEST key,
  * Cashfree sandbox; prod → pay, LIVE key).
@@ -46,13 +47,14 @@ export class HubApiError extends HttpError {
 
 async function hubFetch<T>(
   path: string,
-  init: { method?: "GET" | "POST"; body?: unknown; idempotencyKey?: string } = {},
+  init: { method?: "GET" | "POST"; body?: unknown; idempotencyKey?: string; timeoutMs?: number } = {},
 ): Promise<T> {
   if (!paymentHubConfigured) throw HttpError.badGateway("PaymentHub is not configured");
   const response = await fetch(`${env.PAYMENTHUB_URL}${path}`, {
     method: init.method ?? "GET",
-    // The hub itself retries the gateway for up to ~15 s before answering.
-    signal: AbortSignal.timeout(25_000),
+    // The hub itself retries the gateway for up to ~15 s before answering;
+    // a bank check asks the bank live and passes its own, longer timeout.
+    signal: AbortSignal.timeout(init.timeoutMs ?? 25_000),
     headers: {
       authorization: `Bearer ${env.PAYMENTHUB_API_KEY}`,
       ...(init.body !== undefined ? { "content-type": "application/json" } : {}),
@@ -95,4 +97,44 @@ export function retryIntent(id: string, idempotencyKey: string): Promise<HubInte
 
 export function cancelIntent(id: string, idempotencyKey: string): Promise<HubIntent> {
   return hubFetch<HubIntent>(`/v1/payment-intents/${encodeURIComponent(id)}/cancel`, { method: "POST", body: {}, idempotencyKey });
+}
+
+export type HubVerificationStatus = "VALID" | "NEEDS_REVIEW" | "INVALID" | "RETRY_LATER";
+
+/** The hub's verification object — never carries the full account number. */
+export interface HubVerification {
+  id: string;
+  payeeRef: string;
+  status: HubVerificationStatus;
+  /** Masked, e.g. "XXXX1191". */
+  target: string;
+  details: { ifsc?: string; bankName?: string; branch?: string; city?: string } | null;
+  /** Filled only when `status` is VALID. */
+  registeredName: string | null;
+  nameMatch: string | null;
+  /** For admins only — can say the provider flagged the account as fraud. */
+  reasonCode: string | null;
+  reused: boolean;
+}
+
+export interface VerifyBankAccountInput {
+  payeeRef: string;
+  accountNumber: string;
+  ifsc: string;
+  accountHolder: string;
+  phone?: string;
+}
+
+/** The bank is asked live (up to ~30 s on the hub's side). */
+export function verifyBankAccount(
+  input: VerifyBankAccountInput,
+  idempotencyKey: string,
+  timeoutMs: number,
+): Promise<HubVerification> {
+  return hubFetch<HubVerification>("/v1/verifications/bank-account", {
+    method: "POST",
+    body: input,
+    idempotencyKey,
+    timeoutMs,
+  });
 }

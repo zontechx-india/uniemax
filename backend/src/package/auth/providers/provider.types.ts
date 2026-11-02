@@ -14,7 +14,7 @@
 export type CodeChannel = "EMAIL" | "SMS";
 
 /** Why a verification code was issued (mirrors the `OtpPurpose` enum values used by auth). */
-export type CodePurpose = "LOGIN" | "LINK" | "EMAIL_VERIFY" | "PASSWORD_RESET";
+export type CodePurpose = "LOGIN" | "LINK" | "EMAIL_VERIFY" | "PASSWORD_RESET" | "BANK_CHANGE";
 
 /** Social sign-in providers (mirrors the `AuthProvider` Prisma enum). */
 export type OAuthProviderName = "GOOGLE" | "APPLE";

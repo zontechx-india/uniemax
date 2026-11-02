@@ -17,6 +17,7 @@ import {
 } from "../stores/storeReadiness.js";
 import type { Readiness } from "../stores/storeReadiness.js";
 import { notify } from "../notifications/notifications.service.js";
+import { listBankEvents, recordBankEvent } from "../stores/storeBank.history.js";
 import type {
   BankVerificationInput,
   StoreListQuery,
@@ -216,12 +217,40 @@ export async function getStore(storeRef: string) {
           bankName: true,
           branch: true,
           upiId: true,
+          phone: true,
           isPrimary: true,
+          promoteWhenVerified: true,
           verificationStatus: true,
           verificationMethod: true,
           verificationNote: true,
           verifiedAt: true,
+          // PaymentHub's last answer — admin-only (reasonCode can say fraud).
+          checkStatus: true,
+          checkReasonCode: true,
+          checkRegisteredName: true,
+          checkNameMatch: true,
+          checkedAt: true,
           createdAt: true,
+          // New details waiting for their check (payouts stay on the above).
+          changes: {
+            where: { status: "OPEN" },
+            take: 1,
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              accountHolderName: true,
+              accountNumber: true,
+              ifsc: true,
+              bankName: true,
+              branch: true,
+              checkStatus: true,
+              checkReasonCode: true,
+              checkRegisteredName: true,
+              checkNameMatch: true,
+              checkedAt: true,
+              createdAt: true,
+            },
+          },
         },
       },
     },
@@ -305,10 +334,18 @@ export async function getStore(storeRef: string) {
     },
     // Account numbers are never shown in full to an admin — the last four
     // are enough to match a seller's support request against a payout.
-    bankAccounts: bankAccounts.map(({ accountNumber, ...account }) => ({
-      ...account,
-      accountNumberLast4: accountNumber.slice(-4),
-    })),
+    bankAccounts: bankAccounts.map(({ accountNumber, changes, ...account }) => {
+      const change = changes[0];
+      return {
+        ...account,
+        accountNumberLast4: accountNumber.slice(-4),
+        pendingChange: change
+          ? (({ accountNumber: number, ...rest }) => ({ ...rest, accountNumberLast4: number.slice(-4) }))(change)
+          : null,
+      };
+    }),
+    // Who changed which payout account, newest first — with admin notes.
+    bankHistory: await listBankEvents(store.id, { withNotes: true, take: 30 }),
     orderStatus: Object.fromEntries(
       orderStatus.map((row) => [row.status, row._count._all]),
     ),
@@ -433,7 +470,15 @@ export async function setBankVerification(
 
   const account = await prisma.storeBankAccount.findFirst({
     where: { id: accountId, storeId: store.id },
-    select: { id: true, bankName: true, accountNumber: true },
+    select: {
+      id: true,
+      accountHolderName: true,
+      accountNumber: true,
+      ifsc: true,
+      bankName: true,
+      branch: true,
+      promoteWhenVerified: true,
+    },
   });
   if (!account) throw HttpError.notFound("Bank account not found");
 
@@ -442,15 +487,42 @@ export async function setBankVerification(
     throw HttpError.badRequest("Add a note explaining why verification failed");
   }
 
-  await prisma.storeBankAccount.update({
-    where: { id: account.id },
-    data: {
-      verificationStatus: input.status,
-      verificationMethod: input.status === "PENDING" ? null : "MANUAL",
-      verificationNote: input.note ?? null,
-      verifiedAt: input.status === "VERIFIED" ? new Date() : null,
-      verifiedBy: input.status === "PENDING" ? null : adminId,
-    },
+  const admin = { type: "ADMIN" as const, id: adminId };
+  await prisma.$transaction(async (tx) => {
+    await tx.storeBankAccount.update({
+      where: { id: account.id },
+      data: {
+        verificationStatus: input.status,
+        verificationMethod: input.status === "PENDING" ? null : "MANUAL",
+        verificationNote: input.note ?? null,
+        verifiedAt: input.status === "VERIFIED" ? new Date() : null,
+        verifiedBy: input.status === "PENDING" ? null : adminId,
+      },
+    });
+    await recordBankEvent(
+      {
+        storeId: store.id,
+        accountId: account.id,
+        action:
+          input.status === "VERIFIED" ? "MANUAL_VERIFIED" : input.status === "FAILED" ? "MANUAL_FAILED" : "MANUAL_RESET",
+        actor: admin,
+        details: account,
+        note: input.note ?? null,
+      },
+      tx,
+    );
+    // Asked to be the main account once verified — a manual verify counts.
+    if (input.status === "VERIFIED" && account.promoteWhenVerified) {
+      await tx.storeBankAccount.updateMany({ where: { storeId: store.id }, data: { isPrimary: false } });
+      await tx.storeBankAccount.update({
+        where: { id: account.id },
+        data: { isPrimary: true, promoteWhenVerified: false },
+      });
+      await recordBankEvent(
+        { storeId: store.id, accountId: account.id, action: "PRIMARY_CHANGED", actor: admin, details: account },
+        tx,
+      );
+    }
   });
 
   if (input.status !== "PENDING") {

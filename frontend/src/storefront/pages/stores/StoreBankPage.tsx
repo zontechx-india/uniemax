@@ -14,6 +14,10 @@ import type { StoreAddress } from '../../features/stores/storeProfile'
 import { storeBankApi, storesApi } from '../../features/stores/storesApi'
 import type {
   BankAccountDetails,
+  BankCheckOutcome,
+  BankCheckStatus,
+  BankHistoryEvent,
+  BankSaveResult,
   Store,
   StoreBankAccount,
 } from '../../features/stores/storesApi'
@@ -22,6 +26,7 @@ import {
   BankIcon,
   CardIcon,
   CheckIcon,
+  ClockIcon,
   MapPinIcon,
   PencilIcon,
   PlusIcon,
@@ -39,40 +44,62 @@ import { StatusPill } from './ui/StatusPill'
 import type { StatusTone } from './ui/StatusPill'
 import { showToast } from './ui/Toast'
 import { useGateBlockers } from './GateBlockers'
+import { CodeCancelled, useBankCode } from './BankCodeDialog'
 
 /**
  * Bank Accounts section of Store Management — the seller's payout accounts.
  * A store can save up to 5; exactly one is **primary**, and that account
  * alone receives payouts from UnieMax when customers pay through the
- * platform. Every account carries a verification status: it starts
- * "Pending verification" and will be checked by a third-party validator or
- * manually by a UnieMax admin (admin panel is a future module — the status
- * fields are provisioned now). Editing a verified account's bank details
- * resets it to pending.
+ * platform. Dropship suppliers use this same page and form.
  *
- * **Adding an account needs the business address** — it is no longer asked
- * for at signup (sellers abandoned the wizard on it), and a payout account
- * is the first thing that needs to know where the business being paid is.
- * It is asked for **right here**, as step 1 of adding the account, so a
- * seller who came to add a bank account is never sent to another page (PAN
- * and GSTIN are optional and not asked). The condition is
+ * **Saving checks the account with the bank** (PaymentHub). The answer comes
+ * back with the save, up to a minute later: Verified (with the name the bank
+ * holds), Under review, Could not verify (edit and save again), Bank didn't
+ * answer (check again later) or Unavailable (our side — never "invalid").
+ *
+ * **Every change but the first account needs a code** (`BankCodeDialog`),
+ * sent to the seller's verified phone, else email — and they are emailed
+ * after it. Changing a VERIFIED account does not touch it: the new details
+ * wait beside it ("New details: under review") and payouts keep going to
+ * the verified ones until the new details are verified. The full account
+ * number is never shown again after saving — only the last 4 digits.
+ *
+ * **Adding an account needs the business address** — asked for **right
+ * here**, as step 1 of adding the account, so a seller who came to add a
+ * bank account is never sent to another page. The condition is
  * `store.readiness.gates.PAYOUT_SETUP`, the same evaluation
- * `POST /bank-accounts` enforces; anything it ever needs that this page
- * cannot ask for falls back to a link. Editing, re-prioritising and deleting
- * existing accounts are never gated. Every change re-fetches the store, so
- * the Payments switch unlocks the moment a main account exists.
+ * `POST /bank-accounts` enforces.
  *
  * The form asks in the order a seller holds the information — the name on
  * the account, then the **IFSC**, which looks the branch up
  * (`lookupIfsc`, Razorpay's public IFSC directory) and fills the bank name
- * and branch for them — then the account number twice. Each technical field
- * has a one-line "where do I find this" hint and an ⓘ sheet.
+ * and branch for them — then the account number twice.
  */
 
 const MAX_ACCOUNTS = 5
 
 /** The one payout requirement this page collects itself. */
 const ADDRESS_KEY = 'address.business'
+
+/** What a check's answer means, in the seller's words. */
+function checkMessage(check: BankCheckOutcome | null): { text: string; tone: 'ok' | 'info' | 'error' } | null {
+  if (!check) return null
+  if (check.error && check.error.reason !== 'UNAVAILABLE') return { text: check.error.message, tone: 'error' }
+  switch (check.status) {
+    case 'VALID':
+      return { text: 'Bank account verified.', tone: 'ok' }
+    case 'NEEDS_REVIEW':
+      return { text: 'We are checking your bank details. We will tell you when it is done.', tone: 'info' }
+    case 'INVALID':
+      return { text: "We couldn't verify this account. Check the account number and IFSC.", tone: 'error' }
+    case 'RETRY_LATER':
+      return { text: "Your bank didn't answer. Try again in a few minutes.", tone: 'info' }
+    case 'UNAVAILABLE':
+      return { text: 'Verification is unavailable right now. Your details are saved — try again later.', tone: 'info' }
+    default:
+      return null
+  }
+}
 
 export function StoreBankPage() {
   const { store, onStoreChange, refreshStore } = useManagedStore()
@@ -83,9 +110,12 @@ export function StoreBankPage() {
   const [editing, setEditing] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [result, setResult] = useState<ReturnType<typeof checkMessage>>(null)
   const [confirmDelete, setConfirmDelete] = useState<StoreBankAccount | null>(
     null,
   )
+  const [history, setHistory] = useState<BankHistoryEvent[] | null>(null)
+  const bankCode = useBankCode(store.id)
 
   useEffect(() => {
     let cancelled = false
@@ -104,55 +134,97 @@ export function StoreBankPage() {
     }
   }, [store.id])
 
+  const loadHistory = () => {
+    storeBankApi
+      .history(store.id)
+      .then(setHistory)
+      .catch((err) => setActionError(toApiError(err).message))
+  }
+
   const run = async (action: () => Promise<void>): Promise<boolean> => {
     setBusy(true)
     setActionError(null)
+    setResult(null)
     try {
       await action()
-      showToast('Saved')
       return true
     } catch (err) {
-      setActionError(toApiError(err).message)
+      if (!(err instanceof CodeCancelled)) setActionError(toApiError(err).message)
       return false
     } finally {
       setBusy(false)
     }
   }
 
-  // The store's readiness counts the main account (online payment needs
-  // one), so every change that can move it re-fetches the store — otherwise
-  // the Payments switch would stay locked until a reload.
-  const create = (input: BankAccountDetails) =>
-    run(async () => {
-      const account = await storeBankApi.create(store.id, input)
-      setAccounts((rows) => [
-        ...(rows ?? []).map((row) =>
-          account.isPrimary ? { ...row, isPrimary: false } : row,
-        ),
-        account,
-      ])
-      setEditing(null)
-      refreshStore?.()
+  /** Put the saved account in the list and say what the bank check found. */
+  const applySaved = (saved: BankSaveResult) => {
+    setAccounts((rows) => {
+      const list = rows ?? []
+      const merged = list.some((row) => row.id === saved.account.id)
+        ? list.map((row) => (row.id === saved.account.id ? saved.account : row))
+        : [...list, saved.account]
+      // Only one main account: the saved one wins.
+      return saved.account.isPrimary
+        ? merged.map((row) => (row.id === saved.account.id ? row : { ...row, isPrimary: false }))
+        : merged
     })
+    const message = checkMessage(saved.check)
+    setResult(message)
+    showToast(message?.tone === 'ok' ? 'Saved and verified' : 'Saved')
+    if (history) loadHistory()
+  }
 
-  const update = (accountId: string, input: BankAccountDetails) =>
-    run(async () => {
-      const account = await storeBankApi.update(store.id, accountId, input)
-      setAccounts((rows) =>
-        (rows ?? []).map((row) => (row.id === account.id ? account : row)),
-      )
-      setEditing(null)
-    })
+  // The store's readiness counts the main account (online payment needs
+  // one), so every change that can move it re-fetches the store.
+  const create = (input: BankAccountDetails) =>
+    run(() =>
+      bankCode.run(
+        async (otp) => {
+          const saved = await storeBankApi.create(store.id, { ...input, ...(otp ? { otp } : {}) })
+          applySaved(saved)
+          setEditing(null)
+          refreshStore?.()
+        },
+        // The first account needs no code; any later one does.
+        { needsCode: (accounts ?? []).length > 0 },
+      ),
+    )
+
+  const update = (accountId: string, input: Partial<BankAccountDetails>) =>
+    run(() =>
+      bankCode.run(
+        async (otp) => {
+          const saved = await storeBankApi.update(store.id, accountId, { ...input, otp: otp ?? '' })
+          applySaved(saved)
+          setEditing(null)
+        },
+        { needsCode: true },
+      ),
+    )
 
   const setPrimary = (accountId: string) =>
+    run(() =>
+      bankCode.run(
+        async (otp) => {
+          applySaved(await storeBankApi.setPrimary(store.id, accountId, otp ?? ''))
+          refreshStore?.()
+        },
+        { needsCode: true },
+      ),
+    )
+
+  const recheck = (accountId: string) =>
     run(async () => {
-      const account = await storeBankApi.setPrimary(store.id, accountId)
-      setAccounts((rows) =>
-        (rows ?? []).map((row) =>
-          row.id === account.id ? account : { ...row, isPrimary: false },
-        ),
-      )
+      applySaved(await storeBankApi.recheck(store.id, accountId))
       refreshStore?.()
+    })
+
+  const discard = (accountId: string) =>
+    run(async () => {
+      const account = await storeBankApi.discardChange(store.id, accountId)
+      setAccounts((rows) => (rows ?? []).map((row) => (row.id === account.id ? account : row)))
+      showToast('New details removed')
+      if (history) loadHistory()
     })
 
   const remove = async () => {
@@ -161,7 +233,9 @@ export function StoreBankPage() {
     const ok = await run(async () => {
       await storeBankApi.remove(store.id, target.id)
       setAccounts((rows) => (rows ?? []).filter((row) => row.id !== target.id))
+      showToast('Deleted')
       refreshStore?.()
+      if (history) loadHistory()
     })
     if (ok) setConfirmDelete(null)
   }
@@ -281,6 +355,13 @@ export function StoreBankPage() {
         </div>
       )}
 
+      {result &&
+        (result.tone === 'error' ? (
+          <ErrorNote>{result.text}</ErrorNote>
+        ) : (
+          <InfoNote>{result.text}</InfoNote>
+        ))}
+
       {(accounts ?? []).length > 0 && (
         <ul className="glass-card divide-y divide-line overflow-hidden rounded-glass">
           {(accounts ?? []).map((account) =>
@@ -301,6 +382,8 @@ export function StoreBankPage() {
                 onSetPrimary={() => void setPrimary(account.id)}
                 onEdit={() => setEditing(account.id)}
                 onDelete={() => setConfirmDelete(account)}
+                onRecheck={() => void recheck(account.id)}
+                onDiscard={() => void discard(account.id)}
               />
             ),
           )}
@@ -320,25 +403,31 @@ export function StoreBankPage() {
           <AccountForm
             busy={busy}
             onCancel={() => setEditing(null)}
-            onSubmit={(input) => void create(input)}
+            onSubmit={(input) => void create(input as BankAccountDetails)}
           />
         ))}
 
       {actionError && <ErrorNote>{actionError}</ErrorNote>}
+
+      {(accounts ?? []).length > 0 && (
+        <BankHistory history={history} onOpen={loadHistory} />
+      )}
 
       <ConfirmDialog
         open={confirmDelete !== null}
         title="Delete this bank account?"
         description={
           confirmDelete?.isPrimary
-            ? `This is your MAIN account (${confirmDelete.bankName} ····${confirmDelete.accountNumber.slice(-4)}). After deleting it, payments are on hold until you set another account as main.`
-            : `${confirmDelete?.bankName ?? ''} ····${confirmDelete?.accountNumber.slice(-4) ?? ''} will be removed.`
+            ? `This is your MAIN account (${confirmDelete.bankName} ····${confirmDelete.accountNumberLast4}). After deleting it, payments are on hold until you set another account as main.`
+            : `${confirmDelete?.bankName ?? ''} ····${confirmDelete?.accountNumberLast4 ?? ''} will be removed.`
         }
         confirmLabel="Delete"
         busy={busy}
         onConfirm={() => void remove()}
         onCancel={() => setConfirmDelete(null)}
       />
+
+      {bankCode.dialog}
     </div>
   )
 }
@@ -347,10 +436,51 @@ export function StoreBankPage() {
 // Row
 // ---------------------------------------------------------------------------
 
-const STATUS_META: Record<StoreBankAccount['verificationStatus'], { label: string; tone: StatusTone }> = {
-  PENDING: { label: 'Being checked', tone: 'pending' },
-  VERIFIED: { label: 'Verified', tone: 'success' },
-  FAILED: { label: 'Check failed', tone: 'danger' },
+interface CheckView {
+  label: string
+  tone: StatusTone
+  /** One line under the details. */
+  note: string | null
+  /** "Check again" makes sense (no answer yet / bank or service didn't answer). */
+  canRecheck: boolean
+}
+
+/** A check status the seller reads (never the admin-only reason code). */
+function pendingView(status: BankCheckStatus | null): CheckView {
+  switch (status) {
+    case 'NEEDS_REVIEW':
+      return { label: 'Under review', tone: 'pending', note: 'We are checking your bank details.', canRecheck: false }
+    case 'RETRY_LATER':
+      return { label: "Bank didn't answer", tone: 'pending', note: 'Try again in a few minutes.', canRecheck: true }
+    case 'UNAVAILABLE':
+      return { label: 'Unavailable', tone: 'neutral', note: 'Verification is unavailable right now. Try again later.', canRecheck: true }
+    case 'INVALID':
+      return { label: 'Could not verify', tone: 'danger', note: 'Check the account number and IFSC, then save again.', canRecheck: false }
+    case 'VALID':
+      return { label: 'Verified', tone: 'success', note: null, canRecheck: false }
+    default:
+      return { label: 'Not checked yet', tone: 'pending', note: null, canRecheck: true }
+  }
+}
+
+function accountView(account: StoreBankAccount): CheckView {
+  if (account.verificationStatus === 'VERIFIED') {
+    return {
+      label: 'Verified',
+      tone: 'success',
+      note: account.checkRegisteredName ? `Name at bank: ${account.checkRegisteredName}` : null,
+      canRecheck: false,
+    }
+  }
+  if (account.verificationStatus === 'FAILED') {
+    return {
+      label: 'Could not verify',
+      tone: 'danger',
+      note: account.verificationNote ?? 'Check the account number and IFSC, then save again.',
+      canRecheck: false,
+    }
+  }
+  return pendingView(account.checkStatus)
 }
 
 function AccountRow({
@@ -359,14 +489,20 @@ function AccountRow({
   onSetPrimary,
   onEdit,
   onDelete,
+  onRecheck,
+  onDiscard,
 }: {
   account: StoreBankAccount
   busy: boolean
   onSetPrimary: () => void
   onEdit: () => void
   onDelete: () => void
+  onRecheck: () => void
+  onDiscard: () => void
 }) {
-  const status = STATUS_META[account.verificationStatus]
+  const view = accountView(account)
+  const change = account.pendingChange
+  const changeView = change ? pendingView(change.checkStatus) : null
   return (
     <li>
       <ActionRow
@@ -375,7 +511,7 @@ function AccountRow({
             <BankIcon className="h-6 w-6" />
           </span>
         }
-        title={`${account.bankName} ····${account.accountNumber.slice(-4)}`}
+        title={`${account.bankName} ····${account.accountNumberLast4}`}
         status={
           <>
             {account.isPrimary && (
@@ -384,7 +520,7 @@ function AccountRow({
                 Main account
               </StatusPill>
             )}
-            <StatusPill tone={status.tone}>{status.label}</StatusPill>
+            <StatusPill tone={view.tone}>{view.label}</StatusPill>
           </>
         }
         meta={
@@ -394,24 +530,61 @@ function AccountRow({
               IFSC {account.ifsc}
               {account.upiId && <> · UPI {account.upiId}</>}
             </span>
-            {account.verificationStatus === 'FAILED' && account.verificationNote && (
-              <span className="mt-1 block font-semibold text-danger">{account.verificationNote}</span>
+            {view.note && (
+              <span className={`mt-1 block ${view.tone === 'danger' ? 'font-semibold text-danger' : ''}`}>
+                {view.note}
+              </span>
+            )}
+            {account.promoteWhenVerified && (
+              <span className="mt-1 block">Becomes your main account once it is verified.</span>
+            )}
+            {change && changeView && (
+              <span className="mt-2 block rounded-lg bg-pending-soft p-2 text-fg">
+                <span className="block font-semibold">
+                  New details: {change.bankName} ····{change.accountNumberLast4} — {changeView.label}
+                </span>
+                <span className="block text-muted">
+                  {changeView.note ? `${changeView.note} ` : ''}
+                  Payouts still go to ····{account.accountNumberLast4} until the new details are verified.
+                </span>
+              </span>
             )}
           </>
         }
         primary={
-          <button
-            type="button"
-            onClick={onEdit}
-            disabled={busy}
-            className={buttonClass({ variant: 'secondary', size: 'md', className: 'px-4' })}
-          >
-            <PencilIcon className="h-4 w-4" />
-            Edit
-          </button>
+          (change ? changeView?.canRecheck : view.canRecheck) ? (
+            <Button variant="secondary" size="md" className="px-4" onClick={onRecheck} disabled={busy}>
+              <ClockIcon className="h-4 w-4" />
+              {busy ? 'Checking…' : 'Check again'}
+            </Button>
+          ) : (
+            <button
+              type="button"
+              onClick={onEdit}
+              disabled={busy}
+              className={buttonClass({ variant: 'secondary', size: 'md', className: 'px-4' })}
+            >
+              <PencilIcon className="h-4 w-4" />
+              Edit
+            </button>
+          )
         }
         menu={[
-          ...(!account.isPrimary
+          ...((change ? changeView?.canRecheck : view.canRecheck)
+            ? [{ label: 'Edit details', icon: PencilIcon, disabled: busy, onSelect: onEdit }]
+            : []),
+          ...(change
+            ? [
+                {
+                  label: 'Remove the new details',
+                  icon: TrashIcon,
+                  note: `Keep ····${account.accountNumberLast4}`,
+                  disabled: busy,
+                  onSelect: onDiscard,
+                },
+              ]
+            : []),
+          ...(!account.isPrimary && !account.promoteWhenVerified
             ? [
                 {
                   label: 'Make this my main account',
@@ -432,6 +605,73 @@ function AccountRow({
         ]}
       />
     </li>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// History
+// ---------------------------------------------------------------------------
+
+const HISTORY_LABEL: Record<BankHistoryEvent['action'], string> = {
+  ACCOUNT_ADDED: 'Account added',
+  DETAILS_CHANGED: 'Details changed',
+  CHANGE_REQUESTED: 'New details sent for checking',
+  CHANGE_APPLIED: 'New details verified and now in use',
+  CHANGE_DISCARDED: 'New details removed',
+  PRIMARY_CHANGED: 'Made the main account',
+  PRIMARY_QUEUED: 'Will be the main account once verified',
+  ACCOUNT_DELETED: 'Account deleted',
+  CHECK_RESULT: 'Bank check',
+  MANUAL_VERIFIED: 'Verified by UnieMax',
+  MANUAL_FAILED: 'Marked failed by UnieMax',
+  MANUAL_RESET: 'Verification reset by UnieMax',
+}
+
+const ACTOR_LABEL: Record<BankHistoryEvent['actor'], string> = {
+  SELLER: 'You',
+  ADMIN: 'UnieMax',
+  SYSTEM: 'Automatic',
+}
+
+/** Who changed which account and when — opened on demand. */
+function BankHistory({ history, onOpen }: { history: BankHistoryEvent[] | null; onOpen: () => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <GlassCard icon={ClockIcon} title="Change history" description="Every change to your bank accounts, newest first.">
+      {!open ? (
+        <Button
+          variant="secondary"
+          size="md"
+          onClick={() => {
+            setOpen(true)
+            onOpen()
+          }}
+        >
+          Show history
+        </Button>
+      ) : history === null ? (
+        <p className="text-sm text-muted">Loading…</p>
+      ) : history.length === 0 ? (
+        <p className="text-sm text-muted">No changes yet.</p>
+      ) : (
+        <ul className="divide-y divide-line">
+          {history.map((event) => (
+            <li key={event.id} className="py-2 text-sm">
+              <span className="font-semibold text-fg">
+                {HISTORY_LABEL[event.action]}
+                {event.action === 'CHECK_RESULT' && event.checkStatus
+                  ? `: ${pendingView(event.checkStatus).label}`
+                  : ''}
+              </span>
+              <span className="block text-muted">
+                {event.details ? `${event.details.bankName} ····${event.details.last4} · ` : ''}
+                {ACTOR_LABEL[event.actor]} · {new Date(event.createdAt).toLocaleString()}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </GlassCard>
   )
 }
 
@@ -515,6 +755,7 @@ function AddressStep({
   )
 }
 
+
 // ---------------------------------------------------------------------------
 // Add / edit form
 // ---------------------------------------------------------------------------
@@ -527,9 +768,18 @@ interface AccountDraft {
   bankName: string
   branch: string
   upiId: string
+  phone: string
 }
 
-/** Also used in place by the dropship package's bank prompt (a supplier adds its payout account without leaving its page). */
+/** The bank check's name rule — so the seller fixes it before a paid check. */
+const HOLDER_NAME = /^[A-Za-z0-9 .\-/&]+$/
+
+/**
+ * Also used in place by the dropship package's bank prompt (a supplier adds
+ * its payout account without leaving its page). Editing never shows the full
+ * account number: both number fields start empty, and empty means "keep
+ * ····1234" — the submitted patch then leaves it out.
+ */
 export function AccountForm({
   initial,
   busy,
@@ -538,17 +788,18 @@ export function AccountForm({
 }: {
   initial?: StoreBankAccount
   busy: boolean
-  onSubmit: (input: BankAccountDetails) => void
+  onSubmit: (input: Partial<BankAccountDetails>) => void
   onCancel: () => void
 }) {
   const [draft, setDraft] = useState<AccountDraft>({
     accountHolderName: initial?.accountHolderName ?? '',
-    accountNumber: initial?.accountNumber ?? '',
-    confirmAccountNumber: initial?.accountNumber ?? '',
+    accountNumber: '',
+    confirmAccountNumber: '',
     ifsc: initial?.ifsc ?? '',
     bankName: initial?.bankName ?? '',
     branch: initial?.branch ?? '',
     upiId: initial?.upiId ?? '',
+    phone: initial?.phone ?? '',
   })
   const [problem, setProblem] = useState<string | null>(null)
   // What the last lookup filled in, so a newer lookup may replace it — but
@@ -567,44 +818,56 @@ export function AccountForm({
   const set = <K extends keyof AccountDraft>(key: K, value: AccountDraft[K]) =>
     setDraft((d) => ({ ...d, [key]: value }))
 
-  const willResetVerification =
+  const keepNumber = initial !== undefined && draft.accountNumber === '' && draft.confirmAccountNumber === ''
+
+  const changesVerified =
     initial !== undefined &&
     initial.verificationStatus === 'VERIFIED' &&
     (draft.accountHolderName.trim() !== initial.accountHolderName ||
-      draft.accountNumber.trim() !== initial.accountNumber ||
+      !keepNumber ||
       draft.ifsc.trim().toUpperCase() !== initial.ifsc ||
       draft.bankName.trim() !== initial.bankName ||
       draft.branch.trim() !== initial.branch ||
-      (draft.upiId.trim() || null) !== initial.upiId)
+      (draft.upiId.trim() || null) !== initial.upiId ||
+      (draft.phone.replace(/\s/g, '') || null) !== initial.phone)
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (!draft.accountHolderName.trim()) {
-      return setProblem('Type the name on the bank account.')
+    const name = draft.accountHolderName.trim()
+    if (!name) return setProblem('Type the name on the bank account.')
+    if (!HOLDER_NAME.test(name)) {
+      return setProblem('Type the name in English letters, as printed on your passbook. Only . - / & are allowed besides letters and numbers.')
     }
     if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(draft.ifsc.trim().toUpperCase())) {
-      return setProblem('The branch code (IFSC) has 11 letters and numbers, like SBIN0001234.')
+      return setProblem('The branch code (IFSC) has 11 letters and numbers, like SBIN0001234. The fifth one is always a zero.')
     }
     if (!draft.bankName.trim()) return setProblem('Type the bank name.')
     if (!draft.branch.trim()) return setProblem('Type the branch name.')
-    if (!/^\d{9,18}$/.test(draft.accountNumber.trim())) {
-      return setProblem('The account number has 9 to 18 numbers.')
-    }
-    if (draft.confirmAccountNumber.trim() !== draft.accountNumber.trim()) {
-      return setProblem('The two account numbers are not the same. Please check them.')
+    if (!keepNumber) {
+      if (!/^\d{9,18}$/.test(draft.accountNumber.trim())) {
+        return setProblem('The account number has 9 to 18 numbers.')
+      }
+      if (draft.confirmAccountNumber.trim() !== draft.accountNumber.trim()) {
+        return setProblem('The two account numbers are not the same. Please check them.')
+      }
     }
     const upi = draft.upiId.trim()
     if (upi && !/^[\w.-]{2,}@[a-zA-Z]{2,64}$/.test(upi)) {
       return setProblem('A UPI ID looks like name@okaxis.')
     }
+    const phone = draft.phone.replace(/\s/g, '')
+    if (phone && !/^\+?\d{8,13}$/.test(phone)) {
+      return setProblem('The phone number has 10 numbers, like 9876543210.')
+    }
     setProblem(null)
     onSubmit({
-      accountHolderName: draft.accountHolderName.trim(),
-      accountNumber: draft.accountNumber.trim(),
+      accountHolderName: name,
+      ...(keepNumber ? {} : { accountNumber: draft.accountNumber.trim() }),
       ifsc: draft.ifsc.trim().toUpperCase(),
       bankName: draft.bankName.trim(),
       branch: draft.branch.trim(),
       upiId: upi || null,
+      phone: phone || null,
     })
   }
 
@@ -626,7 +889,7 @@ export function AccountForm({
             value={draft.accountHolderName}
             onChange={(e) => set('accountHolderName', e.target.value)}
             placeholder="Exactly as the bank has it"
-            hint="Printed on the first page of your passbook."
+            hint="As printed on the first page of your passbook or on your cheque, in English."
             maxLength={100}
             autoComplete="name"
           />
@@ -691,7 +954,8 @@ export function AccountForm({
               onChange={(e) => set('accountNumber', e.target.value.replace(/\D/g, ''))}
               inputMode="numeric"
               maxLength={18}
-              hint="Only numbers — 9 to 18 of them."
+              placeholder={initial ? `····${initial.accountNumberLast4}` : undefined}
+              hint={initial ? `Leave empty to keep ····${initial.accountNumberLast4}.` : 'Only numbers — 9 to 18 of them.'}
             />
             <TextField
               label="Type the account number again"
@@ -708,33 +972,50 @@ export function AccountForm({
             />
           </div>
 
-          <TextField
-            label={
-              <>
-                UPI ID (optional){' '}
-                <HelpHint topic="UPI ID">
-                  <p>
-                    Your UPI ID is the address you receive money on in apps
-                    like Google Pay, PhonePe or Paytm. It looks like{' '}
-                    <span className="font-semibold">name@okaxis</span>.
-                  </p>
-                  <p>Open your UPI app and look at your profile to find it. You can skip this.</p>
-                </HelpHint>
-              </>
-            }
-            value={draft.upiId}
-            onChange={(e) => set('upiId', e.target.value)}
-            placeholder="name@okaxis"
-            maxLength={256}
-            autoCapitalize="none"
-          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextField
+              label={
+                <>
+                  UPI ID (optional){' '}
+                  <HelpHint topic="UPI ID">
+                    <p>
+                      Your UPI ID is the address you receive money on in apps
+                      like Google Pay, PhonePe or Paytm. It looks like{' '}
+                      <span className="font-semibold">name@okaxis</span>.
+                    </p>
+                    <p>Open your UPI app and look at your profile to find it. You can skip this.</p>
+                  </HelpHint>
+                </>
+              }
+              value={draft.upiId}
+              onChange={(e) => set('upiId', e.target.value)}
+              placeholder="name@okaxis"
+              maxLength={256}
+              autoCapitalize="none"
+            />
+            <TextField
+              label="Phone linked to the account (optional)"
+              value={draft.phone}
+              onChange={(e) => set('phone', e.target.value.replace(/[^\d+ ]/g, ''))}
+              inputMode="tel"
+              maxLength={16}
+              placeholder="9876543210"
+              hint="Helps the bank check. You can skip this."
+            />
+          </div>
 
-          {willResetVerification && (
+          {changesVerified && (
             <InfoNote>
-              You changed the details of a verified account — after saving, it
-              is checked again before money is sent to it.
+              This account is verified. Your new details are checked with the
+              bank first — until they are verified, payouts keep going to
+              ····{initial?.accountNumberLast4}.
             </InfoNote>
           )}
+          {!initial || initial.verificationStatus !== 'VERIFIED' ? (
+            <p className="text-sm text-muted">
+              When you save, we check this account with your bank. It can take up to a minute.
+            </p>
+          ) : null}
           {problem && <ErrorNote>{problem}</ErrorNote>}
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
@@ -747,7 +1028,7 @@ export function AccountForm({
               Cancel
             </button>
             <Button type="submit" size="lg" loading={busy} className="sm:px-8">
-              {busy ? 'Saving…' : initial ? 'Save changes' : 'Add this account'}
+              {busy ? 'Checking with your bank…' : initial ? 'Save changes' : 'Add this account'}
             </Button>
           </div>
         </div>
