@@ -9,16 +9,23 @@ Markers: ☐ not done · ◐ partly done · ☑ done.
 
 ## 1. Where things stand (2 Nov 2026)
 
-- ☑ Code is built and pushed to `main`, which deploys to **dev**. Not on prod yet.
-- ☑ The dev deploy runs `npm run db:deploy`, so the new migration
-  `20261102100000_bank_account_hub_check` is applied on the **dev** database
-  by the deploy itself. Check the GitHub Actions run to confirm it passed.
+- ☑ Code is built and pushed to `main` (commit `71cf609`), which deploys to
+  **dev**. Not on prod yet.
+- ☑ The "Deploy dev" and "CI" GitHub Actions runs for `71cf609` both passed.
+  The deploy runs `npm run db:deploy`, so the migration
+  `20261102100000_bank_account_hub_check` is applied on the **dev** database.
 - ☑ 190 unit tests pass. Both apps typecheck. The UI check is within budget.
 - ☐ Not tested by hand yet. Start with section 3.
+- ☐ **Not confirmed yet that a real request has reached PaymentHub** — see
+  section 2b.
 - PaymentHub dev (`https://pay.dev.zontechx.com`) still answers
   `503 VERIFIER_NOT_CONFIGURED`. This is expected. It means the hub's
   Cashfree setup is not ready. Real answers start when the PaymentHub team
-  says so. **No code change is needed when that happens.**
+  says so. **No code change is needed when that happens** — see section 2c.
+- Note: the owner's local folder may be behind GitHub `main` and hold
+  uncommitted work. Never stash or reset it. If this file shows up as an
+  untracked copy when syncing, delete the copy first — the same file comes
+  back from GitHub.
 
 ## 2. How it works (short)
 
@@ -46,6 +53,55 @@ Markers: ☐ not done · ◐ partly done · ☑ done.
    last 4 digits only. Sellers see it on the Bank account page; admins see it
    on the store page with extra notes.
 6. **Dropship suppliers** use the same form, check and code.
+
+## 2b. Does a request really reach PaymentHub? ("Check again" flow)
+
+**Yes — if the server has the PaymentHub env vars.** What happens when the
+seller clicks **Check again** (the button shows when the pill says
+Unavailable, Bank didn't answer or Not checked yet):
+
+1. Browser → UnieMax: `POST /api/v1/stores/:id/bank-accounts/:accountId/check`.
+2. UnieMax backend → PaymentHub: `POST https://pay.dev.zontechx.com/v1/verifications/bank-account`
+   with the saved details, `payeeRef = store_<storeId>` and a new idempotency key.
+3. PaymentHub answers `503 VERIFIER_NOT_CONFIGURED` (Cashfree not ready).
+4. UnieMax saves the check as **UNAVAILABLE**. It does not retry a `503`
+   inside the request. Admins get one alert (at most once per 30 min).
+5. The seller sees **Unavailable** and the **Check again** button again.
+
+Good to know:
+- **No money is spent.** The bank was never asked, so a `503` is not a paid check.
+- **The account is not harmed.** It stays `PENDING`, never `FAILED`.
+- **Limit:** 10 saves/checks per store per 10 minutes, then `429`.
+- **If `PAYMENTHUB_URL` / `PAYMENTHUB_API_KEY` are missing on the server,**
+  step 2 never happens: UnieMax shows Unavailable at once. The screen looks
+  the same, so **only the backend log tells the difference**.
+
+☐ **Confirm it on dev** — after a save or "Check again", read the dev
+backend log (pm2):
+
+| Log lines | Meaning |
+| --- | --- |
+| `bank check: no answer` + `bank check: PaymentHub could not verify` with `code: "VERIFIER_NOT_CONFIGURED"` | ✅ The request **reached** PaymentHub; it answered `503`. |
+| Same lines with `code: "NOT_CONFIGURED"` | ❌ Nothing was sent — the server is missing the env vars. Add them. |
+| `bank check: PaymentHub answered` | ✅ Real answer from the hub (Verified / Under review / …). |
+
+You can also look in the PaymentHub dev dashboard: the UnieMax app's
+request should be listed there.
+
+## 2c. When PaymentHub says it is ready — what to do
+
+**No code change in UnieMax.** The code already handles every answer the
+PaymentHub docs list; today the hub only sends `503`. Only settings:
+
+| Item | Where | Needed for |
+| --- | --- | --- |
+| `PAYMENTHUB_URL` + `PAYMENTHUB_API_KEY` (`ph_test_…`) | dev server env file | Any check on dev (confirm with section 2b) |
+| `PAYMENTHUB_WEBHOOK_SECRET` | dev server env file | The "Under review → settled" webhook |
+| A release tag (`v*`) | GitHub | Getting this feature onto **prod** |
+| `PAYMENTHUB_URL=https://pay.zontechx.com` + `ph_live_…` key | prod server env file | Checks on prod, after PaymentHub has live Cashfree keys |
+
+Small risk: if PaymentHub's real answers differ from its docs (a missing
+field, say), a small fix may be needed. Section 4's sandbox tests catch that.
 
 ## 3. Test now on dev (hub answers 503)
 
