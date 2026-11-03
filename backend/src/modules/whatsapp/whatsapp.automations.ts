@@ -219,20 +219,9 @@ export const AUTOMATIONS: AutomationDefinition[] = [
       );
     },
   },
-  {
-    key: "new_order_alert",
-    title: "New order alert",
-    description: "Tells the seller the moment an order comes in (use a utility template).",
-    fieldKind: "sellerOrders",
-    configFields: [],
-    defaults: { templateName: null, mapping: emptyMapping, config: {} },
-    parseConfig: () => ({}),
-    async due({ enabledAt, now }) {
-      // A day's look-back bounds the query; quiet-hours orders wait till morning.
-      const since = new Date(Math.max(enabledAt.getTime(), now.getTime() - DAY_MS));
-      return orderEvents({ placedAt: { gte: since } }, (order) => order.id);
-    },
-  },
+  // No "new order alert" here: the seller's new-order WhatsApp is sent the
+  // moment the order is placed, by whatsapp.orderMessages.ts. A stored
+  // `new_order_alert` row is ignored by the scanner (no definition).
   {
     key: "inactive_store",
     title: "Quiet store nudge",

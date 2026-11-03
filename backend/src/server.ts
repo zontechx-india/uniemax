@@ -4,6 +4,7 @@ import { buildApp } from "./app.js";
 import { env } from "./config/env.js";
 import { startAutomationScanner, stopAutomationScanner } from "./modules/whatsapp/whatsapp.automations.js";
 import { startCampaignWorker, stopCampaignWorker } from "./modules/whatsapp/whatsapp.campaigns.js";
+import { startOrderMessages } from "./modules/whatsapp/whatsapp.orderMessages.js";
 
 /**
  * Application entrypoint — owns the network lifecycle.
@@ -29,10 +30,11 @@ async function start(): Promise<void> {
   try {
     await app.listen({ port: env.PORT, host: env.HOST });
     // Background WhatsApp work (no-ops while WA_ENABLED=false): the campaign
-    // queue and the automation scanner. Started here, not in buildApp, so
-    // tests that build the app never send anything.
+    // queue, the automation scanner and order messages. Started here, not in
+    // buildApp, so tests that build the app never send anything.
     startCampaignWorker(app.log);
     startAutomationScanner(app.log);
+    startOrderMessages(app.log);
   } catch (err) {
     app.log.error(err);
     process.exit(1);

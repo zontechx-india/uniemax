@@ -124,7 +124,7 @@ Verify: `curl http://localhost:4000/health`
 | `WA_VERIFY_TOKEN` | Webhook handshake token — any random string, **different per environment**, entered in that environment's Meta app |
 | `WA_APP_SECRET` | App secret of the Meta app used in this environment — verifies `X-Hub-Signature-256` |
 | `WA_ACCESS_TOKEN` | System-user permanent token (Bearer for the Graph API). Never logged |
-| `WA_PHONE_NUMBER_ID` / `WA_WABA_ID` | Sender number id + WhatsApp Business Account id (prod `1297227253483920` / `946861481250667`; dev: the Meta test number's ids) |
+| `WA_PHONE_NUMBER_ID` / `WA_WABA_ID` | Sender number id + WhatsApp Business Account id (`1297227253483920` / `946861481250667` — the UnieMax account, used by both dev and prod; templates exist only in that account) |
 | `WA_GRAPH_VERSION` | Graph API version (default `v21.0`) |
 | `WA_DEV_ALLOWED_RECIPIENTS` | **Non-production only:** comma-separated numbers sends are restricted to (anything else → 403; empty = nothing sends). Ignored in production |
 | `WA_SEND_RATE_PER_SEC` | Campaign send pace (default `20`) |

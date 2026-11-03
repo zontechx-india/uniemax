@@ -448,7 +448,8 @@ consecutive transient failures do the same — a returning endpoint clears both.
 
 Order events fire from `modules/orders/orders.notifications.ts`, **the same
 function that sends the email**, so a channel can't be added to one and
-forgotten on the other.
+forgotten on the other. WhatsApp is the third channel there (sent in addition
+to email, never instead) — see "Order messages" under the WhatsApp module.
 
 ### The platform admin console — `modules/admin`
 
@@ -680,7 +681,8 @@ WhatsApp Cloud API; setup: `backend/README.md`.
   (contacts, messages, statuses, quick replies, overview counts), and one file per
   feature that holds its own queries: `whatsapp.audiences.ts` (audience resolution,
   segments), `whatsapp.campaigns.ts` (the queue, its worker, tracked links),
-  `whatsapp.automations.ts` (registry + scanner), `whatsapp.sellerReminders.ts`.
+  `whatsapp.automations.ts` (registry + scanner), `whatsapp.sellerReminders.ts`,
+  `whatsapp.orderMessages.ts` (order templates).
   Three pure files have **no env/Prisma import**, so `test/unit/` covers them
   without a server: `whatsapp.webhook.ts` (signature check, payload parsing,
   `toWaId`), `whatsapp.templates.ts` (what a template needs and whether a send
@@ -735,8 +737,9 @@ WhatsApp Cloud API; setup: `backend/README.md`.
   code, and `GET /api/v1/r/:code` counts and redirects. Replies are derived (an
   inbound message within 7 days of the recipient's send), not stored.
 - **Automations** (`whatsapp.automations.ts`). A registry (`AUTOMATIONS`) of seller
-  triggers — setup follow-up, store published, first order, new order, quiet store —
-  each with `due()` returning events, plus a `WaAutomation` row of settings. A
+  triggers — setup follow-up, store published, first order, quiet store —
+  each with `due()` returning events, plus a `WaAutomation` row of settings. (The
+  seller's new-order message is not an automation — see Order messages.) A
   scanner every 5 min, only 09:00–21:00 IST, inserts a `WaAutomationRun` for an event
   **before** sending (unique `(automationKey, refKey)` = once per event), and only
   considers events after `enabledAt`, so switching one on never blasts a backlog.
@@ -773,6 +776,20 @@ WhatsApp Cloud API; setup: `backend/README.md`.
   normalised to +91). The language is whichever the template was approved in.
   The same template to the same number at most once per 24h unless the last
   one failed (409). Renaming a template in WhatsApp Manager breaks its entry.
+- **Order messages** (`whatsapp.orderMessages.ts`) — utility templates sent the
+  moment an order event happens, from `orders.notifications.ts`, **in addition to**
+  email + push. Seller on a new order: `order_received_to_seller` (seller name,
+  order no., store, customer, address, pincode, products, total, payment type,
+  product link, seller order link) to the store's contact phone, else the owner's.
+  Customer on Confirmed / Shipped / Delivered: `order_confirmed_without_link` (name,
+  order no., total, store), `order_shipped_without_link` (name, order no., courier,
+  tracking no., tracking link — the seller's link, else the courier site, else the
+  order page — store; once, when the order turns Shipped), `order_delivered` (name,
+  order no., store), to the checkout phone, else the account's. Cancelled has no
+  template. All language `en`; an empty value is sent as `NA`, whitespace collapsed.
+  Fire-and-forget: a refused or failed send is logged with the order id and never
+  touches the order. Off until `startOrderMessages` runs in `server.ts` with
+  `WA_ENABLED=true`, so tests never send.
 - **Admin-only**, mounted at `/admin/whatsapp` inside the `requireAdmin` subtree;
   sends, campaign creates/tests/controls, imports, consent changes and automation
   edits are written to the audit trail.

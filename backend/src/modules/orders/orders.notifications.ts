@@ -1,11 +1,13 @@
 import { prisma } from "../../config/prisma.js";
 import { publicWebUrl, sendMail } from "../../package/mail/index.js";
 import { notify, notifyAdmins } from "../notifications/notifications.service.js";
+import { whatsAppNewOrder, whatsAppOrderStatus } from "../whatsapp/whatsapp.orderMessages.js";
 import { escapeHtml } from "./couriers.js";
 
 /**
- * Order notifications — **email + push, from one place**, so a new order
- * event can never reach one channel and miss the other.
+ * Order notifications — **email + push + WhatsApp, from one place**, so a new
+ * order event can never reach one channel and miss the other. WhatsApp goes
+ * out in ADDITION to email (templates in `whatsapp/whatsapp.orderMessages.ts`).
  *
  * Covered: customer confirmation + seller "new order" alert on placement, and
  * customer updates on Confirmed / Shipped / Delivered / Cancelled. All
@@ -128,6 +130,9 @@ export function notifyOrderPlaced(
     body: `${order.orderNumber} at ${order.storeName} — ${formatTotal(order.total)}.`,
     url: `/orders/${order.id}`,
   });
+
+  // --- WhatsApp (seller only — the customer's placed message is email) -----
+  whatsAppNewOrder(order.id);
 
   // --- email --------------------------------------------------------------
   void (async () => {
@@ -303,6 +308,9 @@ export function notifyOrderStatusChange(
     });
   }
 
+  // Confirmed / Shipped / Delivered have a template; Cancelled does not.
+  whatsAppOrderStatus(order.id, order.status);
+
   void (async () => {
     const to = await customerAddress(order, customerId);
     if (!to) return;
@@ -425,6 +433,8 @@ export function notifyParcelShipped(
     ? `Order ${order.orderNumber} shipped`
     : `Tracking for order ${order.orderNumber}`;
   sendParcelMessage(order, parcel, customerId, subject, line);
+  // WhatsApp once, when this parcel moved the order to Shipped.
+  if (first) whatsAppOrderStatus(order.id, "SHIPPED", parcel);
 }
 
 /** The seller corrected a parcel's courier, number or link. */

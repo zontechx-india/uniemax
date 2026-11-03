@@ -498,7 +498,8 @@ refund call is the next payments milestone). Returns the full order
 A delivery order goes out in **parcels**: a courier, an optional tracking
 number, an optional tracking link the seller pasted, and what happened to
 it. The customer is told the moment a parcel is sent — email + push with
-the courier, number and link. Rules and failure cases:
+the courier, number and link (plus WhatsApp when the parcel turns the order
+Shipped). Rules and failure cases:
 [dropshipping/shipments](./dropshipping/shipments/context.md). Same two
 mounts as the rest of this router (owner, and super-admin support —
 audited). Every action answers with the **full order** (`shipments[]`
@@ -3168,8 +3169,8 @@ processed_at`), formula-safe, as an attachment.
 Registry (`whatsapp.automations.ts`), each with its own template + mapping:
 `seller_setup_followup` (store not set up N days after creation — `config.days`, default
 `[1, 3, 7]`, ≤ 5 days of 1–60; default template `seller_setup_pending`) ·
-`store_published` · `first_order` · `new_order_alert` (order fields `order_number`,
-`order_total`, `customer_name` added) · `inactive_store` (published, no order for
+`store_published` · `first_order` (order fields `order_number`, `order_total`,
+`customer_name` added) · `inactive_store` (published, no order for
 `config.days`, default 14, 7–90). A scanner runs every 5 min between 09:00 and 21:00
 India time; each event fires once; only events after `enabledAt` count; marketing
 templates go only to sellers with consent.
