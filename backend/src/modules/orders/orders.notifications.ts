@@ -1,5 +1,6 @@
 import { prisma } from "../../config/prisma.js";
 import { publicWebUrl, sendMail } from "../../package/mail/index.js";
+import type { MailMessage } from "../../package/mail/index.js";
 import { HttpError } from "../../utils/httpError.js";
 import { notify, notifyAdmins } from "../notifications/notifications.service.js";
 import { whatsAppNewOrder, whatsAppOrderStatus } from "../whatsapp/whatsapp.orderMessages.js";
@@ -140,16 +141,16 @@ export function notifyOrderPlaced(
   // --- email --------------------------------------------------------------
   void (async () => {
     const to = await customerAddress(order, customerId);
-    if (to) await mailCustomerPlaced(order, to);
+    if (to) await sendMail(customerPlacedMail(order, to));
   })().catch(logFailure("customer placed"));
 
   if (sellerEmail) {
-    mailSellerPlaced(order, sellerEmail).catch(logFailure("seller placed"));
+    sendMail(sellerPlacedMail(order, sellerEmail)).catch(logFailure("seller placed"));
   }
 }
 
 /** The customer's "order placed" email. */
-function mailCustomerPlaced(order: OrderMailData, to: string): Promise<void> {
+function customerPlacedMail(order: OrderMailData, to: string): MailMessage {
   const paymentLine =
     order.paymentMethod === "COD"
       ? "Payment: Cash on Delivery"
@@ -161,7 +162,7 @@ function mailCustomerPlaced(order: OrderMailData, to: string): Promise<void> {
   const confirmationUrl = publicWebUrl
     ? `${publicWebUrl}/order/${order.storeSlug}/${order.id}`
     : null;
-  return sendMail({
+  return {
     to,
     subject: `Order ${order.orderNumber} placed — ${order.storeName}`,
     text: `Hi${order.customerName ? ` ${order.customerName}` : ""},\n\nYour order at ${order.storeName} has been placed.\n\n${itemLines(order)}\n\nTotal: ${formatTotal(order.total)}\n${paymentLine}\n${fulfilmentLine}\n\nWe'll email you as it progresses.${confirmationUrl ? `\n\nView your order: ${confirmationUrl}` : ""}`,
@@ -176,15 +177,15 @@ function mailCustomerPlaced(order: OrderMailData, to: string): Promise<void> {
        <p style="margin:4px 0 0;font-size:13px;color:#444">${paymentLine}. ${fulfilmentLine}</p>
        ${confirmationUrl ? linkHtml(confirmationUrl, "View your order") : ""}`,
     ),
-  });
+  };
 }
 
 /** The seller's "new order" email. */
-function mailSellerPlaced(order: OrderMailData, to: string): Promise<void> {
+function sellerPlacedMail(order: OrderMailData, to: string): MailMessage {
   const manageUrl = publicWebUrl
     ? `${publicWebUrl}/stores/${order.storeSlug}/orders/${order.id}`
     : null;
-  return sendMail({
+  return {
     to,
     subject: `New order ${order.orderNumber} — ${order.storeName}`,
     text: `You have a new order at ${order.storeName}.\n\n${order.customerName ? `Customer: ${order.customerName}\n` : ""}${itemLines(order)}\n\nTotal: ${formatTotal(order.total)}\n${order.paymentMethod === "COD" ? "Cash on Delivery" : "Online payment"} · ${order.fulfilment === "PICKUP" ? "Store pickup" : "Delivery"}${manageUrl ? `\n\nManage it: ${manageUrl}` : "\n\nOpen your store's Orders section to confirm it."}`,
@@ -201,7 +202,7 @@ function mailSellerPlaced(order: OrderMailData, to: string): Promise<void> {
          ${order.fulfilment === "PICKUP" ? "Store pickup" : "Delivery"}</p>
        ${manageUrl ? linkHtml(manageUrl, "Confirm this order") : ""}`,
     ),
-  });
+  };
 }
 
 /**
@@ -321,19 +322,19 @@ export function notifyOrderStatusChange(
 
   void (async () => {
     const to = await customerAddress(order, customerId);
-    if (to) await mailStatus(order, order.status, to);
+    if (to) await sendMail(statusMail(order, order.status, to));
   })().catch(logFailure(`customer ${order.status.toLowerCase()}`));
 }
 
 /** The customer's plain status email (no parcel details). */
-function mailStatus(order: OrderMailData, status: string, to: string): Promise<void> {
+function statusMail(order: OrderMailData, status: string, to: string): MailMessage {
   const copy = STATUS_MAIL[status];
   if (!copy) throw new Error(`No email copy for status ${status}`);
   const confirmationUrl = publicWebUrl
     ? `${publicWebUrl}/order/${order.storeSlug}/${order.id}`
     : null;
   const line = copy.line(order);
-  return sendMail({
+  return {
     to,
     subject: copy.subject(order),
     text: `Hi${order.customerName ? ` ${order.customerName}` : ""},\n\n${line}\n\nTotal: ${formatTotal(order.total)}${confirmationUrl ? `\n\nView your order: ${confirmationUrl}` : ""}`,
@@ -344,7 +345,7 @@ function mailStatus(order: OrderMailData, status: string, to: string): Promise<v
          <strong>Total: ${formatTotal(order.total)}</strong></p>
        ${confirmationUrl ? linkHtml(confirmationUrl, "View your order") : ""}`,
     ),
-  });
+  };
 }
 
 /** A parcel as the customer messages need it (the shaped parcel satisfies it). */
@@ -387,18 +388,18 @@ function sendParcelMessage(
 
   void (async () => {
     const to = await customerAddress(order, customerId);
-    if (to) await mailParcel(order, parcel, to, subject, line);
+    if (to) await sendMail(parcelMail(order, parcel, to, subject, line));
   })().catch(logFailure("customer parcel"));
 }
 
 /** One parcel's email — courier, tracking number and where to follow it. */
-async function mailParcel(
+function parcelMail(
   order: OrderMailData,
   parcel: ParcelMailData,
   to: string,
   subject: string,
   line: string,
-): Promise<void> {
+): MailMessage {
   const number = parcel.trackingNumber;
   const orderUrl = publicWebUrl ? `${publicWebUrl}/order/${order.storeSlug}/${order.id}` : null;
   // The seller's own tracking link wins; without one, the courier's site
@@ -423,7 +424,7 @@ async function mailParcel(
     .filter((part) => part !== null)
     .join("\n");
 
-  await sendMail({
+  return {
     to,
     subject,
     text,
@@ -435,7 +436,7 @@ async function mailParcel(
        ${trackUrl ? linkHtml(escapeHtml(trackUrl), escapeHtml(trackLabel)) : ""}
        ${orderUrl ? linkHtml(orderUrl, "View your order") : ""}`,
     ),
-  });
+  };
 }
 
 /** The "shipped" wording for a parcel; `first` = it moved the order to Shipped. */
@@ -536,26 +537,39 @@ export function orderMailRecipient(
 }
 
 /**
- * The same email the automatic send would build, sent NOW and awaited — a
- * missing address or a provider refusal is thrown so the admin sees why.
- * Returns the address it went to.
+ * The email the automatic send would build — to, subject, text and HTML —
+ * without sending it. The console previews it; `sendOrderMail` sends it.
+ */
+export async function buildOrderMail(
+  message: OrderMailMessage,
+  order: OrderMailData,
+  context: OrderMailContext,
+): Promise<MailMessage> {
+  const to = await orderMailRecipient(message, order, context);
+  if (!to) throw new HttpError(422, "This order has no email address for that message");
+  if (message === "CUSTOMER_PLACED") return customerPlacedMail(order, to);
+  if (message === "SELLER_NEW_ORDER") return sellerPlacedMail(order, to);
+  if (message === "SHIPPED" && context.parcel) {
+    const { line, subject } = parcelShippedCopy(order, context.parcel, true);
+    return parcelMail(order, context.parcel, to, subject, line);
+  }
+  return statusMail(order, message, to);
+}
+
+/**
+ * The same email, sent NOW and awaited — a missing address or a provider
+ * refusal is thrown so the admin sees why. Returns the address it went to.
  */
 export async function sendOrderMail(
   message: OrderMailMessage,
   order: OrderMailData,
   context: OrderMailContext,
 ): Promise<string> {
-  const to = await orderMailRecipient(message, order, context);
-  if (!to) throw new HttpError(422, "This order has no email address for that message");
+  const mail = await buildOrderMail(message, order, context);
   try {
-    if (message === "CUSTOMER_PLACED") await mailCustomerPlaced(order, to);
-    else if (message === "SELLER_NEW_ORDER") await mailSellerPlaced(order, to);
-    else if (message === "SHIPPED" && context.parcel) {
-      const { line, subject } = parcelShippedCopy(order, context.parcel, true);
-      await mailParcel(order, context.parcel, to, subject, line);
-    } else await mailStatus(order, message, to);
+    await sendMail(mail);
   } catch (error) {
     throw new HttpError(502, error instanceof Error ? error.message : "Email send failed");
   }
-  return to;
+  return mail.to;
 }

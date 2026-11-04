@@ -183,6 +183,12 @@ export async function listOrderMessages(request: FastifyRequest) {
   return ok(await orderMessages.listOrderMessages(id));
 }
 
+export async function previewOrderMessage(request: FastifyRequest) {
+  const { id } = idParamSchema.parse(request.params);
+  const input = schema.orderMessageSendSchema.parse(request.query);
+  return ok(await orderMessages.previewOrderMessage(id, input, request.log));
+}
+
 export async function sendOrderMessage(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   const input = schema.orderMessageSendSchema.parse(request.body);

@@ -4,7 +4,8 @@ import { prisma } from "../../config/prisma.js";
 import { publicWebUrl } from "../../package/mail/index.js";
 import { HttpError } from "../../utils/httpError.js";
 import { resolveProfile } from "../stores/storeProfile.schema.js";
-import { sendTemplate } from "./whatsapp.service.js";
+import { availableTemplates, sendTemplate } from "./whatsapp.service.js";
+import { fillTemplateBody } from "./whatsapp.templates.js";
 import { toWaId } from "./whatsapp.webhook.js";
 
 /**
@@ -291,6 +292,34 @@ async function prepareManual(orderId: string, message: OrderWaMessage) {
 export async function previewOrderWhatsApp(orderId: string, message: OrderWaMessage) {
   const prepared = await prepareManual(orderId, message);
   return { to: prepared?.to ?? null, templateName: prepared?.templateName ?? null };
+}
+
+/**
+ * Exactly what a manual send would deliver — recipient, template and the
+ * {{1}}… values — with the approved text filled in when Meta's template list
+ * is reachable (`body` null otherwise: the console fills its own copy).
+ */
+export async function previewOrderWhatsAppMessage(
+  orderId: string,
+  message: OrderWaMessage,
+  logger: FastifyBaseLogger,
+) {
+  const prepared = await prepareManual(orderId, message);
+  if (!prepared) throw new HttpError(422, "This order has no store to message");
+  const templates = env.WA_ENABLED ? await availableTemplates(logger) : null;
+  const template = templates?.find(
+    (t) => t.name === prepared.templateName && t.language === LANGUAGE,
+  );
+  return {
+    to: prepared.to,
+    templateName: prepared.templateName,
+    language: LANGUAGE,
+    bodyParams: prepared.bodyParams,
+    header: template?.header ?? null,
+    body: template ? fillTemplateBody(template.body, prepared.bodyParams) : null,
+    footer: template?.footer ?? null,
+    buttons: template?.buttons ?? [],
+  };
 }
 
 /**

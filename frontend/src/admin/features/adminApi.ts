@@ -73,6 +73,26 @@ export interface OrderMessages {
   }[]
 }
 
+/** `GET /orders/:id/messages/preview` — exactly what a send would deliver. */
+export interface OrderMessagePreview {
+  message: OrderMessageKey
+  channel: OrderMessageChannel
+  label: string
+  whatsapp?: {
+    to: string | null
+    templateName: string
+    language: string
+    /** The {{1}}, {{2}}… values, in order. */
+    bodyParams: string[]
+    header: string | null
+    /** The approved text with the values filled in; null = Meta's list unreachable. */
+    body: string | null
+    footer: string | null
+    buttons: string[]
+  }
+  email?: { to: string; subject: string; text: string; html: string; delivered: boolean }
+}
+
 export interface OrderMessageSent {
   orderNumber: string
   message: OrderMessageKey
@@ -1098,6 +1118,9 @@ export const adminApi = {
   },
   listOrderMessages(id: string) {
     return call<OrderMessages>(http.get(`${BASE}/orders/${id}/messages`))
+  },
+  previewOrderMessage(id: string, query: { message: OrderMessageKey; channel: OrderMessageChannel }) {
+    return call<OrderMessagePreview>(http.get(`${BASE}/orders/${id}/messages/preview`, params(query)))
   },
   sendOrderMessage(id: string, body: { message: OrderMessageKey; channel: OrderMessageChannel }) {
     return call<OrderMessageSent>(http.post(`${BASE}/orders/${id}/messages`, body))

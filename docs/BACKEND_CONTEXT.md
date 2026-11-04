@@ -802,6 +802,10 @@ WhatsApp Cloud API; setup: `backend/README.md`.
   (`sendOrderWhatsApp`, used by `admin/adminOrderMessages.service.ts`) builds the
   same message and recipient but is awaited and THROWS on a refusal, so the admin
   sees why; the email twin is `sendOrderMail` in `orders.notifications.ts`.
+  The console's preview uses the same builders without sending —
+  `previewOrderWhatsAppMessage` (values + Meta's approved text when reachable)
+  and `buildOrderMail` (each order email is built by a `*Mail()` function that
+  returns `{ to, subject, text, html }`; sending is a separate `sendMail`).
 - **Admin-only**, mounted at `/admin/whatsapp` inside the `requireAdmin` subtree;
   sends, campaign creates/tests/controls, imports, consent changes and automation
   edits are written to the audit trail.

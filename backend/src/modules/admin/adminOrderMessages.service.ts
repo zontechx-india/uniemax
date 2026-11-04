@@ -3,11 +3,19 @@ import { env } from "../../config/env.js";
 import { prisma } from "../../config/prisma.js";
 import { mailConfigured } from "../../package/mail/index.js";
 import { HttpError } from "../../utils/httpError.js";
-import { orderMailRecipient, sendOrderMail } from "../orders/orders.notifications.js";
+import {
+  buildOrderMail,
+  orderMailRecipient,
+  sendOrderMail,
+} from "../orders/orders.notifications.js";
 import type { OrderMailContext, OrderMailMessage } from "../orders/orders.notifications.js";
 import { shapeShipment, shipmentSelect } from "../orders/shipments.shape.js";
 import { assertEnabled } from "../whatsapp/whatsapp.service.js";
-import { previewOrderWhatsApp, sendOrderWhatsApp } from "../whatsapp/whatsapp.orderMessages.js";
+import {
+  previewOrderWhatsApp,
+  previewOrderWhatsAppMessage,
+  sendOrderWhatsApp,
+} from "../whatsapp/whatsapp.orderMessages.js";
 import type { OrderWaMessage } from "../whatsapp/whatsapp.orderMessages.js";
 import type { OrderMessageSendInput } from "./admin.schema.js";
 
@@ -107,21 +115,55 @@ export async function listOrderMessages(orderId: string) {
   };
 }
 
+/** The message spec + the loaded order, after the checks every send makes. */
+async function checked(orderId: string, input: OrderMessageSendInput) {
+  const spec = MESSAGES.find((m) => m.key === input.message);
+  if (!spec) throw HttpError.badRequest("Unknown message");
+  const loaded = await loadOrder(orderId);
+  if (loaded.order[spec.stage] === null) {
+    throw HttpError.conflict(`This order has not reached the "${spec.label}" stage yet`);
+  }
+  if (input.channel === "whatsapp" && !spec.whatsapp) {
+    throw HttpError.badRequest(`"${spec.label}" has no WhatsApp template`);
+  }
+  return { spec, ...loaded };
+}
+
+/**
+ * Exactly what `sendOrderMessage` would deliver, without sending: the email's
+ * to / subject / text / HTML, or the WhatsApp recipient, template and values
+ * (with the approved text when Meta's list is reachable).
+ */
+export async function previewOrderMessage(
+  orderId: string,
+  input: OrderMessageSendInput,
+  logger: FastifyBaseLogger,
+) {
+  const { spec, order, context } = await checked(orderId, input);
+  if (input.channel === "whatsapp" && spec.whatsapp) {
+    return {
+      ...input,
+      label: spec.label,
+      whatsapp: await previewOrderWhatsAppMessage(orderId, spec.whatsapp, logger),
+    };
+  }
+  const mail = await buildOrderMail(spec.key, order, context);
+  return {
+    ...input,
+    label: spec.label,
+    email: { to: mail.to, subject: mail.subject, text: mail.text, html: mail.html, delivered: mailConfigured },
+  };
+}
+
 /** Sends one message on one channel, now, and says where it went. */
 export async function sendOrderMessage(
   orderId: string,
   input: OrderMessageSendInput,
   logger: FastifyBaseLogger,
 ) {
-  const spec = MESSAGES.find((m) => m.key === input.message);
-  if (!spec) throw HttpError.badRequest("Unknown message");
-  const { order, context } = await loadOrder(orderId);
-  if (order[spec.stage] === null) {
-    throw HttpError.conflict(`This order has not reached the "${spec.label}" stage yet`);
-  }
+  const { spec, order, context } = await checked(orderId, input);
 
-  if (input.channel === "whatsapp") {
-    if (!spec.whatsapp) throw HttpError.badRequest(`"${spec.label}" has no WhatsApp template`);
+  if (input.channel === "whatsapp" && spec.whatsapp) {
     assertEnabled();
     const sent = await sendOrderWhatsApp(orderId, spec.whatsapp, logger);
     return { orderNumber: order.orderNumber, ...input, to: sent.to, templateName: sent.templateName, wamid: sent.wamid };

@@ -3573,6 +3573,13 @@ no usable address/phone. Keys, in order: `SELLER_NEW_ORDER` (email + WhatsApp
 `order_received_to_seller`), `CUSTOMER_PLACED` (email), `CONFIRMED`, `SHIPPED`
 (left out for pickup orders), `DELIVERED` (email + WhatsApp), `CANCELLED` (email).
 
+`GET /api/v1/admin/orders/:id/messages/preview?message=<key>&channel=…` shows
+exactly what a send would deliver, without sending (same checks and errors as
+`POST`): `{ message, channel, label }` plus either `email: { to, subject, text,
+html, delivered }` or `whatsapp: { to, templateName, language, bodyParams[],
+header, body, footer, buttons[] }`. `body` is the approved text with the values
+filled in, or `null` when Meta's template list can't be reached (WhatsApp off).
+
 `POST` body `{ "message": "<key>", "channel": "whatsapp" | "email" }` sends now
 and waits for the result: `{ orderNumber, message, channel, to }` plus
 `templateName` + `wamid` (WhatsApp) or `delivered` (email). Shipped email

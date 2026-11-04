@@ -43,6 +43,7 @@ export const adminConsoleRoutes: FastifyPluginAsync = async (app) => {
   );
   // Send an order's email / WhatsApp again (the order itself is not changed).
   app.get("/orders/:id/messages", controller.listOrderMessages);
+  app.get("/orders/:id/messages/preview", controller.previewOrderMessage);
   app.post("/orders/:id/messages", controller.sendOrderMessage);
   app.get("/payments", controller.listPayments);
 
