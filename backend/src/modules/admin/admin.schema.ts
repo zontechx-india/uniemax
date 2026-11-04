@@ -81,6 +81,16 @@ export const orderListQuery = searchQuery.extend({
   to: isoDate,
 });
 
+/** A parcel's expected delivery day ("YYYY-MM-DD", null = none) + "Show to customer". */
+export const expectedDeliverySchema = z.object({
+  expectedDeliveryAt: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Use the format YYYY-MM-DD")
+    .refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00Z`)), "Not a real date")
+    .nullable(),
+  visible: z.boolean(),
+});
+
 /** Send one of an order's messages again, on one channel. */
 export const orderMessageSendSchema = z.object({
   message: z.enum([
@@ -182,6 +192,7 @@ export type CustomerListQuery = z.infer<typeof customerListQuery>;
 export type CustomerBlockInput = z.infer<typeof customerBlockSchema>;
 export type OrderListQuery = z.infer<typeof orderListQuery>;
 export type OrderMessageSendInput = z.infer<typeof orderMessageSendSchema>;
+export type ExpectedDeliveryInput = z.infer<typeof expectedDeliverySchema>;
 export type ProductListQuery = z.infer<typeof productListQuery>;
 export type ProductVisibilityInput = z.infer<typeof productVisibilitySchema>;
 export type ShelfListQuery = z.infer<typeof shelfListQuery>;

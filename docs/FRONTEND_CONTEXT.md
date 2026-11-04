@@ -938,8 +938,15 @@ count; a card skeleton shows while the layout's fetch is in flight.
   website** + "copy the number, then paste it there"; "Parcel 1 of 2",
   "Shipped by …"; a redacted view says "Sign in as the buyer to see the
   tracking number"), and each shipped order card on My Orders a one-line
-  `ParcelLine` ("Delhivery · 2123… · Track"). Admin's order detail shows a
-  **Parcels** card with the proof photo.
+  `ParcelLine` ("Delhivery · 2123… · Track"). While a parcel is on the way
+  and an admin set and showed an expected day, the block shows **Expected
+  delivery: Mon, 10 Nov** and the line adds "Arriving by 10 Nov"
+  (`expectedDay()`, formatted in UTC so the day never shifts); the seller's
+  `ParcelCard` shows it read-only, with "not shown to the customer" when the
+  tick is off. Admin's order detail shows a **Parcels** card with the proof
+  photo and, per parcel on the way, `orders/ExpectedDeliveryEditor` (date
+  input from the day it was sent, **Show to customer** checkbox — disabled
+  without a date — **Save** / **Clear**).
 
 **Publish & share** — one body (`ShareActions` in `StorePublishCard.tsx`, state
 in `usePublishActions.ts`) in two frames: on desktop it ends the left card

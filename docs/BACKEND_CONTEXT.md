@@ -464,8 +464,12 @@ module repeats the guard. Deliberate scope decisions:
   [One plugin, two mounts](#one-plugin-two-mounts--the-storeactor-pattern)) —
   which is not a set of admin endpoints at all, but the seller's own,
   re-mounted.
-- **Re-sending order messages** (`adminOrderMessages.service.ts`) is the one
-  write on an order, and it does not change the order: it sends an order's
+- **Expected delivery** (`setExpectedDelivery` in `adminOrders.service.ts`)
+  is the one fulfilment detail the console sets: a parcel's expected day and
+  its "Show to customer" tick — information for the customer, not a seller
+  step. Only while the parcel is on the way, never before the day it left.
+- **Re-sending order messages** (`adminOrderMessages.service.ts`) does not
+  change the order: it sends an order's
   email or WhatsApp message again, with the automatic send's own text and
   recipient (never typed by the admin), only for a stage the order has reached
   (its timestamp is set), and writes `order.message.send` to the audit trail.
@@ -1571,6 +1575,10 @@ White-label design — one codebase, any business:
   `trackingUrl` (only a link the seller pasted — no per-number links are
   guessed), `senderName` / `source` (`ShipmentSource` SELLER | PACKAGE) /
   `externalRef` for packages, `shippedAt` / `deliveredAt` / `returnedAt`,
+  `expectedDeliveryAt` (`@db.Date`, a calendar day an admin types from the
+  courier's estimate) + `expectedDeliveryVisible` (the admin's "Show to
+  customer" tick — `shapeShipment` leaves the date out of the customer and
+  public views until it is on),
   `restocked` (its returned items went back in stock on cancel) and an
   optional `podKey` (proof-of-delivery photo, media bucket under
   `pod/{storeId}/{orderId}/`, referenced by `npm run audit-media`). Each line

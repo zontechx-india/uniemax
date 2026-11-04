@@ -1336,6 +1336,12 @@ model OrderShipment {
   /// Opaque reference of whoever created a PACKAGE parcel.
   externalRef    String?
   shippedAt      DateTime       @default(now())
+  /// When the customer can expect it — a calendar day, typed by an admin from
+  /// the courier's estimate. Shown to the customer while the parcel is on the way.
+  expectedDeliveryAt DateTime?  @db.Date
+  /// The admin's "Show to customer" tick. Off = the date stays internal
+  /// (seller + admin only); the customer's views never receive it.
+  expectedDeliveryVisible Boolean @default(false)
   deliveredAt    DateTime?
   /// The parcel came back undelivered (returned to sender).
   returnedAt     DateTime?

@@ -2290,6 +2290,13 @@ export interface OrderShipment {
   senderName: string | null
   source: 'SELLER' | 'PACKAGE'
   shippedAt: string
+  /**
+   * "YYYY-MM-DD" — when the customer can expect it, set by an admin. The
+   * customer's views only receive it once the admin ticked "Show to customer".
+   */
+  expectedDeliveryAt: string | null
+  /** Seller and admin views only: the admin's "Show to customer" tick. */
+  expectedDeliveryVisible?: boolean
   deliveredAt: string | null
   /** The parcel came back undelivered (returned to sender). */
   returnedAt: string | null

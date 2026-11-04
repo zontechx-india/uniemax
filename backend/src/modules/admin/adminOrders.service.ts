@@ -5,7 +5,7 @@ import { buildListMeta } from "../../utils/response.js";
 import { mediaUrl } from "../../package/storage/index.js";
 import { shapeShipment, shipmentSelect } from "../orders/shipments.shape.js";
 import { readOrderCustomFields } from "../orders/customFields.js";
-import type { OrderListQuery, PaymentListQuery } from "./admin.schema.js";
+import type { ExpectedDeliveryInput, OrderListQuery, PaymentListQuery } from "./admin.schema.js";
 
 /**
  * Orders and payments across every store — the platform's read-only view.
@@ -158,6 +158,48 @@ export async function getOrder(orderId: string) {
     // Staff see parcels as the seller does — proof-of-delivery photo included.
     shipments: shipments.map((shipment) => shapeShipment(shipment, "seller")),
   };
+}
+
+/**
+ * A parcel's expected delivery day, typed by an admin from the courier's
+ * estimate, and whether the customer sees it. The one fulfilment detail the
+ * console sets: it is information for the customer, not a step the seller
+ * takes. Only while the parcel is on the way; never before the day it left.
+ */
+export async function setExpectedDelivery(
+  orderId: string,
+  shipmentId: string,
+  input: ExpectedDeliveryInput,
+) {
+  const parcel = await prisma.orderShipment.findFirst({
+    where: { id: shipmentId, orderId },
+    select: { shippedAt: true, deliveredAt: true, returnedAt: true },
+  });
+  if (!parcel) throw HttpError.notFound("Parcel not found on this order");
+  if (parcel.deliveredAt || parcel.returnedAt) {
+    throw HttpError.conflict(
+      parcel.deliveredAt ? "This parcel is already delivered" : "This parcel came back to the store",
+    );
+  }
+  if (input.visible && !input.expectedDeliveryAt) {
+    throw new HttpError(422, "Add an expected delivery date before showing it to the customer");
+  }
+  // Compared as "YYYY-MM-DD" strings in UTC — the column is a calendar day.
+  if (
+    input.expectedDeliveryAt &&
+    input.expectedDeliveryAt < parcel.shippedAt.toISOString().slice(0, 10)
+  ) {
+    throw new HttpError(422, "The expected delivery date can't be before the day the parcel was sent");
+  }
+
+  await prisma.orderShipment.update({
+    where: { id: shipmentId },
+    data: {
+      expectedDeliveryAt: input.expectedDeliveryAt ? new Date(`${input.expectedDeliveryAt}T00:00:00Z`) : null,
+      expectedDeliveryVisible: input.visible,
+    },
+  });
+  return getOrder(orderId);
 }
 
 // ---------------------------------------------------------------------------

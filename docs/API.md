@@ -521,12 +521,16 @@ refuse it with `409` — the supplier updates it.
   "senderName": null,           // "Shipped by …" — null = the store itself
   "source": "SELLER",
   "shippedAt": "…", "deliveredAt": null, "returnedAt": null,
+  "expectedDeliveryAt": "2026-11-10", // "YYYY-MM-DD" set by an admin; null = none (or not shown)
+  "expectedDeliveryVisible": true, // the admin's "Show to customer" tick — seller + admin views only
   "restocked": false,           // seller + admin views only
   "podUrl": null                // proof-of-delivery photo — seller + admin views only
 }
 ```
 The buyer's views (`GET /api/v1/orders`, their order link) carry neither
-`restocked` nor `podUrl`; anyone else opening an order link gets
+`restocked` nor `podUrl` nor `expectedDeliveryVisible`, and get
+`expectedDeliveryAt` only when the admin ticked "Show to customer" (otherwise
+`null`); anyone else opening an order link gets
 `trackingNumber` and `trackingUrl` as `null` too (a courier's site can show
 the delivery address).
 
@@ -3544,6 +3548,16 @@ Detail adds the money breakdown, contact + delivery snapshot, lifecycle
 timestamps, `cfOrderId`, the linked customer/store, items with `imageUrl`,
 and `shipments[]` as the seller sees them (proof-of-delivery `podUrl`
 included — shape under **Parcels**).
+
+### `PATCH /api/v1/admin/orders/:id/shipments/:shipmentId/expected-delivery`
+
+Body `{ "expectedDeliveryAt": "2026-11-10" | null, "visible": true }` — a
+parcel's expected delivery day (typed from the courier's estimate) and whether
+the customer sees it. Answers the order detail (as `GET /admin/orders/:id`).
+`404` parcel not on this order · `409` parcel already delivered or returned ·
+`422` `visible` without a date, or a date before the day the parcel was sent ·
+`400` not `YYYY-MM-DD`. Audit action `order.expectedDelivery` (`meta`:
+orderNumber, shipmentId, expectedDeliveryAt, visible).
 
 ### `GET /api/v1/admin/orders/:id/messages` · `POST /api/v1/admin/orders/:id/messages`
 

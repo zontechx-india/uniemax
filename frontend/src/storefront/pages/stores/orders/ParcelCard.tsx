@@ -2,7 +2,7 @@ import { copyToClipboard } from '../../../../shared/share'
 import { Badge } from '../../../../shared/ui/Badge'
 import { Button, buttonClass } from '../../../../shared/ui/Button'
 import { MediaImg } from '../../../../shared/media/MediaImg'
-import { parcelStatus } from '../../../features/stores/ParcelTracking'
+import { expectedDay, parcelStatus } from '../../../features/stores/ParcelTracking'
 import type { OrderShipment, PlacedOrder } from '../../../features/stores/storesApi'
 import { ClipboardIcon, ExternalLinkIcon, PencilIcon, TruckIcon } from '../../../layout/icons'
 import { formatOrderDateTime } from '../orderMeta'
@@ -122,6 +122,13 @@ function SellerParcel({
             No tracking number — your customer can&apos;t follow this parcel.
           </p>
         )
+      )}
+
+      {expectedDay(parcel) && (
+        <p className="text-hint text-muted">
+          Expected delivery {expectedDay(parcel)}
+          {parcel.expectedDeliveryVisible ? '' : ' · not shown to the customer'}
+        </p>
       )}
 
       <p className="text-hint text-muted">

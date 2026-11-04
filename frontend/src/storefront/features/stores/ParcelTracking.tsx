@@ -16,6 +16,30 @@ import type { OrderShipment } from './storesApi'
 
 const dateFormat = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' })
 
+// The expected day is a calendar day ("2026-11-10"), read in UTC so no
+// timezone can move it to the 9th.
+const dayFormat = new Intl.DateTimeFormat('en-IN', {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  timeZone: 'UTC',
+})
+const shortDayFormat = new Intl.DateTimeFormat('en-IN', {
+  day: 'numeric',
+  month: 'short',
+  timeZone: 'UTC',
+})
+
+/**
+ * "Mon, 10 Nov" — the parcel's expected delivery day while it is on the way;
+ * null once delivered or returned, or when none is set (or not shown).
+ */
+export function expectedDay(parcel: OrderShipment, short = false): string | null {
+  if (!parcel.expectedDeliveryAt || parcel.deliveredAt || parcel.returnedAt) return null
+  const day = new Date(`${parcel.expectedDeliveryAt}T00:00:00Z`)
+  return (short ? shortDayFormat : dayFormat).format(day)
+}
+
 /** Status words + badge tone for one parcel. */
 export function parcelStatus(parcel: OrderShipment): { label: string; tone: BadgeTone } {
   if (parcel.deliveredAt) {
@@ -63,6 +87,7 @@ function ParcelBlock({
   const status = parcelStatus(parcel)
   const own = parcel.carrierCode === 'self'
   const number = parcel.trackingNumber
+  const expected = expectedDay(parcel)
 
   return (
     <li className="rounded-xl border border-line p-4">
@@ -80,6 +105,12 @@ function ParcelBlock({
           {[label, parcel.senderName ? `Shipped by ${parcel.senderName}` : null]
             .filter(Boolean)
             .join(' · ')}
+        </p>
+      )}
+
+      {expected && (
+        <p className="mt-3 rounded-md bg-brand-soft px-3 py-2 text-sm text-fg">
+          Expected delivery: <span className="font-semibold">{expected}</span>
         </p>
       )}
 
@@ -157,6 +188,7 @@ export function ParcelTracking({
 /** One line per parcel — "Delhivery · 2123… · Track" — for an order card. */
 export function ParcelLine({ parcel }: { parcel: OrderShipment }) {
   const href = parcel.trackingUrl ?? (parcel.trackingNumber ? parcel.courierSite : null)
+  const expected = expectedDay(parcel, true)
   return (
     <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-muted">
       <TruckIcon className="h-4 w-4 shrink-0" />
@@ -164,6 +196,11 @@ export function ParcelLine({ parcel }: { parcel: OrderShipment }) {
       {parcel.trackingNumber && (
         <>
           · <span className="font-figure text-fg">{parcel.trackingNumber}</span>
+        </>
+      )}
+      {expected && (
+        <>
+          · <span className="text-fg">Arriving by {expected}</span>
         </>
       )}
       {href && (

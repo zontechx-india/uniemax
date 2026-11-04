@@ -36,6 +36,11 @@ export const adminConsoleRoutes: FastifyPluginAsync = async (app) => {
   // Orders + payments — read-only across every store
   app.get("/orders", controller.listOrders);
   app.get("/orders/:id", controller.getOrder);
+  // A parcel's expected delivery day + whether the customer sees it.
+  app.patch(
+    "/orders/:id/shipments/:shipmentId/expected-delivery",
+    controller.setExpectedDelivery,
+  );
   // Send an order's email / WhatsApp again (the order itself is not changed).
   app.get("/orders/:id/messages", controller.listOrderMessages);
   app.post("/orders/:id/messages", controller.sendOrderMessage);

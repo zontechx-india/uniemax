@@ -158,6 +158,26 @@ export async function getOrder(request: FastifyRequest) {
   return ok(await orders.getOrder(id));
 }
 
+const shipmentParams = z.object({ id: z.string().min(1), shipmentId: z.string().min(1) });
+
+export async function setExpectedDelivery(request: FastifyRequest) {
+  const { id, shipmentId } = shipmentParams.parse(request.params);
+  const input = schema.expectedDeliverySchema.parse(request.body);
+  const order = await orders.setExpectedDelivery(id, shipmentId, input);
+  recordAudit(request, {
+    action: "order.expectedDelivery",
+    entityType: "order",
+    entityId: id,
+    meta: {
+      orderNumber: order.orderNumber,
+      shipmentId,
+      expectedDeliveryAt: input.expectedDeliveryAt,
+      visible: input.visible,
+    },
+  });
+  return ok(order);
+}
+
 export async function listOrderMessages(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   return ok(await orderMessages.listOrderMessages(id));

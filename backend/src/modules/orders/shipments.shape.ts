@@ -21,6 +21,8 @@ export const shipmentSelect = {
   senderName: true,
   source: true,
   shippedAt: true,
+  expectedDeliveryAt: true,
+  expectedDeliveryVisible: true,
   deliveredAt: true,
   returnedAt: true,
   restocked: true,
@@ -43,6 +45,16 @@ export function shapeShipment(row: ShipmentRow, audience: OrderAudience) {
     senderName: row.senderName,
     source: row.source,
     shippedAt: row.shippedAt,
+    /**
+     * "YYYY-MM-DD" — a calendar day, not an instant, so no timezone can shift
+     * it. The customer and the public only get it once an admin ticked "Show
+     * to customer"; the seller and admins always see it.
+     */
+    expectedDeliveryAt:
+      audience === "seller" || row.expectedDeliveryVisible
+        ? (row.expectedDeliveryAt?.toISOString().slice(0, 10) ?? null)
+        : null,
+    ...(audience === "seller" ? { expectedDeliveryVisible: row.expectedDeliveryVisible } : {}),
     deliveredAt: row.deliveredAt,
     returnedAt: row.returnedAt,
     ...(audience === "seller"

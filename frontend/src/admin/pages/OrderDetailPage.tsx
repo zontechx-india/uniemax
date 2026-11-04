@@ -8,6 +8,7 @@ import { formatDateTime, formatMoneyExact } from '../ui/format'
 import { BackIcon } from '../layout/icons'
 import { MediaImg } from '../../shared/media/MediaImg'
 import { OrderMessagesCard } from './orders/OrderMessagesCard'
+import { ExpectedDeliveryEditor } from './orders/ExpectedDeliveryEditor'
 
 /**
  * One order, everything known about it — the page a support conversation is
@@ -242,6 +243,7 @@ export default function OrderDetailPage() {
                       {parcel.returnedAt ? ` · came back ${formatDateTime(parcel.returnedAt)}` : ''}
                       {parcel.returnedAt && parcel.restocked ? ' · put back in stock' : ''}
                     </p>
+                    <ExpectedDeliveryEditor orderId={order.id} parcel={parcel} />
                     {parcel.podUrl ? (
                       <a
                         href={parcel.podUrl}

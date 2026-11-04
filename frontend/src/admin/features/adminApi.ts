@@ -147,6 +147,10 @@ export interface OrderParcel {
   senderName: string | null
   source: 'SELLER' | 'PACKAGE'
   shippedAt: string
+  /** "YYYY-MM-DD", set by an admin; null = none. */
+  expectedDeliveryAt: string | null
+  /** The admin's "Show to customer" tick. */
+  expectedDeliveryVisible: boolean
   deliveredAt: string | null
   returnedAt: string | null
   restocked: boolean
@@ -1082,6 +1086,15 @@ export const adminApi = {
   },
   getOrder(id: string) {
     return call<OrderDetail>(http.get(`${BASE}/orders/${id}`))
+  },
+  setExpectedDelivery(
+    orderId: string,
+    shipmentId: string,
+    body: { expectedDeliveryAt: string | null; visible: boolean },
+  ) {
+    return call<OrderDetail>(
+      http.patch(`${BASE}/orders/${orderId}/shipments/${shipmentId}/expected-delivery`, body),
+    )
   },
   listOrderMessages(id: string) {
     return call<OrderMessages>(http.get(`${BASE}/orders/${id}/messages`))
