@@ -106,27 +106,47 @@ function firstWaId(...phones: (string | null | undefined)[]): string | null {
   return null;
 }
 
+/** One order message, ready to send: who, which template, the {{1}}… values. */
+interface PreparedMessage {
+  to: string | null;
+  templateName: string;
+  bodyParams: string[];
+}
+
+/** Sends a prepared message and returns Meta's message id. Throws on refusal. */
+async function deliverPrepared(
+  message: PreparedMessage & { to: string },
+  logger: FastifyBaseLogger,
+): Promise<string | null> {
+  const result = await sendTemplate(
+    {
+      to: message.to,
+      templateName: message.templateName,
+      languageCode: LANGUAGE,
+      bodyParams: message.bodyParams,
+      buttonParams: [],
+      header: null,
+    },
+    logger,
+  );
+  return result.messages?.[0]?.id ?? null;
+}
+
+/** The automatic send: never throws — a refused send is logged and skipped. */
 async function send(
   orderId: string,
-  to: string | null,
-  templateName: string,
-  bodyParams: string[],
+  message: PreparedMessage,
   logger: FastifyBaseLogger,
 ): Promise<void> {
-  const wa = { orderId, template: templateName };
+  const wa = { orderId, template: message.templateName };
+  const to = message.to;
   if (!to) {
     logger.info({ wa }, "whatsapp: order message skipped — no usable phone");
     return;
   }
   try {
-    const result = await sendTemplate(
-      { to, templateName, languageCode: LANGUAGE, bodyParams, buttonParams: [], header: null },
-      logger,
-    );
-    logger.info(
-      { wa: { ...wa, wamid: result.messages?.[0]?.id ?? null } },
-      "whatsapp: order message sent",
-    );
+    const wamid = await deliverPrepared({ ...message, to }, logger);
+    logger.info({ wa: { ...wa, wamid } }, "whatsapp: order message sent");
   } catch (error) {
     // 403 = not on the dev allowlist, 409 = opted out: expected, not a fault.
     const expected =
@@ -164,16 +184,25 @@ function sellerParams(order: OrderRow): string[] {
   ];
 }
 
+/** The seller's "new order" message: business phone, else the owner's login phone. */
+function prepareSellerNewOrder(order: OrderRow): PreparedMessage | null {
+  if (!order.store) return null;
+  const profile = resolveProfile(order.store.profile);
+  return {
+    to: firstWaId(profile.phone, order.store.owner.phone),
+    templateName: TEMPLATES.sellerNewOrder,
+    bodyParams: sellerParams(order),
+  };
+}
+
 /** The seller's "new order" message. */
 export function whatsAppNewOrder(orderId: string): void {
   const logger = log;
   if (!logger) return;
   void (async () => {
     const order = await loadOrder(orderId);
-    if (!order?.store) return;
-    const profile = resolveProfile(order.store.profile);
-    const to = firstWaId(profile.phone, order.store.owner.phone);
-    await send(orderId, to, TEMPLATES.sellerNewOrder, sellerParams(order), logger);
+    const message = order ? prepareSellerNewOrder(order) : null;
+    if (message) await send(orderId, message, logger);
   })().catch((err: unknown) => logger.error({ err, orderId }, "whatsapp: seller order message"));
 }
 
@@ -200,34 +229,86 @@ export function whatsAppOrderStatus(
   if (status !== "CONFIRMED" && status !== "SHIPPED" && status !== "DELIVERED") return;
   void (async () => {
     const order = await loadOrder(orderId);
-    if (!order) return;
-    const to = firstWaId(order.customerPhone, order.customer?.phone);
-    const name = clean(order.customerName ?? order.customer?.name ?? "there");
-    const store = clean(order.storeName);
-    const number = clean(order.orderNumber);
-
-    let params: string[];
-    if (status === "CONFIRMED") {
-      params = [name, number, clean(amount(order.total)), store];
-    } else if (status === "SHIPPED") {
-      const shipment = parcel ?? order.shipments[0] ?? null;
-      const trackUrl =
-        shipment?.trackingUrl ??
-        (parcel?.trackingNumber ? parcel.courierSite : null) ??
-        link(`/order/${order.storeSlug}/${order.id}`);
-      params = [
-        name,
-        number,
-        clean(shipment?.carrier),
-        clean(shipment?.trackingNumber),
-        clean(trackUrl),
-        store,
-      ];
-    } else {
-      params = [name, number, store];
-    }
-    await send(orderId, to, TEMPLATES[status], params, logger);
+    if (order) await send(orderId, prepareCustomerStatus(order, status, parcel), logger);
   })().catch((err: unknown) =>
     logger.error({ err, orderId, status }, "whatsapp: customer order message"),
   );
+}
+
+type CustomerStatus = "CONFIRMED" | "SHIPPED" | "DELIVERED";
+
+/** The customer's message for a status: checkout phone, else the account's phone. */
+function prepareCustomerStatus(
+  order: OrderRow,
+  status: CustomerStatus,
+  parcel?: ShippedParcel | null,
+): PreparedMessage {
+  const name = clean(order.customerName ?? order.customer?.name ?? "there");
+  const store = clean(order.storeName);
+  const number = clean(order.orderNumber);
+
+  let params: string[];
+  if (status === "CONFIRMED") {
+    params = [name, number, clean(amount(order.total)), store];
+  } else if (status === "SHIPPED") {
+    const shipment = parcel ?? order.shipments[0] ?? null;
+    const trackUrl =
+      shipment?.trackingUrl ??
+      (parcel?.trackingNumber ? parcel.courierSite : null) ??
+      link(`/order/${order.storeSlug}/${order.id}`);
+    params = [
+      name,
+      number,
+      clean(shipment?.carrier),
+      clean(shipment?.trackingNumber),
+      clean(trackUrl),
+      store,
+    ];
+  } else {
+    params = [name, number, store];
+  }
+  return {
+    to: firstWaId(order.customerPhone, order.customer?.phone),
+    templateName: TEMPLATES[status],
+    bodyParams: params,
+  };
+}
+
+// ---- Manual sends (admin console) -------------------------------------------
+
+/** The order messages an admin can send again by hand. */
+export type OrderWaMessage = "SELLER_NEW_ORDER" | CustomerStatus;
+
+async function prepareManual(orderId: string, message: OrderWaMessage) {
+  const order = await loadOrder(orderId);
+  if (!order) throw HttpError.notFound("Order not found");
+  return message === "SELLER_NEW_ORDER"
+    ? prepareSellerNewOrder(order)
+    : prepareCustomerStatus(order, message);
+}
+
+/** Who a manual send would go to, and with which template — for the confirm step. */
+export async function previewOrderWhatsApp(orderId: string, message: OrderWaMessage) {
+  const prepared = await prepareManual(orderId, message);
+  return { to: prepared?.to ?? null, templateName: prepared?.templateName ?? null };
+}
+
+/**
+ * The same message the automatic send would build, sent NOW and awaited —
+ * unlike the automatic path, a refusal (opted out, not allowlisted, template
+ * problem, Meta error) is thrown so the admin sees why. Stored as a WaMessage
+ * by `sendTemplate` like every other send.
+ */
+export async function sendOrderWhatsApp(
+  orderId: string,
+  message: OrderWaMessage,
+  logger: FastifyBaseLogger,
+) {
+  const prepared = await prepareManual(orderId, message);
+  const to = prepared?.to;
+  if (!prepared || !to) {
+    throw new HttpError(422, "This order has no usable phone number for that message");
+  }
+  const wamid = await deliverPrepared({ ...prepared, to }, logger);
+  return { to, templateName: prepared.templateName, wamid };
 }

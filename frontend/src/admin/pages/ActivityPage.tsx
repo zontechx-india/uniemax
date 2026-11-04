@@ -30,6 +30,7 @@ const ACTIONS: Record<string, { label: string; tone: 'neutral' | 'danger' | 'suc
   'admin.create': { label: 'Created admin', tone: 'neutral' },
   'admin.update': { label: 'Updated admin', tone: 'neutral' },
   'admin.passwordReset': { label: 'Reset admin password', tone: 'danger' },
+  'order.message.send': { label: 'Sent order message', tone: 'neutral' },
 }
 
 const ACTION_FILTER = [

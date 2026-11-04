@@ -18,6 +18,9 @@ const blank = (value: string | undefined) =>
 const RESEND_API_KEY = blank(process.env["RESEND_API_KEY"]);
 const EMAIL_FROM = blank(process.env["EMAIL_FROM"]) ?? "connect@zontechx.com";
 
+/** False = no RESEND_API_KEY: mail is printed to the server console, not sent. */
+export const mailConfigured = RESEND_API_KEY !== undefined;
+
 /** Storefront origin for links inside emails; null = links omitted. */
 export const publicWebUrl: string | null =
   blank(process.env["PUBLIC_WEB_URL"])?.replace(/\/+$/, "") ?? null;

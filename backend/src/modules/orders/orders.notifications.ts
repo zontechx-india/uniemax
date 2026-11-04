@@ -1,5 +1,6 @@
 import { prisma } from "../../config/prisma.js";
 import { publicWebUrl, sendMail } from "../../package/mail/index.js";
+import { HttpError } from "../../utils/httpError.js";
 import { notify, notifyAdmins } from "../notifications/notifications.service.js";
 import { whatsAppNewOrder, whatsAppOrderStatus } from "../whatsapp/whatsapp.orderMessages.js";
 import { escapeHtml } from "./couriers.js";
@@ -12,7 +13,9 @@ import { escapeHtml } from "./couriers.js";
  * Covered: customer confirmation + seller "new order" alert on placement, and
  * customer updates on Confirmed / Shipped / Delivered / Cancelled. All
  * FIRE-AND-FORGET: a delivery failure must never fail (or slow) the order
- * flow itself, so every entry point catches and logs.
+ * flow itself, so every entry point catches and logs. The one exception is
+ * `sendOrderMail` at the bottom: the admin console's manual re-send, which is
+ * awaited and throws so the admin sees why a send failed.
  *
  * Recipient resolution: the checkout's email field is optional per store, so
  * the customer address falls back to the account's login email; the seller
@@ -136,64 +139,69 @@ export function notifyOrderPlaced(
 
   // --- email --------------------------------------------------------------
   void (async () => {
-    const paymentLine =
-      order.paymentMethod === "COD"
-        ? "Payment: Cash on Delivery"
-        : "Payment: Online";
-    const fulfilmentLine =
-      order.fulfilment === "PICKUP"
-        ? "You chose store pickup."
-        : "It will be delivered to your address.";
-
     const to = await customerAddress(order, customerId);
-    if (to) {
-      const confirmationUrl = publicWebUrl
-        ? `${publicWebUrl}/order/${order.storeSlug}/${order.id}`
-        : null;
-      await sendMail({
-        to,
-        subject: `Order ${order.orderNumber} placed — ${order.storeName}`,
-        text: `Hi${order.customerName ? ` ${order.customerName}` : ""},\n\nYour order at ${order.storeName} has been placed.\n\n${itemLines(order)}\n\nTotal: ${formatTotal(order.total)}\n${paymentLine}\n${fulfilmentLine}\n\nWe'll email you as it progresses.${confirmationUrl ? `\n\nView your order: ${confirmationUrl}` : ""}`,
-        html: wrapHtml(
-          `Your order is placed 🎉`,
-          `<p style="margin:0;font-size:14px;color:#444">
-             Order <strong>${order.orderNumber}</strong> at
-             <strong>${order.storeName}</strong> has been placed.</p>
-           ${itemsHtml(order)}
-           <p style="margin:12px 0 0;font-size:14px;color:#111">
-             <strong>Total: ${formatTotal(order.total)}</strong></p>
-           <p style="margin:4px 0 0;font-size:13px;color:#444">${paymentLine}. ${fulfilmentLine}</p>
-           ${confirmationUrl ? linkHtml(confirmationUrl, "View your order") : ""}`,
-        ),
-      });
-    }
+    if (to) await mailCustomerPlaced(order, to);
   })().catch(logFailure("customer placed"));
 
   if (sellerEmail) {
-    void (async () => {
-      const manageUrl = publicWebUrl
-        ? `${publicWebUrl}/stores/${order.storeSlug}/orders/${order.id}`
-        : null;
-      await sendMail({
-        to: sellerEmail,
-        subject: `New order ${order.orderNumber} — ${order.storeName}`,
-        text: `You have a new order at ${order.storeName}.\n\n${order.customerName ? `Customer: ${order.customerName}\n` : ""}${itemLines(order)}\n\nTotal: ${formatTotal(order.total)}\n${order.paymentMethod === "COD" ? "Cash on Delivery" : "Online payment"} · ${order.fulfilment === "PICKUP" ? "Store pickup" : "Delivery"}${manageUrl ? `\n\nManage it: ${manageUrl}` : "\n\nOpen your store's Orders section to confirm it."}`,
-        html: wrapHtml(
-          "You have a new order",
-          `<p style="margin:0;font-size:14px;color:#444">
-             Order <strong>${order.orderNumber}</strong> at
-             <strong>${order.storeName}</strong>${order.customerName ? ` from ${order.customerName}` : ""}.</p>
-           ${itemsHtml(order)}
-           <p style="margin:12px 0 0;font-size:14px;color:#111">
-             <strong>Total: ${formatTotal(order.total)}</strong></p>
-           <p style="margin:4px 0 0;font-size:13px;color:#444">
-             ${order.paymentMethod === "COD" ? "Cash on Delivery" : "Online payment"} ·
-             ${order.fulfilment === "PICKUP" ? "Store pickup" : "Delivery"}</p>
-           ${manageUrl ? linkHtml(manageUrl, "Confirm this order") : ""}`,
-        ),
-      });
-    })().catch(logFailure("seller placed"));
+    mailSellerPlaced(order, sellerEmail).catch(logFailure("seller placed"));
   }
+}
+
+/** The customer's "order placed" email. */
+function mailCustomerPlaced(order: OrderMailData, to: string): Promise<void> {
+  const paymentLine =
+    order.paymentMethod === "COD"
+      ? "Payment: Cash on Delivery"
+      : "Payment: Online";
+  const fulfilmentLine =
+    order.fulfilment === "PICKUP"
+      ? "You chose store pickup."
+      : "It will be delivered to your address.";
+  const confirmationUrl = publicWebUrl
+    ? `${publicWebUrl}/order/${order.storeSlug}/${order.id}`
+    : null;
+  return sendMail({
+    to,
+    subject: `Order ${order.orderNumber} placed — ${order.storeName}`,
+    text: `Hi${order.customerName ? ` ${order.customerName}` : ""},\n\nYour order at ${order.storeName} has been placed.\n\n${itemLines(order)}\n\nTotal: ${formatTotal(order.total)}\n${paymentLine}\n${fulfilmentLine}\n\nWe'll email you as it progresses.${confirmationUrl ? `\n\nView your order: ${confirmationUrl}` : ""}`,
+    html: wrapHtml(
+      `Your order is placed 🎉`,
+      `<p style="margin:0;font-size:14px;color:#444">
+         Order <strong>${order.orderNumber}</strong> at
+         <strong>${order.storeName}</strong> has been placed.</p>
+       ${itemsHtml(order)}
+       <p style="margin:12px 0 0;font-size:14px;color:#111">
+         <strong>Total: ${formatTotal(order.total)}</strong></p>
+       <p style="margin:4px 0 0;font-size:13px;color:#444">${paymentLine}. ${fulfilmentLine}</p>
+       ${confirmationUrl ? linkHtml(confirmationUrl, "View your order") : ""}`,
+    ),
+  });
+}
+
+/** The seller's "new order" email. */
+function mailSellerPlaced(order: OrderMailData, to: string): Promise<void> {
+  const manageUrl = publicWebUrl
+    ? `${publicWebUrl}/stores/${order.storeSlug}/orders/${order.id}`
+    : null;
+  return sendMail({
+    to,
+    subject: `New order ${order.orderNumber} — ${order.storeName}`,
+    text: `You have a new order at ${order.storeName}.\n\n${order.customerName ? `Customer: ${order.customerName}\n` : ""}${itemLines(order)}\n\nTotal: ${formatTotal(order.total)}\n${order.paymentMethod === "COD" ? "Cash on Delivery" : "Online payment"} · ${order.fulfilment === "PICKUP" ? "Store pickup" : "Delivery"}${manageUrl ? `\n\nManage it: ${manageUrl}` : "\n\nOpen your store's Orders section to confirm it."}`,
+    html: wrapHtml(
+      "You have a new order",
+      `<p style="margin:0;font-size:14px;color:#444">
+         Order <strong>${order.orderNumber}</strong> at
+         <strong>${order.storeName}</strong>${order.customerName ? ` from ${order.customerName}` : ""}.</p>
+       ${itemsHtml(order)}
+       <p style="margin:12px 0 0;font-size:14px;color:#111">
+         <strong>Total: ${formatTotal(order.total)}</strong></p>
+       <p style="margin:4px 0 0;font-size:13px;color:#444">
+         ${order.paymentMethod === "COD" ? "Cash on Delivery" : "Online payment"} ·
+         ${order.fulfilment === "PICKUP" ? "Store pickup" : "Delivery"}</p>
+       ${manageUrl ? linkHtml(manageUrl, "Confirm this order") : ""}`,
+    ),
+  });
 }
 
 /**
@@ -313,24 +321,30 @@ export function notifyOrderStatusChange(
 
   void (async () => {
     const to = await customerAddress(order, customerId);
-    if (!to) return;
-    const confirmationUrl = publicWebUrl
-      ? `${publicWebUrl}/order/${order.storeSlug}/${order.id}`
-      : null;
-    const line = copy.line(order);
-    await sendMail({
-      to,
-      subject: copy.subject(order),
-      text: `Hi${order.customerName ? ` ${order.customerName}` : ""},\n\n${line}\n\nTotal: ${formatTotal(order.total)}${confirmationUrl ? `\n\nView your order: ${confirmationUrl}` : ""}`,
-      html: wrapHtml(
-        copy.subject(order),
-        `<p style="margin:0;font-size:14px;color:#444">${line}</p>
-         <p style="margin:12px 0 0;font-size:14px;color:#111">
-           <strong>Total: ${formatTotal(order.total)}</strong></p>
-         ${confirmationUrl ? linkHtml(confirmationUrl, "View your order") : ""}`,
-      ),
-    });
+    if (to) await mailStatus(order, order.status, to);
   })().catch(logFailure(`customer ${order.status.toLowerCase()}`));
+}
+
+/** The customer's plain status email (no parcel details). */
+function mailStatus(order: OrderMailData, status: string, to: string): Promise<void> {
+  const copy = STATUS_MAIL[status];
+  if (!copy) throw new Error(`No email copy for status ${status}`);
+  const confirmationUrl = publicWebUrl
+    ? `${publicWebUrl}/order/${order.storeSlug}/${order.id}`
+    : null;
+  const line = copy.line(order);
+  return sendMail({
+    to,
+    subject: copy.subject(order),
+    text: `Hi${order.customerName ? ` ${order.customerName}` : ""},\n\n${line}\n\nTotal: ${formatTotal(order.total)}${confirmationUrl ? `\n\nView your order: ${confirmationUrl}` : ""}`,
+    html: wrapHtml(
+      copy.subject(order),
+      `<p style="margin:0;font-size:14px;color:#444">${line}</p>
+       <p style="margin:12px 0 0;font-size:14px;color:#111">
+         <strong>Total: ${formatTotal(order.total)}</strong></p>
+       ${confirmationUrl ? linkHtml(confirmationUrl, "View your order") : ""}`,
+    ),
+  });
 }
 
 /** A parcel as the customer messages need it (the shaped parcel satisfies it). */
@@ -373,44 +387,67 @@ function sendParcelMessage(
 
   void (async () => {
     const to = await customerAddress(order, customerId);
-    if (!to) return;
-    const orderUrl = publicWebUrl ? `${publicWebUrl}${orderPath}` : null;
-    // The seller's own tracking link wins; without one, the courier's site
-    // (where the customer pastes the number).
-    const trackUrl = parcel.trackingUrl ?? (number ? parcel.courierSite : null);
-    const trackLabel = parcel.trackingUrl
-      ? "Track your parcel"
-      : `Track it on the ${parcel.carrier} website`;
-    const shippedBy = parcel.senderName ? `Shipped by ${parcel.senderName}.` : null;
-
-    const text = [
-      `Hi${order.customerName ? ` ${order.customerName}` : ""},`,
-      "",
-      line,
-      shippedBy,
-      number ? `Tracking number: ${number}` : null,
-      trackUrl
-        ? `${trackLabel}: ${trackUrl}${parcel.trackingUrl ? "" : " (use the tracking number above)"}`
-        : null,
-      orderUrl ? `\nView your order: ${orderUrl}` : null,
-    ]
-      .filter((part) => part !== null)
-      .join("\n");
-
-    await sendMail({
-      to,
-      subject,
-      text,
-      html: wrapHtml(
-        escapeHtml(subject),
-        `<p style="margin:0;font-size:14px;color:#444">${escapeHtml(line)}</p>
-         ${shippedBy ? `<p style="margin:4px 0 0;font-size:13px;color:#444">${escapeHtml(shippedBy)}</p>` : ""}
-         ${number ? `<p style="margin:12px 0 0;font-size:14px;color:#111">Tracking number: <strong>${escapeHtml(number)}</strong></p>` : ""}
-         ${trackUrl ? linkHtml(escapeHtml(trackUrl), escapeHtml(trackLabel)) : ""}
-         ${orderUrl ? linkHtml(orderUrl, "View your order") : ""}`,
-      ),
-    });
+    if (to) await mailParcel(order, parcel, to, subject, line);
   })().catch(logFailure("customer parcel"));
+}
+
+/** One parcel's email — courier, tracking number and where to follow it. */
+async function mailParcel(
+  order: OrderMailData,
+  parcel: ParcelMailData,
+  to: string,
+  subject: string,
+  line: string,
+): Promise<void> {
+  const number = parcel.trackingNumber;
+  const orderUrl = publicWebUrl ? `${publicWebUrl}/order/${order.storeSlug}/${order.id}` : null;
+  // The seller's own tracking link wins; without one, the courier's site
+  // (where the customer pastes the number).
+  const trackUrl = parcel.trackingUrl ?? (number ? parcel.courierSite : null);
+  const trackLabel = parcel.trackingUrl
+    ? "Track your parcel"
+    : `Track it on the ${parcel.carrier} website`;
+  const shippedBy = parcel.senderName ? `Shipped by ${parcel.senderName}.` : null;
+
+  const text = [
+    `Hi${order.customerName ? ` ${order.customerName}` : ""},`,
+    "",
+    line,
+    shippedBy,
+    number ? `Tracking number: ${number}` : null,
+    trackUrl
+      ? `${trackLabel}: ${trackUrl}${parcel.trackingUrl ? "" : " (use the tracking number above)"}`
+      : null,
+    orderUrl ? `\nView your order: ${orderUrl}` : null,
+  ]
+    .filter((part) => part !== null)
+    .join("\n");
+
+  await sendMail({
+    to,
+    subject,
+    text,
+    html: wrapHtml(
+      escapeHtml(subject),
+      `<p style="margin:0;font-size:14px;color:#444">${escapeHtml(line)}</p>
+       ${shippedBy ? `<p style="margin:4px 0 0;font-size:13px;color:#444">${escapeHtml(shippedBy)}</p>` : ""}
+       ${number ? `<p style="margin:12px 0 0;font-size:14px;color:#111">Tracking number: <strong>${escapeHtml(number)}</strong></p>` : ""}
+       ${trackUrl ? linkHtml(escapeHtml(trackUrl), escapeHtml(trackLabel)) : ""}
+       ${orderUrl ? linkHtml(orderUrl, "View your order") : ""}`,
+    ),
+  });
+}
+
+/** The "shipped" wording for a parcel; `first` = it moved the order to Shipped. */
+function parcelShippedCopy(order: OrderMailData, parcel: ParcelMailData, first: boolean) {
+  const line =
+    parcel.carrierCode === "self"
+      ? `${order.storeName} is delivering your order themselves.`
+      : `${order.storeName} has ${first ? "shipped" : "sent"} your order with ${parcel.carrier}.`;
+  const subject = first
+    ? `Order ${order.orderNumber} shipped`
+    : `Tracking for order ${order.orderNumber}`;
+  return { line, subject };
 }
 
 /**
@@ -425,13 +462,7 @@ export function notifyParcelShipped(
   customerId: string | null,
   { first }: { first: boolean },
 ): void {
-  const line =
-    parcel.carrierCode === "self"
-      ? `${order.storeName} is delivering your order themselves.`
-      : `${order.storeName} has ${first ? "shipped" : "sent"} your order with ${parcel.carrier}.`;
-  const subject = first
-    ? `Order ${order.orderNumber} shipped`
-    : `Tracking for order ${order.orderNumber}`;
+  const { line, subject } = parcelShippedCopy(order, parcel, first);
   sendParcelMessage(order, parcel, customerId, subject, line);
   // WhatsApp once, when this parcel moved the order to Shipped.
   if (first) whatsAppOrderStatus(order.id, "SHIPPED", parcel);
@@ -473,4 +504,58 @@ export function notifyCustomerCancelled(
     url: `/mystores/${order.storeSlug}/orders/${order.id}`,
     data: { orderId: order.id, status: "CANCELLED" },
   });
+}
+
+// ---- Manual sends (admin console) -------------------------------------------
+
+/** The order emails an admin can send again by hand. */
+export type OrderMailMessage =
+  | "CUSTOMER_PLACED"
+  | "SELLER_NEW_ORDER"
+  | "CONFIRMED"
+  | "SHIPPED"
+  | "DELIVERED"
+  | "CANCELLED";
+
+export interface OrderMailContext {
+  customerId: string | null;
+  sellerEmail: string | null;
+  /** The latest parcel — Shipped then carries its tracking, as the automatic send does. */
+  parcel: ParcelMailData | null;
+}
+
+/** Where a manual send would go — the same address the automatic send uses. */
+export function orderMailRecipient(
+  message: OrderMailMessage,
+  order: OrderMailData,
+  context: OrderMailContext,
+): Promise<string | null> {
+  return message === "SELLER_NEW_ORDER"
+    ? Promise.resolve(context.sellerEmail)
+    : customerAddress(order, context.customerId);
+}
+
+/**
+ * The same email the automatic send would build, sent NOW and awaited — a
+ * missing address or a provider refusal is thrown so the admin sees why.
+ * Returns the address it went to.
+ */
+export async function sendOrderMail(
+  message: OrderMailMessage,
+  order: OrderMailData,
+  context: OrderMailContext,
+): Promise<string> {
+  const to = await orderMailRecipient(message, order, context);
+  if (!to) throw new HttpError(422, "This order has no email address for that message");
+  try {
+    if (message === "CUSTOMER_PLACED") await mailCustomerPlaced(order, to);
+    else if (message === "SELLER_NEW_ORDER") await mailSellerPlaced(order, to);
+    else if (message === "SHIPPED" && context.parcel) {
+      const { line, subject } = parcelShippedCopy(order, context.parcel, true);
+      await mailParcel(order, context.parcel, to, subject, line);
+    } else await mailStatus(order, message, to);
+  } catch (error) {
+    throw new HttpError(502, error instanceof Error ? error.message : "Email send failed");
+  }
+  return to;
 }

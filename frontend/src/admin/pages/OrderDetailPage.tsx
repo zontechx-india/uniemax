@@ -7,6 +7,7 @@ import { OrderStatusChip, PaymentChip } from '../ui/statusMeta'
 import { formatDateTime, formatMoneyExact } from '../ui/format'
 import { BackIcon } from '../layout/icons'
 import { MediaImg } from '../../shared/media/MediaImg'
+import { OrderMessagesCard } from './orders/OrderMessagesCard'
 
 /**
  * One order, everything known about it — the page a support conversation is
@@ -336,6 +337,8 @@ export default function OrderDetailPage() {
             <CardHeader title="Timeline" />
             <Timeline order={order} />
           </Card>
+
+          <OrderMessagesCard orderId={order.id} />
         </div>
       </div>
     </>

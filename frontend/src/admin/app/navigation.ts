@@ -9,6 +9,7 @@
  *   Commerce   — the day's work (orders, payments, catalog)
  *   Accounts   — who is on the platform
  *   Platform   — announcements, security, configuration
+ *   Documents  — read-only reference pages (nothing to act on)
  */
 
 export interface NavItem {
@@ -70,6 +71,13 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/admins', label: 'Admin users', superAdminOnly: true },
     ],
   },
+  {
+    title: 'Documents',
+    items: [
+      // Every WhatsApp template: its text, who gets it, and each {{n}}'s value.
+      { to: '/docs/whatsapp-templates', label: 'WhatsApp templates' },
+    ],
+  },
 ]
 
 /** Browser tab title per path prefix — longest match wins. */
@@ -92,6 +100,7 @@ const TITLES: [string, string][] = [
   ['/notifications', 'Notifications'],
   ['/activity', 'Activity log'],
   ['/admins', 'Admin users'],
+  ['/docs/whatsapp-templates', 'WhatsApp templates'],
 ]
 
 export function titleForPath(pathname: string): string {

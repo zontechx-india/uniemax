@@ -464,6 +464,11 @@ module repeats the guard. Deliberate scope decisions:
   [One plugin, two mounts](#one-plugin-two-mounts--the-storeactor-pattern)) —
   which is not a set of admin endpoints at all, but the seller's own,
   re-mounted.
+- **Re-sending order messages** (`adminOrderMessages.service.ts`) is the one
+  write on an order, and it does not change the order: it sends an order's
+  email or WhatsApp message again, with the automatic send's own text and
+  recipient (never typed by the admin), only for a stage the order has reached
+  (its timestamp is set), and writes `order.message.send` to the audit trail.
 - **Store suspension** (`Store.suspendedAt`) is a separate axis from the
   owner's `isPublished`. Suspension outranks it in every public query
   (`PUBLIC_STORE_VISIBILITY` in `publicStore.service.ts`, reused by
@@ -789,7 +794,10 @@ WhatsApp Cloud API; setup: `backend/README.md`.
   template. All language `en`; an empty value is sent as `NA`, whitespace collapsed.
   Fire-and-forget: a refused or failed send is logged with the order id and never
   touches the order. Off until `startOrderMessages` runs in `server.ts` with
-  `WA_ENABLED=true`, so tests never send.
+  `WA_ENABLED=true`, so tests never send. **Manual re-send** from the console
+  (`sendOrderWhatsApp`, used by `admin/adminOrderMessages.service.ts`) builds the
+  same message and recipient but is awaited and THROWS on a refusal, so the admin
+  sees why; the email twin is `sendOrderMail` in `orders.notifications.ts`.
 - **Admin-only**, mounted at `/admin/whatsapp` inside the `requireAdmin` subtree;
   sends, campaign creates/tests/controls, imports, consent changes and automation
   edits are written to the audit trail.

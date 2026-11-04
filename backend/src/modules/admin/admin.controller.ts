@@ -8,6 +8,7 @@ import * as dashboard from "./adminDashboard.service.js";
 import * as stores from "./adminStores.service.js";
 import * as customers from "./adminCustomers.service.js";
 import * as orders from "./adminOrders.service.js";
+import * as orderMessages from "./adminOrderMessages.service.js";
 import * as products from "./adminProducts.service.js";
 import * as accounts from "./adminAccounts.service.js";
 import * as categoryMapping from "./adminCategoryMapping.service.js";
@@ -155,6 +156,29 @@ export async function listOrders(request: FastifyRequest) {
 export async function getOrder(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   return ok(await orders.getOrder(id));
+}
+
+export async function listOrderMessages(request: FastifyRequest) {
+  const { id } = idParamSchema.parse(request.params);
+  return ok(await orderMessages.listOrderMessages(id));
+}
+
+export async function sendOrderMessage(request: FastifyRequest) {
+  const { id } = idParamSchema.parse(request.params);
+  const input = schema.orderMessageSendSchema.parse(request.body);
+  const sent = await orderMessages.sendOrderMessage(id, input, request.log);
+  recordAudit(request, {
+    action: "order.message.send",
+    entityType: "order",
+    entityId: id,
+    meta: {
+      orderNumber: sent.orderNumber,
+      message: input.message,
+      channel: input.channel,
+      to: sent.to,
+    },
+  });
+  return ok(sent);
 }
 
 export async function listPayments(request: FastifyRequest) {

@@ -47,6 +47,42 @@ export interface OrderRow {
   itemCount: number
 }
 
+export type OrderMessageKey =
+  | 'SELLER_NEW_ORDER'
+  | 'CUSTOMER_PLACED'
+  | 'CONFIRMED'
+  | 'SHIPPED'
+  | 'DELIVERED'
+  | 'CANCELLED'
+export type OrderMessageChannel = 'whatsapp' | 'email'
+
+/** `GET /orders/:id/messages` — what can be sent again, and to whom. */
+export interface OrderMessages {
+  whatsappEnabled: boolean
+  /** False = emails are printed to the server console, not delivered. */
+  emailDelivered: boolean
+  messages: {
+    key: OrderMessageKey
+    label: string
+    audience: 'seller' | 'customer'
+    /** The order has reached this message's stage — only then can it be sent. */
+    reached: boolean
+    email: { to: string | null }
+    /** Null = the message has no WhatsApp template. */
+    whatsapp: { to: string | null; templateName: string | null } | null
+  }[]
+}
+
+export interface OrderMessageSent {
+  orderNumber: string
+  message: OrderMessageKey
+  channel: OrderMessageChannel
+  to: string
+  templateName?: string
+  wamid?: string | null
+  delivered?: boolean
+}
+
 export interface OrderDetail extends OrderRow {
   customerEmail: string | null
   addressLine: string | null
@@ -1046,6 +1082,12 @@ export const adminApi = {
   },
   getOrder(id: string) {
     return call<OrderDetail>(http.get(`${BASE}/orders/${id}`))
+  },
+  listOrderMessages(id: string) {
+    return call<OrderMessages>(http.get(`${BASE}/orders/${id}/messages`))
+  },
+  sendOrderMessage(id: string, body: { message: OrderMessageKey; channel: OrderMessageChannel }) {
+    return call<OrderMessageSent>(http.post(`${BASE}/orders/${id}/messages`, body))
   },
   listPayments(query: Params) {
     return callList<OrderRow>(http.get(`${BASE}/payments`, params(query)))

@@ -3545,6 +3545,30 @@ timestamps, `cfOrderId`, the linked customer/store, items with `imageUrl`,
 and `shipments[]` as the seller sees them (proof-of-delivery `podUrl`
 included — shape under **Parcels**).
 
+### `GET /api/v1/admin/orders/:id/messages` · `POST /api/v1/admin/orders/:id/messages`
+
+Send an order's email or WhatsApp message **again**, by hand. The order is not
+changed; the text and recipient are the automatic send's own.
+
+`GET` answers `{ whatsappEnabled, emailDelivered, messages[] }`.
+`emailDelivered: false` = no `RESEND_API_KEY`, so mail is printed to the server
+log. Each message is `{ key, label, audience: "seller" | "customer", reached,
+email: { to }, whatsapp: { to, templateName } | null }`. `reached` = the order's
+timestamp for that stage is set. `whatsapp: null` = no template. `to: null` =
+no usable address/phone. Keys, in order: `SELLER_NEW_ORDER` (email + WhatsApp
+`order_received_to_seller`), `CUSTOMER_PLACED` (email), `CONFIRMED`, `SHIPPED`
+(left out for pickup orders), `DELIVERED` (email + WhatsApp), `CANCELLED` (email).
+
+`POST` body `{ "message": "<key>", "channel": "whatsapp" | "email" }` sends now
+and waits for the result: `{ orderNumber, message, channel, to }` plus
+`templateName` + `wamid` (WhatsApp) or `delivered` (email). Shipped email
+carries the latest parcel's tracking when there is one. Errors: `409` stage
+not reached · `400` no WhatsApp template for that message · `422` no
+address/phone, or a template problem · `503` WhatsApp disabled · `403` not on
+the dev allowlist · `409` recipient opted out · `502` email provider refused.
+Meta's own refusals pass through with their message. Audit action
+`order.message.send` (`meta`: orderNumber, message, channel, to).
+
 ### `GET /api/v1/admin/payments`
 
 The same order rows through the money lens (there is no separate payments

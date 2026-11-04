@@ -36,6 +36,9 @@ export const adminConsoleRoutes: FastifyPluginAsync = async (app) => {
   // Orders + payments — read-only across every store
   app.get("/orders", controller.listOrders);
   app.get("/orders/:id", controller.getOrder);
+  // Send an order's email / WhatsApp again (the order itself is not changed).
+  app.get("/orders/:id/messages", controller.listOrderMessages);
+  app.post("/orders/:id/messages", controller.sendOrderMessage);
   app.get("/payments", controller.listPayments);
 
   // Catalog oversight — the sellers' products, platform-wide.

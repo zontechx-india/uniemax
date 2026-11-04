@@ -81,6 +81,19 @@ export const orderListQuery = searchQuery.extend({
   to: isoDate,
 });
 
+/** Send one of an order's messages again, on one channel. */
+export const orderMessageSendSchema = z.object({
+  message: z.enum([
+    "SELLER_NEW_ORDER",
+    "CUSTOMER_PLACED",
+    "CONFIRMED",
+    "SHIPPED",
+    "DELIVERED",
+    "CANCELLED",
+  ]),
+  channel: z.enum(["whatsapp", "email"]),
+});
+
 // ---- Products -------------------------------------------------------------
 
 export const productListQuery = searchQuery.extend({
@@ -168,6 +181,7 @@ export type BankVerificationInput = z.infer<typeof bankVerificationSchema>;
 export type CustomerListQuery = z.infer<typeof customerListQuery>;
 export type CustomerBlockInput = z.infer<typeof customerBlockSchema>;
 export type OrderListQuery = z.infer<typeof orderListQuery>;
+export type OrderMessageSendInput = z.infer<typeof orderMessageSendSchema>;
 export type ProductListQuery = z.infer<typeof productListQuery>;
 export type ProductVisibilityInput = z.infer<typeof productVisibilitySchema>;
 export type ShelfListQuery = z.infer<typeof shelfListQuery>;

@@ -62,6 +62,7 @@ const PayoutsPage = lazy(
 const NotificationsPage = lazy(() => import('../pages/NotificationsPage'))
 const ActivityPage = lazy(() => import('../pages/ActivityPage'))
 const AdminsPage = lazy(() => import('../pages/AdminsPage'))
+const WhatsAppTemplateDocsPage = lazy(() => import('../pages/docs/WhatsAppTemplateDocsPage'))
 
 /**
  * Managing a seller's shop.
@@ -243,6 +244,8 @@ export function AdminRouter() {
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="activity" element={<ActivityPage />} />
                 <Route path="admins" element={<AdminsPage />} />
+                <Route path="docs/whatsapp-templates" element={<WhatsAppTemplateDocsPage />} />
+                <Route path="docs/whatsapp-templates/:name" element={<WhatsAppTemplateDocsPage />} />
                 {/* Unknown console paths go home rather than 404 — there is
                     no useful "not found" story inside a fixed nav. */}
                 <Route path="*" element={<Navigate to="/" replace />} />
