@@ -357,37 +357,18 @@ export default function StoreDetailPage() {
                     {account.isPrimary ? <Chip tone="brand">Primary</Chip> : null}
                     <BankStatusChip status={account.verificationStatus} />
                   </p>
-                  <p className="mt-0.5 text-sm text-muted">
-                    {account.accountHolderName} · {account.ifsc} · {account.branch}
-                    {account.upiId ? ` · ${account.upiId}` : ''}
-                  </p>
-                  {account.verificationNote ? (
-                    <p className="mt-1 text-xs text-muted">Note: {account.verificationNote}</p>
-                  ) : null}
-                  {account.verifiedAt ? (
-                    <p className="mt-1 text-xs text-muted">
-                      Verified {formatDateTime(account.verifiedAt)}
-                    </p>
-                  ) : null}
-                  {account.checkStatus ? (
-                    <p className="mt-1 text-xs text-muted">
-                      Bank check: {BANK_CHECK_LABEL[account.checkStatus]}
-                      {account.checkRegisteredName
-                        ? ` · Name at bank: ${account.checkRegisteredName}`
-                        : ''}
-                      {account.checkNameMatch ? ` · Match: ${account.checkNameMatch}` : ''}
-                      {account.checkReasonCode ? ` · Code: ${account.checkReasonCode}` : ''}
-                      {account.checkedAt ? ` · ${formatDateTime(account.checkedAt)}` : ''}
-                    </p>
-                  ) : null}
+                  <BankAccountDetails account={account} />
                   {account.promoteWhenVerified ? (
                     <p className="mt-1 text-xs text-muted">Becomes the main account once verified.</p>
                   ) : null}
                   {account.pendingChange ? (
                     <div className="mt-2 rounded-md bg-surface-alt p-2 text-xs text-muted">
                       <p className="font-medium text-fg">
-                        New details waiting: {account.pendingChange.bankName} ····
-                        {account.pendingChange.accountNumberLast4} ·{' '}
+                        New details waiting: {account.pendingChange.bankName}{' '}
+                        <span className="font-mono tabular-nums">
+                          {account.pendingChange.accountNumber}
+                        </span>{' '}
+                        ·{' '}
                         {account.pendingChange.accountHolderName} · {account.pendingChange.ifsc}
                       </p>
                       <p>
@@ -684,7 +665,85 @@ export default function StoreDetailPage() {
 // ---------------------------------------------------------------------------
 
 /** The GST portal's public taxpayer search — where the admin checks a GSTIN. */
-const GST_PORTAL_SEARCH = 'https://services.gst.gov.in/services/searchtp'
+const VERIFICATION_METHOD_LABEL: Record<'THIRD_PARTY' | 'MANUAL', string> = {
+  THIRD_PARTY: 'Bank check (automatic)',
+  MANUAL: 'Manual, by an admin',
+}
+
+/**
+ * Every field of one payout account, in full — the admin settles payouts to
+ * it and checks it against the bank record. Hide fields per admin role here
+ * (and in the backend's getStore) once roles/privileges exist.
+ */
+function BankAccountDetails({ account }: { account: BankAccount }) {
+  return (
+    <dl className="mt-2 max-w-xl">
+      <Detail label="Account holder">{account.accountHolderName}</Detail>
+      <Detail label="Account number">
+        <span className="inline-flex items-center gap-2">
+          <span className="font-mono tabular-nums">{account.accountNumber}</span>
+          <CopyButton text={account.accountNumber} label="Copy" variant="ghost" />
+        </span>
+      </Detail>
+      <Detail label="IFSC">
+        <span className="inline-flex items-center gap-2">
+          <span className="font-mono">{account.ifsc}</span>
+          <CopyButton text={account.ifsc} label="Copy" variant="ghost" />
+        </span>
+      </Detail>
+      <Detail label="Bank">{account.bankName}</Detail>
+      <Detail label="Branch">{account.branch}</Detail>
+      <Detail label="UPI ID">
+        {account.upiId ? (
+          <span className="inline-flex items-center gap-2">
+            <span>{account.upiId}</span>
+            <CopyButton text={account.upiId} label="Copy" variant="ghost" />
+          </span>
+        ) : (
+          'Not added'
+        )}
+      </Detail>
+      <Detail label="Phone">{account.phone ?? 'Not added'}</Detail>
+      <Detail label="Bank check">
+        {account.checkStatus ? BANK_CHECK_LABEL[account.checkStatus] : 'Not run yet'}
+      </Detail>
+      {account.checkRegisteredName ? (
+        <Detail label="Name at bank">{account.checkRegisteredName}</Detail>
+      ) : null}
+      {account.checkNameMatch ? (
+        <Detail label="Name match">{account.checkNameMatch}</Detail>
+      ) : null}
+      {account.checkReasonCode ? (
+        <Detail label="Check code">{account.checkReasonCode}</Detail>
+      ) : null}
+      {account.checkedAt ? (
+        <Detail label="Checked on">{formatDateTime(account.checkedAt)}</Detail>
+      ) : null}
+      <Detail label="Verified by">
+        {account.verificationMethod
+          ? `${VERIFICATION_METHOD_LABEL[account.verificationMethod]}${
+              account.verifiedBy ? ` — ${account.verifiedBy}` : ''
+            }`
+          : account.verifiedBy ?? 'Not yet'}
+      </Detail>
+      {account.verifiedAt ? (
+        <Detail label="Verified on">{formatDateTime(account.verifiedAt)}</Detail>
+      ) : null}
+      {account.verificationRef ? (
+        <Detail label="Check reference">
+          <span className="font-mono">{account.verificationRef}</span>
+        </Detail>
+      ) : null}
+      {account.verificationNote ? (
+        <Detail label="Note">{account.verificationNote}</Detail>
+      ) : null}
+      <Detail label="Added">{formatDateTime(account.createdAt)}</Detail>
+      <Detail label="Last changed">{formatDateTime(account.updatedAt)}</Detail>
+    </dl>
+  )
+}
+
+const GST_PORTAL_SEARCH ='https://services.gst.gov.in/services/searchtp'
 
 /**
  * Manual store verification. The admin checks the GSTIN on the GST portal —
@@ -1135,7 +1194,7 @@ function CopyButton({
 }: {
   text: string
   label: string
-  variant?: 'primary' | 'secondary'
+  variant?: 'primary' | 'secondary' | 'ghost'
 }) {
   const [copied, setCopied] = useState(false)
 

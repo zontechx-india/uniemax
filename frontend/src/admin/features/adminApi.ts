@@ -270,6 +270,8 @@ export interface ThemeTemplateInput {
 export interface BankAccount {
   id: string
   accountHolderName: string
+  /** Full number — the console settles payouts to it. */
+  accountNumber: string
   accountNumberLast4: string
   ifsc: string
   bankName: string
@@ -277,8 +279,14 @@ export interface BankAccount {
   upiId: string | null
   isPrimary: boolean
   verificationStatus: BankVerificationStatus
+  verificationMethod: 'THIRD_PARTY' | 'MANUAL' | null
+  /** The verification provider's check id, when a third party verified it. */
+  verificationRef: string | null
   verificationNote: string | null
   verifiedAt: string | null
+  /** Name (or email) of the admin who set the verification status. */
+  verifiedBy: string | null
+  updatedAt: string
   /** PaymentHub's last answer — admin-only; reasonCode can say fraud. */
   checkStatus: BankCheckStatus | null
   checkReasonCode: string | null
@@ -293,6 +301,7 @@ export interface BankAccount {
   pendingChange: {
     id: string
     accountHolderName: string
+    accountNumber: string
     accountNumberLast4: string
     ifsc: string
     bankName: string

@@ -3407,11 +3407,13 @@ seller count, not the order or product count.
 
 `:id` accepts an id or a slug. Adds `settings` (resolved payments / shipping /
 checkout — the same effective values the storefront sees), `bankAccounts`
-(**account numbers masked to the last 4**; each with the admin-only check
-fields and its `pendingChange` — new details waiting for their check —
-including `checkReasonCode`), `bankHistory` (the last 30 payout-account
-events, newest first, **with** `actorId` and `note` — reason codes, manual
-notes), `orderStatus` counts, `theme`,
+(**every field in full** — `accountNumber` unmasked plus `accountNumberLast4`,
+`verificationMethod`, `verificationRef`, `verifiedBy` (admin name or email),
+`updatedAt`; no role-based masking yet; each with the admin-only check
+fields and its `pendingChange` — new details waiting for their check, also
+with the full `accountNumber` — including `checkReasonCode`), `bankHistory`
+(the last 30 payout-account events, newest first, **with** `actorId` and
+`note` — reason codes, manual notes; details stay masked to the last 4), `orderStatus` counts, `theme`,
 `footer`, the 10 latest orders, and `readiness` — the **full** evaluation
 (every step with its individual requirements), not just the `setup` summary,
 so the console can name what is missing ("Contact email", "Business address") in the

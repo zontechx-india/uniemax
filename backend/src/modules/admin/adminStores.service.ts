@@ -222,8 +222,11 @@ export async function getStore(storeRef: string) {
           promoteWhenVerified: true,
           verificationStatus: true,
           verificationMethod: true,
+          verificationRef: true,
           verificationNote: true,
           verifiedAt: true,
+          verifiedBy: true,
+          updatedAt: true,
           // PaymentHub's last answer — admin-only (reasonCode can say fraud).
           checkStatus: true,
           checkReasonCode: true,
@@ -257,7 +260,15 @@ export async function getStore(storeRef: string) {
   });
   if (!store) throw HttpError.notFound("Store not found");
 
-  const [readiness, revenue, orderStatus, recentOrders, verifier] = await Promise.all([
+  // Admins who verified any of the payout accounts, so the card can name them.
+  const bankVerifierIds = [
+    ...new Set(
+      store.bankAccounts.map((a) => a.verifiedBy).filter((id): id is string => !!id),
+    ),
+  ];
+
+  const [readiness, revenue, orderStatus, recentOrders, verifier, bankVerifiers] =
+    await Promise.all([
     readinessFor([store as StoreListRow]),
     prisma.order.aggregate({
       where: { storeId: store.id, status: { not: "CANCELLED" } },
@@ -289,7 +300,14 @@ export async function getStore(storeRef: string) {
           select: { name: true, email: true },
         })
       : null,
+    bankVerifierIds.length
+      ? prisma.admin.findMany({
+          where: { id: { in: bankVerifierIds } },
+          select: { id: true, name: true, email: true },
+        })
+      : [],
   ]);
+  const bankVerifierName = new Map(bankVerifiers.map((a) => [a.id, a.name ?? a.email]));
 
   const {
     bankAccounts,
@@ -332,15 +350,18 @@ export async function getStore(storeRef: string) {
       shipping: resolveShipping(shipping),
       checkout: resolveCheckoutFields(checkout),
     },
-    // Account numbers are never shown in full to an admin — the last four
-    // are enough to match a seller's support request against a payout.
-    bankAccounts: bankAccounts.map(({ accountNumber, changes, ...account }) => {
+    // Shown in full: the admin settles payouts to these accounts and checks
+    // them against the bank record. Mask per role here once admin
+    // roles/privileges exist (the history below stays masked — it only
+    // ever stored the last four).
+    bankAccounts: bankAccounts.map(({ changes, verifiedBy, ...account }) => {
       const change = changes[0];
       return {
         ...account,
-        accountNumberLast4: accountNumber.slice(-4),
+        accountNumberLast4: account.accountNumber.slice(-4),
+        verifiedBy: verifiedBy ? (bankVerifierName.get(verifiedBy) ?? null) : null,
         pendingChange: change
-          ? (({ accountNumber: number, ...rest }) => ({ ...rest, accountNumberLast4: number.slice(-4) }))(change)
+          ? { ...change, accountNumberLast4: change.accountNumber.slice(-4) }
           : null,
       };
     }),
