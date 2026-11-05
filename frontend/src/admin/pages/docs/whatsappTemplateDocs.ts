@@ -2,7 +2,7 @@
  * Reference data for Documents → WhatsApp templates.
  *
  * A hand-kept copy of `whatsapp_templates.md` (checked in WhatsApp Manager on
- * 3 Nov 2026). It is documentation, not config: the backend sends with its own
+ * 6 Nov 2026). It is documentation, not config: the backend sends with its own
  * names and value order (`whatsapp.orderMessages.ts` and friends), and the live
  * list with approval status is WhatsApp → Templates. When a template changes in
  * WhatsApp Manager, update the md file and this file together.
@@ -298,7 +298,7 @@ We look forward to serving you again!`,
     language: 'en',
     recipient: 'Seller',
     when: 'A payout to the seller is marked Paid out (manual or PaymentHub)',
-    templateId: 'Not created yet — add it in WhatsApp Manager',
+    templateId: 'Approved 6 Nov 2026 (ID not recorded yet)',
     body: `Hi {{1}},
 
 UnieMax has sent you a payout of ₹{{2}} for order #{{3}} from your store {{4}}.
@@ -331,7 +331,7 @@ It may take a few hours to show in your bank account. Tap below to see all your 
       field: 'Store slug + /earnings',
       example: 'fashion-hub/earnings',
     },
-    note: 'Sent by modules/payouts/payouts.notifications.ts, once per payout, alongside an email. Until the template is approved, the send is refused and logged — the email still goes.',
+    note: 'Sent by modules/payouts/payouts.notifications.ts, once per payout, alongside an email; also by hand from the order page (Send message). Active since 6 Nov 2026.',
   },
   {
     name: 'uniemax_address_update',
