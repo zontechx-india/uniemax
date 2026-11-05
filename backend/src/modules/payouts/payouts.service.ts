@@ -34,6 +34,7 @@ import type {
   PayoutListQuery,
   PayoutStatusInput,
 } from "./payouts.schema.js";
+import { notifySellerPayoutSent } from "./payouts.notifications.js";
 import {
   getOrderFinancials,
   lockedBalances,
@@ -373,7 +374,13 @@ async function loadPayout(payoutId: string) {
 // ---------------------------------------------------------------------------
 
 /** Record money an admin sent by hand. */
-export async function recordManualPayout(orderId: string, input: ManualPayoutInput, actor: PayoutActor) {
+export async function recordManualPayout(
+  orderId: string,
+  input: ManualPayoutInput,
+  actor: PayoutActor,
+  log: FastifyBaseLogger,
+) {
+  let created = false;
   let paid: { at: Date; timeKnown: boolean };
   try {
     paid = indiaDateTime(input.paidOn, input.paidTime);
@@ -441,9 +448,12 @@ export async function recordManualPayout(orderId: string, input: ManualPayoutInp
       select: { id: true },
     });
     await syncPayoutLedger(tx, payout.id);
+    created = true;
     return payout.id;
   });
 
+  // Recorded as already sent → tell the seller (once: a repeat key never gets here).
+  if (created && input.status === "SUCCEEDED") notifySellerPayoutSent(payoutId, log);
   return loadPayout(payoutId);
 }
 
@@ -453,6 +463,7 @@ export async function updateManualStatus(
   payoutId: string,
   input: PayoutStatusInput,
   actor: PayoutActor,
+  log: FastifyBaseLogger,
 ) {
   const payout = await prisma.orderPayout.findFirst({
     where: { id: payoutId, orderId },
@@ -494,6 +505,8 @@ export async function updateManualStatus(
     await syncPayoutLedger(tx, payout.id);
   });
 
+  // This guarded update won the move to SUCCEEDED → tell the seller once.
+  if (input.status === "SUCCEEDED") notifySellerPayoutSent(payout.id, log);
   return { from: payout.status, payout: await loadPayout(payout.id) };
 }
 
@@ -735,5 +748,6 @@ export async function applyHubPayout(
   });
 
   log.info({ payoutId: payout.id, from: payout.status, to, source: origin.source }, "PaymentHub payout update");
+  if (moves && to === "SUCCEEDED") notifySellerPayoutSent(payout.id, log);
   return moves ? "applied" : "unchanged";
 }

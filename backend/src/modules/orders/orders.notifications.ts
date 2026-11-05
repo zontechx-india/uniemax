@@ -56,7 +56,7 @@ function itemLines(order: OrderMailData): string {
     .join("\n");
 }
 
-function wrapHtml(title: string, bodyHtml: string): string {
+export function wrapHtml(title: string, bodyHtml: string): string {
   return `
   <div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px">
     <h2 style="margin:0 0 12px;font-size:18px;color:#111">${title}</h2>
@@ -75,7 +75,7 @@ function itemsHtml(order: OrderMailData): string {
   return `<ul style="margin:8px 0 0;padding-left:18px;font-size:14px;color:#444">${rows}</ul>`;
 }
 
-function linkHtml(href: string, label: string): string {
+export function linkHtml(href: string, label: string): string {
   // Brand purple — email clients get literal hex, not the app's CSS tokens.
   return `<p style="margin:16px 0 0"><a href="${href}" style="font-size:14px;color:#6c3ef4">${label}</a></p>`;
 }

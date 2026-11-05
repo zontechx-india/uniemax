@@ -102,6 +102,11 @@ export const payoutStatusSchema = z.object({
   utr,
 });
 
+/** The "payout sent" message again, by hand, on one channel. */
+export const payoutMessageSchema = z.object({
+  channel: z.enum(["email", "whatsapp"]),
+});
+
 export const payoutListQuery = paginationQuery.extend({
   q: z.string().trim().min(1).max(100).optional(),
   status: z.enum(["PENDING", "PROCESSING", "SUCCEEDED", "FAILED", "REVERSED", "CANCELLED"]).optional(),

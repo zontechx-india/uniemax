@@ -1169,6 +1169,16 @@ export interface OrderPayouts {
   payouts: Payout[]
 }
 
+/** `GET /orders/:id/payouts/:payoutId/message/preview` */
+export interface PayoutMessagePreview {
+  channel: OrderMessageChannel
+  email?: NonNullable<OrderMessagePreview['email']>
+  whatsapp?: NonNullable<OrderMessagePreview['whatsapp']> & {
+    /** false = the template isn't approved in Meta yet (or Meta is unreachable). */
+    approved: boolean
+  }
+}
+
 export interface ManualPayoutInput {
   amount: string
   /** COD dues settled by this payout instead of being sent. */
@@ -1398,6 +1408,17 @@ export const adminApi = {
   },
   resendGatewayPayout(orderId: string, payoutId: string) {
     return call<Payout>(http.post(`${BASE}/orders/${orderId}/payouts/${payoutId}/resend`))
+  },
+  /** The seller's "payout sent" message, exactly as it would go out. */
+  previewPayoutMessage(orderId: string, payoutId: string, channel: OrderMessageChannel) {
+    return call<PayoutMessagePreview>(
+      http.get(`${BASE}/orders/${orderId}/payouts/${payoutId}/message/preview`, params({ channel })),
+    )
+  },
+  sendPayoutMessage(orderId: string, payoutId: string, channel: OrderMessageChannel) {
+    return call<{ channel: OrderMessageChannel; to: string; wamid?: string | null; delivered?: boolean }>(
+      http.post(`${BASE}/orders/${orderId}/payouts/${payoutId}/message`, { channel }),
+    )
   },
   updatePayoutStatus(
     orderId: string,

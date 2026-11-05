@@ -1036,6 +1036,10 @@ revoked from anywhere else.
   never deleted — it is marked cancelled with a reason. The **Seller
   payouts** page lists orders still to pay (oldest delivery first) and every
   payout made, searchable by UTR, sender, order or store, for reconciliation.
+  When a payout is marked **Paid out** (by hand or by PaymentHub), the seller
+  gets an **email** and a **WhatsApp** message with the amount, order,
+  platform fee, COD dues adjusted, bank (last 4 digits), UTR and date, and a
+  button to their Earnings page. SMS is on hold.
 - **Seller finance** (full rules: docs/seller-finance/README.md) — UnieMax
   takes a **platform fee %** on the product price (never shipping), set under
   **Finance → Fee settings** and 0% to start. Customers never see it; sellers

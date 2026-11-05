@@ -54,7 +54,7 @@ export function startOrderMessages(appLog: FastifyBaseLogger): void {
  * Meta refuses an empty value and one with newlines, tabs or 4+ spaces in a
  * row — so whitespace collapses and a missing value becomes "NA".
  */
-function clean(value: string | null | undefined): string {
+export function clean(value: string | null | undefined): string {
   const text = (value ?? "").replace(/\s+/g, " ").trim();
   if (!text) return "NA";
   return text.length > MAX_VALUE ? `${text.slice(0, MAX_VALUE - 1)}…` : text;
@@ -99,7 +99,7 @@ async function loadOrder(orderId: string) {
 type OrderRow = NonNullable<Awaited<ReturnType<typeof loadOrder>>>;
 
 /** First usable number of the list, as Meta's wa_id. */
-function firstWaId(...phones: (string | null | undefined)[]): string | null {
+export function firstWaId(...phones: (string | null | undefined)[]): string | null {
   for (const phone of phones) {
     const waId = phone ? toWaId(phone) : null;
     if (waId) return waId;

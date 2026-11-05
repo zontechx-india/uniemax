@@ -5,10 +5,30 @@ import { idParamSchema } from "../../utils/zodHelpers.js";
 import { recordAudit } from "../admin/adminAudit.js";
 import * as schema from "./payouts.schema.js";
 import * as service from "./payouts.service.js";
+import * as messages from "./payouts.notifications.js";
 
 /**
  * Seller payouts — admin console. Parse, call the service, audit every write.
  */
+
+export async function previewPayoutMessage(request: FastifyRequest) {
+  const { id, payoutId } = schema.payoutParams.parse(request.params);
+  const { channel } = schema.payoutMessageSchema.parse(request.query);
+  return ok(await messages.previewPayoutMessage(id, payoutId, channel, request.log));
+}
+
+export async function sendPayoutMessage(request: FastifyRequest) {
+  const { id, payoutId } = schema.payoutParams.parse(request.params);
+  const { channel } = schema.payoutMessageSchema.parse(request.body);
+  const sent = await messages.sendPayoutMessage(id, payoutId, channel, request.log);
+  recordAudit(request, {
+    action: "payout.message.send",
+    entityType: "order",
+    entityId: id,
+    meta: { payoutId, channel, to: sent.to },
+  });
+  return ok(sent);
+}
 
 async function actor(request: FastifyRequest) {
   if (!request.admin) throw HttpError.unauthorized();
@@ -23,7 +43,7 @@ export async function getOrderPayouts(request: FastifyRequest) {
 export async function recordManualPayout(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   const input = schema.manualPayoutSchema.parse(request.body);
-  const payout = await service.recordManualPayout(id, input, await actor(request));
+  const payout = await service.recordManualPayout(id, input, await actor(request), request.log);
   recordAudit(request, {
     action: "payout.manual.record",
     entityType: "order",
@@ -67,7 +87,7 @@ export async function resendGatewayPayout(request: FastifyRequest) {
 export async function updatePayoutStatus(request: FastifyRequest) {
   const { id, payoutId } = schema.payoutParams.parse(request.params);
   const input = schema.payoutStatusSchema.parse(request.body);
-  const { from, payout } = await service.updateManualStatus(id, payoutId, input, await actor(request));
+  const { from, payout } = await service.updateManualStatus(id, payoutId, input, await actor(request), request.log);
   recordAudit(request, {
     action: "payout.status",
     entityType: "order",

@@ -219,7 +219,7 @@ function SendPreviewDialog({
   )
 }
 
-function EmailPreview({ email }: { email: NonNullable<OrderMessagePreview['email']> }) {
+export function EmailPreview({ email }: { email: NonNullable<OrderMessagePreview['email']> }) {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted">
@@ -250,7 +250,7 @@ function EmailPreview({ email }: { email: NonNullable<OrderMessagePreview['email
   )
 }
 
-function WhatsAppPreview({ whatsapp }: { whatsapp: NonNullable<OrderMessagePreview['whatsapp']> }) {
+export function WhatsAppPreview({ whatsapp }: { whatsapp: NonNullable<OrderMessagePreview['whatsapp']> }) {
   // Meta's approved text when the server could reach it; otherwise the copy
   // in Documents → WhatsApp templates, filled with the same values.
   const doc = WA_TEMPLATE_DOCS.find((d) => d.name === whatsapp.templateName)

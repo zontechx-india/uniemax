@@ -1,7 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { adminApi } from '../../features/adminApi'
-import type { ManualPayoutInput, OrderPayouts, Payout, PayoutStatus } from '../../features/adminApi'
+import type {
+  ManualPayoutInput,
+  OrderMessageChannel,
+  OrderPayouts,
+  Payout,
+  PayoutMessagePreview,
+  PayoutStatus,
+} from '../../features/adminApi'
+import { Tabs } from '../../ui/Toolbar'
+import { EmailPreview, WhatsAppPreview } from './OrderMessagesCard'
 import { useAdminQuery } from '../../features/useAdminQuery'
 import { Dialog } from '../../../shared/ui/Dialog'
 import { Alert } from '../../../shared/ui/Alert'
@@ -256,6 +265,7 @@ function PayoutItem({
 }) {
   const [busy, setBusy] = useState(false)
   const [resendError, setResendError] = useState<string | null>(null)
+  const [messaging, setMessaging] = useState(false)
 
   async function resend() {
     setBusy(true)
@@ -289,9 +299,23 @@ function PayoutItem({
               {busy ? 'Sending…' : 'Send again'}
             </Button>
           ) : null}
+          {payout.status === 'SUCCEEDED' ? (
+            <Button onClick={() => setMessaging(true)}>Send message</Button>
+          ) : null}
           {payout.nextStatuses.length > 0 ? <Button onClick={onChangeStatus}>Change status</Button> : null}
         </div>
       </div>
+      {messaging ? (
+        <PayoutMessageDialog
+          orderId={orderId}
+          payout={payout}
+          onClose={() => setMessaging(false)}
+          onSent={(text) => {
+            setMessaging(false)
+            onResent(text)
+          }}
+        />
+      ) : null}
 
       <dl className="grid gap-x-4 gap-y-0.5 text-sm sm:grid-cols-2">
         {payout.method === 'MANUAL' ? (
@@ -777,6 +801,181 @@ function StatusDialog({
           />
         ) : null}
       </div>
+    </Dialog>
+  )
+}
+
+
+// ---------------------------------------------------------------------------
+// Send the "payout sent" message to the seller, by hand
+// ---------------------------------------------------------------------------
+
+const CHANNEL_NAME: Record<OrderMessageChannel, string> = { email: 'Email', whatsapp: 'WhatsApp' }
+const CHANNEL_ORDER: OrderMessageChannel[] = ['email', 'whatsapp']
+
+type Loaded = { preview: PayoutMessagePreview | null; error: string | null }
+type Outcome = { ok: boolean; text: string }
+
+/**
+ * The seller's "your payout was sent" message — the automatic send's own
+ * text and recipient, built by the server. Both channels load together; the
+ * admin ticks Email and/or WhatsApp, checks the preview, and sends once.
+ * A channel with no recipient can't be ticked. After a send, each channel
+ * says whether it went; a failed one stays ticked to try again.
+ */
+function PayoutMessageDialog({
+  orderId,
+  payout,
+  onClose,
+  onSent,
+}: {
+  orderId: string
+  payout: Payout
+  onClose: () => void
+  onSent: (text: string) => void
+}) {
+  const [loaded, setLoaded] = useState<Partial<Record<OrderMessageChannel, Loaded>>>({})
+  const [ticked, setTicked] = useState<Record<OrderMessageChannel, boolean>>({ email: true, whatsapp: true })
+  const [viewing, setViewing] = useState<OrderMessageChannel>('email')
+  const [busy, setBusy] = useState(false)
+  const [outcome, setOutcome] = useState<Partial<Record<OrderMessageChannel, Outcome>>>({})
+
+  useEffect(() => {
+    let live = true
+    for (const channel of CHANNEL_ORDER) {
+      adminApi
+        .previewPayoutMessage(orderId, payout.id, channel)
+        .then((preview) => {
+          if (live) setLoaded((s) => ({ ...s, [channel]: { preview, error: null } }))
+        })
+        .catch((err: unknown) => {
+          if (live) setLoaded((s) => ({ ...s, [channel]: { preview: null, error: errorText(err, 'Could not load') } }))
+        })
+    }
+    return () => {
+      live = false
+    }
+  }, [orderId, payout.id])
+
+  const recipient = (channel: OrderMessageChannel): string | null => {
+    const preview = loaded[channel]?.preview
+    const to = channel === 'email' ? preview?.email?.to : preview?.whatsapp?.to
+    return to ? (channel === 'whatsapp' ? `+${to}` : to) : null
+  }
+  const usable = (channel: OrderMessageChannel) => recipient(channel) !== null
+  const chosen = CHANNEL_ORDER.filter((c) => ticked[c] && usable(c) && !outcome[c]?.ok)
+  const allLoaded = CHANNEL_ORDER.every((c) => loaded[c])
+
+  async function send() {
+    setBusy(true)
+    const results: Partial<Record<OrderMessageChannel, Outcome>> = { ...outcome }
+    for (const channel of chosen) {
+      try {
+        const sent = await adminApi.sendPayoutMessage(orderId, payout.id, channel)
+        results[channel] = { ok: true, text: `Sent to ${channel === 'whatsapp' ? `+${sent.to}` : sent.to}` }
+      } catch (err) {
+        results[channel] = { ok: false, text: errorText(err, 'Could not send') }
+      }
+    }
+    setOutcome(results)
+    setBusy(false)
+    const done = CHANNEL_ORDER.filter((c) => results[c]?.ok)
+    // Everything ticked went → close with a summary; otherwise stay open on the failure.
+    if (chosen.every((c) => results[c]?.ok)) {
+      onSent(`Payout message sent to the seller by ${done.map((c) => CHANNEL_NAME[c]).join(' and ')}.`)
+    }
+  }
+
+  const view = loaded[viewing]
+
+  return (
+    <Dialog
+      open
+      size="lg"
+      title="Send payout message"
+      subtitle={`To the seller · ${formatMoneyExact(payout.amount)} paid out`}
+      onClose={() => {
+        if (!busy) onClose()
+      }}
+      footer={
+        <>
+          <Button disabled={busy} onClick={onClose}>
+            {Object.values(outcome).some((o) => o?.ok) ? 'Close' : 'Cancel'}
+          </Button>
+          <Button variant="primary" disabled={busy || !allLoaded || chosen.length === 0} onClick={() => void send()}>
+            {busy
+              ? 'Sending…'
+              : chosen.length === 0
+                ? 'Send'
+                : `Send by ${chosen.map((c) => CHANNEL_NAME[c]).join(' + ')}`}
+          </Button>
+        </>
+      }
+    >
+      <fieldset className="space-y-2">
+        <legend className="mb-2 text-sm font-semibold text-fg">Send by</legend>
+        {CHANNEL_ORDER.map((channel) => {
+          const state = loaded[channel]
+          const to = recipient(channel)
+          const result = outcome[channel]
+          return (
+            <label
+              key={channel}
+              className={`flex items-start gap-3 rounded-md border border-line px-3 py-2.5 ${
+                to && !result?.ok ? 'cursor-pointer' : 'opacity-70'
+              }`}
+            >
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-[var(--brand)]"
+                checked={ticked[channel] && Boolean(to) && !result?.ok}
+                disabled={busy || !to || result?.ok}
+                onChange={(e) => setTicked((t) => ({ ...t, [channel]: e.target.checked }))}
+              />
+              <span className="min-w-0 flex-1 text-sm">
+                <span className="font-medium text-fg">{CHANNEL_NAME[channel]}</span>
+                <span className="block text-muted">
+                  {!state
+                    ? 'Loading…'
+                    : state.error
+                      ? state.error
+                      : to
+                        ? `To ${to}`
+                        : channel === 'email'
+                          ? 'The seller has no email address'
+                          : 'No usable phone number, or WhatsApp is off'}
+                </span>
+                {channel === 'whatsapp' && state?.preview?.whatsapp && !state.preview.whatsapp.approved ? (
+                  <span className="block text-warning">Template not approved in Meta yet — this will fail until it is.</span>
+                ) : null}
+                {result ? (
+                  <span className={`block font-medium ${result.ok ? 'text-success' : 'text-danger'}`}>
+                    {result.ok ? '✓ ' : ''}
+                    {result.text}
+                  </span>
+                ) : null}
+              </span>
+            </label>
+          )
+        })}
+      </fieldset>
+
+      <div className="-mx-4 mt-4 mb-4 sm:-mx-5">
+        <Tabs
+          value={viewing}
+          onChange={(c) => setViewing(c)}
+          options={CHANNEL_ORDER.map((c) => ({ value: c, label: `Preview ${CHANNEL_NAME[c]}` }))}
+        />
+      </div>
+      {!view ? (
+        <Skeleton rows={6} />
+      ) : view.error ? (
+        <p className="text-sm text-danger">{view.error}</p>
+      ) : view.preview?.email ? (
+        <EmailPreview email={view.preview.email} />
+      ) : view.preview?.whatsapp ? (
+        <WhatsAppPreview whatsapp={view.preview.whatsapp} />
+      ) : null}
     </Dialog>
   )
 }

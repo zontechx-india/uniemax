@@ -512,7 +512,10 @@ module repeats the guard. Deliberate scope decisions:
   only forward. The payout base is the seller's earning from
   `modules/finance` (order total − platform fee), and every payout change
   posts its seller-ledger entries in the same transaction (`syncPayoutLedger`;
-  lock order: order row, then the store's balance row). Gateway payouts stay off until `PAYMENTHUB_PAYOUTS_ENABLED` —
+  lock order: order row, then the store's balance row). The code path that
+  moves a payout to `SUCCEEDED` calls `notifySellerPayoutSent`
+  (`payouts.notifications.ts`): email + WhatsApp `seller_payout_sent`, once,
+  fire-and-forget (SMS not built). Gateway payouts stay off until `PAYMENTHUB_PAYOUTS_ENABLED` —
   the hub has no payout API yet, so the request body and webhook shape are
   UnieMax's expectation, to align when the hub ships it.
 - **CSRF, second layer.** The whole `requireAdmin` subtree also carries

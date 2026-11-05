@@ -12,6 +12,9 @@ export const adminPayoutRoutes: FastifyPluginAsync = async (app) => {
   app.post("/orders/:id/payouts/gateway", controller.triggerGatewayPayout);
   app.post("/orders/:id/payouts/:payoutId/resend", controller.resendGatewayPayout);
   app.patch("/orders/:id/payouts/:payoutId/status", controller.updatePayoutStatus);
+  // The seller's "payout sent" email / WhatsApp, by hand (paid-out payouts).
+  app.get("/orders/:id/payouts/:payoutId/message/preview", controller.previewPayoutMessage);
+  app.post("/orders/:id/payouts/:payoutId/message", controller.sendPayoutMessage);
 
   // Across every order — tracking and reconciliation. "seller-" keeps these
   // apart from the dropship package's supplier payouts (/admin/dropship/payouts).

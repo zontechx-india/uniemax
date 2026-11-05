@@ -3679,7 +3679,23 @@ GATEWAY payout is `PENDING`/`PROCESSING` per order.
 → the payout. The store's primary bank account is snapshotted onto it (last 4
 digits only; all null when the store has none). Every payout change also
 posts its seller-ledger entries in the same transaction (docs/seller-finance
-§5). `409` order not eligible · `409` amount + dues above what is left · `409`
+§5). **Seller message:** when a payout becomes `SUCCEEDED` — recorded as
+sent here, marked sent via `…/status`, or reported by PaymentHub — the
+seller gets an email (store business email, else owner email) and the
+WhatsApp template `seller_payout_sent` (business phone, else owner phone;
+button `<slug>/earnings`). Once per payout, fire-and-forget. No SMS yet.
+
+#### `GET …/payouts/:payoutId/message/preview?channel=email|whatsapp` · `POST …/payouts/:payoutId/message`
+
+The seller's "payout sent" message **again, by hand** — `SUCCEEDED` payouts
+only (else `409`). Same text and recipient as the automatic send. Preview →
+`{ channel, email: { to, subject, text, html, delivered } }` or `{ channel,
+whatsapp: { to, templateName, language, bodyParams[], header, body, footer,
+buttons[], approved } }` (`body` null + `approved: false` = not in Meta's
+approved list, or Meta unreachable). `POST` body `{ "channel" }` sends now and
+waits: `{ channel, to, delivered }` / `{ channel, to, templateName, wamid }`.
+`422` no email / phone · `503` WhatsApp off · `502` email provider refused ·
+Meta's refusals pass through. Audit `payout.message.send`. `409` order not eligible · `409` amount + dues above what is left · `409`
 dues above what the seller owes · `422` date in the future. Audit
 `payout.manual.record`.
 
