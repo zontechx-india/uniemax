@@ -3682,8 +3682,11 @@ posts its seller-ledger entries in the same transaction (docs/seller-finance
 §5). **Seller message:** when a payout becomes `SUCCEEDED` — recorded as
 sent here, marked sent via `…/status`, or reported by PaymentHub — the
 seller gets an email (store business email, else owner email) and the
-WhatsApp template `seller_payout_sent` (business phone, else owner phone;
-button `<slug>/earnings`). Once per payout, fire-and-forget. No SMS yet.
+WhatsApp template `seller_payout_sent_v2` once Meta lists it as approved
+(13 values, with the gateway fee line — "paid by UnieMax as your discount"
+while UnieMax pays it), else `seller_payout_sent` (10 values); business
+phone, else owner phone; button `<slug>/earnings`. The email shows the
+gateway fee row whenever it is above 0. Once per payout, fire-and-forget. No SMS yet.
 
 #### `GET …/payouts/:payoutId/message/preview?channel=email|whatsapp` · `POST …/payouts/:payoutId/message`
 
@@ -3811,8 +3814,9 @@ Audit `finance.adjustment`.
 #### Seller side — `GET /api/v1/stores/:id/platform-fee` · `GET /api/v1/stores/:id/earnings` 🔒 owner
 
 Also on the admin manage mount. `platform-fee` → `{ percent, effectiveFrom,
-upcoming: { kind, percent, bearer, effectiveFrom } | null }` — the product
-form's note. `earnings?page&pageSize(≤50)` → `{ balance, delivered, rates,
+upcoming: { kind, percent, bearer, effectiveFrom } | null, gateway: { percent,
+bearer } }` — the product form's note (gateway shown as UnieMax's discount
+when `bearer` is `PLATFORM`). `earnings` → `rates` also carries `gateway`. `earnings?page&pageSize(≤50)` → `{ balance, delivered, rates,
 ledger { rows (no actor / key / meta), meta }, payouts[20] { id, status,
 amount, duesDeducted, paidAt, paidAtTimeKnown, utr, method, createdAt,
 order { id, orderNumber } } }`.

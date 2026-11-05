@@ -20,6 +20,8 @@ export async function getPlatformFee(request: FastifyRequest) {
     percent: rates.platform.percent,
     effectiveFrom: rates.platform.effectiveFrom,
     upcoming: rates.upcoming.find((rule) => rule.kind === "PLATFORM") ?? null,
+    // Online payments only. bearer PLATFORM = UnieMax pays it (the seller's discount).
+    gateway: { percent: rates.gateway.percent, bearer: rates.gateway.bearer },
   });
 }
 

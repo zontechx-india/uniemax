@@ -46,6 +46,8 @@ export function StoreEarningsPage() {
   const [page, setPage] = useState(1)
   const [data, setData] = useState<SellerEarnings | null>(null)
   const [error, setError] = useState<string | null>(null)
+  /** UnieMax pays the gateway fee — shown to the seller as our discount. */
+  const ourDiscount = data?.rates.gateway.bearer === 'PLATFORM'
 
   const load = useCallback(() => {
     setError(null)
@@ -84,17 +86,33 @@ export function StoreEarningsPage() {
             />
           </div>
 
-          <Card>
+          <Card className="space-y-2">
             <p className="text-base text-fg">
               <span className="font-semibold">Platform fee: {Number(data.rates.platform.percent)}%</span>{' '}
               <span className="text-muted">
                 of the product price, on every delivered order (never on shipping). Customers don’t see it.
               </span>
             </p>
+            {Number(data.rates.gateway.percent) > 0 ? (
+              <p className="text-base text-fg">
+                <span className={`font-semibold ${ourDiscount ? 'text-success' : ''}`}>
+                  Payment gateway fee: {Number(data.rates.gateway.percent)}%
+                </span>{' '}
+                <span className="text-muted">
+                  {ourDiscount
+                    ? 'on online payments — paid by UnieMax as our discount to you. It is not taken from your money.'
+                    : 'on online payments, taken from your payout.'}
+                </span>
+              </p>
+            ) : null}
           </Card>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <Totals title="Online orders delivered" t={data.delivered.online} />
+            <Totals
+              title="Online orders delivered"
+              t={data.delivered.online}
+              gateway={ourDiscount ? 'Gateway fee paid by UnieMax (your discount)' : 'Gateway fee'}
+            />
             <Totals title="Cash on delivery orders delivered" t={data.delivered.cod} />
           </div>
 
@@ -187,11 +205,21 @@ function Tile({ label, value, hint, warn = false }: { label: string; value: stri
   )
 }
 
-function Totals({ title, t }: { title: string; t: SellerEarnings['delivered']['online'] }) {
+function Totals({
+  title,
+  t,
+  gateway,
+}: {
+  title: string
+  t: SellerEarnings['delivered']['online']
+  /** Online only — the gateway-fee row's label. */
+  gateway?: string
+}) {
   const rows: [string, string][] = [
     ['Orders', String(t.orders)],
     ['Sales', money(t.sales)],
     ['Platform fee', money(t.platformFees)],
+    ...(gateway && Number(t.gatewayFees) > 0 ? ([[gateway, money(t.gatewayFees)]] as [string, string][]) : []),
   ]
   return (
     <Card>

@@ -331,7 +331,53 @@ It may take a few hours to show in your bank account. Tap below to see all your 
       field: 'Store slug + /earnings',
       example: 'fashion-hub/earnings',
     },
-    note: 'Sent by modules/payouts/payouts.notifications.ts, once per payout, alongside an email; also by hand from the order page (Send message). Active since 6 Nov 2026.',
+    note: 'Sent by modules/payouts/payouts.notifications.ts, once per payout, alongside an email; also by hand from the order page (Send message). Active since 6 Nov 2026. Replaced automatically by seller_payout_sent_v2 once that is approved.',
+  },
+  {
+    name: 'seller_payout_sent_v2',
+    group: 'Payout',
+    category: 'Utility',
+    language: 'en',
+    recipient: 'Seller',
+    when: 'Same as seller_payout_sent — with the payment gateway fee shown as UnieMax’s discount',
+    templateId: 'To submit in WhatsApp Manager (6 Nov 2026)',
+    body: `Hi {{1}},
+
+UnieMax has sent you a payout of ₹{{2}} for order #{{3}} from your store {{4}}.
+
+Payout details:
+• Order total: ₹{{5}}
+• Platform fee: ₹{{6}}
+• Payment gateway fee ({{7}}): ₹{{8}}, {{9}}
+• COD dues adjusted: ₹{{10}}
+• Paid to: {{11}}
+• Reference (UTR): {{12}}
+• Paid on: {{13}}
+
+It may take a few hours to show in your bank account. Tap below to see all your earnings.`,
+    footer: 'UnieMax seller payouts',
+    params: [
+      p(1, 'sellerName', 'Seller name', 'Ravi'),
+      p(2, 'amountSent', 'Amount sent (number only)', '1,349.10'),
+      p(3, 'orderId', 'Order number (no #)', 'UM-1002'),
+      p(4, 'storeName', 'Store name', 'Fashion Hub'),
+      p(5, 'orderTotal', 'Order total (number only)', '1,499.00'),
+      p(6, 'platformFee', 'Platform fee (number only)', '149.90'),
+      p(7, 'gatewayPercent', 'Gateway fee percent (with %)', '2%'),
+      p(8, 'gatewayFee', 'Gateway fee amount (number only)', '29.98'),
+      p(9, 'gatewayNote', 'Who pays it', 'paid by UnieMax as your discount'),
+      p(10, 'codDues', 'COD dues adjusted (number only)', '0.00'),
+      p(11, 'paidTo', 'Bank + last 4 digits', 'State Bank of India A/c XX4821'),
+      p(12, 'utr', 'UTR / reference ("NA" if none)', 'HDFCR52026110512345'),
+      p(13, 'paidOn', 'Date (and time) paid', '5 Nov 2026, 2:30 pm'),
+    ],
+    button: {
+      label: 'View earnings',
+      urlPrefix: MYSTORES,
+      field: 'Store slug + /earnings',
+      example: 'fashion-hub/earnings',
+    },
+    note: 'The backend uses this one as soon as WhatsApp Manager lists it as approved, and seller_payout_sent until then — no code change on approval.',
   },
   {
     name: 'uniemax_address_update',

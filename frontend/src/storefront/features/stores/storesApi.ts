@@ -1396,6 +1396,8 @@ export interface StorePlatformFee {
   percent: string
   effectiveFrom: string | null
   upcoming: { percent: string; effectiveFrom: string } | null
+  /** Online payments only. PLATFORM = UnieMax pays it — the seller's discount. */
+  gateway: { percent: string; bearer: 'SELLER' | 'PLATFORM' }
 }
 
 export interface SellerLedgerRow {
@@ -1424,7 +1426,7 @@ export interface SellerLedgerRow {
 export interface SellerEarnings {
   balance: { payable: string; inPayout: string; owed: string; net: string }
   delivered: Record<'online' | 'cod', { orders: number; sales: string; platformFees: string; gatewayFees: string }>
-  rates: { platform: { percent: string } }
+  rates: { platform: { percent: string }; gateway: { percent: string; bearer: 'SELLER' | 'PLATFORM' } }
   ledger: { rows: SellerLedgerRow[]; meta: ListMeta }
   payouts: {
     id: string

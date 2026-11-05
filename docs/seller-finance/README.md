@@ -25,7 +25,7 @@ between UnieMax and a seller is an entry on the **seller ledger**.
 | D1 | A "seller" is a **store** — the ledger and balances are per store. |
 | D2 | Platform fee = a **%**, configurable by an admin, **0% to start**. |
 | D3 | Fee base = **product price only** (line totals), never shipping. |
-| D4 | Gateway fee = a configurable %, **0% to start**, **paid by UnieMax** (bearer configurable; not taken from the seller while UnieMax pays). Online orders only, on what the customer paid. |
+| D4 | Gateway fee = a configurable %, **0% to start**, **paid by UnieMax** (bearer configurable; not taken from the seller while UnieMax pays). Online orders only, on what the customer paid. **Set to 2% on 6 Nov 2026** (in Fee settings) and **shown to the seller as UnieMax's discount** — under the product price, on Earnings, in the payout email and WhatsApp (`seller_payout_sent_v2`). |
 | D5 | Old orders follow the same rules → the rule in force when they were placed, i.e. 0%. |
 | D6 | Online money is payable once the order is **delivered** and **paid** — no hold period yet. |
 | D7 | COD dues are deducted from a **manual** payout (the form suggests the full dues; the admin can change it). Gateway payouts don't deduct dues. |

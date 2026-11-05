@@ -58,10 +58,29 @@ export function PlatformFeeNote({ storeId, price }: { storeId: string; price?: s
     ? ` From ${new Date(fee.upcoming.effectiveFrom).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} it becomes ${pct(fee.upcoming.percent)}.`
     : ''
 
+  const gatewayBp = toBp(fee.gateway.percent)
+
   return (
-    <p className="mt-2 rounded-md bg-fg/5 px-3 py-2 text-hint text-muted" role="note">
-      <span className="font-semibold text-fg">UnieMax platform fee: {pct(fee.percent)}</span> of the product
-      price (not shipping).{example}{upcoming} Customers don’t see this fee.
-    </p>
+    <div className="mt-2 space-y-1 rounded-md bg-fg/5 px-3 py-2 text-hint text-muted" role="note">
+      <p>
+        <span className="font-semibold text-fg">UnieMax platform fee: {pct(fee.percent)}</span> of the product
+        price (not shipping).{example}{upcoming} Customers don’t see this fee.
+      </p>
+      {gatewayBp > 0n ? (
+        fee.gateway.bearer === 'PLATFORM' ? (
+          <p>
+            <span className="font-semibold text-success">
+              Payment gateway fee {pct(fee.gateway.percent)} — paid by UnieMax
+            </span>{' '}
+            on online payments, as our discount to you. It is not taken from your money.
+          </p>
+        ) : (
+          <p>
+            <span className="font-semibold text-fg">Payment gateway fee: {pct(fee.gateway.percent)}</span> of
+            online payments, taken from your payout.
+          </p>
+        )
+      ) : null}
+    </div>
   )
 }
