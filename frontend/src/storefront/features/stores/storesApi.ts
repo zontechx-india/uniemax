@@ -1389,6 +1389,74 @@ export interface BankHistoryEvent {
   createdAt: string
 }
 
+// ---- Seller finance (docs/seller-finance/) ------------------------------
+
+/** The platform fee % on this store's product prices. Never shown to customers. */
+export interface StorePlatformFee {
+  percent: string
+  effectiveFrom: string | null
+  upcoming: { percent: string; effectiveFrom: string } | null
+}
+
+export interface SellerLedgerRow {
+  id: string
+  bucket: 'PAYABLE' | 'IN_PAYOUT' | 'OWED'
+  type:
+    | 'ORDER_SALE'
+    | 'PLATFORM_FEE'
+    | 'GATEWAY_FEE'
+    | 'COD_PLATFORM_FEE'
+    | 'DUES_SETTLED'
+    | 'DUES_RESTORED'
+    | 'PAYOUT_RESERVED'
+    | 'PAYOUT_PAID'
+    | 'PAYOUT_RELEASED'
+    | 'PAYOUT_RETURNED'
+    | 'ADJUSTMENT'
+  amount: string
+  balanceAfter: string
+  orderId: string | null
+  orderNumber: string | null
+  description: string
+  createdAt: string
+}
+
+export interface SellerEarnings {
+  balance: { payable: string; inPayout: string; owed: string; net: string }
+  delivered: Record<'online' | 'cod', { orders: number; sales: string; platformFees: string; gatewayFees: string }>
+  rates: { platform: { percent: string } }
+  ledger: { rows: SellerLedgerRow[]; meta: ListMeta }
+  payouts: {
+    id: string
+    status: 'PENDING' | 'PROCESSING' | 'SUCCEEDED' | 'FAILED' | 'REVERSED' | 'CANCELLED'
+    amount: string
+    duesDeducted: string
+    paidAt: string | null
+    paidAtTimeKnown: boolean
+    utr: string | null
+    createdAt: string
+    order: { id: string; orderNumber: string }
+  }[]
+}
+
+/** Platform fee cache per store — the product form asks once per session. */
+const platformFeeRequests = new Map<string, Promise<StorePlatformFee>>()
+
+export const storeFinanceApi = {
+  platformFee(storeRef: string): Promise<StorePlatformFee> {
+    let request = platformFeeRequests.get(storeRef)
+    if (!request) {
+      request = call<StorePlatformFee>(http.get(`${base()}/${storeRef}/platform-fee`))
+      request.catch(() => platformFeeRequests.delete(storeRef))
+      platformFeeRequests.set(storeRef, request)
+    }
+    return request
+  },
+  earnings(storeRef: string, page = 1): Promise<SellerEarnings> {
+    return call<SellerEarnings>(http.get(`${base()}/${storeRef}/earnings`, { params: { page } }))
+  },
+}
+
 /**
  * Payout bank accounts of one store (`storeRef` = id or slug). Capped at 5.
  * Saving runs a bank check (up to ~50 s) and answers `{ account, check }`.

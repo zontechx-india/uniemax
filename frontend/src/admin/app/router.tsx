@@ -31,6 +31,9 @@ const OrdersPage = lazy(() => import('../pages/OrdersPage'))
 const OrderDetailPage = lazy(() => import('../pages/OrderDetailPage'))
 const PaymentsPage = lazy(() => import('../pages/PaymentsPage'))
 const SellerPayoutsPage = lazy(() => import('../pages/SellerPayoutsPage'))
+const FeeSettingsPage = lazy(() => import('../pages/finance/FeeSettingsPage'))
+const SellerBalancesPage = lazy(() => import('../pages/finance/SellerBalancesPage'))
+const SellerFinancePage = lazy(() => import('../pages/finance/SellerFinancePage'))
 const ProductsPage = lazy(() => import('../pages/ProductsPage'))
 const CategoriesPage = lazy(() => import('../pages/CategoriesPage'))
 const CategoryMappingPage = lazy(() => import('../pages/CategoryMappingPage'))
@@ -222,6 +225,9 @@ export function AdminRouter() {
                 <Route path="orders/:orderId" element={<OrderDetailPage />} />
                 <Route path="payments" element={<PaymentsPage />} />
                 <Route path="seller-payouts" element={<SellerPayoutsPage />} />
+                <Route path="finance/fees" element={<FeeSettingsPage />} />
+                <Route path="finance/sellers" element={<SellerBalancesPage />} />
+                <Route path="finance/sellers/:storeId" element={<SellerFinancePage />} />
                 <Route path="products" element={<ProductsPage />} />
                 <Route path="categories" element={<CategoriesPage />} />
                 <Route path="category-mapping" element={<CategoryMappingPage />} />

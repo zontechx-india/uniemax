@@ -16,6 +16,7 @@ import { loggerConfig } from "./utils/logger.js";
 import { registerPrisma } from "./plugins/prisma.js";
 import { registerRoutes } from "./routes.js";
 import { startPaymentJobs } from "./modules/payments/payments.jobs.js";
+import { startFinance } from "./modules/finance/finance.jobs.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 
 /**
@@ -112,6 +113,11 @@ export async function buildApp(): Promise<FastifyInstance> {
   // webhook never did. No-op without Cashfree credentials.
   const stopPaymentJobs = startPaymentJobs(app.log);
   app.addHook("onClose", async () => stopPaymentJobs());
+
+  // Seller ledger: post delivered orders (event + 15-min sweep that also
+  // backfills older orders and payouts). Idempotent.
+  const stopFinance = startFinance(app.log);
+  app.addHook("onClose", async () => stopFinance());
 
   return app;
 }

@@ -20,6 +20,7 @@ one file (no duplication).
 | Prisma schema models/enums                       | [`docs/BACKEND_CONTEXT.md`](./docs/BACKEND_CONTEXT.md) (Data Model section) |
 | Frontend structure, shared UI, theme tokens, per-store theming | [`docs/FRONTEND_CONTEXT.md`](./docs/FRONTEND_CONTEXT.md) |
 | Affiliate system (programmes, invitations, links, attribution, commission, payouts) | [`docs/AFFILIATE.md`](./docs/AFFILIATE.md) |
+| Seller finance — platform / gateway fee rules, order fee snapshots, seller ledger & balances, COD dues, Earnings page | [`docs/seller-finance/README.md`](./docs/seller-finance/README.md) — start there |
 | Dropshipping — anything in `package/dropship` (its endpoints, schema, rules, screens), plans and status | [`docs/dropshipping/`](./docs/dropshipping/README.md) — start at its README |
 | UI/UX rules (spacing, type, colour, components, states) | [`docs/DESIGN_GUIDELINES.md`](./docs/DESIGN_GUIDELINES.md) — **read before any UI work; it wins over older plans** |
 | Design-system clean-up phases and status | [`docs/DESIGN_SYSTEM_PLAN.md`](./docs/DESIGN_SYSTEM_PLAN.md) |

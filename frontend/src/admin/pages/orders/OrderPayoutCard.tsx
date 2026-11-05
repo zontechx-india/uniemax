@@ -170,16 +170,22 @@ export function OrderPayoutCard({ orderId }: { orderId: string }) {
 // ---------------------------------------------------------------------------
 
 function Totals({ summary }: { summary: Summary }) {
+  const fin = summary.financials
+  const feeLabel = fin.platformFeePercent !== null ? `Platform fee (${Number(fin.platformFeePercent)}%)` : 'Platform fee'
   const cells: { label: string; value: string; strong?: boolean }[] = [
     { label: 'Order total', value: summary.orderTotal },
+    { label: feeLabel, value: summary.platformFee },
+    { label: 'Seller earns', value: summary.sellerEarning },
     { label: 'Paid out', value: summary.paidOut },
+    ...(Number(summary.duesDeducted) > 0 ? [{ label: 'COD dues deducted', value: summary.duesDeducted }] : []),
     { label: 'In progress', value: summary.inProgress },
     { label: 'Left to pay', value: summary.remaining, strong: true },
   ]
   return (
-    <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-line sm:grid-cols-4">
-      {cells.map((cell) => (
-        <div key={cell.label} className="bg-surface px-3 py-2.5">
+    <div className="space-y-1.5">
+    <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-line sm:grid-cols-3">
+      {cells.map((cell, i) => (
+        <div key={cell.label} className={`bg-surface px-3 py-2.5 ${i === cells.length - 1 ? lastSpan(cells.length) : ''}`}>
           <dt className="text-xs text-muted">{cell.label}</dt>
           <dd className={`font-figure text-sm text-fg ${cell.strong ? 'font-semibold' : 'font-medium'}`}>
             {formatMoneyExact(cell.value)}
@@ -187,7 +193,21 @@ function Totals({ summary }: { summary: Summary }) {
         </div>
       ))}
     </dl>
+    {fin.paymentMethod === 'ONLINE' && Number(fin.gatewayFee) > 0 ? (
+      <p className="text-xs text-muted">
+        Gateway fee {formatMoneyExact(fin.gatewayFee)} ({Number(fin.gatewayFeePercent)}%) —{' '}
+        {fin.gatewayFeeBearer === 'PLATFORM' ? 'paid by UnieMax, not taken from the seller.' : 'taken from the seller.'}
+      </p>
+    ) : null}
+    </div>
   )
+}
+
+/** The last box stretches over the empty cells of its row (2 columns, 3 from sm). */
+function lastSpan(count: number): string {
+  const phone = count % 2 === 1 ? 'col-span-2' : ''
+  const wide = count % 3 === 1 ? 'sm:col-span-3' : count % 3 === 2 ? 'sm:col-span-2' : 'sm:col-span-1'
+  return `${phone} ${wide}`
 }
 
 function PayTo({ summary }: { summary: Summary }) {
@@ -288,6 +308,9 @@ function PayoutItem({
           <Fact label="Sent to">
             {payout.payeeName} ({payout.payeeBank} ••••{payout.payeeLast4})
           </Fact>
+        ) : null}
+        {Number(payout.duesDeducted) > 0 ? (
+          <Fact label="COD dues deducted">{formatMoneyExact(payout.duesDeducted)}</Fact>
         ) : null}
         {when ? <Fact label="Paid on">{when}</Fact> : null}
         {payout.utr ? (
@@ -403,8 +426,11 @@ function ManualPayoutDialog({
 }) {
   // One key per opening: a double click or a retry saves ONE payout.
   const [idempotencyKey] = useState(newKey)
+  const hasDues = Number(summary.storeDues) > 0
   const [form, setForm] = useState({
-    amount: summary.remaining,
+    // The server's split: the seller's COD dues first, the rest sent.
+    amount: summary.suggested.amount,
+    duesDeducted: summary.suggested.duesDeducted,
     status: 'SUCCEEDED' as ManualPayoutInput['status'],
     senderName: '',
     senderBank: '',
@@ -418,9 +444,12 @@ function ManualPayoutDialog({
   const [formError, setFormError] = useState<string | null>(null)
   const set = (key: keyof typeof form) => (value: string) => setForm((f) => ({ ...f, [key]: value }))
 
-  const amountOk = /^\d{1,8}(\.\d{1,2})?$/.test(form.amount.trim()) && Number(form.amount) > 0
+  const isAmount = (v: string) => /^\d{1,8}(\.\d{1,2})?$/.test(v.trim())
+  const duesOk = form.duesDeducted.trim() === '' || isAmount(form.duesDeducted)
+  // ₹0 sent is fine when the payout only settles dues; the server checks the totals.
+  const amountOk = isAmount(form.amount) && (Number(form.amount) > 0 || Number(form.duesDeducted) > 0)
   const last4Ok = form.senderLast4 === '' || /^\d{4}$/.test(form.senderLast4)
-  const canSave = amountOk && last4Ok && form.senderName.trim().length >= 2 && form.paidOn !== ''
+  const canSave = amountOk && duesOk && last4Ok && form.senderName.trim().length >= 2 && form.paidOn !== ''
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -430,6 +459,7 @@ function ManualPayoutDialog({
     try {
       const payout = await adminApi.recordManualPayout(orderId, {
         amount: form.amount.trim(),
+        duesDeducted: form.duesDeducted.trim() || '0',
         idempotencyKey,
         status: form.status,
         senderName: form.senderName.trim(),
@@ -468,16 +498,31 @@ function ManualPayoutDialog({
       }
     >
       <form id="manual-payout" onSubmit={(e) => void submit(e)} className="space-y-4">
+        {hasDues ? (
+          <Alert tone="info" title={`The seller owes ${formatMoneyExact(summary.storeDues)} in COD platform fees`}>
+            It is taken from this payout below. Clear the field to send the full amount instead.
+          </Alert>
+        ) : null}
         <div className="grid gap-3 sm:grid-cols-2">
           <TextInput
-            label="Amount (₹)"
+            label="Amount sent (₹)"
             inputMode="decimal"
             required
             value={form.amount}
             onChange={(e) => set('amount')(e.target.value)}
-            hint={`Up to ${formatMoneyExact(summary.remaining)} is left to pay.`}
+            hint={`Up to ${formatMoneyExact(summary.remaining)} is left to pay${hasDues ? ' (amount + dues)' : ''}.`}
             aria-invalid={!amountOk}
           />
+          {hasDues ? (
+            <TextInput
+              label="COD dues deducted (₹)"
+              inputMode="decimal"
+              value={form.duesDeducted}
+              onChange={(e) => set('duesDeducted')(e.target.value)}
+              hint={`Kept by UnieMax to settle what the seller owes (up to ${formatMoneyExact(summary.storeDues)}).`}
+              aria-invalid={!duesOk}
+            />
+          ) : null}
           <div>
             <SelectInput
               label="Status"

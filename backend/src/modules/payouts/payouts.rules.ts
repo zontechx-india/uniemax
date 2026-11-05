@@ -119,28 +119,32 @@ export function paiseToAmount(paise: bigint): string {
 }
 
 export interface PayoutTotals {
-  /** Grand total the customer paid. */
-  orderTotal: bigint;
+  /** What the seller earns on the order (total − platform fee …). */
+  earning: bigint;
   /** SUCCEEDED — the seller has it. */
   paidOut: bigint;
   /** PENDING + PROCESSING — on its way. */
   inProgress: bigint;
-  /** What may still be paid out: total − paid out − in progress (never < 0). */
+  /** COD dues settled by active payouts instead of being sent. */
+  duesDeducted: bigint;
+  /** What may still be covered: earning − paid − in progress − dues (never < 0). */
   remaining: bigint;
 }
 
 export function payoutTotals(
-  orderTotal: bigint,
-  payouts: { status: PayoutStatus; amountPaise: bigint }[],
+  earning: bigint,
+  payouts: { status: PayoutStatus; amountPaise: bigint; duesPaise?: bigint }[],
 ): PayoutTotals {
   let paidOut = 0n;
   let inProgress = 0n;
+  let duesDeducted = 0n;
   for (const payout of payouts) {
     if (payout.status === "SUCCEEDED") paidOut += payout.amountPaise;
     else if (payout.status === "PENDING" || payout.status === "PROCESSING") inProgress += payout.amountPaise;
+    if (isActive(payout.status)) duesDeducted += payout.duesPaise ?? 0n;
   }
-  const left = orderTotal - paidOut - inProgress;
-  return { orderTotal, paidOut, inProgress, remaining: left > 0n ? left : 0n };
+  const left = earning - paidOut - inProgress - duesDeducted;
+  return { earning, paidOut, inProgress, duesDeducted, remaining: left > 0n ? left : 0n };
 }
 
 // ---------------------------------------------------------------------------

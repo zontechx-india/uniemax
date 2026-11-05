@@ -30,6 +30,7 @@ import { CheckIcon, PlusIcon, SlidersIcon, TagIcon } from '../../../../layout/ic
 import { OptionTypesEditor } from '../OptionTypesEditor'
 import type { OptionsDraft } from '../OptionTypesEditor'
 import { VariantMatrix } from '../VariantMatrix'
+import { PlatformFeeNote } from './PlatformFeeNote'
 import { ChoicesPreview, exampleChoice, listWords } from './choicesHelp'
 import { Field, ChoiceCard, Hint, inputClass, StepButtons, StepError, StepShell } from './shared'
 import type { StepKey, VersionPlan } from './shared'
@@ -422,6 +423,7 @@ export function PricingStep({
           placeholder="e.g. 1499"
           className={inputClass}
         />
+        {supplyOnly ? null : <PlatformFeeNote storeId={storeId} price={price} />}
       </Field>
       <Field
         label="Printed price / MRP (₹)"
@@ -606,6 +608,9 @@ export function PricingStep({
           disabled={busy}
         />
       )}
+
+      {/* Each choice has its own price — one note for all of them. */}
+      {mode === 'options' && part === 'prices' && !supplyOnly ? <PlatformFeeNote storeId={storeId} /> : null}
 
       {error && <StepError>{error}</StepError>}
 

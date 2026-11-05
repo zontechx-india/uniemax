@@ -34,6 +34,12 @@ import type {
   PayoutListQuery,
   PayoutStatusInput,
 } from "./payouts.schema.js";
+import {
+  getOrderFinancials,
+  lockedBalances,
+  postDeliveredOrder,
+  syncPayoutLedger,
+} from "../finance/finance.service.js";
 
 /**
  * Seller payouts — the money UnieMax sends a seller for an online-paid order.
@@ -108,31 +114,53 @@ async function lockOrder(tx: Tx, orderId: string): Promise<OrderFacts> {
   return order;
 }
 
+/**
+ * What has been paid against the order. The base is the seller's EARNING
+ * (order total − platform fee …, modules/finance), not the order total.
+ */
 async function totalsFor(db: Tx | typeof prisma, order: OrderFacts) {
-  const rows = await db.orderPayout.findMany({
-    where: { orderId: order.id },
-    select: { status: true, amount: true, method: true },
-  });
+  const [rows, fin] = await Promise.all([
+    db.orderPayout.findMany({
+      where: { orderId: order.id },
+      select: { status: true, amount: true, duesDeducted: true, method: true },
+    }),
+    getOrderFinancials(order.id, db),
+  ]);
   return {
     rows,
+    fin,
     totals: payoutTotals(
-      decimalToPaise(order.total),
-      rows.map((row) => ({ status: row.status, amountPaise: decimalToPaise(row.amount) })),
+      fin.sellerEarningPaise,
+      rows.map((row) => ({
+        status: row.status,
+        amountPaise: decimalToPaise(row.amount),
+        duesPaise: decimalToPaise(row.duesDeducted),
+      })),
     ),
   };
 }
 
-function checkAmount(amount: string, remaining: bigint): bigint {
+/**
+ * The money sent + the COD dues settled must fit what is left on the
+ * order; the dues can't exceed what the seller owes. A payout may send ₹0
+ * only when it settles dues.
+ */
+function checkAmounts(amount: string, dues: string, remaining: bigint, owed: bigint) {
   const paise = amountToPaise(amount);
-  if (paise === null || paise <= 0n) throw HttpError.badRequest("Enter a valid amount");
-  if (paise > remaining) {
+  const duesPaise = amountToPaise(dues);
+  if (paise === null || duesPaise === null) throw HttpError.badRequest("Enter a valid amount");
+  if (paise + duesPaise <= 0n) throw HttpError.badRequest("Enter an amount more than zero");
+  if (duesPaise > owed) {
+    throw HttpError.conflict(`The seller owes only ₹${paiseToAmount(owed)} in COD dues.`);
+  }
+  if (paise + duesPaise > remaining) {
     throw HttpError.conflict(
       remaining === 0n
         ? "This order is already fully paid out (or a payout is in progress)."
-        : `Only ₹${paiseToAmount(remaining)} is still unpaid on this order.`,
+        : `Only ₹${paiseToAmount(remaining)} is left to pay on this order (amount + dues deducted).`,
     );
   }
-  return paise;
+  return { paise, duesPaise };
 }
 
 const payoutInclude = {
@@ -155,12 +183,18 @@ function shapePayout(payout: PayoutWithEvents) {
 // Read
 // ---------------------------------------------------------------------------
 
+/** Dues first (up to what is left on the order), the rest as money sent. */
+function suggestSplit(remaining: bigint, owed: bigint) {
+  const dues = owed > 0n ? (owed < remaining ? owed : remaining) : 0n;
+  return { duesDeducted: paiseToAmount(dues), amount: paiseToAmount(remaining - dues) };
+}
+
 /** The order page's Payout section: totals, who gets paid, what's allowed, history. */
 export async function getOrderPayouts(orderId: string) {
   const order = await prisma.order.findUnique({ where: { id: orderId }, select: ORDER_FACTS });
   if (!order) throw HttpError.notFound("Order not found");
 
-  const [{ totals, rows }, payee, payouts] = await Promise.all([
+  const [{ totals, rows, fin }, payee, payouts, balance] = await Promise.all([
     totalsFor(prisma, order),
     primaryAccount(prisma, order.storeId),
     prisma.orderPayout.findMany({
@@ -168,7 +202,11 @@ export async function getOrderPayouts(orderId: string) {
       orderBy: { createdAt: "asc" },
       include: payoutInclude,
     }),
+    order.storeId
+      ? prisma.sellerBalance.findUnique({ where: { storeId: order.storeId }, select: { owed: true } })
+      : null,
   ]);
+  const { sellerEarningPaise: _, ...financials } = fin;
 
   const blockers = payoutBlockers(order);
   const gatewayInFlight = rows.some(
@@ -188,10 +226,19 @@ export async function getOrderPayouts(orderId: string) {
 
   return {
     summary: {
-      orderTotal: paiseToAmount(totals.orderTotal),
+      orderTotal: order.total.toFixed(2),
+      platformFee: financials.platformFee,
+      /** What the seller earns on this order — the payout base. */
+      sellerEarning: paiseToAmount(totals.earning),
       paidOut: paiseToAmount(totals.paidOut),
       inProgress: paiseToAmount(totals.inProgress),
+      duesDeducted: paiseToAmount(totals.duesDeducted),
       remaining: paiseToAmount(totals.remaining),
+      /** The store's COD dues right now — can be taken from this payout. */
+      storeDues: balance ? balance.owed.toFixed(2) : "0.00",
+      /** The form's starting split: settle the dues first, send the rest. */
+      suggested: suggestSplit(totals.remaining, balance ? decimalToPaise(balance.owed) : 0n),
+      financials,
       /** Why no payout can be made at all — empty when one can. */
       blockers,
       canPay: blockers.length === 0 && totals.remaining > 0n,
@@ -338,6 +385,9 @@ export async function recordManualPayout(orderId: string, input: ManualPayoutInp
     throw new HttpError(422, "The payment date and time can't be in the future");
   }
 
+  // The order's own sale must be on the ledger before money is paid out of it.
+  await postDeliveredOrder(orderId);
+
   const payoutId = await prisma.$transaction(async (tx) => {
     const order = await lockOrder(tx, orderId);
 
@@ -350,7 +400,9 @@ export async function recordManualPayout(orderId: string, input: ManualPayoutInp
     const blockers = payoutBlockers(order);
     if (blockers.length > 0) throw HttpError.conflict(blockers[0]!);
     const { totals } = await totalsFor(tx, order);
-    const paise = checkAmount(input.amount, totals.remaining);
+    // Lock order: the order row (above), then the store's balance row.
+    const owed = order.storeId ? (await lockedBalances(tx, order.storeId)).owed : 0n;
+    const { paise, duesPaise } = checkAmounts(input.amount, input.duesDeducted, totals.remaining, owed > 0n ? owed : 0n);
     const payee = await primaryAccount(tx, order.storeId);
 
     const payout = await tx.orderPayout.create({
@@ -359,6 +411,7 @@ export async function recordManualPayout(orderId: string, input: ManualPayoutInp
         method: "MANUAL",
         status: input.status,
         amount: new Prisma.Decimal(paiseToAmount(paise)),
+        duesDeducted: new Prisma.Decimal(paiseToAmount(duesPaise)),
         payeeAccountId: payee?.id ?? null,
         payeeName: payee?.accountHolderName ?? null,
         payeeBank: payee?.bankName ?? null,
@@ -381,12 +434,13 @@ export async function recordManualPayout(orderId: string, input: ManualPayoutInp
             source: "ADMIN",
             actorId: actor.id,
             actorEmail: actor.email,
-            note: "Manual payout recorded",
+            note: duesPaise > 0n ? `Manual payout recorded — ₹${paiseToAmount(duesPaise)} COD dues deducted` : "Manual payout recorded",
           },
         },
       },
       select: { id: true },
     });
+    await syncPayoutLedger(tx, payout.id);
     return payout.id;
   });
 
@@ -437,6 +491,7 @@ export async function updateManualStatus(
         note: input.reason ?? (input.utr && !payout.utr ? `UTR ${input.utr}` : null),
       },
     });
+    await syncPayoutLedger(tx, payout.id);
   });
 
   return { from: payout.status, payout: await loadPayout(payout.id) };
@@ -456,6 +511,8 @@ export async function triggerGatewayPayout(
   if (!paymentHubPayoutsEnabled) {
     throw HttpError.conflict("Gateway payouts are not switched on yet. Record a manual payout instead.");
   }
+
+  await postDeliveredOrder(orderId);
 
   const created = await prisma.$transaction(async (tx) => {
     const order = await lockOrder(tx, orderId);
@@ -477,7 +534,8 @@ export async function triggerGatewayPayout(
     if (rows.some((row) => row.method === "GATEWAY" && (IN_FLIGHT_STATUSES as readonly string[]).includes(row.status))) {
       throw HttpError.conflict("A gateway payout for this order is already in progress.");
     }
-    const paise = checkAmount(input.amount, totals.remaining);
+    // Gateway payouts send money only; COD dues are deducted on manual ones.
+    const { paise } = checkAmounts(input.amount, "0", totals.remaining, 0n);
 
     const payout = await tx.orderPayout.create({
       data: {
@@ -519,6 +577,7 @@ export async function triggerGatewayPayout(
         },
       },
     });
+    await syncPayoutLedger(tx, payout.id);
     return { id: payout.id, isNew: true };
   });
 
@@ -593,6 +652,7 @@ async function sendToHub(payoutId: string, log: FastifyBaseLogger): Promise<void
           payload: { error: detail },
         },
       });
+      await syncPayoutLedger(tx, payout.id);
     });
     return;
   }
@@ -671,6 +731,7 @@ export async function applyHubPayout(
         payload: origin.payload,
       },
     });
+    await syncPayoutLedger(tx, payout.id);
   });
 
   log.info({ payoutId: payout.id, from: payout.status, to, source: origin.source }, "PaymentHub payout update");

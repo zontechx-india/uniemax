@@ -1,4 +1,4 @@
-import { call, callList, http } from '../../shared/auth/http'
+import { call, callEnvelope, callList, http } from '../../shared/auth/http'
 import type { ListMeta } from '../../shared/auth/http'
 import type { Admin } from '../../shared/auth/authApi'
 import type { MarketHomeSection } from '../../storefront/features/discovery/marketHomeSections'
@@ -1093,6 +1093,7 @@ export interface Payout {
   method: PayoutMethod
   status: PayoutStatus
   amount: string
+  duesDeducted: string
   payeeName: string | null
   payeeBank: string | null
   payeeIfsc: string | null
@@ -1119,13 +1120,39 @@ export interface Payout {
   canResend: boolean
 }
 
+/** An order's fee breakdown — admin and seller only, never the customer. */
+export interface OrderFinancials {
+  paymentMethod: 'ONLINE' | 'COD'
+  orderTotal: string
+  itemsAmount: string
+  shippingAmount: string
+  platformFee: string
+  /** null when lines used different rates. */
+  platformFeePercent: string | null
+  gatewayFee: string
+  gatewayFeePercent: string
+  gatewayFeeBearer: FeeBearer
+  sellerEarning: string
+  /** false = computed now; frozen once the order is delivered. */
+  frozen: boolean
+  postedAt: string | null
+}
+
 /** `GET /orders/:id/payouts` — the order page's payout section. */
 export interface OrderPayouts {
   summary: {
     orderTotal: string
+    platformFee: string
+    /** The payout base: order total − platform fee (…). */
+    sellerEarning: string
     paidOut: string
     inProgress: string
+    duesDeducted: string
     remaining: string
+    /** The store's COD dues now. */
+    storeDues: string
+    suggested: { amount: string; duesDeducted: string }
+    financials: OrderFinancials
     /** Why no payout can be made — empty when one can. */
     blockers: string[]
     canPay: boolean
@@ -1144,6 +1171,8 @@ export interface OrderPayouts {
 
 export interface ManualPayoutInput {
   amount: string
+  /** COD dues settled by this payout instead of being sent. */
+  duesDeducted: string
   idempotencyKey: string
   status: 'PENDING' | 'PROCESSING' | 'SUCCEEDED'
   senderName: string
@@ -1185,6 +1214,102 @@ export interface AwaitingPayoutRow {
   deliveredAt: string | null
   /** Earlier payouts that failed / were reversed / cancelled. */
   pastAttempts: number
+}
+
+// ---- Seller finance -------------------------------------------------------
+
+export type FeeKind = 'PLATFORM' | 'GATEWAY'
+export type FeeBearer = 'SELLER' | 'PLATFORM'
+export type LedgerBucket = 'PAYABLE' | 'IN_PAYOUT' | 'OWED'
+export type LedgerEntryType =
+  | 'ORDER_SALE'
+  | 'PLATFORM_FEE'
+  | 'GATEWAY_FEE'
+  | 'COD_PLATFORM_FEE'
+  | 'DUES_SETTLED'
+  | 'DUES_RESTORED'
+  | 'PAYOUT_RESERVED'
+  | 'PAYOUT_PAID'
+  | 'PAYOUT_RELEASED'
+  | 'PAYOUT_RETURNED'
+  | 'ADJUSTMENT'
+
+export interface RateNow {
+  ruleId: string | null
+  percent: string
+  bearer: FeeBearer
+  effectiveFrom: string | null
+}
+
+export interface FinanceRates {
+  platform: RateNow
+  platformCod: RateNow
+  gateway: RateNow
+  upcoming: { kind: FeeKind; percent: string; bearer: FeeBearer; effectiveFrom: string }[]
+}
+
+export interface FeeRule {
+  id: string
+  kind: FeeKind
+  scope: 'GLOBAL' | 'STORE' | 'CATEGORY'
+  percent: string
+  bearer: FeeBearer
+  effectiveFrom: string
+  retiredAt: string | null
+  note: string | null
+  createdByEmail: string | null
+  createdAt: string
+}
+
+export interface FeeRules {
+  current: FinanceRates
+  rules: FeeRule[]
+}
+
+export interface Balance {
+  payable: string
+  inPayout: string
+  owed: string
+  /** payable − owed */
+  net: string
+  updatedAt: string | null
+}
+
+export interface BalanceRow extends Balance {
+  storeId: string
+  storeName: string
+  storeSlug: string | null
+}
+
+export interface DeliveredTotals {
+  orders: number
+  sales: string
+  platformFees: string
+  gatewayFees: string
+}
+
+export interface StoreFinance {
+  store: { id: string; name: string; slug: string | null }
+  balance: Balance
+  delivered: { online: DeliveredTotals; cod: DeliveredTotals }
+  rates: FinanceRates
+}
+
+export interface LedgerEntry {
+  id: string
+  storeId: string
+  bucket: LedgerBucket
+  type: LedgerEntryType
+  /** Signed: + grows the bucket. */
+  amount: string
+  balanceBefore: string
+  balanceAfter: string
+  orderId: string | null
+  orderNumber: string | null
+  payoutId: string | null
+  description: string
+  createdByEmail: string | null
+  createdAt: string
 }
 
 export const adminApi = {
@@ -1286,6 +1411,48 @@ export const adminApi = {
   },
   listAwaitingPayouts(query: Params) {
     return callList<AwaitingPayoutRow>(http.get(`${BASE}/seller-payouts/awaiting`, params(query)))
+  },
+
+  // Seller finance
+  listFeeRules() {
+    return call<FeeRules>(http.get(`${BASE}/finance/fee-rules`))
+  },
+  createFeeRule(body: {
+    kind: FeeKind
+    percent: string
+    effectiveFrom?: string | null
+    bearer?: FeeBearer
+    note?: string | null
+  }) {
+    return call<FeeRules>(http.post(`${BASE}/finance/fee-rules`, body))
+  },
+  listBalances(query: Params) {
+    return callList<BalanceRow>(http.get(`${BASE}/finance/balances`, params(query)))
+  },
+  /** Platform-wide sums of every store's balances. */
+  async balanceTotals() {
+    const envelope = await callEnvelope<{ totals: { payable: string; inPayout: string; owed: string } }>(
+      http.get(`${BASE}/finance/balances`, params({ pageSize: 1 })),
+    )
+    return envelope.totals
+  },
+  getStoreFinance(storeId: string) {
+    return call<StoreFinance>(http.get(`${BASE}/finance/stores/${storeId}`))
+  },
+  listLedger(storeId: string, query: Params) {
+    return callList<LedgerEntry>(http.get(`${BASE}/finance/stores/${storeId}/ledger`, params(query)))
+  },
+  addAdjustment(
+    storeId: string,
+    body: {
+      bucket: 'PAYABLE' | 'OWED'
+      direction: 'INCREASE' | 'DECREASE'
+      amount: string
+      reason: string
+      idempotencyKey: string
+    },
+  ) {
+    return call<StoreFinance>(http.post(`${BASE}/finance/stores/${storeId}/adjustments`, body))
   },
 
   // Catalog

@@ -3616,8 +3616,11 @@ the others don't.
 
 **Eligible order:** `paymentMethod: ONLINE`, `paymentStatus: PAID`, `status:
 DELIVERED` (a picked-up order is DELIVERED too). COD never needs a payout.
+**Payout base = the seller's earning** (order total − platform fee, see
+[Seller finance](#seller-finance--apiv1adminfinance)), not the order total.
 **No duplicates:** each create locks the order row, refuses an amount above
-what is left (`total − SUCCEEDED − PENDING/PROCESSING`), and takes an
+what is left (`earning − SUCCEEDED − PENDING/PROCESSING − COD dues
+deducted`), and takes an
 `idempotencyKey` (8–100 chars, one per dialog) — the same key on the same
 order returns the payout already made instead of a second one. At most one
 GATEWAY payout is `PENDING`/`PROCESSING` per order.
@@ -3627,7 +3630,14 @@ GATEWAY payout is `PENDING`/`PROCESSING` per order.
 ```jsonc
 {
   "summary": {
-    "orderTotal": "1499.00", "paidOut": "1000.00", "inProgress": "0.00", "remaining": "499.00",
+    "orderTotal": "100.00", "platformFee": "10.00",
+    "sellerEarning": "90.00",  // the payout base
+    "paidOut": "0.00", "inProgress": "0.00",
+    "duesDeducted": "0.00",    // COD dues settled by active payouts on this order
+    "remaining": "90.00",
+    "storeDues": "10.00",      // the store's OWED balance now
+    "suggested": { "amount": "80.00", "duesDeducted": "10.00" },  // dues first, the rest sent
+    "financials": { /* as GET /admin/orders/:id/financials */ },
     "blockers": [],            // why no payout can be made (COD, not delivered…) — empty when one can
     "canPay": true,            // no blockers and remaining > 0
     "payee": { "id", "accountHolderName", "bankName", "ifsc", "last4", "verificationStatus" } | null,
@@ -3635,6 +3645,7 @@ GATEWAY payout is `PENDING`/`PROCESSING` per order.
   },
   "payouts": [ /* oldest first */ {
     "id", "method": "MANUAL" | "GATEWAY", "status", "amount",
+    "duesDeducted",                                         // COD dues settled instead of sent
     "payeeName", "payeeBank", "payeeIfsc", "payeeLast4",   // store's primary account AT THE TIME
     "senderName", "senderBank", "senderLast4",              // MANUAL
     "paidAt", "paidAtTimeKnown", "utr", "notes",
@@ -3652,8 +3663,9 @@ GATEWAY payout is `PENDING`/`PROCESSING` per order.
 
 ```jsonc
 {
-  "amount": "1499.00",           // > 0, ≤ remaining
-  "idempotencyKey": "…",
+  "amount": "80.00",             // money sent; may be "0" only when duesDeducted > 0
+  "duesDeducted": "10.00",       // optional (default 0) — COD dues kept to settle OWED; ≤ storeDues
+  "idempotencyKey": "…",         // amount + duesDeducted ≤ remaining
   "status": "SUCCEEDED",         // default · or PROCESSING / PENDING
   "senderName": "Anwin Paulji",  // whose account the money left from
   "senderBank": "HDFC Bank",     // optional
@@ -3665,8 +3677,10 @@ GATEWAY payout is `PENDING`/`PROCESSING` per order.
 }
 ```
 → the payout. The store's primary bank account is snapshotted onto it (last 4
-digits only; all null when the store has none). `409` order not eligible ·
-`409` amount above what is left · `422` date in the future. Audit
+digits only; all null when the store has none). Every payout change also
+posts its seller-ledger entries in the same transaction (docs/seller-finance
+§5). `409` order not eligible · `409` amount + dues above what is left · `409`
+dues above what the seller owes · `422` date in the future. Audit
 `payout.manual.record`.
 
 #### `PATCH /api/v1/admin/orders/:id/payouts/:payoutId/status`
@@ -3715,6 +3729,77 @@ processing or done, oldest delivery first. Query `q` (order number / store).
 Rows: `{ id, orderNumber, storeId, storeName, total, placedAt, deliveredAt,
 pastAttempts }` (`pastAttempts` = earlier failed / reversed / cancelled
 payouts), plus **`totalAmount`**. A partly paid order is not listed here.
+
+### Seller finance — `/api/v1/admin/finance/**`
+
+Fee rules, per-order fee snapshots and the seller ledger. Rules, buckets and
+entry types: [`docs/seller-finance/README.md`](./seller-finance/README.md).
+Fees are admin + seller only — never in a customer or public response.
+
+#### `GET /api/v1/admin/finance/fee-rules` · `POST /api/v1/admin/finance/fee-rules`
+
+`GET` → `{ current: { platform, platformCod, gateway, upcoming[] }, rules[] }`.
+Each of `platform` / `gateway` = `{ ruleId, percent: "10.00", bearer, effectiveFrom }`
+in force now; `upcoming` = scheduled GLOBAL versions `{ kind, percent, bearer,
+effectiveFrom }`; `rules` = every version newest first (`id, kind, scope,
+storeId, categoryId, paymentMethod, percent, bearer, effectiveFrom, retiredAt,
+note, createdByEmail, createdAt`).
+
+`POST` adds a version (GLOBAL scope) and answers like `GET`:
+
+```jsonc
+{
+  "kind": "PLATFORM" | "GATEWAY",
+  "percent": "10",             // 0–100, ≤ 2 decimals
+  "effectiveFrom": null,       // ISO date-time; null/"" = now; never in the past (422)
+  "bearer": "PLATFORM",        // GATEWAY only (SELLER | PLATFORM); PLATFORM fee is always SELLER
+  "note": "…"                  // optional
+}
+```
+Audit `finance.feeRule.create`.
+
+#### `GET /api/v1/admin/orders/:id/financials`
+
+An order's fee breakdown: `{ paymentMethod, orderTotal, itemsAmount,
+shippingAmount, platformFee, platformFeePercent (null if lines differ),
+gatewayFee, gatewayFeePercent, gatewayFeeBearer, sellerEarning, lines[{
+orderItemId, base, percent, fee, ruleId }], frozen, postedAt }`. `frozen:
+false` = computed now with the rules in force at placement; it is saved when
+the order is delivered (same numbers).
+
+#### `GET /api/v1/admin/finance/balances`
+
+Query `q` (store name / slug), `filter` (`PAYABLE` = we owe them · `OWED` =
+they owe us), `page`, `pageSize`. Rows `{ storeId, storeName, storeSlug,
+payable, inPayout, owed, net, updatedAt }` (only stores with ledger activity),
+plus **`totals`** `{ payable, inPayout, owed }` for the filter.
+
+#### `GET /api/v1/admin/finance/stores/:storeId` · `GET …/ledger`
+
+Summary → `{ store, balance { payable, inPayout, owed, net, updatedAt },
+delivered { online, cod: { orders, sales, platformFees, gatewayFees } },
+rates }` (delivered = orders on the ledger).
+
+`…/ledger` — entries newest first. Query `bucket`, `type`, `from`, `to`,
+`page`, `pageSize`. Rows `{ id, storeId, bucket, type, amount (signed),
+balanceBefore, balanceAfter, orderId, orderNumber, payoutId, idempotencyKey,
+description, createdById, createdByEmail, meta, createdAt }`.
+
+#### `POST /api/v1/admin/finance/stores/:storeId/adjustments`
+
+Body `{ bucket: "PAYABLE" | "OWED", direction: "INCREASE" | "DECREASE",
+amount, reason (5–300), idempotencyKey }` — a correction entry (`ADJUSTMENT`);
+nothing existing changes. The seller sees the reason. → the store summary.
+Audit `finance.adjustment`.
+
+#### Seller side — `GET /api/v1/stores/:id/platform-fee` · `GET /api/v1/stores/:id/earnings` 🔒 owner
+
+Also on the admin manage mount. `platform-fee` → `{ percent, effectiveFrom,
+upcoming: { kind, percent, bearer, effectiveFrom } | null }` — the product
+form's note. `earnings?page&pageSize(≤50)` → `{ balance, delivered, rates,
+ledger { rows (no actor / key / meta), meta }, payouts[20] { id, status,
+amount, duesDeducted, paidAt, paidAtTimeKnown, utr, method, createdAt,
+order { id, orderNumber } } }`.
 
 ### `GET /api/v1/admin/catalog/products` · `GET …/:id`
 

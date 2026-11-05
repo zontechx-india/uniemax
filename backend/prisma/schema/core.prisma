@@ -1234,6 +1234,9 @@ model Order {
   /// Money sent to the seller for this order — manual transfers and
   /// PaymentHub payouts. Tracked apart from `status` (docs/BACKEND_CONTEXT.md).
   payouts             OrderPayout[]
+  /// Fee breakdown (platform / gateway fee, seller earning) — seller and
+  /// admin only, never the customer (modules/finance).
+  financials          OrderFinancials?
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 
@@ -1311,7 +1314,14 @@ model OrderPayout {
 
   method PayoutMethod
   status PayoutStatus
+  /// Money actually sent to the seller.
   amount Decimal      @db.Decimal(10, 2)
+  /// The seller's COD dues settled by this payout instead of being sent
+  /// (amount + duesDeducted is what this payout covers of the order).
+  duesDeducted Decimal       @default(0) @db.Decimal(10, 2)
+  /// The status the seller ledger was last brought in line with — differs
+  /// from `status` only until the sync (same transaction, or the sweep).
+  ledgerStatus PayoutStatus?
 
   // Who received it — the store's PRIMARY bank account at the time,
   // snapshotted (the seller may change accounts later). Never the full

@@ -299,6 +299,12 @@ export const router = createBrowserRouter([
                     }),
                   },
                   {
+                    path: 'earnings',
+                    lazy: async () => ({
+                      Component: (await import('../pages/stores/StoreEarningsPage')).StoreEarningsPage,
+                    }),
+                  },
+                  {
                     path: 'bank-accounts',
                     lazy: async () => ({
                       Component: (await import('../pages/stores/StoreBankPage')).StoreBankPage,

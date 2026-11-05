@@ -53,7 +53,16 @@ export const payoutParams = z.object({
 
 /** Money an admin already sent (or is sending) by hand. */
 export const manualPayoutSchema = z.object({
-  amount,
+  /** Money sent. May be 0 when the payout only settles COD dues. */
+  amount: z
+    .string()
+    .trim()
+    .regex(/^\d{1,8}(\.\d{1,2})?$/, "Enter an amount like 1250 or 1250.50"),
+  /** The seller's COD dues taken from this payout instead of being sent. */
+  duesDeducted: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? "0" : v),
+    z.string().trim().regex(/^\d{1,8}(\.\d{1,2})?$/, "Enter an amount like 10 or 10.50"),
+  ),
   idempotencyKey,
   /** Usually SUCCEEDED — the transfer is done when it is recorded. */
   status: z.enum(["PENDING", "PROCESSING", "SUCCEEDED"]).default("SUCCEEDED"),

@@ -179,6 +179,11 @@ backend/
 │   │   │                      #   + payments.jobs.ts (10-min stranded-payment
 │   │   │                      #   sweep, settle-only)
 │   │   │                      #   (see docs/CASHFREE_PAYMENTS.md)
+│   │   ├── finance/           # seller finance (docs/seller-finance/): fee
+│   │   │                      #   rules, order fee snapshots, seller ledger ·
+│   │   │                      #   finance.rules.ts (pure, unit-tested) ·
+│   │   │                      #   ledger.service.ts (the one posting path) ·
+│   │   │                      #   finance.jobs.ts (DELIVERED event + sweep)
 │   │   ├── payouts/           # seller payouts per order (admin only):
 │   │   │                      #   payouts.rules.ts (pure: moves, eligibility,
 │   │   │                      #   paise maths — unit-tested) · service
@@ -504,7 +509,10 @@ module repeats the guard. Deliberate scope decisions:
   mistake is `CANCELLED` with a reason. Status moves live in
   `payouts.rules.ts`: MANUAL rows move by an admin, GATEWAY rows only by
   PaymentHub (its answer to `POST /v1/payouts`, then `payout.*` webhooks) and
-  only forward. Gateway payouts stay off until `PAYMENTHUB_PAYOUTS_ENABLED` —
+  only forward. The payout base is the seller's earning from
+  `modules/finance` (order total − platform fee), and every payout change
+  posts its seller-ledger entries in the same transaction (`syncPayoutLedger`;
+  lock order: order row, then the store's balance row). Gateway payouts stay off until `PAYMENTHUB_PAYOUTS_ENABLED` —
   the hub has no payout API yet, so the request body and webhook shape are
   UnieMax's expectation, to align when the hub ships it.
 - **CSRF, second layer.** The whole `requireAdmin` subtree also carries
@@ -1633,6 +1641,16 @@ White-label design — one codebase, any business:
   `hubResponse` (JSON), `failureReason`. `createdById` / `createdByEmail`
   (snapshot), `idempotencyKey` unique per order. `onDelete: Restrict` on the
   order — a financial record keeps its order.
+- **OrderPayout** also has `duesDeducted` (COD dues settled by the payout
+  instead of sent) and `ledgerStatus` (status the seller ledger last matched;
+  the finance sweep syncs rows where it differs from `status`).
+- **Seller finance** (`finance.prisma`) — **FeeRule** (`fee_rules`, versioned,
+  never edited), **OrderFinancials** (`order_financials`, one per order,
+  `Order.financials`, Restrict), **SellerBalance** (`seller_balances`, per
+  store, no FK so history outlives a deleted store) and **SellerLedgerEntry**
+  (`seller_ledger_entries`, immutable, unique `idempotencyKey`). Enums
+  `FeeKind`, `FeeScope`, `FeeBearer`, `LedgerBucket`, `LedgerEntryType`. Field
+  meanings and posting rules: [`docs/seller-finance/README.md`](./seller-finance/README.md).
 - **OrderPayoutEvent** (`order_payout_events`) — append-only history of a
   payout: `fromStatus` (null on creation) → `toStatus`, `source` `ADMIN |
   HUB_RESPONSE | HUB_WEBHOOK`, `actorId/Email`, `note`, `hubEventId`,
@@ -2007,7 +2025,9 @@ store + seller oversight with **suspension**, customer oversight with
 seller-catalog oversight with a **hide/restore** moderation switch, **manual
 payout-account verification**, **seller payouts** per order (manual records
 now; PaymentHub payouts built but switched off until the hub offers them —
-`modules/payouts`), an append-only **audit trail** of every admin
+`modules/payouts`), **seller finance** — versioned platform / gateway fee %,
+per-order fee snapshots and a per-store ledger with COD dues deducted from
+payouts (`modules/finance`, docs/seller-finance/), an append-only **audit trail** of every admin
 write, and SUPER_ADMIN-only **admin-account management** (create / role /
 deactivate / password reset, each revoking that admin's sessions). Verified
 end to end against the live database.

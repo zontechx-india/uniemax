@@ -1,0 +1,189 @@
+// ---------------------------------------------------------------------------
+// Seller finance — fee rules, per-order fee snapshots, the seller ledger.
+// Knowledge base: docs/seller-finance/README.md. Code: src/modules/finance.
+// ---------------------------------------------------------------------------
+
+/// Which charge a fee rule sets.
+enum FeeKind {
+  /// UnieMax's fee on the product price. Never shown to customers.
+  PLATFORM
+  /// The payment gateway's charge on an online payment.
+  GATEWAY
+
+  @@schema("public")
+}
+
+/// Who a fee rule applies to. Only GLOBAL is offered today; STORE and
+/// CATEGORY are wired into the resolver so adding them later is a form
+/// field, not a rebuild. The most specific matching rule wins.
+enum FeeScope {
+  GLOBAL
+  STORE
+  CATEGORY
+
+  @@schema("public")
+}
+
+/// Who pays a charge.
+enum FeeBearer {
+  SELLER
+  PLATFORM
+
+  @@schema("public")
+}
+
+/// One version of a fee. Rows are NEVER edited: a change is a new row with a
+/// later `effectiveFrom`, so every order keeps the rate in force when it was
+/// placed. `effectiveFrom` can't be in the past (service-enforced).
+model FeeRule {
+  id            String         @id @default(cuid())
+  kind          FeeKind
+  scope         FeeScope       @default(GLOBAL)
+  /// STORE scope only.
+  storeId       String?
+  /// CATEGORY scope only (a platform category).
+  categoryId    String?
+  /// Null = both COD and online.
+  paymentMethod PaymentMethod?
+
+  /// 0–100, two decimals ("2.50" = 2.5%).
+  percent Decimal   @db.Decimal(5, 2)
+  bearer  FeeBearer
+
+  effectiveFrom DateTime
+  /// A scoped override can be switched off from this moment (future use).
+  retiredAt     DateTime?
+  note          String?
+
+  createdById    String?
+  createdByEmail String?
+  createdAt      DateTime @default(now())
+
+  @@index([kind, effectiveFrom])
+  @@map("fee_rules")
+  @@schema("public")
+}
+
+/// The fee breakdown of one order, frozen when the order is delivered,
+/// computed with the rules in force when it was PLACED. Never shown to the
+/// customer. `lines` holds the per-item fee (rate, rule) so category fees
+/// work later without a schema change.
+model OrderFinancials {
+  orderId String @id
+  /// Restrict: a financial record keeps its order.
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  paymentMethod  PaymentMethod
+  /// Product price total — the platform fee's base (never shipping).
+  itemsAmount    Decimal       @db.Decimal(10, 2)
+  shippingAmount Decimal       @db.Decimal(10, 2)
+  orderTotal     Decimal       @db.Decimal(10, 2)
+
+  platformFee        Decimal  @db.Decimal(10, 2)
+  /// The rate when every line used the same rule; null if they differ.
+  platformFeePercent Decimal? @db.Decimal(5, 2)
+
+  /// Online only (0 for COD), on the amount the customer paid.
+  gatewayFee        Decimal   @db.Decimal(10, 2)
+  gatewayFeePercent Decimal   @db.Decimal(5, 2)
+  gatewayFeeBearer  FeeBearer
+  gatewayFeeRuleId  String?
+
+  /// What the seller ends up with for this order: total − platform fee
+  /// (− gateway fee when the seller bears it).
+  sellerEarning Decimal @db.Decimal(10, 2)
+
+  /// [{ orderItemId, base, percent, fee, ruleId }] — amounts as "123.45".
+  lines Json
+
+  /// When the ledger entries for this order were written.
+  postedAt  DateTime?
+  createdAt DateTime  @default(now())
+
+  @@map("order_financials")
+  @@schema("public")
+}
+
+/// Which balance a ledger entry moves.
+enum LedgerBucket {
+  /// UnieMax owes the seller — ready to pay.
+  PAYABLE
+  /// Taken out of PAYABLE for a payout that isn't finished. Stops the same
+  /// money being paid twice.
+  IN_PAYOUT
+  /// The seller owes UnieMax (COD platform fees, adjustments).
+  OWED
+
+  @@schema("public")
+}
+
+enum LedgerEntryType {
+  /// Online order delivered: the customer's payment, owed to the seller.
+  ORDER_SALE
+  /// Online order: UnieMax's platform fee, taken from the sale.
+  PLATFORM_FEE
+  /// Online order: gateway fee, when the seller bears it.
+  GATEWAY_FEE
+  /// COD order delivered: the seller holds the cash and owes the fee.
+  COD_PLATFORM_FEE
+  /// COD dues taken out of a payout (PAYABLE − and OWED −).
+  DUES_SETTLED
+  /// That deduction undone (the payout failed / was cancelled).
+  DUES_RESTORED
+  /// Money set aside for a payout (PAYABLE → IN_PAYOUT).
+  PAYOUT_RESERVED
+  /// The payout reached the seller (IN_PAYOUT −).
+  PAYOUT_PAID
+  /// A payout that never went out (IN_PAYOUT → PAYABLE).
+  PAYOUT_RELEASED
+  /// A paid payout that came back (PAYABLE +).
+  PAYOUT_RETURNED
+  /// An admin's correction, with a reason.
+  ADJUSTMENT
+
+  @@schema("public")
+}
+
+/// A store's three balances — always equal to the sum of its ledger entries
+/// per bucket. Locked (`SELECT … FOR UPDATE`) for every posting. No foreign
+/// key to the store on purpose: financial history outlives a deleted store.
+model SellerBalance {
+  storeId   String   @id
+  payable   Decimal  @default(0) @db.Decimal(12, 2)
+  inPayout  Decimal  @default(0) @db.Decimal(12, 2)
+  owed      Decimal  @default(0) @db.Decimal(12, 2)
+  updatedAt DateTime @updatedAt
+
+  @@map("seller_balances")
+  @@schema("public")
+}
+
+/// One movement of a seller's money. NEVER edited or deleted — a mistake is
+/// corrected with another entry. `amount` is signed: + grows the bucket.
+model SellerLedgerEntry {
+  id            String          @id @default(cuid())
+  storeId       String
+  bucket        LedgerBucket
+  type          LedgerEntryType
+  amount        Decimal         @db.Decimal(12, 2)
+  balanceBefore Decimal         @db.Decimal(12, 2)
+  balanceAfter  Decimal         @db.Decimal(12, 2)
+
+  orderId  String?
+  payoutId String?
+
+  /// Unique: a repeated call / webhook / job run posts nothing new.
+  idempotencyKey String   @unique
+  description    String
+  /// Null = the system.
+  createdById    String?
+  createdByEmail String?
+  meta           Json?
+  createdAt      DateTime @default(now())
+
+  @@index([storeId, createdAt])
+  @@index([orderId])
+  @@index([payoutId])
+  @@map("seller_ledger_entries")
+  @@schema("public")
+}

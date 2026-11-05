@@ -5,6 +5,7 @@ import * as catalogController from "./storeCatalog.controller.js";
 import * as bankController from "./storeBank.controller.js";
 import * as bannerController from "./storeBanner.controller.js";
 import * as publicController from "./publicStore.controller.js";
+import * as financeController from "./storeFinance.controller.js";
 import * as ordersController from "../orders/orders.controller.js";
 import { storeOwnerSupportRoutes } from "../support/support.routes.js";
 import { prisma } from "../../config/prisma.js";
@@ -102,6 +103,10 @@ export const storeRoutes: FastifyPluginAsync<StoreRoutesOptions> = async (
     await app.register(storeOwnerSupportRoutes, { prefix: "/:id/support" });
   }
   app.get("/:id", controller.getStore);
+  // Seller finance, read-only: the platform fee % (the product form's note)
+  // and the Earnings page. Both mounts — support can read what the seller sees.
+  app.get("/:id/platform-fee", financeController.getPlatformFee);
+  app.get("/:id/earnings", financeController.getEarnings);
   app.patch("/:id", controller.updateStore);
   app.patch("/:id/theme", controller.updateStoreTheme);
   app.patch("/:id/homepage", controller.updateStoreHomepage);

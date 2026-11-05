@@ -38,10 +38,17 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/orders', label: 'Orders' },
       { to: '/payments', label: 'Payments' },
-      { to: '/seller-payouts', label: 'Seller payouts' },
       { to: '/products', label: 'Products' },
       { to: '/categories', label: 'Categories' },
       { to: '/category-mapping', label: 'Category mapping' },
+    ],
+  },
+  {
+    title: 'Finance',
+    items: [
+      { to: '/seller-payouts', label: 'Seller payouts' },
+      { to: '/finance/sellers', label: 'Seller balances' },
+      { to: '/finance/fees', label: 'Fee settings' },
     ],
   },
   {
@@ -86,6 +93,8 @@ const TITLES: [string, string][] = [
   ['/orders', 'Orders'],
   ['/payments', 'Payments'],
   ['/seller-payouts', 'Seller payouts'],
+  ['/finance/sellers', 'Seller balances'],
+  ['/finance/fees', 'Fee settings'],
   ['/products', 'Products'],
   ['/categories', 'Categories'],
   ['/category-mapping', 'Category mapping'],

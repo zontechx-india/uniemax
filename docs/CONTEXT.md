@@ -44,6 +44,8 @@ The first implementation will be for a **Cricket Bat Store**, but the architectu
 - Suspend / restore a store; verify a seller's payout account
 - Pay sellers for online orders (record a manual transfer now; PaymentHub
   payouts once the hub offers them) and track every payout
+- Set the platform fee % and the gateway fee % (and who pays it); see every
+  seller's balance — what UnieMax owes them, what they owe — and its ledger
 - Block / unblock a customer account
 - Send platform announcements
 - Answer support tickets from sellers and shoppers, and triage the queue
@@ -1034,6 +1036,18 @@ revoked from anywhere else.
   never deleted — it is marked cancelled with a reason. The **Seller
   payouts** page lists orders still to pay (oldest delivery first) and every
   payout made, searchable by UTR, sender, order or store, for reconciliation.
+- **Seller finance** (full rules: docs/seller-finance/README.md) — UnieMax
+  takes a **platform fee %** on the product price (never shipping), set under
+  **Finance → Fee settings** and 0% to start. Customers never see it; sellers
+  see it under the price when they add a product ("you receive ₹…"). A
+  **gateway fee %** (0% to start) is paid by UnieMax for now. A change applies
+  to orders placed from its start time; old orders keep their fee. When an
+  order is delivered, the seller's ledger records it: an online order adds
+  "total − fee" to what UnieMax owes the seller; a cash order adds the fee to
+  what the seller owes UnieMax. Those COD dues are taken from the seller's
+  next manual payout. **Seller balances** shows each store's balances and
+  every entry, with corrections (reason required). Sellers see the same on
+  their **Earnings** page.
 - **Products** — the seller catalog across all stores, with inventory views
   (low stock, out of stock) and the platform's one moderation lever:
   **hide a listing** (with a reason the seller is told). It flips the same

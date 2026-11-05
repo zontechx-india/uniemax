@@ -139,6 +139,9 @@ never ships to a shopper.
 - **Seller payouts** per order — record a manual bank transfer, or (once
   PaymentHub offers it) send through the hub; full status history, no
   accidental double payout, and a payouts ledger for reconciliation.
+- **Seller finance** — configurable platform fee % (on product price, hidden
+  from customers) and gateway fee %, a per-store ledger (what we owe / what
+  they owe), COD fees taken from the next payout; sellers see it on Earnings.
 - **Manage a seller's store for them** (SUPER_ADMIN only) — the support path
   for "can you fix my listing?". Opens the seller's own dashboard (catalog,
   media, storefront, delivery, orders), not an admin rebuild of it, so staff
@@ -209,7 +212,7 @@ root — a per-folder install wipes the shared `node_modules`.
 ### Backend modules
 
 `addresses` · `admin` · `category` · `discovery` · `health` · `notifications` ·
-`orders` · `payments` · `payouts` · `product` · `stores` · `support` · `themeTemplates`
+`finance` · `orders` · `payments` · `payouts` · `product` · `stores` · `support` · `themeTemplates`
 
 Each is `schema.ts` · `service.ts` · `controller.ts` · `routes.ts`, registered in
 [`backend/src/routes.ts`](./backend/src/routes.ts). `stores` and `admin` are large
