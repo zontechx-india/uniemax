@@ -39,6 +39,7 @@ import {
 } from "./modules/orders/orders.routes.js";
 import { paymentRoutes } from "./modules/payments/payments.routes.js";
 import { adminConsoleRoutes } from "./modules/admin/admin.routes.js";
+import { adminPayoutRoutes } from "./modules/payouts/payouts.routes.js";
 import {
   adminNotificationRoutes,
   customerNotificationRoutes,
@@ -183,6 +184,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
             // The platform console (dashboard, stores, customers, orders,
             // payments, catalog oversight, audit trail, admin accounts).
             await guarded.register(adminConsoleRoutes);
+            // Seller payouts — manual records + PaymentHub payouts per order.
+            await guarded.register(adminPayoutRoutes);
             // Store management ON BEHALF OF A SELLER — the SAME plugin that
             // serves /stores, mounted a second time with an admin actor so
             // support can fix a seller's catalog or storefront without a

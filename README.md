@@ -136,6 +136,9 @@ never ships to a shopper.
 - One-request dashboard: totals, today, per-day series, order pipeline, payment
   split, top stores/products, low stock, integration health.
 - Store oversight with **suspension**; seller payout-account verification.
+- **Seller payouts** per order — record a manual bank transfer, or (once
+  PaymentHub offers it) send through the hub; full status history, no
+  accidental double payout, and a payouts ledger for reconciliation.
 - **Manage a seller's store for them** (SUPER_ADMIN only) — the support path
   for "can you fix my listing?". Opens the seller's own dashboard (catalog,
   media, storefront, delivery, orders), not an admin rebuild of it, so staff
@@ -206,7 +209,7 @@ root — a per-folder install wipes the shared `node_modules`.
 ### Backend modules
 
 `addresses` · `admin` · `category` · `discovery` · `health` · `notifications` ·
-`orders` · `payments` · `product` · `stores` · `support` · `themeTemplates`
+`orders` · `payments` · `payouts` · `product` · `stores` · `support` · `themeTemplates`
 
 Each is `schema.ts` · `service.ts` · `controller.ts` · `routes.ts`, registered in
 [`backend/src/routes.ts`](./backend/src/routes.ts). `stores` and `admin` are large

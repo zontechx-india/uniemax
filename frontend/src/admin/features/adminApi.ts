@@ -1055,6 +1055,129 @@ export interface BannerInput {
   isActive?: boolean
 }
 
+// ---- Seller payouts -------------------------------------------------------
+
+export type PayoutStatus =
+  | 'PENDING'
+  | 'PROCESSING'
+  | 'SUCCEEDED'
+  | 'FAILED'
+  | 'REVERSED'
+  | 'CANCELLED'
+export type PayoutMethod = 'MANUAL' | 'GATEWAY'
+
+export interface PayoutEvent {
+  id: string
+  fromStatus: PayoutStatus | null
+  toStatus: PayoutStatus
+  source: 'ADMIN' | 'HUB_RESPONSE' | 'HUB_WEBHOOK'
+  actorEmail: string | null
+  note: string | null
+  hubEventId: string | null
+  payload: unknown
+  createdAt: string
+}
+
+export interface Payout {
+  id: string
+  orderId: string
+  method: PayoutMethod
+  status: PayoutStatus
+  amount: string
+  payeeName: string | null
+  payeeBank: string | null
+  payeeIfsc: string | null
+  payeeLast4: string | null
+  senderName: string | null
+  senderBank: string | null
+  senderLast4: string | null
+  paidAt: string | null
+  paidAtTimeKnown: boolean
+  utr: string | null
+  notes: string | null
+  gateway: string | null
+  hubPayoutId: string | null
+  gatewayRef: string | null
+  hubRequest: unknown
+  hubResponse: unknown
+  failureReason: string | null
+  createdByEmail: string | null
+  createdAt: string
+  events: PayoutEvent[]
+  /** Where an admin may move it (manual payouts only). */
+  nextStatuses: PayoutStatus[]
+  /** A gateway payout PaymentHub never answered — can be sent again. */
+  canResend: boolean
+}
+
+/** `GET /orders/:id/payouts` — the order page's payout section. */
+export interface OrderPayouts {
+  summary: {
+    orderTotal: string
+    paidOut: string
+    inProgress: string
+    remaining: string
+    /** Why no payout can be made — empty when one can. */
+    blockers: string[]
+    canPay: boolean
+    payee: {
+      id: string
+      accountHolderName: string
+      bankName: string
+      ifsc: string
+      last4: string
+      verificationStatus: BankVerificationStatus
+    } | null
+    gateway: { available: boolean; reason: string | null }
+  }
+  payouts: Payout[]
+}
+
+export interface ManualPayoutInput {
+  amount: string
+  idempotencyKey: string
+  status: 'PENDING' | 'PROCESSING' | 'SUCCEEDED'
+  senderName: string
+  senderBank?: string | null
+  senderLast4?: string | null
+  paidOn: string
+  paidTime?: string | null
+  utr?: string | null
+  notes?: string | null
+}
+
+export interface PayoutRow {
+  id: string
+  method: PayoutMethod
+  status: PayoutStatus
+  amount: string
+  payeeName: string | null
+  payeeBank: string | null
+  payeeLast4: string | null
+  senderName: string | null
+  paidAt: string | null
+  paidAtTimeKnown: boolean
+  utr: string | null
+  gateway: string | null
+  hubPayoutId: string | null
+  failureReason: string | null
+  createdByEmail: string | null
+  createdAt: string
+  order: { id: string; orderNumber: string; storeId: string | null; storeName: string; total: string }
+}
+
+export interface AwaitingPayoutRow {
+  id: string
+  orderNumber: string
+  storeId: string | null
+  storeName: string
+  total: string
+  placedAt: string
+  deliveredAt: string | null
+  /** Earlier payouts that failed / were reversed / cancelled. */
+  pastAttempts: number
+}
+
 export const adminApi = {
   dashboard(days: number) {
     return call<Dashboard>(http.get(`${BASE}/dashboard`, params({ days })))
@@ -1127,6 +1250,33 @@ export const adminApi = {
   },
   listPayments(query: Params) {
     return callList<OrderRow>(http.get(`${BASE}/payments`, params(query)))
+  },
+
+  // Seller payouts
+  getOrderPayouts(orderId: string) {
+    return call<OrderPayouts>(http.get(`${BASE}/orders/${orderId}/payouts`))
+  },
+  recordManualPayout(orderId: string, body: ManualPayoutInput) {
+    return call<Payout>(http.post(`${BASE}/orders/${orderId}/payouts/manual`, body))
+  },
+  triggerGatewayPayout(orderId: string, body: { amount: string; idempotencyKey: string }) {
+    return call<Payout>(http.post(`${BASE}/orders/${orderId}/payouts/gateway`, body))
+  },
+  resendGatewayPayout(orderId: string, payoutId: string) {
+    return call<Payout>(http.post(`${BASE}/orders/${orderId}/payouts/${payoutId}/resend`))
+  },
+  updatePayoutStatus(
+    orderId: string,
+    payoutId: string,
+    body: { status: PayoutStatus; reason?: string | null; utr?: string | null },
+  ) {
+    return call<Payout>(http.patch(`${BASE}/orders/${orderId}/payouts/${payoutId}/status`, body))
+  },
+  listSellerPayouts(query: Params) {
+    return callList<PayoutRow>(http.get(`${BASE}/seller-payouts`, params(query)))
+  },
+  listAwaitingPayouts(query: Params) {
+    return callList<AwaitingPayoutRow>(http.get(`${BASE}/seller-payouts/awaiting`, params(query)))
   },
 
   // Catalog

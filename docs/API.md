@@ -2154,6 +2154,7 @@ carries `{ orderId, storeSlug }`.
 | `payment.failed` / `payment.expired` / `payment.cancelled` | `PENDING` → `FAILED` (retryable, like the Cashfree path). No-op if the order is past `PENDING` or the event is for an intent other than the order's current `paymentIntentId`. |
 | `refund.succeeded` / `refund.failed` | Logged and acknowledged — UnieMax has no refund records yet. |
 | `verification.updated` | A hub admin settled a `NEEDS_REVIEW` bank check. Applied to the payout account — or the OPEN pending change — whose `verificationRef` is `data.verification.id` (and `payeeRef` = `store_<storeId>`), with the same mapping as a [save](#payout-bank-accounts--apiv1storesidbank-accounts); `VALID` on a change applies it. Ignored when it is no longer the latest check (the seller sent new details, the change was superseded/withdrawn) or an admin decided manually meanwhile. The seller is notified. |
+| `payout.initiated` / `payout.succeeded` / `payout.failed` / `payout.reversed` | A seller payout moved at the gateway. `data.payout` = `{ id, reference, status, amountMinor, gateway?, gatewayRef?, utr?, failureReason? }`; found by `hubPayoutId` = `id`, then our payout id = `reference`. Forward-only (`PENDING → PROCESSING → SUCCEEDED / FAILED`, `SUCCEEDED → REVERSED`); a SUCCEEDED stamps `paidAt`. `amountMinor` must equal the payout amount, else logged and left alone. Every delivery adds a `HUB_WEBHOOK` history event with the payload. See [Seller payouts](#seller-payouts--apiv1adminordersidpayouts--apiv1adminseller-payouts). |
 | anything else | Logged and acknowledged. |
 
 The order is found by `Order.paymentIntentId`, then `metadata.orderId`; no
@@ -3596,6 +3597,122 @@ The same order rows through the money lens (there is no separate payments
 table — a payment *is* an order's settlement). Query: `q`, `paymentStatus`,
 `paymentMethod`, `from`, `to`. Also returns **`totals`** — count + amount per
 payment status for the current filter.
+
+### Seller payouts — `/api/v1/admin/orders/:id/payouts` · `/api/v1/admin/seller-payouts`
+
+Money UnieMax sends a seller for an order the customer **paid online**. Two
+ways, one record (`order_payouts`) with an append-only history
+(`order_payout_events`): **MANUAL** — an admin sent it by hand from a savings
+account (theirs or someone else's) and records it; **GATEWAY** — an admin asks
+PaymentHub to send it. Payout status is separate from the order status and
+never changes the order. Money is a decimal string, as everywhere.
+
+Statuses: `PENDING` · `PROCESSING` · `SUCCEEDED` (paid out) · `FAILED` ·
+`REVERSED` (arrived, came back) · `CANCELLED` (recorded by mistake, manual
+only). `PENDING` + `PROCESSING` + `SUCCEEDED` count against the order total;
+the others don't.
+
+**Eligible order:** `paymentMethod: ONLINE`, `paymentStatus: PAID`, `status:
+DELIVERED` (a picked-up order is DELIVERED too). COD never needs a payout.
+**No duplicates:** each create locks the order row, refuses an amount above
+what is left (`total − SUCCEEDED − PENDING/PROCESSING`), and takes an
+`idempotencyKey` (8–100 chars, one per dialog) — the same key on the same
+order returns the payout already made instead of a second one. At most one
+GATEWAY payout is `PENDING`/`PROCESSING` per order.
+
+#### `GET /api/v1/admin/orders/:id/payouts`
+
+```jsonc
+{
+  "summary": {
+    "orderTotal": "1499.00", "paidOut": "1000.00", "inProgress": "0.00", "remaining": "499.00",
+    "blockers": [],            // why no payout can be made (COD, not delivered…) — empty when one can
+    "canPay": true,            // no blockers and remaining > 0
+    "payee": { "id", "accountHolderName", "bankName", "ifsc", "last4", "verificationStatus" } | null,
+    "gateway": { "available": false, "reason": "Gateway payouts are not switched on yet — …" }
+  },
+  "payouts": [ /* oldest first */ {
+    "id", "method": "MANUAL" | "GATEWAY", "status", "amount",
+    "payeeName", "payeeBank", "payeeIfsc", "payeeLast4",   // store's primary account AT THE TIME
+    "senderName", "senderBank", "senderLast4",              // MANUAL
+    "paidAt", "paidAtTimeKnown", "utr", "notes",
+    "gateway", "hubPayoutId", "gatewayRef", "hubRequest", "hubResponse", "failureReason",
+    "createdById", "createdByEmail", "createdAt", "updatedAt",
+    "events": [ { "fromStatus", "toStatus", "source": "ADMIN" | "HUB_RESPONSE" | "HUB_WEBHOOK",
+                  "actorEmail", "note", "hubEventId", "payload", "createdAt" } ],
+    "nextStatuses": ["REVERSED", "CANCELLED"],  // what an admin may set (MANUAL only)
+    "canResend": false                          // GATEWAY, PENDING, never acknowledged by the hub
+  } ]
+}
+```
+
+#### `POST /api/v1/admin/orders/:id/payouts/manual`
+
+```jsonc
+{
+  "amount": "1499.00",           // > 0, ≤ remaining
+  "idempotencyKey": "…",
+  "status": "SUCCEEDED",         // default · or PROCESSING / PENDING
+  "senderName": "Anwin Paulji",  // whose account the money left from
+  "senderBank": "HDFC Bank",     // optional
+  "senderLast4": "1190",         // optional, exactly 4 digits — a full number is never stored
+  "paidOn": "2026-11-05",        // India date; not in the future
+  "paidTime": "14:30",           // optional, India time — without it the day alone is shown
+  "utr": "HDFCR520261105…",      // optional; letters, digits, - and /
+  "notes": "…"                   // optional
+}
+```
+→ the payout. The store's primary bank account is snapshotted onto it (last 4
+digits only; all null when the store has none). `409` order not eligible ·
+`409` amount above what is left · `422` date in the future. Audit
+`payout.manual.record`.
+
+#### `PATCH /api/v1/admin/orders/:id/payouts/:payoutId/status`
+
+Body `{ "status", "reason"?, "utr"? }` — MANUAL payouts only. Moves:
+`PENDING → PROCESSING | SUCCEEDED | FAILED | CANCELLED`, `PROCESSING →
+SUCCEEDED | FAILED | CANCELLED`, `SUCCEEDED → REVERSED | CANCELLED`; FAILED,
+REVERSED and CANCELLED are final. `reason` is required for FAILED / REVERSED /
+CANCELLED (stored as `failureReason`). `utr` fills in a missing reference.
+`409` gateway payout, move not allowed, or someone changed it meanwhile ·
+`422` reason missing. Audit `payout.status` (`meta`: from, to, reason).
+
+#### `POST /api/v1/admin/orders/:id/payouts/gateway`
+
+Body `{ "amount", "idempotencyKey" }`. Needs `PAYMENTHUB_PAYOUTS_ENABLED=true`
+(else `409`) and a **verified** primary bank account. Creates the payout
+(`PENDING`), then calls the hub's `POST /v1/payouts` with idempotency key =
+the payout id and body `{ reference: <payout id>, payeeRef: "store_<storeId>",
+amountMinor, currency: "INR", metadata: { orderId, orderNumber, storeSlug } }`
+(stored as `hubRequest`). Hub answers → its id, gateway, status and response
+are stored. Hub refuses (4xx) → `FAILED`, no money moved. No answer
+(timeout / 5xx) → stays `PENDING` with `canResend`. Audit
+`payout.gateway.trigger`.
+
+> PaymentHub has **no payout API yet** (its Phase 3). This request and the
+> `payout.*` webhooks below are the contract UnieMax expects; align both when
+> the hub ships it.
+
+#### `POST /api/v1/admin/orders/:id/payouts/:payoutId/resend`
+
+Sends a `PENDING` gateway payout the hub never acknowledged again, with the
+same idempotency key — the hub can't pay twice. `409` otherwise. Audit
+`payout.gateway.resend`.
+
+#### `GET /api/v1/admin/seller-payouts` · `GET /api/v1/admin/seller-payouts/awaiting`
+
+`/seller-payouts` — every payout, newest first. Query `q` (UTR / sender / hub
+payout id / order number / store), `status`, `method`, `page`, `pageSize`.
+Rows: `{ id, method, status, amount, payeeName, payeeBank, payeeLast4,
+senderName, paidAt, paidAtTimeKnown, utr, gateway, hubPayoutId, failureReason,
+createdByEmail, createdAt, order { id, orderNumber, storeId, storeName, total } }`,
+plus **`totals`** — count + amount per status for the filter.
+
+`/seller-payouts/awaiting` — eligible orders with **no** payout pending,
+processing or done, oldest delivery first. Query `q` (order number / store).
+Rows: `{ id, orderNumber, storeId, storeName, total, placedAt, deliveredAt,
+pastAttempts }` (`pastAttempts` = earlier failed / reversed / cancelled
+payouts), plus **`totalAmount`**. A partly paid order is not listed here.
 
 ### `GET /api/v1/admin/catalog/products` · `GET …/:id`
 

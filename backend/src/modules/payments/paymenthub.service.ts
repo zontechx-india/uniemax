@@ -3,6 +3,7 @@ import { prisma } from "../../config/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { afterOrderPaid } from "./payments.service.js";
 import { applyVerificationUpdate } from "../stores/bankCheck.service.js";
+import { applyHubPayout } from "../payouts/payouts.service.js";
 import {
   decide,
   FAILED_FROM,
@@ -116,6 +117,23 @@ export async function handlePaymentHubEvent(
     log[result === "unknown" ? "warn" : "info"](
       { ...ctx, verificationId: verification.id, status: verification.status, result },
       "PaymentHub webhook: bank verification update",
+    );
+    await markProcessed(envelope.id);
+    return result === "applied" ? "processed" : "ignored";
+  }
+
+  if (event.kind === "payout") {
+    // A seller payout moved at the gateway (modules/payouts). Forward-only;
+    // a race throws → 500 → the hub retries this event.
+    const { payout } = event;
+    const result = await applyHubPayout(
+      payout,
+      {
+        source: "HUB_WEBHOOK",
+        hubEventId: envelope.id,
+        payload: { type: envelope.type, createdAt: envelope.createdAt, payout } as Prisma.InputJsonObject,
+      },
+      log,
     );
     await markProcessed(envelope.id);
     return result === "applied" ? "processed" : "ignored";

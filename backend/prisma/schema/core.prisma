@@ -1231,6 +1231,9 @@ model Order {
   items               OrderItem[]
   /// Parcels the order went out in — courier, tracking, delivered / came back.
   shipments           OrderShipment[]
+  /// Money sent to the seller for this order — manual transfers and
+  /// PaymentHub payouts. Tracked apart from `status` (docs/BACKEND_CONTEXT.md).
+  payouts             OrderPayout[]
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 
@@ -1244,6 +1247,155 @@ model Order {
   @@index([status])
   @@index([paymentStatus])
   @@map("orders")
+  @@schema("public")
+}
+
+// ---------------------------------------------------------------------------
+// Seller payouts — money UnieMax sends the seller for an online-paid order
+// ---------------------------------------------------------------------------
+
+/// MANUAL = an admin sent the money by hand from a bank account and records
+/// it here. GATEWAY = an admin asked PaymentHub to send it.
+enum PayoutMethod {
+  MANUAL
+  GATEWAY
+
+  @@schema("public")
+}
+
+/// PENDING    recorded / asked for, money not moving yet
+/// PROCESSING the bank or gateway is moving it
+/// SUCCEEDED  the seller has it
+/// FAILED     it never arrived (reason required)
+/// REVERSED   it arrived and came back (reason required)
+/// CANCELLED  recorded by mistake, no money moved (manual only)
+///
+/// PENDING, PROCESSING and SUCCEEDED count against the order total; the
+/// others do not. The allowed moves live in `modules/payouts/payouts.rules.ts`.
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  REVERSED
+  CANCELLED
+
+  @@schema("public")
+}
+
+/// What moved a payout to a status.
+enum PayoutEventSource {
+  /// An admin in the console (recorded, triggered or changed by hand).
+  ADMIN
+  /// PaymentHub's answer to the payout request.
+  HUB_RESPONSE
+  /// A PaymentHub webhook.
+  HUB_WEBHOOK
+
+  @@schema("public")
+}
+
+/// One payout to a seller for one order. An order can have several (a
+/// failed attempt and its retry, or a split transfer); the active ones
+/// (PENDING / PROCESSING / SUCCEEDED) never add up to more than the order
+/// total — `payouts.service.ts` checks that under a row lock on the order.
+///
+/// Rows are never deleted, and their money facts are never edited: a mistake
+/// is a status change (CANCELLED) with a reason, and every change appends an
+/// `OrderPayoutEvent`.
+model OrderPayout {
+  id      String @id @default(cuid())
+  orderId String
+  /// Restrict: a payout is a financial record — its order can't vanish.
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  method PayoutMethod
+  status PayoutStatus
+  amount Decimal      @db.Decimal(10, 2)
+
+  // Who received it — the store's PRIMARY bank account at the time,
+  // snapshotted (the seller may change accounts later). Never the full
+  // account number: last 4 digits only. All null = the store had none.
+  payeeAccountId String?
+  payeeName      String?
+  payeeBank      String?
+  payeeIfsc      String?
+  payeeLast4     String?
+
+  // MANUAL — whose savings account the money left from.
+  senderName  String?
+  senderBank  String?
+  /// Last 4 digits only — a full personal account number is never stored.
+  senderLast4 String?
+
+  /// When the money left. MANUAL: typed by the admin (India time). GATEWAY:
+  /// when the hub reported success.
+  paidAt          DateTime?
+  /// False = the admin gave only the day; show the date without a time.
+  paidAtTimeKnown Boolean   @default(false)
+  /// Bank reference — the UTR an admin types, or the gateway's UTR.
+  utr             String?
+  notes           String?
+
+  // GATEWAY — what was asked of PaymentHub and what came back.
+  /// Gateway that moved the money, as the hub names it ("cashfree").
+  gateway       String?
+  /// The hub's payout id (po_…) — how payout webhooks find this row.
+  hubPayoutId   String? @unique
+  /// The gateway's own transfer / settlement id.
+  gatewayRef    String?
+  /// The exact body sent to the hub (it holds no secrets).
+  hubRequest    Json?
+  /// The hub's latest answer to that request, or its error.
+  hubResponse   Json?
+  /// Why it FAILED / was REVERSED / was CANCELLED.
+  failureReason String?
+
+  /// The admin who recorded or triggered it (email snapshotted, like the
+  /// audit log — an admin can be deleted, the record can't).
+  createdById    String?
+  createdByEmail String?
+
+  /// Client-generated per dialog — a double-click returns the same payout.
+  idempotencyKey String
+
+  events OrderPayoutEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orderId, idempotencyKey])
+  @@index([orderId, createdAt])
+  @@index([status, createdAt])
+  @@index([utr])
+  @@map("order_payouts")
+  @@schema("public")
+}
+
+/// Append-only history of a payout: its creation and every status change,
+/// with who or what made it and the raw hub answer / webhook behind it.
+model OrderPayoutEvent {
+  id       String      @id @default(cuid())
+  payoutId String
+  payout   OrderPayout @relation(fields: [payoutId], references: [id], onDelete: Restrict)
+
+  /// Null on the first event (the payout was created).
+  fromStatus PayoutStatus?
+  toStatus   PayoutStatus
+  source     PayoutEventSource
+
+  actorId    String?
+  actorEmail String?
+  note       String?
+  /// The webhook's event id (evt_…) for HUB_WEBHOOK events.
+  hubEventId String?
+  /// The hub response / webhook data as received.
+  payload    Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([payoutId, createdAt])
+  @@map("order_payout_events")
   @@schema("public")
 }
 

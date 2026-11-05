@@ -5,6 +5,8 @@ import type {
   OrderStatus,
   PaymentMethod,
   PaymentStatus,
+  PayoutMethod,
+  PayoutStatus,
   SetupSummary,
   TicketCategory,
   TicketPriority,
@@ -77,6 +79,26 @@ export function PaymentChip({
 export function BankStatusChip({ status }: { status: BankVerificationStatus }) {
   const meta = BANK_STATUS[status]
   return <Chip tone={meta.tone}>{meta.label}</Chip>
+}
+
+const PAYOUT_STATUS: Record<PayoutStatus, Meta> = {
+  PENDING: { label: 'Pending', tone: 'warning' },
+  PROCESSING: { label: 'Processing', tone: 'info' },
+  SUCCEEDED: { label: 'Paid out', tone: 'success' },
+  FAILED: { label: 'Failed', tone: 'danger' },
+  REVERSED: { label: 'Reversed', tone: 'danger' },
+  CANCELLED: { label: 'Cancelled', tone: 'neutral' },
+}
+
+export const payoutStatusLabel = (status: PayoutStatus) => PAYOUT_STATUS[status].label
+
+export function PayoutStatusChip({ status }: { status: PayoutStatus }) {
+  const meta = PAYOUT_STATUS[status]
+  return <Chip tone={meta.tone}>{meta.label}</Chip>
+}
+
+export function PayoutMethodChip({ method }: { method: PayoutMethod }) {
+  return <Chip>{method === 'MANUAL' ? 'Manual' : 'PaymentHub'}</Chip>
 }
 
 /** Published / Draft / Suspended — suspension outranks the publish flag. */

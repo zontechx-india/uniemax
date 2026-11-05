@@ -42,6 +42,8 @@ The first implementation will be for a **Cricket Bat Store**, but the architectu
 - Oversee orders and payments across every store
 - Oversee the seller catalog; hide a listing that breaks the rules
 - Suspend / restore a store; verify a seller's payout account
+- Pay sellers for online orders (record a manual transfer now; PaymentHub
+  payouts once the hub offers them) and track every payout
 - Block / unblock a customer account
 - Send platform announcements
 - Answer support tickets from sellers and shoppers, and triage the queue
@@ -1011,6 +1013,27 @@ revoked from anywhere else.
   the platform overriding that would make their dashboard lie.
 - **Payments** — the same orders through the money lens: settlement status,
   method, gateway reference, and per-status totals for whatever is filtered.
+- **Seller payouts** — the money UnieMax sends a seller for an order the
+  customer paid online, once it is delivered. Cash-on-delivery orders need
+  none (the seller holds the cash). Paid from the order page's **Seller
+  payout** section, which shows the order total, what is paid out, what is
+  in progress, what is left, and the store's primary bank account:
+  - **Record manual payout** — for money an admin sent by hand from a savings
+    account (their own or someone else's): amount, sender name, sender bank
+    and last 4 digits (optional — a full account number is never stored),
+    payment date, approximate time (optional), UTR (optional), notes
+    (optional) and status. Who recorded it is saved.
+  - **Pay via PaymentHub** — PaymentHub sends it through the gateway; the
+    hub's answer and webhooks update the status, and the gateway, hub
+    references, request and response are kept. Switched off until PaymentHub
+    offers payouts.
+  Every payout keeps its full status history (pending, processing, paid
+  out, failed, reversed, cancelled), separate from the order status. Nothing
+  can be paid out twice by accident: the payouts on an order never add up to
+  more than its total, and a double click saves one payout. A mistake is
+  never deleted — it is marked cancelled with a reason. The **Seller
+  payouts** page lists orders still to pay (oldest delivery first) and every
+  payout made, searchable by UTR, sender, order or store, for reconciliation.
 - **Products** — the seller catalog across all stores, with inventory views
   (low stock, out of stock) and the platform's one moderation lever:
   **hide a listing** (with a reason the seller is told). It flips the same

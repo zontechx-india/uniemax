@@ -9,6 +9,7 @@ import { BackIcon } from '../layout/icons'
 import { MediaImg } from '../../shared/media/MediaImg'
 import { OrderMessagesCard } from './orders/OrderMessagesCard'
 import { ExpectedDeliveryEditor } from './orders/ExpectedDeliveryEditor'
+import { OrderPayoutCard } from './orders/OrderPayoutCard'
 
 /**
  * One order, everything known about it — the page a support conversation is
@@ -17,7 +18,8 @@ import { ExpectedDeliveryEditor } from './orders/ExpectedDeliveryEditor'
  * Read-only: the seller moves an order along (they hold the stock), and a
  * platform admin overriding that would leave the seller's dashboard lying.
  * What the console adds is the joins the seller can't see — the customer
- * account behind the order and the gateway reference behind the payment.
+ * account behind the order and the gateway reference behind the payment —
+ * and the seller payout, which is the platform's own job.
  */
 
 /** The lifecycle, drawn from the order's own timestamps. */
@@ -160,6 +162,8 @@ export default function OrderDetailPage() {
               </Detail>
             </dl>
           </Card>
+
+          <OrderPayoutCard orderId={order.id} />
 
           <Card>
             <CardHeader

@@ -99,6 +99,38 @@ export function cancelIntent(id: string, idempotencyKey: string): Promise<HubInt
   return hubFetch<HubIntent>(`/v1/payment-intents/${encodeURIComponent(id)}/cancel`, { method: "POST", body: {}, idempotencyKey });
 }
 
+/**
+ * A payout to a seller. The hub's payout API (its Phase 3) is not built yet:
+ * this is the shape UnieMax expects, and the call is reached only when
+ * PAYMENTHUB_PAYOUTS_ENABLED is true. Align it with the hub when it ships.
+ */
+export interface CreatePayoutInput {
+  /** Our OrderPayout id — the hub echoes it back in webhooks. */
+  reference: string;
+  /** The seller as registered at the hub ("store_<storeId>"). */
+  payeeRef: string;
+  amountMinor: number;
+  currency: "INR";
+  metadata: { orderId: string; orderNumber: string; storeSlug: string };
+}
+
+export interface HubPayout {
+  id: string;
+  reference: string;
+  status: string;
+  amountMinor: number;
+  gateway?: string | null | undefined;
+  gatewayRef?: string | null | undefined;
+  utr?: string | null | undefined;
+  failureReason?: string | null | undefined;
+}
+
+export const paymentHubPayoutsEnabled = paymentHubConfigured && env.PAYMENTHUB_PAYOUTS_ENABLED;
+
+export function createPayout(input: CreatePayoutInput, idempotencyKey: string): Promise<HubPayout> {
+  return hubFetch<HubPayout>("/v1/payouts", { method: "POST", body: input, idempotencyKey });
+}
+
 export type HubVerificationStatus = "VALID" | "NEEDS_REVIEW" | "INVALID" | "RETRY_LATER";
 
 /** The hub's verification object — never carries the full account number. */

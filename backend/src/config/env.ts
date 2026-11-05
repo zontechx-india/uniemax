@@ -89,6 +89,13 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((v) => v === "true"),
+  // true = admins can send a seller's payout through PaymentHub
+  // (POST /v1/payouts). Leave false until the hub offers payouts — manual
+  // payouts work either way.
+  PAYMENTHUB_PAYOUTS_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
 
   // Platform support contact — printed on the seller's Support page and
   // served to clients at GET /api/v1/public/support-contact. Defaults are the

@@ -179,6 +179,11 @@ backend/
 │   │   │                      #   + payments.jobs.ts (10-min stranded-payment
 │   │   │                      #   sweep, settle-only)
 │   │   │                      #   (see docs/CASHFREE_PAYMENTS.md)
+│   │   ├── payouts/           # seller payouts per order (admin only):
+│   │   │                      #   payouts.rules.ts (pure: moves, eligibility,
+│   │   │                      #   paise maths — unit-tested) · service
+│   │   │                      #   (manual record, PaymentHub trigger, hub
+│   │   │                      #   answers + payout.* webhooks)
 │   │   ├── whatsapp/          # WhatsApp Cloud API: signed webhook in, template/
 │   │   │                      #   text/media sends, queued campaigns, audiences,
 │   │   │                      #   automations, inbox · client (Graph API) ·
@@ -488,6 +493,20 @@ module repeats the guard. Deliberate scope decisions:
 - **Payout verification** is the `MANUAL` half of the `BankVerificationMethod`
   the schema already provisioned; `FAILED` requires a note, and `verifiedBy`
   records who decided, because money settles to that account.
+- **Seller payouts** live in their own module, `modules/payouts` (routes
+  registered next to the console's, same guard). They are the platform's own
+  job, not a seller step, so unlike fulfilment the console drives them. Rules:
+  only `ONLINE` + `PAID` + `DELIVERED` orders; the active payouts (`PENDING`,
+  `PROCESSING`, `SUCCEEDED`) never add up to more than the order total —
+  checked under `SELECT … FOR UPDATE` on the order row; a repeated
+  `idempotencyKey` returns the existing payout; one in-flight gateway payout
+  per order. Records are never deleted and their money facts never edited — a
+  mistake is `CANCELLED` with a reason. Status moves live in
+  `payouts.rules.ts`: MANUAL rows move by an admin, GATEWAY rows only by
+  PaymentHub (its answer to `POST /v1/payouts`, then `payout.*` webhooks) and
+  only forward. Gateway payouts stay off until `PAYMENTHUB_PAYOUTS_ENABLED` —
+  the hub has no payout API yet, so the request body and webhook shape are
+  UnieMax's expectation, to align when the hub ships it.
 - **CSRF, second layer.** The whole `requireAdmin` subtree also carries
   `requireAdminCsrf`: a cookie-authenticated non-`GET` needs the
   `um_admin_csrf` cookie echoed in `X-CSRF-Token`, or `403`. `SameSite=Lax`
@@ -1602,6 +1621,22 @@ White-label design — one codebase, any business:
   to SHIPPED / DELIVERED is refused (409) while tagged lines exist — the
   order moves on as their parcels do (`createPackageShipment`,
   `source: PACKAGE`, tracking number required).
+- **OrderPayout** (`order_payouts`) — one payout to the seller for an order
+  (an order can have several: a failed try and its retry, or a split).
+  `method` `MANUAL | GATEWAY`; `status` `PENDING | PROCESSING | SUCCEEDED |
+  FAILED | REVERSED | CANCELLED`; `amount` Decimal(10,2). Snapshots the
+  store's primary bank account at the time (`payeeName/Bank/Ifsc/Last4`,
+  `payeeAccountId` — last 4 digits only). MANUAL: `senderName`, `senderBank`,
+  `senderLast4` (never a full number), `paidAt` + `paidAtTimeKnown` (India
+  time; false = day only), `utr`, `notes`. GATEWAY: `gateway`, `hubPayoutId`
+  (unique — webhooks find the row by it), `gatewayRef`, `hubRequest`,
+  `hubResponse` (JSON), `failureReason`. `createdById` / `createdByEmail`
+  (snapshot), `idempotencyKey` unique per order. `onDelete: Restrict` on the
+  order — a financial record keeps its order.
+- **OrderPayoutEvent** (`order_payout_events`) — append-only history of a
+  payout: `fromStatus` (null on creation) → `toStatus`, `source` `ADMIN |
+  HUB_RESPONSE | HUB_WEBHOOK`, `actorId/Email`, `note`, `hubEventId`,
+  `payload` (the hub answer or webhook data as received).
 - **PaymentHubEvent** (`payment_hub_events`) — dedupe log for PaymentHub
   webhooks: `id` = the hub's event id, `type`, `receivedAt`, `processedAt`
   (set in the same transaction as the order update; null = reprocess on the
@@ -1840,7 +1875,9 @@ UnieMax details, so no environment has to set them), and the Cashfree gateway se
 (webhook signing secret, per environment; unset → that route answers 503),
 `PAYMENTHUB_URL` + `PAYMENTHUB_API_KEY` (the matching hub and its key) and
 `PAYMENTS_VIA_HUB` (`true` = new ONLINE orders pay through the hub; boot fails
-if the set is incomplete or the key's mode doesn't fit the environment).
+if the set is incomplete or the key's mode doesn't fit the environment) and
+`PAYMENTHUB_PAYOUTS_ENABLED` (`true` = admins can send seller payouts through
+the hub; default `false` — manual payouts work either way).
 Mail-level
 (`package/mail/index.ts`): reuses `RESEND_API_KEY`/`EMAIL_FROM`, plus optional
 `PUBLIC_WEB_URL` (storefront origin for deep links in order emails).
@@ -1968,7 +2005,9 @@ pipeline, payment split, top stores/products, low stock, integration health),
 store + seller oversight with **suspension**, customer oversight with
 **blocking** (revokes every session), platform-wide order and payment views,
 seller-catalog oversight with a **hide/restore** moderation switch, **manual
-payout-account verification**, an append-only **audit trail** of every admin
+payout-account verification**, **seller payouts** per order (manual records
+now; PaymentHub payouts built but switched off until the hub offers them —
+`modules/payouts`), an append-only **audit trail** of every admin
 write, and SUPER_ADMIN-only **admin-account management** (create / role /
 deactivate / password reset, each revoking that admin's sessions). Verified
 end to end against the live database.
