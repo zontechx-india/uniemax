@@ -9,7 +9,7 @@ Checked in WhatsApp Manager on 6 Nov 2026.
 | Sending phone number | +91 70943 10139 |
 | Phone Number ID | `1297227253483920` |
 | Meta Business ID | `998630909433831` |
-| Total templates | 13 (12 **Active**, `seller_payout_sent_v2` to be submitted) |
+| Total templates | 13 (12 **Active**, `seller_payout_sent_v2` in review) |
 
 > Templates only work inside the WABA where they were created. Always send from the UnieMax account above.
 > The other account "Zontechx" (`1762129785093231`) has no phone number and cannot send. Ignore any templates there.
@@ -32,7 +32,7 @@ Checked in WhatsApp Manager on 6 Nov 2026.
 | 10 | `seller_motivation_tip` | Marketing | `en` | 2 | URL (dynamic) | Seller | 1672165614609890 |
 | 11 | `uniemax_address_update` | Utility | `en_US` | 3 | – | Customer | 1833517641150563 |
 | 12 | `seller_payout_sent` | Utility | `en` | 10 | URL (dynamic) | Seller | – (approved 6 Nov 2026; ID not recorded yet) |
-| 13 | `seller_payout_sent_v2` | Utility | `en` | 13 | URL (dynamic) | Seller | – (**to submit** — replaces #12 automatically once approved) |
+| 13 | `seller_payout_sent_v2` | Utility | `en` | 13 | URL (dynamic) | Seller | – (In review, submitted 6 Nov 2026 — replaces #12 automatically once approved) |
 
 ---
 
@@ -358,9 +358,11 @@ UnieMax seller payouts
 | {{10}} | Date (and time) paid | 5 Nov 2026, 2:30 pm |
 | Button {{1}} | Store slug + `/earnings` | fashion-hub/earnings |
 
+> Only send the masked account number (last 4 digits). Never send the full bank account number.
+
 ### 5.2 `seller_payout_sent_v2` (with the payment gateway fee)
 
-- **Category:** Utility · **Language:** `en` · **Status:** **Submit for approval** (added 6 Nov 2026)
+- **Category:** Utility · **Language:** `en` · **Status:** In review (submitted 6 Nov 2026)
 - **Same use as 5.1**, plus the payment gateway fee line — shown to the seller as **UnieMax's discount** while UnieMax pays it.
 - **The code sends v2 automatically once Meta approves it**; until then it keeps sending 5.1. No code change needed when it is approved.
 - **Header:** none · **Footer:** `UnieMax seller payouts`
