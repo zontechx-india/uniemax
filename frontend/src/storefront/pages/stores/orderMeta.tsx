@@ -16,6 +16,8 @@ import type { StatusTone } from './ui/StatusPill'
  * in dark mode (the old warning brown was 2.6:1 there).
  */
 export const ORDER_STATUS_META: Record<OrderStatus, { label: string; tone: StatusTone }> = {
+  // Never reaches a seller (the API hides unpaid online orders); here for the type.
+  AWAITING_PAYMENT: { label: 'Awaiting payment', tone: 'neutral' },
   PENDING: { label: 'Waiting', tone: 'pending' },
   CONFIRMED: { label: 'Confirmed', tone: 'brand' },
   PACKED: { label: 'Packed', tone: 'brand' },

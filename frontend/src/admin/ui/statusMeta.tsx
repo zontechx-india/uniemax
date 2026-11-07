@@ -29,6 +29,7 @@ interface Meta {
 }
 
 const ORDER_STATUS: Record<OrderStatus, Meta> = {
+  AWAITING_PAYMENT: { label: 'Awaiting payment', tone: 'neutral' },
   PENDING: { label: 'Pending', tone: 'warning' },
   CONFIRMED: { label: 'Confirmed', tone: 'info' },
   PACKED: { label: 'Packed', tone: 'info' },

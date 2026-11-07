@@ -23,6 +23,7 @@ import { formatDateTime, formatMoney } from '../ui/format'
 
 const STATUS_TABS = [
   { value: '', label: 'All' },
+  { value: 'AWAITING_PAYMENT', label: 'Awaiting payment' },
   { value: 'PENDING', label: 'Pending' },
   { value: 'CONFIRMED', label: 'Confirmed' },
   { value: 'PACKED', label: 'Packed' },

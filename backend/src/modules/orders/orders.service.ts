@@ -87,10 +87,12 @@ import {
  * sees exactly what placement will charge — the client never computes money.
  *
  * Payment: COD orders start `paymentStatus: PENDING`. ONLINE orders go
- * through Cashfree when the gateway keys are configured — the order is
- * created PENDING, a Cashfree payment session is attached, and the response
- * carries `payment.paymentSessionId` for the web SDK; PAID arrives via the
- * webhook (payments module). Without keys, dev builds simulate the payment
+ * through the gateway when it is configured — the order is created with
+ * status AWAITING_PAYMENT (hidden from the seller, stock held), a payment
+ * session is attached, and the response carries `payment.paymentSessionId`
+ * for the web SDK; PAID arrives via the webhook (payments module), which
+ * also moves the order to PENDING. Unpaid past the payment window, the
+ * payments job cancels it (`expireUnpaidOrder`). Without keys, dev builds simulate the payment
  * (`paymentRef: "DEV-SIMULATED"`, marked PAID instantly) and production
  * refuses ONLINE with 503.
  */
@@ -697,6 +699,8 @@ export async function createOrder(
           tax: money.tax,
           discount: money.discount,
           total: money.total,
+          // A gateway order isn't an order for the seller until it is paid.
+          status: viaGateway ? "AWAITING_PAYMENT" : "PENDING",
           paymentMethod: input.paymentMethod,
           paymentStatus: simulated ? "PAID" : "PENDING",
           paymentRef: simulated ? "DEV-SIMULATED" : null,
@@ -786,6 +790,17 @@ export async function createOrder(
 }
 
 /**
+ * What a seller sees of their orders: everything except ONLINE orders whose
+ * payment never went through. Those were never real orders for the store —
+ * still AWAITING_PAYMENT, or cancelled when the payment window closed — so
+ * they stay out of every seller list, count, detail and action. (An ONLINE
+ * order only ever leaves AWAITING_PAYMENT by being paid.)
+ */
+export const SELLER_VISIBLE = {
+  NOT: { paymentMethod: "ONLINE", paymentStatus: { in: ["PENDING", "FAILED"] } },
+} satisfies Prisma.OrderWhereInput;
+
+/**
  * Seller dashboard for one store — order counters + the latest orders.
  * Counter semantics against the order lifecycle (progressed by the seller
  * via the order-management endpoints below):
@@ -800,7 +815,7 @@ export async function createOrder(
  */
 export async function getStoreDashboard(actor: StoreActor, storeRef: string) {
   const store = await getMyStore(actor, storeRef); // ownership check
-  const storeId = store.id;
+  const mine = { storeId: store.id, ...SELLER_VISIBLE };
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
@@ -808,20 +823,20 @@ export async function getStoreDashboard(actor: StoreActor, storeRef: string) {
   const [byStatus, today, refunded, totals, recentOrders] = await Promise.all([
     prisma.order.groupBy({
       by: ["status"],
-      where: { storeId },
+      where: mine,
       _count: { _all: true },
     }),
     prisma.order.count({
-      where: { storeId, placedAt: { gte: startOfToday } },
+      where: { ...mine, placedAt: { gte: startOfToday } },
     }),
-    prisma.order.count({ where: { storeId, paymentStatus: "REFUNDED" } }),
+    prisma.order.count({ where: { ...mine, paymentStatus: "REFUNDED" } }),
     prisma.order.aggregate({
-      where: { storeId, status: { not: "CANCELLED" } },
+      where: { ...mine, status: { not: "CANCELLED" } },
       _count: { _all: true },
       _sum: { total: true },
     }),
     prisma.order.findMany({
-      where: { storeId },
+      where: mine,
       orderBy: { placedAt: "desc" },
       take: 8,
       select: {
@@ -890,6 +905,7 @@ export const STATUS_RANK: Record<string, number> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
+  AWAITING_PAYMENT: "Awaiting payment",
   PENDING: "Pending",
   CONFIRMED: "Confirmed",
   PACKED: "Packed",
@@ -929,7 +945,7 @@ export async function listStoreOrders(
 ) {
   const store = await getMyStore(actor, storeRef); // ownership check
 
-  const where: Prisma.OrderWhereInput = { storeId: store.id };
+  const where: Prisma.OrderWhereInput = { storeId: store.id, ...SELLER_VISIBLE };
   if (query.status) where.status = query.status;
   if (query.q) {
     where.OR = [
@@ -968,7 +984,7 @@ export async function getStoreOrder(
 ) {
   const store = await getMyStore(actor, storeRef);
   const row = await prisma.order.findFirst({
-    where: { id: orderId, storeId: store.id },
+    where: { id: orderId, storeId: store.id, ...SELLER_VISIBLE },
     select: orderSelect,
   });
   if (!row) throw HttpError.notFound("Order not found");
@@ -1003,6 +1019,16 @@ export async function writeStatusChange(
 ): Promise<{ paid: boolean }> {
   if (current.status === "CANCELLED") {
     throw HttpError.conflict("A cancelled order cannot be updated");
+  }
+  // Fulfilment starts only once the money is in: an online order must be
+  // paid first (it leaves AWAITING_PAYMENT only by being paid).
+  if (
+    current.status === "AWAITING_PAYMENT" ||
+    (current.paymentMethod === "ONLINE" && current.paymentStatus !== "PAID")
+  ) {
+    throw HttpError.conflict(
+      "This order isn't paid yet — it can move forward once the customer's payment goes through",
+    );
   }
   if (STATUS_RANK[to]! <= STATUS_RANK[current.status]!) {
     throw HttpError.conflict(
@@ -1063,7 +1089,7 @@ export async function updateOrderStatus(
 ) {
   const store = await getMyStore(actor, storeRef);
   const current = await prisma.order.findFirst({
-    where: { id: orderId, storeId: store.id },
+    where: { id: orderId, storeId: store.id, ...SELLER_VISIBLE },
     select: statusGuardSelect,
   });
   if (!current) throw HttpError.notFound("Order not found");
@@ -1132,8 +1158,9 @@ async function cancelOrderCore(
   storeId: string | null,
   reason: string | null,
   restockReturned?: boolean,
+  options: { notifyCustomer?: boolean } = {},
 ) {
-  const scope = storeId ? { storeId } : {};
+  const scope = storeId ? { storeId, ...SELLER_VISIBLE } : {};
   const current = await prisma.order.findFirst({
     where: { id: orderId, ...scope },
     select: {
@@ -1238,9 +1265,39 @@ async function cancelOrderCore(
   });
   const shaped = shapeOrder(row!, "seller");
   // Fire-and-forget cancellation email to the customer.
-  notifyOrderStatusChange(shaped, current.customerId);
+  if (options.notifyCustomer !== false) {
+    notifyOrderStatusChange(shaped, current.customerId);
+  }
   emit("order.cancelled", { orderId });
   return shaped;
+}
+
+/** Why an unpaid order was closed — shown to the customer and admins. */
+export const PAYMENT_EXPIRED_REASON = "Payment not completed";
+
+/**
+ * Close an ONLINE order whose payment window ran out (payments job). Only an
+ * order still AWAITING_PAYMENT is touched; the same cancel as everywhere
+ * else returns its stock, closes the gateway checkout and fires
+ * `order.cancelled`. Silent: the customer never finished paying, so a
+ * "the store cancelled your order" message would be wrong. A payment that
+ * lands meanwhile wins — the guarded write then refuses, and we answer false.
+ */
+export async function expireUnpaidOrder(orderId: string): Promise<boolean> {
+  const current = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { status: true },
+  });
+  if (current?.status !== "AWAITING_PAYMENT") return false;
+  try {
+    await cancelOrderCore(orderId, null, PAYMENT_EXPIRED_REASON, undefined, {
+      notifyCustomer: false,
+    });
+    return true;
+  } catch (err) {
+    if (err instanceof HttpError && err.statusCode === 409) return false;
+    throw err;
+  }
 }
 
 /**
@@ -1335,11 +1392,13 @@ export async function cancelMyOrder(
   if (current.status === "CANCELLED") {
     throw HttpError.conflict("This order is already cancelled");
   }
-  if (current.status !== "PENDING") {
+  if (current.status !== "PENDING" && current.status !== "AWAITING_PAYMENT") {
     throw HttpError.conflict(
       "The seller has already confirmed this order — contact the store to cancel it.",
     );
   }
+  // The seller never saw an order still waiting for its payment.
+  const sellerSawIt = current.status === "PENDING";
   if (current.paymentStatus === "PAID" || current.paymentStatus === "REFUNDED") {
     throw HttpError.conflict(
       "This order is already paid — contact the store to cancel it and arrange the refund.",
@@ -1351,7 +1410,7 @@ export async function cancelMyOrder(
       where: {
         id: orderId,
         customerId,
-        status: "PENDING",
+        status: current.status,
         paymentStatus: current.paymentStatus,
       },
       data: {
@@ -1376,7 +1435,7 @@ export async function cancelMyOrder(
   });
   const shaped = shapeOrder(row!);
   notifyOrderStatusChange(shaped, customerId);
-  notifyCustomerCancelled(shaped, current.store?.owner.id ?? null);
+  if (sellerSawIt) notifyCustomerCancelled(shaped, current.store?.owner.id ?? null);
   emit("order.cancelled", { orderId });
   return { ...shaped, redacted: false };
 }

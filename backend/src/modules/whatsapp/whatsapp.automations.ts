@@ -92,7 +92,7 @@ async function orderEvents(
   refKey: (order: { id: string; storeId: string }) => string,
 ): Promise<DueEvent[]> {
   const orders = await prisma.order.findMany({
-    where: { ...where, storeId: { not: null }, status: { not: "CANCELLED" } },
+    where: { ...where, storeId: { not: null }, status: { notIn: ["CANCELLED", "AWAITING_PAYMENT"] } },
     orderBy: { placedAt: "asc" },
     take: MAX_PER_SCAN,
     select: { id: true, storeId: true, orderNumber: true, total: true, customerName: true },
@@ -206,7 +206,7 @@ export const AUTOMATIONS: AutomationDefinition[] = [
       // Stores whose earliest order is after switching on = their first order is new.
       const firsts = await prisma.order.groupBy({
         by: ["storeId"],
-        where: { storeId: { not: null }, status: { not: "CANCELLED" } },
+        where: { storeId: { not: null }, status: { notIn: ["CANCELLED", "AWAITING_PAYMENT"] } },
         _min: { placedAt: true },
         having: { placedAt: { _min: { gte: enabledAt } } },
       });

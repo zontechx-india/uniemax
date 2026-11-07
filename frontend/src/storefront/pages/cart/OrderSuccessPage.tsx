@@ -21,6 +21,7 @@ import {
   formatStepTime,
   orderProgress,
   orderStatusCopy,
+  paymentNotCompleted,
   phoneDigits,
 } from '../../features/stores/orderStatus'
 import {
@@ -70,7 +71,7 @@ export function OrderSuccessPage({
   const triedRefresh = useRef(false)
   const fresh =
     !!order &&
-    order.status === 'PENDING' &&
+    (order.status === 'PENDING' || order.status === 'AWAITING_PAYMENT') &&
     Date.now() - new Date(order.placedAt).getTime() < FRESH_MS
   usePrivatePageTitle(
     order && !fresh ? 'Your Order' : 'Order Placed',
@@ -309,6 +310,10 @@ export function OrderSuccessPage({
                   </p>
                   {order.cancelledByCustomer ? (
                     <p className="mt-1 text-fg">You cancelled this order.</p>
+                  ) : paymentNotCompleted(order) ? (
+                    <p className="mt-1 text-fg">
+                      The payment did not go through in time, so this order was closed. You were not charged.
+                    </p>
                   ) : (
                     order.cancelReason && (
                       <p className="mt-1 text-fg">
@@ -539,7 +544,7 @@ export function OrderSuccessPage({
             </section>
 
             {!order.redacted &&
-              order.status === 'PENDING' &&
+              (order.status === 'PENDING' || order.status === 'AWAITING_PAYMENT') &&
               order.paymentStatus !== 'PAID' &&
               order.paymentStatus !== 'REFUNDED' && (
                 <CancelOrderRow order={order} onCancelled={setOrder} />

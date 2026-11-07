@@ -16,6 +16,7 @@ import {
 } from "./orders.notifications.js";
 import type { ShipmentTrackingInput } from "./orders.schema.js";
 import {
+  SELLER_VISIBLE,
   STATUS_RANK,
   announceStatusChange,
   loadOrder,
@@ -120,6 +121,12 @@ async function sendableOrder(where: Prisma.OrderWhereInput): Promise<SendableOrd
   }
   if (order.status === "CANCELLED") {
     throw HttpError.conflict("A cancelled order can't be sent");
+  }
+  if (
+    order.status === "AWAITING_PAYMENT" ||
+    (order.paymentMethod === "ONLINE" && order.paymentStatus !== "PAID")
+  ) {
+    throw HttpError.conflict("This order isn't paid yet — it can't be sent");
   }
   if (order.status === "DELIVERED") {
     throw HttpError.conflict("This order is already delivered");
@@ -266,7 +273,7 @@ export async function createShipment(
   input: ShipmentTrackingInput,
 ) {
   const store = await getMyStore(actor, storeRef);
-  const order = await sendableOrder({ id: orderId, storeId: store.id });
+  const order = await sendableOrder({ id: orderId, storeId: store.id, ...SELLER_VISIBLE });
   const sent = await sendParcel(order, { fulfilledBy: null }, null, trackingData(input));
   return sent.order;
 }

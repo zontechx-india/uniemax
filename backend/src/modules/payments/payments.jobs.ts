@@ -1,6 +1,7 @@
 import type { FastifyBaseLogger } from "fastify";
 import { prisma } from "../../config/prisma.js";
 import { gatewayConfigured, reconcilePendingPayment } from "./payments.service.js";
+import { expireUnpaidOrder } from "../orders/orders.service.js";
 
 /**
  * Stranded-payment sweep — the webhook's safety net.
@@ -19,6 +20,11 @@ const MIN_AGE_MS = 5 * 60_000;
 /** Cashfree sessions expire well before this; older rows are settled or dead. */
 const MAX_AGE_MS = 48 * 60 * 60_000;
 const BATCH = 50;
+/**
+ * The payment window: how long an ONLINE order may sit AWAITING_PAYMENT
+ * (holding its stock, the customer free to retry) before it is closed.
+ */
+export const PAYMENT_WINDOW_MS = 60 * 60_000;
 
 export async function reconcileStrandedPayments(): Promise<number> {
   const now = Date.now();
@@ -40,14 +46,45 @@ export async function reconcileStrandedPayments(): Promise<number> {
   return stranded.length;
 }
 
+/**
+ * Close ONLINE orders still unpaid after the payment window: one last look
+ * at the gateway (a payment that landed is settled, never cancelled), then
+ * cancel — stock back on sale, checkout closed, no message to anyone. The
+ * seller never saw these orders, so nothing changes for them.
+ */
+export async function expireUnpaidOrders(): Promise<number> {
+  const due = await prisma.order.findMany({
+    where: {
+      status: "AWAITING_PAYMENT",
+      placedAt: { lte: new Date(Date.now() - PAYMENT_WINDOW_MS) },
+    },
+    orderBy: { placedAt: "asc" },
+    take: BATCH,
+    select: { id: true },
+  });
+  let closed = 0;
+  for (const { id } of due) {
+    await reconcilePendingPayment(id);
+    if (await expireUnpaidOrder(id)) closed++;
+  }
+  return closed;
+}
+
 export function startPaymentJobs(log: FastifyBaseLogger): () => void {
-  if (!gatewayConfigured) return () => undefined;
   const run = async () => {
+    if (gatewayConfigured) {
+      try {
+        const checked = await reconcileStrandedPayments();
+        if (checked) log.info({ checked }, "stranded-payment sweep ran");
+      } catch (err) {
+        log.error(err, "stranded-payment sweep failed");
+      }
+    }
     try {
-      const checked = await reconcileStrandedPayments();
-      if (checked) log.info({ checked }, "stranded-payment sweep ran");
+      const closed = await expireUnpaidOrders();
+      if (closed) log.info({ closed }, "unpaid orders closed after the payment window");
     } catch (err) {
-      log.error(err, "stranded-payment sweep failed");
+      log.error(err, "closing unpaid orders failed");
     }
   };
   const timer = setInterval(run, INTERVAL_MS);

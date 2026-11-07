@@ -2409,8 +2409,12 @@ export const courierApi = {
   },
 }
 
-/** The order lifecycle. Sellers move orders forward; CANCELLED sits apart. */
+/**
+ * The order lifecycle. Sellers move orders forward; CANCELLED sits apart.
+ * AWAITING_PAYMENT = an online order not paid yet — only its buyer sees it.
+ */
 export type OrderStatus =
+  | 'AWAITING_PAYMENT'
   | 'PENDING'
   | 'CONFIRMED'
   | 'PACKED'

@@ -177,7 +177,8 @@ backend/
 │   │   │                      #   HMAC-verified webhook + reconcile fallback
 │   │   │                      #   + session termination on seller cancel
 │   │   │                      #   + payments.jobs.ts (10-min stranded-payment
-│   │   │                      #   sweep, settle-only)
+│   │   │                      #   sweep, settle-only; closes orders still
+│   │   │                      #   AWAITING_PAYMENT after 60 min)
 │   │   │                      #   (see docs/CASHFREE_PAYMENTS.md)
 │   │   ├── finance/           # seller finance (docs/seller-finance/): fee
 │   │   │                      #   rules, order fee snapshots, seller ledger ·
@@ -1577,7 +1578,8 @@ White-label design — one codebase, any business:
   **Seller order management** (owner-scoped under `/stores/:id/orders`):
   list (status/search filters, paginated), detail, `PATCH …/status`
   (forward-only lifecycle `PENDING → CONFIRMED → PACKED → SHIPPED →
-  DELIVERED`, jumps ahead allowed — pickup orders skip SHIPPED; each move
+  DELIVERED` — an online order enters at `PENDING` only once paid,
+  from `AWAITING_PAYMENT`; jumps ahead allowed — pickup orders skip SHIPPED; each move
   stamps `confirmedAt`/`packedAt`/`shippedAt`/`deliveredAt`; delivering a
   COD order flips `paymentStatus` to PAID, and closes any parcel still on
   its way) and `POST …/cancel` (before SHIPPED, or once every parcel came
@@ -1741,7 +1743,8 @@ White-label design — one codebase, any business:
   blocks the account; every sign-in strategy checks it and blocking revokes
   all sessions.
 
-Enums: `OrderStatus`, `PaymentMethod`, `PaymentStatus`, `ShippingType`,
+Enums: `OrderStatus` (`AWAITING_PAYMENT` first — online orders until paid),
+`PaymentMethod`, `PaymentStatus`, `ShippingType`,
 `OtpChannel`, `OtpPurpose`, `AuthProvider`, `AdminRole`, `StoreMediaType`,
 `BankVerificationStatus`, `BankVerificationMethod`, `PrincipalType`,
 `NotificationKind` (includes `SUPPORT`, `AFFILIATE`, `DROPSHIP`), `SupportRecipient`,
@@ -2005,7 +2008,15 @@ client never computes money. COD is live end-to-end; ONLINE payment
 runs through **Cashfree** (`modules/payments` — session on placement,
 HMAC-verified webhook, reconcile fallback — on page visit and every 10
 minutes for ONLINE orders 5 min – 48 h old still unpaid (`payments.jobs.ts`,
-settle-only: it never cancels or releases stock) —, pay/retry endpoint; see
+settle-only: it never cancels or releases stock) —, pay/retry endpoint;
+a gateway order is born **`AWAITING_PAYMENT`** — hidden from the seller
+(`SELLER_VISIBLE` in `orders.service.ts` filters every seller list, count,
+detail and action) — and becomes `PENDING` in the same transaction as the
+PAID flip (`releaseToSeller`); one still unpaid 60 min after placing is
+cancelled by the same job (`expireUnpaidOrder`: last gateway check, then the
+normal cancel — stock back, checkout closed, silent, reason "Payment not
+completed"). `writeStatusChange` and the parcel send refuse any online order
+not `PAID`; see
 `docs/CASHFREE_PAYMENTS.md`) when the gateway keys are configured, and
 falls back to the dev **simulation** (`paymentRef: "DEV-SIMULATED"`) /
 production 503 without them. The module also serves

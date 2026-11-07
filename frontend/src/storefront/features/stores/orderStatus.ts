@@ -19,10 +19,52 @@ export interface StatusCopy {
   tone: 'wait' | 'progress' | 'done' | 'stopped'
 }
 
-export function orderStatusCopy(order: Pick<PlacedOrder, 'status' | 'fulfilment' | 'storeName'>): StatusCopy {
+/**
+ * An ONLINE order closed because its payment never went through (the
+ * payment window ran out) — not a seller's cancellation.
+ */
+export function paymentNotCompleted(
+  order: Pick<PlacedOrder, 'status' | 'paymentMethod' | 'paymentStatus' | 'cancelledByCustomer'>,
+): boolean {
+  return (
+    order.status === 'CANCELLED' &&
+    !order.cancelledByCustomer &&
+    order.paymentMethod === 'ONLINE' &&
+    (order.paymentStatus === 'PENDING' || order.paymentStatus === 'FAILED')
+  )
+}
+
+export function orderStatusCopy(
+  order: Pick<PlacedOrder, 'status' | 'fulfilment' | 'storeName'> &
+    Partial<Pick<PlacedOrder, 'paymentMethod' | 'paymentStatus' | 'cancelledByCustomer'>>,
+): StatusCopy {
   const pickup = order.fulfilment === 'PICKUP'
   const store = order.storeName
+  if (
+    order.paymentMethod &&
+    order.paymentStatus &&
+    paymentNotCompleted({
+      status: order.status,
+      paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus,
+      cancelledByCustomer: order.cancelledByCustomer ?? false,
+    })
+  ) {
+    return {
+      label: 'Payment not completed',
+      headline: 'Payment not completed',
+      next: 'The payment did not go through, so this order was closed. You were not charged.',
+      tone: 'stopped',
+    }
+  }
   switch (order.status as Status) {
+    case 'AWAITING_PAYMENT':
+      return {
+        label: 'Awaiting payment',
+        headline: 'Complete your payment',
+        next: `${store} gets your order once the payment goes through.`,
+        tone: 'wait',
+      }
     case 'CONFIRMED':
       return {
         label: 'Confirmed',

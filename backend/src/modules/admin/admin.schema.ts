@@ -72,7 +72,7 @@ const isoDate = z.coerce.date().optional();
 
 export const orderListQuery = searchQuery.extend({
   status: z
-    .enum(["PENDING", "CONFIRMED", "PACKED", "SHIPPED", "DELIVERED", "CANCELLED"])
+    .enum(["AWAITING_PAYMENT", "PENDING", "CONFIRMED", "PACKED", "SHIPPED", "DELIVERED", "CANCELLED"])
     .optional(),
   paymentStatus: z.enum(["PENDING", "PAID", "FAILED", "REFUNDED"]).optional(),
   paymentMethod: z.enum(["ONLINE", "COD"]).optional(),

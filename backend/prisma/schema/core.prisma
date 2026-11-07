@@ -18,6 +18,10 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 enum OrderStatus {
+  /// An ONLINE order whose payment has not gone through yet. The seller never
+  /// sees it; it becomes PENDING when paid, or CANCELLED when the payment
+  /// window closes (payments.jobs.ts). COD orders start at PENDING.
+  AWAITING_PAYMENT
   PENDING
   CONFIRMED
   PACKED

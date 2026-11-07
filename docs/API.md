@@ -432,6 +432,13 @@ allowed (a pickup order goes `PACKED → DELIVERED` without ever being
 `SHIPPED`) and never backwards. `CANCELLED` sits outside the sequence and
 has its own endpoint because it restores stock.
 
+**Unpaid online orders never reach the seller.** An `ONLINE` order whose
+`paymentStatus` is `PENDING`/`FAILED` (status `AWAITING_PAYMENT`, or
+cancelled when its payment window closed) is left out of this list, the
+dashboard counts, the detail (`404`) and every action. As a second guard,
+no status change or parcel is accepted for an online order that is not
+`PAID` (`409 "This order isn't paid yet…"`).
+
 **`GET /api/v1/stores/:id/orders`** — newest first, server-paginated.
 
 | Query      | Type | Default | Notes                                        |
@@ -2030,8 +2037,12 @@ orders skip the check.
 **Payment:** `COD` orders start `paymentStatus: "PENDING"`. `ONLINE` goes
 through **Cashfree** when the gateway keys are configured (see
 [CASHFREE_PAYMENTS.md](./CASHFREE_PAYMENTS.md)): the order is created
-`PENDING`, a Cashfree order is registered, and the response carries a
-`payment` object for the web SDK. If Cashfree rejects the registration the
+with status **`AWAITING_PAYMENT`** (stock held; the seller does not see it),
+a payment session is registered, and the response carries a `payment`
+object for the web SDK. The payment moves it to `PENDING` (now the
+seller sees it). Still unpaid **60 minutes** after placing, the payments
+job cancels it (`cancelReason: "Payment not completed"`, stock restored,
+checkout closed, no message sent). If Cashfree rejects the registration the
 placement is rolled back (stock restored, order deleted, `502`). Without
 keys, the pre-gateway behavior holds: dev **simulates** (instantly `PAID`,
 `paymentRef: "DEV-SIMULATED"`), production answers
@@ -2040,7 +2051,8 @@ keys, the pre-gateway behavior holds: dev **simulates** (instantly `PAID`,
 Response: the full order —
 ```jsonc
 { "id", "orderNumber",              // e.g. "UM-MDL3X9K2-7QHT"
-  "status": "PENDING", "storeName", "storeSlug",
+  "status": "PENDING",             // "AWAITING_PAYMENT" for a gateway order until paid
+  "storeName", "storeSlug",
   "fulfilment", "customerName", "customerPhone", "customerEmail",
   "addressLine", "pincode", "state", "country",   // null when not collected
   "billingAddress": { "name", "phone", "addressLine",
@@ -2101,12 +2113,13 @@ gateway is not configured.
 
 ### `POST /api/v1/public/stores/:slug/orders/:orderId/cancel` 🔒 customer
 
-The **buyer** cancels their own order — only while it is still `PENDING`
-(the seller has not confirmed it) and not `PAID`/`REFUNDED` (a paid order
+The **buyer** cancels their own order — only while it is still
+`AWAITING_PAYMENT` or `PENDING` (the seller has not confirmed it) and not `PAID`/`REFUNDED` (a paid order
 needs a real refund, so it goes through the store). Body `{ reason? }`
 (optional, ≤ 300 chars). Same effect as the seller's cancel: `CANCELLED`,
 `cancelledAt`, `cancelledByCustomer: true`, stock restored, the Cashfree
-payment window closed, the buyer emailed and the seller notified. Returns the
+payment window closed, the buyer emailed and the seller notified (not for
+an `AWAITING_PAYMENT` order — the seller never saw it). Returns the
 order (unredacted). `409` once confirmed, paid, or already cancelled; `404`
 for an order that is not the caller's. 10/min.
 

@@ -108,7 +108,7 @@ export async function loadSellers(filters: SellerFilters, storeIds?: string[]) {
     loadReadinessCounts(storeIdList),
     prisma.order.groupBy({
       by: ["storeId"],
-      where: { storeId: { in: storeIdList }, status: { not: "CANCELLED" } },
+      where: { storeId: { in: storeIdList }, status: { notIn: ["CANCELLED", "AWAITING_PAYMENT"] } },
       _count: { _all: true },
       _max: { placedAt: true },
     }),

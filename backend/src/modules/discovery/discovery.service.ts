@@ -317,7 +317,7 @@ export async function getPlatformStats(): Promise<PlatformStats> {
     prisma.storeProduct.count({
       where: { ...PUBLIC_PRODUCT_VISIBILITY, store: publishedStore },
     }),
-    prisma.order.count({ where: { status: { not: "CANCELLED" } } }),
+    prisma.order.count({ where: { status: { notIn: ["CANCELLED", "AWAITING_PAYMENT"] } } }),
     prisma.customer.count({ where: { blockedAt: null } }),
   ]);
 

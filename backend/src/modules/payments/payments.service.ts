@@ -327,12 +327,31 @@ async function markOrderPaid(
   orderId: string,
   cfPaymentId: string,
 ): Promise<void> {
-  const updated = await prisma.order.updateMany({
-    where: { id: orderId, paymentStatus: { in: ["PENDING", "FAILED"] } },
-    data: { paymentStatus: "PAID", paymentRef: cfPaymentId },
+  const won = await prisma.$transaction(async (tx) => {
+    const updated = await tx.order.updateMany({
+      where: { id: orderId, paymentStatus: { in: ["PENDING", "FAILED"] } },
+      data: { paymentStatus: "PAID", paymentRef: cfPaymentId },
+    });
+    if (updated.count > 0) await releaseToSeller(tx, orderId);
+    return updated.count > 0;
   });
-  if (updated.count === 0) return; // already settled
+  if (!won) return; // already settled
   await afterOrderPaid(orderId);
+}
+
+/**
+ * The payment made it a real order: AWAITING_PAYMENT → PENDING, so the
+ * seller now sees it. Run in the same transaction as the PAID flip, so an
+ * order is never paid yet still hidden. A cancelled order stays cancelled.
+ */
+export async function releaseToSeller(
+  db: Prisma.TransactionClient,
+  orderId: string,
+): Promise<void> {
+  await db.order.updateMany({
+    where: { id: orderId, status: "AWAITING_PAYMENT" },
+    data: { status: "PENDING" },
+  });
 }
 
 /**

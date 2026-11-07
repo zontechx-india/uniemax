@@ -19,6 +19,7 @@ const BASE = '/api/v1/admin'
 // ---- Shared row shapes ----------------------------------------------------
 
 export type OrderStatus =
+  | 'AWAITING_PAYMENT'
   | 'PENDING'
   | 'CONFIRMED'
   | 'PACKED'

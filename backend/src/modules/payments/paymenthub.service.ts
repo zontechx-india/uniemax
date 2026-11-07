@@ -1,7 +1,7 @@
 import type { FastifyBaseLogger } from "fastify";
 import { prisma } from "../../config/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
-import { afterOrderPaid } from "./payments.service.js";
+import { afterOrderPaid, releaseToSeller } from "./payments.service.js";
 import { applyVerificationUpdate } from "../stores/bankCheck.service.js";
 import { applyHubPayout } from "../payouts/payouts.service.js";
 import {
@@ -180,6 +180,7 @@ export async function handlePaymentHubEvent(
       where: { id: order.id, paymentStatus: { in: [...PAID_FROM] } },
       data: { paymentStatus: "PAID", paymentRef: decision.paymentRef },
     });
+    if (updated.count > 0) await releaseToSeller(tx, order.id);
     await tx.paymentHubEvent.update({
       where: { id: envelope.id },
       data: { processedAt: new Date() },
