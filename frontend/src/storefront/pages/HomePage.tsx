@@ -353,7 +353,7 @@ export function MarketHeader() {
             >
               <CartIcon className="h-5 w-5" />
               {cartCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-pill bg-brand px-1 text-xs font-bold text-brand-contrast">
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-pill bg-brand px-1 text-xs font-semibold text-brand-contrast">
                   {cartCount > 99 ? '99+' : cartCount}
                 </span>
               )}
@@ -540,7 +540,7 @@ function GlobalSearchBox({ autoFocus = false }: { autoFocus?: boolean }) {
             if (e.key === 'Enter') seeAll()
           }}
           enterKeyHint="search"
-          placeholder="Search stores, products, or categories..."
+          placeholder="Search stores and products"
           aria-label="Search stores, products, or categories"
           className="w-full bg-transparent text-sm text-fg outline-none placeholder:text-muted"
         />
@@ -561,7 +561,7 @@ function GlobalSearchBox({ autoFocus = false }: { autoFocus?: boolean }) {
           {!active ? (
             /* Recent searches — local only; shown while the field is empty. */
             <div className="px-4 py-2">
-              <p className="pb-2 text-xs font-semibold uppercase tracking-widest text-muted">
+              <p className="pb-2 text-xs font-medium text-muted">
                 Recent searches
               </p>
               <div className="flex flex-wrap gap-2">
@@ -707,7 +707,7 @@ function SearchResultsPanel({
               subtitle={`${product.categoryName} · ${product.store.name}`}
               trailing={
                 product.price !== null ? (
-                  <span className="font-figure text-sm font-semibold text-brand">
+                  <span className="font-figure text-sm font-semibold text-fg">
                     {formatPrice(product.price)}
                   </span>
                 ) : undefined
@@ -729,7 +729,7 @@ function ResultGroup({
 }) {
   return (
     <div className="py-2">
-      <p className="px-5 pb-1 pt-2 text-xs font-semibold uppercase tracking-widest text-muted">
+      <p className="px-5 pb-1 pt-2 text-xs font-medium text-muted">
         {label}
       </p>
       {children}
@@ -770,7 +770,7 @@ function ResultRow({
 
 function IconTile({ children }: { children: React.ReactNode }) {
   return (
-    <span className="flex h-9 w-9 items-center justify-center rounded-md bg-brand/10 text-brand">
+    <span className="flex h-9 w-9 items-center justify-center rounded-md bg-surface-alt text-muted">
       {children}
     </span>
   )
@@ -994,7 +994,7 @@ function TopStoresSection({ design }: { design: TopStoresDesign }) {
   return (
     <Section
       id="top-stores"
-      title="Top Stores"
+      title="Top stores"
       // Tighter than the default band, like Shop by category — it opens the
       // feed right under the slim top bands.
       padding="pt-2 pb-4 sm:pt-4 sm:pb-6 lg:pt-5 lg:pb-7"
@@ -1014,11 +1014,11 @@ function TopStoresSection({ design }: { design: TopStoresDesign }) {
             <StoreIcon className="h-4 w-4" />
           </IconTile>
           <p className="mt-3 text-sm font-medium text-fg">
-            No stores to show yet.
+            No stores to show yet
           </p>
-          <p className="mt-1 text-sm text-muted">Be the first seller!</p>
+          <p className="mt-1 text-sm text-muted">Be the first seller</p>
           <CreateStoreLink placement="home_new_stores_empty" className={buttonClass({ size: 'md', className: 'mt-4' })}>
-            Create Store →
+            Create a store
           </CreateStoreLink>
         </div>
       ) : (
@@ -1092,7 +1092,7 @@ function MarketIdentityBar() {
                 key={label}
                 className="flex items-center gap-1 whitespace-nowrap text-xs text-muted sm:gap-1.5"
               >
-                <Icon className="h-3.5 w-3.5 shrink-0 text-brand sm:h-4 sm:w-4" />
+                <Icon className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
                 {label}
               </li>
             ))}
@@ -1139,7 +1139,7 @@ function PopularCategoriesBar() {
       <div className={`${CONTENT_COLUMN} py-3`}>
         {categories === null ? (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:flex-nowrap" aria-hidden>
-            <span className="flex min-h-tap shrink-0 items-center text-xs font-semibold uppercase tracking-widest text-muted sm:min-h-0">
+            <span className="flex min-h-tap shrink-0 items-center text-sm font-medium text-muted sm:min-h-0">
               Popular
             </span>
             <div className={CHIP_SCROLLER_TWO_ROWS}>
@@ -1161,7 +1161,7 @@ function PopularCategoriesBar() {
           // `lg` (a mouse cannot swipe), and "All" at every width — the row
           // is capped, the taxonomy is not.
           <nav aria-label="Popular categories" className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:flex-nowrap">
-            <span className="shrink-0 text-xs font-semibold uppercase tracking-widest text-muted">
+            <span className="shrink-0 text-sm font-medium text-muted">
               Popular
             </span>
             <ul ref={scroller} onScroll={sync} className={`order-last sm:order-none ${CHIP_SCROLLER_TWO_ROWS}`}>
@@ -1237,8 +1237,8 @@ function FreshFindsSection({
 
   return (
     <Section
-      title="Fresh Finds"
-      subtitle="The latest products added across all stores."
+      title="Fresh finds"
+      subtitle="The latest products added across all stores"
       tone="alt"
       action={
         products !== null && products.length > 0 ? (
@@ -1351,7 +1351,7 @@ function MoreToExploreSection() {
   return (
     <Section
       title="More to explore"
-      subtitle="The newest from each top category."
+      subtitle="The newest from each top category"
     >
       {top === null ? (
         <CardSkeletons count={5} media="square" layout="rail" />
@@ -1421,13 +1421,18 @@ function CategoryRail({ category }: { category: BrowsableCategory }) {
 /**
  * Marketplace product card — image, store, name, price. One link, no CTA,
  * plus the save heart on the photo (a sibling of the link, not inside it).
- * Shares the store card's hover language (4px lift, deeper halo, image zoom)
- * so the two grids on this page feel like one system — the lift is on the
- * wrapper, so the heart rides up with the card.
+ * Hover is a border step only, the same as the Top Stores cards — nothing
+ * moves or zooms, so a grid of twelve stays calm under the pointer.
+ *
+ * The price is plain text, not brand colour: on a grid of twelve, a purple
+ * price and a purple "SALE" pill on every card left nothing standing out. A
+ * sale shows the struck-out MRP and the real saving ("−15%"), worked out from
+ * the two prices the product already has.
  */
 function ProductCard({ product }: { product: MarketProduct }) {
+  const off = percentOff(product.price, product.compareAtPrice)
   return (
-    <div className="relative h-full min-w-0 transition duration-200 hover:-translate-y-1">
+    <div className="relative h-full min-w-0">
       <SaveButton
         productId={product.id}
         productName={product.name}
@@ -1435,10 +1440,8 @@ function ProductCard({ product }: { product: MarketProduct }) {
       />
       <a
         href={`/store/${product.store.slug}/product/${product.slug}`}
-        className="group flex h-full flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-floating transition duration-200 hover:border-accent hover:shadow-lifted"
+        className="group flex h-full flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-floating transition-colors duration-200 hover:border-fg/25"
       >
-        {/* Own overflow context, so the zoom is clipped by the image frame and
-            the divider below it doesn't scale along. */}
         <div className="aspect-square w-full overflow-hidden border-b border-line bg-surface-alt">
           {product.image?.url ? (
             <MediaImg
@@ -1447,7 +1450,7 @@ function ProductCard({ product }: { product: MarketProduct }) {
               alt={product.image.altText ?? product.name}
               loading="lazy"
               decoding="async"
-              className="h-full w-full object-contain transition-transform duration-500 ease-out group-hover:scale-105"
+              className="h-full w-full object-contain"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-muted">
@@ -1461,16 +1464,21 @@ function ProductCard({ product }: { product: MarketProduct }) {
             {product.name}
           </p>
           {product.price !== null && (
-            <p className="mt-1.5 flex flex-wrap items-center gap-1.5 font-figure text-sm font-semibold text-brand">
+            <p className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 font-figure text-sm font-semibold text-fg">
               {formatPrice(product.price)}
               {product.compareAtPrice && (
                 <>
                   <s className="text-xs font-normal text-muted">
+                    <span className="sr-only">MRP </span>
                     {formatPrice(product.compareAtPrice)}
                   </s>
-                  <span className="rounded-full bg-brand px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide text-brand-contrast">
-                    Sale
-                  </span>
+                  {/* `success-ink`, not `success`: #008000 is 3.1:1 on the
+                      dark canvas; the ink token has a dark step. */}
+                  {off !== null && (
+                    <span className="text-xs font-medium text-success-ink">
+                      −{off}%
+                    </span>
+                  )}
                 </>
               )}
             </p>
@@ -1479,6 +1487,19 @@ function ProductCard({ product }: { product: MarketProduct }) {
       </a>
     </div>
   )
+}
+
+/**
+ * Whole-number saving of a sale price against its MRP: 1,499 vs 1,800 → 17.
+ * `null` when either price is missing or the saving rounds to under 1% — a
+ * "−0%" label would only add noise.
+ */
+function percentOff(price: string | null, compareAtPrice: string | null): number | null {
+  const now = Number(price)
+  const was = Number(compareAtPrice)
+  if (price === null || compareAtPrice === null || !(was > now) || !(now >= 0)) return null
+  const off = Math.round((1 - now / was) * 100)
+  return off >= 1 ? off : null
 }
 
 // ---------------------------------------------------------------------------
@@ -1496,8 +1517,8 @@ function RecentlyViewedSection() {
 
   return (
     <Section
-      title="Recently Viewed"
-      subtitle="Pick up where you left off."
+      title="Recently viewed"
+      subtitle="Pick up where you left off"
       tone="alt"
       action={arrows}
     >
@@ -1540,8 +1561,8 @@ function RecentlyViewedSection() {
 function MyStoresSection({ stores }: { stores: Store[] }) {
   return (
     <Section
-      title="My Stores"
-      subtitle="Jump straight into managing a store."
+      title="My stores"
+      subtitle="Jump straight into managing a store"
     >
       {/* Same auto-fill grid as Recently Viewed — no dead space at row end. */}
       <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(240px,1fr))]">
@@ -1573,7 +1594,7 @@ function MyStoresSection({ stores }: { stores: Store[] }) {
           className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-line px-4 py-3 text-sm font-semibold text-muted transition-colors hover:border-accent hover:text-fg"
         >
           <PlusIcon className="h-4 w-4" />
-          Create New Store
+          Create new store
         </Link>
       </div>
     </Section>
@@ -1640,10 +1661,10 @@ function BecomeSellerSection({ ownsStores }: { ownsStores: boolean }) {
               the middle of a 1400px panel empty. */}
           <div className="grid gap-10 px-5 py-12 sm:px-10 sm:py-14 lg:grid-cols-2 lg:items-center lg:gap-14 lg:px-14">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-white/80">
-                Become a Seller
+              <p className="text-sm font-medium text-white/80">
+                Become a seller
               </p>
-              <h2 className="mt-3 font-heading text-3xl font-bold leading-[1.1] sm:text-4xl lg:text-5xl">
+              <h2 className="mt-3 font-heading text-3xl font-semibold leading-[1.1] sm:text-4xl lg:text-5xl">
                 Start selling online
               </h2>
               <p className="mt-3 max-w-md text-sm text-white/90 sm:text-base">
@@ -1673,15 +1694,20 @@ function BecomeSellerSection({ ownsStores }: { ownsStores: boolean }) {
 
             <div className="aurora-pane min-w-0 rounded-lg p-4 sm:p-6">
               {counters.length > 0 && (
-                <dl className="mb-7 grid auto-cols-fr grid-flow-col gap-2 sm:gap-3">
-                  {counters.map(({ value, label }) => (
-                    <div key={label} className="aurora-frost min-w-0 rounded-lg px-2.5 py-3.5 sm:px-4 sm:py-4">
-                      <dd className="aurora-figure font-figure text-xl font-bold leading-tight sm:text-3xl">
-                        {compactCount(value)}
-                      </dd>
-                      <dt className="mt-1 truncate text-xs font-semibold text-white/80 sm:uppercase sm:tracking-wider">
+                // Plain figures split by hairlines, above a hairline that
+                // separates them from the steps — no boxes of their own.
+                <dl className="mb-6 grid auto-cols-fr grid-flow-col border-b border-white/15 pb-6">
+                  {counters.map(({ value, label }, index) => (
+                    <div
+                      key={label}
+                      className={`flex min-w-0 flex-col-reverse ${index > 0 ? 'border-l border-white/15 pl-4 sm:pl-6' : ''}`}
+                    >
+                      <dt className="mt-1 truncate text-sm text-white/80">
                         {label}
                       </dt>
+                      <dd className="font-figure text-2xl font-semibold leading-tight text-white sm:text-3xl">
+                        {compactCount(value)}
+                      </dd>
                     </div>
                   ))}
                 </dl>
@@ -1691,7 +1717,7 @@ function BecomeSellerSection({ ownsStores }: { ownsStores: boolean }) {
                   <li key={step.title} className="flex gap-4">
                     <span
                       aria-hidden="true"
-                      className="aurora-frost flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-heading text-sm font-bold"
+                      className="aurora-frost flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-figure text-sm font-semibold"
                     >
                       {index + 1}
                     </span>
@@ -1724,7 +1750,7 @@ const FOOTER_COLUMNS = [
     links: [
       { label: 'All categories', to: '/categories' },
       { label: 'All shops', to: '/shops' },
-      { label: 'Fresh Finds', to: '/new' },
+      { label: 'Fresh finds', to: '/new' },
       { label: 'About', to: '/about' },
       { label: 'Support', to: '/support' },
       { label: 'Contact', to: '/contact' },
@@ -1733,10 +1759,10 @@ const FOOTER_COLUMNS = [
   {
     title: 'Legal',
     links: [
-      { label: 'Privacy Policy', to: '/privacy' },
-      { label: 'Terms & Conditions', to: '/terms' },
-      { label: 'Refund & Returns', to: '/refund-policy' },
-      { label: 'Shipping Policy', to: '/shipping-policy' },
+      { label: 'Privacy policy', to: '/privacy' },
+      { label: 'Terms and conditions', to: '/terms' },
+      { label: 'Refunds and returns', to: '/refund-policy' },
+      { label: 'Shipping policy', to: '/shipping-policy' },
     ],
   },
 ] as const
@@ -1758,7 +1784,7 @@ export function MarketFooter() {
 
           {FOOTER_COLUMNS.map(({ title, links }) => (
             <nav key={title} aria-label={title}>
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted">
+              <p className="text-sm font-medium text-muted">
                 {title}
               </p>
               <ul className="mt-3 space-y-2">
@@ -1777,14 +1803,14 @@ export function MarketFooter() {
           ))}
 
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted">
+            <p className="text-sm font-medium text-muted">
               Sell on UnieMax
             </p>
             <p className="mt-3 text-sm text-muted">
               Open your own store in minutes — no technical knowledge required.
             </p>
-            <CreateStoreLink placement="home_footer" className="mt-4 inline-block rounded-md border border-line px-4 py-2 text-sm font-semibold text-fg transition-colors hover:border-accent">
-              Become a Seller
+            <CreateStoreLink placement="home_footer" className={buttonClass({ variant: 'secondary', size: 'sm', className: 'mt-4' })}>
+              Become a seller
             </CreateStoreLink>
           </div>
         </div>
@@ -1796,7 +1822,7 @@ export function MarketFooter() {
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted">
             <span className="flex items-center gap-1.5">
               <CheckIcon className="h-3.5 w-3.5" />
-              Cash on Delivery available
+              Cash on delivery available
             </span>
             <span className="flex items-center gap-1.5">
               <LockIcon className="h-3.5 w-3.5" />

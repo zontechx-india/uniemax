@@ -211,14 +211,15 @@ export function isNewlyOpened(publishedAt: string | null): boolean {
  * nested `<a>` — that would be invalid HTML and a second tab stop for the same
  * destination.
  *
- * Hover is the premium cue: 4px lift, deeper halo (`shadow-lifted`), the
- * banner zooms, and the CTA fills with the brand color.
+ * Hover is a quiet step, the same as the homepage cards: the border darkens
+ * and the CTA takes a surface tint. Nothing lifts or zooms, and no card turns
+ * purple — on a page of 24 shops the pointer should not light one up.
  */
 export function StoreCard({ store }: { store: MarketStore }) {
   return (
     <a
       href={`/store/${store.slug}`}
-      className="group flex flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-floating transition duration-200 hover:-translate-y-1 hover:border-accent hover:shadow-lifted"
+      className="group flex flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-floating transition-colors duration-200 hover:border-fg/25"
     >
       {/* The New badge rides the ARTWORK rather than the text block. It is a
           fact about the shop, not about its name, and overlaid it costs no
@@ -226,7 +227,7 @@ export function StoreCard({ store }: { store: MarketStore }) {
       <div className="relative">
         <StorePreview images={store.previewImages} />
         {isNewlyOpened(store.publishedAt) && (
-          <span className="absolute left-2 top-2 rounded-pill bg-brand px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-brand-contrast shadow-floating">
+          <span className="absolute left-2 top-2 rounded-pill border border-line bg-surface px-2 py-0.5 text-xs font-semibold text-fg">
             New
           </span>
         )}
@@ -254,9 +255,11 @@ export function StoreCard({ store }: { store: MarketStore }) {
                 hand. Absent for every other store — never a "not verified"
                 label, which would read as a warning against honest new shops. */}
             {store.isVerified && (
-              <span className="mt-1 flex items-center gap-1 text-xs font-semibold text-success">
-                <ShieldCheckIcon className="h-3.5 w-3.5" />
-                Verified seller
+              // "Verified" alone on a phone: the full label wrapped to two
+              // lines in a ~95px text column. `success-ink` reads on dark.
+              <span className="mt-1 flex items-center gap-1 whitespace-nowrap text-xs font-medium text-success-ink">
+                <ShieldCheckIcon className="h-3.5 w-3.5 shrink-0" />
+                Verified<span className="hidden sm:inline"> seller</span>
               </span>
             )}
 
@@ -278,7 +281,7 @@ export function StoreCard({ store }: { store: MarketStore }) {
         {/* A real button, pinned to the bottom. The whole card is still one
             link — this is a styled `<span>`, never a nested `<a>`, so there is
             no second tab stop for the same destination. */}
-        <span className="mt-auto flex h-9 w-full items-center justify-center gap-1 rounded-md border border-line text-xs font-bold text-fg transition-colors group-hover:border-brand group-hover:bg-brand group-hover:text-brand-contrast">
+        <span className="mt-auto flex h-9 w-full items-center justify-center gap-1 rounded-md border border-line text-xs font-semibold text-fg transition-colors group-hover:border-fg/25 group-hover:bg-surface-alt">
           Visit store
           <ChevronRightIcon className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
         </span>
@@ -308,14 +311,10 @@ function StorePreview({ images }: { images: string[] }) {
 
   return (
     <div className="aspect-[9/14] w-full overflow-hidden bg-surface-alt">
-      {/* The zoom lives on the inner layer so the hairlines and the frame stay
-          put while the photographs move. */}
-      <div className="h-full w-full transition-transform duration-500 ease-out group-hover:scale-[1.04]">
+      <div className="h-full w-full">
         {shots.length === 0 ? (
-          // A soft brand-tinted panel, not a grey glyph on grey. A shop with no
-          // products yet is the one most in need of looking deliberate.
           <div className="flex h-full w-full items-center justify-center bg-surface-alt">
-            <StoreIcon className="h-9 w-9 text-brand opacity-40" />
+            <StoreIcon className="h-9 w-9 text-muted opacity-60" />
           </div>
         ) : shots.length === 1 ? (
           <Cover url={shots[0]!} />

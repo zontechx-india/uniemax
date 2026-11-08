@@ -170,7 +170,7 @@ function ShotStrip({ images, count, sizes }: { images: string[]; count: number; 
 
 function NewChip({ className = '' }: { className?: string }) {
   return (
-    <span className={`rounded-pill bg-brand px-2 py-0.5 text-xs font-bold text-brand-contrast ${className}`}>
+    <span className={`rounded-pill bg-brand px-2 py-0.5 text-xs font-semibold text-brand-contrast ${className}`}>
       New
     </span>
   )
@@ -180,7 +180,7 @@ function NewChip({ className = '' }: { className?: string }) {
 function StoreName({ store, className = 'text-sm' }: { store: MarketStore; className?: string }) {
   return (
     <span className="flex min-w-0 items-center gap-1">
-      <span className={`truncate font-bold text-fg transition-colors group-hover:text-brand ${className}`}>
+      <span className={`truncate font-semibold text-fg transition-colors group-hover:text-brand ${className}`}>
         {store.name}
       </span>
       {store.isVerified && (
@@ -223,7 +223,7 @@ function ListRow({ store }: { store: MarketStore }) {
         <span className="flex items-center gap-1.5">
           <StoreName store={store} className="text-sm sm:text-base" />
           {isNewlyOpened(store.publishedAt) && (
-            <span className="shrink-0 rounded-pill bg-brand-soft px-1.5 text-xs font-bold text-brand">New</span>
+            <span className="shrink-0 rounded-pill bg-brand-soft px-1.5 text-xs font-semibold text-brand">New</span>
           )}
         </span>
         <StoreShelves store={store} />

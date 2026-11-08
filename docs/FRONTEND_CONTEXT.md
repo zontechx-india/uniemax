@@ -315,7 +315,7 @@ for guests and signed-in customers alike and adapts per session state.
   The mosaic is **the shop's own product covers**, and it degrades by how many
   of them there are rather than by breakpoint: four or three put a lead cover
   across the top two thirds with two beneath it, two split the frame
-  horizontally, one fills it, none gives a soft brand-tinted panel. Both splits
+  horizontally, one fills it, none gives a grey panel with a muted store glyph. Both splits
   cut across the **short** axis — in a portrait frame two side-by-side cells
   would be slivers, while two stacked ones are each a normal landscape crop.
 
@@ -324,12 +324,16 @@ for guests and signed-in customers alike and adapts per session state.
   not. It is a photograph of one product, and on the live marketplace two
   neighbouring cards showed near-identical crops of the same brownie and read
   as a duplicate render. A shop is a *collection*, so its artwork is one.
-  Hairline gaps (`gap-px` over `bg-line`); the hover zoom sits on an inner
-  layer so the frame and the hairlines stay put while the photographs move.
+  Hairline gaps (`gap-px` over `bg-line`). Hover is a quiet step: the card
+  border darkens (`hover:border-fg/25`) and Visit store takes a
+  `bg-surface-alt` tint — no lift, no zoom, no purple fill.
 
   A **New** badge (published within 30 days) sits on the artwork, top-left —
   it is a fact about the shop rather than about its name, and overlaid it costs
-  no height, which is what freed the footer's second line.
+  no height, which is what freed the footer's second line. It is a quiet
+  sentence-case chip (`bg-surface`, hairline, weight 600), not a brand pill.
+  The Verified line is `text-success-ink` and reads "Verified" on phones,
+  "Verified seller" from `sm` (the full label wrapped in a 2-up grid).
 
   The footer is three things over two rows: an `h-9` logo beside the name
   (`line-clamp-2`) with **what the shop sells** under it, and a full-width
@@ -415,16 +419,18 @@ for guests and signed-in customers alike and adapts per session state.
   name, Published/Draft chip — deliberately slim so consumer sections keep the
   prime real estate); and a **Become a Seller** "aurora" panel (`seller-aurora`:
   deep base lit by purple / blue / magenta washes, fixed colours so it looks
-  the same in both schemes; CTA is the shared primary button with `--cta`
+  the same in both schemes; no glow shadow, no moving light, no blur, no
+  gradient text — the colour field is the only rich thing in it; label
+  "Become a seller" in sentence case, headline weight 600; CTA is the shared primary button with `--cta`
   re-pointed to white; two equal
   columns from `lg`: pitch + 3 check-mark proof points + CTA on the left —
   label flips to "Create another store" for owners; for guests the CTA opens the
   auth dialog and navigates to `/mystores/new` via `onSignedIn` — and, on the
   right, the live **counters** (Stores · Products · Users from
   `GET /public/stats`, short form via `Intl.NumberFormat` compact — "1.2K";
-  zeros and a failed fetch simply drop out; each in a frosted `aurora-frost`
-  tile — labels are normal case on phones so "Products" fits) above **how it
-  works**, three numbered steps, both inside one blurred `aurora-pane`). The
+  zeros and a failed fetch simply drop out; plain white figures split by
+  hairlines, sentence-case labels, no tiles) above **how it
+  works**, three numbered steps, both inside one flat hairline `aurora-pane`). The
   **footer** is a structured 4-column block: brand + tagline, Marketplace
   (All categories / All shops / Fresh Finds / About / Support / Contact) and Legal (Privacy / Terms / Refund & Returns /
   Shipping Policy) columns
@@ -3590,15 +3596,20 @@ whole palette as CSS variables and maps them into Tailwind v4 via
 | `text-brand-contrast` | text on brand (white) | `bg-accent` / `text-accent` | focus / active (blue) |
 | `bg-brand-soft` | brand tint (Light Purple) | `logo-lockup` | the brand lockup (see *Brand art*) |
 | `text-danger` / `success` / `warning` | status | `shadow-floating` | elevation |
+| `text-success-ink` | green as small text on the canvas (#008000 light, #3fbf6a dark — base `success` is 3.1:1 on dark) | | |
 | `text-pending` / `bg-pending-soft` | setup not finished (orange) | `bg-pending-gradient` | the animated pending mark |
 | `rounded-md` (4px) · `rounded-lg` (6px) · `rounded-pill` (50px) | radius | `font-heading` / `font-body` / `font-display` / `font-accent` / `font-figure` | all Plus Jakarta Sans (display: −0.015em; accent: italic 500; figure: tabular) |
 
 **Card hover language** (marketplace grids): `shadow-floating` at rest →
 `hover:-translate-y-1` (4px lift) + `hover:shadow-lifted` (the deeper
 zero-offset halo token) + `group-hover:scale-105` on the image, over
-`duration-200` / `duration-500`. Store cards, product cards and the
-Recently-Viewed pills all share it. (Per-store pages use the flat
-`card-hover` utility instead.)
+`duration-200` / `duration-500` — no marketplace card uses it any more. The
+**homepage** product card (`ProductCard` in `HomePage.tsx`), the Top Stores
+cards and the `/shops` store cards (`StoreCard`) are calmer: a border step only
+(`hover:border-fg/25`, `transition-colors`), nothing moves or zooms. Its price
+is `text-fg` (not brand); a sale shows the struck MRP and the real saving
+(`−15%`, `percentOff()`) in `text-success-ink` — no "SALE" pill. (Per-store
+pages use the flat `card-hover` utility instead.)
 
 **`dark:` variant.** `index.css` declares
 `@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *))`,
@@ -3871,8 +3882,8 @@ lighter `#25d366` was ~2:1).
 | `glass-tint` | The featured card (Dashboard hero): `glass-card` plus a 16% brand wash (top-right) and 10% accent wash (bottom-left) — muted text stays 4.8:1 at the brand corner. Colour utility `border-glass-border` for its inner panes. |
 | `glass-card` | A card INSIDE a glass panel: glass fill, edge, highlight and the glass-safe text steps, but **no** `backdrop-filter` (the panel already blurred the canvas) |
 | `seller-canvas` | On the workspace root: ONE fixed layer of radial brand light behind everything (painted once, no `filter: blur`) |
-| `seller-aurora` | Homepage Become a Seller panel only: fixed deep base + purple / blue / magenta radial washes, a slow-drifting light (`::before`, frozen by reduced motion) and grain (`::after`). Re-points `--cta` to white (brand text) and `--accent` (focus ring) to white inside it |
-| `aurora-pane` · `aurora-frost` · `aurora-figure` | Inside `seller-aurora`: the ONE blurred pane · frosted tiles/chips (fill only, no second blur) · white→lavender counter numbers |
+| `seller-aurora` | Homepage Become a Seller panel only: fixed deep base + purple / blue / magenta radial washes and grain (`::after`) — no glow shadow, no moving light. Re-points `--cta` to white (brand text) and `--accent` (focus ring) to white inside it |
+| `aurora-pane` · `aurora-frost` | Inside `seller-aurora`: the right column (faint fill + hairline, no blur) · the check marks and step numbers (hairline ring) |
 | `animate-sheet-in` | 200ms rise for sheets, bars, toasts |
 
 Rules that keep it legible and fast:

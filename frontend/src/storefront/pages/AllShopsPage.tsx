@@ -68,7 +68,7 @@ export function AllShopsPage() {
       <div className={`${CONTENT_COLUMN} py-6 sm:py-8`}>
         <ListingHeader
           title="All shops"
-          lead="Stocked shops, ready to order from — every order goes straight to the seller."
+          lead="Stocked shops, ready to order from — every order goes straight to the seller"
         />
 
         <div className="mt-6">

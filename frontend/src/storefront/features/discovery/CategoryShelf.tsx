@@ -70,7 +70,7 @@ export function CategoryShelf({
           because the 180° turn puts the element's left side on the right. */}
       <h2
         id={headingId}
-        className="-ml-4 flex w-7 shrink-0 rotate-180 items-center justify-center rounded-l-lg bg-brand-soft sm:ml-0 sm:rounded-none text-xs font-bold uppercase tracking-[0.14em] text-brand [writing-mode:vertical-rl] sm:mb-4 sm:w-auto sm:rotate-0 sm:justify-start sm:bg-transparent sm:font-heading sm:text-3xl sm:font-semibold sm:normal-case sm:tracking-normal sm:text-fg sm:[writing-mode:horizontal-tb]"
+        className="-ml-4 flex w-7 shrink-0 rotate-180 items-center justify-center rounded-l-lg bg-brand-soft sm:ml-0 sm:rounded-none text-xs font-semibold text-brand [writing-mode:vertical-rl] sm:mb-4 sm:w-auto sm:rotate-0 sm:justify-start sm:bg-transparent sm:font-heading sm:text-3xl sm:font-semibold sm:normal-case sm:tracking-normal sm:text-fg sm:[writing-mode:horizontal-tb]"
       >
         <span className="sm:hidden">Categories</span>
         <span className="hidden sm:inline">Shop by category</span>
