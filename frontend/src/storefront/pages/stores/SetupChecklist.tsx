@@ -74,10 +74,10 @@ function LaunchCard({
       <header className="flex items-center gap-3.5 border-b border-line p-4 sm:p-5">
         <ProgressRing done={done} total={total} size={52} label />
         <div className="min-w-0">
-          <h3 className="font-heading text-lg font-bold text-fg">Get your shop live</h3>
+          <h3 className="font-heading text-lg font-semibold text-fg">Get your shop live</h3>
           <p className="mt-0.5 text-hint text-muted">
-            {done} of {total} steps done.{' '}
-            {canPublish ? 'Only publishing is left.' : 'Do the steps below in order.'}
+            {done} of {total} steps done ·{' '}
+            {canPublish ? 'only publishing is left' : 'do the steps below in order'}
           </p>
         </div>
       </header>
@@ -156,9 +156,9 @@ function OnlinePaymentsCard({ steps }: { steps: StepState[] }) {
   return (
     <section className="glass-card overflow-hidden rounded-glass">
       <header className="border-b border-line p-4 sm:p-5">
-        <h3 className="font-heading text-lg font-bold text-fg">
+        <h3 className="font-heading text-lg font-semibold text-fg">
           Take online payments{' '}
-          <span className="text-hint font-semibold text-muted">(optional)</span>
+          <span className="text-hint font-normal text-muted">(optional)</span>
         </h3>
         <p className="mt-1 text-hint text-muted">
           Cash on Delivery already works. To take UPI and card payments, add
@@ -260,11 +260,11 @@ function Row({
       )}
       <span
         aria-hidden
-        className={`relative z-[1] flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+        className={`relative z-[1] flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold tabular-nums ${
           complete
             ? 'bg-success text-brand-contrast'
             : current
-              ? 'bg-brand-gradient text-brand-contrast shadow-[0_6px_16px_-6px_var(--cta-glow)]'
+              ? 'bg-brand text-brand-contrast'
               : optional
                 ? 'bg-brand-soft text-brand'
                 : 'glass-inset text-muted'

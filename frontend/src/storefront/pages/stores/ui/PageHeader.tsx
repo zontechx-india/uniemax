@@ -25,12 +25,14 @@ export function PageHeader({
     <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="flex min-w-0 items-start gap-3">
         {Icon && (
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-gradient text-brand-contrast shadow-[0_6px_18px_-8px_var(--cta-glow)]">
+          // A flat tint, no gradient or glow: the page's main button is the
+          // one solid colour, and the icon only says where the seller is.
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-brand-soft text-brand">
             <Icon className="h-5 w-5" />
           </span>
         )}
         <div className="min-w-0">
-          <h2 className="font-heading text-xl font-bold leading-tight text-fg">
+          <h2 className="font-heading text-xl font-semibold leading-tight text-fg">
             {title}
           </h2>
           <p className="mt-1 text-sm leading-relaxed text-muted">{description}</p>

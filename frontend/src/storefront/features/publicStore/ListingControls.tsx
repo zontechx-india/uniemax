@@ -198,12 +198,14 @@ export function Breadcrumb({
             {crumb.to ? (
               <Link
                 to={crumb.to}
-                className={`font-semibold hover:text-brand ${skin.muted}`}
+                className={`transition-colors hover:text-brand ${skin.muted}`}
               >
                 {crumb.label}
               </Link>
             ) : (
-              <span className="font-semibold text-brand">{crumb.label}</span>
+              // The current page: primary text, not the store colour — the
+              // colour is kept for actions and the selection.
+              <span className={`font-medium ${skin.text}`}>{crumb.label}</span>
             )}
           </li>
         ))}

@@ -734,8 +734,8 @@ once-ever setting look as important as a daily job:
 | **Overview** | Dashboard · Orders *(pending-count badge)* |
 | **Catalog** | Categories · Products |
 | **Storefront** | Shop name & logo · Business details · **Design your shop** |
-| **Payments & Delivery** | Payments · Bank account · Delivery · Checkout |
-| **Marketing** | Affiliate Marketing |
+| **Payments & delivery** | Payments · Bank account · Delivery · Checkout |
+| **Marketing** | Affiliate marketing |
 | **Help** | Customer messages · Help from UnieMax |
 
 When the dropship package is on (`useDropshipRole`, below), `useSectionGroups`
@@ -794,7 +794,7 @@ Ordering rationale, so it isn't re-shuffled by accident: Catalog leads because
 Products is the most-opened section after Orders (it used to sit last);
 Categories precedes Products because the app gates Products until a category
 exists; **Storefront** is what a customer sees (safe to experiment with) while
-**Payments & Delivery** is money + fulfilment (three of which confirm before
+**Payments & delivery** is money + fulfilment (three of which confirm before
 saving) — named for its contents rather than the old "Settings", which
 described nothing since every group here is settings;
 Store Details is branding rather than configuration, so it sits under
@@ -844,11 +844,11 @@ It renders, top to bottom:
 
 - A **hero** — a tinted glass card (`glass-tint`: the glass fill with a soft
   brand wash from the top-right and an accent wash from the bottom-left), so
-  the next-step button is the only solid colour on it: a time-of-day greeting
+  the next-step button is the only solid colour on it: today's date (no greeting)
   and the shop name; once a live shop has orders, three frosted stat tiles —
   **Today** / **Waiting** (orange dot when > 0) / **Total sales** (its own
   full-width row on a phone, so the whole amount shows); and a lighter
-  **Next step** pane (gradient icon chip) with ONE action picked from the
+  **Next step** pane (flat `brand-soft` icon tile, sentence-case label) with ONE action picked from the
   shop's state — the first
   unfinished launch step (its `stepAction` button), **Publish my shop**
   (`sheen`) when ready, **See waiting orders** when orders are pending, else
@@ -975,7 +975,7 @@ where available). Before publishing, the same URL works as a **private
 draft preview** for the signed-in owner (an amber hint says only they can
 open it), and a **Preview** button beside Share opens it in a new tab
 (labelled "View shop" once published). Once live, a full-width green
-**Share on WhatsApp** (`ui/WhatsAppShareLink`, a gold light lapping its edge; `wa.me/?text=` with a ready "…is now online. See our
+**Share on WhatsApp** (`ui/WhatsAppShareLink`, flat green, no animation; `wa.me/?text=` with a ready "…is now online. See our
 products and order here: {url}" message, `whatsAppShareUrl()` in
 `usePublishActions.ts`) leads the panel. Directly under it is **Share your
 store**, the entry to the Share Kit: a sunset glass button
@@ -1463,13 +1463,17 @@ full-bleed section bands instead.
   different scope. Target of the header search, the Shop nav item and every
   "View all" link (which passes its section).
 - **`StoreProductPage`** — under the buy buttons, "Have a question? Ask the
-  shop" (`ContactActions`, when the shop has a WhatsApp number) with the
+  shop" (`ContactActions quiet`, when the shop has a WhatsApp number — both
+  as 44px secondary buttons so nothing competes with Buy Now) with the
   first message pre-typed: the product name, the chosen option and its link.
   The **only** page that renders variants, laid out
-  as breadcrumb · gallery + purchase card · Product Highlights · Description ·
+  as breadcrumb · gallery + purchase card · Product highlights · Description ·
   Specifications (`SpecTable`: the product's real `specifications` rows when
   present, else the description-parsed ones, plus one row per option type —
-  "Size: S, M, L" — then Category, Availability, Sold by) · You May Also Like:
+  "Size: S, M, L" — then Category, Availability, Sold by) · You may also like.
+  The store colour is kept for Buy Now, the selection and links; the
+  category label, breadcrumb's current item, highlight ticks, delivery and
+  trust icons and the sticky-bar price use the neutral text roles:
   - **Media gallery** — main viewer plus a thumbnail rail (vertical beside the
     image on `lg`, a snap-scrolling strip below on phones) whenever there is
     more than one item; the rail is a nowrap flex row, so its min-content width
@@ -1477,14 +1481,15 @@ full-bleed section bands instead.
     `min-w-0` to keep that from widening the page on a phone; the product
     video plays inline with a play-glyph thumb and thumbs lazy-load.
     Interactions: pointer-anchored **hover zoom** (mouse only — `pointerType`
-    guarded, images only), **swipe** between items on touch, hover arrows and
-    an `n / total` counter. The gallery is `lg:sticky` so it stays in view
+    guarded, images only — no "Hover to zoom" pill over the photo), **swipe**
+    between items on touch, hover arrows and an `n / total` counter. The gallery is `lg:sticky` so it stays in view
     while the long right column scrolls.
   - **Purchase card** — everything about buying inside one bordered card:
-    category eyebrow → name → price (MRP struck through and "N% off" in the
+    category link (sentence case, muted) → name → price (MRP struck through and "N% off" in the
     success colour when the selected variant's MRP is above its price — no
     "Sale" pill and no repeat of the chosen option's name; the picker says
-    that) → stock badge (Low / Out only) → the first few highlights →
+    that) → stock badge ("Only a few left" / "Out of stock" — the product
+    card's words) → the first few highlights →
     **`OptionPicker`** (`features/publicStore/OptionPicker.tsx` — one
     radiogroup per option type; the selection is a `Record<type, value>`
     resolved to a variant by `findVariant`; a value is greyed via
@@ -1507,16 +1512,17 @@ full-bleed section bands instead.
     cart — changing the quantity updates it" under Buy Now. The sticky bar's
     **Add** likewise becomes **In Cart**. Buy Now adds the line if absent,
     else checks out what is there (a second Buy Now never orders two), then
-    goes straight to `/checkout/{storeSlug}`) → the delivery check → ONE bordered
-    "Delivery and payment" panel holding the delivery rows and the trust
-    badges (three blocks in three styles read as clutter). The spec table is
+    goes straight to `/checkout/{storeSlug}`) → ONE bordered "Delivery and
+    payment" panel: the delivery check first (hairline below), then the
+    delivery rows, then the trust line — every row on one 28px icon column,
+    so titles start on one line (separate boxes read as clutter). The spec table is
     capped at `max-w-3xl` with a 1/3 label column, and labels typed in
     capitals ("SIZE") go through `displayName()`. Seller text pasted in
     Unicode "fancy" letters is shown as plain letters (`plainLetters`,
     display only). The **share button** sits in the card header beside the
     name.
-  - **Delivery check** (`features/publicStore/DeliveryCheck.tsx`, right
-    under the purchase buttons) — does this product reach the customer's
+  - **Delivery check** (`features/publicStore/DeliveryCheck.tsx`, the first
+    row of the delivery panel under the purchase buttons) — does this product reach the customer's
     pincode? Unrestricted products (`product.delivery.restricted` false)
     just say "Delivers to all pincodes" with no request. Restricted ones
     run `publicStoreApi.checkDelivery` against the pincode from
@@ -3911,7 +3917,7 @@ Rules that keep it legible and fast:
 | Component | Purpose |
 | --------- | ------- |
 | `GlassCard` | The one card: optional icon chip + title + one plain sentence + `aside` (pill/action). `padded={false}` for row lists. Default fill is `glass-card` (no own blur — it sits in the already-frosted panel); `blur` for a card directly on the canvas. Replaces Business `Card`, Footer `SectionCard`, Shipping border-top sections. |
-| `PageHeader` | Section heading: gradient icon chip, 22px title, required one-line description, optional action (full width on phones). |
+| `PageHeader` | Section heading: flat `brand-soft` icon tile (no gradient or glow), 22px semibold title, required one-line description, optional action (full width on phones). |
 | `SaveBar` | THE save model for forms: hidden until `dirty`; then a sticky `glass-strong` bar (message, **Undo changes**, **Save changes**) that stays under the thumb; shows `error`. Sits above the mobile tab bar via `--seller-dock`. Renders the unsaved-changes guard. |
 | `useUnsavedChangesGuard(dirty)` | `beforeunload` + react-router `useBlocker` with a plain-words "Leave without saving?" sheet. The blocker half renders only under a data router (`UNSAFE_DataRouterContext`) — the admin console mounts these pages under `<BrowserRouter>`, where `useBlocker` would throw. Ignores same-path (query-only) moves. |
 | `ActionRow` | One list item: leading photo, title + status, ≤2 facts, an optional `below` line (a nudge, chips), then ONE labelled primary action, a `toggle` kept apart, and `menu` → `RowMenu`. Actions drop below the text on phones so the name keeps the width. |
@@ -3919,7 +3925,7 @@ Rules that keep it legible and fast:
 | `BigSwitch` | Successor to `ActiveSwitch` (same core props): 52×32 track, 44px hit area, the state *written* beside it (`onText` / `offText`, width reserved for the longer word so lists stay aligned). |
 | `ProgressRing` | "3 of 5" as a ring (brand → green when complete); optional "3/5" label. My shops cards, setup checklist. |
 | `StatusPill` | The shared `Badge` with a dot by default (`wrap` for a long one). |
-| `WhatsAppShareLink` | THE green **Share on WhatsApp** link (`href` only), on `StarBorder`: a gold (`--whatsapp-glow`) light laps its edge continuously. Publish & share panel, dashboard next step, Share Kit page. |
+| `WhatsAppShareLink` | THE green **Share on WhatsApp** link (`href` only) — flat, 48px, no animation (the looping gold `StarBorder` edge was removed Nov 2026). Publish & share panel, dashboard next step, Share Kit page. |
 | `EmptyState` | Re-export of the shared `EmptyState` (flat icon chip, title, sentence, optional `steps`, one action). |
 | `showToast()` / `ToastHost` | "Saved ✓" for instant saves. Module store (`useSyncExternalStore`), no provider; `ToastHost` is mounted once in `StoreManageLayout`. |
 | `HelpHint` | ⓘ (44px hit, inline in a label) → a sheet explaining a term in plain words. |

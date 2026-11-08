@@ -172,7 +172,7 @@ export function StoreManageLayout() {
     <div className="mx-auto max-w-7xl space-y-3 pb-[var(--seller-dock)] [--seller-dock:calc(84px+env(safe-area-inset-bottom))] lg:pb-0 lg:[--seller-dock:0px]">
       <Link
         to={scope.indexPath}
-        className="hidden min-h-tap items-center gap-1.5 text-sm font-medium text-muted transition hover:text-fg lg:inline-flex"
+        className="hidden min-h-tap items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:text-fg lg:inline-flex"
       >
         <ArrowLeftIcon className="h-4 w-4" />
         All stores
@@ -185,7 +185,7 @@ export function StoreManageLayout() {
         <Link
           to={scope.indexPath}
           aria-label="All stores"
-          className="flex size-tap shrink-0 items-center justify-center rounded-xl text-muted transition hover:bg-fg/5 hover:text-fg"
+          className="flex size-tap shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-fg/5 hover:text-fg"
         >
           <ArrowLeftIcon className="h-5 w-5" />
         </Link>
@@ -194,16 +194,16 @@ export function StoreManageLayout() {
             sizes="40px"
             src={store.logoUrl}
             alt=""
-            className="h-10 w-10 shrink-0 rounded-xl object-cover"
+            className="h-10 w-10 shrink-0 rounded-md object-cover"
           />
         ) : (
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-brand-soft text-brand">
             <StoreIcon className="h-5 w-5" />
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <p className="truncate font-heading text-base font-bold text-fg">{store.name}</p>
-          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${stripTone.text}`}>
+          <p className="truncate font-heading text-base font-semibold text-fg">{store.name}</p>
+          <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${stripTone.text}`}>
             <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${stripTone.dot}`} />
             {supplierPill
               ? `${supplierPill.label} · Supplier account`
@@ -303,7 +303,7 @@ export function StoreManageLayout() {
               onClick={toggleRail}
               aria-pressed={rail}
               title={rail ? 'Expand sections' : 'Minimise sections'}
-              className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted transition hover:bg-surface-alt hover:text-fg lg:inline-flex"
+              className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-alt hover:text-fg lg:inline-flex"
             >
               <PanelLeftIcon className="h-4 w-4" />
               <span className="sr-only">

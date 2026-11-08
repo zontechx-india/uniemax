@@ -84,7 +84,7 @@ export function DeliveryCheck({
         title="Delivers to all pincodes"
         skin={skin}
       >
-        Enter your address at checkout.
+        Enter your address at checkout
       </Row>
     )
   }
@@ -108,16 +108,16 @@ export function DeliveryCheck({
       <form
         onSubmit={submit}
         noValidate
-        className={`mt-5 rounded-lg border p-3 ${skin.border}`}
+        className={`mb-4 border-b pb-4 ${skin.border}`}
       >
-        <label className={`flex items-center gap-2 text-sm font-semibold ${skin.text}`}>
-          <MapPinIcon className="h-4 w-4 shrink-0 text-brand" />
+        <label className={`flex items-center gap-2 text-sm font-medium ${skin.text}`}>
+          <MapPinIcon className={`h-4 w-4 shrink-0 ${skin.muted}`} />
           Check delivery to your pincode
         </label>
         <p className={`mt-1 text-xs ${skin.muted}`}>
-          This product is delivered to selected areas only.
+          This product is delivered to selected areas only
         </p>
-        <div className="mt-2.5 flex gap-2">
+        <div className="mt-3 flex gap-2">
           <input
             value={draft}
             onChange={(e) => {
@@ -144,7 +144,7 @@ export function DeliveryCheck({
                 setProblem(null)
               }}
               aria-label="Cancel"
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md border transition hover:border-brand ${skin.border} ${skin.text}`}
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md border transition-colors hover:border-brand ${skin.border} ${skin.text}`}
             >
               <CloseIcon className="h-4 w-4" />
             </button>
@@ -192,8 +192,8 @@ export function DeliveryCheck({
       skin={skin}
     >
       {source === 'address'
-        ? 'Based on your default address.'
-        : 'Delivery available to this pincode.'}
+        ? 'Based on your default address'
+        : 'Delivery available to this pincode'}
     </Row>
   ) : (
     <Row
@@ -231,11 +231,12 @@ function Row({
       : tone === 'bad'
         ? 'bg-danger/15 text-danger'
         : `${skin.well} ${skin.muted}`
-  const border = tone === 'bad' ? 'border-danger/40' : skin.border
+  // The first row of the product page's delivery panel: a hairline below
+  // separates it from the store's own delivery terms (no box of its own).
   return (
     <div
       role={tone === 'bad' ? 'alert' : undefined}
-      className={`mt-5 flex items-start gap-3 rounded-lg border p-3 ${border}`}
+      className={`mb-4 flex items-start gap-3 border-b pb-4 ${skin.border}`}
     >
       <span
         className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${badge}`}
@@ -243,7 +244,7 @@ function Row({
         {icon}
       </span>
       <div className="min-w-0 flex-1 text-sm">
-        <p className={`flex flex-wrap items-center justify-between gap-x-3 font-semibold ${tone === 'bad' ? 'text-danger' : skin.text}`}>
+        <p className={`flex flex-wrap items-center justify-between gap-x-3 font-medium ${tone === 'bad' ? 'text-danger' : skin.text}`}>
           <span>{title}</span>
           {action && <span className="text-xs">{action}</span>}
         </p>

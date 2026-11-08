@@ -67,8 +67,8 @@ function ShareActions({
         )}
         <p className="min-w-0 text-hint text-muted">
           {store.isPublished
-            ? 'Customers can see your shop and order.'
-            : 'Only you can see your shop for now.'}
+            ? 'Customers can see your shop and order'
+            : 'Only you can see your shop for now'}
         </p>
       </div>
 
@@ -120,7 +120,7 @@ function ShareActions({
         href={shareUrl}
         target="_blank"
         rel="noreferrer"
-        className="glass-inset flex min-h-tap items-center gap-2 rounded-md px-3 text-hint text-muted transition hover:text-fg"
+        className="glass-inset flex min-h-tap items-center gap-2 rounded-md px-3 text-hint text-muted transition-colors hover:text-fg"
       >
         <GlobeIcon className="h-4 w-4 shrink-0" />
         <span className="truncate">{shareUrl.replace(/^https?:\/\//, '')}</span>
@@ -138,7 +138,7 @@ function ShareActions({
           })}
         >
           {copied ? <CheckIcon className="h-4 w-4" /> : <ShareIcon className="h-4 w-4" />}
-          {copied ? 'Copied!' : 'Copy link'}
+          {copied ? 'Copied' : 'Copy link'}
         </button>
         <a
           href={shareUrl}
@@ -166,7 +166,7 @@ function ShareActions({
         <button
           type="button"
           onClick={actions.askUnpublish}
-          className="flex min-h-tap w-full items-center justify-center rounded-md text-sm font-semibold text-muted transition hover:bg-fg/5 hover:text-danger"
+          className="flex min-h-tap w-full items-center justify-center rounded-md text-sm font-medium text-muted transition-colors hover:bg-fg/5 hover:text-danger"
         >
           Take shop offline
         </button>

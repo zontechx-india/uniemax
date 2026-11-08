@@ -15,11 +15,15 @@ export function SaveButton({
   productId,
   productName,
   auth,
+  floating = true,
   className = '',
 }: {
   productId: string
   productName: string
   auth?: AuthDialogOptions
+  /** Lift it off a photo with a shadow. Off on the product page, where it
+   *  sits on the plain page beside the (shadowless) share button. */
+  floating?: boolean
   className?: string
 }) {
   const isSaved = useIsSaved(productId)
@@ -35,7 +39,7 @@ export function SaveButton({
         event.stopPropagation()
         toggleSaved(productId, auth)
       }}
-      className={`flex h-10 w-10 items-center justify-center rounded-full border border-line bg-surface shadow-floating transition-colors hover:text-brand ${
+      className={`flex h-10 w-10 items-center justify-center rounded-full border border-line bg-surface ${floating ? 'shadow-floating' : ''} transition-colors hover:text-brand ${
         isSaved ? 'text-brand' : 'text-fg'
       } ${className}`}
     >

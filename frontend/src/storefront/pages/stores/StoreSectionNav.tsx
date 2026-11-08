@@ -127,7 +127,7 @@ const SECTION_GROUPS: SectionGroup[] = [
   },
   {
     key: 'settings',
-    caption: 'Payments & Delivery',
+    caption: 'Payments & delivery',
     items: [
       { label: 'Earnings', to: 'earnings', icon: RupeeIcon },
       { label: 'Payments', to: 'payments', icon: CardIcon },
@@ -141,7 +141,7 @@ const SECTION_GROUPS: SectionGroup[] = [
     caption: 'Marketing',
     // "Share your store" (the Share Kit) is not a row here: its entry is the
     // shining button under Share on WhatsApp in the publish & share panel.
-    items: [{ label: 'Affiliate Marketing', to: 'affiliate', icon: MegaphoneIcon }],
+    items: [{ label: 'Affiliate marketing', to: 'affiliate', icon: MegaphoneIcon }],
   },
   {
     key: 'help',
@@ -367,7 +367,7 @@ export function OrderBadge({ count, className = '' }: { count: number; className
       // Not aria-hidden: "3 orders waiting" is the whole point of the badge
       // for a screen-reader user too.
       aria-label={`${count} pending`}
-      className={`flex h-5 min-w-5 shrink-0 items-center justify-center rounded-pill bg-brand px-1.5 text-xs font-bold text-brand-contrast ${className}`}
+      className={`flex h-5 min-w-5 shrink-0 items-center justify-center rounded-pill bg-brand px-1.5 text-xs font-semibold tabular-nums text-brand-contrast ${className}`}
     >
       {count > 99 ? '99+' : count}
     </span>
@@ -463,7 +463,9 @@ function SectionDisclosure({
             open ? '' : '-rotate-90'
           }`}
         />
-        <span className="min-w-0 flex-1 truncate text-xs font-bold tracking-[0.08em] uppercase">
+        {/* Sentence case at normal tracking — a group name, not a shout. */}
+        <span className="min-w-0 flex-1 truncate text-xs font-semibold">
+
           {group.caption}
         </span>
 
@@ -526,7 +528,7 @@ export function SectionSheetList({
         <section key={group.key} aria-labelledby={`sheet-group-${group.key}`}>
           <h3
             id={`sheet-group-${group.key}`}
-            className="px-2.5 pb-1 text-xs font-bold tracking-[0.06em] text-muted uppercase"
+            className="px-2.5 pb-1 text-xs font-semibold text-muted"
           >
             {group.caption}
           </h3>

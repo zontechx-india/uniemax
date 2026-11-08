@@ -88,14 +88,16 @@ export function SellerOrderRow({ order, to }: { order: SellerOrderSummary; to: s
   return (
     <Link
       to={to}
-      className="flex min-h-[64px] items-center gap-3 px-4 py-3 transition hover:bg-fg/5 sm:px-5"
+      className="flex min-h-[64px] items-center gap-3 px-4 py-3 transition-colors hover:bg-fg/5 sm:px-5"
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
-          <p className="min-w-0 truncate text-base font-bold text-fg">
+          <p className="min-w-0 truncate text-base font-medium text-fg">
             {order.customerName ?? order.orderNumber}
           </p>
-          <span className="shrink-0 text-base font-bold text-fg">{total}</span>
+          <span className="shrink-0 font-figure text-base font-semibold tabular-nums text-fg">
+            {total}
+          </span>
         </div>
         <p className="mt-0.5 text-hint text-muted">
           {timeAgo(order.placedAt)} · {order.itemCount} item{order.itemCount === 1 ? '' : 's'}

@@ -24,7 +24,7 @@ import { EmptyState, PageHeader, ProgressRing, StatusPill, ToastHost } from './u
  * First-run visitors get a picture-led empty state instead of an empty grid.
  */
 export function StoresPage() {
-  usePrivatePageTitle('My Stores')
+  usePrivatePageTitle('My shops')
   const { stores } = useStores()
   // Publishing from a card's sheet returns the fresh store; this list has no
   // setter of its own, so the fresh copies overlay the fetched ones.
@@ -53,7 +53,7 @@ export function StoresPage() {
           <EmptyState
             icon={StoreIcon}
             title="Open your first shop"
-            description="All you need is a name. You can add your logo, products and everything else later."
+            description="All you need is a name — add your logo, products and everything else later"
             steps={[
               { icon: StoreIcon, label: 'Name your shop' },
               { icon: BoxIcon, label: 'Add products' },
@@ -72,7 +72,7 @@ export function StoresPage() {
           <PageHeader
             icon={StoreIcon}
             title="My shops"
-            description="Tap Manage to work on a shop, or Share to send its link to customers."
+            description="Tap Manage to work on a shop, or Share to send its link to customers"
             action={
               // Wrapped, not `hidden` on the link: the button's own
               // `inline-flex` would compete with an unprefixed `hidden`.
@@ -111,7 +111,8 @@ export function StoresPage() {
             className={buttonClass({
               size: 'lg',
               className:
-                'fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 rounded-pill px-6 shadow-[0_10px_30px_-8px_var(--cta-glow)] sm:hidden',
+                // A neutral floating shadow, not a purple glow.
+                'fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 rounded-pill px-6 shadow-floating sm:hidden',
             })}
           >
             <PlusIcon className="h-5 w-5" />
@@ -145,25 +146,27 @@ function StoreCard({ store, onShare }: { store: Store; onShare: () => void }) {
 
   return (
     <CardShell>
-      <div className="flex items-start gap-3.5">
+      <div className="flex items-start gap-4">
+        {/* Logo on a hairline, not a drop shadow; 8px corners inside the
+            card's 12px. */}
         {store.logoUrl ? (
           <MediaImg
             sizes="56px"
             src={store.logoUrl}
             alt=""
-            className="h-14 w-14 shrink-0 rounded-2xl object-cover shadow-[0_4px_14px_-6px_rgba(0,0,0,0.3)]"
+            className="h-14 w-14 shrink-0 rounded-md border border-line object-cover"
           />
         ) : (
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-soft text-brand">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-brand-soft text-brand">
             <StoreIcon className="h-7 w-7" />
           </span>
         )}
         <div className="min-w-0 flex-1">
           {/* User-typed names render in the body face, two lines at most. */}
-          <h2 className="line-clamp-2 font-body text-base leading-snug font-bold tracking-normal break-words text-fg">
+          <h2 className="line-clamp-2 font-body text-base leading-snug font-semibold tracking-normal break-words text-fg">
             {store.name}
           </h2>
-          <div className="mt-1.5">
+          <div className="mt-2">
             {store.isPublished ? (
               <StatusPill tone="success">Live</StatusPill>
             ) : (
@@ -173,24 +176,24 @@ function StoreCard({ store, onShare }: { store: Store; onShare: () => void }) {
         </div>
       </div>
 
-      <div className="mt-4 flex min-h-[52px] items-center gap-3 rounded-xl bg-fg/[0.04] px-3 py-2.5">
+      <div className="mt-4 flex min-h-[52px] items-center gap-3 rounded-md bg-fg/[0.04] px-3 py-3">
         {showProgress ? (
           <>
             <ProgressRing done={done} total={total} />
             <p className="min-w-0 text-hint text-fg">
-              <span className="font-semibold">
+              <span className="font-medium">
                 {done} of {total} steps done
               </span>
               <span className="block text-muted">
-                {done === total ? 'Ready to publish.' : 'Finish setup to open your shop.'}
+                {done === total ? 'Ready to publish' : 'Finish setup to open your shop'}
               </span>
             </p>
           </>
         ) : (
           <p className="min-w-0 text-hint text-muted">
             {store.isPublished
-              ? 'Customers can see your shop and place orders.'
-              : 'Open your shop to finish setting it up.'}
+              ? 'Customers can see your shop and place orders'
+              : 'Open your shop to finish setting it up'}
           </p>
         )}
       </div>
@@ -236,7 +239,7 @@ function StoreGroup({
   return (
     <section aria-label={title ?? undefined} className="space-y-3">
       {title && (
-        <h2 className="flex flex-wrap items-baseline gap-x-2 font-body text-base font-bold tracking-normal text-fg">
+        <h2 className="flex flex-wrap items-baseline gap-x-2 font-body text-base font-semibold tracking-normal text-fg">
           {title}
           <span className="text-hint font-normal text-muted">{hint}</span>
         </h2>
@@ -258,33 +261,33 @@ function SupplierCard({ store, supplier }: { store: Store; supplier: OwnedSuppli
 
   return (
     <CardShell>
-      <div className="flex items-start gap-3.5">
-        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-fg/[0.06] text-fg">
+      <div className="flex items-start gap-4">
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-fg/[0.06] text-fg">
           <TruckIcon className="h-7 w-7" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="line-clamp-2 font-body text-base leading-snug font-bold tracking-normal break-words text-fg">
+          <h2 className="line-clamp-2 font-body text-base leading-snug font-semibold tracking-normal break-words text-fg">
             {store.name}
           </h2>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <StatusPill tone={pill.tone}>{pill.label}</StatusPill>
             <span className="text-hint text-muted">Supplier account</span>
           </div>
         </div>
       </div>
 
-      <div className="mt-4 flex min-h-[52px] items-center gap-3 rounded-xl bg-fg/[0.04] px-3 py-2.5">
+      <div className="mt-4 flex min-h-[52px] items-center gap-3 rounded-md bg-fg/[0.04] px-3 py-3">
         <p className="min-w-0 text-hint text-fg">
-          <span className="font-semibold">
+          <span className="font-medium">
             {sellers === 1 ? 'Supplies 1 seller' : `Supplies ${sellers} sellers`}
             {toShip > 0 && ` · ${toShip === 1 ? '1 order' : `${toShip} orders`} to ship`}
           </span>
           <span className="block text-muted">
             {supplier.status !== 'ACTIVE'
-              ? 'Sellers can’t order from you right now.'
+              ? 'Sellers can’t order from you right now'
               : sellers === 0
-                ? 'No seller is linked right now.'
-                : 'Your sellers can add the products you offer.'}
+                ? 'No seller is linked right now'
+                : 'Your sellers can add the products you offer'}
           </span>
         </p>
       </div>

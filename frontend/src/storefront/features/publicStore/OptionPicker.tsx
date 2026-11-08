@@ -91,12 +91,10 @@ export function OptionPicker({
         const swatches = [...pictures.values()].some(Boolean)
         return (
           <div key={type.name}>
-            <p
-              className={`text-xs font-bold uppercase tracking-wide ${skin.muted}`}
-            >
+            <p className={`text-sm ${skin.muted}`}>
               {type.name}
               {chosen && (
-                <span className="ml-1.5 font-semibold normal-case tracking-normal">
+                <span className={`ml-1.5 font-medium ${skin.text}`}>
                   · {chosen}
                 </span>
               )}

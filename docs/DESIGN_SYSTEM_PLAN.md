@@ -165,6 +165,19 @@ Also: 9 separate dialog implementations, 3 card styles, 13 corner radii,
 - The remaining guard counts are the deliberate exceptions listed under
   Phase 5; they are frozen, not driven to 0.
 
+## Follow-up — polish pass (November 2026) ☑
+- **Product page** (`StoreProductPage` + shared `Breadcrumb`, `StockBadge`,
+  `OptionPicker`, `GroupSwatchRow`, `DeliveryCheck`, `ContactActions`): store
+  colour kept for Buy Now, the selection and links only; one delivery panel;
+  sentence-case labels; no "Hover to zoom" pill.
+- **My Shops shell + dashboard + My shops list** (glass kept, per Decision 1):
+  no greeting (today's date instead); flat `brand-soft` icon tiles instead of
+  gradient + glow (`PageHeader`, Next step, checklist step); no uppercase
+  tracked captions; 700 → 600/500; inner tiles 8px inside 12px cards; the
+  looping gold edge on **Share on WhatsApp** removed (it was never on the
+  sanctioned list above).
+- Budget after: gradients 23, ad-hoc effects 15 (others unchanged).
+
 ## Done
 All six phases are shipped. New UI work follows `DESIGN_GUIDELINES.md`; the
 `check:ui` guard keeps the counts from rising.

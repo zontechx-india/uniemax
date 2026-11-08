@@ -28,7 +28,7 @@ export function ShopTrustTips({ store }: { store: Store }) {
       key: 'contact',
       icon: WhatsAppIcon,
       title: 'Add your WhatsApp number',
-      why: 'Customers see “WhatsApp” and “Call” buttons and can ask you before buying.',
+      why: 'Customers see “WhatsApp” and “Call” buttons and can ask you before buying',
       to: 'footer',
     })
   }
@@ -37,7 +37,7 @@ export function ShopTrustTips({ store }: { store: Store }) {
       key: 'about',
       icon: ChatIcon,
       title: 'Write one line about your shop',
-      why: 'It shows under your shop name, e.g. “Pure silk sarees from Kanchipuram since 1998”.',
+      why: 'It shows under your shop name, e.g. “Pure silk sarees from Kanchipuram since 1998”',
       to: 'footer',
     })
   }
@@ -46,7 +46,7 @@ export function ShopTrustTips({ store }: { store: Store }) {
       key: 'logo',
       icon: StoreIcon,
       title: 'Add your shop logo',
-      why: 'A logo makes your shop look real and easy to remember.',
+      why: 'A logo makes your shop look real and easy to remember',
       to: 'details',
     })
   }
@@ -54,11 +54,11 @@ export function ShopTrustTips({ store }: { store: Store }) {
 
   return (
     <section aria-labelledby="trust-heading">
-      <h3 id="trust-heading" className="mb-1 text-base font-bold text-fg">
+      <h3 id="trust-heading" className="mb-1 text-base font-semibold text-fg">
         Help customers trust your shop
       </h3>
-      <p className="mb-2.5 text-hint text-muted">
-        New customers order more from shops that show these.
+      <p className="mb-3 text-hint text-muted">
+        New customers order more from shops that show these
       </p>
       <ul className="glass-card divide-y divide-line overflow-hidden rounded-glass">
         {tips.map(({ key, icon: Icon, title, why, to }) => (

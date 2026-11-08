@@ -28,7 +28,8 @@ import { SupplierHome, useDropshipRole } from '../../../packages/dropship'
  * Dashboard — the landing view of store management.
  *
  * It opens on a HERO — a tinted glass card (`glass-tint`), not a solid block,
- * so the one strong colour on it is the next-step button — that answers the
+ * so the one strong colour on it is the next-step button; it is titled with
+ * the shop name under today's date (no greeting) — that answers the
  * only two questions a seller has when
  * they arrive: *how am I doing?* (today's orders, waiting orders, sales) and
  * *what should I do now?* — ONE next step with ONE button, picked from the
@@ -111,29 +112,29 @@ export function StoreDashboardPage() {
       {dashboard && hasOrders && (
         <>
           <section aria-labelledby="pipeline-heading">
-            <h3 id="pipeline-heading" className="mb-2.5 text-base font-bold text-fg">
+            <h3 id="pipeline-heading" className="mb-3 text-base font-semibold text-fg">
               Your orders
             </h3>
             {/* Phone: one row that scrolls sideways (the fade on the right
                 says there is more). From sm: a grid, nothing hidden. */}
             <div className="-mx-4 [mask-image:linear-gradient(to_right,#000_85%,transparent)] sm:mx-0 sm:[mask-image:none]">
-              <div className="flex snap-x gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:grid sm:grid-cols-3 sm:px-0 lg:grid-cols-6">
+              <div className="flex snap-x gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:grid sm:grid-cols-3 sm:px-0 lg:grid-cols-6">
                 {PIPELINE.map(({ key, label, to, dot }) => {
                   const body = (
                     <>
-                      <span className="flex items-center gap-1.5 text-hint font-semibold text-muted">
+                      <span className="flex items-center gap-1.5 text-hint font-medium text-muted">
                         <span aria-hidden className={`h-2 w-2 rounded-full ${dot}`} />
                         {label}
                       </span>
-                      <span className="mt-1 block font-figure text-3xl leading-none font-bold text-fg">
+                      <span className="mt-2 block font-figure text-3xl leading-none font-semibold tabular-nums text-fg">
                         {dashboard.stats[key]}
                       </span>
                     </>
                   )
                   const chip =
-                    'glass-card block min-w-[124px] shrink-0 snap-start rounded-2xl px-3.5 py-3 sm:min-w-0'
+                    'glass-card block min-w-[124px] shrink-0 snap-start rounded-xl px-4 py-3 sm:min-w-0'
                   return to ? (
-                    <Link key={key} to={to} className={`${chip} transition hover:border-brand/40`}>
+                    <Link key={key} to={to} className={`${chip} transition-colors hover:border-brand/40`}>
                       {body}
                     </Link>
                   ) : (
@@ -147,13 +148,13 @@ export function StoreDashboardPage() {
           </section>
 
           <section aria-labelledby="latest-heading">
-            <div className="mb-2.5 flex items-center justify-between gap-3">
-              <h3 id="latest-heading" className="text-base font-bold text-fg">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 id="latest-heading" className="text-base font-semibold text-fg">
                 Latest orders
               </h3>
               <Link
                 to="orders"
-                className="inline-flex min-h-tap items-center gap-1 rounded-xl px-2 text-sm font-semibold text-brand transition hover:bg-brand-soft"
+                className="inline-flex min-h-tap items-center gap-1 rounded-md px-2 text-sm font-medium text-brand transition-colors hover:bg-brand-soft"
               >
                 See all
                 <ArrowRightIcon className="h-4 w-4" />
@@ -181,7 +182,7 @@ export function StoreDashboardPage() {
           <EmptyState
             icon={CartIcon}
             title="No orders yet"
-            description="When a customer orders, it shows up here straight away."
+            description="When a customer orders, it shows up here straight away"
           />
         </div>
       )}
@@ -197,10 +198,13 @@ export function StoreDashboardPage() {
 // Hero
 // ---------------------------------------------------------------------------
 
-function greeting(hour: number): string {
-  if (hour < 12) return 'Good morning'
-  if (hour < 17) return 'Good afternoon'
-  return 'Good evening'
+/** "Saturday, 8 November" — names the day the hero's "Today" counts. */
+function todayLabel(): string {
+  return new Date().toLocaleDateString('en-IN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  })
 }
 
 function Hero({
@@ -217,8 +221,8 @@ function Hero({
 
   return (
     <section className="glass-tint rounded-glass p-4 sm:p-6">
-      <p className="text-sm font-medium text-muted">{greeting(new Date().getHours())}</p>
-      <h2 className="mt-0.5 font-heading text-2xl leading-tight font-bold break-words text-fg">
+      <p className="text-sm text-muted">{todayLabel()}</p>
+      <h2 className="mt-1 font-heading text-2xl leading-tight font-semibold break-words text-fg">
         {store.name}
       </h2>
 
@@ -265,13 +269,15 @@ function HeroStat({
   className?: string
 }) {
   return (
-    <div className={`min-w-0 ${className} rounded-2xl border border-glass-border bg-surface/55 px-3 py-2.5 shadow-[inset_0_1px_0_var(--glass-border)]`}>
-      <dt className="flex items-center gap-1.5 text-xs font-semibold text-muted">
+    // 8px corners inside the hero card's 12px — an inner radius is smaller
+    // than the one around it.
+    <div className={`min-w-0 ${className} rounded-md border border-glass-border bg-surface/55 px-3 py-3 shadow-[inset_0_1px_0_var(--glass-border)]`}>
+      <dt className="flex items-center gap-1.5 text-xs font-medium text-muted">
         {dot && <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${dot}`} />}
         {label}
       </dt>
       <dd
-        className={`mt-0.5 font-figure leading-tight font-bold text-fg ${
+        className={`mt-1 font-figure leading-tight font-semibold tabular-nums text-fg ${
           small ? 'break-words text-xl' : 'truncate text-2xl'
         }`}
       >
@@ -320,7 +326,7 @@ function NextStep({
     } else {
       icon = CheckIcon
       title = 'Your shop is ready'
-      detail = 'Publish it so customers can see it and order.'
+      detail = 'Publish it so customers can see it and order'
       action = (
         <button
           type="button"
@@ -336,7 +342,7 @@ function NextStep({
     const waiting = dashboard.stats.pending
     icon = CartIcon
     title = `${waiting} order${waiting === 1 ? ' is' : 's are'} waiting`
-    detail = 'Confirm them so your customers know their order is coming.'
+    detail = 'Confirm them so your customers know their order is coming'
     action = (
       <Link to="orders?status=PENDING" className={buttonClass({ size: 'lg', full: true })}>
         See waiting orders
@@ -348,8 +354,8 @@ function NextStep({
     icon = first ? ShareIcon : CheckIcon
     title = first ? 'Get your first order' : 'All caught up'
     detail = first
-      ? 'Send your shop link to your customers on WhatsApp.'
-      : 'No orders are waiting. Share your shop to get more.'
+      ? 'Send your shop link to your customers on WhatsApp'
+      : 'No orders are waiting — share your shop to get more'
     action = (
       <WhatsAppShareLink href={whatsAppShareUrl(store.name, url)} />
     )
@@ -357,15 +363,17 @@ function NextStep({
 
   const Icon = icon
   return (
-    <div className="mt-4 rounded-2xl border border-glass-border bg-surface/70 p-3.5 shadow-[inset_0_1px_0_var(--glass-border)]">
+    <div className="mt-4 rounded-md border border-glass-border bg-surface/70 p-4 shadow-[inset_0_1px_0_var(--glass-border)]">
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-gradient text-brand-contrast shadow-[0_6px_16px_-8px_var(--cta-glow)]">
+        {/* Flat tile, no gradient or glow: the button below is the one
+            solid colour on the card. */}
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-brand-soft text-brand">
           <Icon className="h-5 w-5" />
         </span>
         <div className="min-w-0">
-          <p className="text-xs font-bold tracking-[0.06em] text-brand uppercase">Next step</p>
-          <p className="text-base leading-snug font-bold text-fg">{title}</p>
-          <p className="mt-0.5 text-hint text-muted">{detail}</p>
+          <p className="text-xs font-medium text-brand">Next step</p>
+          <p className="text-base leading-snug font-semibold text-fg">{title}</p>
+          <p className="mt-1 text-hint text-muted">{detail}</p>
         </div>
       </div>
       {action && <div className="mt-3">{action}</div>}
@@ -385,7 +393,7 @@ function DashboardSkeleton() {
       <div className="h-5 w-32 animate-pulse rounded-md bg-fg/10" />
       <div className="flex gap-2.5">
         {[0, 1, 2].map((key) => (
-          <div key={key} className="glass-card h-[76px] flex-1 animate-pulse rounded-2xl" />
+          <div key={key} className="glass-card h-[76px] flex-1 animate-pulse rounded-xl" />
         ))}
       </div>
     </div>

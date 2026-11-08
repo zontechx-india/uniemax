@@ -43,7 +43,7 @@ export function ProgressRing({
         />
       </svg>
       {label && (
-        <span className="relative text-xs font-bold text-fg">
+        <span className="relative text-xs font-semibold tabular-nums text-fg">
           {done}/{total}
         </span>
       )}

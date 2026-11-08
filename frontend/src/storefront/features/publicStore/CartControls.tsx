@@ -402,15 +402,16 @@ export function StockBadge({ stock }: { stock: number }) {
   const level = stockLevel(stock)
   if (level === 'out') {
     return (
-      <span className="rounded-full bg-surface-alt px-1.5 py-0.5 text-xs font-semibold text-muted">
-        Out of Stock
+      <span className="rounded-full bg-surface-alt px-2 py-0.5 text-xs font-medium text-muted">
+        Out of stock
       </span>
     )
   }
   if (level === 'low') {
     return (
-      <span className="rounded-full bg-warning/15 px-1.5 py-0.5 text-xs font-semibold text-warning">
-        Low Stock
+      // Same words as the product card ("Only a few left") — one voice.
+      <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
+        Only a few left
       </span>
     )
   }

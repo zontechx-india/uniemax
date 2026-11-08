@@ -35,9 +35,9 @@ export function GroupSwatchRow({
     <div className="mt-6 space-y-4">
       {groups.map((group) => (
         <div key={group.optionName}>
-          <p className={`text-xs font-bold uppercase tracking-wide ${skin.muted}`}>
+          <p className={`text-sm ${skin.muted}`}>
             {group.optionName}
-            <span className="ml-1.5 font-semibold normal-case tracking-normal">
+            <span className={`ml-1.5 font-medium ${skin.text}`}>
               · {group.value}
             </span>
           </p>

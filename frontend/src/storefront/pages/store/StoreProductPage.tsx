@@ -60,6 +60,7 @@ import {
 } from '../../layout/icons'
 import type { Skin } from '../../features/publicStore/storeTheme'
 import { MediaImg } from '../../../shared/media/MediaImg'
+import { buttonClass } from '../../../shared/ui/Button'
 import { displayName, plainLetters } from '../../features/publicStore/shopShape'
 import { ContactActions, shopContact } from '../../features/publicStore/ShopContact'
 
@@ -176,7 +177,7 @@ export function StoreProductPage() {
     return (
       <StorePageShell>
         <div className="py-16 text-center">
-          <h1 className={`font-heading text-lg font-bold ${skin.text}`}>
+          <h1 className={`font-heading text-lg font-semibold ${skin.text}`}>
             Product not found
           </h1>
           <p className={`mt-2 text-sm ${skin.muted}`}>
@@ -184,7 +185,7 @@ export function StoreProductPage() {
           </p>
           <Link
             to={`/store/${store.slug}`}
-            className={`mt-5 inline-flex h-10 items-center rounded-md px-5 text-sm font-bold ${skin.cta}`}
+            className={buttonClass({ variant: 'primary', className: 'mt-5' })}
           >
             Back to store
           </Link>
@@ -294,7 +295,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
             <div className="min-w-0">
               <Link
                 to={storeCategoryUrl(store.slug, product.category.slug)}
-                className="text-xs font-semibold uppercase tracking-[0.2em] text-brand transition-opacity hover:opacity-80"
+                className={`text-sm font-medium transition-colors hover:text-brand ${skin.muted}`}
               >
                 {product.category.name}
               </Link>
@@ -310,6 +311,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
                 productId={product.id}
                 productName={product.name}
                 auth={storeAuthRequest(store)}
+                floating={false}
               />
               <ShareButton
                 title={`${product.name} · ${store.name}`}
@@ -348,7 +350,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
             <ul className="mt-4 space-y-1.5">
               {content.highlights.slice(0, CARD_HIGHLIGHTS).map((line, i) => (
                 <li key={i} className={`flex gap-2 text-sm ${skin.muted}`}>
-                  <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+                  <CheckIcon className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>{plainLetters(line)}</span>
                 </li>
               ))}
@@ -371,7 +373,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
           />
           {hasOptions && !variant && (
             <p className={`mt-3 text-sm font-medium ${skin.muted}`}>
-              This combination isn’t available — try another option.
+              This combination isn’t available — try another option
             </p>
           )}
 
@@ -387,12 +389,13 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
               linking it, so the seller knows exactly what they mean. */}
           {shopContact(store).whatsapp && (
             <div className="mt-4">
-              <p className={`mb-2 text-sm font-semibold ${skin.text}`}>
+              <p className={`mb-2 text-sm font-medium ${skin.text}`}>
                 Have a question? Ask the shop
               </p>
               <ContactActions
                 store={store}
                 skin={skin}
+                quiet
                 message={`Hi, I have a question about "${product.name}"${
                   variant?.name ? ` (${variant.name})` : ''
                 }: ${window.location.origin}${window.location.pathname}`}
@@ -404,15 +407,14 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
               default address (or a pincode they typed) the moment the page
               opens, so a product outside their area says so before they add
               it to the cart. */}
-          <DeliveryCheck store={store} product={product} skin={skin} />
-
-          {/* Delivery, payment and trust as ONE quiet panel — three blocks
-              in three different styles (box, icon list, badge row) read as
-              clutter beside the buy buttons. */}
+          {/* Delivery, payment and trust as ONE quiet panel: the pincode
+              answer leads, then the store's own terms, then the trust line.
+              Two stacked boxes read as two forms beside the buy buttons. */}
           <section
             aria-label="Delivery and payment"
-            className={`mt-5 rounded-lg border px-4 py-4 sm:px-5 ${skin.border}`}
+            className={`mt-6 rounded-lg border px-4 py-4 sm:px-5 ${skin.border}`}
           >
+            <DeliveryCheck store={store} product={product} skin={skin} />
             <DeliveryInfo store={store} product={product} skin={skin} />
             <TrustBadges store={store} skin={skin} />
           </section>
@@ -422,14 +424,14 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
       {/* Only when the card preview didn't already show them all — the same
           bullets twice on one screen reads as padding, not detail. */}
       {content.highlights.length > CARD_HIGHLIGHTS && (
-        <PageSection title="Product Highlights" skin={skin}>
+        <PageSection title="Product highlights" skin={skin}>
           <ul className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             {content.highlights.map((line, i) => (
               <li
                 key={i}
                 className={`flex gap-2.5 rounded-lg border p-3 text-sm ${skin.border} ${skin.surface} ${skin.text}`}
               >
-                <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+                <CheckIcon className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>{plainLetters(line)}</span>
               </li>
             ))}
@@ -461,7 +463,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
       </PageSection>
 
       {product.related.length > 0 && (
-        <PageSection title="You May Also Like" skin={skin}>
+        <PageSection title="You may also like" skin={skin}>
           <ProductGrid store={store} products={product.related} skin={skin} />
         </PageSection>
       )}
@@ -550,7 +552,7 @@ function DeliveryInfo({
         >
           {pickupAt
             ? `Collect from ${pickupAt.label ? `${pickupAt.label} — ` : ''}${pickupAt.address}`
-            : 'Choose pickup at checkout.'}
+            : 'Choose pickup at checkout'}
         </InfoRow>
       )}
 
@@ -560,7 +562,7 @@ function DeliveryInfo({
           title="Cash on delivery"
           skin={skin}
         >
-          Pay when your order arrives.
+          Pay when your order arrives
         </InfoRow>
       ) : store.payments.acceptCod ? (
         <InfoRow
@@ -569,7 +571,7 @@ function DeliveryInfo({
           skin={skin}
         >
           Cash on delivery isn&rsquo;t offered for this product — pay online at
-          checkout.
+          checkout
         </InfoRow>
       ) : null}
 
@@ -604,15 +606,15 @@ function DeliveryInfo({
 function shippingCopy(shipping: PublicProductDetail['shipping']): string {
   if (shipping.type === 'FREE') {
     return shipping.source === 'PRODUCT'
-      ? 'This product ships free — no delivery charge at checkout.'
-      : 'Delivered to your address — no shipping charges at checkout.'
+      ? 'This product ships free — no delivery charge at checkout'
+      : 'Delivered to your address — no shipping charges at checkout'
   }
   let copy = `Flat ${formatPrice(shipping.amount)} shipping per order`
   if (shipping.freeAbove !== null) {
     copy += `, free on orders above ${formatPrice(shipping.freeAbove)}`
   }
   if (shipping.source === 'PRODUCT') copy += ' (this product’s own rate)'
-  return `${copy}. Confirmed at checkout.`
+  return `${copy} · confirmed at checkout`
 }
 
 function InfoRow({
@@ -627,10 +629,15 @@ function InfoRow({
   children: React.ReactNode
 }) {
   return (
+    // Same 28px icon column as the pincode row above (`DeliveryCheck`), so
+    // every title in the panel starts on one line. Icons are muted: the
+    // store colour is kept for the buy button and the selection.
     <li className="flex gap-3">
-      <span className="mt-0.5 shrink-0 text-brand">{icon}</span>
+      <span className={`mt-0.5 flex w-7 shrink-0 justify-center ${skin.muted}`}>
+        {icon}
+      </span>
       <div className="min-w-0">
-        <p className={`font-semibold ${skin.text}`}>{title}</p>
+        <p className={`font-medium ${skin.text}`}>{title}</p>
         <p className={skin.muted}>{children}</p>
       </div>
     </li>
@@ -688,13 +695,15 @@ function TrustBadges({ store, skin }: { store: PublicStore; skin: Skin }) {
   }
 
   return (
-    <ul className={`mt-4 grid grid-cols-2 gap-2 border-t pt-4 ${skin.border}`}>
+    <ul
+      className={`mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t pt-4 ${skin.border}`}
+    >
       {badges.map((badge) => (
         <li
           key={badge.label}
-          className={`flex items-center gap-2 text-xs font-semibold ${skin.muted}`}
+          className={`flex min-w-0 items-center gap-3 text-xs font-medium ${skin.muted}`}
         >
-          <span className="shrink-0 text-brand">{badge.icon}</span>
+          <span className="flex w-7 shrink-0 justify-center">{badge.icon}</span>
           <span className="truncate">{badge.label}</span>
         </li>
       ))}
@@ -817,7 +826,7 @@ function StickyBuyBar({
           <p className={`truncate text-sm font-semibold ${skin.text}`}>
             {displayName(product.name)}
           </p>
-          <p className="font-figure text-base font-bold text-brand">
+          <p className={`font-figure text-base font-semibold ${skin.text}`}>
             {formatPrice(price)}
             {target.variantName && (
               <span className={`ml-2 text-xs font-normal ${skin.muted}`}>
@@ -909,8 +918,6 @@ function MediaGallery({
   const step = (delta: number) =>
     setIndex((current) => (current + delta + media.length) % media.length)
 
-  const isImage = active.type === 'IMAGE'
-
   return (
     <div className="flex min-w-0 flex-col-reverse gap-3 lg:flex-row">
       {media.length > 1 && (
@@ -926,7 +933,7 @@ function MediaGallery({
                     : (item.altText ?? `Show image ${i + 1}`)
                 }
                 aria-pressed={i === index}
-                className={`relative block h-16 w-16 overflow-hidden rounded-md border transition duration-200 lg:h-20 lg:w-20 ${
+                className={`relative block h-16 w-16 overflow-hidden rounded-md border transition-[border-color,opacity] duration-150 lg:h-20 lg:w-20 ${
                   i === index
                     ? 'border-brand ring-2 ring-brand/40'
                     : `${skin.border} opacity-70 hover:opacity-100 hover:border-brand`
@@ -1031,22 +1038,14 @@ function MediaGallery({
           <>
             <GalleryArrow direction="prev" onClick={() => step(-1)} skin={skin} />
             <GalleryArrow direction="next" onClick={() => step(1)} skin={skin} />
+            {/* Position only — no "Hover to zoom" pill: the zoom shows
+                itself under the cursor, and the pill covered the photo. */}
             <span
-              className={`pointer-events-none absolute bottom-3 right-3 rounded-full px-2.5 py-1 text-xs font-semibold ${skin.surface} ${skin.muted}`}
+              className={`pointer-events-none absolute bottom-3 right-3 rounded-full px-2.5 py-1 font-figure text-xs font-medium tabular-nums ${skin.surface} ${skin.muted}`}
             >
               {index + 1} / {media.length}
             </span>
           </>
-        )}
-
-        {isImage && (
-          <span
-            className={`pointer-events-none absolute bottom-3 left-3 hidden rounded-full px-2.5 py-1 text-xs font-semibold lg:block ${skin.surface} ${skin.muted} ${
-              zoom ? 'opacity-0' : 'opacity-100'
-            } transition-opacity`}
-          >
-            Hover to zoom
-          </span>
         )}
       </div>
     </div>
@@ -1067,7 +1066,7 @@ function GalleryArrow({
       type="button"
       onClick={onClick}
       aria-label={direction === 'prev' ? 'Previous image' : 'Next image'}
-      className={`absolute top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 ${
+      className={`absolute top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 ${
         direction === 'prev' ? 'left-3' : 'right-3'
       } ${skin.border} ${skin.surface} ${skin.text}`}
     >
