@@ -11,6 +11,7 @@ import type {
 } from '../features/adminApi'
 import { useAdminQuery } from '../features/useAdminQuery'
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
+import { storefrontOrigin } from '../../shared/appOrigin'
 import { copyToClipboard } from '../../shared/share'
 import { toApiError } from '../../shared/auth/http'
 import { WaStatusChip } from './whatsapp/whatsappUi'
@@ -201,7 +202,7 @@ export default function StoreDetailPage() {
             <StoreStatusChip isPublished={store.isPublished} suspendedAt={store.suspendedAt} />
             {store.verifiedAt ? <Chip tone="success">Verified</Chip> : null}
             <a
-              href={`/store/${store.slug}`}
+              href={`${storefrontOrigin()}/store/${store.slug}`}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1 text-accent hover:underline"
@@ -928,7 +929,7 @@ function SellerSetupCard({ store }: { store: StoreDetail }) {
   // The seller's own management pages, absolute: this link is going into a
   // WhatsApp message or an email, where a bare path resolves to nothing.
   const linkTo = (href: string) =>
-    `${window.location.origin}/mystores/${store.slug}/${href}`
+    `${storefrontOrigin()}/mystores/${store.slug}/${href}`
 
   const message = [
     `Hi — your UnieMax store "${store.name}" isn't finished yet.`,

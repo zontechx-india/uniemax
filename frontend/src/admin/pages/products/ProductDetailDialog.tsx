@@ -4,6 +4,7 @@ import { adminApi } from '../../features/adminApi'
 import type { ProductDetail } from '../../features/adminApi'
 import { useAdminQuery } from '../../features/useAdminQuery'
 import { Dialog } from '../../../shared/ui/Dialog'
+import { storefrontOrigin } from '../../../shared/appOrigin'
 import { Button, Chip, ErrorState, Skeleton } from '../../ui/primitives'
 import { ActiveChip } from '../../ui/statusMeta'
 import {
@@ -93,7 +94,7 @@ function ProductDetailPanel({
           product ? (
             <>
               <a
-                href={`/store/${product.store.slug}/product/${product.slug}`}
+                href={`${storefrontOrigin()}/store/${product.store.slug}/product/${product.slug}`}
                 target="_blank"
                 rel="noreferrer"
                 className="mr-auto inline-flex items-center gap-1 text-sm text-accent hover:underline"

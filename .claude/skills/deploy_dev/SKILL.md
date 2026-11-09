@@ -11,7 +11,8 @@ workspace warning, verification).
 
 Key facts:
 
-- **Dev site:** `https://dev.uniemax.zontechx.com/` (+ `/admin`, `/api/v1/...`),
+- **Dev site:** `https://dev.uniemax.zontechx.com/` (+ `/api/v1/...`); admin app
+  at `https://admin.dev.uniemax.zontechx.com/` (vhost `uniemax-admin-dev`, same root);
   nginx vhost `uniemax-domain`, root `/var/www/uniemax`; also on
   `http://13.206.249.204:8080/` and port 80 by IP (vhost `uniemax`).
 - **This deploys the backend, which prod shares.** One pm2 process
@@ -54,7 +55,8 @@ Summary of the flow:
      that the right database is live.
 4. **Verify (never skip):** pm2 online with stable restart count, port 4000
    listening, local curl 200, then from the local machine check the public
-   URLs (storefront `/`, `/admin`, `/api/v1/public/stores`).
+   URLs (storefront `/`, `/api/v1/public/stores`, and
+   `https://admin.dev.uniemax.zontechx.com/orders` returns the admin bundle).
 5. **Report:** deployed commit hash + what was rebuilt (backend/frontend/both)
    + verification results.
 

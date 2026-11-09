@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Dialog } from '../../../shared/ui/Dialog'
+import { storefrontOrigin } from '../../../shared/appOrigin'
 import { adminApi } from '../../features/adminApi'
 import type { WaTemplate } from '../../features/adminApi'
 import { useAdminQuery } from '../../features/useAdminQuery'
@@ -143,7 +144,7 @@ export default function WhatsAppTemplatesPage() {
                 ) : null}
                 <p className="text-xs text-muted">
                   To count clicks on a campaign button, give it the link{' '}
-                  <span className="break-all font-mono">{`${window.location.origin}/api/v1/r/{{1}}`}</span>{' '}
+                  <span className="break-all font-mono">{`${storefrontOrigin()}/api/v1/r/{{1}}`}</span>{' '}
                   in WhatsApp Manager — each campaign then sets where the click goes.
                 </p>
               </div>

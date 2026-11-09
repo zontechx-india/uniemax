@@ -258,7 +258,7 @@ An admin account is per-database: a fresh project has none until
 | URL                                            | What                    |
 | ---------------------------------------------- | ----------------------- |
 | **`https://dev.uniemax.zontechx.com/`**        | Storefront (primary URL) |
-| **`https://dev.uniemax.zontechx.com/admin`**   | Admin app               |
+| **`https://admin.dev.uniemax.zontechx.com/`** | Admin app (own nginx site `uniemax-admin-dev`) |
 | **`https://dev.uniemax.zontechx.com/api/v1/...`** | API (proxied to :4000) |
 | `http://127.0.0.1:8080/` (on the box only)     | Same site by IP, for on-box checks |
 
@@ -271,7 +271,7 @@ connection (`444`).
 | URL                                          | What                                  |
 | -------------------------------------------- | ------------------------------------- |
 | **`https://uniemax.com/`**                   | PROD storefront (primary)             |
-| **`https://uniemax.com/admin`**              | PROD admin app                        |
+| **`https://admin.uniemax.com/`**             | PROD admin app (own nginx site `uniemax-admin`) |
 | **`https://uniemax.com/api/v1/...`**         | API (proxied to :4000)                |
 | `https://www.uniemax.com/`                   | Same site (covered by the same cert)  |
 | `http://127.0.0.1:8081/` (on the box only)   | Same prod site by IP, for on-box checks |
@@ -389,7 +389,35 @@ Notes:
 - Env files are not in git; they persist on the server across deploys. Only
   re-upload them (pscp) if a new env var was added.
 
-### The `/admin` console needs its own nginx fallback
+### The admin console has its own host
+
+Since 10 Nov 2026 the console is served at **`admin.uniemax.com`** (prod) and
+**`admin.dev.uniemax.zontechx.com`** (dev). Each is its own nginx site —
+`sites-available/uniemax-admin` and `uniemax-admin-dev` — over the **same**
+web root as its storefront host (`/var/www/uniemax-prod`, `/var/www/uniemax`),
+so a deploy updates it with no extra step. Each site:
+
+- proxies `/api/` + `/uploads/` to its backend (`:4000` prod, `:4001` dev);
+- serves `admin.html` for every path (`location / { try_files $uri /admin.html; }`);
+- serves the **storefront** shell for `/store/**` — the store builder previews
+  the storefront there in a same-origin iframe;
+- 301s old `/admin/...` links to the same path at the root;
+- answers `robots.txt` with `Disallow: /` and (via the `$um_robots` map in
+  `conf.d/uniemax-security-maps.conf`) `X-Robots-Tag: noindex, nofollow`;
+- has its own Let's Encrypt cert (`certbot --nginx -d <host>`; auto-renews).
+  The DNS records are grey-cloud A records to the EC2 IP, like the others.
+
+Check after a change:
+
+```bash
+curl -s -H 'Accept: text/html' https://admin.uniemax.com/orders | grep -c assets/admin       # 1
+curl -s -H 'Accept: text/html' https://admin.uniemax.com/store/x | grep -c assets/storefront # 1
+curl -sI https://admin.uniemax.com/ | grep -i x-robots-tag                                    # noindex, nofollow
+```
+
+The storefront hosts still carry the older `/admin` blocks below.
+
+### The `/admin` path on the storefront hosts
 
 The admin app is a **second SPA** (`admin.html`) served at `/admin` on the same
 origin, with client-side routes like `/admin/orders/abc`. All four site configs

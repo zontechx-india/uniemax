@@ -8,12 +8,12 @@
 ## Core Principle — Two Apps, One Repo
 
 The frontend ships **two completely separate applications** — two HTML
-entries, two bundles, one origin:
+entries, two bundles, one build folder:
 
 | App        | Served at        | Audience                | API surface           |
 | ---------- | ---------------- | ----------------------- | --------------------- |
 | Storefront | `/` (everything else) | Customers & sellers | `/api/v1/...`         |
-| Admin      | **`/admin`**     | UnieMax platform staff | `/api/v1/admin/...`   |
+| Admin      | **`admin.<host>/`** (`admin.uniemax.com`); `/admin` locally | UnieMax platform staff | `/api/v1/admin/...`   |
 
 This mirrors the backend, which already splits its routes into a public
 (customer) subtree and an `/admin` subtree (see [BACKEND_CONTEXT.md](./BACKEND_CONTEXT.md)).
@@ -21,8 +21,8 @@ This mirrors the backend, which already splits its routes into a public
 **Why separate builds:**
 
 - **Security** — admin code, routes, and views never ship in the bundle a
-  customer downloads. `admin.html` is only fetched by someone who asked for
-  `/admin`.
+  customer downloads. `admin.html` is only fetched by someone who opened
+  the admin host (or `/admin`).
 - **Isolation** — a change to the admin console cannot break the storefront and
   vice versa. They share the token layer (`src/index.css`) and `src/shared/`,
   plus **one deliberate exception**: the admin console imports the seller's
@@ -32,15 +32,30 @@ This mirrors the backend, which already splits its routes into a public
   That direction is one-way — the storefront imports nothing from `admin/` —
   and the shared pages default to owner behaviour, so the storefront is
   unaffected by the admin's use of them.
-- **Deployment** — the `/admin` path can be cached and access-controlled
+- **Deployment** — the admin host can be cached and access-controlled
   independently (WAF / IP allow-list at the edge) on top of the backend's
   `requireAdmin` guard.
 
-**Why one origin rather than an `admin.` sub-domain** (the earlier plan): the
-API's auth cookies are same-origin, so a second origin would need CORS +
-`SameSite=None` and a second TLS certificate for no security gain — the
-bundle separation is what keeps admin code off a customer's machine, not the
-hostname. The sub-domain form still resolves in dev for old bookmarks.
+**Its own host (since 10 Nov 2026).** `admin.uniemax.com` and
+`admin.dev.uniemax.zontechx.com` are separate nginx sites over the **same**
+build folder as their storefront host. Each proxies `/api` + `/uploads` to
+its environment's backend itself, so the console still calls a same-origin
+`/api` — the auth cookies stay host-only and no CORS or `SameSite=None` is
+needed. Admins sign in once per host. Rules that follow:
+
+- **Basename** comes from `shared/appOrigin.ts` → `adminBasename()`: `/` on an
+  `admin.` host, `/admin` otherwise (local `localhost:5173/admin` still works;
+  `admin.localhost:5173` is the production-like form).
+- **Links from the console to the storefront** (View marketplace, a store or
+  product page, a seller's `/mystores/...` link sent over WhatsApp,
+  `publicStoreUrl`, the WhatsApp click-tracking URL) use `storefrontOrigin()`,
+  never `window.location.origin` or a bare `/store/...` — on the admin host
+  those resolve to the console.
+- **The admin host serves `/store/**` as the storefront shell**: the store
+  builder previews the storefront in a same-origin iframe
+  (`/store/<slug>?builder=1`, `builderBridge.ts` checks the origin). The Vite
+  dev router does the same on `admin.localhost`.
+- Old `/admin/...` links on the admin host 301 to the same path at the root.
 
 ---
 

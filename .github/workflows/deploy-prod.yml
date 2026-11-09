@@ -129,9 +129,13 @@ jobs:
 
       - name: Verify public production URLs
         run: |
-          for url in https://uniemax.com/ https://uniemax.com/admin \
+          for url in https://uniemax.com/ https://admin.uniemax.com/ \
                      https://uniemax.com/api/v1/public/stores https://www.uniemax.com/; do
             code=$(curl -s -o /dev/null -w '%{http_code}' "$url")
             echo "$url -> $code"
             [ "$code" = "200" ] || exit 1
           done
+          # The admin console's own host must return the admin shell, not the storefront.
+          curl -s -H 'Accept: text/html' https://admin.uniemax.com/orders | grep -q assets/admin \
+            || { echo "FAIL: admin.uniemax.com does not serve the admin app"; exit 1; }
+          echo "admin host -> admin app"

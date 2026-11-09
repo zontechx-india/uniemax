@@ -12,7 +12,8 @@ Follow the runbook in [docs/DEPLOYMENT.md](../../../docs/DEPLOYMENT.md)
   but shares the SAME backend (pm2 `uniemax-backend`, port 4000) as dev.
   `/deploy_prod` must NEVER touch the backend, pm2, or Prisma. In particular it
   must never run `db:deploy` — schema changes ship through `/deploy_dev`.
-- Prod URLs: `https://uniemax.com/` and `https://www.uniemax.com/` (+ `/admin`),
+- Prod URLs: `https://uniemax.com/` and `https://www.uniemax.com/`; admin app at
+  `https://admin.uniemax.com/` (vhost `uniemax-admin`, same web root),
   direct port `http://13.206.249.204:8081/` (needs TCP 8081 inbound in the
   security group). Served by nginx vhosts `uniemax-com` (domain, HTTPS via the
   `uniemax.com` certbot cert) and `uniemax-prod` (port 8081), both rooted at
@@ -41,9 +42,9 @@ Follow the runbook in [docs/DEPLOYMENT.md](../../../docs/DEPLOYMENT.md)
      fine — dev's deployed files in `/var/www/uniemax` are not touched.
 4. **Verify (never skip):** on the server curl `http://127.0.0.1:8081/`,
    `/admin`, `/api/v1/public/stores` → all 200; then from the local machine
-   check `https://uniemax.com/` (+ `/admin`). The `/admin` check matters — it
-   is a second SPA (`admin.html`) and depends on the vhost's `^~ /admin/`
-   fallback, so confirm it returns the admin bundle, not the storefront.
+   check `https://uniemax.com/` and `https://admin.uniemax.com/orders`. The
+   admin check matters — it is a second SPA (`admin.html`) served by its own
+   vhost, so confirm it returns the admin bundle, not the storefront.
 5. **Report:** deployed commit hash + verification results. Explicitly remind
    that the backend was NOT redeployed (use `/deploy_dev` for backend changes —
    backend changes affect BOTH dev and prod since they share it).

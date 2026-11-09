@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '../features/adminApi'
+import { storefrontOrigin } from '../../shared/appOrigin'
 import {
   Button,
   Card,
@@ -123,7 +124,7 @@ export default function HomeSectionsPage() {
             </Button>
             {/* Plain <a>: the homepage is the storefront build, not this one. */}
             <a
-              href="/"
+              href={`${storefrontOrigin()}/`}
               target="_blank"
               rel="noreferrer"
               className="inline-flex min-h-tap items-center gap-1.5 text-sm font-semibold text-fg underline decoration-line underline-offset-[6px] hover:text-brand"

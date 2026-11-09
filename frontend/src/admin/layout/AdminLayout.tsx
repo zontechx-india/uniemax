@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { AppLogoLockup } from '../../shared/ui/AppLogo'
+import { storefrontOrigin } from '../../shared/appOrigin'
 import { ThemeToggle } from '../../shared/theme/ThemeToggle'
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
 import { useAdminSession } from '../app/adminSession'
@@ -159,7 +160,7 @@ export function AdminLayout() {
           </span>
           <div className="ml-auto flex items-center gap-1">
             <a
-              href="/"
+              href={`${storefrontOrigin()}/`}
               className="hidden rounded-md px-3 py-2 text-sm text-muted transition-colors hover:bg-surface-alt hover:text-fg sm:block"
             >
               View marketplace

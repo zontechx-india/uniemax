@@ -1,6 +1,7 @@
 import { BrowserRouter } from 'react-router-dom'
 import { adminAuth } from '../shared/auth/authApi'
 import { useSession } from '../shared/auth/useSession'
+import { adminBasename } from '../shared/appOrigin'
 import { ThemeProvider } from '../shared/theme/ThemeProvider'
 import { AppLogoFull } from '../shared/ui/AppLogo'
 import { AdminSessionProvider } from './app/adminSession'
@@ -15,10 +16,10 @@ import { LoginPage } from './pages/LoginPage'
  * the console. Tokens live in httpOnly cookies — the console never holds a
  * credential in JS.
  *
- * `basename="/admin"`: this build is served at the `/admin` path of the same
- * origin as the storefront, so its client-side routes are `/admin/orders`
- * and so on. nginx returns `admin.html` for every path under `/admin`
- * (`try_files $uri /admin.html`), which is what makes a deep link work.
+ * Basename: on its own host (`admin.uniemax.com`) the console lives at `/`;
+ * at the `/admin` path of the storefront host (local dev) it is `/admin`.
+ * nginx returns `admin.html` for every console path (`try_files $uri
+ * /admin.html`), which is what makes a deep link work. See `appOrigin.ts`.
  */
 export function AdminApp() {
   const { state, signedIn, signOut } = useSession(adminAuth)
@@ -37,7 +38,7 @@ export function AdminApp() {
 
   return (
     <ThemeProvider>
-      <BrowserRouter basename="/admin">
+      <BrowserRouter basename={adminBasename()}>
         <AdminSessionProvider admin={state.user} onSignedOut={() => void signOut()}>
           <AdminRouter />
         </AdminSessionProvider>

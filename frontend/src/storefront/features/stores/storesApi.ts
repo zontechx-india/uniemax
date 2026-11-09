@@ -1,5 +1,6 @@
 import { call, callList, http } from '../../../shared/auth/http'
 import type { ListMeta } from '../../../shared/auth/http'
+import { storefrontOrigin } from '../../../shared/appOrigin'
 import { EMPTY_PROFILE, PERMISSIVE_READINESS } from './storeProfile'
 import type {
   Readiness,
@@ -974,9 +975,13 @@ function normalizePublic(raw: RawPublicStore): PublicStore {
   }
 }
 
-/** The customer-facing URL a store is shared at (public storefront page). */
+/**
+ * The customer-facing URL a store is shared at (public storefront page).
+ * Storefront origin, not the current one: these screens also run inside the
+ * admin console, whose host is `admin.…`.
+ */
 export function publicStoreUrl(slug: string): string {
-  return `${window.location.origin}/store/${slug}`
+  return `${storefrontOrigin()}/store/${slug}`
 }
 
 export const storesApi = {

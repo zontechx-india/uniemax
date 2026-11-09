@@ -7,17 +7,15 @@ import type { Connect, Plugin } from 'vite'
 /**
  * Dev-only admin router — mirrors what nginx does in production.
  *
- * The admin console is a SEPARATE build (`admin.html`) served on the same
- * origin under the `/admin` path, so its bundle never ships to a customer.
- * Because it is a client-side router, every deep link (`/admin/orders/x`)
- * must also return `admin.html`, exactly like nginx's
- * `location /admin { try_files $uri /admin.html; }`.
+ * The admin console is a SEPARATE build (`admin.html`), so its bundle never
+ * ships to a customer. In production it has its own host (admin.uniemax.com),
+ * where every path returns `admin.html` except `/store/…` — the store
+ * builder previews the storefront there in a same-origin iframe. Both forms
+ * work locally (`*.localhost` points at 127.0.0.1 automatically):
  *
  *   Storefront →  http://localhost:5173
- *   Admin      →  http://localhost:5173/admin
- *
- * The legacy `admin.` sub-domain form still resolves, so an existing
- * bookmark keeps working (`*.localhost` points at 127.0.0.1 automatically).
+ *   Admin      →  http://admin.localhost:5173   (as in production)
+ *              or http://localhost:5173/admin
  */
 function adminRouter(): Plugin {
   const handler: Connect.NextHandleFunction = (req, _res, next) => {
@@ -25,7 +23,9 @@ function adminRouter(): Plugin {
     const path = (req.url ?? '/').split('?')[0]
     const isHtmlNav = (req.headers.accept ?? '').includes('text/html')
     const isAdmin =
-      host.startsWith('admin.') || path === '/admin' || path.startsWith('/admin/')
+      (host.startsWith('admin.') && !path.startsWith('/store/')) ||
+      path === '/admin' ||
+      path.startsWith('/admin/')
 
     // Only rewrite top-level navigations; let assets (JS/CSS/img) pass through.
     if (isAdmin && isHtmlNav) {
