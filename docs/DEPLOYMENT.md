@@ -415,24 +415,20 @@ curl -s -H 'Accept: text/html' https://admin.uniemax.com/store/x | grep -c asset
 curl -sI https://admin.uniemax.com/ | grep -i x-robots-tag                                    # noindex, nofollow
 ```
 
-The storefront hosts still carry the older `/admin` blocks below.
-
 ### The `/admin` path on the storefront hosts
 
-The admin app is a **second SPA** (`admin.html`) served at `/admin` on the same
-origin, with client-side routes like `/admin/orders/abc`. All four site configs
-(`uniemax`, `uniemax-domain`, `uniemax-prod`, `uniemax-com`) **already
-carry** these two blocks ahead of the catch-all — verified on the server:
+The domain sites `uniemax-com` and `uniemax-domain` now **301** old console
+links to the admin host, keeping the path (`uniemax.com/admin/orders/x` →
+`admin.uniemax.com/orders/x`). Backups of the earlier blocks:
+`sites-available/.uniemax-com.pre-admin-redirect-*` (same for `uniemax-domain`).
 
 ```nginx
-location = /admin  { try_files /admin.html =404; }   # the bare path
-location ^~ /admin/ { try_files $uri /admin.html; }  # deep links + assets
-location /          { try_files $uri $uri/ /index.html; }  # storefront
+location = /admin   { return 301 https://admin.uniemax.com/; }
+location ^~ /admin/ { rewrite ^/admin/(.*)$ https://admin.uniemax.com/$1 permanent; }
 ```
 
-`^~` matters: it stops nginx from falling through to `location /` for anything
-under `/admin/`, so a refresh on a console route returns `admin.html` instead
-of the storefront. Verify after a deploy (`8080` = dev, `8081` = prod):
+The loopback IP sites (`uniemax` :8080, `uniemax-prod` :8081) still serve
+`admin.html` at `/admin` for on-box checks:
 
 ```bash
 curl -s -H 'Accept: text/html' http://127.0.0.1:8080/admin/orders | grep -c assets/admin   # 1
