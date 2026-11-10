@@ -844,6 +844,37 @@ WhatsApp Cloud API; setup: `backend/README.md`.
   sends, campaign creates/tests/controls, imports, consent changes and automation
   edits are written to the audit trail.
 
+### Meta Conversions API — `modules/meta`
+
+Server-side companion of the browser Meta Pixel. The pixel on the storefront
+fires `CompleteRegistration` with an `eventID`; the browser then calls
+`POST /api/v1/analytics/meta/seller-signup`, which this module uses to fire
+the SAME event server-side with the same id. Meta de-duplicates on
+`(event_name, event_id)` and fills in matching from whichever leg carried
+more signal — so hashed email, phone, external_id, IP, user agent, `_fbp`
+and `_fbc` arriving via the server lift Event Match Quality past the ~6 the
+browser pixel gets alone.
+
+- **Files.** Four standard ones plus `meta.config.ts` (env schema +
+  `isConfigured()` guard) and `meta.hash.ts` (`hashEmail`, `hashPhone` with
+  Indian E.164 normalisation, `hashExternalId`). Nothing is sent raw — PII
+  never reaches Meta's logs.
+- **Only `CompleteRegistration` goes server-side today**, fired only for
+  SELLER sign-ups (`AuthIntent === 'sell'` on the frontend). Buyer sign-ups
+  fire the custom `BuyerSignup` event in the browser only, so the ad
+  campaign optimising for `CompleteRegistration` is never trained on buyer
+  audiences — the whole point of the split.
+- **Idempotent per customer.** `Customer.metaSellerSignupSentAt` is set only
+  after Meta returns 2xx; a Meta error or network failure leaves it null so
+  a retry can still deliver. A repeat call for the same customer is a no-op
+  (`sent: false, reason: 'already_sent'`), surviving refreshes, re-logins
+  and other browsers.
+- **Off without env.** Missing `META_CAPI_PIXEL_ID` or
+  `META_CAPI_ACCESS_TOKEN` → endpoint logs and returns
+  `sent: false, reason: 'not_configured'`, still marking the customer sent
+  so a later retry cannot double-fire once the token lands. `META_CAPI_TEST_EVENT_CODE`
+  routes events to Events Manager → Test events for verification.
+
 ### Package seams — hooks and catalog events (`package/events`)
 
 What lets a package (dropshipping, Phases 2+) take part in core actions
@@ -867,6 +898,9 @@ without the core naming it. Rules: [dropshipping/architecture](./dropshipping/ar
   - `product.saving(productId, { kind, input })`: before any write in
     `updateProduct`, `replaceProductOptions`, `updateVariant` and
     `copyProduct` (veto only).
+  - `store.publishing(storeId)`: before a store is put on the marketplace, in
+    `setStorePublished` (veto only — dropshipping refuses a supplier account, which has
+    no shop).
 - **Catalog events**, emitted after commit: `catalog.product.changed`
   (edit, options, copy, delete), `catalog.variant.changed` (variant edit),
   `catalog.store.changed` (payments / shipping settings, admin suspension).
@@ -898,9 +932,6 @@ It is a `package/`, not a `modules/` feature, because it is built to be lifted
 out into its own service later. The `package/storage` idea — a `types.ts` port
 and swappable `drivers/` — is applied to the **host platform itself**:
 `types.ts` declares `AffiliateHost` (stores, products, order snapshots, mail,
-  - `store.publishing(storeId)`: before a store is put on the marketplace, in
-    `setStorePublished` (veto only — dropshipping refuses a supplier account, which has
-    no shop).
 notifications), `hosts/inProcess.ts` answers it from the core tables today, and
 an HTTP host would answer it after extraction. Nothing above that interface
 changes.
@@ -1759,7 +1790,9 @@ White-label design — one codebase, any business:
   business name changes. Verified stores rank first in `GET /public/stores`.
 - **Customer** additions: `blockedAt` / `blockedReason` — set when an admin
   blocks the account; every sign-in strategy checks it and blocking revokes
-  all sessions.
+  all sessions. `metaSellerSignupSentAt` — set when the Meta Conversions API
+  `CompleteRegistration` event is delivered for this account (`modules/meta`),
+  so a repeat sign-up call is idempotent for the lifetime of the account.
 
 Enums: `OrderStatus` (`AWAITING_PAYMENT` first — online orders until paid),
 `PaymentMethod`, `PaymentStatus`, `ShippingType`,

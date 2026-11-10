@@ -87,7 +87,7 @@ database. Only the frontend *root* is shared in the sense that each has its own.
 | Frontend root | `/var/www/uniemax` | `/var/www/uniemax-prod` |
 | nginx vhosts | `uniemax-domain`, `uniemax` | `uniemax-com`, `uniemax-prod` |
 | URL | `dev.uniemax.zontechx.com` | `uniemax.com`, `www` |
-| Deployed by | push to `main` → `deploy-dev.yml` | tag `v*` + approval → `deploy-prod.yml` |
+| Deployed by | push to `main` → `deploy-dev.yml` | tag `v*` → `deploy-prod.yml` (no approval step) |
 | `PAYMENTHUB_WEBHOOK_SECRET` | dev hub's secret, in `~/uniemax-dev/backend/.env.development` | prod hub's secret, in `~/uniemax/backend/.env.production` |
 | `PAYMENTHUB_API_KEY` | dev hub's TEST key `ph_test_6hl1…`, same file | prod hub's LIVE key `ph_live_kXFI…`, same file |
 | `PAYMENTHUB_URL` | `https://pay.dev.zontechx.com`, same file | `https://pay.zontechx.com`, same file |
@@ -317,12 +317,12 @@ CI/CD lives in `.github/workflows/`:
 | -------- | ------- | ---- |
 | `ci.yml` | every push + PR | `npm ci`, `prisma generate`, backend typecheck + build, frontend build. Also reused as a gate by both deploys. |
 | `deploy-dev.yml` | push to `main` | Deploys `~/uniemax-dev` → `dev.uniemax.zontechx.com`. Runs `db:deploy` against the **dev** DB. |
-| `deploy-prod.yml` | tag `v*` (or manual) | Waits for approval on the `production` environment, then deploys `~/uniemax` → `uniemax.com`. Health-checks and **auto-rolls-back** on failure. |
+| `deploy-prod.yml` | tag `v*` (or manual) | Deploys `~/uniemax` → `uniemax.com` as soon as CI passes — **there is no approval step**; pushing the tag is the release. Health-checks and **auto-rolls-back** on failure. |
 
 Release to production:
 
 ```bash
-git tag v1.2.0 && git push origin v1.2.0     # then approve in the Actions tab
+git tag v1.2.0 && git push origin v1.2.0     # deploys at once — nothing to approve
 ```
 
 Both deploys assert the boot banner names the right database (`aws-1-` for dev,
@@ -332,8 +332,9 @@ Required repo configuration:
 
 - **Secrets:** `SSH_PRIVATE_KEY` (OpenSSH format), `SSH_HOST`, `SSH_USER`,
   `SSH_KNOWN_HOSTS`.
-- **Environments:** `development` (no gate) and `production` (required
-  reviewer — this is the approval gate).
+- **Environments:** `development` and `production`, both with no gate
+  (checked 11 Nov 2026: `production` has no required reviewers). A reviewer
+  can be added in Settings → Environments if an approval step is ever wanted.
 
 ### Manual fallback (Claude Code runbook)
 

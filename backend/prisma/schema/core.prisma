@@ -250,6 +250,14 @@ model Customer {
   supportTickets SupportTicket[]
   cart           Cart?
   wishlist       WishlistItem[]
+
+  /// When the seller-signup event was sent to Meta's Conversions API for this
+  /// account. Null until the browser's `/analytics/meta/seller-signup` call
+  /// succeeds for the first time. The route refuses to send again when this is
+  /// set, so a page refresh or a repeat sign-in never fires the campaign-
+  /// optimised `CompleteRegistration` twice for the same seller.
+  metaSellerSignupSentAt DateTime?
+
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 

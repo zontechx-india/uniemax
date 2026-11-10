@@ -407,7 +407,7 @@ projects.
 | Environment | URL | Trigger |
 | ----------- | --- | ------- |
 | **dev** | `https://dev.uniemax.zontechx.com` | every push to `main` (`deploy-dev.yml`) |
-| **prod** | `https://uniemax.com` | `v*` tag + approval (`deploy-prod.yml`) |
+| **prod** | `https://uniemax.com` | `v*` tag (`deploy-prod.yml`, no approval step) |
 
 `ci.yml` runs on every push and PR (install, `prisma generate`, backend typecheck
 + build, frontend build) and is reused as a gate by both deploy workflows.

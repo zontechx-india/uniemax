@@ -1,7 +1,28 @@
 import { useState } from 'react'
-import { trackCompleteRegistration } from '../../../shared/analytics/track'
+import {
+  trackBuyerSignup,
+  trackSellerSignup,
+} from '../../../shared/analytics/track'
 import { customerAuth } from '../../../shared/auth/authApi'
 import type { Customer } from '../../../shared/auth/authApi'
+import type { AuthIntent } from './authDialogStore'
+
+/**
+ * Fire the right sign-up event for the opener's intent.
+ *
+ * Only `intent === 'sell'` (the `/sell` CTA → the Create Store flow) counts as
+ * the seller `CompleteRegistration` that Meta's campaign optimises against.
+ * Every other opener — shopping, checkout, generic `/login` — is a buyer and
+ * fires the custom `BuyerSignup` event instead, so Meta never trains the
+ * seller campaign on buyer audiences.
+ */
+function fireSignup(
+  intent: AuthIntent | undefined,
+  method: 'email' | 'phone_otp' | 'google',
+): void {
+  if (intent === 'sell') trackSellerSignup(method)
+  else trackBuyerSignup(method)
+}
 import {
   AuthCard,
   TextField,
@@ -62,6 +83,7 @@ export function CustomerAuthPanel({
   onSignedIn,
   initialView = 'email',
   variant = 'page',
+  intent,
 }: {
   onSignedIn: (customer: Customer) => void
   /** Which flow to open on. */
@@ -72,6 +94,13 @@ export function CustomerAuthPanel({
    * surface, and a card inside a card reads as clutter.
    */
   variant?: 'page' | 'dialog'
+  /**
+   * Who is signing in — the `/sell` CTAs pass `sell`, every other opener is a
+   * buyer. Steers which Meta event fires on registration (seller
+   * `CompleteRegistration` vs custom `BuyerSignup`), so a buyer sign-up never
+   * trains the seller campaign on the wrong audience.
+   */
+  intent?: AuthIntent
 }) {
   const [view, setView] = useState<AuthView>(initialView)
   const [notice, setNotice] = useState('') // cross-view success message
@@ -112,10 +141,15 @@ export function CustomerAuthPanel({
             setNotice('')
             setView('forgot')
           }}
+          intent={intent}
         />
       )}
       {view === 'register' && (
-        <Register onSignedIn={onSignedIn} onBack={() => setView('email')} />
+        <Register
+          onSignedIn={onSignedIn}
+          onBack={() => setView('email')}
+          intent={intent}
+        />
       )}
       {/* One branch for both steps: `ForgotPassword` keeps the email it was
           given, so it must stay mounted from "send code" through "reset". */}
@@ -136,6 +170,7 @@ export function CustomerAuthPanel({
           onCodeSent={() => setView('phone-verify')}
           onBack={() => setView('phone')}
           onSignedIn={onSignedIn}
+          intent={intent}
         />
       )}
     </>
@@ -151,10 +186,12 @@ function EmailSignIn({
   onSignedIn,
   onRegister,
   onForgot,
+  intent,
 }: {
   onSignedIn: (customer: Customer) => void
   onRegister: () => void
   onForgot: () => void
+  intent?: AuthIntent
 }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -222,7 +259,7 @@ function EmailSignIn({
       {GOOGLE_SIGNIN_ENABLED && (
         <>
           <OrDivider />
-          <GoogleSignIn onSignedIn={onSignedIn} />
+          <GoogleSignIn onSignedIn={onSignedIn} intent={intent} />
         </>
       )}
 
@@ -251,9 +288,11 @@ function EmailSignIn({
 function Register({
   onSignedIn,
   onBack,
+  intent,
 }: {
   onSignedIn: (customer: Customer) => void
   onBack: () => void
+  intent?: AuthIntent
 }) {
   const [step, setStep] = useState<'form' | 'code'>('form')
   const [name, setName] = useState('')
@@ -297,8 +336,12 @@ function Register({
     try {
       const { customer } = await customerAuth.registerVerify({ ...form, code })
       // Registration is verify-first: the account exists only once this call
-      // succeeds, so this is the exact moment Meta's CompleteRegistration means.
-      trackCompleteRegistration('email')
+      // succeeds — the exact moment the sign-up event means. `fireSignup`
+      // picks the seller event (`CompleteRegistration`, campaign-optimised)
+      // for `intent === 'sell'` openers and the buyer event (`BuyerSignup`,
+      // custom) for everyone else, so a buyer never trains the seller
+      // campaign.
+      fireSignup(intent, 'email')
       onSignedIn(customer)
     } catch (err) {
       setError((err as Error).message)
@@ -531,11 +574,13 @@ function PhoneOtp({
   onCodeSent,
   onBack,
   onSignedIn,
+  intent,
 }: {
   step: 'phone' | 'phone-verify'
   onCodeSent: () => void
   onBack: () => void
   onSignedIn: (customer: Customer) => void
+  intent?: AuthIntent
 }) {
   const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
@@ -568,8 +613,9 @@ function PhoneOtp({
         code,
       })
       // OTP is login-only today, but the backend still reports whether it had
-      // to create the account — only that case is a registration.
-      if (isNewUser) trackCompleteRegistration('phone_otp')
+      // to create the account — only that case is a registration. Buyer vs
+      // seller split is driven by the opener's `intent` (see `fireSignup`).
+      if (isNewUser) fireSignup(intent, 'phone_otp')
       onSignedIn(customer)
     } catch (err) {
       setError((err as Error).message)
@@ -664,7 +710,13 @@ function PhoneOtp({
  * Google Identity Services button and pass its real `credential` (ID token)
  * to `customerAuth.google(...)` — nothing else changes.
  */
-function GoogleSignIn({ onSignedIn }: { onSignedIn: (customer: Customer) => void }) {
+function GoogleSignIn({
+  onSignedIn,
+  intent,
+}: {
+  onSignedIn: (customer: Customer) => void
+  intent?: AuthIntent
+}) {
   const [open, setOpen] = useState(false)
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
@@ -683,7 +735,7 @@ function GoogleSignIn({ onSignedIn }: { onSignedIn: (customer: Customer) => void
         ...(name.trim() ? { name: name.trim() } : {}),
       })
       const { customer, isNewUser } = await customerAuth.google(idToken)
-      if (isNewUser) trackCompleteRegistration('google')
+      if (isNewUser) fireSignup(intent, 'google')
       onSignedIn(customer)
     } catch (err) {
       setError((err as Error).message)

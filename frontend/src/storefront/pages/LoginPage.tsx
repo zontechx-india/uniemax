@@ -38,7 +38,7 @@ export function LoginPage({
         subtitle={selling ? 'Sign in or create a free account to set up your store' : 'Sign in to continue shopping'}
       />
 
-      <CustomerAuthPanel variant="page" onSignedIn={onSignedIn} />
+      <CustomerAuthPanel variant="page" onSignedIn={onSignedIn} intent={intent} />
 
       {!selling && (
         <p className="mt-4 text-center text-sm text-muted">

@@ -130,6 +130,10 @@ Verify: `curl http://localhost:4000/health`
 | `WA_DEV_ALLOWED_RECIPIENTS` | **Non-production only:** comma-separated numbers sends are restricted to (anything else → 403; empty = nothing sends). Ignored in production |
 | `WA_SEND_RATE_PER_SEC` | Campaign send pace (default `20`) |
 | `WA_LOG_PAYLOADS` | Production only: `true` logs the full Graph request (URL, headers with the token masked, body) and Meta's full response, to debug a failing send. Puts message text in the logs — switch it back off. Non-production always logs in full (default `false`) |
+| `META_CAPI_PIXEL_ID` | Meta Pixel / dataset id for the Conversions API (`modules/meta`). Production: `931826082697608` (dataset "Uniemax Web"). Unset → `/api/v1/analytics/meta/seller-signup` logs and no-ops, so dev needs no config |
+| `META_CAPI_ACCESS_TOKEN` | Long-lived CAPI access token — generated in Events Manager → the dataset → **Settings → Conversions API → Generate access token**. Per-mode file; server-side only, never logged. Unset → endpoint no-ops |
+| `META_CAPI_TEST_EVENT_CODE` | Optional. The code from Events Manager → **Test events** — when set, every server event is tagged so it shows up in that panel in real time instead of counting in reporting. Set it to verify, unset it in production |
+| `META_CAPI_GRAPH_VERSION` | Graph API version for CAPI calls (default `v21.0`). Shared across environments |
 
 > All auth vars (`JWT_*`, `AUTH_COOKIE_*`, `OTP_*`, OAuth client ids) are read from the
 > same `.env` but validated **inside** the self-contained

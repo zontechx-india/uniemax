@@ -2700,14 +2700,6 @@ Rules they follow (constraints, not taste):
 | `/admins` | SUPER_ADMIN only: create, promote/demote, deactivate, reset password. |
 | `/docs/whatsapp-templates`, `/docs/whatsapp-templates/:name` | **Documents → WhatsApp templates** (`pages/docs/`) — a static reference, no API call. List of every template on the UnieMax WhatsApp account (grouped Order / Seller setup / Other) on the left; the chosen one on the right: category, language, recipient, when it is sent, template ID, header/footer/button, the body as approved (each `{{n}}` highlighted) beside a sample filled with example values, the parameters table (slot, field, code key, example, button URL suffix), the Cloud API request JSON (copy button), and the sending rules + common error codes. Below `lg` it shows one pane at a time. Data lives in `whatsappTemplateDocs.ts`, a hand-kept copy of `whatsapp_templates.md` — update both when a template changes in WhatsApp Manager. The live list with approval status stays at WhatsApp → Templates. |
 
-**Seller setup (`SellerSetupCard`, `StoreDetailPage`)** — the console's answer
-to "who has not finished, and how do I tell them?". The platform cannot
-complete a seller's setup for them (tax IDs are theirs to enter; the contact
-fields are *verified* identifiers an admin could not type even with the data
-in hand), so the card's whole job is making the chase easy: each unfinished
-step lists its **missing requirements by name** — "2 of 4" is not something
-you can put in a message — shows the path (`/mystores/{slug}/business`), and
-carries a **Copy link** button giving the absolute URL. A **Copy message for
 **Store verification (`VerificationCard`, `StoreDetailPage`)** — shows the
 details an admin checks on the GST portal (business name, seller name, GSTIN,
 PAN, business address), with **Copy GSTIN**, **Open GST portal** and **Mark
@@ -2717,6 +2709,14 @@ verified store shows a **Verified** chip in the page header. On the
 marketplace homepage, a verified store's card shows **Verified seller**
 (`StoreCard`, from `isVerified`); unverified cards show nothing.
 
+**Seller setup (`SellerSetupCard`, `StoreDetailPage`)** — the console's answer
+to "who has not finished, and how do I tell them?". The platform cannot
+complete a seller's setup for them (tax IDs are theirs to enter; the contact
+fields are *verified* identifiers an admin could not type even with the data
+in hand), so the card's whole job is making the chase easy: each unfinished
+step lists its **missing requirements by name** — "2 of 4" is not something
+you can put in a message — shows the path (`/mystores/{slug}/business`), and
+carries a **Copy link** button giving the absolute URL. A **Copy message for
 the seller** button assembles the whole note: what is outstanding, with the
 links de-duplicated (business, address and tax all live on one page, so the
 same URL three times would read as a mistake). Confirmation lands **on the
@@ -2989,11 +2989,26 @@ never break a page.
   snippet, so without it Meta would only ever see the first URL of a visit.
   Whichever router the page load did not mount never navigates, so it never
   double-counts.
-- `trackCompleteRegistration(method)` fires on **account creation only**:
-  after `registerVerify` (verify-first — no account exists until then), and
-  after OTP/Google sign-in when the backend reports `isNewUser`. A returning
-  sign-in must never fire it; that would train Meta's delivery model on the
-  wrong people.
+- **Seller vs buyer split on registration.** `CustomerAuthPanel` takes an
+  `AuthIntent` (`sell` for the `/sell` CTAs → `openAuthDialog({ intent: 'sell' })`;
+  everyone else is a buyer by default). On a new account:
+  - `intent === 'sell'` → `trackSellerSignup(method)` fires Meta's standard
+    **`CompleteRegistration`** (what the Facebook ad campaign optimises
+    against) AND posts the same event + `eventID` to the backend's
+    Conversions API bridge (`POST /api/v1/analytics/meta/seller-signup`) so
+    Meta de-duplicates the pair.
+  - every other opener → `trackBuyerSignup(method)` fires the **custom
+    `BuyerSignup`** event instead. Buyers registering on a seller storefront
+    never pollute the seller campaign's audience, which is what was pushing
+    cost per seller sign-up up.
+  Both paths fire **only on account creation** (`registerVerify` success;
+  OTP/Google only when the backend reports `isNewUser`). A returning sign-in
+  never fires either.
+- **Server-side de-duplication.** The browser event carries an `eventID`; the
+  server CAPI event carries the same id. Meta counts the pair as one.
+  `metaSellerSignupSentAt` on `Customer` makes the server event idempotent
+  per account, so a page refresh, a re-login or a cross-browser repeat
+  never double-fires `CompleteRegistration`.
 - The snippet's `<noscript>` tracking image is kept as Meta issues it, though
   it can never fire: the app needs JS to render at all.
 
@@ -3051,7 +3066,7 @@ before the app boots.
 | `add_to_cart` | `AddToCart` | `cart.add()` |
 | `begin_checkout` | `InitiateCheckout` | `CheckoutPage` |
 | `purchase` (`transaction_id` = order id) | `Purchase` | `OrderSuccessPage`, once per order |
-| `sign_up` (`method`) | `CompleteRegistration` | `CustomerAuthPanel`, new accounts only |
+| `sign_up` (`method`) | `CompleteRegistration` (seller) **or** `BuyerSignup` (buyer, custom) | `CustomerAuthPanel`, new accounts only — the standard event fires only when the opener's `AuthIntent === 'sell'`; buyers get the custom event |
 | `seller_cta_click` (`placement`, `store_name_entered`) | — | every seller CTA, via `useStartSelling` / `CreateStoreLink` (`sell_hero`, `sell_final`, `sell_header`, `sell_sticky`, `home_header`, `home_seller_panel`, `home_new_stores_empty`, `home_footer`); `store_name_entered` says whether a name was typed first |
 | `store_created` | — | `CreateStorePage`, after `storesApi.create` succeeds |
 
@@ -3161,10 +3176,14 @@ frontend/
     │   │   └── socialIcons.tsx   # Social brand glyphs + SOCIAL_META (label + icon per platform)
     │   ├── analytics/
     │   │   ├── track.ts         # THE tracking API call sites import: fans each
-    │   │   │                    #   moment out to Meta + GA4; purchase once-per-order guard
-    │   │   ├── metaPixel.ts     # Meta Pixel: SPA PageView, CompleteRegistration,
-    │   │   │                    #   and the ViewContent→Purchase funnel
+    │   │   │                    #   moment out to Meta + GA4; purchase once-per-order guard;
+    │   │   │                    #   seller vs buyer sign-up split (CompleteRegistration vs BuyerSignup)
+    │   │   ├── metaPixel.ts     # Meta Pixel: SPA PageView, seller CompleteRegistration
+    │   │   │                    #   (with eventID), buyer BuyerSignup (custom), fbp/fbc cookie
+    │   │   │                    #   reads, and the ViewContent→Purchase funnel
     │   │   │                    #   (layers on the index.html base snippet)
+    │   │   ├── metaCapi.ts      # Browser→backend bridge for Meta's Conversions API
+    │   │   │                    #   (posts seller signup event + id for dedupe)
     │   │   └── ga4.ts           # GA4 events (view_item…purchase, sign_up,
     │   │                        #   seller_cta_click, store_created)
     │   ├── maps/

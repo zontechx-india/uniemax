@@ -56,6 +56,7 @@ import {
   publicWaLinkRoutes,
   publicWhatsAppRoutes,
 } from "./modules/whatsapp/whatsapp.routes.js";
+import { metaAnalyticsRoutes } from "./modules/meta/meta.routes.js";
 
 /**
  * Central route registrar.
@@ -130,6 +131,10 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       await api.register(publicWhatsAppRoutes, { prefix: "/whatsapp" });
       // Tracked WhatsApp campaign links — count the click, redirect.
       await api.register(publicWaLinkRoutes, { prefix: "/r" });
+      // Meta Conversions API bridge — the server half of the seller
+      // `CompleteRegistration` event. Browser pixel + server CAPI share one
+      // event_id so Meta de-duplicates them (see modules/meta).
+      await api.register(metaAnalyticsRoutes, { prefix: "/analytics/meta" });
 
       // Upload rules (max sizes + allowed types) and where sized copies of
       // stored images are served — read by clients so their hints, pre-upload

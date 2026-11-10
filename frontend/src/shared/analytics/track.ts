@@ -1,6 +1,7 @@
 import * as ga4 from './ga4'
 import * as pixel from './metaPixel'
 import type { PixelLine } from './metaPixel'
+import { reportSellerSignup } from './metaCapi'
 
 /**
  * The storefront's one tracking API — every moment worth measuring is
@@ -30,9 +31,35 @@ export function trackInitiateCheckout(lines: PixelLine[]): void {
   ga4.beginCheckout(lines)
 }
 
-/** Account created — never a returning sign-in. */
-export function trackCompleteRegistration(method: 'email' | 'phone_otp' | 'google'): void {
-  pixel.trackCompleteRegistration(method)
+/**
+ * Account created through the `/sell` flow — a SELLER signup. Fires Meta's
+ * standard `CompleteRegistration` (what the ad campaign optimises against),
+ * posts the same event + id to the backend's Conversions API endpoint so Meta
+ * can de-duplicate the pair, and records a GA4 `sign_up`.
+ *
+ * The caller MUST only invoke this when `intent === 'sell'`. Buyer
+ * registrations go through `trackBuyerSignup` and never fire
+ * `CompleteRegistration`.
+ */
+export function trackSellerSignup(method: 'email' | 'phone_otp' | 'google'): void {
+  const eventId = pixel.trackSellerSignup(method)
+  reportSellerSignup({
+    eventId,
+    method,
+    fbp: pixel.fbp(),
+    fbc: pixel.fbc(),
+  })
+  ga4.signUp(method)
+}
+
+/**
+ * Account created on a seller storefront (or the generic sign-in page without
+ * `intent === 'sell'`) — a BUYER signup. Fires a custom Meta event
+ * (`BuyerSignup`), never `CompleteRegistration`, so the seller campaign is not
+ * polluted. GA4 still gets a `sign_up`.
+ */
+export function trackBuyerSignup(method: 'email' | 'phone_otp' | 'google'): void {
+  pixel.trackBuyerSignup(method)
   ga4.signUp(method)
 }
 

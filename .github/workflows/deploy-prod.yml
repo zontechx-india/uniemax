@@ -1,7 +1,8 @@
 name: Deploy production
 
-# Production ships on a version tag only, and then only after a human
-# approves the `production` environment in GitHub.
+# Production ships on a version tag only. There is NO approval step: pushing
+# the tag deploys straight away (the `production` environment has no
+# required reviewers).
 #
 #   git tag v1.2.0 && git push origin v1.2.0
 #
@@ -27,8 +28,9 @@ jobs:
     name: Deploy to production
     needs: ci
     runs-on: ubuntu-latest
-    # Gate: configure `production` in Settings → Environments with yourself
-    # as a required reviewer. The job pauses here until approved.
+    # No gate today: the `production` environment has no required reviewers,
+    # so this job starts as soon as CI passes. To add one, set a required
+    # reviewer in Settings → Environments → production.
     environment:
       name: production
       url: https://uniemax.com

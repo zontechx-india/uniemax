@@ -4061,6 +4061,54 @@ SUPER_ADMIN** cannot be demoted or deactivated (`409`).
 
 ---
 
+## Meta Analytics — `/api/v1/analytics/meta` 🔒 customer
+
+Bridge between the browser Meta Pixel and Meta's Conversions API, so a
+seller sign-up is counted ONCE even when ad blockers block the browser
+pixel. Pixel id, access token and (optional) test event code come from
+`META_CAPI_*` env vars; without them the endpoint logs the attempt and
+returns `sent: false, reason: "not_configured"` — the sign-up flow is
+never broken.
+
+### `POST /api/v1/analytics/meta/seller-signup` 🔒 customer
+
+Fires Meta's standard `CompleteRegistration` server-side with the SAME
+`eventId` the browser's `fbq` used, so Meta de-duplicates the pair. Only
+the signed-in customer may claim their own signup; a repeat call is a
+no-op (`Customer.metaSellerSignupSentAt` guards it forever).
+
+Body (frontend sends; `method` from the auth path; `fbp`/`fbc` from the
+browser cookies Meta drops):
+
+```json
+{
+  "eventId": "4b2f…",
+  "method": "email" | "phone_otp" | "google",
+  "fbp": "fb.1.1690000000000.1234567890",
+  "fbc": "fb.1.1690000000000.AbC...",
+  "eventSourceUrl": "https://uniemax.com/sell"
+}
+```
+
+200 response:
+
+```json
+{ "success": true, "data": { "sent": true } }
+```
+
+On a repeat call (same customer): `{ sent: false, reason: "already_sent" }`.
+With Meta CAPI unconfigured: `{ sent: false, reason: "not_configured" }`.
+
+The server hashes email and phone (SHA-256, trimmed/lowercased; Indian
+phones E.164-normalised to `91…` without `+`), hashes the customer id as
+`external_id`, and includes the request's IP + user agent — this is what
+lifts Event Match Quality past the 6-ish the browser pixel gets alone.
+
+Buyer signups never reach here. They fire the custom `BuyerSignup` event
+on the browser only (see `frontend/src/shared/analytics/track.ts`).
+
+---
+
 ## Planned Endpoints (not yet implemented)
 
 - **Partial refunds** (today a refund is always the whole order total,

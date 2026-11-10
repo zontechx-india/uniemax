@@ -9,7 +9,14 @@
  *   - `trackRouterPageViews()` — the snippet reports one `PageView` for the
  *     url the browser loaded. This is a client-side-routed SPA, so every
  *     navigation after that is invisible to it and has to be reported here.
- *   - `trackCompleteRegistration()` — the sign-up conversion (see `LoginPage`).
+ *   - `trackSellerSignup()` — the sign-up conversion the ad campaign optimises
+ *     against (standard event `CompleteRegistration`). Only ever fires when a
+ *     seller account is created via the `/sell` flow — buyers on seller
+ *     storefronts fire the custom `BuyerSignup` event instead, so Meta's
+ *     delivery model is never trained on buyers it has mislabelled as sellers.
+ *   - `trackBuyerSignup()` — same moment, different event name, so buyer
+ *     registrations on store pages still show up in Events Manager without
+ *     polluting the seller conversion.
  *   - The shopping funnel — `ViewContent` → `AddToCart` → `InitiateCheckout` →
  *     `Purchase`. `Purchase` is what lets Meta report revenue and optimise for
  *     buyers rather than browsers, so it carries the order total and is fired
@@ -40,18 +47,96 @@ type StandardEvent =
   | 'InitiateCheckout'
   | 'Purchase'
 
+/** Custom events — anything Meta does not ship as a standard. */
+type CustomEvent = 'BuyerSignup'
+
 /** Fires a standard event. No-op when the pixel did not load. */
-export function trackEvent(event: StandardEvent, params?: Record<string, unknown>): void {
-  window.fbq?.('track', event, params)
+export function trackEvent(
+  event: StandardEvent,
+  params?: Record<string, unknown>,
+  eventID?: string,
+): void {
+  // Meta's docs: the third-position arg can be `params`; event id goes on the
+  // fourth-position object `{ eventID }`, which is what the browser pixel and
+  // the Conversions API match on for de-duplication.
+  window.fbq?.('track', event, params ?? {}, eventID ? { eventID } : undefined)
+}
+
+/** Fires a custom (non-standard) event. */
+export function trackCustomEvent(
+  event: CustomEvent,
+  params?: Record<string, unknown>,
+): void {
+  window.fbq?.('trackCustom', event, params ?? {})
+}
+
+/** Reads a cookie value (`_fbp` / `_fbc`), or `undefined` when absent. */
+export function readCookie(name: string): string | undefined {
+  if (typeof document === 'undefined') return undefined
+  const match = document.cookie
+    .split('; ')
+    .find((part) => part.startsWith(`${name}=`))
+  return match ? decodeURIComponent(match.slice(name.length + 1)) : undefined
+}
+
+/** `_fbp` cookie — Meta's browser id for the visitor. */
+export function fbp(): string | undefined {
+  return readCookie('_fbp')
+}
+
+/** `_fbc` cookie — Meta's click id for the ad that brought the visitor. */
+export function fbc(): string | undefined {
+  return readCookie('_fbc')
 }
 
 /**
- * Account created. Fired once per new customer, never on a returning sign-in —
- * this is the event sign-up campaigns optimise against, so a repeat login
- * counted here would train delivery on the wrong people.
+ * Random event id used to de-duplicate browser + server events on Meta's end.
+ * `crypto.randomUUID` on every modern browser; the fallback is good enough —
+ * event ids only need to be unique inside the dedupe window.
  */
-export function trackCompleteRegistration(method: 'email' | 'phone_otp' | 'google'): void {
-  trackEvent('CompleteRegistration', {
+export function newEventId(): string {
+  const g = globalThis as unknown as {
+    crypto?: { randomUUID?: () => string }
+  }
+  if (typeof g.crypto?.randomUUID === 'function') return g.crypto.randomUUID()
+  return (
+    Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10)
+  )
+}
+
+/**
+ * Seller account created via `/sell`. Fires Meta's standard
+ * `CompleteRegistration` event — the one the ad campaign optimises against —
+ * and returns the `eventID` the caller must send to the server so the
+ * Conversions API event matches up and Meta counts the two as one.
+ *
+ * NEVER call this for a buyer registration. The campaign's cost per
+ * acquisition rises when the delivery model learns on buyer-shaped audiences.
+ */
+export function trackSellerSignup(
+  method: 'email' | 'phone_otp' | 'google',
+): string {
+  const eventID = newEventId()
+  trackEvent(
+    'CompleteRegistration',
+    {
+      content_name: 'Seller account',
+      registration_method: method,
+      status: true,
+    },
+    eventID,
+  )
+  return eventID
+}
+
+/**
+ * Buyer account created on a seller storefront. Fires a custom event
+ * (`BuyerSignup`) rather than `CompleteRegistration`, so the seller campaign's
+ * delivery model stays trained on sellers alone. We still see it in Events
+ * Manager and can report on it or build a buyer-side audience later.
+ */
+export function trackBuyerSignup(method: 'email' | 'phone_otp' | 'google'): void {
+  trackCustomEvent('BuyerSignup', {
     content_name: 'Customer account',
     registration_method: method,
     status: true,

@@ -157,6 +157,7 @@ function OpenAuthDialog({ req }: { req: AuthDialogRequest }) {
                 variant="dialog"
                 initialView={req.initialView}
                 onSignedIn={handleSignedIn}
+                intent={req.intent}
               />
             )}
 
