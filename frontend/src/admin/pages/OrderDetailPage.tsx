@@ -10,6 +10,7 @@ import { MediaImg } from '../../shared/media/MediaImg'
 import { OrderMessagesCard } from './orders/OrderMessagesCard'
 import { ExpectedDeliveryEditor } from './orders/ExpectedDeliveryEditor'
 import { OrderPayoutCard } from './orders/OrderPayoutCard'
+import { RefundRetry } from './orders/RefundRetry'
 
 /**
  * One order, everything known about it — the page a support conversation is
@@ -364,10 +365,14 @@ export default function OrderDetailPage() {
                   ) : null}
                 </p>
                 {refund.status === 'FAILED' ? (
-                  <p className="mt-1 text-xs text-danger">
-                    {refund.failureReason ?? 'The refund failed.'} Refund it by hand from the
-                    PaymentHub dashboard — this updates by itself when it goes through.
-                  </p>
+                  <>
+                    <p className="mt-1 text-xs text-danger">
+                      {refund.failureReason ?? 'The refund failed.'}
+                    </p>
+                    {(order.refunds ?? []).some((r) => r.status !== 'FAILED') ? null : (
+                      <RefundRetry orderId={order.id} refundId={refund.id} onDone={refresh} />
+                    )}
+                  </>
                 ) : null}
               </div>
             ))}

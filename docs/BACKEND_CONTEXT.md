@@ -1672,7 +1672,12 @@ White-label design — one codebase, any business:
   `payments/refunds.service.ts`: queued when a PAID order is cancelled or a
   payment lands on a cancelled order, sent with idempotency key
   `refund:<row id>`, settled by the hub's `refund.*` webhooks, retried by the
-  payments job (5 tries, then FAILED + admin notification).
+  payments job (5 tries, then FAILED + admin notification). An admin can start
+  a FAILED one again (`retryFailedRefund` — a new row; audit action
+  `order.refund.retry`).
+- **Order.paidNotifiedAt** — when the "paid" follow-up (`afterOrderPaid`: the
+  `order.paid` event + placed / refund messages) ran for a gateway order.
+  Null on a PAID gateway order = it never finished; the payments job redoes it.
 - **PaymentHubEvent** (`payment_hub_events`) — dedupe log for PaymentHub
   webhooks: `id` = the hub's event id, `type`, `receivedAt`, `processedAt`
   (set in the same transaction as the order update; null = reprocess on the
@@ -2021,7 +2026,9 @@ client never computes money. COD is live end-to-end; ONLINE payment
 runs through **Cashfree** (`modules/payments` — session on placement,
 HMAC-verified webhook, reconcile fallback — on page visit and every 10
 minutes for ONLINE orders 5 min – 48 h old still unpaid (`payments.jobs.ts`,
-settle-only: it never cancels or releases stock) —, pay/retry endpoint;
+settle-only: it never cancels or releases stock; cancelled orders are watched
+for 3 h; a paid order with no `paidNotifiedAt` gets its follow-up run again) —,
+pay/retry endpoint;
 a gateway order is born **`AWAITING_PAYMENT`** — hidden from the seller
 (`SELLER_VISIBLE` in `orders.service.ts` filters every seller list, count,
 detail and action) — and becomes `PENDING` in the same transaction as the

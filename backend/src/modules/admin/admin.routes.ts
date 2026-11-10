@@ -45,6 +45,8 @@ export const adminConsoleRoutes: FastifyPluginAsync = async (app) => {
   app.get("/orders/:id/messages", controller.listOrderMessages);
   app.get("/orders/:id/messages/preview", controller.previewOrderMessage);
   app.post("/orders/:id/messages", controller.sendOrderMessage);
+  // Start a failed refund again (payments/refunds.service.ts).
+  app.post("/orders/:id/refunds/:refundId/retry", controller.retryOrderRefund);
   app.get("/payments", controller.listPayments);
 
   // Catalog oversight — the sellers' products, platform-wide.

@@ -1390,6 +1390,10 @@ export const adminApi = {
   getOrder(id: string) {
     return call<OrderDetail>(http.get(`${BASE}/orders/${id}`))
   },
+  /** Start a FAILED refund again — answers the refreshed order. */
+  retryRefund(orderId: string, refundId: string) {
+    return call<OrderDetail>(http.post(`${BASE}/orders/${orderId}/refunds/${refundId}/retry`, {}))
+  },
   setExpectedDelivery(
     orderId: string,
     shipmentId: string,

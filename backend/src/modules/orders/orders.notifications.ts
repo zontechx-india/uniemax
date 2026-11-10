@@ -69,7 +69,7 @@ function itemsHtml(order: OrderMailData): string {
   const rows = order.items
     .map(
       (item) =>
-        `<li style="margin:2px 0">${item.productName} × ${item.quantity}</li>`,
+        `<li style="margin:2px 0">${escapeHtml(item.productName)} × ${item.quantity}</li>`,
     )
     .join("");
   return `<ul style="margin:8px 0 0;padding-left:18px;font-size:14px;color:#444">${rows}</ul>`;
@@ -102,9 +102,9 @@ const logFailure = (context: string) => (err: unknown) => {
 export function notifyOrderPlaced(
   order: OrderMailData,
   customerId: string,
-  seller: OrderSeller,
+  seller: OrderSeller | null,
 ): void {
-  const sellerEmail = seller.email;
+  const sellerEmail = seller?.email ?? null;
   const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
 
   // --- push ---------------------------------------------------------------
@@ -119,15 +119,18 @@ export function notifyOrderPlaced(
       data: { orderId: order.id },
     });
   }
-  notify({
-    principalType: "CUSTOMER",
-    principalId: seller.id,
-    kind: "ORDER_PLACED",
-    title: `New order · ${order.storeName}`,
-    body: `${order.orderNumber} — ${itemCount} item${itemCount === 1 ? "" : "s"}, ${formatTotal(order.total)}. Confirm it to get started.`,
-    url: `/mystores/${order.storeSlug}/orders/${order.id}`,
-    data: { orderId: order.id },
-  });
+  // The store can be gone (deleted mid-payment): no seller left to tell.
+  if (seller) {
+    notify({
+      principalType: "CUSTOMER",
+      principalId: seller.id,
+      kind: "ORDER_PLACED",
+      title: `New order · ${order.storeName}`,
+      body: `${order.orderNumber} — ${itemCount} item${itemCount === 1 ? "" : "s"}, ${formatTotal(order.total)}. Confirm it to get started.`,
+      url: `/mystores/${order.storeSlug}/orders/${order.id}`,
+      data: { orderId: order.id },
+    });
+  }
   notifyAdmins({
     kind: "ORDER_PLACED",
     title: "New order on the platform",
@@ -136,7 +139,7 @@ export function notifyOrderPlaced(
   });
 
   // --- WhatsApp (seller only — the customer's placed message is email) -----
-  whatsAppNewOrder(order.id);
+  if (seller) whatsAppNewOrder(order.id);
 
   // --- email --------------------------------------------------------------
   void (async () => {
@@ -170,7 +173,7 @@ function customerPlacedMail(order: OrderMailData, to: string): MailMessage {
       `Your order is placed 🎉`,
       `<p style="margin:0;font-size:14px;color:#444">
          Order <strong>${order.orderNumber}</strong> at
-         <strong>${order.storeName}</strong> has been placed.</p>
+         <strong>${escapeHtml(order.storeName)}</strong> has been placed.</p>
        ${itemsHtml(order)}
        <p style="margin:12px 0 0;font-size:14px;color:#111">
          <strong>Total: ${formatTotal(order.total)}</strong></p>
@@ -193,7 +196,7 @@ function sellerPlacedMail(order: OrderMailData, to: string): MailMessage {
       "You have a new order",
       `<p style="margin:0;font-size:14px;color:#444">
          Order <strong>${order.orderNumber}</strong> at
-         <strong>${order.storeName}</strong>${order.customerName ? ` from ${order.customerName}` : ""}.</p>
+         <strong>${escapeHtml(order.storeName)}</strong>${order.customerName ? ` from ${escapeHtml(order.customerName)}` : ""}.</p>
        ${itemsHtml(order)}
        <p style="margin:12px 0 0;font-size:14px;color:#111">
          <strong>Total: ${formatTotal(order.total)}</strong></p>
@@ -383,7 +386,7 @@ function statusMail(order: OrderMailData, status: string, to: string): MailMessa
     text: `Hi${order.customerName ? ` ${order.customerName}` : ""},\n\n${line}\n\nTotal: ${formatTotal(order.total)}${confirmationUrl ? `\n\nView your order: ${confirmationUrl}` : ""}`,
     html: wrapHtml(
       copy.subject(order),
-      `<p style="margin:0;font-size:14px;color:#444">${line}</p>
+      `<p style="margin:0;font-size:14px;color:#444">${escapeHtml(line)}</p>
        <p style="margin:12px 0 0;font-size:14px;color:#111">
          <strong>Total: ${formatTotal(order.total)}</strong></p>
        ${confirmationUrl ? linkHtml(confirmationUrl, "View your order") : ""}`,

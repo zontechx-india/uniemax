@@ -32,6 +32,7 @@ const ACTIONS: Record<string, { label: string; tone: 'neutral' | 'danger' | 'suc
   'admin.passwordReset': { label: 'Reset admin password', tone: 'danger' },
   'order.message.send': { label: 'Sent order message', tone: 'neutral' },
   'order.expectedDelivery': { label: 'Set expected delivery', tone: 'neutral' },
+  'order.refund.retry': { label: 'Started a refund again', tone: 'neutral' },
 }
 
 const ACTION_FILTER = [

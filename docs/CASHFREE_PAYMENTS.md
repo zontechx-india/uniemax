@@ -125,8 +125,15 @@ Node.js Backend (payments module)
 **If the webhook never arrives:** the order page reconciles on every visit,
 and `modules/payments/payments.jobs.ts` sweeps every 10 minutes — ONLINE
 orders 5 min to 48 h old whose payment is still PENDING/FAILED are asked about
-at Cashfree and settled if paid (up to 50 per run, sequentially). It never
-cancels or releases stock; it only runs when the gateway keys are set.
+at the gateway and settled if paid (all of them, in pages of 50, up to 500 per
+run, sequentially). A **cancelled** order is still asked about for 3 hours
+after its cancel, so a payment that lands late is seen and refunded. The sweep
+itself never cancels or releases stock; it only runs when a gateway is set.
+
+The same job also **finishes a paid order's follow-up**: `afterOrderPaid`
+stamps `Order.paidNotifiedAt` when the `order.paid` event and the messages
+went out. A gateway order that is PAID with no stamp after 3 minutes (the
+server stopped in between) gets the follow-up run again.
 
 **Dashboard setup:** in the Cashfree merchant dashboard add the webhook URL
 `https://<api-host>/api/v1/payments/webhooks/cashfree` with the
@@ -239,7 +246,7 @@ is always the **whole order total**.
 | Sent | Right after commit: `POST /v1/payment-intents/:id/refunds` with idempotency key `refund:<row id>`, so a retry can never refund twice. The paid intent is the order's latest one, or an older one found by the order number. |
 | Settled | The hub's `refund.succeeded` / `refund.failed` webhook. Succeeded → row `SUCCEEDED`, order `REFUNDED`, customer told (push + email). Failed → row `FAILED`, admins notified. |
 | Retried | The payments job (every 10 min): a row not sent yet is sent again (5 tries, then `FAILED`); a row sent 15+ min ago with no webhook is read back with `GET /v1/refunds/:id`. |
-| By hand | A `FAILED` refund is redone in the PaymentHub dashboard; its webhook marks our row `SUCCEEDED`. An order paid straight through Cashfree (no hub intent) goes `FAILED` at once — refund it in the Cashfree dashboard. |
+| By hand | An admin presses **Try the refund again** on the order page (`POST /admin/orders/:id/refunds/:refundId/retry` — a new row, its own idempotency key), or redoes a `FAILED` refund in the PaymentHub dashboard; its webhook marks our row `SUCCEEDED`. An order paid straight through Cashfree (no hub intent) goes `FAILED` at once — refund it in the Cashfree dashboard. |
 
 Admins are also notified when a payment arrives but the order is **not**
 marked paid (wrong amount, wrong reference) and when a **second payment**

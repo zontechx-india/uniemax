@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { publicWebUrl, sendMail } from "../../package/mail/index.js";
+import { HttpError } from "../../utils/httpError.js";
 import { notify, notifyAdmins } from "../notifications/notifications.service.js";
 import { escapeHtml } from "../orders/couriers.js";
 import {
@@ -273,6 +274,38 @@ function tellCustomerRefunded(row: RefundRow): void {
       </div>`,
     });
   })().catch(log("customer email"));
+}
+
+/**
+ * An admin starts a FAILED refund again (the admin order page). The failed
+ * row stays as history; a NEW row is made and sent now, with its own
+ * idempotency key. Refused while another refund of the order is on its way
+ * or already went through — the hub also never pays back more than was paid.
+ */
+export async function retryFailedRefund(orderId: string, refundId: string) {
+  const failed = await prisma.orderRefund.findFirst({
+    where: { id: refundId, orderId },
+    select: { status: true, amount: true, reason: true },
+  });
+  if (!failed) throw HttpError.notFound("Refund not found");
+  if (failed.status !== "FAILED") {
+    throw HttpError.conflict("Only a failed refund can be started again");
+  }
+  const other = await prisma.orderRefund.count({
+    where: { orderId, status: { in: ["PENDING", "SUCCEEDED"] } },
+  });
+  if (other > 0) {
+    throw HttpError.conflict("This order already has a refund that is on its way or sent");
+  }
+  const created = await prisma.orderRefund.create({
+    data: { orderId, amount: failed.amount, reason: failed.reason },
+    select: { id: true },
+  });
+  await sendRefund(created.id);
+  return prisma.orderRefund.findUniqueOrThrow({
+    where: { id: created.id },
+    select: { id: true, status: true, amount: true, failureReason: true, hubRefundId: true },
+  });
 }
 
 // ---------------------------------------------------------------------------

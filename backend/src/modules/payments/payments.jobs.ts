@@ -1,6 +1,7 @@
 import type { FastifyBaseLogger } from "fastify";
 import { prisma } from "../../config/prisma.js";
-import { gatewayConfigured, reconcilePendingPayment } from "./payments.service.js";
+import type { Prisma } from "../../generated/prisma/client.js";
+import { afterOrderPaid, gatewayConfigured, reconcilePendingPayment } from "./payments.service.js";
 import { expireUnpaidOrder } from "../orders/orders.service.js";
 import { retryRefunds } from "./refunds.service.js";
 
@@ -21,6 +22,14 @@ const MIN_AGE_MS = 5 * 60_000;
 /** Cashfree sessions expire well before this; older rows are settled or dead. */
 const MAX_AGE_MS = 48 * 60 * 60_000;
 const BATCH = 50;
+/** Most orders one run asks the gateway about — a cap, not a normal load. */
+const SWEEP_MAX = 500;
+/**
+ * A cancelled order is still asked about for this long: a customer who was
+ * on the checkout when it closed can pay a little later, and that money
+ * must be seen (it is then refunded).
+ */
+const CANCELLED_WATCH_MS = 3 * 60 * 60_000;
 /**
  * The payment window: how long an ONLINE order may sit AWAITING_PAYMENT
  * (holding its stock, the customer free to retry) before it is closed.
@@ -29,22 +38,66 @@ export const PAYMENT_WINDOW_MS = 60 * 60_000;
 
 export async function reconcileStrandedPayments(): Promise<number> {
   const now = Date.now();
-  const stranded = await prisma.order.findMany({
+  const where = {
+    paymentMethod: "ONLINE",
+    paymentStatus: { in: ["PENDING", "FAILED"] },
+    placedAt: { gte: new Date(now - MAX_AGE_MS), lte: new Date(now - MIN_AGE_MS) },
+    AND: [
+      { OR: [{ cfOrderId: { not: null } }, { paymentIntentId: { not: null } }] },
+      {
+        OR: [
+          { status: { not: "CANCELLED" } },
+          { status: "CANCELLED", cancelledAt: { gte: new Date(now - CANCELLED_WATCH_MS) } },
+        ],
+      },
+    ],
+  } satisfies Prisma.OrderWhereInput;
+  // Page through ALL of them (by id), so a busy day can't leave the older
+  // ones unchecked. Sequential on purpose: steady gateway calls, not a burst
+  // against the rate limits.
+  let checked = 0;
+  let after: string | undefined;
+  while (checked < SWEEP_MAX) {
+    const page = await prisma.order.findMany({
+      where,
+      orderBy: { id: "asc" },
+      take: BATCH,
+      ...(after ? { cursor: { id: after }, skip: 1 } : {}),
+      select: { id: true },
+    });
+    for (const { id } of page) await reconcilePendingPayment(id);
+    checked += page.length;
+    if (page.length < BATCH) break;
+    after = page[page.length - 1]!.id;
+  }
+  return checked;
+}
+
+/** A paid order's follow-up is left alone this long — its own request may still be running. */
+const FOLLOW_UP_AFTER_MS = 3 * 60_000;
+
+/**
+ * Paid gateway orders whose follow-up never finished (the server stopped
+ * between "mark paid" and the messages): run it again, so the seller and the
+ * customer still hear about the order. `afterOrderPaid` stamps the order
+ * when it is done, so each one is picked up here at most until it succeeds.
+ */
+export async function finishPaidFollowUps(): Promise<number> {
+  const now = Date.now();
+  const missed = await prisma.order.findMany({
     where: {
       paymentMethod: "ONLINE",
-      paymentStatus: { in: ["PENDING", "FAILED"] },
+      paymentStatus: "PAID",
+      paidNotifiedAt: null,
       OR: [{ cfOrderId: { not: null } }, { paymentIntentId: { not: null } }],
-      status: { not: "CANCELLED" },
-      placedAt: { gte: new Date(now - MAX_AGE_MS), lte: new Date(now - MIN_AGE_MS) },
+      placedAt: { gte: new Date(now - MAX_AGE_MS) },
+      updatedAt: { lte: new Date(now - FOLLOW_UP_AFTER_MS) },
     },
-    orderBy: { placedAt: "desc" },
     take: BATCH,
     select: { id: true },
   });
-  // Sequential on purpose: a handful of gateway calls every ten minutes, not
-  // a burst against Cashfree's rate limits.
-  for (const { id } of stranded) await reconcilePendingPayment(id);
-  return stranded.length;
+  for (const { id } of missed) await afterOrderPaid(id);
+  return missed.length;
 }
 
 /**
@@ -86,6 +139,12 @@ export function startPaymentJobs(log: FastifyBaseLogger): () => void {
       if (closed) log.info({ closed }, "unpaid orders closed after the payment window");
     } catch (err) {
       log.error(err, "closing unpaid orders failed");
+    }
+    try {
+      const finished = await finishPaidFollowUps();
+      if (finished) log.warn({ finished }, "paid orders whose messages were never sent — sent now");
+    } catch (err) {
+      log.error(err, "paid follow-up step failed");
     }
     try {
       // Refunds not sent yet, or sent and never reported on (refunds.service.ts).

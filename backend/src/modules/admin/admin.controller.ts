@@ -13,6 +13,7 @@ import * as products from "./adminProducts.service.js";
 import * as accounts from "./adminAccounts.service.js";
 import * as categoryMapping from "./adminCategoryMapping.service.js";
 import * as bankCheck from "../stores/bankCheck.service.js";
+import { retryFailedRefund } from "../payments/refunds.service.js";
 import { listAudit, recordAudit } from "./adminAudit.js";
 
 /**
@@ -205,6 +206,20 @@ export async function sendOrderMessage(request: FastifyRequest) {
     },
   });
   return ok(sent);
+}
+
+const refundParams = z.object({ id: z.string().min(1), refundId: z.string().min(1) });
+
+export async function retryOrderRefund(request: FastifyRequest) {
+  const { id, refundId } = refundParams.parse(request.params);
+  const refund = await retryFailedRefund(id, refundId);
+  recordAudit(request, {
+    action: "order.refund.retry",
+    entityType: "order",
+    entityId: id,
+    meta: { failedRefundId: refundId, refundId: refund.id, status: refund.status, amount: refund.amount.toFixed(2) },
+  });
+  return ok(await orders.getOrder(id));
 }
 
 export async function listPayments(request: FastifyRequest) {

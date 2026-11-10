@@ -1206,6 +1206,10 @@ model Order {
   /// PaymentHub intent id (pi_…) of the latest hub payment — how hub webhooks
   /// find the order. Null until UnieMax creates payments through the hub.
   paymentIntentId  String?       @unique
+  /// When the "paid" follow-up ran for a gateway order (the order.paid event
+  /// and the placed / refund messages). Null on a paid order = the server
+  /// stopped in between; the payments job runs it again.
+  paidNotifiedAt   DateTime?
 
   // Seller order-management lifecycle stamps — set when the seller moves the
   // order along PENDING → CONFIRMED → PACKED → SHIPPED → DELIVERED (forward

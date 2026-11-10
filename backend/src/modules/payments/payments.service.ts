@@ -389,14 +389,23 @@ export async function afterOrderPaid(orderId: string): Promise<void> {
   if (order.status === "CANCELLED") {
     // The order can't be revived (its stock went back on sale), so the money
     // goes straight back — and both sides are told.
-    const refundId = await queueRefund(prisma, order.id, "Paid after the order was cancelled");
-    if (refundId) sendRefundSoon(refundId);
+    // (A re-run of this step must not ask for the same money twice.)
+    const already = await prisma.orderRefund.count({ where: { orderId: order.id } });
+    if (already === 0) {
+      const refundId = await queueRefund(prisma, order.id, "Paid after the order was cancelled");
+      if (refundId) sendRefundSoon(refundId);
+    }
     notifyPaymentOnCancelledOrder(order, order.customerId, seller ?? null);
-    return;
+  } else {
+    // The store is gone (SetNull) only if it was deleted mid-payment — there
+    // is no seller left to alert, but the customer still gets their confirmation.
+    notifyOrderPlaced(order, order.customerId ?? "", seller);
   }
-  // The store is gone (SetNull) only if it was deleted mid-payment — there is
-  // no seller left to alert, but the customer still gets their confirmation.
-  if (seller) notifyOrderPlaced(order, order.customerId ?? "", seller);
+  // Done: the payments job re-runs this for a paid order that never got here.
+  await prisma.order.updateMany({
+    where: { id: orderId, paidNotifiedAt: null },
+    data: { paidNotifiedAt: new Date() },
+  });
 }
 
 /**

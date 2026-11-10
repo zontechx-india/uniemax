@@ -3572,6 +3572,15 @@ timestamps, `cfOrderId`, the linked customer/store, items with `imageUrl`,
 and `shipments[]` as the seller sees them (proof-of-delivery `podUrl`
 included — shape under **Parcels**).
 
+### `POST /api/v1/admin/orders/:id/refunds/:refundId/retry`
+
+Start a `FAILED` refund again: a new refund row is made and sent to PaymentHub
+now (the failed one stays as history). No body. Answers the order detail (as
+`GET /admin/orders/:id`) — read `refunds[0]` for the new one's state.
+`404` refund not on this order · `409` the refund is not `FAILED`, or the order
+already has a refund that is `PENDING` or `SUCCEEDED`. Audit action
+`order.refund.retry` (`meta`: failedRefundId, refundId, status, amount).
+
 ### `PATCH /api/v1/admin/orders/:id/shipments/:shipmentId/expected-delivery`
 
 Body `{ "expectedDeliveryAt": "2026-11-10" | null, "visible": true }` — a
@@ -4054,9 +4063,8 @@ SUPER_ADMIN** cannot be demoted or deactivated (`409`).
 
 ## Planned Endpoints (not yet implemented)
 
-- **Partial refunds** and an admin "refund again" button (today a refund is
-  always the whole order total, started by a cancel; a failed one is redone by
-  hand in the PaymentHub dashboard)
+- **Partial refunds** (today a refund is always the whole order total,
+  started by a cancel)
 - `GET /api/v1/shipping/quote` — auto shipping calculation (orders currently
   ship free)
 - `GET /api/v1/banners`, `GET /api/v1/store` — home page content
