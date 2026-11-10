@@ -2927,7 +2927,7 @@ Full architecture: [`PUSH_NOTIFICATIONS.md`](./PUSH_NOTIFICATIONS.md).
 
 ---
 
-## Installable app (PWA — storefront only)
+## Installable app (PWA — storefront and admin host)
 
 The storefront installs to a phone's home screen and opens **standalone**: its
 own window, no URL bar, no browser tabs. Four things have to line up, and
@@ -2947,9 +2947,13 @@ the install worked but isn't one:
 4. **A service worker with a fetch handler** — `public/push-sw.js`, registered
    on load by `shared/serviceWorker.ts`.
 
-The **admin console is deliberately not installable**: `admin.html` links no
-manifest and never calls `initServiceWorker()`. It is a staff tool on the same
-origin, not something to put on a home screen.
+The **admin console installs too, on its own host** (`admin.uniemax.com`,
+`admin.dev.uniemax.zontechx.com`): `admin.html` links
+`public/manifest-admin.json` ("UnieMax Admin", `start_url`/`scope` `/`, its own
+`id` so it is a separate app from the shop) and `src/admin/main.tsx` calls
+`initServiceWorker()`. At `/admin` on a storefront host the manifest's `/`
+would point at the shop, so `main.tsx` removes the manifest link there and the
+console is not installable on that path.
 
 `theme-color` (the status bar colour when standalone) is a single meta tag
 rewritten by `shared/theme/mode.ts`, not a `prefers-color-scheme` pair — the

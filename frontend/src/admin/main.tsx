@@ -3,12 +3,25 @@ import { createRoot } from 'react-dom/client'
 import '../index.css'
 import { ThemeProvider, initThemeMode } from '../shared/theme'
 import { initStaleBuildReload } from '../shared/staleBuildReload'
+import { initServiceWorker } from '../shared/serviceWorker'
+import { isAdminHost } from '../shared/appOrigin'
 import { configureStoresApi } from '../storefront/features/stores/storesApi'
 import { configureThemeTemplatesApi } from '../storefront/features/stores/themeTemplatesApi'
 import { AdminApp } from './AdminApp'
 
 initStaleBuildReload()
 initThemeMode()
+
+/**
+ * Installable only on the admin host, where the console lives at `/`. At
+ * /admin on a storefront host the manifest's start_url `/` would open the
+ * shop, so drop the link there; the worker is still the storefront's own.
+ */
+if (isAdminHost()) {
+  initServiceWorker()
+} else {
+  document.querySelector('link[rel="manifest"]')?.remove()
+}
 
 /**
  * This console drives the seller's store screens against the ADMIN mount of

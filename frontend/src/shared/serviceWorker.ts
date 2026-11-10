@@ -14,8 +14,8 @@
  * Registration is idempotent — the same script URL and scope resolves to the
  * existing registration — so the push hook registering again costs nothing.
  *
- * Storefront only. The admin console (`admin.html`) deliberately never calls
- * this: it is a staff tool on the same origin, not something to install.
+ * Called by the storefront, and by the admin console on its own host
+ * (admin.uniemax.com) so the console installs as a standalone app too.
  */
 export function initServiceWorker(): void {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return
