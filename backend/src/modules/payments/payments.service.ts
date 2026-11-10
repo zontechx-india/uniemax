@@ -26,6 +26,7 @@ import {
   type HubIntent,
 } from "./paymenthub.client.js";
 import { decide, rupeesToPaise, type OrderSnapshot } from "./paymenthub.webhook.js";
+import { queueRefund, sendRefundSoon } from "./refunds.service.js";
 
 /**
  * Two providers behind one lifecycle. With PAYMENTS_VIA_HUB=true, new ONLINE
@@ -386,7 +387,11 @@ export async function afterOrderPaid(orderId: string): Promise<void> {
 
   const seller = order.store?.owner ?? null;
   if (order.status === "CANCELLED") {
-    notifyPaymentOnCancelledOrder(order, order.customerId, seller?.email ?? null);
+    // The order can't be revived (its stock went back on sale), so the money
+    // goes straight back — and both sides are told.
+    const refundId = await queueRefund(prisma, order.id, "Paid after the order was cancelled");
+    if (refundId) sendRefundSoon(refundId);
+    notifyPaymentOnCancelledOrder(order, order.customerId, seller ?? null);
     return;
   }
   // The store is gone (SetNull) only if it was deleted mid-payment — there is

@@ -321,10 +321,21 @@ export function OrderSuccessPage({
                       </p>
                     )
                   )}
-                  {order.paymentMethod === 'ONLINE' && order.paymentStatus === 'PAID' && (
+                  {order.refund ? (
                     <p className="mt-1 text-muted">
-                      You paid online — contact the seller below about your refund.
+                      {order.refund.status === 'SUCCEEDED'
+                        ? `Your refund of ₹${order.refund.amount} has been sent. It usually reaches your account within 5–7 working days.`
+                        : order.refund.status === 'PENDING'
+                          ? `Your payment of ₹${order.refund.amount} is being refunded. You don't need to do anything.`
+                          : `Your refund of ₹${order.refund.amount} needs a hand from our team — we are on it. Contact UnieMax support if you don't hear back.`}
                     </p>
+                  ) : (
+                    order.paymentMethod === 'ONLINE' &&
+                    order.paymentStatus === 'PAID' && (
+                      <p className="mt-1 text-muted">
+                        You paid online — your payment will be refunded.
+                      </p>
+                    )
                   )}
                 </div>
               ) : (

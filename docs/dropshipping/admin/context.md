@@ -19,8 +19,9 @@ Status: ◐ Suppliers built (Phase 2, 20 Oct 2026); Needs action built (Phase 4,
   - **Came back:** parcels returned to the supplier.
   - **Problems reported:** with a link to the support ticket.
   - **Refunds to make:** paid orders cancelled for a supplier reason, with the
-    per-vendor amounts for a Split Refund once Easy Split is live. Refunds are
-    status-only today, so the money is returned from the gateway dashboard.
+    per-vendor amounts for a Split Refund once Easy Split is live. The core
+    refunds the customer through PaymentHub by itself; this list is where an
+    admin checks it went through (the order page shows the refund's state).
   - Phase 6, **Split not done** (PS-3) and **Vendor balance low** (PS-5): with
     the per-vendor amounts needed to fix them by hand.
 

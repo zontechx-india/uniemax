@@ -30,6 +30,19 @@ export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED'
 export type PaymentMethod = 'ONLINE' | 'COD'
 export type BankVerificationStatus = 'PENDING' | 'VERIFIED' | 'FAILED'
 
+/** One refund of an online payment. FAILED = a person must refund it by hand. */
+export interface OrderRefund {
+  id: string
+  status: 'PENDING' | 'SUCCEEDED' | 'FAILED'
+  amount: string
+  reason: string | null
+  failureReason: string | null
+  hubRefundId: string | null
+  attempts: number
+  createdAt: string
+  processedAt: string | null
+}
+
 export interface OrderRow {
   id: string
   orderNumber: string
@@ -129,6 +142,8 @@ export interface OrderDetail extends OrderRow {
   customFields: { id: string; label: string; section: 'CONTACT' | 'DELIVERY'; value: string }[]
   cfOrderId: string | null
   paymentIntentId: string | null
+  /** Refunds to the customer through PaymentHub, newest first. */
+  refunds?: OrderRefund[]
   confirmedAt: string | null
   packedAt: string | null
   shippedAt: string | null

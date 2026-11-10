@@ -206,34 +206,73 @@ function sellerPlacedMail(order: OrderMailData, to: string): MailMessage {
 }
 
 /**
- * A gateway payment landed on an order the seller had ALREADY CANCELLED
- * (the customer was mid-checkout when it was cancelled). The money is real
- * and the order cannot be revived — its stock went back on sale — so both
- * sides are told a refund is owed rather than "your order is placed".
- * The seller must issue the refund from the Cashfree dashboard until the
- * automatic refund call lands.
+ * A gateway payment landed on an order that was ALREADY CANCELLED (the
+ * customer was mid-checkout when the seller cancelled it, or paid after the
+ * payment window closed). The money is real and the order cannot be revived —
+ * its stock went back on sale — so nobody is told "your order is placed".
+ * UnieMax holds the money and sends it back by itself (payments/
+ * refunds.service.ts): the customer hears a refund is coming, the seller that
+ * there is nothing to do, and the admins that it happened.
  */
 export function notifyPaymentOnCancelledOrder(
   order: OrderMailData,
   customerId: string | null,
-  sellerEmail: string | null,
+  seller: OrderSeller | null,
 ): void {
+  const orderPath = `/order/${order.storeSlug}/${order.id}`;
+
+  // --- push ---------------------------------------------------------------
+  if (customerId) {
+    notify({
+      principalType: "CUSTOMER",
+      principalId: customerId,
+      kind: "PAYMENT",
+      title: `Refund on the way — order ${order.orderNumber}`,
+      body: `Your payment of ${formatTotal(order.total)} went through after this order was closed. It will be refunded in full.`,
+      url: orderPath,
+      data: { orderId: order.id },
+    });
+  }
+  if (seller) {
+    notify({
+      principalType: "CUSTOMER",
+      principalId: seller.id,
+      kind: "PAYMENT",
+      title: `Late payment on cancelled order ${order.orderNumber}`,
+      body: `The customer paid ${formatTotal(order.total)} after the order was cancelled. UnieMax is refunding it — don't pack or ship this order.`,
+      url: `/mystores/${order.storeSlug}/orders/${order.id}`,
+      data: { orderId: order.id },
+    });
+  }
+  notifyAdmins({
+    kind: "PAYMENT",
+    title: `Payment on a cancelled order — ${order.orderNumber}`,
+    body: `${formatTotal(order.total)} was paid at ${order.storeName} after the order was cancelled. A refund was started — check it went through.`,
+    url: `/orders/${order.id}`,
+    data: { orderId: order.id },
+  });
+
+  // --- email --------------------------------------------------------------
   void (async () => {
     const to = await customerAddress(order, customerId);
     if (!to) return;
-    const orderUrl = publicWebUrl
-      ? `${publicWebUrl}/order/${order.storeSlug}/${order.id}`
-      : null;
+    const orderUrl = publicWebUrl ? `${publicWebUrl}${orderPath}` : null;
     await sendMail({
       to,
       subject: `Refund on the way for order ${order.orderNumber}`,
-      text: `Hi${order.customerName ? ` ${order.customerName}` : ""},\n\nYour payment of ${formatTotal(order.total)} for order ${order.orderNumber} went through, but ${order.storeName} had already cancelled the order — so it will not be fulfilled and your payment will be refunded in full.\n\nRefunds usually reach your account within 5–7 working days.${orderUrl ? `\n\nView your order: ${orderUrl}` : ""}`,
+      text: `Hi${order.customerName ? ` ${order.customerName}` : ""},
+
+Your payment of ${formatTotal(order.total)} for order ${order.orderNumber} at ${order.storeName} went through, but the order had already been cancelled — so it will not be fulfilled and your payment will be refunded in full.
+
+Refunds usually reach your account within 5–7 working days.${orderUrl ? `
+
+View your order: ${orderUrl}` : ""}`,
       html: wrapHtml(
         "Your payment will be refunded",
         `<p style="margin:0;font-size:14px;color:#444">
            Your payment of <strong>${formatTotal(order.total)}</strong> for order
-           <strong>${order.orderNumber}</strong> went through, but
-           <strong>${order.storeName}</strong> had already cancelled the order.
+           <strong>${order.orderNumber}</strong> at <strong>${escapeHtml(order.storeName)}</strong>
+           went through, but the order had already been cancelled.
            It will not be fulfilled and your payment will be refunded in full.</p>
          <p style="margin:12px 0 0;font-size:13px;color:#444">
            Refunds usually reach your account within 5–7 working days.</p>
@@ -242,24 +281,28 @@ export function notifyPaymentOnCancelledOrder(
     });
   })().catch(logFailure("customer payment on cancelled order"));
 
+  const sellerEmail = seller?.email;
   if (sellerEmail) {
     void (async () => {
       const manageUrl = publicWebUrl
-        ? `${publicWebUrl}/stores/${order.storeSlug}/orders/${order.id}`
+        ? `${publicWebUrl}/mystores/${order.storeSlug}/orders/${order.id}`
         : null;
       await sendMail({
         to: sellerEmail,
-        subject: `Refund required — payment received on cancelled order ${order.orderNumber}`,
-        text: `A payment of ${formatTotal(order.total)} was received for order ${order.orderNumber}, which you had already cancelled.\n\nThe customer was completing payment when the order was cancelled. The order stays cancelled and its stock is back on sale, but the money HAS been captured.\n\nRefund it from your Cashfree dashboard.${manageUrl ? `\n\nOrder details: ${manageUrl}` : ""}`,
+        subject: `Late payment on cancelled order ${order.orderNumber} — being refunded`,
+        text: `A payment of ${formatTotal(order.total)} was received for order ${order.orderNumber} after it was cancelled.
+
+The order stays cancelled and its stock is back on sale. UnieMax is refunding the customer — you don't need to do anything. Please don't pack or ship this order.${manageUrl ? `
+
+Order details: ${manageUrl}` : ""}`,
         html: wrapHtml(
-          "Refund required",
+          "Late payment — being refunded",
           `<p style="margin:0;font-size:14px;color:#444">
              A payment of <strong>${formatTotal(order.total)}</strong> was received for order
-             <strong>${order.orderNumber}</strong>, which you had already cancelled.</p>
+             <strong>${order.orderNumber}</strong> after it was cancelled.</p>
            <p style="margin:12px 0 0;font-size:13px;color:#444">
-             The customer was completing payment when the order was cancelled. The order
-             stays cancelled and its stock is back on sale, but the money
-             <strong>has been captured</strong> — refund it from your Cashfree dashboard.</p>
+             The order stays cancelled and its stock is back on sale. UnieMax is refunding
+             the customer — you don't need to do anything. Please don't pack or ship this order.</p>
            ${manageUrl ? linkHtml(manageUrl, "View the order") : ""}`,
         ),
       });

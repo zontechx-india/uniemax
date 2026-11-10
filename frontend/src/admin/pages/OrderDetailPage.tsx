@@ -332,6 +332,45 @@ export default function OrderDetailPage() {
                 </Detail>
               ) : null}
             </dl>
+            {(order.refunds ?? []).map((refund) => (
+              <div key={refund.id} className="mt-3 border-t border-line pt-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-semibold">Refund {formatMoneyExact(refund.amount)}</span>
+                  <Chip
+                    tone={
+                      refund.status === 'SUCCEEDED'
+                        ? 'success'
+                        : refund.status === 'FAILED'
+                          ? 'danger'
+                          : 'warning'
+                    }
+                  >
+                    {refund.status === 'SUCCEEDED'
+                      ? 'Sent'
+                      : refund.status === 'FAILED'
+                        ? 'Needs you'
+                        : 'In progress'}
+                  </Chip>
+                </div>
+                <p className="mt-1 text-xs text-muted">
+                  {refund.status === 'SUCCEEDED' && refund.processedAt
+                    ? `Sent ${formatDateTime(refund.processedAt)}`
+                    : `Started ${formatDateTime(refund.createdAt)}`}
+                  {refund.hubRefundId ? (
+                    <>
+                      {' · '}
+                      <span className="font-mono">{refund.hubRefundId}</span>
+                    </>
+                  ) : null}
+                </p>
+                {refund.status === 'FAILED' ? (
+                  <p className="mt-1 text-xs text-danger">
+                    {refund.failureReason ?? 'The refund failed.'} Refund it by hand from the
+                    PaymentHub dashboard — this updates by itself when it goes through.
+                  </p>
+                ) : null}
+              </div>
+            ))}
             {order.paymentRef === 'DEV-SIMULATED' ? (
               <p className="mt-2 text-xs text-warning">
                 Simulated in a development build — no real money moved.

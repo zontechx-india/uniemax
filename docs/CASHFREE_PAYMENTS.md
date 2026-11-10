@@ -43,7 +43,7 @@ with `503`. Production boot fails fast if only one of the two keys is set.
 > `CASHFREE_ENV=production` with the live merchant keys, and all three share
 > one backend (`:4000`) and whichever database that backend's `.env` names.
 > **Any order placed in any environment charges a real card**, including
-> test orders on the dev domain. Refunds are still manual (see Known gaps).
+> test orders on the dev domain. Refunds go through PaymentHub (see Refunds).
 
 `PUBLIC_WEB_URL` (return_url) and `PUBLIC_API_URL` (notify_url) must both be
 `https://uniemax.com` on the server — the old `uniemax.zontechx.com` domain is
@@ -169,9 +169,10 @@ for goods that are no longer reserved:
 2. **What slips through is recorded, not celebrated.** If a payment still
    lands first, `markOrderPaid` sees `status: CANCELLED` and records the
    money (`paymentStatus: PAID`) — losing it would be worse — but the order
-   **stays cancelled** and both parties get the refund-required emails
-   instead of an order confirmation: the seller is told to refund from the
-   Cashfree dashboard, the customer is told a refund is coming.
+   **stays cancelled**, a refund is started at once (see Refunds), and
+   nobody gets an order confirmation: the customer is told a refund is
+   coming, the seller that UnieMax is refunding it and there is nothing to
+   do, and the admins that it happened (push + email).
 
 Such an order shows in the seller's list as `CANCELLED` + payment `PAID`.
 It is deliberately excluded from dashboard revenue (which skips `CANCELLED`)
@@ -196,8 +197,7 @@ The storefront is unchanged — it still opens the Cashfree SDK with
 
 Each order stays on the provider it started with: an order with a `cfOrderId`
 keeps settling through Cashfree after the switch, but a *new* attempt for it
-goes through the hub. Refunds through the hub are not wired yet (same gap as
-below). Switch: [DEPLOYMENT.md](./DEPLOYMENT.md) — on for dev and prod (prod since 2026-10-18). Orders placed on prod
+goes through the hub. Refunds go through the hub too (see Refunds). Switch: [DEPLOYMENT.md](./DEPLOYMENT.md) — on for dev and prod (prod since 2026-10-18). Orders placed on prod
 before then stay on direct Cashfree and never appear in the hub.
 
 ## Data model (Order)
@@ -228,16 +228,28 @@ require payment:
   `CASHFREE_*` keys are still the live pair, so switching it off makes dev
   charge real cards again.
 
+## Refunds (through PaymentHub)
+
+`modules/payments/refunds.service.ts` (rules in `refunds.rules.ts`). A refund
+is always the **whole order total**.
+
+| Step | What happens |
+| --- | --- |
+| Started | A PAID online order is cancelled (seller, admin, or the system — e.g. a supplier couldn't ship), or a payment lands on an order already cancelled. An `OrderRefund` row (`PENDING`) is written — for a cancel, in the cancel's own transaction. |
+| Sent | Right after commit: `POST /v1/payment-intents/:id/refunds` with idempotency key `refund:<row id>`, so a retry can never refund twice. The paid intent is the order's latest one, or an older one found by the order number. |
+| Settled | The hub's `refund.succeeded` / `refund.failed` webhook. Succeeded → row `SUCCEEDED`, order `REFUNDED`, customer told (push + email). Failed → row `FAILED`, admins notified. |
+| Retried | The payments job (every 10 min): a row not sent yet is sent again (5 tries, then `FAILED`); a row sent 15+ min ago with no webhook is read back with `GET /v1/refunds/:id`. |
+| By hand | A `FAILED` refund is redone in the PaymentHub dashboard; its webhook marks our row `SUCCEEDED`. An order paid straight through Cashfree (no hub intent) goes `FAILED` at once — refund it in the Cashfree dashboard. |
+
+Admins are also notified when a payment arrives but the order is **not**
+marked paid (wrong amount, wrong reference) and when a **second payment**
+arrives for an order that is already paid — both need a person.
+
 ## Known gaps / next milestones
 
-- **Refunds:** seller cancellation of a PAID order flips the status to
-  `REFUNDED` but does **not** call Cashfree's refund API yet — refund the
-  money from the Cashfree dashboard until that lands. The same applies to a
-  payment that arrives on an already-cancelled order (above).
+- **Partial refunds** are not built — a refund is the whole order total.
+- **Direct-Cashfree orders** (placed before the hub) are refunded by hand.
 - **Webhook replay window:** the signature covers `x-webhook-timestamp` but
   its freshness is not yet checked, so a captured signed webhook replays
   indefinitely. Processing is idempotent, which limits the impact, but the
   standard ±5 min tolerance should be added.
-- **Abandoned unpaid orders hold stock** until the seller cancels them from
-  the store's Orders section (cancellation restores stock). An automatic
-  expiry sweep is a candidate follow-up.

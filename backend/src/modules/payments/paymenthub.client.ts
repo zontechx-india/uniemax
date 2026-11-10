@@ -99,6 +99,40 @@ export function cancelIntent(id: string, idempotencyKey: string): Promise<HubInt
   return hubFetch<HubIntent>(`/v1/payment-intents/${encodeURIComponent(id)}/cancel`, { method: "POST", body: {}, idempotencyKey });
 }
 
+/** Every intent that used this reference (our orderNumber), newest first. */
+export function listIntentsByReference(reference: string): Promise<HubIntent[]> {
+  return hubFetch<HubIntent[]>(`/v1/payment-intents?reference=${encodeURIComponent(reference)}`);
+}
+
+/** A refund at the hub — `PENDING → SUCCEEDED | FAILED`. */
+export interface HubRefund {
+  id: string;
+  intentId: string;
+  amountMinor: number;
+  status: string;
+  gatewayRefundId?: string | null | undefined;
+}
+
+/**
+ * Send money back for a paid intent. The same idempotency key always answers
+ * with the first refund, so a retry can never refund twice.
+ */
+export function createRefund(
+  intentId: string,
+  input: { amountMinor: number; reason?: string },
+  idempotencyKey: string,
+): Promise<HubRefund> {
+  return hubFetch<HubRefund>(`/v1/payment-intents/${encodeURIComponent(intentId)}/refunds`, {
+    method: "POST",
+    body: input,
+    idempotencyKey,
+  });
+}
+
+export function getRefund(id: string): Promise<HubRefund> {
+  return hubFetch<HubRefund>(`/v1/refunds/${encodeURIComponent(id)}`);
+}
+
 /**
  * A payout to a seller. The hub's payout API (its Phase 3) is not built yet:
  * this is the shape UnieMax expects, and the call is reached only when

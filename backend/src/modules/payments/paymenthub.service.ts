@@ -4,6 +4,8 @@ import { Prisma } from "../../generated/prisma/client.js";
 import { afterOrderPaid, releaseToSeller } from "./payments.service.js";
 import { applyVerificationUpdate } from "../stores/bankCheck.service.js";
 import { applyHubPayout } from "../payouts/payouts.service.js";
+import { notifyAdmins } from "../notifications/notifications.service.js";
+import { applyHubRefund } from "./refunds.service.js";
 import {
   decide,
   FAILED_FROM,
@@ -40,6 +42,7 @@ const ORDER_SELECT = {
   paymentMethod: true,
   paymentStatus: true,
   paymentIntentId: true,
+  paymentRef: true,
 } as const;
 
 function isUniqueViolation(error: unknown): boolean {
@@ -101,13 +104,16 @@ export async function handlePaymentHubEvent(
   }
 
   if (event.kind === "refund") {
-    // UnieMax has no refund records yet — they arrive with the hub migration.
-    log.info(
-      { ...ctx, refundId: event.refund.id, intentId: event.refund.intentId, reference: event.refund.reference },
-      "PaymentHub webhook: refund event received — no refund records yet, acknowledged",
+    // Settles our refund row (refunds.service.ts). A database error throws →
+    // 500 → the hub retries; the settle is guarded, so a redo is harmless.
+    const { refund } = event;
+    const result = await applyHubRefund(refund);
+    log[result === "unknown" ? "warn" : "info"](
+      { ...ctx, refundId: refund.id, intentId: refund.intentId, reference: refund.reference, status: refund.status, result },
+      "PaymentHub webhook: refund update",
     );
     await markProcessed(envelope.id);
-    return "ignored";
+    return result === "applied" ? "processed" : "ignored";
   }
 
   if (event.kind === "verification") {
@@ -155,6 +161,28 @@ export async function handlePaymentHubEvent(
 
   if (decision.action === "ignore") {
     log[decision.level]({ ...orderCtx, reason: decision.reason }, "PaymentHub webhook: no change");
+    if (event.type === "payment.succeeded") {
+      // Money was taken and the order did NOT become paid by it — a person
+      // must look. (A repeat delivery of the same payment is not one of these.)
+      const paidAgain =
+        decision.level === "info" &&
+        !!intent.gatewayPaymentId &&
+        !!order.paymentRef &&
+        order.paymentRef !== intent.gatewayPaymentId;
+      if (decision.level === "error" || paidAgain) {
+        notifyAdmins({
+          kind: "PAYMENT",
+          title: paidAgain
+            ? `Order ${order.orderNumber} was paid twice`
+            : `Payment needs you — order ${order.orderNumber}`,
+          body: paidAgain
+            ? `A second payment (${intent.gatewayPaymentId}) arrived for an order that is already paid. Refund the extra one from the PaymentHub dashboard.`
+            : `A payment arrived but the order was not marked paid: ${decision.reason}. Check it in the PaymentHub dashboard.`,
+          url: `/orders/${order.id}`,
+          data: { orderId: order.id, intentId: intent.id },
+        });
+      }
+    }
     await markProcessed(envelope.id);
     return "ignored";
   }

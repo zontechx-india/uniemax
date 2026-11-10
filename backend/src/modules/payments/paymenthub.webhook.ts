@@ -198,6 +198,8 @@ export interface OrderSnapshot {
   paymentMethod: string;
   paymentStatus: string;
   paymentIntentId: string | null;
+  /** The gateway payment that paid the order — tells a second payment from a repeat. */
+  paymentRef?: string | null;
 }
 
 /** Payment statuses each transition may start from — the update guards. */

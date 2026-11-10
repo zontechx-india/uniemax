@@ -66,6 +66,7 @@ import {
   voidPaymentSession,
   type PaymentSession,
 } from "../payments/payments.service.js";
+import { queueRefund, sendRefundSoon } from "../payments/refunds.service.js";
 
 /**
  * Order placement — the storefront checkout's final step. Requires a
@@ -173,6 +174,12 @@ const orderSelect = {
     },
   },
   shipments: { orderBy: { shippedAt: "asc" }, select: shipmentSelect },
+  // The latest refund to the customer, if any (payments/refunds.service.ts).
+  refunds: {
+    orderBy: { createdAt: "desc" },
+    take: 1,
+    select: { status: true, amount: true, processedAt: true },
+  },
 } satisfies Prisma.OrderSelect;
 
 type OrderRow = Prisma.OrderGetPayload<{ select: typeof orderSelect }>;
@@ -183,9 +190,11 @@ type OrderRow = Prisma.OrderGetPayload<{ select: typeof orderSelect }>;
  * contact redaction for the public link is `getPublicOrder`'s job.
  */
 function shapeOrder(row: OrderRow, audience: OrderAudience = "customer") {
-  const { items, shipments, customFields, ...rest } = row;
+  const { items, shipments, customFields, refunds, ...rest } = row;
   return {
     ...rest,
+    /** Where the customer's money stands after a cancel — null when none was owed. */
+    refund: refunds[0] ?? null,
     customFields: readOrderCustomFields(customFields),
     items: items.map(({ imageKey, ...item }) => ({
       ...item,
@@ -1206,7 +1215,7 @@ async function cancelOrderCore(
     ...(restockReturned ? returnedItems : []),
   ];
 
-  await prisma.$transaction(async (tx) => {
+  const refundId = await prisma.$transaction(async (tx) => {
     const updated = await tx.order.updateMany({
       // paymentStatus too: a payment webhook landing between the read above
       // and this write would otherwise leave the order CANCELLED + PAID —
@@ -1252,12 +1261,17 @@ async function cancelOrderCore(
         data: { restocked: true },
       });
     }
+    // A paid online order: the money goes back. Queued here, in the cancel's
+    // own transaction, so a cancelled paid order always has its refund row.
+    return current.paymentStatus === "PAID" ? queueRefund(tx, orderId, reason) : null;
   });
 
   // Close the payment window before answering: the stock is back on sale, so
   // the customer's still-open checkout must stop being payable. Never throws
   // and is time-bounded, so a gateway problem can't fail or hang the cancel.
   await voidPaymentSession(orderId);
+  // Ask PaymentHub for the refund now; the payments job retries a failure.
+  if (refundId) sendRefundSoon(refundId);
 
   const row = await prisma.order.findFirst({
     where: { id: orderId },
@@ -1503,6 +1517,7 @@ export async function getPublicOrder(
     pincode: null,
     billingAddress: null,
     customFields: [],
+    refund: null,
     // The success page only needs to know a payment was simulated; a real
     // gateway reference is the buyer's business.
     paymentRef: shaped.paymentRef === "DEV-SIMULATED" ? shaped.paymentRef : null,

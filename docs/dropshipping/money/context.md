@@ -125,7 +125,7 @@ the seller owes the supplier.
 | M-3 | The courier collected less than `collectAmount`. | The statement uses `collectAmount`. The supplier saw the amount on its card and slip, so the gap is settled between them. |
 | M-4 | An order is refunded after a payment was recorded. | Its line becomes `VOID` and the balance shifts by itself. The next payment evens it out. |
 | M-5 | Rounding drift. | All maths in `Decimal` in `domain.ts`. Amounts are stored once and never recomputed differently. |
-| M-6 | A paid order is cancelled for a supplier reason. UnieMax's own refunds are status-only today. | It goes on admin's **Refunds to make** with the per-vendor amounts ([admin](../admin/context.md)). |
+| M-6 | A paid order is cancelled for a supplier reason. The core refunds the customer through PaymentHub by itself (docs/CASHFREE_PAYMENTS.md → Refunds). | It still goes on admin's **Refunds to make** with the per-vendor amounts, to check the refund went through and settle the vendors ([admin](../admin/context.md)). |
 | M-7 | A payment is recorded twice. | Both are visible. The recorder deletes one, and the other side is told. |
 | M-8 | The two sides disagree. | Support ticket to the platform. An admin sees both sides' entries and the terms log. |
 | M-9 | On `DIRECT` prepaid orders UnieMax holds the money while the seller owes the supplier. | Known until Easy Split is live (D-16). The statement shows the debt. |

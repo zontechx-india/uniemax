@@ -142,6 +142,21 @@ export async function getOrder(orderId: string) {
         },
       },
       shipments: { orderBy: { shippedAt: "asc" }, select: shipmentSelect },
+      // Refunds to the customer through PaymentHub, newest first.
+      refunds: {
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          status: true,
+          amount: true,
+          reason: true,
+          failureReason: true,
+          hubRefundId: true,
+          attempts: true,
+          createdAt: true,
+          processedAt: true,
+        },
+      },
     },
   });
   if (!order) throw HttpError.notFound("Order not found");

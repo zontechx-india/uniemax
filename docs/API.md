@@ -494,11 +494,18 @@ has its Cashfree order terminated, so a customer sitting on the hosted
 checkout can no longer pay for stock that just went back on sale; a payment
 that still races through is recorded and flagged for refund rather than
 confirmed (see [CASHFREE_PAYMENTS.md](./CASHFREE_PAYMENTS.md)). A `PAID`
-order flips to `paymentStatus: REFUNDED` — **status only**: the Cashfree
-refund API is not wired yet, so money paid through the gateway must
-currently be refunded from the Cashfree merchant dashboard (the automatic
-refund call is the next payments milestone). Returns the full order
-(`cancelledAt` + `cancelReason` set).
+order flips to `paymentStatus: REFUNDED` and a **refund is started through
+PaymentHub** in the same transaction (the order's `refund` field shows where
+it stands — see [CASHFREE_PAYMENTS.md](./CASHFREE_PAYMENTS.md) → Refunds). An
+order paid straight through Cashfree (before the hub) can't be refunded this
+way: its refund is marked `FAILED` and the admins are told to do it by hand.
+Returns the full order (`cancelledAt` + `cancelReason` set).
+
+Every order response (customer, seller) carries `refund`: `null`, or
+`{ status: "PENDING" | "SUCCEEDED" | "FAILED", amount, processedAt }` for the
+latest refund (always `null` in the redacted public view). The admin order
+detail carries `refunds[]` with `id`, `status`, `amount`, `reason`,
+`failureReason`, `hubRefundId`, `attempts`, `createdAt`, `processedAt`.
 
 ### Parcels — `/api/v1/stores/:id/orders/:orderId/shipments`
 
@@ -2165,7 +2172,7 @@ carries `{ orderId, storeSlug }`.
 | --- | --- |
 | `payment.succeeded` | `PENDING`/`FAILED` → `PAID`, `paymentRef = gatewayPaymentId` (or the intent id), then the usual `order.paid` event + placement notifications (refund-required alert if the order was already cancelled). Requires `amountMinor` = order `total` in paise (string maths), `INR`, matching reference/store and an `ONLINE` order — otherwise logged as an error and left alone. `lateCapture: true` is logged for ops review. |
 | `payment.failed` / `payment.expired` / `payment.cancelled` | `PENDING` → `FAILED` (retryable, like the Cashfree path). No-op if the order is past `PENDING` or the event is for an intent other than the order's current `paymentIntentId`. |
-| `refund.succeeded` / `refund.failed` | Logged and acknowledged — UnieMax has no refund records yet. |
+| `refund.succeeded` / `refund.failed` | Settles the `OrderRefund` row with that `hubRefundId` (or the one being sent for that intent). Succeeded: row `SUCCEEDED`, a still-`PAID` order becomes `REFUNDED` when the whole total went back, the customer gets a push + email. Failed: row `FAILED`, every admin is notified. A successful refund with no row of ours (made by hand in the hub dashboard) is recorded as a new row. |
 | `verification.updated` | A hub admin settled a `NEEDS_REVIEW` bank check. Applied to the payout account — or the OPEN pending change — whose `verificationRef` is `data.verification.id` (and `payeeRef` = `store_<storeId>`), with the same mapping as a [save](#payout-bank-accounts--apiv1storesidbank-accounts); `VALID` on a change applies it. Ignored when it is no longer the latest check (the seller sent new details, the change was superseded/withdrawn) or an admin decided manually meanwhile. The seller is notified. |
 | `payout.initiated` / `payout.succeeded` / `payout.failed` / `payout.reversed` | A seller payout moved at the gateway. `data.payout` = `{ id, reference, status, amountMinor, gateway?, gatewayRef?, utr?, failureReason? }`; found by `hubPayoutId` = `id`, then our payout id = `reference`. Forward-only (`PENDING → PROCESSING → SUCCEEDED / FAILED`, `SUCCEEDED → REVERSED`); a SUCCEEDED stamps `paidAt`. `amountMinor` must equal the payout amount, else logged and left alone. Every delivery adds a `HUB_WEBHOOK` history event with the payload. See [Seller payouts](#seller-payouts--apiv1adminordersidpayouts--apiv1adminseller-payouts). |
 | anything else | Logged and acknowledged. |
@@ -4047,9 +4054,9 @@ SUPER_ADMIN** cannot be demoted or deactivated (`409`).
 
 ## Planned Endpoints (not yet implemented)
 
-- Cashfree **refunds** — `POST /pg/orders/{id}/refunds` on seller
-  cancellation of a PAID order (today cancellation only flips the status;
-  the money is refunded manually from the Cashfree dashboard)
+- **Partial refunds** and an admin "refund again" button (today a refund is
+  always the whole order total, started by a cancel; a failed one is redone by
+  hand in the PaymentHub dashboard)
 - `GET /api/v1/shipping/quote` — auto shipping calculation (orders currently
   ship free)
 - `GET /api/v1/banners`, `GET /api/v1/store` — home page content

@@ -2,6 +2,7 @@ import type { FastifyBaseLogger } from "fastify";
 import { prisma } from "../../config/prisma.js";
 import { gatewayConfigured, reconcilePendingPayment } from "./payments.service.js";
 import { expireUnpaidOrder } from "../orders/orders.service.js";
+import { retryRefunds } from "./refunds.service.js";
 
 /**
  * Stranded-payment sweep — the webhook's safety net.
@@ -85,6 +86,13 @@ export function startPaymentJobs(log: FastifyBaseLogger): () => void {
       if (closed) log.info({ closed }, "unpaid orders closed after the payment window");
     } catch (err) {
       log.error(err, "closing unpaid orders failed");
+    }
+    try {
+      // Refunds not sent yet, or sent and never reported on (refunds.service.ts).
+      const refunds = await retryRefunds();
+      if (refunds) log.info({ refunds }, "pending refunds checked");
+    } catch (err) {
+      log.error(err, "refund retry failed");
     }
   };
   const timer = setInterval(run, INTERVAL_MS);

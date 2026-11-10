@@ -1238,6 +1238,8 @@ model Order {
   /// Money sent to the seller for this order — manual transfers and
   /// PaymentHub payouts. Tracked apart from `status` (docs/BACKEND_CONTEXT.md).
   payouts             OrderPayout[]
+  /// Money sent back to the customer through PaymentHub (payments/refunds.service.ts).
+  refunds             OrderRefund[]
   /// Fee breakdown (platform / gateway fee, seller earning) — seller and
   /// admin only, never the customer (modules/finance).
   financials          OrderFinancials?
@@ -1426,6 +1428,52 @@ model PaymentHubEvent {
   processedAt DateTime?
 
   @@map("payment_hub_events")
+  @@schema("public")
+}
+
+/// Where a refund to the customer stands. PENDING = queued, or sent to the hub
+/// and not settled yet; the payments job retries it.
+enum RefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+
+  @@schema("public")
+}
+
+/// A refund of an online payment, made through PaymentHub. Queued in the same
+/// transaction that cancels a paid order (or when a payment lands on an order
+/// already cancelled), then sent to the hub; `refund.succeeded` /
+/// `refund.failed` webhooks settle it. A refund an operator makes by hand in
+/// the hub dashboard is recorded here too when its webhook arrives.
+model OrderRefund {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  amount Decimal      @db.Decimal(10, 2)
+  status RefundStatus @default(PENDING)
+  /// Why the money goes back — the cancel reason, shown to admins.
+  reason String?
+
+  /// The hub intent that holds the payment (pi_…) — set before the hub call.
+  intentId        String?
+  /// The hub's refund id (rf_…) once the hub accepted the request.
+  hubRefundId     String?   @unique
+  gatewayRefundId String?
+  /// Hub calls made so far — the job gives up (FAILED) after a few.
+  attempts        Int       @default(0)
+  failureReason   String?
+  requestedAt     DateTime?
+  processedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([status, updatedAt])
+  @@index([intentId])
+  @@map("order_refunds")
   @@schema("public")
 }
 

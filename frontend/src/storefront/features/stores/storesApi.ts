@@ -2457,6 +2457,13 @@ export interface PlacedOrder {
   paymentStatus: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED'
   /** "DEV-SIMULATED" on development-mode online payments. */
   paymentRef: string | null
+  /** The refund of a cancelled paid order: on its way, sent, or needing
+   *  UnieMax's help. Null when no money was owed back. */
+  refund?: {
+    status: 'PENDING' | 'SUCCEEDED' | 'FAILED'
+    amount: string
+    processedAt: string | null
+  } | null
   placedAt: string
   /** Lifecycle stamps — null until the seller reaches that stage (a skipped
    *  stage, e.g. SHIPPED on a pickup order, stays null forever). */

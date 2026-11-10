@@ -45,7 +45,7 @@ library, VAPID; console fallback without keys — see
 `docs/PUSH_NOTIFICATIONS.md`). Online payments via **Cashfree PG v4**
 (`modules/payments` — REST wrapper, no SDK; see
 `docs/CASHFREE_PAYMENTS.md`). Planned (hooks already in place): Socket.IO
-(real-time), Google/Apple token verification, Cashfree refunds.
+(real-time), Google/Apple token verification.
 
 ---
 
@@ -178,7 +178,10 @@ backend/
 │   │   │                      #   + session termination on seller cancel
 │   │   │                      #   + payments.jobs.ts (10-min stranded-payment
 │   │   │                      #   sweep, settle-only; closes orders still
-│   │   │                      #   AWAITING_PAYMENT after 60 min)
+│   │   │                      #   AWAITING_PAYMENT after 60 min; retries
+│   │   │                      #   pending refunds)
+│   │   │                      #   + refunds.service.ts / refunds.rules.ts
+│   │   │                      #   (refunds through PaymentHub)
 │   │   │                      #   (see docs/CASHFREE_PAYMENTS.md)
 │   │   ├── finance/           # seller finance (docs/seller-finance/): fee
 │   │   │                      #   rules, order fee snapshots, seller ledger ·
@@ -1587,8 +1590,9 @@ White-label design — one codebase, any business:
   transactionally — items that never shipped always, items that came back
   only when `restockReturned` says so — and recomputes aggregates,
   **terminates the Cashfree order** of an unpaid ONLINE order so the returned
-  stock can't still be paid for, flips a PAID payment to REFUNDED — status
-  only; the Cashfree refund API call is a planned follow-up). Every status
+  stock can't still be paid for, flips a PAID payment to REFUNDED and queues
+  the refund in the same transaction — `queueRefund`, sent to PaymentHub
+  right after commit). Every status
   change goes through ONE pair of helpers — `writeStatusChange` (the guarded
   write, inside the caller's transaction; COD → PAID on DELIVERED) and
   `announceStatusChange` (after commit: the customer message unless the
@@ -1660,6 +1664,15 @@ White-label design — one codebase, any business:
   payout: `fromStatus` (null on creation) → `toStatus`, `source` `ADMIN |
   HUB_RESPONSE | HUB_WEBHOOK`, `actorId/Email`, `note`, `hubEventId`,
   `payload` (the hub answer or webhook data as received).
+- **OrderRefund** (`order_refunds`) — one refund of an online payment through
+  PaymentHub: `orderId`, `amount`, `status` (`RefundStatus`: PENDING →
+  SUCCEEDED | FAILED), `reason`, `intentId` (the paid hub intent, saved before
+  the hub call), `hubRefundId` (unique), `gatewayRefundId`, `attempts`,
+  `failureReason`, `requestedAt`, `processedAt`. Written by
+  `payments/refunds.service.ts`: queued when a PAID order is cancelled or a
+  payment lands on a cancelled order, sent with idempotency key
+  `refund:<row id>`, settled by the hub's `refund.*` webhooks, retried by the
+  payments job (5 tries, then FAILED + admin notification).
 - **PaymentHubEvent** (`payment_hub_events`) — dedupe log for PaymentHub
   webhooks: `id` = the hub's event id, `type`, `receivedAt`, `processedAt`
   (set in the same transaction as the order update; null = reprocess on the
@@ -2068,10 +2081,9 @@ change notifies the other side over the existing feed + Web Push, and every
 admin write lands in the audit trail.
 
 **Not yet (hooks in place):**
-1. **Cashfree refunds** — cancelling a paid order marks REFUNDED (status
-   only); the actual refund API call is manual (Cashfree dashboard) until
-   wired. Also: automatic expiry/cancel sweep for abandoned unpaid ONLINE
-   orders (they hold stock until the seller cancels).
+1. **Partial refunds** — a refund is always the whole order total, started
+   by a cancel (`payments/refunds.service.ts`). Orders paid straight through
+   Cashfree (before PaymentHub) are still refunded by hand.
 2. Shipping beyond the MVP rates (weight bands, courier APIs, state-level
    delivery restriction — pincode areas and flat/free/free-above rates with
    product overrides are DONE, see `deliveryRules.ts` / `shippingRates.ts`),
