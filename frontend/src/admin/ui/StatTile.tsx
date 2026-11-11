@@ -38,8 +38,8 @@ export function StatTile({
 
   const body = (
     <>
-      <p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p>
-      <p className="mt-1.5 font-figure text-2xl font-bold text-fg">{value}</p>
+      <p className="text-sm font-medium text-muted">{label}</p>
+      <p className="mt-1.5 break-words font-figure text-lg font-bold text-fg sm:text-2xl">{value}</p>
       {hint ? <p className="mt-0.5 text-xs text-muted">{hint}</p> : null}
       {trend && trend.length > 1 ? (
         <div className="mt-3">
@@ -49,7 +49,7 @@ export function StatTile({
     </>
   )
 
-  const className = `block rounded-lg border ${tones[tone]} bg-surface p-4 ${
+  const className = `block min-w-0 rounded-lg border ${tones[tone]} bg-surface p-4 ${
     to ? 'transition-colors hover:bg-surface-alt' : ''
   }`
 

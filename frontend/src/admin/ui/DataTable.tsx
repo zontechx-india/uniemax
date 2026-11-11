@@ -37,6 +37,13 @@ export interface DataTableProps<T> {
   onRetry?: () => void
   onRowClick?: (row: T) => void
   empty?: { title: string; hint?: string }
+  /**
+   * Optional phone row. When given, the phone view is a native-style list —
+   * this content on the left, a chevron on the right when rows open — instead
+   * of the generic label/value card. Use it for the busy lists (orders,
+   * payments) where repeating "Store", "Status"… on every row is noise.
+   */
+  mobileRow?: (row: T) => ReactNode
 }
 
 export function DataTable<T>({
@@ -48,6 +55,7 @@ export function DataTable<T>({
   onRetry,
   onRowClick,
   empty,
+  mobileRow,
 }: DataTableProps<T>) {
   if (error) return <ErrorState message={error} {...(onRetry ? { onRetry } : {})} />
   if (loading && rows.length === 0) return <Skeleton rows={6} className="p-4" />
@@ -71,7 +79,7 @@ export function DataTable<T>({
                 <th
                   key={column.header}
                   scope="col"
-                  className={`px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted ${column.className ?? ''}`}
+                  className={`px-3 py-2.5 text-xs font-medium text-muted ${column.className ?? ''}`}
                 >
                   {column.header}
                 </th>
@@ -107,7 +115,48 @@ export function DataTable<T>({
         </table>
       </div>
 
+      {/* Phone / small tablet, custom row: a native-style list. */}
+      {mobileRow ? (
+        <ul className="divide-y divide-line md:hidden">
+          {rows.map((row) => (
+            <li
+              key={rowKey(row)}
+              className={`flex items-center gap-3 px-4 py-3 ${
+                interactive ? 'cursor-pointer transition-colors active:bg-surface-alt' : ''
+              }`}
+              {...(interactive
+                ? {
+                    onClick: () => onRowClick?.(row),
+                    tabIndex: 0,
+                    role: 'link',
+                    onKeyDown: (event: React.KeyboardEvent) => {
+                      if (event.key === 'Enter') onRowClick?.(row)
+                    },
+                  }
+                : {})}
+            >
+              <div className="min-w-0 flex-1">{mobileRow(row)}</div>
+              {interactive ? (
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4 shrink-0 text-muted"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                >
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
       {/* Phone / small tablet: one card per row. */}
+      {mobileRow ? null : (
       <ul className="divide-y divide-line md:hidden">
         {rows.map((row) => {
           const primary = columns.find((column) => column.primary)
@@ -140,6 +189,7 @@ export function DataTable<T>({
           )
         })}
       </ul>
+      )}
     </>
   )
 }
@@ -167,11 +217,20 @@ export function Pagination({
       <p className="text-xs text-muted">
         Page {page} of {Math.max(totalPages, 1)} · {total.toLocaleString('en-IN')} total
       </p>
-      <div className="flex gap-2">
-        <Button disabled={busy || page <= 1} onClick={() => onPage(page - 1)}>
+      {/* Full-width, thumb-sized halves on a phone; compact on desktop. */}
+      <div className="flex w-full gap-2 sm:w-auto">
+        <Button
+          className="flex-1 sm:flex-none"
+          disabled={busy || page <= 1}
+          onClick={() => onPage(page - 1)}
+        >
           Previous
         </Button>
-        <Button disabled={busy || page >= totalPages} onClick={() => onPage(page + 1)}>
+        <Button
+          className="flex-1 sm:flex-none"
+          disabled={busy || page >= totalPages}
+          onClick={() => onPage(page + 1)}
+        >
           Next
         </Button>
       </div>

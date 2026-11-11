@@ -76,8 +76,10 @@ export default function CategoryMappingPage() {
         onPickStore={(id) => list.setFilter('storeId', id === storeId ? '' : id)}
       />
 
-      <Card>
+      {/* Edge to edge on a phone, like a native list; a card from `sm`. */}
+      <Card padding="none" className="max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0">
         <Tabs<Status>
+          sticky
           value={status}
           onChange={(next) => list.setFilter('status', next === 'ALL' ? '' : next)}
           options={[
@@ -97,8 +99,11 @@ export default function CategoryMappingPage() {
               type="button"
               onClick={() => list.setFilter('storeId', '')}
               aria-label={`Show every store, not only ${storeName}`}
+              className="max-w-full"
             >
-              <Chip tone="info">{storeName} ×</Chip>
+              <Chip tone="info" className="max-w-full">
+                <span className="truncate">{storeName}</span> ×
+              </Chip>
             </button>
           )}
         </Toolbar>
@@ -179,7 +184,7 @@ function CoveragePanel({
 
   return (
     <div className="mb-4 space-y-4">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatTile
           label="On category pages"
           value={`${reach}%`}
@@ -217,9 +222,11 @@ function CoveragePanel({
                 type="button"
                 onClick={() => onPickStore(store.id)}
                 aria-pressed={store.id === activeStoreId}
+                className="max-w-full"
               >
-                <Chip tone={store.id === activeStoreId ? 'info' : 'neutral'}>
-                  {store.name} · {formatCount(store.unclassifiedProducts)}
+                <Chip tone={store.id === activeStoreId ? 'info' : 'neutral'} className="max-w-full">
+                  <span className="truncate">{store.name}</span>
+                  <span className="shrink-0">· {formatCount(store.unclassifiedProducts)}</span>
                 </Chip>
               </button>
             ))}
@@ -326,11 +333,14 @@ function ShelfRowView({
           label=""
           placeholder="Choose the platform category…"
           includeInactive
-          className="min-w-72 flex-1"
+          className="w-full sm:w-auto sm:min-w-72 sm:flex-1"
         />
 
+        {/* Full width under the picker on a phone, like a native form. */}
         <Button
           variant="primary"
+          size="md"
+          className="w-full sm:w-auto"
           disabled={planning || converting || !chosen || noop}
           onClick={() => void preview()}
         >

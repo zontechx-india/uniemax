@@ -222,7 +222,7 @@ export function Detail({ label, children }: { label: string; children: ReactNode
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line py-2 last:border-0">
       <dt className="text-sm text-muted">{label}</dt>
-      <dd className="text-right text-sm font-medium text-fg">{children}</dd>
+      <dd className="min-w-0 text-right text-sm font-medium text-fg wrap-anywhere">{children}</dd>
     </div>
   )
 }

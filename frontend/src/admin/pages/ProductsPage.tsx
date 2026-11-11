@@ -163,8 +163,10 @@ export default function ProductsPage() {
         </div>
       ) : null}
 
-      <Card padding="none">
+      {/* Edge to edge on a phone, like a native list; a card from `sm`. */}
+      <Card padding="none" className="max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0">
         <Tabs
+          sticky
           value={list.filters['status'] ?? ''}
           onChange={(value) => list.setFilter('status', value)}
           options={[...TABS]}
@@ -185,6 +187,44 @@ export default function ProductsPage() {
           error={list.error}
           onRetry={list.refresh}
           onRowClick={(product) => setOpenId(product.id)}
+          // Phone row: photo, name, where it lives, price; stock and
+          // visibility as chips. Hide / Restore lives in the opened dialog.
+          mobileRow={(product) => (
+            <div className="flex gap-3">
+              {product.imageUrl ? (
+                <MediaImg
+                  sizes="56px"
+                  src={product.imageUrl}
+                  alt=""
+                  className="h-14 w-14 shrink-0 rounded-md border border-line object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <span className="h-14 w-14 shrink-0 rounded-md bg-surface-alt" aria-hidden />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-fg">{product.name}</p>
+                <p className="mt-0.5 truncate text-sm text-muted">
+                  {product.store.name} · {product.category.name}
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <span className="mr-1 font-figure text-sm font-medium text-fg">
+                    {formatPriceRange(product.priceMin, product.priceMax)}
+                  </span>
+                  <ActiveChip isActive={product.isActive} />
+                  {product.stockTotal === 0 ? (
+                    <Chip tone="danger">Out of stock</Chip>
+                  ) : product.stockTotal <= 5 ? (
+                    <Chip tone="warning">{product.stockTotal} left</Chip>
+                  ) : (
+                    <span className="text-xs text-muted">
+                      {formatCount(product.stockTotal)} in stock
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
           empty={{
             title: 'No products match these filters',
             ...(storeId ? { hint: 'This store has nothing in this view.' } : {}),

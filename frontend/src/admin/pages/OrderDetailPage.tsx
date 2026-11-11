@@ -79,7 +79,7 @@ export default function OrderDetailPage() {
       <button
         type="button"
         onClick={() => navigate(-1)}
-        className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-fg"
+        className="-ml-2 mb-1 inline-flex h-11 items-center gap-1 rounded-md px-2 text-sm text-muted transition-colors hover:text-fg lg:h-9"
       >
         <BackIcon />
         Back
@@ -108,9 +108,11 @@ export default function OrderDetailPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
-          <Card>
+      {/* On a phone both columns dissolve (`contents`) into ONE stack, ordered
+          by what a support question needs first; from `lg` they are columns. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="contents lg:col-span-2 lg:block lg:min-w-0 lg:space-y-4">
+          <Card className="order-1 min-w-0 lg:order-none">
             <CardHeader title={`Items (${order.itemCount})`} />
             <ul className="divide-y divide-line">
               {order.items.map((item) => (
@@ -127,7 +129,7 @@ export default function OrderDetailPage() {
                     <span className="h-12 w-12 shrink-0 rounded-md bg-surface-alt" aria-hidden />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-fg">{item.productName}</p>
+                    <p className="line-clamp-2 text-sm font-medium text-fg">{item.productName}</p>
                     {item.variantName ? (
                       <Chip className="mt-1">{item.variantName}</Chip>
                     ) : null}
@@ -135,7 +137,7 @@ export default function OrderDetailPage() {
                       <p className="mt-1 font-mono text-xs text-muted">SKU {item.sku}</p>
                     ) : null}
                   </div>
-                  <div className="text-right text-sm">
+                  <div className="shrink-0 text-right text-sm">
                     <p className="text-muted">
                       {item.quantity} × {formatMoneyExact(item.unitPrice)}
                     </p>
@@ -164,9 +166,11 @@ export default function OrderDetailPage() {
             </dl>
           </Card>
 
-          <OrderPayoutCard orderId={order.id} />
+          <div className="order-8 min-w-0 lg:order-none">
+            <OrderPayoutCard orderId={order.id} />
+          </div>
 
-          <Card>
+          <Card className="order-3 min-w-0 lg:order-none">
             <CardHeader
               title={order.fulfilment === 'PICKUP' ? 'Pickup & contact' : 'Delivery & contact'}
             />
@@ -216,7 +220,7 @@ export default function OrderDetailPage() {
           </Card>
 
           {order.shipments.length > 0 ? (
-            <Card>
+            <Card className="order-5 min-w-0 lg:order-none">
               <CardHeader
                 title={order.shipments.length === 1 ? 'Parcel' : `Parcels (${order.shipments.length})`}
               />
@@ -273,10 +277,10 @@ export default function OrderDetailPage() {
           ) : null}
         </div>
 
-        <div className="space-y-4">
-          <Card>
+        <div className="contents lg:block lg:min-w-0 lg:space-y-4">
+          <Card className="order-6 min-w-0 lg:order-none">
             <CardHeader title="Store" />
-            <p className="font-medium text-fg">{order.storeName}</p>
+            <p className="font-medium text-fg wrap-anywhere">{order.storeName}</p>
             {order.store ? (
               <Link
                 to={`/stores/${order.store.id}`}
@@ -289,12 +293,12 @@ export default function OrderDetailPage() {
             )}
           </Card>
 
-          <Card>
+          <Card className="order-7 min-w-0 lg:order-none">
             <CardHeader title="Customer account" />
             {order.customer ? (
               <>
                 <p className="font-medium text-fg">{order.customer.name ?? 'Unnamed'}</p>
-                <p className="text-sm text-muted">{order.customer.email}</p>
+                <p className="text-sm text-muted wrap-anywhere">{order.customer.email}</p>
                 <Link
                   to={`/customers/${order.customer.id}`}
                   className="mt-1 inline-block text-sm text-accent hover:underline"
@@ -307,7 +311,7 @@ export default function OrderDetailPage() {
             )}
           </Card>
 
-          <Card>
+          <Card className="order-2 min-w-0 lg:order-none">
             <CardHeader title="Payment" />
             <dl>
               <Detail label="Method">
@@ -383,12 +387,14 @@ export default function OrderDetailPage() {
             ) : null}
           </Card>
 
-          <Card>
+          <Card className="order-4 min-w-0 lg:order-none">
             <CardHeader title="Timeline" />
             <Timeline order={order} />
           </Card>
 
-          <OrderMessagesCard orderId={order.id} />
+          <div className="order-9 min-w-0 lg:order-none">
+            <OrderMessagesCard orderId={order.id} />
+          </div>
         </div>
       </div>
     </>

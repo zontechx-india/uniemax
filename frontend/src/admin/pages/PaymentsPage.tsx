@@ -7,7 +7,7 @@ import { DataTable, Pagination } from '../ui/DataTable'
 import type { Column } from '../ui/DataTable'
 import { FilterSelect, SearchInput, Tabs, Toolbar } from '../ui/Toolbar'
 import { PaymentChip } from '../ui/statusMeta'
-import { formatDateTime, formatMoney } from '../ui/format'
+import { formatDateTime, formatMoney, formatRelative } from '../ui/format'
 
 /**
  * Payments — the money view of the same orders.
@@ -89,8 +89,10 @@ export default function PaymentsPage() {
         subtitle="Settlement status for every order — online and cash on delivery"
       />
 
-      <Card padding="none">
+      {/* Edge to edge on a phone, like a native list; a card from `sm`. */}
+      <Card padding="none" className="max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0">
         <Tabs
+          sticky
           value={list.filters['paymentStatus'] ?? ''}
           onChange={(value) => list.setFilter('paymentStatus', value)}
           options={[...STATUS_TABS]}
@@ -121,6 +123,32 @@ export default function PaymentsPage() {
           error={list.error}
           onRetry={list.refresh}
           onRowClick={(row) => navigate(`/orders/${row.id}`)}
+          mobileRow={(row) => (
+            <>
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="min-w-0 truncate font-medium text-fg">{row.orderNumber}</p>
+                <p className="shrink-0 font-figure font-medium text-fg">{formatMoney(row.total)}</p>
+              </div>
+              <p className="mt-0.5 truncate text-sm text-muted">
+                {[row.customerName, row.storeName].filter(Boolean).join(' · ')}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <PaymentChip status={row.paymentStatus} method={row.paymentMethod} />
+                {/* "Paid · Online" and "Pay on delivery" already name the method. */}
+                {row.paymentStatus === 'PAID' ||
+                (row.paymentStatus === 'PENDING' && row.paymentMethod === 'COD') ? null : (
+                  <span className="text-xs text-muted">
+                    {row.paymentMethod === 'COD' ? 'Cash on delivery' : 'Online'}
+                  </span>
+                )}
+                <span className="ml-auto text-xs text-muted">{formatRelative(row.placedAt)}</span>
+              </div>
+              {/* The gateway reference is what a support search needs. */}
+              {row.paymentRef ? (
+                <p className="mt-1 truncate font-mono text-xs text-muted">{row.paymentRef}</p>
+              ) : null}
+            </>
+          )}
           empty={{ title: 'No payments match these filters' }}
         />
         <Pagination

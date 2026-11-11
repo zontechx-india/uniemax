@@ -122,8 +122,8 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="min-w-0 lg:col-span-2">
           <ChartFrame
             title={measure === 'revenue' ? 'Revenue' : 'Orders'}
             subtitle={`Per day, last ${days} days`}
@@ -190,7 +190,7 @@ export default function DashboardPage() {
         </ChartFrame>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <ChartFrame title="Order pipeline" subtitle="Every order, by stage">
           <BarList
             data={pipeline.map((stage) => ({
@@ -226,8 +226,8 @@ export default function DashboardPage() {
         </ChartFrame>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2" padding="none">
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <Card className="min-w-0 lg:col-span-2" padding="none">
           <div className="p-4 sm:p-5">
             <CardHeader
               title="Latest orders"
@@ -245,16 +245,28 @@ export default function DashboardPage() {
                   <li key={order.id}>
                     <Link
                       to={`/orders/${order.id}`}
-                      className="-mx-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md px-2 py-3 transition-colors hover:bg-surface-alt"
+                      className="-mx-2 block rounded-md px-2 py-3 transition-colors hover:bg-surface-alt"
                     >
-                      <span className="font-medium text-fg">{order.orderNumber}</span>
-                      <span className="truncate text-sm text-muted">{order.storeName}</span>
-                      <span className="ml-auto flex items-center gap-2">
-                        <OrderStatusChip status={order.status} />
-                        <PaymentChip status={order.paymentStatus} method={order.paymentMethod} />
-                        <span className="font-medium text-fg">{formatMoney(order.total)}</span>
+                      {/* Number + total stay on one line at every width; the
+                          chips wrap under the store name on a phone. */}
+                      <span className="flex items-baseline justify-between gap-3">
+                        <span className="min-w-0 truncate font-medium text-fg">
+                          {order.orderNumber}
+                        </span>
+                        <span className="shrink-0 font-figure font-medium text-fg">
+                          {formatMoney(order.total)}
+                        </span>
                       </span>
-                      <span className="w-full text-xs text-muted">
+                      <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                        <span className="min-w-0 max-w-full truncate text-sm text-muted">
+                          {order.storeName}
+                        </span>
+                        <span className="flex flex-wrap items-center gap-2 sm:ml-auto">
+                          <OrderStatusChip status={order.status} />
+                          <PaymentChip status={order.paymentStatus} method={order.paymentMethod} />
+                        </span>
+                      </span>
+                      <span className="mt-1 block truncate text-xs text-muted">
                         {order.customerName ?? 'Customer'} · {formatRelative(order.placedAt)}
                       </span>
                     </Link>
@@ -265,7 +277,7 @@ export default function DashboardPage() {
           </div>
         </Card>
 
-        <Card>
+        <Card className="min-w-0">
           <CardHeader title="Low stock" subtitle="5 or fewer left, live listings" />
           <ul className="divide-y divide-line">
             {data.lowStock.length === 0 ? (

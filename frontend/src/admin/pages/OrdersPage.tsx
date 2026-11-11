@@ -7,7 +7,7 @@ import { DataTable, Pagination } from '../ui/DataTable'
 import type { Column } from '../ui/DataTable'
 import { FilterSelect, SearchInput, Tabs, Toolbar } from '../ui/Toolbar'
 import { OrderStatusChip, PaymentChip } from '../ui/statusMeta'
-import { formatDateTime, formatMoney } from '../ui/format'
+import { formatDateTime, formatMoney, formatRelative } from '../ui/format'
 
 /**
  * Every order on the platform, filtered.
@@ -87,8 +87,10 @@ export default function OrdersPage() {
     <>
       <PageHeader title="Orders" subtitle="Every order placed across the platform" />
 
-      <Card padding="none">
+      {/* Edge to edge on a phone, like a native list; a card from `sm`. */}
+      <Card padding="none" className="max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0">
         <Tabs
+          sticky
           value={list.filters['status'] ?? ''}
           onChange={(value) => list.setFilter('status', value)}
           options={[...STATUS_TABS]}
@@ -131,6 +133,24 @@ export default function OrdersPage() {
           error={list.error}
           onRetry={list.refresh}
           onRowClick={(order) => navigate(`/orders/${order.id}`)}
+          mobileRow={(order) => (
+            <>
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="min-w-0 truncate font-medium text-fg">{order.orderNumber}</p>
+                <p className="shrink-0 font-figure font-medium text-fg">
+                  {formatMoney(order.total)}
+                </p>
+              </div>
+              <p className="mt-0.5 truncate text-sm text-muted">
+                {[order.customerName, order.storeName].filter(Boolean).join(' · ')}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <OrderStatusChip status={order.status} />
+                <PaymentChip status={order.paymentStatus} method={order.paymentMethod} />
+                <span className="ml-auto text-xs text-muted">{formatRelative(order.placedAt)}</span>
+              </div>
+            </>
+          )}
           empty={{
             title: 'No orders match these filters',
             hint: 'Clear the search or pick a different status.',

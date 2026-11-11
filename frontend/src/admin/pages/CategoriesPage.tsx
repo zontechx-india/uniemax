@@ -3,6 +3,7 @@ import { toApiError } from '../../shared/auth/http'
 import { taxonomyApi, flattenTree } from '../../shared/categories/taxonomyApi'
 import type { CategoryNode } from '../../shared/categories/taxonomyApi'
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
+import { Dialog } from '../../shared/ui/Dialog'
 import {
   Button,
   Card,
@@ -14,6 +15,7 @@ import {
   Skeleton,
   TextInput,
 } from '../ui/primitives'
+import { SearchInput } from '../ui/Toolbar'
 import { MediaImg } from '../../shared/media/MediaImg'
 
 /**
@@ -217,19 +219,35 @@ export default function CategoriesPage() {
         }
       />
 
-      {error && (
+      {error && !draft && (
         <div className="mb-4">
           <ErrorState message={error} onRetry={load} />
         </div>
       )}
 
-      {draft && (
-        <Card className="mb-5">
-          <div className="p-4">
-            <h2 className="mb-4 font-heading text-base font-semibold text-fg">
-              {draft.node ? `Edit “${draft.node.name}”` : 'New category'}
-            </h2>
-            <div className="grid gap-4 sm:grid-cols-2">
+      {/* The form opens over the list (a bottom sheet on a phone), so editing
+          a row deep in the tree never sends the admin back to the top. */}
+      <Dialog
+        open={draft !== null}
+        title={draft?.node ? `Edit “${draft.node.name}”` : 'New category'}
+        onClose={() => {
+          if (!saving) setDraft(null)
+        }}
+        footer={
+          <>
+            <Button onClick={() => setDraft(null)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={() => void save()} disabled={saving}>
+              {saving ? 'Saving…' : draft?.node ? 'Save changes' : 'Create'}
+            </Button>
+          </>
+        }
+      >
+        {draft && (
+          <div>
+            {error ? <p className="mb-4 text-sm text-danger">{error}</p> : null}
+            <div className="grid gap-4">
               <TextInput
                 label="Name"
                 value={draft.name}
@@ -317,25 +335,12 @@ export default function CategoriesPage() {
               Active — a disabled category hides its whole branch from sellers
               and shoppers, but keeps every existing tag.
             </label>
-
-            <div className="mt-4 flex gap-2">
-              <Button variant="primary" onClick={() => void save()} disabled={saving}>
-                {saving ? 'Saving…' : draft.node ? 'Save changes' : 'Create'}
-              </Button>
-              <Button onClick={() => setDraft(null)} disabled={saving}>
-                Cancel
-              </Button>
-            </div>
           </div>
-        </Card>
-      )}
+        )}
+      </Dialog>
 
       <div className="mb-3">
-        <TextInput
-          placeholder="Search the taxonomy…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+        <SearchInput value={query} onChange={setQuery} placeholder="Search categories" delay={150} />
       </div>
 
       {tree === null ? (
@@ -346,7 +351,8 @@ export default function CategoriesPage() {
           description="Seed the initial taxonomy with `npm run seed-categories`, or add the first one above."
         />
       ) : (
-        <Card>
+        // Edge to edge on a phone, like a native list; a card from `sm`.
+        <Card padding="none" className="max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0">
           <div className="divide-y divide-line">
             {searching ? (
               matches.length === 0 ? (
@@ -417,24 +423,43 @@ function CategoryRow({
   onToggleActive: () => void
   onDelete: () => void
 }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  // Each sheet action closes the sheet first, then acts.
+  const act = (action: () => void) => () => {
+    setMenuOpen(false)
+    action()
+  }
+
   return (
     <div
-      className="flex items-center gap-3 px-4 py-2.5"
-      // Indent by depth so the hierarchy is visible without a tree widget.
-      style={showPath ? undefined : { paddingLeft: 16 + node.depth * 22 }}
+      // Indent by depth so the hierarchy is visible without a tree widget —
+      // 12px a level on a phone (names need the room), 22px from `sm`.
+      className={`flex min-h-14 items-center gap-2 py-2 pr-2 sm:gap-3 sm:pr-4 ${
+        showPath ? 'pl-2 sm:pl-4' : 'pl-[calc(8px+var(--depth)*12px)] sm:pl-[calc(16px+var(--depth)*22px)]'
+      }`}
+      style={showPath ? undefined : ({ '--depth': node.depth } as React.CSSProperties)}
     >
-      <div className="w-8 shrink-0">
+      <div className="w-9 shrink-0">
         {node.childCount > 0 && onToggleCollapse && (
           <button
             type="button"
             onClick={onToggleCollapse}
             aria-expanded={!collapsed}
             aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${node.name}`}
-            className="flex h-8 w-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-alt hover:text-fg"
+            className="flex h-9 w-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-alt hover:text-fg"
           >
-            <span className={collapsed ? '' : 'rotate-90'} style={{ display: 'inline-block' }}>
-              ›
-            </span>
+            <svg
+              viewBox="0 0 24 24"
+              className={`h-4 w-4 transition-transform ${collapsed ? '' : 'rotate-90'}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="m9 18 6-6-6-6" />
+            </svg>
           </button>
         )}
       </div>
@@ -464,19 +489,78 @@ function CategoryRow({
 
       {!node.isActive && <Chip tone="neutral">Disabled</Chip>}
 
-      <Button variant="ghost" onClick={onAddChild} title={`Add inside ${node.name}`}>
-        + Sub
+      {/* From `sm`: the actions sit on the row. */}
+      <div className="hidden shrink-0 items-center gap-1 sm:flex">
+        <Button variant="ghost" onClick={onAddChild} title={`Add inside ${node.name}`}>
+          + Sub
+        </Button>
+        <Button variant="ghost" onClick={onEdit}>
+          Edit
+        </Button>
+        <Button variant="ghost" onClick={onToggleActive}>
+          {node.isActive ? 'Disable' : 'Enable'}
+        </Button>
+        <Button variant="ghost" onClick={onDelete} className="text-danger!">
+          Delete
+        </Button>
+      </div>
+
+      {/* On a phone: one "more" button opening an action sheet. */}
+      <Button
+        variant="ghost"
+        size="md"
+        onClick={() => setMenuOpen(true)}
+        aria-label={`Actions for ${node.name}`}
+        className="text-muted sm:hidden"
+      >
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden>
+          <circle cx="5" cy="12" r="1.6" />
+          <circle cx="12" cy="12" r="1.6" />
+          <circle cx="19" cy="12" r="1.6" />
+        </svg>
       </Button>
-      <Button variant="ghost" onClick={onEdit}>
-        Edit
-      </Button>
-      <Button variant="ghost" onClick={onToggleActive}>
-        {node.isActive ? 'Disable' : 'Enable'}
-      </Button>
-      <Button variant="ghost" onClick={onDelete} className="text-danger">
-        Delete
-      </Button>
+      <Dialog
+        open={menuOpen}
+        title={node.name}
+        subtitle={node.pathLabel}
+        flush
+        onClose={() => setMenuOpen(false)}
+      >
+        <div className="grid gap-1 p-2">
+          <SheetAction onClick={act(onEdit)}>Edit</SheetAction>
+          <SheetAction onClick={act(onAddChild)}>Add a subcategory inside</SheetAction>
+          <SheetAction onClick={act(onToggleActive)}>
+            {node.isActive ? 'Disable' : 'Enable'}
+          </SheetAction>
+          <SheetAction onClick={act(onDelete)} danger>
+            Delete
+          </SheetAction>
+        </div>
+      </Dialog>
     </div>
+  )
+}
+
+/** One full-width row of a phone action sheet — a 44px tap target. */
+function SheetAction({
+  onClick,
+  danger = false,
+  children,
+}: {
+  onClick: () => void
+  danger?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="md"
+      onClick={onClick}
+      // `!`: the ghost style sets its own text colour, which would win.
+      className={`w-full justify-start ${danger ? 'text-danger!' : ''}`}
+    >
+      {children}
+    </Button>
   )
 }
 
