@@ -69,6 +69,7 @@ export interface CustomerRef {
   id: string;
   name: string | null;
   email: string | null;
+  phone: string | null;
 }
 
 export interface HostNotification {

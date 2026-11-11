@@ -66,6 +66,11 @@ export const commissionListQuery = paginationQuery.extend({
     .optional(),
 });
 
+/** The admin list can be narrowed to one affiliate (the detail page). */
+export const adminCommissionListQuery = commissionListQuery.extend({
+  affiliateId: z.string().min(1).max(64).optional(),
+});
+
 export const adminAffiliateUpdateSchema = z.object({
   status: z.enum(["ACTIVE", "SUSPENDED"]),
 });

@@ -193,6 +193,68 @@ export interface AdminAffiliate {
   createdAt: string
 }
 
+export interface AdminContact {
+  name: string | null
+  email: string | null
+  phone: string | null
+}
+
+export interface AdminPartnership {
+  id: string
+  storeId: string
+  storeName: string
+  storeSlug: string
+  /** False when the store was deleted — the name is the saved snapshot. */
+  storeExists: boolean
+  storePublished: boolean
+  owner: (AdminContact & { id: string }) | null
+  status: 'ACTIVE' | 'PAUSED' | 'REMOVED'
+  programEnabled: boolean
+  commissionType: CommissionType | null
+  commissionRate: number | null
+  hasOverride: boolean
+  links: number
+  clicks: number
+  commissions: number
+  sales: number
+  pending: number
+  approved: number
+  paid: number
+  joinedAt: string
+}
+
+export interface AdminAffiliateDetail extends Totals {
+  id: string
+  customerId: string
+  displayName: string
+  status: 'ACTIVE' | 'SUSPENDED'
+  createdAt: string
+  updatedAt: string
+  account: AdminContact | null
+  clicks: number
+  stores: AdminPartnership[]
+  links: (AffiliateLink & { lastClickAt: string | null })[]
+  invitations: {
+    id: string
+    storeId: string
+    storeName: string
+    name: string
+    email: string
+    commissionType: CommissionType | null
+    commissionRate: number | null
+    createdAt: string
+    acceptedAt: string | null
+  }[]
+  fraudEvents: {
+    id: string
+    kind: string
+    storeId: string | null
+    orderId: string | null
+    detail: unknown
+    createdAt: string
+  }[]
+}
+
 export type Page<T> = { items: T[]; meta: ListMeta }
 
 interface PageQuery {
@@ -282,9 +344,11 @@ const ADMIN_BASE = '/api/v1/admin/affiliate'
 export const adminAffiliateApi = {
   affiliates: (page: number) =>
     callList<AdminAffiliate>(http.get(`${ADMIN_BASE}/affiliates`, { params: { page } })),
+  affiliate: (id: string) =>
+    call<AdminAffiliateDetail>(http.get(`${ADMIN_BASE}/affiliates/${id}`)),
   setStatus: (id: string, status: AdminAffiliate['status']) =>
     call<AdminAffiliate>(http.patch(`${ADMIN_BASE}/affiliates/${id}`, { status })),
-  commissions: (query: PageQuery) =>
+  commissions: (query: PageQuery & { affiliateId?: string }) =>
     callList<Commission>(http.get(`${ADMIN_BASE}/commissions`, { params: query })),
   updateCommission: (id: string, patch: { status: 'APPROVED' | 'REJECTED'; note?: string }) =>
     call<Commission>(http.patch(`${ADMIN_BASE}/commissions/${id}`, patch)),

@@ -5,8 +5,8 @@ import { list, ok } from "../../../utils/response.js";
 import { deps } from "../deps.js";
 import {
   adminAffiliateUpdateSchema,
+  adminCommissionListQuery,
   adminCommissionUpdateSchema,
-  commissionListQuery,
 } from "../schema.js";
 import * as partner from "../services/partner.js";
 import * as commissions from "../services/commissions.js";
@@ -22,6 +22,11 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     return list(items, meta);
   });
 
+  app.get("/affiliates/:id", async (request) => {
+    const { id } = idParamSchema.parse(request.params);
+    return ok(await partner.adminDetail(id));
+  });
+
   app.patch("/affiliates/:id", async (request) => {
     const { id } = idParamSchema.parse(request.params);
     const { status } = adminAffiliateUpdateSchema.parse(request.body);
@@ -29,8 +34,11 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/commissions", async (request) => {
-    const query = commissionListQuery.parse(request.query);
-    const { items, meta } = await commissions.listCommissions({}, query);
+    const { affiliateId, ...query } = adminCommissionListQuery.parse(request.query);
+    const { items, meta } = await commissions.listCommissions(
+      affiliateId ? { affiliateId } : {},
+      query,
+    );
     return list(items, meta);
   });
 

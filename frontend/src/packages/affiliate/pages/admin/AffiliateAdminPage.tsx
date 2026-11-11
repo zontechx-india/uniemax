@@ -1,14 +1,17 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { toApiError } from '../../../../shared/auth/http'
 import { Button } from '../../../../shared/ui/Button'
 import { adminAffiliateApi } from '../../api'
 import { CommissionsTable } from '../CommissionsTable'
+import { CommissionActions } from './CommissionActions'
 import { Empty, Pager, StatusChip, shortDate, useLoad } from '../../ui'
 
 /**
  * Platform oversight: every affiliate account, every commission, and the
  * approval job on demand. Sellers run their programmes; this is the view
- * from above them.
+ * from above them. Each account opens its full record
+ * (`AffiliateAdminDetailPage`).
  *
  * On a phone both lists run edge to edge like a native list; each account
  * keeps its Suspend / Reinstate on the row, and commissions turn into cards
@@ -64,26 +67,33 @@ export default function AffiliateAdminPage() {
           <ul className="mt-3 divide-y divide-line rounded-lg border border-line bg-surface max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0">
             {affiliates.data.items.map((row) => (
               <li key={row.id} className="flex items-center gap-3 px-4 py-3">
-                <span
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill bg-surface-alt text-sm font-semibold text-muted"
-                  aria-hidden
+                <Link
+                  to={`/affiliates/${row.id}`}
+                  className="group flex min-w-0 flex-1 items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
-                  {row.displayName.charAt(0).toUpperCase()}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-fg">{row.displayName}</p>
-                  <p className="mt-0.5 text-xs text-muted">
-                    {row.stores} store{row.stores === 1 ? '' : 's'} · {row.links} link
-                    {row.links === 1 ? '' : 's'} · joined {shortDate(row.createdAt)}
-                  </p>
-                  {/* The status sits under the name on a phone, beside it from `sm`. */}
-                  <div className="mt-1.5 sm:hidden">
+                  <span
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill bg-surface-alt text-sm font-semibold text-muted"
+                    aria-hidden
+                  >
+                    {row.displayName.charAt(0).toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-fg group-hover:underline">
+                      {row.displayName}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted">
+                      {row.stores} store{row.stores === 1 ? '' : 's'} · {row.links} link
+                      {row.links === 1 ? '' : 's'} · joined {shortDate(row.createdAt)}
+                    </p>
+                    {/* The status sits under the name on a phone, beside it from `sm`. */}
+                    <div className="mt-1.5 sm:hidden">
+                      <StatusChip status={row.status} />
+                    </div>
+                  </div>
+                  <div className="hidden sm:block">
                     <StatusChip status={row.status} />
                   </div>
-                </div>
-                <div className="hidden sm:block">
-                  <StatusChip status={row.status} />
-                </div>
+                </Link>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -115,37 +125,9 @@ export default function AffiliateAdminPage() {
             load={(q) => adminAffiliateApi.commissions(q)}
             showAffiliate
             showStore
-            actions={(row, reload) =>
-              row.status === 'PENDING' || row.status === 'APPROVED' ? (
-                <div className="flex justify-end gap-2">
-                  {row.status === 'PENDING' && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() =>
-                        run(() => adminAffiliateApi.updateCommission(row.id, { status: 'APPROVED' }), reload)
-                      }
-                    >
-                      Approve
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-danger!"
-                    onClick={() => {
-                      const note = window.prompt('Reason for rejecting this commission?') ?? ''
-                      void run(
-                        () => adminAffiliateApi.updateCommission(row.id, { status: 'REJECTED', note }),
-                        reload,
-                      )
-                    }}
-                  >
-                    Reject
-                  </Button>
-                </div>
-              ) : null
-            }
+            actions={(row, reload) => (
+              <CommissionActions row={row} reload={reload} onError={setError} />
+            )}
           />
         </div>
       </section>

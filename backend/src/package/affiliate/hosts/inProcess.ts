@@ -127,7 +127,7 @@ export function createInProcessHost(prisma: PrismaClient): AffiliateHost {
     getCustomer: (id) =>
       prisma.customer.findUnique({
         where: { id },
-        select: { id: true, name: true, email: true },
+        select: { id: true, name: true, email: true, phone: true },
       }),
 
     notify(customerId, message) {

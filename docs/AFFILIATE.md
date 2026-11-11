@@ -154,7 +154,7 @@ backend/src/package/affiliate/
   services/             # Prisma is the data layer, as in every module
     program.ts          # programme config, product rules, seller summary, partners
     invitations.ts      # create / list / withdraw / preview / accept
-    partner.ts          # profile, stores, products, links, admin account list
+    partner.ts          # profile, stores, products, links, admin account list + detail
     tracking.ts         # click → attribution
     commissions.ts      # create-from-order, lifecycle, approval job, lists, totals
 
@@ -239,6 +239,8 @@ frontend/src/packages/affiliate/
     partner/            # PartnerLayout + Overview · Stores (+ products, get link) · Links · Commissions
     seller/             # AffiliateLayout + Programme · Products · Partners · Commissions
     admin/              # AffiliateAdminPage — accounts, commissions, run approval
+                        # AffiliateAdminDetailPage — one affiliate: contact, stores, links, invites, flags
+                        # CommissionActions — approve / reject, shared by both
 ```
 
 ### Mounting — four imports, no other coupling
@@ -248,6 +250,7 @@ storefront/app/router.tsx        + affiliatePublicRoutes (spread), affiliatePart
                                    (account subtree), affiliateSellerRoutes (manage children)
 storefront/pages/stores/StoreSectionNav.tsx   + the "Marketing" group
 admin/app/router.tsx             + /affiliates → pages/admin/AffiliateAdminPage
+                                   + /affiliates/:affiliateId → pages/admin/AffiliateAdminDetailPage
 storefront/pages/cart/CheckoutPage.tsx        + getAttribution / clearAttribution
 ```
 

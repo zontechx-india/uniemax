@@ -2791,7 +2791,14 @@ Where it appears:
   because the seller affiliate API has no admin actor yet.
 - **`/admin/affiliates`** (`pages/admin/AffiliateAdminPage.tsx`) — every
   partner account (suspend / reinstate), every commission (approve early /
-  reject with a note) and a "Run approval now" button.
+  reject with a note) and a "Run approval now" button. Each account row opens
+  **`/admin/affiliates/:affiliateId`** (`AffiliateAdminDetailPage.tsx`): contact
+  (name, email, phone, link to the customer), an earnings total with a
+  pending / approved / paid bar, one card per store partnership (rate, status,
+  seller contact, links, clicks, sales, money), every link with clicks and last
+  click, accepted invitations, fraud flags, and that affiliate's commissions.
+  Both pages share `CommissionActions.tsx` (approve / reject; cancelling the
+  reason prompt now cancels the reject).
 
 Checkout sends `getAttribution(storeSlug)` as `affiliateRef` with the order
 and calls `clearAttribution(storeSlug)` once the order is placed — one click

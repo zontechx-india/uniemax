@@ -193,6 +193,138 @@ export async function adminList(page: number, pageSize: number) {
   return { items, meta: buildListMeta(total, page, pageSize) };
 }
 
+/**
+ * Everything the platform knows about one affiliate: the person behind the
+ * account, every store partnership (with its rate, links, clicks and money),
+ * every link, the invitations they took and any fraud flags. Commissions are
+ * paged separately through `GET /admin/commissions?affiliateId=`.
+ */
+export async function adminDetail(id: string) {
+  const affiliate = await deps.prisma.affiliate.findUnique({ where: { id } });
+  if (!affiliate) throw HttpError.notFound("Affiliate not found");
+
+  const [relations, linkRows, commissionGroups, lastClicks, invitations, fraudEvents, earnings, customer] =
+    await Promise.all([
+      deps.prisma.storeAffiliate.findMany({
+        where: { affiliateId: id },
+        orderBy: { joinedAt: "desc" },
+      }),
+      deps.prisma.affiliateLink.findMany({
+        where: { affiliateId: id },
+        select: { ...linkSelect, storeAffiliateId: true },
+        orderBy: { createdAt: "desc" },
+      }),
+      deps.prisma.affiliateCommission.groupBy({
+        by: ["storeAffiliateId", "status"],
+        where: { affiliateId: id },
+        _sum: { amount: true, lineTotal: true },
+        _count: { _all: true },
+      }),
+      deps.prisma.affiliateClick.groupBy({
+        by: ["linkId"],
+        where: { link: { affiliateId: id } },
+        _max: { createdAt: true },
+      }),
+      deps.prisma.affiliateInvitation.findMany({
+        where: { affiliateId: id },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          storeId: true,
+          storeName: true,
+          name: true,
+          email: true,
+          commissionType: true,
+          commissionRate: true,
+          createdAt: true,
+          acceptedAt: true,
+        },
+      }),
+      deps.prisma.affiliateFraudEvent.findMany({
+        where: { affiliateId: id },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+      totals({ affiliateId: id }),
+      deps.host.getCustomer(affiliate.customerId),
+    ]);
+
+  const storeIds = relations.map((r) => r.storeId);
+  const [programs, stores] = await Promise.all([
+    deps.prisma.affiliateProgram.findMany({ where: { storeId: { in: storeIds } } }),
+    Promise.all(storeIds.map((storeId) => deps.host.getStore(storeId))),
+  ]);
+  const owners = await Promise.all(
+    stores.map((store) => (store ? deps.host.getCustomer(store.ownerId) : null)),
+  );
+  const programByStore = new Map(programs.map((p) => [p.storeId, p]));
+  const lastClickByLink = new Map(lastClicks.map((c) => [c.linkId, c._max.createdAt]));
+
+  const links = linkRows.map(({ storeAffiliateId, ...row }) => ({
+    ...shapeLink(row),
+    storeAffiliateId,
+    lastClickAt: lastClickByLink.get(row.id) ?? null,
+  }));
+
+  const dead = new Set(["CANCELLED", "REVERSED", "REJECTED"]);
+  const partnerships = relations.map((row, i) => {
+    const program = programByStore.get(row.storeId);
+    const rate = program ? resolveRate(program, row) : null;
+    const store = stores[i];
+    const owner = owners[i];
+    const groups = commissionGroups.filter((g) => g.storeAffiliateId === row.id);
+    const sum = (status: string) =>
+      money(groups.find((g) => g.status === status)?._sum.amount) ?? 0;
+    const storeLinks = links.filter((l) => l.storeAffiliateId === row.id);
+    return {
+      id: row.id,
+      storeId: row.storeId,
+      // The live name wins; the snapshot covers a store that has since gone.
+      storeName: store?.name ?? row.storeName,
+      storeSlug: store?.slug ?? row.storeSlug,
+      storeExists: store !== null,
+      storePublished: store?.isPublished ?? false,
+      owner: owner ? { id: owner.id, name: owner.name, email: owner.email, phone: owner.phone } : null,
+      status: row.status,
+      programEnabled: program?.enabled ?? false,
+      commissionType: rate?.type ?? null,
+      commissionRate: money(rate?.rate),
+      hasOverride: row.commissionRate != null,
+      links: storeLinks.length,
+      clicks: storeLinks.reduce((n, l) => n + l.clickCount, 0),
+      commissions: groups.reduce((n, g) => n + g._count._all, 0),
+      sales: groups
+        .filter((g) => !dead.has(g.status))
+        .reduce((n, g) => n + (money(g._sum.lineTotal) ?? 0), 0),
+      pending: sum("PENDING"),
+      approved: sum("APPROVED"),
+      paid: sum("PAID"),
+      joinedAt: row.joinedAt,
+    };
+  });
+
+  return {
+    id: affiliate.id,
+    customerId: affiliate.customerId,
+    displayName: affiliate.displayName,
+    status: affiliate.status,
+    createdAt: affiliate.createdAt,
+    updatedAt: affiliate.updatedAt,
+    account: customer
+      ? { name: customer.name, email: customer.email, phone: customer.phone }
+      : null,
+    ...earnings,
+    clicks: links.reduce((n, l) => n + l.clickCount, 0),
+    stores: partnerships,
+    links: links.map(({ storeAffiliateId: _drop, ...link }) => link),
+    invitations: invitations.map((inv) => ({
+      ...inv,
+      commissionRate: money(inv.commissionRate),
+    })),
+    fraudEvents,
+  };
+}
+
 export async function adminSetStatus(id: string, status: "ACTIVE" | "SUSPENDED") {
   return deps.prisma.affiliate.update({ where: { id }, data: { status } });
 }

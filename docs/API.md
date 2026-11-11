@@ -3357,7 +3357,21 @@ never sends them.
 - `GET …/affiliates?page&pageSize` (list envelope) — `{ id, customerId,
   displayName, status, stores, links, createdAt }`. `PATCH …/affiliates/:id`
   — `{ status: ACTIVE | SUSPENDED }`.
-- `GET …/commissions?page&pageSize&status` (list envelope, every store).
+- `GET …/affiliates/:id` — one affiliate's full record: `{ id, customerId,
+  displayName, status, createdAt, updatedAt, account: { name, email, phone } |
+  null, orders, sales, pending, approved, paid, clicks, stores[], links[],
+  invitations[], fraudEvents[] }`. Each `stores[]` row is one partnership:
+  `{ id, storeId, storeName, storeSlug, storeExists, storePublished, owner: {
+  id, name, email, phone } | null, status, programEnabled, commissionType,
+  commissionRate, hasOverride, links, clicks, commissions, sales, pending,
+  approved, paid, joinedAt }` (live store name/slug, falling back to the saved
+  snapshot when the store is gone). `links[]` is the partner link shape plus
+  `lastClickAt`; `invitations[]` are the invites this affiliate accepted
+  (`storeName, name, email, commissionType, commissionRate, createdAt,
+  acceptedAt`); `fraudEvents[]` the latest 50 for this affiliate. `404` if
+  unknown.
+- `GET …/commissions?page&pageSize&status&affiliateId` (list envelope, every
+  store; `affiliateId` narrows it to one affiliate).
   `PATCH …/commissions/:id` — `{ status: APPROVED | REJECTED, note? }`
   (approve early from `PENDING`; reject from `PENDING` or `APPROVED`; anything
   else `409`).

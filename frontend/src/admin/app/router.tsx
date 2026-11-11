@@ -55,6 +55,9 @@ const HomeSectionsPage = lazy(() => import('../pages/HomeSectionsPage'))
 const AffiliateAdminPage = lazy(
   () => import('../../packages/affiliate/pages/admin/AffiliateAdminPage'),
 )
+const AffiliateAdminDetailPage = lazy(
+  () => import('../../packages/affiliate/pages/admin/AffiliateAdminDetailPage'),
+)
 const SuppliersAdminPage = lazy(
   () => import('../../packages/dropship/pages/admin/SuppliersAdminPage'),
 )
@@ -247,6 +250,7 @@ export function AdminRouter() {
                 <Route path="banners" element={<BannersPage />} />
                 <Route path="home-sections" element={<HomeSectionsPage />} />
                 <Route path="affiliates" element={<AffiliateAdminPage />} />
+                <Route path="affiliates/:affiliateId" element={<AffiliateAdminDetailPage />} />
                 <Route path="suppliers" element={<SuppliersAdminPage />} />
                 <Route path="needs-action" element={<NeedsActionPage />} />
                 <Route path="payouts" element={<PayoutsPage />} />
