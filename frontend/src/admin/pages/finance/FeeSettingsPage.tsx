@@ -142,7 +142,7 @@ function History({ rules }: { rules: FeeRule[] }) {
                 {KIND_COPY[rule.kind].title} · <span className="font-figure">{pct(rule.percent)}</span>
                 <span className="font-normal text-muted"> · {BEARER_LABEL[rule.bearer]}</span>
               </p>
-              <p className="text-xs text-muted">
+              <p className="text-xs text-muted wrap-anywhere">
                 From {new Date(rule.effectiveFrom).getFullYear() > 2020 ? formatDateTime(rule.effectiveFrom) : 'the start'}
                 {rule.createdByEmail ? ` · set by ${rule.createdByEmail} on ${formatDate(rule.createdAt)}` : ''}
               </p>

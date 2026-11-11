@@ -235,7 +235,7 @@ frontend/src/packages/affiliate/
   pages/
     ClickPage.tsx       # /a/:token
     InvitePage.tsx      # /affiliate/invite/:token — public, pre-auth
-    CommissionsTable.tsx# shared by all three audiences
+    CommissionsTable.tsx# shared by all three audiences; one card per row below md, a table from md
     partner/            # PartnerLayout + Overview · Stores (+ products, get link) · Links · Commissions
     seller/             # AffiliateLayout + Programme · Products · Partners · Commissions
     admin/              # AffiliateAdminPage — accounts, commissions, run approval

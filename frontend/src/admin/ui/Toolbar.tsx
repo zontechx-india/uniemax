@@ -78,14 +78,17 @@ export function FilterSelect({
   value,
   onChange,
   options,
+  idleValue = '',
 }: {
   label: string
   value: string
   onChange: (value: string) => void
   options: { value: string; label: string }[]
+  /** The value that means "no filter" (a sort's default) — not tinted. */
+  idleValue?: string
 }) {
   const selected = options.find((option) => option.value === value)?.label ?? ''
-  const active = value !== ''
+  const active = value !== idleValue
   return (
     <label
       className={`relative inline-flex h-9 max-w-full items-center gap-1 rounded-pill border pl-3 pr-2 text-sm transition-colors focus-within:border-brand ${

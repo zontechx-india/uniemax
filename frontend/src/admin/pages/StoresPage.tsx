@@ -127,8 +127,10 @@ export default function StoresPage() {
     <>
       <PageHeader title="Stores & sellers" subtitle="Every store on the marketplace" />
 
-      <Card padding="none">
+      {/* Edge to edge on a phone, like a native list; a card from `sm`. */}
+      <Card padding="none" className="max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0">
         <Tabs
+          sticky
           value={list.filters['status'] ?? ''}
           onChange={(value) => list.setFilter('status', value)}
           options={[...STATUS_TABS]}
@@ -152,6 +154,7 @@ export default function StoresPage() {
           <FilterSelect
             label="Sort"
             value={list.filters['sort'] ?? 'NEWEST'}
+            idleValue="NEWEST"
             onChange={(value) => list.setFilter('sort', value)}
             options={[
               { value: 'NEWEST', label: 'Newest first' },
@@ -170,6 +173,29 @@ export default function StoresPage() {
           error={list.error}
           onRetry={list.refresh}
           onRowClick={(store) => navigate(`/stores/${store.id}`)}
+          mobileRow={(store) => (
+            <div className="flex gap-3">
+              <StoreAvatar logoUrl={store.logoUrl} name={store.name} size="h-11 w-11" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="min-w-0 truncate font-medium text-fg">{store.name}</p>
+                  <p className="shrink-0 font-figure text-sm font-medium text-fg">
+                    {formatMoney(store.revenue)}
+                  </p>
+                </div>
+                <p className="mt-0.5 truncate text-sm text-muted">
+                  {store.owner.name ?? store.owner.email}
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <StoreStatusChip isPublished={store.isPublished} suspendedAt={store.suspendedAt} />
+                  <SetupChip setup={store.setup} />
+                  <span className="ml-auto text-xs text-muted">
+                    {formatCount(store.counts.orders)} orders
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
           empty={{ title: 'No stores match these filters' }}
         />
         <Pagination

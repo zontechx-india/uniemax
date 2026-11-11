@@ -85,8 +85,10 @@ export default function CustomersPage() {
     <>
       <PageHeader title="Customers" subtitle="Everyone with a UnieMax account" />
 
-      <Card padding="none">
+      {/* Edge to edge on a phone, like a native list; a card from `sm`. */}
+      <Card padding="none" className="max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0">
         <Tabs
+          sticky
           value={list.filters['filter'] ?? ''}
           onChange={(value) => list.setFilter('filter', value)}
           options={[...TABS]}
@@ -107,6 +109,45 @@ export default function CustomersPage() {
           error={list.error}
           onRetry={list.refresh}
           onRowClick={(customer) => navigate(`/customers/${customer.id}`)}
+          mobileRow={(customer) => (
+            <div className="flex gap-3">
+              {/* Initial in a circle — a contact list's familiar shape. */}
+              <span
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill bg-surface-alt text-sm font-semibold text-muted"
+                aria-hidden
+              >
+                {(customer.name ?? customer.email ?? '?').charAt(0).toUpperCase()}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="min-w-0 truncate font-medium text-fg">
+                    {customer.name ?? 'Unnamed'}
+                  </p>
+                  <p className="shrink-0 text-xs text-muted">
+                    {formatCount(customer.counts.orders)} orders
+                  </p>
+                </div>
+                <p className="mt-0.5 truncate text-sm text-muted">
+                  {customer.email ?? customer.phone ?? '—'}
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {customer.isSeller ? (
+                    <Chip tone="brand">
+                      Seller · {formatCount(customer.counts.stores)} store
+                      {customer.counts.stores === 1 ? '' : 's'}
+                    </Chip>
+                  ) : (
+                    <Chip>Buyer</Chip>
+                  )}
+                  {/* Active is the normal case — only a block earns a chip. */}
+                  {customer.blockedAt ? <Chip tone="danger">Blocked</Chip> : null}
+                  <span className="ml-auto text-xs text-muted">
+                    Joined {formatDate(customer.createdAt)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
           empty={{ title: 'No customers match these filters' }}
         />
         <Pagination

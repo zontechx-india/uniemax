@@ -63,7 +63,7 @@ export default function SellerBalancesPage() {
         title="Seller balances"
         subtitle="From delivered orders, payouts and COD platform fees. Pay a seller from the order page."
       />
-      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatTile label="We owe sellers" value={totals.data ? formatMoneyExact(totals.data.payable) : '—'} hint="Ready to pay" />
         <StatTile label="Being paid" value={totals.data ? formatMoneyExact(totals.data.inPayout) : '—'} hint="Payouts not finished" />
         <StatTile
@@ -73,8 +73,10 @@ export default function SellerBalancesPage() {
           tone={totals.data && Number(totals.data.owed) > 0 ? 'warning' : 'default'}
         />
       </div>
-      <Card padding="none">
+      {/* Edge to edge on a phone, like a native list; a card from `sm`. */}
+      <Card padding="none" className="max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0">
         <Tabs
+          sticky
           value={list.filters['filter'] ?? ''}
           onChange={(value) => list.setFilter('filter', value)}
           options={[...TABS]}
@@ -94,6 +96,30 @@ export default function SellerBalancesPage() {
           error={list.error}
           onRetry={list.refresh}
           onRowClick={(row) => navigate(`/finance/sellers/${row.storeId}`)}
+          // Phone row: the store and its net figure, then the parts of it.
+          mobileRow={(row) => (
+            <>
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="min-w-0 truncate font-medium text-fg">{row.storeName}</p>
+                <p className="shrink-0 font-figure font-semibold text-fg">{formatMoneyExact(row.net)}</p>
+              </div>
+              <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted">
+                <span>
+                  We owe <span className="font-figure text-fg">{formatMoneyExact(row.payable)}</span>
+                </span>
+                {Number(row.inPayout) > 0 ? (
+                  <span>
+                    Being paid <span className="font-figure text-fg">{formatMoneyExact(row.inPayout)}</span>
+                  </span>
+                ) : null}
+                {Number(row.owed) > 0 ? (
+                  <span>
+                    They owe <span className="font-figure text-warning">{formatMoneyExact(row.owed)}</span>
+                  </span>
+                ) : null}
+              </p>
+            </>
+          )}
           empty={{ title: 'No seller balances yet', hint: 'Balances appear once orders are delivered.' }}
         />
         <Pagination

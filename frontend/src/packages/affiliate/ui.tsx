@@ -4,6 +4,7 @@ import { NavLink } from 'react-router-dom'
 import { toApiError } from '../../shared/auth/http'
 import type { ListMeta } from '../../shared/auth/http'
 import type { CommissionStatus, CommissionType } from './api'
+import { Button } from '../../shared/ui/Button'
 
 /** Small pieces every affiliate screen shares. */
 
@@ -99,27 +100,30 @@ export const COMMISSION_STATUSES: CommissionStatus[] = [
 export function Pager({ meta, onPage }: { meta: ListMeta; onPage: (page: number) => void }) {
   if (meta.totalPages <= 1) return null
   return (
-    <div className="mt-3 flex items-center justify-between text-sm text-muted">
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-muted">
       <span>
         Page {meta.page} of {meta.totalPages} · {meta.total} total
       </span>
-      <div className="flex gap-2">
-        <button
-          type="button"
+      {/* Full-width, thumb-sized halves on a phone; compact from `sm`. */}
+      <div className="flex w-full gap-2 sm:w-auto">
+        <Button
+          variant="secondary"
+          size="sm"
+          className="flex-1 sm:flex-none"
           disabled={meta.page <= 1}
           onClick={() => onPage(meta.page - 1)}
-          className="rounded-md border border-line px-3 py-1 hover:bg-surface-alt disabled:opacity-40"
         >
           Previous
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="flex-1 sm:flex-none"
           disabled={meta.page >= meta.totalPages}
           onClick={() => onPage(meta.page + 1)}
-          className="rounded-md border border-line px-3 py-1 hover:bg-surface-alt disabled:opacity-40"
         >
           Next
-        </button>
+        </Button>
       </div>
     </div>
   )

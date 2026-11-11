@@ -137,8 +137,9 @@ export default function SupportPage() {
         }
       />
 
-      <Card padding="none">
-        <Tabs value={tab} onChange={selectTab} options={[...TABS]} />
+      {/* Edge to edge on a phone, like a native list; a card from `sm`. */}
+      <Card padding="none" className="max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0">
+        <Tabs sticky value={tab} onChange={selectTab} options={[...TABS]} />
         <Toolbar>
           <SearchInput
             value={list.filters['q'] ?? ''}
@@ -173,6 +174,26 @@ export default function SupportPage() {
           error={list.error}
           onRetry={list.refresh}
           onRowClick={(ticket) => navigate(`/support/${ticket.id}`)}
+          // Phone row, like a mail inbox: who + when, the subject, then chips.
+          mobileRow={(ticket) => (
+            <>
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="min-w-0 truncate text-sm text-muted">
+                  {[ticket.customer.name ?? ticket.customer.email, ticket.storeName]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+                <p className="shrink-0 text-xs text-muted">{formatRelative(ticket.lastMessageAt)}</p>
+              </div>
+              <p className="mt-0.5 line-clamp-2 font-medium text-fg">{ticket.subject}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <TicketStatusChip status={ticket.status} />
+                <TicketPriorityChip priority={ticket.priority} />
+                <TicketScopeChip storeId={ticket.storeId} />
+                <span className="ml-auto text-xs text-muted">{ticket.ticketNumber}</span>
+              </div>
+            </>
+          )}
           empty={{
             title: 'No tickets match these filters',
             hint: 'Sellers write in from Store Management → Help & Support; shoppers from their account menu.',

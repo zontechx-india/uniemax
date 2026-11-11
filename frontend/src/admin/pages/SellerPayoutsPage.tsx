@@ -34,8 +34,10 @@ export default function SellerPayoutsPage() {
         title="Seller payouts"
         subtitle="Money sent to sellers for online orders. Pay from the order page."
       />
-      <Card padding="none">
+      {/* Edge to edge on a phone, like a native list; a card from `sm`. */}
+      <Card padding="none" className="max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0">
         <Tabs
+          sticky
           value={view}
           // A new view starts clean — its filters differ from the other's.
           onChange={(value) => setSearchParams(value ? { view: value } : {}, { replace: true })}
@@ -102,6 +104,21 @@ function ToPayView() {
         error={list.error}
         onRetry={list.refresh}
         onRowClick={(row) => navigate(`/orders/${row.id}`)}
+        mobileRow={(row) => (
+          <>
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="min-w-0 truncate font-medium text-fg">{row.orderNumber}</p>
+              <p className="shrink-0 font-figure font-medium text-fg">{formatMoneyExact(row.total)}</p>
+            </div>
+            <p className="mt-0.5 truncate text-sm text-muted">{row.storeName}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {row.pastAttempts > 0 ? (
+                <Chip tone="warning">{row.pastAttempts} failed or cancelled</Chip>
+              ) : null}
+              <span className="ml-auto text-xs text-muted">Delivered {formatDate(row.deliveredAt)}</span>
+            </div>
+          </>
+        )}
         empty={{ title: 'No orders are waiting for a payout' }}
       />
       <Pagination
@@ -210,6 +227,26 @@ function LedgerView() {
         error={list.error}
         onRetry={list.refresh}
         onRowClick={(row) => navigate(`/orders/${row.order.id}`)}
+        mobileRow={(row) => (
+          <>
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="min-w-0 truncate font-medium text-fg">{row.order.orderNumber}</p>
+              <p className="shrink-0 font-figure font-medium text-fg">{formatMoneyExact(row.amount)}</p>
+            </div>
+            <p className="mt-0.5 truncate text-sm text-muted">{row.order.storeName}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <PayoutStatusChip status={row.status} />
+              <PayoutMethodChip method={row.method} />
+              {row.paidAt ? (
+                <span className="ml-auto text-xs text-muted">{formatDate(row.paidAt)}</span>
+              ) : null}
+            </div>
+            {/* UTR / PaymentHub id — what a seller quotes when asking. */}
+            {row.utr ?? row.hubPayoutId ? (
+              <p className="mt-1 truncate font-mono text-xs text-muted">{row.utr ?? row.hubPayoutId}</p>
+            ) : null}
+          </>
+        )}
         empty={{ title: 'No payouts match these filters' }}
       />
       <Pagination
