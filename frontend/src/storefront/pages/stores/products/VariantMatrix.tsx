@@ -72,7 +72,7 @@ export function VariantMatrix({
   const removed = rows.filter((row) => row.removed)
   const missing = rowsNeedingPrice(rows)
   const photoOf = (row: VariantDraft) =>
-    row.mediaId ? (media.find((item) => item.id === row.mediaId) ?? null) : null
+    row.mediaIds[0] ? (media.find((item) => item.id === row.mediaIds[0]) ?? null) : null
   const withPhotos = offered.some((row) => photoOf(row) !== null)
   const valueOf = (row: VariantDraft, type: OptionTypeDraft) =>
     type.values.find((v) => v.key === row.valueKeys[type.key])?.value ?? '—'

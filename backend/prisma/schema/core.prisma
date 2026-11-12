@@ -786,10 +786,13 @@ model StoreProductVariant {
   sku            String?
   /// Strike-through price (MRP). Null = no discount shown; above `price` when set.
   compareAtPrice Decimal?           @db.Decimal(10, 2)
-  /// The product photo that shows this variant (the pink saree's own photo).
-  /// Null = the product's cover. Cleared when that photo is deleted.
+  /// The variant's MAIN photo: always position 0 of `photos`, kept in sync by
+  /// the service (swatch, cart line, order, dropship read it directly).
+  /// Null = no own photo, the product's photos are shown.
   mediaId        String?
   media          StoreProductMedia? @relation(fields: [mediaId], references: [id], onDelete: SetNull)
+  /// Every photo the variant shows, in order (Pink front, Pink back…).
+  photos         StoreProductVariantMedia[]
 
   orderItems OrderItem[]
   cartLines  CartLine[]
@@ -1018,21 +1021,34 @@ model StoreProductMedia {
   altText      String?
   displayOrder Int            @default(0)
 
-  /// Variants that show this photo (the pink saree → its pink photo).
+  /// Variants whose MAIN photo this is.
   variants StoreProductVariant[]
-
-  /// The look this photo shows: the product's look option and one of its
-  /// values ("Colour" / "Pink"). Both null = shared, shown with every look.
-  /// When a shopper picks Pink, the gallery shows Pink's photos, then the
-  /// shared ones. Written only by the options PUT (`mediaLooks`), which
-  /// sends the full set with the CURRENT names, so a rename can't orphan it.
-  lookOption String?
-  lookValue  String?
+  /// Variants that show this photo anywhere in their list. A photo no variant
+  /// lists is an "all colours" photo (size chart, fabric).
+  variantPhotos StoreProductVariantMedia[]
 
   createdAt DateTime @default(now())
 
   @@index([productId, displayOrder])
   @@map("store_product_media")
+  @@schema("public")
+}
+
+/// The photos a variant shows, in order — many to many, so one photo can show
+/// Pink AND Green, and every size of Pink carries the same list (the wizard
+/// picks per colour and writes it to each size). `position` 0 is the main
+/// photo, mirrored in StoreProductVariant.mediaId. Written by the options PUT
+/// (`variants[].mediaIds`); deleting the photo or the variant removes the row.
+model StoreProductVariantMedia {
+  variantId String
+  variant   StoreProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  mediaId   String
+  media     StoreProductMedia   @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  position  Int                 @default(0)
+
+  @@id([variantId, mediaId])
+  @@index([mediaId])
+  @@map("store_product_variant_media")
   @@schema("public")
 }
 

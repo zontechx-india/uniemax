@@ -176,7 +176,8 @@ export interface VariantDraft {
   compareAt: string
   stock: string
   sku: string
-  mediaId: string | null
+  /** Every photo this combination shows, in order ([0] = its main photo). */
+  mediaIds: string[]
   isActive: boolean
   removed: boolean
 }
@@ -190,7 +191,7 @@ const blankRow = (
   compareAt: '',
   stock: '',
   sku: '',
-  mediaId: null,
+  mediaIds: [],
   isActive: true,
   removed,
 })
@@ -244,7 +245,7 @@ export function toDraft(product: Pick<StoreProduct, 'optionTypes' | 'variants'>)
       compareAt: variant.compareAtPrice ?? '',
       stock: String(variant.stockQuantity),
       sku: variant.sku ?? '',
-      mediaId: variant.mediaId,
+      mediaIds: variant.mediaIds?.length ? variant.mediaIds : variant.mediaId ? [variant.mediaId] : [],
       isActive: variant.isActive,
       removed: false,
     })
@@ -427,7 +428,8 @@ export function draftToInput(
       isActive: row.isActive,
       sku: row.sku.trim() || null,
       compareAtPrice: row.compareAt.trim() === '' ? null : Number(row.compareAt),
-      mediaId: row.mediaId,
+      mediaId: row.mediaIds[0] ?? null,
+      mediaIds: row.mediaIds,
     }
   })
 

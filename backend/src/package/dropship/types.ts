@@ -190,16 +190,7 @@ export interface ProductSnapshot {
   globalCategoryName: string | null;
   optionTypes: OptionTypeRef[];
   deliveryRule: DeliveryRuleRef;
-  media: {
-    id: string;
-    key: string;
-    type: "IMAGE" | "VIDEO";
-    altText: string | null;
-    displayOrder: number;
-    /** The look the photo shows ("Colour" / "Pink"); null = shared. */
-    lookOption: string | null;
-    lookValue: string | null;
-  }[];
+  media: { id: string; key: string; type: "IMAGE" | "VIDEO"; altText: string | null; displayOrder: number }[];
   variants: {
     id: string;
     name: string;
@@ -212,6 +203,8 @@ export interface ProductSnapshot {
     optionValues: Record<string, string> | null;
     sku: string | null;
     mediaId: string | null;
+    /** Every photo the variant shows, in order ([0] = mediaId). */
+    mediaIds: string[];
   }[];
 }
 
@@ -231,9 +224,6 @@ export interface CopyMediaInput {
   type: "IMAGE" | "VIDEO";
   altText: string | null;
   displayOrder: number;
-  /** The look the photo shows ("Colour" / "Pink"); null = shared. */
-  lookOption: string | null;
-  lookValue: string | null;
 }
 
 export interface CopyVariantInput {
@@ -246,6 +236,8 @@ export interface CopyVariantInput {
   isActive: boolean;
   /** Index into the copy's media list for the option's photo. */
   mediaIndex: number | null;
+  /** Indexes into the copy's media list for every photo it shows, in order. */
+  mediaIndexes?: number[];
 }
 
 export interface CopyInput {

@@ -647,9 +647,6 @@ export interface PublicProductMediaItem {
   type: 'IMAGE' | 'VIDEO'
   url: string | null
   altText: string | null
-  /** The look this photo shows ("Colour" / "Pink"); both null = shared. */
-  lookOption: string | null
-  lookValue: string | null
 }
 
 export interface PublicStoreVariant {
@@ -666,6 +663,8 @@ export interface PublicStoreVariant {
   sku: string | null
   /** The gallery item that shows this variant; null = the cover. */
   mediaId: string | null
+  /** Every photo this variant shows, in order ([0] = mediaId); empty = all photos. */
+  mediaIds: string[]
 }
 
 /** Full product detail — the only payload that carries variants. */
@@ -1653,6 +1652,8 @@ export interface StoreProductVariant {
   compareAtPrice: string | null
   /** The product photo that shows this variant; null = the cover. */
   mediaId: string | null
+  /** Every photo this variant shows, in order ([0] = mediaId). */
+  mediaIds: string[]
   createdAt: string
 }
 
@@ -1667,9 +1668,6 @@ export interface StoreProductMediaItem {
   url: string | null
   altText: string | null
   displayOrder: number
-  /** The look this photo shows ("Colour" / "Pink"); both null = shared. */
-  lookOption: string | null
-  lookValue: string | null
 }
 
 /**
@@ -1831,6 +1829,8 @@ export interface StoreVariantInput {
   compareAtPrice?: number | null
   /** One of the product's own photos; null = the cover. */
   mediaId?: string | null
+  /** Every photo it shows, in order (first = main). Wins over `mediaId`. */
+  mediaIds?: string[]
 }
 
 /**
@@ -1857,11 +1857,6 @@ export interface StoreProductCreateInput {
 export interface StoreProductOptionsInput {
   optionTypes: ProductOptionType[]
   variants: StoreVariantInput[]
-  /**
-   * Which look each photo shows, the FULL set (unlisted photos become
-   * shared). Omit to leave every photo's look unchanged.
-   */
-  mediaLooks?: { mediaId: string; option: string; value: string }[]
 }
 
 /**

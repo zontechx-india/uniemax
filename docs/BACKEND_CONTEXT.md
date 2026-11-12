@@ -1435,10 +1435,17 @@ White-label design — one codebase, any business:
   up to **20 IMAGEs + 1 VIDEO** (service-enforced), each holding a storage
   **object key** (never a URL), optional `altText` (accessibility) and
   `displayOrder`; a variant may point at one of the images as its own photo.
-  `lookOption` / `lookValue` (nullable) say which look the photo shows
-  ("Colour" / "Pink"); null = shared. Written only by the options PUT
-  (`mediaLooks`, the full set); the product page shows the picked look's
-  photos then the shared ones. Dropship copies carry them over.
+- **StoreProductVariantMedia** — a variant's **ordered photo list**
+  (`variantId`, `mediaId`, `position`; PK `(variantId, mediaId)`, both FKs
+  cascade). Many to many: one photo may show several variants, and the wizard
+  writes the same list to every size of a colour. Position 0 is the main photo,
+  mirrored in `StoreProductVariant.mediaId` (cart, orders, swatches read that).
+  Written by the options PUT (`variants[].mediaIds`) and the variant PATCH
+  (a single `mediaId` = a one-photo list). Deleting a photo removes it from
+  every list and promotes the next photo to main. Photos no variant lists are
+  "all colours" photos. Dropship copies rebuild each variant's list with the
+  copied photo ids. (Replaced v1.106's per-photo `lookOption` / `lookValue`,
+  migration `20261112140000_variant_photo_lists` copied them over.)
   The image with the lowest `displayOrder` is the product's
   **cover** — there is no separate cover flag to fall out of sync. Reordering
   rewrites the image orders 0..n-1; the video sits at a high order outside

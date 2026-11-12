@@ -1,60 +1,43 @@
-// Photos per look → the product page gallery. Pure logic: `npm run test:unit`.
+// Photos per variant → the product page gallery. Pure logic: `npm run test:unit`.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { galleryFor, lookOptionOf } from '../src/storefront/features/stores/productLooks'
+import { galleryFor } from '../src/storefront/features/stores/productLooks'
 
-const types = [
-  { name: 'Colour', values: ['Pink', 'Blue'] },
-  { name: 'Size', values: ['S', 'M'] },
-]
-const photo = (id: string, lookValue: string | null, lookOption: string | null = lookValue ? 'Colour' : null) => ({
-  id,
-  lookOption,
-  lookValue,
-})
+const media = ['pink-front', 'pink-back', 'blue-front', 'size-chart', 'video'].map((id) => ({ id }))
 const ids = (list: { id: string }[]) => list.map((m) => m.id)
+const pink = { mediaIds: ['pink-front', 'pink-back'] }
+const blue = { mediaIds: ['blue-front'] }
+const green = { mediaIds: ['pink-front'] } // reuses a Pink photo
+const variants = [pink, blue, green]
 
-const media = [
-  photo('pink-front', 'Pink'),
-  photo('blue-front', 'Blue'),
-  photo('size-chart', null),
-  photo('pink-back', 'Pink'),
-  photo('blue-back', 'Blue'),
-]
-
-test('a picked colour shows its photos, then the shared ones — never another colour', () => {
-  assert.deepEqual(ids(galleryFor(media, types, { Colour: 'Blue', Size: 'S' }, null)), [
-    'blue-front',
-    'blue-back',
-    'size-chart',
-  ])
+test("a picked colour shows its photos in order, then the photos no colour lists", () => {
+  assert.deepEqual(ids(galleryFor(media, variants, pink)), ['pink-front', 'pink-back', 'size-chart', 'video'])
 })
 
-test("the variant's own photo leads", () => {
-  assert.deepEqual(ids(galleryFor(media, types, { Colour: 'Pink', Size: 'M' }, 'pink-back')), [
+test("another colour's own photos are hidden", () => {
+  assert.deepEqual(ids(galleryFor(media, variants, blue)), ['blue-front', 'size-chart', 'video'])
+})
+
+test('one photo can show two colours', () => {
+  assert.deepEqual(ids(galleryFor(media, variants, green)), ['pink-front', 'size-chart', 'video'])
+})
+
+test('the list order wins over the gallery order', () => {
+  assert.deepEqual(ids(galleryFor(media, variants, { mediaIds: ['pink-back', 'pink-front'] })).slice(0, 2), [
     'pink-back',
     'pink-front',
-    'size-chart',
   ])
 })
 
-test('names match without caring about case or spaces', () => {
-  const loose = [photo('a', ' pink ', 'colour'), photo('b', 'Blue'), photo('c', null)]
-  assert.deepEqual(ids(galleryFor(loose, types, { Colour: 'Pink' }, null)), ['a', 'c'])
+test('no variant, or a variant without photos, shows every photo', () => {
+  assert.deepEqual(ids(galleryFor(media, variants, null)), ids(media))
+  assert.deepEqual(ids(galleryFor(media, variants, { mediaIds: [] })), ids(media))
 })
 
-test('an untagged product shows every photo, as before', () => {
-  const plain = [photo('a', null), photo('b', null)]
-  assert.equal(lookOptionOf(plain, types), null)
-  assert.deepEqual(ids(galleryFor(plain, types, { Colour: 'Pink' }, 'b')), ['a', 'b'])
-})
-
-test('a colour with no photos of its own falls back to every photo', () => {
-  const onlyPink = [photo('p', 'Pink'), photo('s', null)]
-  assert.deepEqual(ids(galleryFor(onlyPink, types, { Colour: 'Blue' }, null)), ['p', 's'])
-})
-
-test('a stale tag (value or option gone) counts as shared, so it is never hidden', () => {
-  const stale = [photo('p', 'Pink'), photo('old', 'Green'), photo('x', 'Pink', 'Pattern')]
-  assert.deepEqual(ids(galleryFor(stale, types, { Colour: 'Pink' }, null)), ['p', 'old', 'x'])
+test('a listed photo that was deleted is skipped', () => {
+  assert.deepEqual(ids(galleryFor(media, variants, { mediaIds: ['gone', 'blue-front'] })), [
+    'blue-front',
+    'size-chart',
+    'video',
+  ])
 })

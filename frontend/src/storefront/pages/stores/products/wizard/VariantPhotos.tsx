@@ -7,49 +7,48 @@ import { MediaImg } from '../../../../../shared/media/MediaImg'
 import { prepareImage, webpName } from '../../../../../shared/media/cropImage'
 import { getMediaConfig, validateImageSource } from '../../../../../shared/media/mediaConfig'
 import { storeCatalogApi } from '../../../../features/stores/storesApi'
-import type {
-  ProductOptionType,
-  StoreProduct,
-  StoreProductMediaItem,
-} from '../../../../features/stores/storesApi'
+import type { StoreProduct, StoreProductMediaItem } from '../../../../features/stores/storesApi'
 import type {
   OptionTypeDraft,
   OptionValueDraft,
   VariantDraft,
 } from '../../../../features/stores/productOptions'
-import { lookOf, lookOptionOf } from '../../../../features/stores/productLooks'
+import { BigSwitch } from '../../ui/BigSwitch'
 import { CheckIcon, ImageIcon, PlusIcon } from '../../../../layout/icons'
 import { MAX_LIVE_PHOTOS } from '../../media/useLiveMedia'
 import { ChoiceCard } from './shared'
 
-/** Which value (by draft key) each photo shows: mediaId → value key. */
-export type LookMap = Record<string, string>
+/** Photos one variant may list (server limit). */
+export const MAX_VARIANT_PHOTOS = 10
 
 /**
- * The middle screen of "Price & choices" (Choices → **Photos** → Prices):
- * the photos of each value of the choice that changes how the product LOOKS
- * (Colour, Design, Print…). On the product page the FIRST photo of a value
- * is its colour button, and picking the colour shows only that colour's
- * photos (then the shared ones) — so the screen shows that, live, instead of
- * explaining it in a paragraph.
+ * The middle screen of "Price & choices" (Choices → **Photos** → Prices),
+ * shown when a choice changes how the product LOOKS (Colour, Print…).
  *
- * One tile per value; a tap opens a sheet where the seller ticks every photo
- * that shows it (front, back, close-up) or takes / uploads several at once,
- * auto-ticked. A photo shows one value only — ticking Blue's photo for Pink
- * moves it. Photos ticked for no value are shared.
+ * The product owns a photo library; each colour picks ANY photos from it, in
+ * order — the model large marketplaces use. Reuse is free: one photo can show
+ * Pink and Green ("Also in Pink" is a label, nothing moves). Photo 1 of a
+ * colour is its MAIN photo: the colour button, the first gallery photo, the
+ * cart and order picture. The list is picked per colour and written to every
+ * size of it (each variant keeps \`mediaIds\`).
  *
- * Required: Continue waits until every value on sale has at least one photo.
- * State lives in \`PricingStep\`: rows carry the first photo (\`mediaId\`, the
- * swatch and the cart thumbnail), \`looks\` carries the rest; both are saved
- * with the options PUT (\`mediaLooks\`).
+ * Two ways in, editing the same lists: **By colour** (a row per colour with
+ * its photo strip and a +, opening a numbered tick sheet with upload) and
+ * **By photo** (each photo with colour chips — fastest with many photos).
+ * "Same photos for all colours" is the one switch for a seller whose photos
+ * show every colour together.
+ *
+ * Required, never a dead end: each colour needs at least one photo, a reused
+ * photo counts, the switch counts, and upload sits inside the sheet.
  */
 export function VariantPhotos({
   storeId,
   product,
   type,
   rows,
-  looks,
-  onChange,
+  onRowsChange,
+  same,
+  onSameChange,
   onSaved,
   highlightKey,
   disabled,
@@ -59,154 +58,196 @@ export function VariantPhotos({
   /** The choice whose values get photos (Colour). */
   type: OptionTypeDraft
   rows: VariantDraft[]
-  looks: LookMap
-  onChange: (next: { rows: VariantDraft[]; looks: LookMap }) => void
+  onRowsChange: (rows: VariantDraft[]) => void
+  /** "Same photos for all colours". */
+  same: boolean
+  onSameChange: (same: boolean) => void
   /** Photos were uploaded from here — the product came back with them. */
   onSaved: (product: StoreProduct) => void
   /** The value Continue stopped at, outlined. */
   highlightKey: string | null
   disabled: boolean
 }) {
+  const [view, setView] = useState<'colour' | 'photo'>('colour')
   const [openKey, setOpenKey] = useState<string | null>(null)
   const media = product.media.filter((m) => m.type === 'IMAGE')
   const values = valuesOnSale(type, rows)
-  const photosOf = (valueKey: string) => valuePhotos(rows, looks, type.key, valueKey, media)
-  const done = values.filter((v) => photosOf(v.key).length > 0).length
-  const open = values.find((v) => v.key === openKey) ?? null
   const label = type.name.trim() || 'Choice'
-  const firstWithPhoto = values.find((v) => photosOf(v.key).length > 0) ?? values[0] ?? null
+  const lower = label.toLowerCase()
+  const listOf = (valueKey: string) => valueList(rows, type.key, valueKey, media)
+  const done = values.filter((v) => listOf(v.key).length > 0).length
+  const open = values.find((v) => v.key === openKey) ?? null
+  const uploader = useUploader(storeId, product, onSaved)
 
-  /** The sheet's answer for one value: exactly these photos, first = its button. */
-  const setPhotos = (valueKey: string, ids: string[]) => {
-    const nextLooks: LookMap = {}
-    for (const [id, key] of Object.entries(looks)) if (key !== valueKey && !ids.includes(id)) nextLooks[id] = key
-    for (const id of ids) nextLooks[id] = valueKey
-    const nextRows = rows.map((row) => {
-      const key = row.valueKeys[type.key]
-      if (key === valueKey) return { ...row, mediaId: ids[0] ?? null }
-      // A photo that moved away from this value can't stay its button.
-      if (key && row.mediaId && ids.includes(row.mediaId)) {
-        const left = media.find((m) => nextLooks[m.id] === key)
-        return { ...row, mediaId: left?.id ?? null }
-      }
-      return row
-    })
-    onChange({ rows: nextRows, looks: nextLooks })
-  }
+  const setList = (valueKey: string, ids: string[]) =>
+    onRowsChange(rows.map((row) => (row.valueKeys[type.key] === valueKey ? { ...row, mediaIds: ids } : row)))
 
   return (
-    <div className="space-y-5">
-      {/* What customers see — fills in as the seller picks. */}
-      <figure className="rounded-2xl border border-line bg-surface/70 p-4" aria-hidden>
-        <figcaption className="text-xs font-semibold tracking-wide text-muted uppercase">
-          What customers see
-        </figcaption>
-        <p className="mt-2 truncate text-base font-semibold text-fg">{product.name}</p>
-        <p className="mt-0.5 text-sm text-muted">
-          {label}: <span className="font-semibold text-fg">{firstWithPhoto?.value}</span>
-        </p>
-        <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
-          {values.map((v) => {
-            const photo = photosOf(v.key)[0] ?? null
-            return (
-              <span key={v.key} className="flex w-12 shrink-0 flex-col items-center gap-1">
-                <span
-                  className={`flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg ${
-                    photo
-                      ? `border-2 ${v.key === firstWithPhoto?.key ? 'border-brand' : 'border-line'}`
-                      : 'border-2 border-dashed border-line text-muted'
-                  }`}
-                >
-                  {photo ? (
-                    <MediaImg sizes="48px" src={photo.url} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="text-sm font-semibold">?</span>
-                  )}
-                </span>
-                <span className="w-full truncate text-center text-xs text-muted">{v.value}</span>
-              </span>
-            )
-          })}
-        </div>
-      </figure>
-
-      <div>
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-          <p className="text-base font-semibold text-fg">Tap each {label.toLowerCase()} to add its photos</p>
-          <p className={`shrink-0 text-sm font-semibold ${done === values.length ? 'text-success' : 'text-muted'}`}>
-            {done} of {values.length} done
-          </p>
-        </div>
-        <ul className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4">
-          {values.map((v) => {
-            const photos = photosOf(v.key)
-            const photo = photos[0] ?? null
-            const flagged = highlightKey === v.key && !photo
-            return (
-              <li key={v.key}>
-                <button
-                  type="button"
-                  onClick={() => setOpenKey(v.key)}
-                  disabled={disabled}
-                  aria-label={
-                    photo
-                      ? `${v.value}: ${photos.length} photo${photos.length === 1 ? '' : 's'}. Change`
-                      : `Add photos for ${v.value}`
-                  }
-                  className={`relative flex aspect-square w-full flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border-2 transition disabled:opacity-60 ${
-                    photo
-                      ? 'border-line hover:border-brand'
-                      : flagged
-                        ? 'border-dashed border-danger bg-danger/5 text-danger'
-                        : 'border-dashed border-brand/40 bg-brand-soft/40 text-brand hover:border-brand'
-                  }`}
-                >
-                  {photo ? (
-                    <>
-                      <MediaImg sizes="(min-width: 640px) 160px, 30vw" src={photo.url} alt="" className="h-full w-full object-cover" />
-                      <span className="absolute top-1.5 right-1.5 flex h-6 min-w-6 items-center justify-center gap-0.5 rounded-full bg-success px-1.5 text-xs font-bold text-white">
-                        <CheckIcon className="h-3.5 w-3.5" />
-                        {photos.length > 1 ? photos.length : null}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <PlusIcon className="h-6 w-6" />
-                      <span className="text-sm font-semibold">Add photos</span>
-                    </>
-                  )}
-                </button>
-                <p className="mt-1.5 text-center text-sm font-semibold break-words text-fg">{v.value}</p>
-              </li>
-            )
-          })}
-        </ul>
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-line bg-surface/70 px-4 py-3">
+        <BigSwitch
+          checked={same}
+          disabled={disabled}
+          label={`Same photos for all ${lower}s`}
+          onText={`Same photos for all ${lower}s`}
+          offText={`Same photos for all ${lower}s`}
+          onChange={onSameChange}
+        />
+        <p className="mt-1 text-hint text-muted">Turn on if your photos show every {lower} together.</p>
       </div>
+
+      {same ? (
+        <p className="flex items-start gap-2 rounded-xl bg-success/10 px-3 py-2.5 text-hint text-fg">
+          <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+          All {media.length} photo{media.length === 1 ? '' : 's'} show with every {lower}. Customers pick a {lower} by its
+          name.
+        </p>
+      ) : (
+        <>
+          <div role="group" aria-label="Arrange photos" className="flex gap-1 rounded-xl bg-fg/5 p-1">
+            {(['colour', 'photo'] as const).map((v) => (
+              <Button
+                key={v}
+                variant={view === v ? 'secondary' : 'ghost'}
+                size="sm"
+                aria-pressed={view === v}
+                onClick={() => setView(v)}
+                className="flex-1"
+              >
+                {v === 'colour' ? `By ${lower}` : 'By photo'}
+              </Button>
+            ))}
+          </div>
+
+          {view === 'colour' ? (
+            <ul className="space-y-2.5">
+              {values.map((v) => {
+                const list = listOf(v.key)
+                const flagged = highlightKey === v.key && list.length === 0
+                return (
+                  <li
+                    key={v.key}
+                    className={`rounded-2xl border p-3 ${flagged ? 'border-danger bg-danger/5' : 'border-line bg-surface/70'}`}
+                  >
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="min-w-0 text-base font-bold break-words text-fg">{v.value}</p>
+                      <p className={`shrink-0 text-sm font-semibold ${list.length ? 'text-success' : 'text-danger'}`}>
+                        {list.length ? `${list.length} photo${list.length === 1 ? '' : 's'}` : 'Needs a photo'}
+                      </p>
+                    </div>
+                    {/* The whole strip is one button: every photo and the + open the same sheet. */}
+                    <button
+                      type="button"
+                      onClick={() => setOpenKey(v.key)}
+                      disabled={disabled}
+                      aria-label={
+                        list.length
+                          ? `${v.value}: ${list.length} photo${list.length === 1 ? '' : 's'}. Change`
+                          : `Choose photos for ${v.value}`
+                      }
+                      className="-mx-3 mt-2 flex w-[calc(100%+1.5rem)] gap-2 overflow-x-auto px-3 pb-1 text-left [scrollbar-width:none]"
+                    >
+                      {list.map((photo, i) => (
+                        <span
+                          key={photo.id}
+                          className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-line"
+                        >
+                          <MediaImg sizes="64px" src={photo.url} alt="" className="h-full w-full object-cover" />
+                          {i === 0 && (
+                            <span className="absolute inset-x-0 bottom-0 bg-brand text-center text-xs leading-4 font-bold text-brand-contrast">
+                              Main
+                            </span>
+                          )}
+                        </span>
+                      ))}
+                      <span
+                        className={`flex h-16 shrink-0 items-center justify-center gap-1 rounded-xl border-2 border-dashed font-semibold transition ${
+                          list.length ? 'w-16' : 'px-4'
+                        } ${flagged ? 'border-danger text-danger' : 'border-brand/50 bg-brand-soft/40 text-brand'}`}
+                      >
+                        <PlusIcon className="h-5 w-5" />
+                        {list.length === 0 && <span className="text-sm">Add photos</span>}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : (
+            <ul className="space-y-2.5">
+              {media.map((photo) => {
+                const tags = values.filter((v) => listOf(v.key).some((m) => m.id === photo.id))
+                return (
+                  <li key={photo.id} className="flex gap-3 rounded-2xl border border-line bg-surface/70 p-2.5">
+                    <span className="h-20 w-20 shrink-0 overflow-hidden rounded-xl">
+                      <MediaImg sizes="80px" src={photo.url} alt="" className="h-full w-full object-cover" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-hint text-muted">
+                        {tags.length ? `Shows ${tags.map((t) => t.value).join(', ')}` : `All ${lower}s (not tagged)`}
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {values.map((v) => {
+                          const on = tags.includes(v)
+                          const list = listOf(v.key).map((m) => m.id)
+                          return (
+                            <Button
+                              key={v.key}
+                              variant="secondary"
+                              size="sm"
+                              aria-pressed={on}
+                              disabled={disabled || (!on && list.length >= MAX_VARIANT_PHOTOS)}
+                              onClick={() =>
+                                setList(v.key, on ? list.filter((id) => id !== photo.id) : [...list, photo.id])
+                              }
+                              className="px-3"
+                            >
+                              <span className={`inline-flex items-center gap-1 ${on ? 'text-brand' : 'text-fg'}`}>
+                                {on && <CheckIcon className="h-3.5 w-3.5" />}
+                                {v.value}
+                              </span>
+                            </Button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </li>
+                )
+              })}
+              <li>
+                <UploadButton uploader={uploader} room={MAX_LIVE_PHOTOS - media.length} tile={false} />
+                {uploader.error && <p className="mt-2 text-hint text-danger">{uploader.error}</p>}
+              </li>
+            </ul>
+          )}
+
+          <p className={`text-sm font-semibold ${done === values.length ? 'text-success' : 'text-muted'}`}>
+            {done === values.length ? `All ${values.length} ${lower}s ready` : `${done} of ${values.length} ${lower}s ready`}
+          </p>
+        </>
+      )}
 
       {open && (
         <PhotoSheet
           key={open.key}
-          storeId={storeId}
-          product={product}
           media={media}
           value={open.value}
-          step={photosOf(open.key).length > 0 ? null : { n: done + 1, of: values.length }}
-          initial={photosOf(open.key).map((m) => m.id)}
-          ownerOf={(mediaId) => {
-            const key = looks[mediaId] ?? rows.find((row) => row.mediaId === mediaId)?.valueKeys[type.key]
-            return key && key !== open.key ? (type.values.find((v) => v.key === key)?.value ?? null) : null
-          }}
+          step={listOf(open.key).length > 0 ? null : { n: done + 1, of: values.length }}
+          initial={listOf(open.key).map((m) => m.id)}
+          alsoIn={(mediaId) =>
+            values.filter((v) => v.key !== open.key && listOf(v.key).some((m) => m.id === mediaId)).map((v) => v.value)
+          }
+          uploader={uploader}
           onDone={(ids) => {
-            const wasEmpty = photosOf(open.key).length === 0
-            setPhotos(open.key, ids)
+            const wasEmpty = listOf(open.key).length === 0
+            setList(open.key, ids)
             // Filling in: carry on with the next value still empty.
             const next =
               wasEmpty && ids.length > 0
-                ? values.find((v) => v.key !== open.key && photosOf(v.key).length === 0)
+                ? values.find((v) => v.key !== open.key && listOf(v.key).length === 0)
                 : undefined
             setOpenKey(next?.key ?? null)
           }}
-          onSaved={onSaved}
           onClose={() => setOpenKey(null)}
         />
       )}
@@ -249,56 +290,129 @@ export function LooksQuestion({
 }
 
 /**
- * "Photos of Pink": tick every photo that shows it. The first ticked is its
- * colour button ("Button" label). A photo another value uses carries that
- * value's name; ticking it moves it here. "Take or upload photos" accepts
- * several files and ticks each one as it lands.
+ * "Photos of Pink": tap photos in order — the number on each is its place, 1
+ * is the main photo. A photo other colours use says "Also in Blue" and stays
+ * theirs too. "Take or upload photos" adds several at once, ticked in order.
  */
 function PhotoSheet({
-  storeId,
-  product,
   media,
   value,
   step,
   initial,
-  ownerOf,
+  alsoIn,
+  uploader,
   onDone,
-  onSaved,
   onClose,
 }: {
-  storeId: string
-  product: StoreProduct
   media: StoreProductMediaItem[]
   value: string
   /** "2 of 5" while filling in empty values one after another. */
   step: { n: number; of: number } | null
   initial: string[]
-  /** The other value a photo shows now, if any. */
-  ownerOf: (mediaId: string) => string | null
+  alsoIn: (mediaId: string) => string[]
+  uploader: Uploader
   onDone: (ids: string[]) => void
-  onSaved: (product: StoreProduct) => void
   onClose: () => void
 }) {
   const [picked, setPicked] = useState<string[]>(initial)
-  const [uploading, setUploading] = useState<{ n: number; of: number } | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const room = MAX_LIVE_PHOTOS - media.length
+  const full = picked.length >= MAX_VARIANT_PHOTOS
 
   const toggle = (id: string) =>
-    setPicked((list) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]))
+    setPicked((list) => (list.includes(id) ? list.filter((x) => x !== id) : list.length >= MAX_VARIANT_PHOTOS ? list : [...list, id]))
 
-  const upload = async (e: ChangeEvent<HTMLInputElement>) => {
-    const files = [...(e.target.files ?? [])]
-    e.target.value = ''
-    if (files.length === 0) return
+  return (
+    <Dialog
+      open
+      title={`Photos of ${value}`}
+      subtitle={`${step ? `${step.n} of ${step.of} · ` : ''}Tap in order. 1 is the main photo.`}
+      onClose={onClose}
+      footer={
+        <Button
+          variant="primary"
+          size="lg"
+          full
+          disabled={uploader.busy !== null}
+          onClick={() => onDone(picked.filter((id) => media.some((m) => m.id === id)))}
+        >
+          {picked.length === 0 ? 'Done' : `Done · ${picked.length} photo${picked.length === 1 ? '' : 's'}`}
+        </Button>
+      }
+    >
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+        <UploadButton
+          uploader={uploader}
+          room={Math.min(MAX_LIVE_PHOTOS - media.length, MAX_VARIANT_PHOTOS - picked.length)}
+          tile
+          onUploaded={(ids) => setPicked((list) => [...list, ...ids].slice(0, MAX_VARIANT_PHOTOS))}
+        />
+        {media.map((item) => {
+          const at = picked.indexOf(item.id)
+          const on = at >= 0
+          const others = alsoIn(item.id)
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => toggle(item.id)}
+              disabled={uploader.busy !== null || (!on && full)}
+              aria-pressed={on}
+              aria-label={`${on ? `Photo ${at + 1}, tap to remove` : 'Tap to add'}${others.length ? ` (also in ${others.join(', ')})` : ''}`}
+              className={`relative aspect-square max-w-full overflow-hidden rounded-xl border-2 transition disabled:opacity-50 ${
+                on ? 'border-brand ring-2 ring-brand/30' : 'border-line hover:border-brand'
+              }`}
+            >
+              <MediaImg sizes="(min-width: 640px) 160px, 30vw" src={item.url} alt="" className="h-full w-full object-cover" />
+              <span
+                className={`absolute top-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full border-2 text-sm font-bold ${
+                  on ? 'border-brand bg-brand text-brand-contrast' : 'border-white bg-black/25 text-white'
+                }`}
+              >
+                {on ? at + 1 : ''}
+              </span>
+              {at === 0 ? (
+                <span className="absolute inset-x-0 bottom-0 bg-brand text-center text-xs leading-5 font-bold text-brand-contrast">
+                  Main
+                </span>
+              ) : others.length > 0 ? (
+                <span className="absolute inset-x-0 bottom-0 truncate bg-scrim px-1 text-center text-xs leading-5 font-semibold text-white">
+                  Also in {others.join(', ')}
+                </span>
+              ) : null}
+            </button>
+          )
+        })}
+      </div>
+      {full && <p className="mt-3 text-hint text-muted">{MAX_VARIANT_PHOTOS} photos is the most for one {value}.</p>}
+      {uploader.error && <p className="mt-2 text-hint text-danger">{uploader.error}</p>}
+    </Dialog>
+  )
+}
+
+// ---- upload --------------------------------------------------------------------
+
+interface Uploader {
+  /** "2 of 3" while uploading, else null. */
+  busy: { n: number; of: number } | null
+  error: string | null
+  /** Uploads in order; resolves with the new photo ids. */
+  upload: (files: File[], room: number) => Promise<string[]>
+}
+
+/** Several photos straight onto the product, one at a time (each reply is the whole product). */
+function useUploader(storeId: string, product: StoreProduct, onSaved: (p: StoreProduct) => void): Uploader {
+  const [busy, setBusy] = useState<{ n: number; of: number } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const upload = async (files: File[], room: number) => {
     setError(null)
     const take = files.slice(0, Math.max(room, 0))
-    if (take.length < files.length) setError(`${MAX_LIVE_PHOTOS} photos per product — only ${take.length} added.`)
-    let known = new Set(media.map((m) => m.id))
+    if (take.length < files.length) setError(`Only ${take.length} of ${files.length} added — that is the limit here.`)
+    const added: string[] = []
+    let known = new Set(product.media.map((m) => m.id))
     try {
       const config = await getMediaConfig()
       for (const [i, file] of take.entries()) {
-        setUploading({ n: i + 1, of: take.length })
+        setBusy({ n: i + 1, of: take.length })
         if (validateImageSource(file, config.image)) {
           setError(`“${file.name}” is not a photo we can use. Try a JPG or PNG.`)
           continue
@@ -310,106 +424,60 @@ function PhotoSheet({
         }
         const updated = await storeCatalogApi.addProductMedia(storeId, product.id, blob, webpName(file.name))
         onSaved(updated)
-        const added = updated.media.find((m) => m.type === 'IMAGE' && !known.has(m.id))
+        const fresh = updated.media.find((m) => m.type === 'IMAGE' && !known.has(m.id))
         known = new Set(updated.media.map((m) => m.id))
-        if (added) setPicked((list) => [...list, added.id])
+        if (fresh) added.push(fresh.id)
       }
     } catch (err) {
       setError(toApiError(err).message)
     } finally {
-      setUploading(null)
+      setBusy(null)
     }
+    return added
   }
 
+  return { busy, error, upload }
+}
+
+/** "Take or upload photos" — a tile in the sheet, a button under the photo list. */
+function UploadButton({
+  uploader,
+  room,
+  tile,
+  onUploaded,
+}: {
+  uploader: Uploader
+  room: number
+  tile: boolean
+  onUploaded?: (ids: string[]) => void
+}) {
+  const blocked = room <= 0 || uploader.busy !== null
+  const onPick = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = [...(e.target.files ?? [])]
+    e.target.value = ''
+    if (files.length === 0) return
+    const ids = await uploader.upload(files, room)
+    onUploaded?.(ids)
+  }
+  const text = uploader.busy
+    ? `Uploading ${uploader.busy.n} of ${uploader.busy.of}…`
+    : room <= 0
+      ? 'Photo limit reached'
+      : 'Take or upload photos'
   return (
-    <Dialog
-      open
-      title={`Photos of ${value}`}
-      subtitle={`${step ? `${step.n} of ${step.of} · ` : ''}Tap every photo that shows ${value}.`}
-      onClose={onClose}
-      footer={
-        <Button
-          variant="primary"
-          size="lg"
-          full
-          disabled={uploading !== null}
-          onClick={() => onDone(picked.filter((id) => media.some((m) => m.id === id)))}
-        >
-          {picked.length === 0 ? 'Done' : `Done · ${picked.length} photo${picked.length === 1 ? '' : 's'}`}
-        </Button>
-      }
+    <label
+      className={`relative flex items-center justify-center gap-1.5 border-2 border-dashed text-center font-semibold transition ${
+        tile ? 'aspect-square max-w-full flex-col rounded-xl px-1 text-sm leading-tight' : 'min-h-tap rounded-xl px-4 text-sm'
+      } ${blocked ? 'cursor-default border-line text-muted' : 'cursor-pointer border-brand/50 bg-brand-soft/40 text-brand hover:border-brand'}`}
     >
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-        <label
-          className={`relative flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-1 text-center transition ${
-            room <= 0 || uploading
-              ? 'cursor-default border-line text-muted'
-              : 'cursor-pointer border-brand/50 bg-brand-soft/40 text-brand hover:border-brand'
-          }`}
-        >
-          {uploading ? (
-            <span aria-hidden className="h-6 w-6 animate-spin rounded-full border-2 border-brand border-r-transparent" />
-          ) : (
-            <PlusIcon className="h-6 w-6" />
-          )}
-          <span className="text-sm leading-tight font-semibold">
-            {uploading
-              ? `Uploading ${uploading.n} of ${uploading.of}…`
-              : room <= 0
-                ? `${MAX_LIVE_PHOTOS} photos max`
-                : 'Take or upload photos'}
-          </span>
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            className="sr-only"
-            disabled={room <= 0 || uploading !== null}
-            onChange={(e) => void upload(e)}
-          />
-        </label>
-        {media.map((item) => {
-          const at = picked.indexOf(item.id)
-          const on = at >= 0
-          const owner = on ? null : ownerOf(item.id)
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => toggle(item.id)}
-              disabled={uploading !== null}
-              aria-pressed={on}
-              aria-label={`${on ? 'Untick' : 'Tick'} this photo${owner ? ` (now ${owner})` : ''}`}
-              className={`relative aspect-square overflow-hidden rounded-xl border-2 transition ${
-                on ? 'border-brand ring-2 ring-brand/30' : 'border-line hover:border-brand'
-              }`}
-            >
-              <MediaImg sizes="(min-width: 640px) 160px, 30vw" src={item.url} alt="" className="h-full w-full object-cover" />
-              <span
-                className={`absolute top-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 ${
-                  on ? 'border-brand bg-brand text-brand-contrast' : 'border-white bg-black/20'
-                }`}
-              >
-                {on && <CheckIcon className="h-4 w-4" />}
-              </span>
-              {(at === 0 || owner) && (
-                <span
-                  className={`absolute inset-x-0 bottom-0 truncate px-1 text-center text-xs leading-5 font-semibold ${
-                    at === 0 ? 'bg-brand text-brand-contrast' : 'bg-scrim text-white'
-                  }`}
-                >
-                  {at === 0 ? 'Button' : owner}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
-      <p className="mt-3 text-hint text-muted">
-        The first one you tick is the {value} button customers tap.
-      </p>
-      {error && <p className="mt-2 text-hint text-danger">{error}</p>}
-    </Dialog>
+      {uploader.busy ? (
+        <span aria-hidden className="h-5 w-5 animate-spin rounded-full border-2 border-brand border-r-transparent" />
+      ) : (
+        <PlusIcon className="h-5 w-5 shrink-0" />
+      )}
+      <span>{text}</span>
+      <input type="file" accept="image/*" multiple className="sr-only" disabled={blocked} onChange={(e) => void onPick(e)} />
+    </label>
   )
 }
 
@@ -439,88 +507,53 @@ export function valuesOnSale(type: OptionTypeDraft, rows: VariantDraft[]): Optio
 }
 
 /**
- * A value's photos, in order: its button (the photo on its combinations on
- * sale, when they agree) then every other photo ticked for it.
+ * A value's photos, in order: the list of its first combination on sale that
+ * has one (a size added later starts empty and takes it on save), keeping
+ * only photos the product still has.
  */
-export function valuePhotos(
+export function valueList(
   rows: VariantDraft[],
-  looks: LookMap,
   typeKey: string,
   valueKey: string,
   media: StoreProductMediaItem[],
 ): StoreProductMediaItem[] {
-  const mine = rows.filter((row) => !row.removed && row.valueKeys[typeKey] === valueKey)
-  const firstId = mine[0]?.mediaId ?? null
-  const lead =
-    firstId && mine.every((row) => row.mediaId === firstId)
-      ? (media.find((m) => m.id === firstId) ?? null)
-      : null
-  const rest = media.filter((m) => m !== lead && looks[m.id] === valueKey)
-  return lead ? [lead, ...rest] : rest
+  const row = rows.find((r) => !r.removed && r.valueKeys[typeKey] === valueKey && r.mediaIds.length > 0)
+  return (row?.mediaIds ?? []).flatMap((id) => {
+    const item = media.find((m) => m.id === id)
+    return item ? [item] : []
+  })
 }
 
 /** The first value on sale still without a photo (Continue stops there). */
 export function valueWithoutPhoto(
   type: OptionTypeDraft,
   rows: VariantDraft[],
-  looks: LookMap,
   media: StoreProductMediaItem[],
 ): OptionValueDraft | null {
-  return valuesOnSale(type, rows).find((v) => valuePhotos(rows, looks, type.key, v.key, media).length === 0) ?? null
+  return valuesOnSale(type, rows).find((v) => valueList(rows, type.key, v.key, media).length === 0) ?? null
 }
 
 /**
- * The saved looks as a draft map. Tagged photos map by option + value name;
- * a product saved before photos had looks maps each combination's own photo
- * to its value, so nothing is lost the first time it is edited.
+ * The rows as they are saved: every size of a colour carries that colour's
+ * list; "same photos" or "they look the same" clears every list; with no
+ * look choice the rows keep theirs. Deleted photos are dropped either way.
  */
-export function initialLooks(
-  product: StoreProduct,
-  types: OptionTypeDraft[],
+export function rowsWithPhotos(
   rows: VariantDraft[],
-): LookMap {
-  const looks: LookMap = {}
-  const saved: ProductOptionType[] = types.map((t) => ({ name: t.name, values: t.values.map((v) => v.value) }))
-  const type = lookOptionOf(product.media, saved)
-  const draftType = type ? types.find((t) => t.name === type.name) : undefined
-  if (type && draftType) {
-    for (const item of product.media) {
-      const value = lookOf(item, type)
-      const key = draftType.values.find((v) => v.value === value)?.key
-      if (key) looks[item.id] = key
-    }
-    return looks
-  }
-  const choice = photoChoiceFor(types)
-  if (!choice) return looks
-  for (const row of rows) {
-    const key = row.valueKeys[choice.key]
-    if (row.mediaId && key && !looks[row.mediaId]) looks[row.mediaId] = key
-  }
-  return looks
+  type: OptionTypeDraft | null,
+  mode: 'lists' | 'none',
+  media: StoreProductMediaItem[],
+): VariantDraft[] {
+  const exists = (id: string) => media.some((m) => m.id === id)
+  if (mode === 'none') return rows.map((row) => ({ ...row, mediaIds: [] }))
+  if (!type) return rows.map((row) => ({ ...row, mediaIds: row.mediaIds.filter(exists) }))
+  return rows.map((row) => {
+    const key = row.valueKeys[type.key]
+    return { ...row, mediaIds: key ? valueList(rows, type.key, key, media).map((m) => m.id) : [] }
+  })
 }
 
-/** What the options PUT saves as \`mediaLooks\` — only values still on sale. */
-export function mediaLooksFor(
-  type: OptionTypeDraft | null,
-  rows: VariantDraft[],
-  looks: LookMap,
-  media: StoreProductMediaItem[],
-  savedTypes: ProductOptionType[],
-): { mediaId: string; option: string; value: string }[] {
-  if (!type) return []
-  const saved = savedTypes.find((t) => t.name.trim().toLowerCase() === type.name.trim().toLowerCase())
-  if (!saved) return []
-  // A photo shows one look: an old product that used one photo for two
-  // colours keeps it on the first.
-  const taken = new Set<string>()
-  return valuesOnSale(type, rows).flatMap((v) => {
-    const value = saved.values.find((x) => x === v.value.trim() || x === v.value)
-    if (!value) return []
-    return valuePhotos(rows, looks, type.key, v.key, media).flatMap((m) => {
-      if (taken.has(m.id)) return []
-      taken.add(m.id)
-      return [{ mediaId: m.id, option: saved.name, value }]
-    })
-  })
+/** A saved product whose combinations have no photos of their own already uses the same photos for all. */
+export function initiallySame(rows: VariantDraft[], media: StoreProductMediaItem[]): boolean {
+  return media.length > 0 && rows.some((row) => row.id) && rows.every((row) => row.removed || row.mediaIds.length === 0)
 }

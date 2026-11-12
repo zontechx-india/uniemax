@@ -834,11 +834,12 @@ export async function getPublicProduct(
           sku: true,
           compareAtPrice: true,
           mediaId: true,
+          photos: { orderBy: { position: "asc" }, select: { mediaId: true } },
         },
       },
       media: {
         orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
-        select: { id: true, type: true, key: true, altText: true, lookOption: true, lookValue: true },
+        select: { id: true, type: true, key: true, altText: true },
       },
       // The families this product is in, with every member a shopper may
       // see — the swatch row that switches to the Blue one.
@@ -954,6 +955,11 @@ export async function getPublicProduct(
       sku: variant.sku,
       /** The gallery item that shows this variant; null = the cover. */
       mediaId: variant.mediaId,
+      /**
+       * Every photo this variant shows, in order ([0] = `mediaId`). The
+       * page shows these, then the photos no variant lists; empty = all photos.
+       */
+      mediaIds: variant.photos.map((photo) => photo.mediaId),
       stockQuantity: variant.stockQuantity,
       optionValues: variant.optionValues,
     })),
@@ -969,9 +975,6 @@ export async function getPublicProduct(
       type: item.type,
       url: mediaUrl("media", item.key),
       altText: item.altText,
-      /** The look this photo shows ("Colour" / "Pink"); null = shared. */
-      lookOption: item.lookOption,
-      lookValue: item.lookValue,
     })),
     /**
      * The product families this one belongs to ("Colour": Maroon / Blue /

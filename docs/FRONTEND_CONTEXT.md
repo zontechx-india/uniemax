@@ -1498,13 +1498,12 @@ full-bleed section bands instead.
     Interactions: pointer-anchored **hover zoom** (mouse only — `pointerType`
     guarded, images only — no "Hover to zoom" pill over the photo), **swipe**
     between items on touch, hover arrows and an `n / total` counter. The gallery is `lg:sticky` so it stays in view
-    while the long right column scrolls. **Photos per look**
-    (`features/stores/productLooks.ts` → `galleryFor`, unit-tested): with
-    tagged photos, picking Pink shows only Pink's photos (its variant photo
-    first), then the shared ones — never another colour's; it is keyed on
-    that list, so it starts at the first photo. Untagged products, no choice
-    yet, or a look with no photos of its own show every photo as before; a
-    stale tag counts as shared, so it never hides a photo.
+    while the long right column scrolls. **Photos per variant**
+    (`features/stores/productLooks.ts` → `galleryFor`, unit-tested): the
+    picked variant's `mediaIds` in order, then the photos no variant lists
+    ("all colours": size chart, fabric) — never another colour's own photos;
+    keyed on that list, so it starts at photo 1. A variant without photos of
+    its own (or none picked) shows every photo.
   - **Purchase card** — everything about buying inside one bordered card:
     category link (sentence case, muted) → name → price (MRP struck through and "N% off" in the
     success colour when the selected variant's MRP is above its price — no
@@ -2486,19 +2485,25 @@ is never shown a pickup-address item.
   first, "Does each type look different?" Yes / No; sizes and weights alone
   skip the screen): "Photo for each colour", a live **What customers see**
   swatch row that fills in as photos are picked, then one big tile per value
-  on sale ("Add photos", dashed; a "✓ 3" badge once filled; "2 of 4 done").
-  **A value may have several photos.** A tap opens "Photos of Pink", a tick
-  sheet: the product's photos (one used by another value carries its name and
-  MOVES here when ticked — a photo shows one look) plus **Take or upload
-  photos** (several files at once, each auto-ticked as it lands; "Uploading 2
-  of 3…"); the first ticked is labelled **Button** — it is the value's swatch
-  and every row's `mediaId`; the others are saved as photo looks
-  (`mediaLooks` on the options PUT, from the `LookMap` draft in
-  `PricingStep`; `initialLooks` maps a product saved before looks existed
-  from its rows' photos). "Done · 2 photos" fills it; filling an EMPTY value
-  moves straight on to the next empty one ("3 of 5"). Photos ticked for no
-  value are shared. **Required** — Continue outlines the first value without
-  one ("Add a photo for Maroon — tap its box"). On a phone the preview
+  on sale. **The product owns a photo library; each value picks ANY photos
+  from it, in order** — the marketplace model. Reuse is free (one photo can
+  show Pink and Green). Top: a **Same photos for all colours** switch (for
+  photos that show every colour together; no lists are saved and customers
+  pick by name). Then **By colour / By photo**: *By colour* is a row per value
+  ("Pink · 2 photos" / "Needs a photo") whose whole photo strip (photo 1
+  labelled **Main**) plus "+" is one button opening **Photos of Pink** — a
+  numbered tick sheet (tap in order; 1 = main; a photo other values use says
+  "Also in Blue" and stays theirs) with **Take or upload photos** (several
+  files, ticked as they land; "Uploading 2 of 3…"; max 10 per value, 20 per
+  product). Filling an EMPTY value moves straight on to the next empty one
+  ("3 of 5"). *By photo* lists every photo with a chip per value to toggle.
+  Lists live on the draft rows (`VariantDraft.mediaIds`); on save
+  `rowsWithPhotos` writes each value's list to every size of it (or clears all
+  for the switch / "they look the same"), sent as `variants[].mediaIds`.
+  `initiallySame` turns the switch on for a saved product whose combinations
+  have no photos of their own. **Required** — each value needs one photo
+  (a reused one counts) unless the switch is on; Continue outlines the first
+  value without one. On a phone the preview
   swatches are one sideways-scrolling row and the step strip drops its
   number circles under 360px. Then **Prices** — the
   `VariantMatrix` (a blank stock counts as 0, but ALL blank is refused —
@@ -3392,7 +3397,7 @@ frontend/
     │   │       ├── shippingRates.ts # Shipping-rate summaries/validation (seller editors; no charge math)
     │   │       ├── productOptions.ts # Client mirror of the server option logic + seller draft model
     │   │       ├── productGroups.ts  # Product-family draft (members, values, primary) + PUT body / validation
-    │   │       ├── productLooks.ts   # Photos per look: which photos the product page shows for the picked colour
+    │   │       ├── productLooks.ts   # Photos per variant: which photos the product page shows for the picked colour
     │   │       ├── useStores.ts  # useStores (list) + useStore (by id) hooks
     │   │       └── useManagedStore.ts # Outlet-context hook for manage sections
     │   └── pages/
@@ -3502,7 +3507,7 @@ frontend/
     │           │   │   ├── CategoryPick.tsx     # ① Main category chips → ② grouped sub-category cards
     │           │   │   ├── PhotosStep.tsx       # Media Board on the draft
     │           │   │   ├── PricingStep.tsx      # One version / choices → Choices → Photos (looks only) → Prices
-    │           │   │   ├── VariantPhotos.tsx    # Required photos per Colour value (tick sheet, multi-upload) + "look different?" question
+    │           │   │   ├── VariantPhotos.tsx    # Photos per colour: By colour / By photo, numbered tick sheet, same-for-all switch
     │           │   │   ├── choicesHelp.tsx      # Colour/weight-in-name hint, category example, ChoicesPreview
     │           │   │   ├── DetailsStep.tsx      # Description + suggested spec rows
     │           │   │   ├── DeliveryStep.tsx     # Store settings vs per-product overrides

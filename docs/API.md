@@ -1237,8 +1237,7 @@ Each:
   "variants": [ { "id", "name", "price", "compareAtPrice", "stockQuantity", "isActive", "sku",
                   "mediaId",                                  // one of media[] (IMAGE), or null = cover
                   "optionValues": { "Storage": "128 GB" }, "createdAt" } ],
-  "media":    [ { "id", "type": "IMAGE|VIDEO", "url", "altText", "displayOrder",
-                  "lookOption", "lookValue" } ],   // the look the photo shows ("Colour"/"Pink"); null = shared
+  "media":    [ { "id", "type": "IMAGE|VIDEO", "url", "altText", "displayOrder" } ],
   // Product families this one is in — the "Other products" option mode (see PUT …/groups)
   "groups":   [ { "id", "optionName": "Colour", "value": "Maroon",
                   "members": [ { "productId", "name", "slug", "imageUrl", "price", "isDraft",
@@ -1336,21 +1335,19 @@ at one revalidates to "no longer available").
   "variants": [
     { "id": "cmr…", "optionValues": { "Size": "S" },  "price": 499, "stockQuantity": 3, "isActive": true, "sku": "TEE-S", "compareAtPrice": 699, "mediaId": "cmr…" },
     { "id": "cmr…", "optionValues": { "Size": "M" },  "price": 499, "stockQuantity": 0, "isActive": false },
-    {               "optionValues": { "Size": "XL" }, "price": 549, "stockQuantity": 2 }   // new combination
-  ],
-  // optional — which look each photo shows (see below)
-  "mediaLooks": [ { "mediaId": "cmr…", "option": "Colour", "value": "Pink" } ]
+    {               "optionValues": { "Size": "XL" }, "price": 549, "stockQuantity": 2,
+                    "mediaIds": ["cmrA…", "cmrB…"] }   // new combination with 2 photos
+  ]
 }
 ```
-**Photos per look** — `mediaLooks` (optional) is the **full set** of photos
-that show one value of the product's look option (`option` must be one of
-`optionTypes`, `value` one of its values; a photo at most once — else `422`;
-every `mediaId` an image of this product — else `400`). Photos not listed
-become **shared** (shown with every look); omitting the field leaves every
-photo's look unchanged; `optionTypes: []` clears them all. The wizard sends it
-on every save with the current names, so a renamed value never orphans a
-photo. A variant's `mediaId` stays its own photo (the swatch, the cart
-thumbnail) — the wizard sets it to the look's first photo.
+**Variant photos** — `variants[].mediaIds` (optional) is the variant's
+**ordered photo list** (max 10, no repeats — else `422`; every id an image of
+this product — else `400`). The first is its **main photo** and is mirrored
+in the variant's `mediaId`. Lists may share photos (one photo can show Pink
+and Green). It wins over `mediaId`; a variant with only `mediaId` gets
+`[mediaId]`; with neither it has no photos of its own. Photos no variant lists
+are "all colours" photos. The wizard picks per colour and sends the same list
+for every size of that colour.
 Same `422` matrix rules as create; `400 "Variant "…" does not belong to this
 product"` for a foreign or stale `id`. `{ "optionTypes": [], "variants": [] }`
 turns the product **back into a simple one**: every variant is replaced by a
@@ -1891,8 +1888,7 @@ product page is where a customer picks one.
   "variants": [ { "id", "name", "price", "compareAtPrice", "sku", "stockQuantity",
                   "mediaId",                                      // the gallery item that shows this variant; null = cover
                   "optionValues": { "Size": "M" } } ],            // enabled combinations only, matrix order
-  "media": [ { "id", "type": "IMAGE|VIDEO", "url", "altText",
-               "lookOption", "lookValue" } ], // gallery, cover first; look = the colour it shows, null = shared
+  "media": [ { "id", "type": "IMAGE|VIDEO", "url", "altText" } ], // gallery, cover first
   "groups": [ { "optionName": "Colour", "value": "Maroon",         // product families this one is in
                 "members": [ { …listing shape…, "value": "Blue", "isCurrent": false } ] } ],
   "related": [ … ] }                                           // same category, max 8

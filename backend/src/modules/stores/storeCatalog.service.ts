@@ -97,6 +97,7 @@ const productSelect = {
       sku: true,
       compareAtPrice: true,
       mediaId: true,
+      photos: { orderBy: { position: "asc" }, select: { mediaId: true } },
       createdAt: true,
     },
   },
@@ -108,8 +109,6 @@ const productSelect = {
       key: true,
       altText: true,
       displayOrder: true,
-      lookOption: true,
-      lookValue: true,
     },
   },
   // The families this product is in, each with every member — the owner UI
@@ -252,9 +251,11 @@ function shapeProduct(row: ProductRow) {  const {
   } = row;
 
   const optionTypes = resolveOptionTypes(storedTypes);
-  const variants = storedVariants.map((variant) => ({
+  const variants = storedVariants.map(({ photos, ...variant }) => ({
     ...variant,
     optionValues: resolveOptionValues(variant.optionValues),
+    /** Every photo the variant shows, in order; [0] is `mediaId`. */
+    mediaIds: photos.map((photo) => photo.mediaId),
   }));
 
   const options = sortByOptionOrder(
@@ -276,8 +277,6 @@ function shapeProduct(row: ProductRow) {  const {
       url: mediaUrl("media", item.key),
       altText: item.altText,
       displayOrder: item.displayOrder,
-      lookOption: item.lookOption,
-      lookValue: item.lookValue,
     })),
     optionTypes,
     specifications: resolveSpecifications(specifications),
@@ -618,6 +617,16 @@ async function assertSkusFree(
   }
 }
 
+/** Replace a variant's photo list (order = position; [0] mirrors `mediaId`). */
+async function writeVariantPhotos(tx: Prisma.TransactionClient, variantId: string, mediaIds: string[]) {
+  await tx.storeProductVariantMedia.deleteMany({ where: { variantId } });
+  if (mediaIds.length > 0) {
+    await tx.storeProductVariantMedia.createMany({
+      data: mediaIds.map((mediaId, position) => ({ variantId, mediaId, position })),
+    });
+  }
+}
+
 /** A variant's photo must be one of its own product's images. */
 async function assertOwnImages(productId: string, mediaIds: (string | null | undefined)[]) {
   const ids = [...new Set(mediaIds.filter((id): id is string => !!id))];
@@ -948,27 +957,12 @@ export async function replaceProductOptions(
     storeId,
     input.variants.map((variant) => ({ sku: variant.sku, variantId: variant.id })),
   );
-  await assertOwnImages(id, [
-    ...input.variants.map((variant) => variant.mediaId),
-    ...(input.mediaLooks ?? []).map((look) => look.mediaId),
-  ]);
+  // A variant's photos: its list, else its single photo, else none.
+  const photosOf = (variant: (typeof input.variants)[number]) =>
+    variant.mediaIds ?? (variant.mediaId ? [variant.mediaId] : []);
+  await assertOwnImages(id, input.variants.flatMap(photosOf));
 
   await prisma.$transaction(async (tx) => {
-    // Photo looks: a simple product has none; otherwise the full set, when sent.
-    if (input.optionTypes.length === 0 || input.mediaLooks !== undefined) {
-      await tx.storeProductMedia.updateMany({
-        where: { productId: id },
-        data: { lookOption: null, lookValue: null },
-      });
-    }
-    if (input.optionTypes.length > 0) {
-      for (const look of input.mediaLooks ?? []) {
-        await tx.storeProductMedia.update({
-          where: { id: look.mediaId },
-          data: { lookOption: look.option, lookValue: look.value },
-        });
-      }
-    }
 
     if (input.optionTypes.length === 0) {
       // Back to a simple product. Keep the money honest: the cheapest price
@@ -1026,15 +1020,16 @@ export async function replaceProductOptions(
             isActive: variant.isActive,
             sku: variant.sku ?? null,
             compareAtPrice: variant.compareAtPrice ?? null,
-            mediaId: variant.mediaId ?? null,
+            mediaId: photosOf(variant)[0] ?? null,
           },
         });
+        await writeVariantPhotos(tx, variant.id!, photosOf(variant));
       }
 
-      const creations = input.variants.filter((variant) => variant.id === undefined);
-      if (creations.length > 0) {
-        await tx.storeProductVariant.createMany({
-          data: creations.map((variant) => ({
+      // One by one (not createMany): each new row's id carries its photo list.
+      for (const variant of input.variants.filter((v) => v.id === undefined)) {
+        const created = await tx.storeProductVariant.create({
+          data: {
             productId: id,
             name: variantLabel(input.optionTypes, variant.optionValues),
             optionValues: variant.optionValues as unknown as Prisma.InputJsonValue,
@@ -1044,9 +1039,11 @@ export async function replaceProductOptions(
             isDefault: false,
             sku: variant.sku ?? null,
             compareAtPrice: variant.compareAtPrice ?? null,
-            mediaId: variant.mediaId ?? null,
-          })),
+            mediaId: photosOf(variant)[0] ?? null,
+          },
+          select: { id: true },
         });
+        await writeVariantPhotos(tx, created.id, photosOf(variant));
       }
 
       await tx.storeProduct.update({
@@ -1440,6 +1437,8 @@ export async function updateVariant(
   if (patch.sku !== undefined) data.sku = patch.sku;
   if (patch.compareAtPrice !== undefined) data.compareAtPrice = patch.compareAtPrice;
   if (patch.mediaId !== undefined) data.mediaId = patch.mediaId;
+  // A single photo set here replaces the variant's list with just that photo.
+  const photoList = patch.mediaId === undefined ? null : patch.mediaId ? [patch.mediaId] : [];
 
   // The MRP rule holds for the resulting state, whichever half was patched.
   const price = patch.price ?? Number(variant.price);
@@ -1453,7 +1452,10 @@ export async function updateVariant(
   if (patch.sku) await assertSkusFree(storeId, [{ sku: patch.sku, variantId }]);
   if (patch.mediaId) await assertOwnImages(id, [patch.mediaId]);
 
-  await prisma.storeProductVariant.update({ where: { id: variantId }, data });
+  await prisma.$transaction(async (tx) => {
+    await tx.storeProductVariant.update({ where: { id: variantId }, data });
+    if (photoList) await writeVariantPhotos(tx, variantId, photoList);
+  });
   emit("catalog.variant.changed", { variantId });
   // Price / stock / isActive all move the aggregates.
   await recomputeProductAggregates(id);
@@ -1679,7 +1681,21 @@ export async function deleteProductMedia(
   });
   if (!media) throw HttpError.notFound("Media not found");
 
-  await prisma.storeProductMedia.delete({ where: { id: media.id } });
+  await prisma.$transaction(async (tx) => {
+    // The photo leaves every variant's list (cascade); a variant that lost
+    // its MAIN photo takes the next one in its list.
+    await tx.storeProductMedia.delete({ where: { id: media.id } });
+    const orphans = await tx.storeProductVariant.findMany({
+      where: { productId, mediaId: null, photos: { some: {} } },
+      select: { id: true, photos: { orderBy: { position: "asc" }, take: 1, select: { mediaId: true } } },
+    });
+    for (const variant of orphans) {
+      await tx.storeProductVariant.update({
+        where: { id: variant.id },
+        data: { mediaId: variant.photos[0]!.mediaId },
+      });
+    }
+  });
   await storage.remove("media", media.key).catch(() => {});
 
   return productWithMedia(productId);

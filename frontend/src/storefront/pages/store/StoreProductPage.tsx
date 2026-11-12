@@ -218,7 +218,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
   const price = variant ? variant.price : (product.price ?? '0')
   const compareAt = variant ? variant.compareAtPrice : product.compareAtPrice
   const sku = variant ? variant.sku : product.sku
-  const gallery = galleryFor(product.media, product.optionTypes, selection, variant?.mediaId ?? null)
+  const gallery = galleryFor(product.media, product.variants, variant)
   // The variant's own photo leads (the pink saree shows pink); else the cover.
   const variantImage = variant?.mediaId
     ? (product.media.find((item) => item.id === variant.mediaId)?.url ?? null)
@@ -286,7 +286,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
       <div className="grid items-start gap-8 lg:grid-cols-2 lg:gap-14">
         {/* The gallery stays put while the long right column scrolls. */}
         <div className="min-w-0 lg:sticky lg:top-[5.5rem]">
-          {/* Pink chosen → Pink's photos, then the shared ones (keyed so it starts at the first). */}
+          {/* Pink chosen → Pink's photos, then the "all colours" ones (keyed so it starts at the first). */}
           <MediaGallery
             key={gallery.map((item) => item.id).join('|')}
             product={product}

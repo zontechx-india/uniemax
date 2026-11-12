@@ -244,7 +244,7 @@ export function createInProcessHost(prisma: PrismaClient): DropshipHost {
           store: { select: { shipping: true } },
           media: {
             orderBy: { displayOrder: "asc" },
-            select: { id: true, key: true, type: true, altText: true, displayOrder: true, lookOption: true, lookValue: true },
+            select: { id: true, key: true, type: true, altText: true, displayOrder: true },
           },
           variants: {
             orderBy: { createdAt: "asc" },
@@ -259,6 +259,7 @@ export function createInProcessHost(prisma: PrismaClient): DropshipHost {
               optionValues: true,
               sku: true,
               mediaId: true,
+              photos: { orderBy: { position: "asc" }, select: { mediaId: true } },
             },
           },
         },
@@ -294,6 +295,7 @@ export function createInProcessHost(prisma: PrismaClient): DropshipHost {
           optionValues: (v.optionValues as Record<string, string> | null) ?? null,
           sku: v.sku,
           mediaId: v.mediaId,
+          mediaIds: v.photos.map((photo) => photo.mediaId),
         })),
       }));
     },
@@ -390,6 +392,13 @@ export function createInProcessHost(prisma: PrismaClient): DropshipHost {
           },
           select: { id: true },
         });
+        // The copy's variant shows the same photos, in the same order.
+        const list = [...new Set((v.mediaIndexes ?? []).flatMap((i) => (mediaIds[i] ? [mediaIds[i]!] : [])))];
+        if (list.length > 0) {
+          await tx.storeProductVariantMedia.createMany({
+            data: list.map((mediaId, position) => ({ variantId: row.id, mediaId, position })),
+          });
+        }
         variantIds.push(row.id);
       }
       await recomputeProductAggregates(product.id, tx);

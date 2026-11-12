@@ -34,12 +34,11 @@ import { PlatformFeeNote } from './PlatformFeeNote'
 import {
   LooksQuestion,
   VariantPhotos,
-  initialLooks,
-  mediaLooksFor,
+  initiallySame,
   photoChoiceFor,
+  rowsWithPhotos,
   valueWithoutPhoto,
 } from './VariantPhotos'
-import type { LookMap } from './VariantPhotos'
 import { ChoicesPreview, exampleChoice, listWords } from './choicesHelp'
 import { Field, ChoiceCard, Hint, inputClass, StepButtons, StepError, StepShell } from './shared'
 import type { StepKey, VersionPlan } from './shared'
@@ -60,8 +59,9 @@ type PendingDrop = Draft & { groups: GroupDraft[]; order: string[]; dropped: Var
  *
  * With typed options the step is up to THREE screens inside one component
  * (so no state is lost between them): **pick the choices** (Size: S, M, L),
- * then — only when a choice changes how it looks (Colour) — **a photo for
- * each look** (required; `VariantPhotos`), then **price and stock for each**. One long page with presets, options, a
+ * then — only when a choice changes how it looks (Colour) — **photos for
+ * each look** (any photo, any colour, in order; required unless "same photos
+ * for all"; `VariantPhotos`), then **price and stock for each**. One long page with presets, options, a
  * combinations grid and bulk tools was where sellers gave up.
  *
  * Nothing is written until Continue. Typed options go through the options
@@ -143,15 +143,18 @@ export function PricingStep({
   /** "Does each Type look different?" — for a choice whose name does not say. */
   const [looks, setLooks] = useState<{ key: string; yes: boolean } | null>(() => {
     const choice = photoChoiceFor(initial.d.types)
-    return choice?.ask && initial.d.rows.some((row) => row.mediaId)
+    return choice?.ask && initial.d.rows.some((row) => row.mediaIds.length > 0)
       ? { key: choice.key, yes: true }
       : null
   })
   /** The value Continue stopped at on the Photos screen. */
   const [missingPhoto, setMissingPhoto] = useState<string | null>(null)
-  /** Which value each photo shows (mediaId → value key); saved as `mediaLooks`. */
-  const [photoLooks, setPhotoLooks] = useState<LookMap>(() =>
-    initialLooks(product, initial.d.types, initial.d.rows),
+  /** "Same photos for all colours" — no lists; every photo shows with every colour. */
+  const [samePhotos, setSamePhotos] = useState(() =>
+    initiallySame(
+      initial.d.rows,
+      product.media.filter((m) => m.type === 'IMAGE'),
+    ),
   )
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -301,14 +304,18 @@ export function PricingStep({
   const persist = async (d: Draft, g: GroupDraft[]): Promise<StoreProduct> => {
     let saved: StoreProduct
     if (d.types.length > 0) {
-      const result = draftToInput(d.types, d.rows)
+      // Every size of a colour carries that colour's photos; "same photos"
+      // or "they look the same" clears the lists.
+      const lookType = d.types.find((t) => t.key === photoType?.key) ?? null
+      const rows = rowsWithPhotos(
+        d.rows,
+        needsPhotos ? lookType : null,
+        (needsPhotos && samePhotos) || (photoType !== null && !needsPhotos) ? 'none' : 'lists',
+        images,
+      )
+      const result = draftToInput(d.types, rows)
       if ('error' in result) throw new Error(result.error)
-      const lookType = needsPhotos ? (d.types.find((t) => t.key === photoType?.key) ?? null) : null
-      saved = await storeCatalogApi.replaceProductOptions(storeId, product.id, {
-        ...result.input,
-        // The full set every time — names are current, so a rename can't orphan a photo.
-        mediaLooks: mediaLooksFor(lookType, d.rows, photoLooks, images, result.input.optionTypes),
-      })
+      saved = await storeCatalogApi.replaceProductOptions(storeId, product.id, result.input)
     } else {
       const fields = readSingleFields()
       if ('error' in fields) throw new Error(fields.error)
@@ -429,7 +436,7 @@ export function PricingStep({
       return setError(`Tap Yes or No first — does each ${photoType?.name.trim().toLowerCase()} look different?`)
     }
     if (needsPhotos && photoType) {
-      const missing = valueWithoutPhoto(photoType, draft.rows, photoLooks, images)
+      const missing = samePhotos ? null : valueWithoutPhoto(photoType, draft.rows, images)
       if (missing) {
         setMissingPhoto(missing.key)
         return setError(`Add a photo for ${missing.value} — tap its box.`)
@@ -526,14 +533,14 @@ export function PricingStep({
           ? 'Price for each choice'
           : mode === 'options' && part === 'photos' && photoType
             ? needsPhotos
-              ? `Photo for each ${photoType.name.trim().toLowerCase()}`
+              ? `Photos for each ${photoType.name.trim().toLowerCase()}`
               : 'Photos'
             : 'Price'
       }
       lead={
         mode === 'options' && part === 'photos' && photoType
           ? needsPhotos
-            ? `Customers tap these photos to pick a ${photoType.name.trim().toLowerCase()}.`
+            ? `Customers tap a ${photoType.name.trim().toLowerCase()} and see its photos.`
             : 'One question, then the prices.'
           : mode === 'options' && part === 'prices'
           ? supplyOnly
@@ -681,10 +688,14 @@ export function PricingStep({
               product={product}
               type={photoType}
               rows={draft.rows}
-              looks={photoLooks}
-              onChange={({ rows, looks }) => {
+              onRowsChange={(rows) => {
                 setDraft({ ...draft, rows })
-                setPhotoLooks(looks)
+                setError(null)
+              }}
+              same={samePhotos}
+              onSameChange={(same) => {
+                setSamePhotos(same)
+                setMissingPhoto(null)
                 setError(null)
               }}
               onSaved={onSaved}
