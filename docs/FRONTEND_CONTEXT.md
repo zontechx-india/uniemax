@@ -2481,17 +2481,28 @@ is never shown a pickup-address item.
   skip the screen): "Photo for each colour", a live **What customers see**
   swatch row that fills in as photos are picked, then one big tile per value
   on sale ("Add photo", dashed; "2 of 4 done"). A tap opens "Photo for Pink":
-  the product's photos plus **Take or upload a photo** (uploads straight
-  onto the product, then is picked). The photo is set on every row with that
-  value. **Required** — Continue outlines the first value without one ("Add a
-  photo for Maroon — tap its box"); two values on one photo get a soft
-  warning. Then **Prices** — the
+  the product's photos (each one already used is labelled with its colour)
+  plus **Take or upload a photo** (uploads straight onto the product, then is
+  picked). Filling an EMPTY value moves the sheet straight on to the next
+  empty one ("Photo for Maroon · 4 of 5"); changing a filled one just closes.
+  The photo is set on every row with that value. **Required** — Continue
+  outlines the first value without one ("Add a photo for Maroon — tap its
+  box"); two values on one photo get a soft warning. On a phone the preview
+  swatches are one sideways-scrolling row and the step strip drops its
+  number circles under 360px. Then **Prices** — the
   `VariantMatrix` (a blank stock counts as 0, but ALL blank is refused —
   `draftToInput` asks for counts and points at "Same stock for all"), whose
   bulk tools ("Same price for all…", MRP, stock,
-  Turn all on) live in ONE sheet; a row only SHOWS its photo (read-only
-  thumbnail, hidden when no row has one). It replaced a photo box on every
-  price card, pre-filled with the cover, that sellers did not know to tap.
+  Turn all on) live in ONE sheet. From `sm` it is a table whose rows only
+  SHOW their photo (read-only, column hidden when no row has one). **On a
+  phone** rows are grouped by the look (a "Pink · 3 sizes" header with its
+  photo, then S / M / L), each row only **Price** and **Stock** (44px) and a
+  bordered "⋯" that opens a sheet with MRP, code, the Selling / Paused
+  switch and "Don't sell this" (an MRP or "Paused" shows as a note under the
+  row's name). One card per combination with all six controls made 5
+  colours × 3 sizes ten screens long; this is about a third. It replaced a
+  photo box on every price card, pre-filled with the cover, that sellers did
+  not know to tap.
   Saved as one `PUT …/options`; dropped saved choices confirmed
   first. In the editor a choice is "Choice 1: Size" with "Size options" as
   chips (`ChipInput`: 36px chips, a visible **Add** button while typing,
@@ -3487,7 +3498,7 @@ frontend/
     │           │   ├── OptionTypesEditor.tsx # ≤3 choices (chips); linked products (a family) behind "More ways"
     │           │   ├── GroupMemberPicker.tsx # Tick the store's products as a family's members
     │           │   ├── CreateMemberDialog.tsx # "Create new product for this value" — draft twin
-    │           │   ├── VariantMatrix.tsx     # Price per choice: cards (phone) / table; bulk tools as a sheet; photos read-only
+    │           │   ├── VariantMatrix.tsx     # Price per choice: grouped Price+Stock rows with a ⋯ sheet (phone) / table; bulk sheet
     │           │   └── SpecificationsEditor.tsx # Ordered label/value rows
     │           ├── ui/                  # Seller UI kit (glass) — GlassCard, PageHeader,
     │           │                        #   SaveBar + useUnsavedChangesGuard, ActionRow,

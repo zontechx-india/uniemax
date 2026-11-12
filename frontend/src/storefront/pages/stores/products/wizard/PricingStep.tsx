@@ -532,18 +532,20 @@ export function PricingStep({
             <li
               key={p}
               aria-current={part === p ? 'step' : undefined}
-              className={`flex flex-1 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${
+              className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-sm font-semibold sm:justify-start sm:gap-2 sm:px-3 ${
                 part === p ? 'bg-brand-soft text-brand' : 'bg-fg/5 text-muted'
               }`}
             >
               <span
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold max-[359px]:hidden ${
                   part === p ? 'bg-brand text-brand-contrast' : 'glass-inset'
                 }`}
               >
                 {i + 1}
               </span>
-              {p === 'choices' ? 'Choices' : p === 'photos' ? 'Photos' : 'Prices'}
+              <span className="truncate">
+                {p === 'choices' ? 'Choices' : p === 'photos' ? 'Photos' : 'Prices'}
+              </span>
             </li>
           ))}
         </ol>

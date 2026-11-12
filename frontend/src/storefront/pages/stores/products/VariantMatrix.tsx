@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Dialog } from '../../../../shared/ui/Dialog'
-import { buttonClass } from '../../../../shared/ui/Button'
+import { Button, buttonClass } from '../../../../shared/ui/Button'
 import { BigSwitch } from '../ui/BigSwitch'
 import {
   OPTION_LIMITS,
@@ -15,7 +15,8 @@ import type {
 } from '../../../features/stores/productOptions'
 import type { StoreProductMediaItem } from '../../../features/stores/storesApi'
 import { ActiveSwitch } from '../ActiveSwitch'
-import { SlidersIcon, TrashIcon } from '../../../layout/icons'
+import { DotsIcon, SlidersIcon, TrashIcon } from '../../../layout/icons'
+import { photoChoiceFor } from './wizard/VariantPhotos'
 import { MediaImg } from '../../../../shared/media/MediaImg'
 
 /**
@@ -37,8 +38,11 @@ import { MediaImg } from '../../../../shared/media/MediaImg'
  * rather than a panel above the list, where four bulk fields and two
  * selects pushed the actual prices a screen down on a phone.
  *
- * Phone cards: 44px fields, a labelled Selling / Not selling switch, and a
- * worded "Don't sell this" — not a bare bin beside the switch.
+ * On a phone the rows are GROUPED by the look (a "Pink" header with its
+ * photo, then S, M, L under it) and each row has only the two fields every
+ * seller fills — price and stock, 44px — plus a "⋯" that opens a sheet with
+ * MRP, code, the Selling switch and "Don't sell this". A card per
+ * combination with all six controls made 5 colours × 3 sizes ten screens long.
  */
 export function VariantMatrix({
   types,
@@ -266,101 +270,16 @@ export function VariantMatrix({
         </table>
       </div>
 
-      {/* Mobile: cards */}
-      <ul className="space-y-3 sm:hidden">
-        {rows.map((row, index) =>
-          row.removed ? null : (
-            <li
-              key={Object.values(row.valueKeys).join('|')}
-              className={`rounded-2xl border border-line bg-surface/80 p-3.5 ${
-                row.isActive ? '' : 'opacity-75'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                {withPhotos && <RowPhoto url={photoOf(row)?.url ?? null} />}
-                <p className="min-w-0 flex-1 text-base leading-snug font-bold break-words text-fg">
-                  {draftLabel(types, row)}
-                </p>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2.5">
-                <label className="block">
-                  <span className="mb-1 block text-hint font-semibold text-fg">
-                    Price (₹)
-                  </span>
-                  <input
-                    value={row.price}
-                    onChange={(e) => patchRow(index, { price: cleanAmount(e.target.value) })}
-                    inputMode="decimal"
-                    placeholder="Required"
-                    disabled={disabled}
-                    className={`${inputClass} ${
-                      row.price.trim() === '' ? 'border-danger/60' : ''
-                    }`}
-                  />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-hint font-semibold text-fg">
-                    MRP (₹) <span className="font-normal text-muted">optional</span>
-                  </span>
-                  <input
-                    value={row.compareAt}
-                    onChange={(e) => patchRow(index, { compareAt: cleanAmount(e.target.value) })}
-                    inputMode="decimal"
-                    placeholder="Optional"
-                    disabled={disabled}
-                    className={inputClass}
-                  />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-hint font-semibold text-fg">
-                    How many you have
-                  </span>
-                  <input
-                    value={row.stock}
-                    onChange={(e) => patchRow(index, { stock: cleanCount(e.target.value) })}
-                    inputMode="numeric"
-                    placeholder="0"
-                    disabled={disabled}
-                    className={inputClass}
-                  />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-hint font-semibold text-fg">
-                    Code <span className="font-normal text-muted">optional</span>
-                  </span>
-                  <input
-                    value={row.sku}
-                    onChange={(e) => patchRow(index, { sku: e.target.value })}
-                    maxLength={64}
-                    placeholder="Optional"
-                    disabled={disabled}
-                    className={inputClass}
-                  />
-                </label>
-              </div>
-              <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-2">
-                <BigSwitch
-                  checked={row.isActive}
-                  disabled={disabled}
-                  label={`Sell ${draftLabel(types, row)}`}
-                  onText="Selling"
-                  offText="Paused"
-                  onChange={(next) => patchRow(index, { isActive: next })}
-                />
-                <button
-                  type="button"
-                  onClick={() => patchRow(index, { removed: true })}
-                  disabled={disabled || offered.length === 1}
-                  className="inline-flex min-h-tap items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-muted transition hover:bg-danger/10 hover:text-danger disabled:opacity-40"
-                >
-                  <TrashIcon className="h-4 w-4" />
-                  Don’t sell this
-                </button>
-              </div>
-            </li>
-          ),
-        )}
-      </ul>
+      {/* Phone: grouped by the look (Pink → S, M, L), two fields a row. */}
+      <PhoneList
+        types={types}
+        rows={rows}
+        photoOf={photoOf}
+        patchRow={patchRow}
+        canRemove={offered.length > 1}
+        disabled={disabled}
+        inputClass={inputClass}
+      />
 
       {/* Combinations the seller does not offer — one click brings any back. */}
       {removed.length > 0 && (
@@ -465,5 +384,208 @@ function BulkField({
         </button>
       </div>
     </label>
+  )
+}
+
+/**
+ * The phone list. Grouped by the look-changing choice (else the first one)
+ * when there are two or more choices; one choice is one plain group.
+ */
+function PhoneList({
+  types,
+  rows,
+  photoOf,
+  patchRow,
+  canRemove,
+  disabled,
+  inputClass,
+}: {
+  types: OptionTypeDraft[]
+  rows: VariantDraft[]
+  photoOf: (row: VariantDraft) => StoreProductMediaItem | null
+  patchRow: (index: number, patch: Partial<VariantDraft>) => void
+  canRemove: boolean
+  disabled: boolean
+  inputClass: string
+}) {
+  const [moreIndex, setMoreIndex] = useState<number | null>(null)
+  const byType =
+    types.length >= 2
+      ? (types.find((t) => t.key === photoChoiceFor(types)?.key) ?? types[0]!)
+      : null
+  const rest = types.filter((t) => t !== byType)
+  const valueOf = (row: VariantDraft, type: OptionTypeDraft) =>
+    type.values.find((v) => v.key === row.valueKeys[type.key])?.value ?? '—'
+  const indexed = rows.map((row, index) => ({ row, index })).filter(({ row }) => !row.removed)
+  const groups = byType
+    ? byType.values
+        .map((value) => ({
+          key: value.key,
+          title: value.value,
+          items: indexed.filter(({ row }) => row.valueKeys[byType.key] === value.key),
+        }))
+        .filter((g) => g.items.length > 0)
+    : [{ key: 'all', title: '', items: indexed }]
+  const more = moreIndex !== null ? (rows[moreIndex] ?? null) : null
+  const moreLabel = more ? draftLabel(types, more) : ''
+  const restName = rest[0]?.name.trim().toLowerCase() || 'choice'
+  // Price | Stock | ⋯ — fixed widths so every row lines up under the headings.
+  const cols =
+    'grid grid-cols-[minmax(0,1fr)_5rem_3.5rem_2.75rem] gap-1.5 min-[360px]:grid-cols-[minmax(0,1fr)_5.5rem_3.75rem_2.75rem]'
+
+  return (
+    <div className="space-y-3 sm:hidden">
+      {groups.map((group) => {
+        const photo = photoOf(group.items[0]!.row)
+        return (
+          <section
+            key={group.key}
+            aria-label={group.title || 'Choices'}
+            className="rounded-2xl border border-line bg-surface/80"
+          >
+            {group.title && (
+              <header className="flex items-center gap-3 border-b border-line px-3 py-2.5">
+                {photo && (
+                  <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-surface-alt">
+                    <MediaImg sizes="40px" src={photo.url} alt="" className="h-full w-full object-cover" />
+                  </span>
+                )}
+                <h3 className="min-w-0 flex-1 text-base font-bold break-words text-fg">{group.title}</h3>
+                <span className="shrink-0 text-hint text-muted">
+                  {group.items.length} {restName}
+                  {group.items.length === 1 ? '' : 's'}
+                </span>
+              </header>
+            )}
+            <div aria-hidden className={`${cols} px-3 pt-2 text-xs font-semibold text-muted`}>
+              <span />
+              <span>Price (₹)</span>
+              <span>Stock</span>
+              <span />
+            </div>
+            <ul className="divide-y divide-line">
+              {group.items.map(({ row, index }) => {
+                const label = byType
+                  ? rest.map((t) => valueOf(row, t)).join(' / ')
+                  : draftLabel(types, row)
+                const full = draftLabel(types, row)
+                const notes = [
+                  row.compareAt.trim() ? `MRP ₹${row.compareAt.trim()}` : '',
+                  row.isActive ? '' : 'Paused',
+                ].filter(Boolean)
+                return (
+                  <li
+                    key={Object.values(row.valueKeys).join('|')}
+                    className={`${cols} items-center px-3 py-2 ${row.isActive ? '' : 'opacity-60'}`}
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-base font-semibold break-words text-fg max-[359px]:text-sm">{label}</span>
+                      {notes.length > 0 && (
+                        <span className="block text-xs text-muted">{notes.join(' · ')}</span>
+                      )}
+                    </span>
+                    <input
+                      value={row.price}
+                      onChange={(e) => patchRow(index, { price: cleanAmount(e.target.value) })}
+                      inputMode="decimal"
+                      placeholder="₹"
+                      disabled={disabled}
+                      aria-label={`Price for ${full}`}
+                      className={`${inputClass} px-2 ${row.price.trim() === '' ? 'border-danger/60' : ''}`}
+                    />
+                    <input
+                      value={row.stock}
+                      onChange={(e) => patchRow(index, { stock: cleanCount(e.target.value) })}
+                      inputMode="numeric"
+                      placeholder="0"
+                      disabled={disabled}
+                      aria-label={`Stock for ${full}`}
+                      className={`${inputClass} px-2`}
+                    />
+                    <Button
+                      variant="secondary"
+                      size="md"
+                      onClick={() => setMoreIndex(index)}
+                      disabled={disabled}
+                      aria-label={`More for ${full}: MRP, code, pause or remove`}
+                      className="w-11 px-0!"
+                    >
+                      <DotsIcon className="h-5 w-5" />
+                    </Button>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        )
+      })}
+
+      <Dialog
+        open={more !== null}
+        title={moreLabel}
+        subtitle="Optional details for this one."
+        onClose={() => setMoreIndex(null)}
+        footer={
+          <Button variant="primary" size="md" full onClick={() => setMoreIndex(null)}>
+            Done
+          </Button>
+        }
+      >
+        {more && moreIndex !== null && (
+          <div className="space-y-4">
+            <label className="block">
+              <span className="mb-1 block text-sm font-semibold text-fg">
+                MRP (₹) <span className="font-normal text-muted">optional</span>
+              </span>
+              <input
+                value={more.compareAt}
+                onChange={(e) => patchRow(moreIndex, { compareAt: cleanAmount(e.target.value) })}
+                inputMode="decimal"
+                placeholder="The price printed on the pack"
+                disabled={disabled}
+                className={inputClass}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-semibold text-fg">
+                Code <span className="font-normal text-muted">optional</span>
+              </span>
+              <input
+                value={more.sku}
+                onChange={(e) => patchRow(moreIndex, { sku: e.target.value })}
+                maxLength={64}
+                placeholder="Only if you use your own codes"
+                disabled={disabled}
+                className={inputClass}
+              />
+            </label>
+            <div className="flex items-center justify-between gap-2 border-t border-line pt-3">
+              <BigSwitch
+                checked={more.isActive}
+                disabled={disabled}
+                label={`Sell ${moreLabel}`}
+                onText="Selling"
+                offText="Paused"
+                onChange={(next) => patchRow(moreIndex, { isActive: next })}
+              />
+              <Button
+                variant="ghost"
+                size="md"
+                disabled={disabled || !canRemove}
+                onClick={() => {
+                  patchRow(moreIndex, { removed: true })
+                  setMoreIndex(null)
+                }}
+              >
+                <span className="inline-flex items-center gap-1.5 text-danger">
+                  <TrashIcon className="h-4 w-4" />
+                  Don’t sell this
+                </span>
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
+    </div>
   )
 }

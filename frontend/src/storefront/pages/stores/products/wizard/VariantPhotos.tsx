@@ -89,11 +89,11 @@ export function VariantPhotos({
         <p className="mt-0.5 text-sm text-muted">
           {label}: <span className="font-semibold text-fg">{firstWithPhoto?.value}</span>
         </p>
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
           {values.map((v) => {
             const photo = photoOf(v.key)
             return (
-              <span key={v.key} className="flex w-12 flex-col items-center gap-1">
+              <span key={v.key} className="flex w-12 shrink-0 flex-col items-center gap-1">
                 <span
                   className={`flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg ${
                     photo
@@ -115,7 +115,7 @@ export function VariantPhotos({
       </figure>
 
       <div>
-        <div className="flex items-baseline justify-between gap-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
           <p className="text-base font-semibold text-fg">Tap each {label.toLowerCase()} to add its photo</p>
           <p className={`shrink-0 text-sm font-semibold ${done === values.length ? 'text-success' : 'text-muted'}`}>
             {done} of {values.length} done
@@ -169,14 +169,28 @@ export function VariantPhotos({
 
       {open && (
         <PhotoSheet
+          key={open.key}
           storeId={storeId}
           product={product}
           media={media}
           title={`Photo for ${open.value}`}
+          step={
+            photoOf(open.key) ? null : { n: done + 1, of: values.length }
+          }
           selectedId={photoOf(open.key)?.id ?? null}
+          usedBy={(mediaId) =>
+            values
+              .filter((v) => v.key !== open.key && photoOf(v.key)?.id === mediaId)
+              .map((v) => v.value)
+          }
           onPick={(mediaId) => {
+            const wasEmpty = photoOf(open.key) === null
             setPhoto(open.key, mediaId)
-            setOpenKey(null)
+            // Filling in: carry on with the next colour still empty.
+            const next = wasEmpty
+              ? values.find((v) => v.key !== open.key && photoOf(v.key) === null)
+              : undefined
+            setOpenKey(next?.key ?? null)
           }}
           onSaved={onSaved}
           onClose={() => setOpenKey(null)}
@@ -225,7 +239,9 @@ function PhotoSheet({
   product,
   media,
   title,
+  step,
   selectedId,
+  usedBy,
   onPick,
   onSaved,
   onClose,
@@ -234,7 +250,11 @@ function PhotoSheet({
   product: StoreProduct
   media: StoreProductMediaItem[]
   title: string
+  /** "2 of 5" while filling in empty colours one after another. */
+  step: { n: number; of: number } | null
   selectedId: string | null
+  /** The other colours already showing a photo. */
+  usedBy: (mediaId: string) => string[]
   onPick: (mediaId: string) => void
   onSaved: (product: StoreProduct) => void
   onClose: () => void
@@ -273,7 +293,12 @@ function PhotoSheet({
   }
 
   return (
-    <Dialog open title={title} subtitle="Pick the photo that shows it." onClose={onClose}>
+    <Dialog
+      open
+      title={title}
+      subtitle={step ? `${step.n} of ${step.of} · Tap the photo that shows it.` : 'Tap the photo that shows it.'}
+      onClose={onClose}
+    >
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
         <label
           className={`relative flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-1 text-center transition ${
@@ -300,6 +325,7 @@ function PhotoSheet({
         </label>
         {media.map((item) => {
           const on = item.id === selectedId
+          const others = usedBy(item.id)
           return (
             <button
               key={item.id}
@@ -315,6 +341,11 @@ function PhotoSheet({
               {on && (
                 <span className="absolute top-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-brand text-brand-contrast">
                   <CheckIcon className="h-4 w-4" />
+                </span>
+              )}
+              {others.length > 0 && (
+                <span className="absolute inset-x-0 bottom-0 truncate bg-scrim px-1 text-center text-xs leading-5 font-semibold text-white">
+                  {others.join(', ')}
                 </span>
               )}
             </button>
