@@ -69,7 +69,7 @@ function Overview() {
     <div className="space-y-4 p-4 sm:p-5">
       <PhoneHealth overview={data} />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="stats">
         <StatTile label="Sent · 30 days" value={formatCount(m.sent)} hint={`${formatCount(m.fromAutomations)} by automations`} />
         <StatTile label="Delivered" value={pct(m.delivered, m.sent)} hint={`${formatCount(m.delivered)} messages`} />
         <StatTile label="Read" value={pct(m.read, m.sent)} hint={`${formatCount(m.read)} messages`} />

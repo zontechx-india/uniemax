@@ -2,22 +2,15 @@ import { useState } from 'react'
 import { adminAuth } from '../../shared/auth/authApi'
 import type { Admin } from '../../shared/auth/authApi'
 import { AppLogoLockup } from '../../shared/ui/AppLogo'
-import {
-  AuthLayout,
-  Hero,
-  AuthCard,
-  Brand,
-  TextField,
-  PrimaryButton,
-  ErrorNote,
-  MailIcon,
-  LockIcon,
-  EyeIcon,
-} from '../../shared/ui/form'
+import { Icon } from '../layout/icons'
+import { Button, PasswordInput, TextInput } from '../ui/primitives'
 
 /**
  * Admin login — email + password against the real backend
  * (POST /api/v1/admin/auth/web/login → httpOnly cookie session).
+ *
+ * The console theme's login screen (ADMIN_UI_THEME.md §7.15): one 380px
+ * card in the middle of the page — brand, title, two fields, one button.
  *
  * No self-service reset by design: admin accounts are provisioned/reset via
  * `npm run create-admin` on the backend.
@@ -25,7 +18,6 @@ import {
 export function LoginPage({ onSignedIn }: { onSignedIn: (admin: Admin) => void }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -44,86 +36,55 @@ export function LoginPage({ onSignedIn }: { onSignedIn: (admin: Admin) => void }
   }
 
   return (
-    <AuthLayout
-      hero={<AdminHero />}
-      footer={
-        <p className="text-xs text-muted">
-          Authorized UnieMax staff only · uniemax.com
-        </p>
-      }
-    >
-      <Brand
-        badge={<AppLogoLockup className="h-11" />}
-        badgeClass=""
-        title="Admin Console"
-        subtitle="Sign in to the UnieMax platform console"
-      />
+    <div className="login">
+      <form className="login-card" onSubmit={signIn}>
+        <div className="brandmark">
+          <AppLogoLockup className="-mr-6 h-7" />
+          <b>Admin</b>
+        </div>
+        <h1>Sign in</h1>
+        <p className="muted">Use your UnieMax admin account.</p>
 
-      <AuthCard>
-        <form className="space-y-4" onSubmit={signIn}>
-          <TextField
-            label="Email"
-            type="email"
-            placeholder="you@example.com"
-            autoComplete="username"
-            icon={<MailIcon />}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoFocus
-          />
-          <TextField
-            label="Password"
-            type={showPassword ? 'text' : 'password'}
-            autoComplete="current-password"
-            placeholder="••••••••"
-            icon={<LockIcon />}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            trailing={
-              <button
-                type="button"
-                onClick={() => setShowPassword((s) => !s)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-muted transition hover:bg-surface-alt hover:text-fg"
-              >
-                <EyeIcon off={showPassword} />
-              </button>
-            }
-          />
-          {error && <ErrorNote>{error}</ErrorNote>}
-          <PrimaryButton type="submit" disabled={busy || !email.trim() || !password}>
-            {busy ? 'Signing in…' : 'Sign in'}
-          </PrimaryButton>
-          <p className="text-center text-xs text-muted">
-            Locked out? Ask a UnieMax super admin to reset your account.
-          </p>
-        </form>
-      </AuthCard>
-    </AuthLayout>
-  )
-}
+        <TextInput
+          label="Email"
+          type="email"
+          placeholder="you@example.com"
+          autoComplete="username"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="mb-3"
+          autoFocus
+        />
+        <PasswordInput
+          label="Password"
+          autoComplete="current-password"
+          placeholder="••••••••"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="mb-3"
+        />
 
-/** Left marketing pane (lg+ only). */
-function AdminHero() {
-  return (
-    <Hero
-      image="/auth_hero_1.jpg"
-      logo={
-        <>
-          <AppLogoLockup tone="on-dark" className="h-8" /> Admin
-        </>
-      }
-    >
-      <div>
-        <h2 className="text-4xl font-bold leading-tight font-heading">
-          Run your store
-          <br />
-          <span className="text-brand-gradient-on-dark">from one place.</span>
-        </h2>
-        <p className="mt-3 max-w-sm text-white/80">
-          Products, orders, inventory, and shipping — all in one console.
-        </p>
-      </div>
-    </Hero>
+        {error ? (
+          <div className="callout c-danger" role="alert">
+            <Icon name="alertCircle" size={15} />
+            <span className="min-w-0 flex-1">{error}</span>
+          </div>
+        ) : null}
+
+        <Button
+          type="submit"
+          variant="primary"
+          size="md"
+          className="mt-1 w-full"
+          loading={busy}
+          disabled={!email.trim() || !password}
+        >
+          {busy ? 'Signing in…' : 'Sign in'}
+        </Button>
+      </form>
+      <p className="login-foot">
+        Authorized UnieMax staff only. Locked out? Ask a super admin to reset your account.
+      </p>
+    </div>
   )
 }

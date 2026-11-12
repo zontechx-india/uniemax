@@ -208,7 +208,7 @@ export default function WhatsAppNewCampaignPage() {
     <div className="mx-auto max-w-4xl">
       <Link
         to="/whatsapp/campaigns"
-        className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-fg"
+        className="ph-back"
       >
         <BackIcon />
         Campaigns

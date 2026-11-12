@@ -176,19 +176,19 @@ export default function NotificationsPage() {
         </div>
 
         <Card className="lg:col-span-2" padding="none">
-          <div className="p-4 sm:p-5">
             <CardHeader
               title="Your notifications"
               action={
                 <button
                   type="button"
                   onClick={() => void api.markAllRead().then(feed.refresh)}
-                  className="text-sm text-accent hover:underline"
+                  className="lnk sm"
                 >
                   Mark all read
                 </button>
               }
             />
+          <div className="card-b">
             {feed.loading && !feed.data ? (
               <Skeleton rows={6} />
             ) : feed.data && feed.data.items.length > 0 ? (

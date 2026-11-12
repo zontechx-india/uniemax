@@ -389,7 +389,7 @@ function VariantsTable({ product }: { product: ProductDetail }) {
 
   return (
     <div className="overflow-x-auto rounded-md border border-line">
-      <table className="w-full text-sm">
+      <table className="tbl w-full text-sm">
         <thead className="bg-surface-alt text-left text-xs text-muted">
           <tr>
             {hasOptions ? (

@@ -3,14 +3,13 @@ import { Link } from 'react-router-dom'
 import { Sparkline } from './charts'
 
 /**
- * A single headline number.
+ * A single headline number (ADMIN_UI_THEME.md §7.3): a small label, a 20px
+ * figure, an optional sub-line. Place tiles in a `<div className="stats">`
+ * row — an auto-fit grid, 170px minimum, two per row on a phone.
  *
- * Not every measure deserves a chart — a total is best read as a total. The
- * optional sparkline adds *shape* without pretending to be a plot: no axes,
- * no labels, no tooltip, since the tile's job is the number.
- *
- * A tile with a `to` becomes a link, which is how the dashboard hands off to
- * the page that can actually act on the number.
+ * The optional sparkline adds *shape* without pretending to be a plot: no
+ * axes, no labels, no tooltip, since the tile's job is the number. A tile
+ * with a `to` becomes a link to the page that can act on the number.
  */
 export function StatTile({
   label,
@@ -30,34 +29,26 @@ export function StatTile({
   to?: string
   tone?: 'default' | 'warning' | 'danger'
 }) {
-  const tones = {
-    default: 'border-line',
-    warning: 'border-warning/40',
-    danger: 'border-danger/40',
-  }
+  const toneClass = tone === 'warning' ? 't-warn' : tone === 'danger' ? 't-danger' : ''
 
   const body = (
     <>
-      <p className="text-sm font-medium text-muted">{label}</p>
-      <p className="mt-1.5 break-words font-figure text-lg font-bold text-fg sm:text-2xl">{value}</p>
-      {hint ? <p className="mt-0.5 text-xs text-muted">{hint}</p> : null}
+      <span className="stat-l">{label}</span>
+      <span className="stat-v">{value}</span>
+      {hint ? <span className="stat-s">{hint}</span> : null}
       {trend && trend.length > 1 ? (
-        <div className="mt-3">
+        <span className="spark block">
           <Sparkline values={trend} series={series} />
-        </div>
+        </span>
       ) : null}
     </>
   )
 
-  const className = `block min-w-0 rounded-lg border ${tones[tone]} bg-surface p-4 ${
-    to ? 'transition-colors hover:bg-surface-alt' : ''
-  }`
-
   return to ? (
-    <Link to={to} className={className}>
+    <Link to={to} className={`stat ${toneClass}`}>
       {body}
     </Link>
   ) : (
-    <div className={className}>{body}</div>
+    <div className={`stat ${toneClass}`}>{body}</div>
   )
 }

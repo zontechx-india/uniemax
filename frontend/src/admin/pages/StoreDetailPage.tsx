@@ -189,7 +189,7 @@ export default function StoreDetailPage() {
       <button
         type="button"
         onClick={() => navigate('/stores')}
-        className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-fg"
+        className="ph-back"
       >
         <BackIcon />
         All stores
@@ -284,7 +284,7 @@ export default function StoreDetailPage() {
 
         <Card>
           <CardHeader title="Business" />
-          <dl>
+          <dl className="bill">
             <Detail label="Revenue">{formatMoney(store.revenue)}</Detail>
             <Detail label="Orders">{formatCount(store.counts.orders)}</Detail>
             <Detail label="Products">

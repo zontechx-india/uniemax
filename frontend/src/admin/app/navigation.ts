@@ -1,3 +1,5 @@
+import type { IconName } from '../layout/icons'
+
 /**
  * Console navigation — the single source of truth for the sidebar, the
  * mobile drawer and the document title. Adding a page is one entry here plus
@@ -15,6 +17,8 @@
 export interface NavItem {
   to: string
   label: string
+  /** Sidebar glyph (layout/icons.tsx). */
+  icon: IconName
   /** `end` = match this path exactly (otherwise "/" highlights everywhere). */
   end?: boolean
   /** Only a SUPER_ADMIN sees the item — the API enforces it regardless. */
@@ -31,59 +35,59 @@ export interface NavGroup {
 export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Overview',
-    items: [{ to: '/', label: 'Dashboard', end: true }],
+    items: [{ to: '/', label: 'Dashboard', icon: 'dashboard', end: true }],
   },
   {
     title: 'Commerce',
     items: [
-      { to: '/orders', label: 'Orders' },
-      { to: '/payments', label: 'Payments' },
-      { to: '/products', label: 'Products' },
-      { to: '/categories', label: 'Categories' },
-      { to: '/category-mapping', label: 'Category mapping' },
+      { to: '/orders', label: 'Orders', icon: 'orders' },
+      { to: '/payments', label: 'Payments', icon: 'card' },
+      { to: '/products', label: 'Products', icon: 'tag' },
+      { to: '/categories', label: 'Categories', icon: 'layers' },
+      { to: '/category-mapping', label: 'Category mapping', icon: 'shuffle' },
     ],
   },
   {
     title: 'Finance',
     items: [
-      { to: '/seller-payouts', label: 'Seller payouts' },
-      { to: '/finance/sellers', label: 'Seller balances' },
-      { to: '/finance/fees', label: 'Fee settings' },
+      { to: '/seller-payouts', label: 'Seller payouts', icon: 'wallet' },
+      { to: '/finance/sellers', label: 'Seller balances', icon: 'scale' },
+      { to: '/finance/fees', label: 'Fee settings', icon: 'percent' },
     ],
   },
   {
     title: 'Accounts',
     items: [
-      { to: '/stores', label: 'Stores & sellers' },
-      { to: '/customers', label: 'Customers' },
-      { to: '/affiliates', label: 'Affiliates' },
-      { to: '/suppliers', label: 'Suppliers', dropship: true },
-      { to: '/needs-action', label: 'Needs action', dropship: true },
-      { to: '/payouts', label: 'Payouts', dropship: true },
+      { to: '/stores', label: 'Stores & sellers', icon: 'store' },
+      { to: '/customers', label: 'Customers', icon: 'users' },
+      { to: '/affiliates', label: 'Affiliates', icon: 'link' },
+      { to: '/suppliers', label: 'Suppliers', icon: 'truck', dropship: true },
+      { to: '/needs-action', label: 'Needs action', icon: 'alert', dropship: true },
+      { to: '/payouts', label: 'Payouts', icon: 'banknote', dropship: true },
     ],
   },
   {
     title: 'Platform',
     items: [
-      { to: '/support', label: 'Support' },
+      { to: '/support', label: 'Support', icon: 'help' },
       // Customer conversations and template campaigns on the business number.
-      { to: '/whatsapp', label: 'WhatsApp' },
+      { to: '/whatsapp', label: 'WhatsApp', icon: 'chat' },
       // The marketplace homepage carousel — the platform's own storefront
       // content, so it sits with the other platform-wide settings.
-      { to: '/banners', label: 'Homepage banners' },
+      { to: '/banners', label: 'Homepage banners', icon: 'image' },
       // Order and on/off for the marketplace homepage's sections.
-      { to: '/home-sections', label: 'Homepage sections' },
-      { to: '/theme-templates', label: 'Store themes' },
-      { to: '/notifications', label: 'Notifications' },
-      { to: '/activity', label: 'Activity log' },
-      { to: '/admins', label: 'Admin users', superAdminOnly: true },
+      { to: '/home-sections', label: 'Homepage sections', icon: 'layout' },
+      { to: '/theme-templates', label: 'Store themes', icon: 'palette' },
+      { to: '/notifications', label: 'Notifications', icon: 'bell' },
+      { to: '/activity', label: 'Activity log', icon: 'activity' },
+      { to: '/admins', label: 'Admin users', icon: 'shield', superAdminOnly: true },
     ],
   },
   {
     title: 'Documents',
     items: [
       // Every WhatsApp template: its text, who gets it, and each {{n}}'s value.
-      { to: '/docs/whatsapp-templates', label: 'WhatsApp templates' },
+      { to: '/docs/whatsapp-templates', label: 'WhatsApp templates', icon: 'file' },
     ],
   },
 ]

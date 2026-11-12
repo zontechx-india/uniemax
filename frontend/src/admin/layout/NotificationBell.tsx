@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { notificationsApi } from '../../shared/notifications/notificationsApi'
 import type { AppNotification } from '../../shared/notifications/notificationsApi'
 import { formatRelative } from '../ui/format'
-import { BellIcon } from './icons'
-import { Skeleton } from '../../shared/ui/states'
+import { IconButton, Skeleton } from '../ui/primitives'
 
 /**
  * The bell: an unread badge plus a dropdown of the latest notifications.
@@ -85,30 +84,29 @@ export function NotificationBell() {
 
   return (
     <div className="relative" ref={containerRef}>
-      <button
-        type="button"
+      <IconButton
+        icon="bell"
         onClick={() => setOpen((value) => !value)}
-        className="relative flex h-10 w-10 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-alt hover:text-fg"
-        aria-label={unread > 0 ? `Notifications (${unread} unread)` : 'Notifications'}
+        className="relative"
+        label={unread > 0 ? `Notifications (${unread} unread)` : 'Notifications'}
         aria-expanded={open}
       >
-        <BellIcon />
         {unread > 0 ? (
-          <span className="absolute right-0.5 top-0.5 flex h-5 min-w-5 items-center justify-center rounded-pill bg-danger px-1 text-xs font-semibold text-white">
+          <span className="nbadge">
             {unread > 9 ? '9+' : unread}
           </span>
         ) : null}
-      </button>
+      </IconButton>
 
       {open ? (
-        <div className="absolute right-0 z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-line bg-surface shadow-floating">
-          <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
-            <span className="text-sm font-medium text-fg">Notifications</span>
+        <div className="absolute right-0 z-30 mt-1.5 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-line bg-surface shadow-floating">
+          <div className="card-h">
+            <h2>Notifications</h2>
             {unread > 0 ? (
               <button
                 type="button"
                 onClick={markAll}
-                className="text-xs text-accent hover:underline"
+                className="lnk sm"
               >
                 Mark all read
               </button>
@@ -126,7 +124,7 @@ export function NotificationBell() {
                   <button
                     type="button"
                     onClick={() => void openNotification(notification)}
-                    className={`block w-full px-4 py-3 text-left transition-colors hover:bg-surface-alt ${
+                    className={`block w-full px-4 py-2.5 text-left transition-colors hover:bg-surface-alt ${
                       notification.readAt ? '' : 'bg-brand/5'
                     }`}
                   >
@@ -141,14 +139,14 @@ export function NotificationBell() {
             )}
           </ul>
 
-          <div className="border-t border-line px-4 py-2 text-center">
+          <div className="border-t border-line px-4 py-2.5 text-center">
             <button
               type="button"
               onClick={() => {
                 setOpen(false)
                 navigate('/notifications')
               }}
-              className="text-xs text-accent hover:underline"
+              className="lnk sm"
             >
               View all notifications
             </button>

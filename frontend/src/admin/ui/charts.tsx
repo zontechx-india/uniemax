@@ -37,11 +37,12 @@ export function ChartFrame({
   footer?: ReactNode
 }) {
   return (
-    <section className="min-w-0 rounded-lg border border-line bg-surface p-4 sm:p-5">
-      <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
+    // The console card (admin.css): a header bar, then the chart in the body.
+    <section className="card pad">
+      <header className="card-h">
         <div className="min-w-0">
-          <h2 className="font-heading text-base font-semibold text-fg">{title}</h2>
-          {subtitle ? <p className="mt-0.5 text-sm text-muted">{subtitle}</p> : null}
+          <h2>{title}</h2>
+          {subtitle ? <p>{subtitle}</p> : null}
         </div>
         {actions}
       </header>

@@ -30,10 +30,13 @@ export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
 export type ButtonSize = 'sm' | 'md' | 'lg'
 
 // Heights in px: sm 36 (dense rows only), md 44 (the tap minimum), lg 48.
+// Each height reads a variable first: the admin console's own stylesheet
+// (admin/admin.css) sets them to its denser 32 / 36 / 36. Nothing else sets
+// them, so the storefront and seller app keep the fallbacks.
 const SIZE: Record<ButtonSize, string> = {
-  sm: 'h-[36px] gap-1.5 px-3.5 text-sm',
-  md: 'h-tap gap-2 px-5 text-sm',
-  lg: 'h-field gap-2 px-6 text-base',
+  sm: 'h-[var(--btn-h-sm,36px)] gap-1.5 px-3.5 text-sm',
+  md: 'h-[var(--btn-h-md,44px)] gap-2 px-5 text-sm',
+  lg: 'h-[var(--btn-h-lg,48px)] gap-2 px-6 text-base',
 }
 
 const VARIANT: Record<ButtonVariant, string> = {

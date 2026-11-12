@@ -94,7 +94,7 @@ export default function SupportTicketPage() {
       <button
         type="button"
         onClick={() => navigate('/support')}
-        className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-fg"
+        className="ph-back"
       >
         <BackIcon />
         All tickets

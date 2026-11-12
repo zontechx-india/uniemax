@@ -381,6 +381,26 @@ Before considering a UI complete, verify:
 
 ---
 
+## 18a. Admin Console (dense theme)
+
+The admin console (`admin.uniemax.com`) is a data tool for staff, not a
+shopping surface, so it follows `ADMIN_UI_THEME.md` (repo root) for
+**pattern and size**, while keeping every colour in §6:
+
+- Base text 13px; type steps 12 · 13 · 14 · 15 · 18 · 22 (page title 20).
+- Controls 32px (inputs, default buttons), 36px for a form's main action;
+  icon buttons 30px. Cards: 10px corners, 1px border, the faintest shadow.
+- Every card that has a title shows it in a 44px header bar (`CardHeader`
+  first in the card). Headline numbers sit in `stats` tiles; lists in
+  `DataTable`.
+- Status = tinted badge with a dot (`Chip`), always with its label.
+- Every data page has loading (shimmer), empty and error-with-Retry states.
+- Implementation: `frontend/src/admin/admin.css` + `admin/ui/` — see
+  FRONTEND_CONTEXT.md "Admin console". The storefront and seller app keep the
+  sizes in §4–§10; the console theme is never loaded there.
+
+---
+
 ## 19. Implementation Rules
 
 Before creating a new UI:

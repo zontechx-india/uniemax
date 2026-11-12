@@ -184,7 +184,7 @@ function CoveragePanel({
 
   return (
     <div className="mb-4 space-y-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="stats mb-0">
         <StatTile
           label="On category pages"
           value={`${reach}%`}

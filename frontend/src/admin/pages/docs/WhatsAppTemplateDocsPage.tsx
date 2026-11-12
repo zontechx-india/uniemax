@@ -153,10 +153,10 @@ function TemplateDetail({ doc }: { doc: TemplateDoc }) {
       </div>
 
       <Card padding="none">
-        <CardHeader title="Parameters" subtitle="Send in this order." className="mb-0 p-4 sm:p-5" />
+        <CardHeader title="Parameters" subtitle="Send in this order." />
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-y border-line bg-surface-alt text-xs uppercase tracking-wide text-muted">
+          <table className="tbl w-full text-left text-sm">
+            <thead className="border-y border-line text-xs text-muted">
               <tr>
                 <th className="px-4 py-2 font-semibold sm:px-5">Var</th>
                 <th className="px-4 py-2 font-semibold">Field</th>

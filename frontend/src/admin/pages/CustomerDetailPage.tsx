@@ -69,7 +69,7 @@ export default function CustomerDetailPage() {
       <button
         type="button"
         onClick={() => navigate('/customers')}
-        className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-fg"
+        className="ph-back"
       >
         <BackIcon />
         All customers
@@ -137,7 +137,7 @@ export default function CustomerDetailPage() {
 
         <Card>
           <CardHeader title="Purchases" />
-          <dl>
+          <dl className="bill">
             <Detail label="Orders placed">{formatCount(customer.spend.orders)}</Detail>
             <Detail label="Lifetime value">{formatMoney(customer.spend.total)}</Detail>
           </dl>

@@ -2655,9 +2655,33 @@ rules the storefront does not have:
    login POST is exempt: a 401 there is a form error, not an expired session.
 
 `layout/AdminLayout.tsx` is the shell — **one nav, two presentations**: the
-same `NAV_GROUPS` render as a fixed 16rem rail from `lg` up and as a slide-in
-drawer below it, so a nav change lands in both at once. The drawer closes on
-navigation and locks body scroll while open. Groups: Overview · Commerce
+same `NAV_GROUPS` (each item has an `icon` from `layout/icons.tsx`) render as a
+sticky 232px sidebar above 900px and as a slide-in drawer (`body.nav-open`,
+backdrop `.side-back`) below it, so a nav change lands in both at once. The
+drawer closes on navigation, Escape and a tap outside, and locks body scroll
+while open. The 52px top bar holds the menu button (below 900px), a **page
+search** (finds a console page by name — `/` or Ctrl/⌘+K focuses it, arrows +
+Enter open; it searches the nav, not records), "View marketplace", the
+notification bell and the light/dark toggle. The sidebar foot shows the
+signed-in admin (initials avatar, role) and Sign out. The page scrolls the
+window; the sidebar and top bar are sticky. `.page` is re-keyed per route so
+its 180ms fade-in plays.
+
+**Console theme (since 12 Nov 2026).** `admin/admin.css` (imported only by
+`admin/main.tsx`, so the storefront never loads it) carries the console's
+pattern and size from `ADMIN_UI_THEME.md` at the repo root — the dense
+data-tool look: 13px base text, 32px controls, 10px card corners, cards with a
+44px header bar, tinted status badges with a dot. **Colours are unchanged**:
+its `--a-*` tokens all point at the existing `index.css` tokens (brand purple,
+neutrals, status colours, accent links), so light, dark and the brand behave as
+before. It also re-points the Tailwind size tokens for the admin build
+(`--text-xs` 12 · `--text-sm` 13 · `--text-base` 14 · `--text-lg` 15 ·
+`--text-xl/2xl` 18 · `--text-3xl/4xl` 22, `--radius-lg/xl` 10, `--radius-2xl`
+12, `--spacing-tap` and `--spacing-field` 32px) and the shared `Button`
+heights (`--btn-h-sm` 32, `--btn-h-md/lg` 36), so every console screen —
+including the seller screens it reuses — lands on the dense scale. Component
+rules sit in Tailwind's `components` layer, so a utility class on the same
+element still wins. Groups: Overview · Commerce
 (Orders, Payments, Products) · Accounts (Stores & sellers, Customers) ·
 Platform (Notifications, Activity log, Admin users — the last SUPER_ADMIN-only,
 and the API enforces that independently).
@@ -2669,7 +2693,7 @@ apps use ONE component kit (docs/DESIGN_GUIDELINES.md §7):
 
 | `shared/ui/` | What |
 | ------------ | ---- |
-| `Button.tsx` | primary / secondary / ghost / danger × sm 36 / md 44 / lg 48; `loading`; `buttonClass()` for links |
+| `Button.tsx` | primary / secondary / ghost / danger × sm 36 / md 44 / lg 48 (each height reads `--btn-h-sm/md/lg` first; only `admin/admin.css` sets them, to 32 / 36 / 36); `loading`; `buttonClass()` for links |
 | `field.ts` | `fieldClass({ dense, invalid, multiline })` — every input/select/textarea (48px/16px, dense 44px/14px), `FIELD_LABEL`, `fieldNoteClass(error)` |
 | `form.tsx` | `TextField` (label, hint, inline error), `Select`, `SegmentedTabs`; `ErrorNote`/`InfoNote`/`SuccessNote` are `Alert` |
 | `Alert.tsx` | Inline message, tone info / success / warning / danger, icon + words (never colour alone), optional title and action |
@@ -2685,17 +2709,17 @@ sheets, storefront filters, store menu drawer, admin menu drawer, login
 dialog — is a `ModalShell`; there are no hand-built `fixed inset-0`
 overlays left (the product wizard's full-screen page is a page, not a modal).
 
-The admin console keeps a thin layer (`admin/ui/`) for console-only shapes and
-dense defaults:
+The admin console keeps its own layer (`admin/ui/`), drawn with the console
+theme's classes from `admin/admin.css`:
 
 | File | What |
 | ---- | ---- |
-| `primitives.tsx` | Re-exports `Card`/`CardHeader`/`EmptyState`/`ErrorState`/`Skeleton`; `Chip` = `Badge`; `Button`/`buttonClass` = shared `Button` at `sm` by default; `TextInput`/`TextArea`/`SelectInput`/`PasswordInput` on `fieldClass({ dense: true })`; console `PageHeader`, `Detail` row |
-| `DataTable.tsx` | **The** table + `Pagination`. Below `md` each row re-renders as a stacked card (that's why every column declares a `header` string; one column may be `primary`, and `hideOnMobile` drops detail). One definition per page instead of a desktop table plus a drifting mobile list. Optional `mobileRow` replaces that card with a native-style list row (your content + a chevron) — Orders, Payments, Products, Stores, Customers, Support, Seller payouts and Seller balances use it. Page-level lists (those plus Categories, Category mapping and Affiliates' accounts) go edge to edge on a phone (`max-sm:-mx-4`, no side borders/corners). Column headers are sentence case. `Pagination` buttons split the width on a phone. |
-| `Toolbar.tsx` | Filter row: debounced `SearchInput` (own full row and 16px text on a phone, so iOS doesn't zoom), `FilterSelect` (a "Label: value ▾" chip with an invisible native `<select>` on top — a tap opens the phone's own picker; tinted when set — `idleValue` names a default that doesn't count as set, e.g. a sort's "Newest first"), scrollable status `Tabs` (no scrollbar; `sticky` pins them under the 64px top bar below `lg`) |
+| `primitives.tsx` | Console `PageHeader` (`.ph`; optional `back` link and title `badge`); `Card` (`.card`, padding none / md / lg) + `CardHeader` (`.card-h` — placed first in a card it becomes the edge-to-edge 44px header bar; optional `count`) + `CardBody`; `Chip` (`.st` tinted badge with a 6px dot; tones neutral / success / warning / danger / info / brand / pending); `Count` bubble; `IconButton` (30px `.ibtn`, label required); `Segmented` control (`.segc`); `Skeleton` / `PageSkeleton` (shimmer bones), `EmptyState`, `ErrorState` (Retry) in the console style; `Button`/`buttonClass` = shared `Button` at `sm` by default (+ `loading`); `TextInput`/`TextArea`/`SelectInput`/`PasswordInput` on `fieldClass({ dense: true })`; `Detail` key–value row (`.kv-row`: muted label column, value beside it, stacked on a phone; inside `<dl className="bill">` the amount sits on the right, and `bill total` sets the last row off as the sum) |
+| `DataTable.tsx` | **The** table (`.tbl`: 12px muted header on a grey row, 9/12px cells, hover rows) + `Pagination` (the `.tfoot` footer: "Page 2 of 12 · 240 total" + arrow icon buttons). At 720px and below each row re-renders as a stacked card (label left, value right) (that's why every column declares a `header` string; one column may be `primary`, and `hideOnMobile` drops detail). One definition per page instead of a desktop table plus a drifting mobile list. Optional `mobileRow` replaces that card with a native-style list row (your content + a chevron) — Orders, Payments, Products, Stores, Customers, Support, Seller payouts and Seller balances use it. Page-level lists (those plus Categories, Category mapping and Affiliates' accounts) go edge to edge on a phone (`max-sm:-mx-4`, no side borders/corners). Column headers are sentence case. |
+| `Toolbar.tsx` | Filter bar (`.fbar`): debounced `SearchInput` (`.fsearch`, 32px; own full row on a phone), `FilterSelect` (`.fsel`, a 32px "Label: value ▾" box with an invisible native `<select>` on top — a tap opens the phone's own picker; tinted when set — `idleValue` names a default that doesn't count as set, e.g. a sort's "Newest first"), scrollable status `Tabs` (`.tabs`, 36px, brand underline, optional count bubble; no scrollbar; `sticky` pins them under the 52px top bar at 720px and below) |
 | `statusMeta.tsx` | One label + tone per domain state, defined once — so "Shipped" is the same word and color everywhere. Every chip carries its label; color is a second signal, never the only one. |
-| `charts.tsx` | `TrendChart` · `BarList` · `Donut` · `Sparkline` · `ChartFrame` (see below) |
-| `StatTile.tsx` | Headline number + optional sparkline; a `to` makes it a link |
+| `charts.tsx` | `TrendChart` · `BarList` · `Donut` · `Sparkline` · `ChartFrame` (a console card with a header bar; see below) |
+| `StatTile.tsx` | `.stat` tile: 12px label, 20px figure, sub-line, optional sparkline; a `to` makes it a link; `tone` warning/danger tints the border and figure. Rows of tiles go in `<div className="stats">` (auto-fit, 170px min, two per row on a phone) |
 | `format.ts` | `formatMoney/Exact/Short`, counts, dates, `formatRelative`, `formatPriceRange` |
 
 **Money is a decimal string** everywhere (`"14250.00"`) — that is what Prisma
@@ -3531,9 +3555,9 @@ frontend/
         │   ├── adminSession.tsx # Context + silent refresh, idle logout, 401 drop-out
         │   └── navigation.ts    # NAV_GROUPS + per-path document titles
         ├── layout/
-        │   ├── AdminLayout.tsx  # Rail (lg+) / drawer (below) + top bar
+        │   ├── AdminLayout.tsx  # Sidebar (>900px) / drawer (below) + top bar with page search
         │   ├── NotificationBell.tsx # Unread badge + feed dropdown
-        │   └── icons.tsx        # Six inline shell glyphs
+        │   └── icons.tsx        # Icon set (Lucide-style, stroke 2) for nav, shell and states
         ├── ui/                  # console layer over shared/ui (see "Admin console")
         │   ├── primitives.tsx · DataTable.tsx · Toolbar.tsx   (Dialog moved to shared/ui)
         │   ├── statusMeta.tsx · StatTile.tsx · charts.tsx · format.ts

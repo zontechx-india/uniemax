@@ -91,7 +91,7 @@ export default function WhatsAppThreadPage() {
     <>
       <Link
         to="/whatsapp/inbox"
-        className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-fg"
+        className="ph-back"
       >
         <BackIcon />
         Inbox

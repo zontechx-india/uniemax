@@ -4,7 +4,16 @@ import { adminApi } from '../features/adminApi'
 import { useAdminQuery } from '../features/useAdminQuery'
 import { BarList, ChartFrame, Donut, TrendChart } from '../ui/charts'
 import { StatTile } from '../ui/StatTile'
-import { Card, CardHeader, Chip, ErrorState, PageHeader, Skeleton } from '../ui/primitives'
+import { Icon } from '../layout/icons'
+import {
+  Card,
+  CardHeader,
+  Chip,
+  ErrorState,
+  PageHeader,
+  PageSkeleton,
+  Segmented,
+} from '../ui/primitives'
 import { OrderStatusChip, PaymentChip } from '../ui/statusMeta'
 import {
   formatCount,
@@ -37,7 +46,7 @@ export default function DashboardPage() {
   const { data, loading, error, refresh } = useAdminQuery(() => adminApi.dashboard(days), [days])
 
   if (error) return <ErrorState message={error} onRetry={refresh} />
-  if (!data || loading) return <Skeleton rows={10} />
+  if (!data || loading) return <PageSkeleton label="Loading the dashboard" />
 
   const revenueSeries = data.series.map((point) => ({
     label: formatDayTick(point.date),
@@ -63,27 +72,20 @@ export default function DashboardPage() {
         title="Dashboard"
         subtitle={`Platform activity over the last ${days} days`}
         actions={
-          <div className="flex rounded-md border border-line p-0.5">
-            {RANGES.map((range) => (
-              <button
-                key={range}
-                type="button"
-                onClick={() => setDays(range)}
-                className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${
-                  days === range ? 'bg-brand text-brand-contrast' : 'text-muted hover:text-fg'
-                }`}
-              >
-                {range}d
-              </button>
-            ))}
-          </div>
+          <Segmented
+            label="Date range"
+            value={days}
+            onChange={setDays}
+            options={RANGES.map((range) => ({ value: range, label: `${range} days` }))}
+          />
         }
       />
 
       {/* Integration health — a missing key should be noticed here, not by a
           customer at checkout. */}
       {!data.integrations.paymentGateway || !data.integrations.push ? (
-        <div className="mb-5 flex flex-wrap items-center gap-2 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
+        <div className="callout c-warn" role="status">
+          <Icon name="alert" size={15} />
           <span className="font-medium text-fg">Setup incomplete:</span>
           {!data.integrations.paymentGateway ? (
             <Chip tone="warning">Payment gateway not configured</Chip>
@@ -92,7 +94,7 @@ export default function DashboardPage() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <div className="stats">
         <StatTile
           label="Revenue"
           value={formatMoney(data.totals.revenue)}
@@ -122,28 +124,23 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="min-w-0 lg:col-span-2">
+      <div className="grid-3">
+        <div className="span-2 min-w-0">
           <ChartFrame
             title={measure === 'revenue' ? 'Revenue' : 'Orders'}
             subtitle={`Per day, last ${days} days`}
             actions={
               // Revenue and orders share no scale, so they are never plotted
               // together — this switches the single series instead.
-              <div className="flex rounded-md border border-line p-0.5">
-                {(['revenue', 'orders'] as const).map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => setMeasure(option)}
-                    className={`rounded-sm px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
-                      measure === option ? 'bg-surface-alt text-fg' : 'text-muted hover:text-fg'
-                    }`}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
+              <Segmented
+                label="Chart measure"
+                value={measure}
+                onChange={setMeasure}
+                options={[
+                  { value: 'revenue', label: 'Revenue' },
+                  { value: 'orders', label: 'Orders' },
+                ]}
+              />
             }
           >
             {measure === 'revenue' ? (
@@ -190,7 +187,7 @@ export default function DashboardPage() {
         </ChartFrame>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="grid-3">
         <ChartFrame title="Order pipeline" subtitle="Every order, by stage">
           <BarList
             data={pipeline.map((stage) => ({
@@ -226,81 +223,75 @@ export default function DashboardPage() {
         </ChartFrame>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card className="min-w-0 lg:col-span-2" padding="none">
-          <div className="p-4 sm:p-5">
-            <CardHeader
-              title="Latest orders"
-              action={
-                <Link to="/orders" className="text-sm text-accent hover:underline">
-                  View all
-                </Link>
-              }
-            />
-            <ul className="divide-y divide-line">
-              {data.recentOrders.length === 0 ? (
-                <li className="py-6 text-center text-sm text-muted">No orders yet.</li>
-              ) : (
-                data.recentOrders.map((order) => (
-                  <li key={order.id}>
-                    <Link
-                      to={`/orders/${order.id}`}
-                      className="-mx-2 block rounded-md px-2 py-3 transition-colors hover:bg-surface-alt"
-                    >
-                      {/* Number + total stay on one line at every width; the
-                          chips wrap under the store name on a phone. */}
-                      <span className="flex items-baseline justify-between gap-3">
-                        <span className="min-w-0 truncate font-medium text-fg">
-                          {order.orderNumber}
-                        </span>
-                        <span className="shrink-0 font-figure font-medium text-fg">
-                          {formatMoney(order.total)}
-                        </span>
-                      </span>
-                      <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                        <span className="min-w-0 max-w-full truncate text-sm text-muted">
-                          {order.storeName}
-                        </span>
-                        <span className="flex flex-wrap items-center gap-2 sm:ml-auto">
-                          <OrderStatusChip status={order.status} />
-                          <PaymentChip status={order.paymentStatus} method={order.paymentMethod} />
-                        </span>
-                      </span>
-                      <span className="mt-1 block truncate text-xs text-muted">
+      <div className="grid-3 mb-0">
+        <Card className="span-2" padding="none">
+          <CardHeader
+            title="Latest orders"
+            action={
+              <Link to="/orders" className="lnk sm">
+                View all
+              </Link>
+            }
+          />
+          {data.recentOrders.length === 0 ? (
+            <p className="mini-empty">No orders yet.</p>
+          ) : (
+            <ul className="mini-list">
+              {data.recentOrders.map((order) => (
+                <li key={order.id}>
+                  <Link to={`/orders/${order.id}`}>
+                    <span className="ml-m">
+                      <b>
+                        {order.orderNumber} · {order.storeName}
+                      </b>
+                      <em>
                         {order.customerName ?? 'Customer'} · {formatRelative(order.placedAt)}
+                      </em>
+                    </span>
+                    <span className="ml-r">
+                      {/* The two chips drop on a phone; the order page has them. */}
+                      <span className="ml-chips hide-sm">
+                        <OrderStatusChip status={order.status} />
+                        <PaymentChip status={order.paymentStatus} method={order.paymentMethod} />
                       </span>
-                    </Link>
-                  </li>
-                ))
-              )}
+                      <span className="num font-semibold text-fg">{formatMoney(order.total)}</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
             </ul>
-          </div>
+          )}
         </Card>
 
-        <Card className="min-w-0">
-          <CardHeader title="Low stock" subtitle="5 or fewer left, live listings" />
-          <ul className="divide-y divide-line">
-            {data.lowStock.length === 0 ? (
-              <li className="py-6 text-center text-sm text-muted">Nothing running low.</li>
-            ) : (
-              data.lowStock.map((product) => (
-                <li key={product.id} className="flex items-center gap-3 py-2.5">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-fg">{product.name}</p>
-                    <p className="truncate text-xs text-muted">{product.storeName}</p>
+        <Card padding="none">
+          <CardHeader
+            title="Low stock"
+            subtitle="5 or fewer left, live listings"
+            action={
+              <Link to="/products?status=LOW_STOCK" className="lnk sm">
+                View inventory
+              </Link>
+            }
+          />
+          {data.lowStock.length === 0 ? (
+            <p className="mini-empty">Nothing running low.</p>
+          ) : (
+            <ul className="mini-list">
+              {data.lowStock.map((product) => (
+                <li key={product.id}>
+                  <div className="ml-row">
+                    <span className="ml-m">
+                      <b>{product.name}</b>
+                      <em>{product.storeName}</em>
+                    </span>
+                    <Chip tone={product.stockTotal === 0 ? 'danger' : 'warning'}>
+                      {product.stockTotal === 0 ? 'Out of stock' : `${product.stockTotal} left`}
+                    </Chip>
                   </div>
-                  <Chip tone={product.stockTotal === 0 ? 'danger' : 'warning'}>
-                    {product.stockTotal === 0 ? 'Out of stock' : `${product.stockTotal} left`}
-                  </Chip>
                 </li>
-              ))
-            )}
-          </ul>
-          <div className="mt-3">
-            <Link to="/products?status=LOW_STOCK" className="text-sm text-accent hover:underline">
-              View inventory
-            </Link>
-          </div>
+              ))}
+            </ul>
+          )}
         </Card>
       </div>
     </>

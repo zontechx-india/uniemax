@@ -1,6 +1,9 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import '../index.css'
+// The console's own theme (ADMIN_UI_THEME.md): pattern and size only — it
+// points every colour at the tokens index.css already defines.
+import './admin.css'
 import { ThemeProvider, initThemeMode } from '../shared/theme'
 import { initStaleBuildReload } from '../shared/staleBuildReload'
 import { initServiceWorker } from '../shared/serviceWorker'

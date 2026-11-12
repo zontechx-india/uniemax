@@ -79,7 +79,7 @@ export default function OrderDetailPage() {
       <button
         type="button"
         onClick={() => navigate(-1)}
-        className="-ml-2 mb-1 inline-flex h-11 items-center gap-1 rounded-md px-2 text-sm text-muted transition-colors hover:text-fg lg:h-9"
+        className="ph-back"
       >
         <BackIcon />
         Back
@@ -146,7 +146,7 @@ export default function OrderDetailPage() {
                 </li>
               ))}
             </ul>
-            <dl className="mt-3">
+            <dl className="bill total mt-3">
               <Detail label="Subtotal">{formatMoneyExact(order.subtotal)}</Detail>
               <Detail label="Shipping">
                 {formatMoneyExact(order.shippingCharge)}

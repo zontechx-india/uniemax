@@ -1,15 +1,17 @@
 import type { ReactNode } from 'react'
-import { Button, EmptyState, ErrorState, Skeleton } from './primitives'
+import { Icon } from '../layout/icons'
+import { EmptyState, ErrorState, IconButton } from './primitives'
 
 /**
- * The console's one table.
+ * The console's one table (ADMIN_UI_THEME.md §7.4).
  *
  * **Responsiveness is the whole point of this component.** A data table
- * cannot simply shrink — below `md` each row re-renders as a stacked card
- * (label + value per cell), which is why every column declares a `header`
- * string: on a wide screen it labels the column, on a phone it labels the
- * value inside the card. One column may be marked `primary` — it becomes the
- * card's heading — and columns marked `hideOnMobile` drop out of the card.
+ * cannot simply shrink — at 720px and below each row re-renders as a stacked
+ * card (label on the left, value on the right), which is why every column
+ * declares a `header` string: on a wide screen it labels the column, on a
+ * phone it labels the value inside the card. One column may be marked
+ * `primary` — it becomes the card's title — and columns marked
+ * `hideOnMobile` drop out of the card.
  *
  * That keeps ONE definition of a table per page instead of a desktop table
  * plus a separate mobile list that drifts out of sync.
@@ -38,12 +40,29 @@ export interface DataTableProps<T> {
   onRowClick?: (row: T) => void
   empty?: { title: string; hint?: string }
   /**
-   * Optional phone row. When given, the phone view is a native-style list —
-   * this content on the left, a chevron on the right when rows open — instead
-   * of the generic label/value card. Use it for the busy lists (orders,
+   * Optional phone row. When given, the phone view is a plain list — this
+   * content on the left, a chevron on the right when rows open — instead of
+   * the generic label/value card. Use it for the busy lists (orders,
    * payments) where repeating "Store", "Status"… on every row is noise.
    */
   mobileRow?: (row: T) => ReactNode
+}
+
+/** Loading bones shaped like the table: a header bar and rows. */
+function TableSkeleton() {
+  return (
+    <div aria-hidden>
+      <div className="skel m-3 h-5 w-1/3 rounded-sm" />
+      {Array.from({ length: 6 }, (_, index) => (
+        <div key={index} className="flex items-center gap-3 border-t border-line px-3 py-2.5">
+          <div className="skel h-4 flex-[2]" />
+          <div className="skel h-4 flex-1" />
+          <div className="skel h-4 flex-1" />
+          <div className="skel h-5 w-20 rounded-pill" />
+        </div>
+      ))}
+    </div>
+  )
 }
 
 export function DataTable<T>({
@@ -58,29 +77,41 @@ export function DataTable<T>({
   mobileRow,
 }: DataTableProps<T>) {
   if (error) return <ErrorState message={error} {...(onRetry ? { onRetry } : {})} />
-  if (loading && rows.length === 0) return <Skeleton rows={6} className="p-4" />
+  if (loading && rows.length === 0) return <TableSkeleton />
   if (rows.length === 0) {
-    return <EmptyState title={empty?.title ?? 'Nothing here yet'} {...(empty?.hint ? { description: empty.hint } : {})} />
+    return (
+      <EmptyState
+        compact
+        title={empty?.title ?? 'Nothing here yet'}
+        {...(empty?.hint ? { description: empty.hint } : {})}
+      />
+    )
   }
 
   const interactive = Boolean(onRowClick)
-  const rowClasses = `border-b border-line last:border-0 ${
-    interactive ? 'cursor-pointer hover:bg-surface-alt' : ''
-  }`
+  const rowProps = (row: T) =>
+    interactive
+      ? {
+          onClick: () => onRowClick?.(row),
+          tabIndex: 0,
+          onKeyDown: (event: React.KeyboardEvent) => {
+            if (event.key === 'Enter') onRowClick?.(row)
+          },
+        }
+      : {}
+
+  const primary = columns.find((column) => column.primary)
+  const rest = columns.filter((column) => !column.primary && !column.hideOnMobile)
 
   return (
     <>
-      {/* Desktop: a real table. */}
-      <div className="hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[52rem] border-collapse text-sm">
+      {/* Wide: a real table. */}
+      <div className="tscroll dt-wide">
+        <table className="tbl min-w-[720px]">
           <thead>
-            <tr className="border-b border-line text-left">
+            <tr>
               {columns.map((column) => (
-                <th
-                  key={column.header}
-                  scope="col"
-                  className={`px-3 py-2.5 text-xs font-medium text-muted ${column.className ?? ''}`}
-                >
+                <th key={column.header} scope="col" className={column.className ?? ''}>
                   {column.header}
                 </th>
               ))}
@@ -88,24 +119,9 @@ export function DataTable<T>({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr
-                key={rowKey(row)}
-                className={rowClasses}
-                {...(interactive
-                  ? {
-                      onClick: () => onRowClick?.(row),
-                      tabIndex: 0,
-                      onKeyDown: (event: React.KeyboardEvent) => {
-                        if (event.key === 'Enter') onRowClick?.(row)
-                      },
-                    }
-                  : {})}
-              >
+              <tr key={rowKey(row)} className={interactive ? 'link' : ''} {...rowProps(row)}>
                 {columns.map((column) => (
-                  <td
-                    key={column.header}
-                    className={`px-3 py-3 align-middle text-fg ${column.className ?? ''}`}
-                  >
+                  <td key={column.header} data-label={column.header} className={column.className ?? ''}>
                     {column.cell(row)}
                   </td>
                 ))}
@@ -115,88 +131,42 @@ export function DataTable<T>({
         </table>
       </div>
 
-      {/* Phone / small tablet, custom row: a native-style list. */}
-      {mobileRow ? (
-        <ul className="divide-y divide-line md:hidden">
-          {rows.map((row) => (
-            <li
-              key={rowKey(row)}
-              className={`flex items-center gap-3 px-4 py-3 ${
-                interactive ? 'cursor-pointer transition-colors active:bg-surface-alt' : ''
-              }`}
-              {...(interactive
-                ? {
-                    onClick: () => onRowClick?.(row),
-                    tabIndex: 0,
-                    role: 'link',
-                    onKeyDown: (event: React.KeyboardEvent) => {
-                      if (event.key === 'Enter') onRowClick?.(row)
-                    },
-                  }
-                : {})}
-            >
+      {/* Phone: the page's own row, or a stacked label/value card. */}
+      <ul className="mlist dt-narrow">
+        {rows.map((row) => (
+          <li
+            key={rowKey(row)}
+            className={interactive ? 'link' : ''}
+            {...(interactive && mobileRow ? { role: 'link' } : {})}
+            {...rowProps(row)}
+          >
+            {mobileRow ? (
               <div className="min-w-0 flex-1">{mobileRow(row)}</div>
-              {interactive ? (
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-4 w-4 shrink-0 text-muted"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden
-                >
-                  <path d="m9 18 6-6-6-6" />
-                </svg>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      {/* Phone / small tablet: one card per row. */}
-      {mobileRow ? null : (
-      <ul className="divide-y divide-line md:hidden">
-        {rows.map((row) => {
-          const primary = columns.find((column) => column.primary)
-          const rest = columns.filter((column) => !column.primary && !column.hideOnMobile)
-          return (
-            <li
-              key={rowKey(row)}
-              className={`px-4 py-3 ${interactive ? 'cursor-pointer active:bg-surface-alt' : ''}`}
-              // Same keyboard behaviour as the desktop row: focusable, Enter opens.
-              {...(interactive
-                ? {
-                    onClick: () => onRowClick?.(row),
-                    tabIndex: 0,
-                    onKeyDown: (event: React.KeyboardEvent) => {
-                      if (event.key === 'Enter') onRowClick?.(row)
-                    },
-                  }
-                : {})}
-            >
-              {primary ? <div className="mb-2 text-sm font-medium text-fg">{primary.cell(row)}</div> : null}
-              <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                {rest.map((column) => (
-                  <div key={column.header} className="min-w-0">
-                    <dt className="text-xs text-muted">{column.header}</dt>
-                    <dd className="truncate text-sm text-fg">{column.cell(row)}</dd>
-                  </div>
-                ))}
-              </dl>
-            </li>
-          )
-        })}
+            ) : (
+              <div className="min-w-0 flex-1">
+                {primary ? <div className="mb-1.5 font-medium text-fg">{primary.cell(row)}</div> : null}
+                <dl className="dt-card">
+                  {rest.map((column) => (
+                    <div key={column.header}>
+                      <dt>{column.header}</dt>
+                      <dd>{column.cell(row)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+            {interactive && mobileRow ? <Icon name="chevron" /> : null}
+          </li>
+        ))}
       </ul>
-      )}
     </>
   )
 }
 
 /**
- * Server pagination controls. Page numbers rather than infinite scroll: an
- * admin needs to jump, come back, and share "page 4" with a colleague.
+ * Server pagination — the table footer: "Page 2 of 12 · 240 total" and two
+ * arrow buttons. Page numbers rather than infinite scroll: an admin needs to
+ * jump, come back, and share "page 4" with a colleague.
  */
 export function Pagination({
   page,
@@ -213,26 +183,23 @@ export function Pagination({
 }) {
   if (total === 0) return null
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3">
-      <p className="text-xs text-muted">
+    <div className="tfoot">
+      <span>
         Page {page} of {Math.max(totalPages, 1)} · {total.toLocaleString('en-IN')} total
-      </p>
-      {/* Full-width, thumb-sized halves on a phone; compact on desktop. */}
-      <div className="flex w-full gap-2 sm:w-auto">
-        <Button
-          className="flex-1 sm:flex-none"
+      </span>
+      <div className="pager">
+        <IconButton
+          icon="back"
+          label="Previous page"
           disabled={busy || page <= 1}
           onClick={() => onPage(page - 1)}
-        >
-          Previous
-        </Button>
-        <Button
-          className="flex-1 sm:flex-none"
+        />
+        <IconButton
+          icon="chevron"
+          label="Next page"
           disabled={busy || page >= totalPages}
           onClick={() => onPage(page + 1)}
-        >
-          Next
-        </Button>
+        />
       </div>
     </div>
   )

@@ -76,10 +76,10 @@ export default function SellerFinancePage() {
 
   return (
     <>
-      <Button variant="ghost" onClick={() => navigate(-1)} className="mb-3 -ml-2">
+      <button type="button" onClick={() => navigate(-1)} className="ph-back">
         <BackIcon />
         Back
-      </Button>
+      </button>
       <PageHeader
         title={data.store.name}
         subtitle={
@@ -110,9 +110,7 @@ export default function SellerFinancePage() {
       </div>
 
       <Card padding="none">
-        <div className="px-4 pt-4 sm:px-5">
-          <CardHeader title="Ledger" subtitle="Every movement of this seller's money, newest first." className="mb-2" />
-        </div>
+        <CardHeader title="Ledger" subtitle="Every movement of this seller's money, newest first." />
         <Toolbar>
           <FilterSelect
             label="Balance"
@@ -162,8 +160,8 @@ export default function SellerFinancePage() {
 function Totals({ title, t }: { title: string; t: StoreFinance['delivered']['online'] }) {
   return (
     <Card>
-      <CardHeader title={title} className="mb-2" />
-      <dl>
+      <CardHeader title={title} />
+      <dl className="bill">
         <Detail label="Orders">{t.orders}</Detail>
         <Detail label="Sales">{formatMoneyExact(t.sales)}</Detail>
         <Detail label="Platform fees">{formatMoneyExact(t.platformFees)}</Detail>

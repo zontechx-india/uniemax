@@ -97,7 +97,7 @@ export default function WhatsAppCampaignPage() {
     <>
       <Link
         to="/whatsapp/campaigns"
-        className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-fg"
+        className="ph-back"
       >
         <BackIcon />
         Campaigns
@@ -253,7 +253,8 @@ function Breakdown({ campaign }: { campaign: WaCampaign }) {
       <CardHeader
         title="Delivery"
         subtitle="Where each message is now — updates as WhatsApp reports back"
-        className="mb-3"
+        // A sub-heading inside the card body, not the card's header bar.
+        className="mb-3 min-h-0 border-0 p-0"
       />
       {counted === 0 ? (
         <p className="text-sm text-muted">No messages have been sent yet.</p>

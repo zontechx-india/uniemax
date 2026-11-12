@@ -580,7 +580,7 @@ export function AudienceSummary({
       </div>
       {preview.sample.length > 0 ? (
         <div className="overflow-x-auto rounded-lg border border-line">
-          <table className="w-full text-left text-sm">
+          <table className="tbl w-full text-left text-sm">
             <thead className="bg-surface-alt text-xs text-muted">
               <tr>
                 <th className="px-3 py-2 font-medium">Name</th>
