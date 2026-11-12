@@ -20,6 +20,7 @@ export function Dialog({
   subtitle,
   size = 'md',
   flush = false,
+  fill = false,
   footer,
   onClose,
   children,
@@ -31,6 +32,11 @@ export function Dialog({
   size?: 'md' | 'lg'
   /** Body without padding — for edge-to-edge action rows (a sheet menu). */
   flush?: boolean
+  /**
+   * Full height, and the body does not scroll: the content lays out its own
+   * scrolling regions (a two-column picker). Use with `flush`.
+   */
+  fill?: boolean
   footer?: ReactNode
   onClose: () => void
   children: ReactNode
@@ -48,7 +54,9 @@ export function Dialog({
       onClose={onClose}
       labelledBy={titleId}
       zIndex="z-40"
-      panelClassName={`flex flex-col ${size === 'lg' ? 'sm:max-w-3xl' : 'sm:max-w-lg'}`}
+      panelClassName={`flex flex-col ${size === 'lg' ? 'sm:max-w-3xl' : 'sm:max-w-lg'} ${
+        fill ? 'h-[92dvh] sm:h-[80vh]' : ''
+      }`}
     >
       {/* Grab-handle: phones only, where the panel is a sheet. */}
       <span aria-hidden className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-pill bg-fg/15 sm:hidden" />
@@ -63,7 +71,9 @@ export function Dialog({
       </header>
 
       <div
-        className={`min-h-0 flex-1 overflow-y-auto ${flush ? '' : 'px-4 pt-4 sm:px-5'} ${
+        className={`min-h-0 flex-1 ${fill ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'} ${
+          flush ? '' : 'px-4 pt-4 sm:px-5'
+        } ${
           footer ? (flush ? '' : 'pb-4') : 'pb-[max(1rem,env(safe-area-inset-bottom))]'
         }`}
       >

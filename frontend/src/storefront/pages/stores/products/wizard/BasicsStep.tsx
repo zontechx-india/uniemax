@@ -24,11 +24,12 @@ import type { VersionPlan } from './shared'
  * where it goes. Continue creates the draft (or renames / moves an existing
  * product), so from here on every other step saves against a real id.
  *
- * The category is a list of big tappable cards — the shop's own categories,
- * the most specific ones first, each showing its group underneath — instead
- * of a dropdown of "Fashion › Women › Sarees" paths. If the right one is
- * missing, **Add a new category** opens the same chooser the Categories page
- * uses, adds it, and selects it — the seller never has to leave the product.
+ * The category is picked in `CategoryPick` (main category chips, then
+ * sub-category cards) instead of a dropdown of "Fashion › Women › Sarees"
+ * paths. If the right one is missing, the last chip, **+ Add a category**,
+ * opens the same chooser the Categories page uses (on the main category the
+ * seller was looking at), adds it, and selects it, so the seller never has
+ * to leave the product.
  *
  * It also asks, before any photo is taken, whether the product comes in more
  * than one colour or size. Sellers who met that question only at step 3 had
@@ -63,6 +64,8 @@ export function BasicsStep({
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [choosing, setChoosing] = useState(false)
+  /** Platform category the chooser opens on (the main category in view). */
+  const [chooseFrom, setChooseFrom] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   /** The name word the seller chose to keep ("it really is only pink"). */
   const [kept, setKept] = useState<string | null>(null)
@@ -220,7 +223,10 @@ export function BasicsStep({
             setCategoryId(id)
             setError(null)
           }}
-          onAdd={() => setChoosing(true)}
+          onAdd={(mainId) => {
+            setChooseFrom(categories.find((c) => c.id === mainId)?.categoryId ?? null)
+            setChoosing(true)
+          }}
         />
       </div>
 
@@ -229,6 +235,7 @@ export function BasicsStep({
         onClose={() => setChoosing(false)}
         addedIds={addedIds}
         busy={adding}
+        startAt={chooseFrom}
         title="Add a category"
         onPick={(node) => void addCategory(node.id, node.name)}
       />

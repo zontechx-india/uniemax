@@ -2373,13 +2373,21 @@ is never shown a pickup-address item.
   `StoreCategoriesPage`
   (adding is **one button that opens `CategoryChooserSheet`**
   (`pages/stores/ui/`) — the seller's own way into the platform taxonomy,
-  full-height with 60px rows. Unlike the shared `CategoryPicker` (admin
-  mapping screens), a tap does the obvious thing: a category with smaller
-  kinds inside OPENS ("Fashion" → Women, Men…, "3 kinds inside — tap to
-  look"), one with nothing inside CHOOSES; inside a level a dashed first row
-  offers "Choose all of Women"; a 48px search on top shows hits with their
-  full path; categories the shop already has are ticked "Added". **Choosing
-  is adding** — no separate Add button — with a toast ("Sarees added"), and a
+  a full-height sheet (`Dialog fill`) in **two columns**, like a shopping
+  app's filter screen. **Left**, the main categories, always in view (own
+  scroll, the open one white with a brand bar, a green tick on any that
+  already holds an added category); **right**, what is inside the open one:
+  deeper levels as small headings ("WOMEN", "WOMEN › ETHNIC") with the real
+  choices as 56px rows (**Add** pill / "✓ Added"), and a quiet "+ Add all of
+  …" under each group and **last** in the column (never first, so the
+  smaller, easier-to-find kinds are seen before the broad one; hidden once
+  added). The whole tree (~160 nodes) comes in one `taxonomyApi.tree()` call
+  when it opens, so switching the left column never waits. `startAt` (a
+  platform category id) opens it on that id's main category. A 48px search
+  on top replaces both columns with one list of hits and their full paths;
+  categories the shop already has are ticked "Added". **Tapping a row is
+  adding** (one answer, so no checkboxes or Apply bar), with a spinner on
+  that row, then a toast ("Sarees added"), and a
   failure toasts over the sheet. There is no name field: a seller chooses a
   category and cannot type one, so no shop invents its own vocabulary.
   Picking a deep category adds its ancestors too, making "Fashion › Women ›
@@ -2429,9 +2437,12 @@ is never shown a pickup-address item.
   **Sarees**"). A flat list of identical cards mixed Sarees, Women and
   Fashion and sellers could not tell them apart. A **new** product starts
   with no category chosen unless the shop has exactly one leaf (a pre-picked
-  first card was tapped straight past). "Not in the list? **Add a category**" opens
-  `CategoryChooserSheet`, adds the pick, refreshes the page's list via
-  `onCategoriesChange` and selects it without leaving the product)
+  first card was tapped straight past). **"+ Add a category"** is the last,
+  dashed chip of ① (where a seller missing a category is already looking;
+  when ① is hidden, the last tile of ②'s grid). It opens
+  `CategoryChooserSheet` on the main category in view, adds the pick,
+  refreshes the page's list via `onCategoriesChange` and selects it without
+  leaving the product)
   (name + category, and **"Do you have it in more than one colour, size or
   weight?"** as two picture cards side by side (`choicesHelp.VersionCard`:
   one shirt vs the same shirt three times — in the category example's
@@ -2626,7 +2637,7 @@ apps use ONE component kit (docs/DESIGN_GUIDELINES.md §7):
 | `Card.tsx` | THE card (flat surface, 1px border, 12px corners, no shadow) + `CardHeader` |
 | `states.tsx` | `Skeleton`, `PageSkeleton`, `EmptyState` (flat icon chip, optional steps/action), `ErrorState` (message + Try again) — no bare "Loading…" |
 | `ModalShell.tsx` | THE modal base: portal (or `portal={false}` for storefront modals that must keep the shop's colours), flat `--overlay-soft`, Escape / backdrop close (switchable), scroll lock, focus trap + return, placements `sheet` · `center` · `drawer-left` · `drawer-right` · `fullscreen`; `ModalClose` (44px) |
-| `Dialog.tsx` / `ConfirmDialog.tsx` | Content dialog and two-button question, both on `ModalShell` |
+| `Dialog.tsx` / `ConfirmDialog.tsx` | Content dialog and two-button question, both on `ModalShell`. `Dialog fill` (with `flush`) is full height with a non-scrolling body, for content with its own scrolling columns |
 | `Toast.tsx` | `showToast()` + `ToastHost`, `TOAST_CLASS` (flat, bordered) |
 
 Every overlay in the app — product photo editor, describe/review photo
@@ -3985,7 +3996,7 @@ Rules that keep it legible and fast:
 | `EmptyState` | Re-export of the shared `EmptyState` (flat icon chip, title, sentence, optional `steps`, one action). |
 | `showToast()` / `ToastHost` | "Saved ✓" for instant saves. Module store (`useSyncExternalStore`), no provider; `ToastHost` is mounted once in `StoreManageLayout`. |
 | `HelpHint` | ⓘ (44px hit, inline in a label) → a sheet explaining a term in plain words. |
-| `CategoryChooserSheet` | The seller's category chooser (tap opens / tap chooses, search with paths, "Choose all of …", ticks for added). Used by Categories, the Products first-category gate and the product wizard. |
+| `CategoryChooserSheet` | The seller's category chooser (two columns: main categories left, their contents right; search with paths, "Add all of …", ticks for added). Used by Categories, the Products first-category gate and the product wizard. |
 
 `ActiveSwitch` keeps its compact visual for the rows not yet migrated, but its
 hit area is now 44px tall (`before:` inset).

@@ -19,6 +19,10 @@ import { inputClass } from './shared'
  *
  * Fewer questions when the shop allows: one main category hides step ①,
  * and a main category with nothing inside is itself the answer.
+ *
+ * "+ Add a category" is the LAST main-category chip, where a seller whose
+ * category is missing is already looking. When step ① is hidden it is the
+ * last tile under the sub-categories instead.
  */
 export function CategoryPick({
   categories,
@@ -29,8 +33,8 @@ export function CategoryPick({
   categories: StoreCategory[]
   value: string
   onChange: (categoryId: string) => void
-  /** Opens the "add a category" sheet. */
-  onAdd: () => void
+  /** Opens the "add a category" sheet, on the main category being looked at. */
+  onAdd: (mainId: string) => void
 }) {
   const byId = new Map(categories.map((c) => [c.id, c]))
   const childrenOf = (id: string | null) => categories.filter((c) => c.parentId === id)
@@ -72,6 +76,9 @@ export function CategoryPick({
 
   const path = value ? pathOf(value, byId) : []
   const isLeafMain = main !== null && childrenOf(main.id).length === 0
+  // No chip row to end with: the add tile closes the last sub-category grid,
+  // or stands alone when there is no grid to join.
+  const tileInGrid = mains.length <= 1 && main !== null && !isLeafMain && shown.length > 0
 
   return (
     <div className="space-y-5">
@@ -101,6 +108,7 @@ export function CategoryPick({
                 </button>
               )
             })}
+            <AddTile chip onClick={() => onAdd(mainId)} />
           </div>
         </section>
       )}
@@ -125,7 +133,7 @@ export function CategoryPick({
           )}
 
           <div role="radiogroup" aria-labelledby="pick-sub" className="mt-2.5 space-y-4">
-            {shown.map((group) => (
+            {shown.map((group, gi) => (
               <div key={group.id}>
                 {group.label && (
                   <p className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-wide text-muted uppercase">
@@ -161,6 +169,7 @@ export function CategoryPick({
                       </button>
                     )
                   })}
+                  {tileInGrid && gi === shown.length - 1 && <AddTile onClick={() => onAdd(mainId)} />}
                 </div>
                 {group.parent && !q && (
                   <Button
@@ -186,7 +195,7 @@ export function CategoryPick({
             ))}
             {q && shown.length === 0 && (
               <p className="text-hint text-muted">
-                Nothing called “{query.trim()}” in {main.name}. Add it below.
+                Nothing called “{query.trim()}” in {main.name}. Tap “Add a category” to add it.
               </p>
             )}
           </div>
@@ -216,16 +225,28 @@ export function CategoryPick({
         )
       )}
 
-      <div className="flex flex-wrap items-center gap-x-2">
-        <span className="text-hint text-muted">Not in the list?</span>
-        <Button variant="ghost" size="sm" onClick={onAdd} className="px-2">
-          <span className="inline-flex items-center gap-1.5 text-brand">
-            <PlusIcon className="h-4 w-4" />
-            Add a category
-          </span>
-        </Button>
-      </div>
+      {mains.length <= 1 && !tileInGrid && (
+        <div className="grid grid-cols-2 gap-2">
+          <AddTile onClick={() => onAdd(mainId)} />
+        </div>
+      )}
     </div>
+  )
+}
+
+/** "+ Add a category": a dashed chip at the end of the main row, or a tile. */
+function AddTile({ chip = false, onClick }: { chip?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 border-2 border-dashed border-brand/40 bg-brand-soft/40 font-semibold text-brand transition hover:border-brand hover:bg-brand-soft ${
+        chip ? 'min-h-tap rounded-pill px-4 text-base' : 'min-h-[52px] rounded-xl px-3 py-2 text-left text-base'
+      }`}
+    >
+      <PlusIcon className="h-4 w-4 shrink-0" />
+      Add a category
+    </button>
   )
 }
 
