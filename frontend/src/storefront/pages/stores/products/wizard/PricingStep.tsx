@@ -31,6 +31,7 @@ import { OptionTypesEditor } from '../OptionTypesEditor'
 import type { OptionsDraft } from '../OptionTypesEditor'
 import { VariantMatrix } from '../VariantMatrix'
 import { PlatformFeeNote } from './PlatformFeeNote'
+import { LooksQuestion, VariantPhotos, photoChoiceFor, valueWithoutPhoto } from './VariantPhotos'
 import { ChoicesPreview, exampleChoice, listWords } from './choicesHelp'
 import { Field, ChoiceCard, Hint, inputClass, StepButtons, StepError, StepShell } from './shared'
 import type { StepKey, VersionPlan } from './shared'
@@ -49,9 +50,10 @@ type PendingDrop = Draft & { groups: GroupDraft[]; order: string[]; dropped: Var
  * of its own, this one among them. A product with only a family and no
  * typed option still sells at one price, so the four fields show again.
  *
- * With typed options the step is TWO screens inside one component (so no
- * state is lost between them): **pick the choices** (Size: S, M, L), then
- * **price and stock for each**. One long page with presets, options, a
+ * With typed options the step is up to THREE screens inside one component
+ * (so no state is lost between them): **pick the choices** (Size: S, M, L),
+ * then — only when a choice changes how it looks (Colour) — **a photo for
+ * each look** (required; `VariantPhotos`), then **price and stock for each**. One long page with presets, options, a
  * combinations grid and bulk tools was where sellers gave up.
  *
  * Nothing is written until Continue. Typed options go through the options
@@ -128,8 +130,17 @@ export function PricingStep({
   const [order, setOrder] = useState<string[]>(initial.order)
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null)
   const [confirmSingle, setConfirmSingle] = useState(false)
-  /** "choices" → "prices": the two screens of the options path. */
-  const [part, setPart] = useState<'choices' | 'prices'>('choices')
+  /** "choices" → "photos" (only for a look-changing choice) → "prices". */
+  const [part, setPart] = useState<'choices' | 'photos' | 'prices'>('choices')
+  /** "Does each Type look different?" — for a choice whose name does not say. */
+  const [looks, setLooks] = useState<{ key: string; yes: boolean } | null>(() => {
+    const choice = photoChoiceFor(initial.d.types)
+    return choice?.ask && initial.d.rows.some((row) => row.mediaId)
+      ? { key: choice.key, yes: true }
+      : null
+  })
+  /** The value Continue stopped at on the Photos screen. */
+  const [missingPhoto, setMissingPhoto] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -142,6 +153,13 @@ export function PricingStep({
   )
   const unusedPresets = presets.filter((preset) => !usedNames.has(preset.name.toLowerCase()))
   const images = product.media.filter((m) => m.type === 'IMAGE')
+  const photoChoice = mode === 'options' ? photoChoiceFor(draft.types) : null
+  const photoType = photoChoice ? (draft.types.find((t) => t.key === photoChoice.key) ?? null) : null
+  const looksAnswer = photoChoice && looks?.key === photoChoice.key ? looks.yes : null
+  const needsPhotos = photoType !== null && (!photoChoice!.ask || looksAnswer === true)
+  const parts = photoType
+    ? (['choices', 'photos', 'prices'] as const)
+    : (['choices', 'prices'] as const)
   const cardCount = draft.types.length + groups.length
   const example = exampleChoice(presets)
   // The seller's own name reads best in the example, unless it is long.
@@ -385,6 +403,23 @@ export function PricingStep({
     const empty = draft.types.find((t) => t.values.length === 0)
     if (empty) return setError(`Add at least one option to “${empty.name.trim()}” — for example S, M, L.`)
     setError(null)
+    setPart(photoType ? 'photos' : 'prices')
+  }
+
+  /** Photos screen → prices: every look on sale needs its own photo. */
+  const fromPhotos = () => {
+    if (photoChoice?.ask && looksAnswer === null) {
+      return setError(`Tap Yes or No first — does each ${photoType?.name.trim().toLowerCase()} look different?`)
+    }
+    if (needsPhotos && photoType) {
+      const missing = valueWithoutPhoto(photoType, draft.rows, images)
+      if (missing) {
+        setMissingPhoto(missing.key)
+        return setError(`Add a photo for ${missing.value} — tap its box.`)
+      }
+    }
+    setMissingPhoto(null)
+    setError(null)
     setPart('prices')
   }
 
@@ -394,6 +429,7 @@ export function PricingStep({
     }
     // Typed options are priced on their own screen.
     if (mode === 'options' && part === 'choices' && draft.types.length > 0) return toPrices()
+    if (mode === 'options' && part === 'photos') return fromPhotos()
     if (mode === 'single') {
       if (product.hasVariants || product.groups.length > 0) return setConfirmSingle(true)
       return void saveSingle()
@@ -468,9 +504,21 @@ export function PricingStep({
 
   return (
     <StepShell
-      title={mode === 'options' && part === 'prices' ? 'Price for each choice' : 'Price'}
-      lead={
+      title={
         mode === 'options' && part === 'prices'
+          ? 'Price for each choice'
+          : mode === 'options' && part === 'photos' && photoType
+            ? needsPhotos
+              ? `Photo for each ${photoType.name.trim().toLowerCase()}`
+              : 'Photos'
+            : 'Price'
+      }
+      lead={
+        mode === 'options' && part === 'photos' && photoType
+          ? needsPhotos
+            ? `Customers tap these photos to pick a ${photoType.name.trim().toLowerCase()}.`
+            : 'One question, then the prices.'
+          : mode === 'options' && part === 'prices'
           ? supplyOnly
             ? 'Type the suggested price and how many you have for each one. Your price for sellers is asked in the last step.'
             : 'Type a price and how many you have for each one. Use “Same price for all” if most are the same.'
@@ -480,7 +528,7 @@ export function PricingStep({
       {/* Where the seller is on the two-screen path. */}
       {mode === 'options' && draft.types.length > 0 && (
         <ol className="flex gap-2" aria-label="Price step">
-          {(['choices', 'prices'] as const).map((p, i) => (
+          {parts.map((p, i) => (
             <li
               key={p}
               aria-current={part === p ? 'step' : undefined}
@@ -495,7 +543,7 @@ export function PricingStep({
               >
                 {i + 1}
               </span>
-              {p === 'choices' ? 'Choices' : 'Prices'}
+              {p === 'choices' ? 'Choices' : p === 'photos' ? 'Photos' : 'Prices'}
             </li>
           ))}
         </ol>
@@ -580,8 +628,8 @@ export function PricingStep({
             <p className="flex items-center gap-2 rounded-xl bg-success/10 px-3 py-2.5 text-hint font-medium text-fg">
               <CheckIcon className="h-4 w-4 shrink-0 text-success" />
               {draft.rows.filter((row) => !row.removed).length} choice
-              {draft.rows.filter((row) => !row.removed).length === 1 ? '' : 's'} to price.
-              Tap Continue to set the prices.
+              {draft.rows.filter((row) => !row.removed).length === 1 ? '' : 's'}.
+              Tap Continue to {photoType ? 'add their photos' : 'set the prices'}.
             </p>
           )}
 
@@ -594,6 +642,34 @@ export function PricingStep({
               </Hint>
               <div className="mt-3">{singleFields}</div>
             </div>
+          )}
+        </div>
+      ) : part === 'photos' && photoType ? (
+        <div className="space-y-5">
+          {photoChoice?.ask && (
+            <LooksQuestion
+              name={photoType.name}
+              answer={looksAnswer}
+              onAnswer={(yes) => {
+                setLooks({ key: photoType.key, yes })
+                setError(null)
+              }}
+            />
+          )}
+          {needsPhotos && (
+            <VariantPhotos
+              storeId={storeId}
+              product={product}
+              type={photoType}
+              rows={draft.rows}
+              onRowsChange={(rows) => {
+                setDraft({ ...draft, rows })
+                setError(null)
+              }}
+              onSaved={onSaved}
+              highlightKey={missingPhoto}
+              disabled={busy}
+            />
           )}
         </div>
       ) : (
@@ -616,10 +692,10 @@ export function PricingStep({
 
       <StepButtons
         onBack={
-          mode === 'options' && part === 'prices'
+          mode === 'options' && part !== 'choices'
             ? () => {
                 setError(null)
-                setPart('choices')
+                setPart(part === 'prices' && photoType ? 'photos' : 'choices')
               }
             : onBack
         }

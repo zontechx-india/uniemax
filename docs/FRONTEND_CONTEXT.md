@@ -2469,17 +2469,30 @@ is never shown a pickup-address item.
   MRP, how many you have, product code (optional). "How many you have" starts
   **empty** on a never-priced draft and is required — a prefilled 0 used to
   be saved untouched and the product went live sold out; **"Many colours,
-  sizes or weights"** (body: "Like {product} in Red, Maroon and Pink") = TWO screens inside one `PricingStep` (state survives between
-  them; a "1 Choices · 2 Prices" strip shows where you are):
+  sizes or weights"** (body: "Like {product} in Red, Maroon and Pink") = up to THREE screens inside one `PricingStep` (state survives between
+  them; a "1 Choices · 2 Photos · 3 Prices" strip shows where you are):
   **Choices** — the category's **suggested options** as one-tap 44px chips
   ("What do customers choose? Tap one") and the `OptionTypesEditor`; Continue
-  checks every choice is named and has options, then **Prices** — the
+  checks every choice is named and has options, then **Photos**
+  (`wizard/VariantPhotos.tsx`) — only when a choice changes how the product
+  LOOKS (`photoChoiceFor`: Colour / Shade / Design / Pattern / Print / Style /
+  Finish are certain; any other name not size-like — Type, Model — is asked
+  first, "Does each type look different?" Yes / No; sizes and weights alone
+  skip the screen): "Photo for each colour", a live **What customers see**
+  swatch row that fills in as photos are picked, then one big tile per value
+  on sale ("Add photo", dashed; "2 of 4 done"). A tap opens "Photo for Pink":
+  the product's photos plus **Take or upload a photo** (uploads straight
+  onto the product, then is picked). The photo is set on every row with that
+  value. **Required** — Continue outlines the first value without one ("Add a
+  photo for Maroon — tap its box"); two values on one photo get a soft
+  warning. Then **Prices** — the
   `VariantMatrix` (a blank stock counts as 0, but ALL blank is refused —
   `draftToInput` asks for counts and points at "Same stock for all"), whose
   bulk tools ("Same price for all…", MRP, stock,
-  Turn all on, "Same photo for every…") live in ONE sheet, and whose
-  per-choice photo is picked by sight in a bottom sheet ("Main" = the first
-  photo). Saved as one `PUT …/options`; dropped saved choices confirmed
+  Turn all on) live in ONE sheet; a row only SHOWS its photo (read-only
+  thumbnail, hidden when no row has one). It replaced a photo box on every
+  price card, pre-filled with the cover, that sellers did not know to tap.
+  Saved as one `PUT …/options`; dropped saved choices confirmed
   first. In the editor a choice is "Choice 1: Size" with "Size options" as
   chips (`ChipInput`: 36px chips, a visible **Add** button while typing,
   "S, M, L" typed at once becomes three) and a worded **Remove**. The
@@ -3465,7 +3478,8 @@ frontend/
     │           │   │   ├── BasicsStep.tsx       # Name + "more than one colour?" + category → creates the draft
     │           │   │   ├── CategoryPick.tsx     # ① Main category chips → ② grouped sub-category cards
     │           │   │   ├── PhotosStep.tsx       # Media Board on the draft
-    │           │   │   ├── PricingStep.tsx      # One version / choices → Choices screen → Prices screen
+    │           │   │   ├── PricingStep.tsx      # One version / choices → Choices → Photos (looks only) → Prices
+    │           │   │   ├── VariantPhotos.tsx    # Required photo per Colour value + "does it look different?" question
     │           │   │   ├── choicesHelp.tsx      # Colour/weight-in-name hint, category example, ChoicesPreview
     │           │   │   ├── DetailsStep.tsx      # Description + suggested spec rows
     │           │   │   ├── DeliveryStep.tsx     # Store settings vs per-product overrides
@@ -3473,7 +3487,7 @@ frontend/
     │           │   ├── OptionTypesEditor.tsx # ≤3 choices (chips); linked products (a family) behind "More ways"
     │           │   ├── GroupMemberPicker.tsx # Tick the store's products as a family's members
     │           │   ├── CreateMemberDialog.tsx # "Create new product for this value" — draft twin
-    │           │   ├── VariantMatrix.tsx     # Price per choice: cards (phone) / table; bulk + photo pickers as sheets
+    │           │   ├── VariantMatrix.tsx     # Price per choice: cards (phone) / table; bulk tools as a sheet; photos read-only
     │           │   └── SpecificationsEditor.tsx # Ordered label/value rows
     │           ├── ui/                  # Seller UI kit (glass) — GlassCard, PageHeader,
     │           │                        #   SaveBar + useUnsavedChangesGuard, ActionRow,

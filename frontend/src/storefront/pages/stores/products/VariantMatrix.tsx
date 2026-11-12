@@ -15,7 +15,7 @@ import type {
 } from '../../../features/stores/productOptions'
 import type { StoreProductMediaItem } from '../../../features/stores/storesApi'
 import { ActiveSwitch } from '../ActiveSwitch'
-import { CheckIcon, ChevronDownIcon, SlidersIcon, TrashIcon } from '../../../layout/icons'
+import { SlidersIcon, TrashIcon } from '../../../layout/icons'
 import { MediaImg } from '../../../../shared/media/MediaImg'
 
 /**
@@ -26,14 +26,14 @@ import { MediaImg } from '../../../../shared/media/MediaImg'
  * a "not offered" strip below the grid and can be brought back with one click,
  * so the grid never loses a combination the seller might want later.
  *
- * Photos are chosen by looking at them: the thumbnail is the control, and it
- * opens the product's own photos to pick from — never a "Photo 3" in a list.
+ * Photos are NOT chosen here: they belong to a look (every Pink row shows
+ * the Pink photo) and are picked one per value on the screen before this
+ * (`wizard/VariantPhotos.tsx`). A row only shows its photo, read-only.
  *
  * From `sm` up it is a table with one column per option type; on a phone each
  * combination is a card, because a seven-column table at 375px is unusable.
  * Bulk helpers exist because a 6 × 4 matrix is 24 prices to type and most of
- * them are the same — and because "every pink one shows the pink photo" is
- * one decision, not six. They live in ONE sheet ("Same price for all…")
+ * them are the same. They live in ONE sheet ("Same price for all…")
  * rather than a panel above the list, where four bulk fields and two
  * selects pushed the actual prices a screen down on a phone.
  *
@@ -49,7 +49,7 @@ export function VariantMatrix({
 }: {
   types: OptionTypeDraft[]
   rows: VariantDraft[]
-  /** The product's photos, for the per-variant picker. Empty before the first upload. */
+  /** The product's photos, to show each row's chosen one. */
   media: StoreProductMediaItem[]
   onChange: (rows: VariantDraft[]) => void
   disabled?: boolean
@@ -57,9 +57,6 @@ export function VariantMatrix({
   const [bulkPrice, setBulkPrice] = useState('')
   const [bulkMrp, setBulkMrp] = useState('')
   const [bulkStock, setBulkStock] = useState('')
-  const [photoTypeKey, setPhotoTypeKey] = useState('')
-  const [photoValueKey, setPhotoValueKey] = useState('')
-  const [photoMediaId, setPhotoMediaId] = useState<string | null>(null)
   const [bulkOpen, setBulkOpen] = useState(false)
 
   const patchRow = (index: number, patch: Partial<VariantDraft>) =>
@@ -70,21 +67,11 @@ export function VariantMatrix({
   const offered = rows.filter((row) => !row.removed)
   const removed = rows.filter((row) => row.removed)
   const missing = rowsNeedingPrice(rows)
+  const photoOf = (row: VariantDraft) =>
+    row.mediaId ? (media.find((item) => item.id === row.mediaId) ?? null) : null
+  const withPhotos = offered.some((row) => photoOf(row) !== null)
   const valueOf = (row: VariantDraft, type: OptionTypeDraft) =>
     type.values.find((v) => v.key === row.valueKeys[type.key])?.value ?? '—'
-
-  const photoType = types.find((type) => type.key === photoTypeKey)
-  const photoValue = photoType?.values.find((v) => v.key === photoValueKey)
-  const applyPhotoByValue = () => {
-    if (!photoTypeKey || !photoValueKey) return
-    onChange(
-      rows.map((row) =>
-        row.valueKeys[photoTypeKey] === photoValueKey
-          ? { ...row, mediaId: photoMediaId }
-          : row,
-      ),
-    )
-  }
 
   // 44px on phones (the card fields); the dense desktop table keeps 36px.
   const inputClass =
@@ -167,70 +154,6 @@ export function VariantMatrix({
             Turn all on
           </button>
         </div>
-
-        {/* "Every Pink shows the pink photo" — one decision for a whole value. */}
-        {media.length > 0 && (
-          <div className="border-t border-line pt-4">
-            <span className={helperLabel}>Same photo for every…</span>
-            <div className="grid items-center gap-2">
-              <select
-                value={photoTypeKey}
-                onChange={(e) => {
-                  setPhotoTypeKey(e.target.value)
-                  setPhotoValueKey('')
-                }}
-                disabled={disabled}
-                aria-label="Option"
-                className={inputClass}
-              >
-                <option value="">Choose an option…</option>
-                {types.map((type) => (
-                  <option key={type.key} value={type.key}>
-                    {type.name.trim() || 'Option'}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={photoValueKey}
-                onChange={(e) => setPhotoValueKey(e.target.value)}
-                disabled={disabled || !photoType}
-                aria-label="Value"
-                className={inputClass}
-              >
-                <option value="">
-                  {photoType ? `Which ${photoType.name.trim() || 'value'}…` : 'Then a value…'}
-                </option>
-                {(photoType?.values ?? []).map((value) => (
-                  <option key={value.key} value={value.key}>
-                    {value.value}
-                  </option>
-                ))}
-              </select>
-              <div className="flex items-center gap-2">
-                <span className="text-hint text-muted">shows this photo:</span>
-                <PhotoPicker
-                  value={photoMediaId}
-                  media={media}
-                  onChange={setPhotoMediaId}
-                  disabled={disabled}
-                  label={
-                    photoValue
-                      ? `Photo for every ${photoValue.value}`
-                      : 'Photo to apply'
-                  }
-                />
-              </div>
-              <button
-                type="button"
-                onClick={applyPhotoByValue}
-                disabled={disabled || !photoTypeKey || !photoValueKey}
-                className={`${helperButton} w-full`}
-              >
-                Apply photo
-              </button>
-            </div>
-          </div>
-        )}
       </div>
       </Dialog>
 
@@ -239,7 +162,7 @@ export function VariantMatrix({
         <table className="w-full text-sm">
           <thead className="bg-fg/[0.04] text-left text-xs font-semibold text-muted">
             <tr>
-              <th className="whitespace-nowrap px-3 py-2">Photo</th>
+              {withPhotos && <th className="whitespace-nowrap px-3 py-2">Photo</th>}
               {types.map((type) => (
                 <th key={type.key} className="whitespace-nowrap px-3 py-2">
                   {type.name.trim() || 'Option'}
@@ -260,15 +183,11 @@ export function VariantMatrix({
                   key={Object.values(row.valueKeys).join('|')}
                   className={row.isActive ? '' : 'text-muted'}
                 >
-                  <td className="px-3 py-2">
-                    <PhotoPicker
-                      value={row.mediaId}
-                      media={media}
-                      onChange={(mediaId) => patchRow(index, { mediaId })}
-                      disabled={disabled}
-                      label={`Photo for ${draftLabel(types, row)}`}
-                    />
-                  </td>
+                  {withPhotos && (
+                    <td className="px-3 py-2">
+                      <RowPhoto url={photoOf(row)?.url ?? null} />
+                    </td>
+                  )}
                   {types.map((type) => (
                     <td key={type.key} className="whitespace-nowrap px-3 py-2 font-medium">
                       {valueOf(row, type)}
@@ -358,13 +277,7 @@ export function VariantMatrix({
               }`}
             >
               <div className="flex items-center gap-3">
-                <PhotoPicker
-                  value={row.mediaId}
-                  media={media}
-                  onChange={(mediaId) => patchRow(index, { mediaId })}
-                  disabled={disabled}
-                  label={`Photo for ${draftLabel(types, row)}`}
-                />
+                {withPhotos && <RowPhoto url={photoOf(row)?.url ?? null} />}
                 <p className="min-w-0 flex-1 text-base leading-snug font-bold break-words text-fg">
                   {draftLabel(types, row)}
                 </p>
@@ -492,132 +405,16 @@ export function VariantMatrix({
   )
 }
 
-/**
- * The photo a combination shows, chosen by sight: the thumbnail IS the
- * control, and it opens the product's own photos to pick from. "Cover" (the
- * first photo) is what a combination shows when nothing is chosen.
- */
-function PhotoPicker({
-  value,
-  media,
-  onChange,
-  disabled,
-  label,
-}: {
-  value: string | null
-  media: StoreProductMediaItem[]
-  onChange: (mediaId: string | null) => void
-  disabled: boolean
-  label: string
-}) {
-  const [open, setOpen] = useState(false)
-
-  const cover = media[0] ?? null
-  const chosen = value ? (media.find((item) => item.id === value) ?? null) : null
-  const shown = chosen ?? cover
-  const pick = (mediaId: string | null) => {
-    onChange(mediaId)
-    setOpen(false)
-  }
-
+/** A row's photo, shown not chosen — the Photos screen chose it. */
+function RowPhoto({ url }: { url: string | null }) {
   return (
-    <div className="inline-block">
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        disabled={disabled || media.length === 0}
-        aria-label={label}
-        aria-haspopup="dialog"
-        title={
-          media.length === 0
-            ? 'Add photos in the Photos step first, then pick one here'
-            : 'Tap to choose which photo this combination shows'
-        }
-        className="flex items-center gap-1 rounded-xl border border-line bg-input p-1 pr-1.5 transition hover:border-brand disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <span className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-alt">
-          {shown?.url ? (
-            <MediaImg sizes="48px" src={shown.url} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <span className="text-xs font-semibold text-muted">Photo</span>
-          )}
-          {!chosen && shown?.url && (
-            <span className="absolute inset-x-0 bottom-0 bg-scrim text-center text-xs leading-4 font-semibold text-white">
-              Main
-            </span>
-          )}
-        </span>
-        <ChevronDownIcon className="h-3.5 w-3.5 shrink-0 text-muted" />
-      </button>
-
-      <Dialog
-        open={open}
-        title="Which photo?"
-        subtitle={label}
-        onClose={() => setOpen(false)}
-      >
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-            <PhotoTile
-              url={cover?.url ?? null}
-              caption="Main"
-              selected={value === null}
-              onClick={() => pick(null)}
-            />
-            {media.map((item, i) => (
-              <PhotoTile
-                key={item.id}
-                url={item.url}
-                caption={String(i + 1)}
-                selected={value === item.id}
-                onClick={() => pick(item.id)}
-              />
-            ))}
-          </div>
-          <p className="mt-3 text-hint text-muted">
-            “Main” is your first photo — whichever photo is first.
-          </p>
-      </Dialog>
-    </div>
-  )
-}
-
-function PhotoTile({
-  url,
-  caption,
-  selected,
-  onClick,
-}: {
-  url: string | null
-  caption: string
-  selected: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={selected}
-      aria-label={caption === 'Main' ? 'Use the main photo' : `Use photo ${caption}`}
-      className={`relative aspect-square overflow-hidden rounded-xl border transition ${
-        selected ? 'border-brand ring-2 ring-brand/40' : 'border-line hover:border-brand'
-      }`}
-    >
+    <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-alt">
       {url ? (
-        <MediaImg sizes="96px" src={url} alt="" className="h-full w-full object-cover" />
+        <MediaImg sizes="48px" src={url} alt="" className="h-full w-full object-cover" />
       ) : (
-        <span className="flex h-full w-full items-center justify-center bg-surface-alt text-xs text-muted">
-          —
-        </span>
+        <span className="text-xs text-muted">—</span>
       )}
-      <span className="absolute inset-x-0 bottom-0 bg-scrim text-center text-xs leading-5 font-semibold text-white">
-        {caption}
-      </span>
-      {selected && (
-        <span className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-brand text-brand-contrast">
-          <CheckIcon className="h-4 w-4" />
-        </span>
-      )}
-    </button>
+    </span>
   )
 }
 
