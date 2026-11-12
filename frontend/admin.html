@@ -6,7 +6,7 @@
          instead of after the CSS is parsed (fewer fallback-font flashes). -->
     <link rel="preload" href="/fonts/PlusJakartaSans-Latin.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="icon" type="image/png" href="/app_logo.png" />
-    <link rel="apple-touch-icon" href="/app_logo.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Admin · UnieMax</title>
 
@@ -25,6 +25,16 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="UM Admin" />
+    <!-- Dev host → "UM Admin DEV" with an A-DEV badge (see index.html). -->
+    <script>
+      (function () {
+        var h = location.hostname
+        if (!/(^|\.)dev\.uniemax\.zontechx\.com$/.test(h) && h !== 'localhost' && !/\.localhost$/.test(h)) return
+        document.querySelector('link[rel="manifest"]').href = '/manifest-admin-dev.json'
+        document.querySelector('link[rel="apple-touch-icon"]').href = '/apple-touch-icon-admin-dev.png'
+        document.querySelector('meta[name="apple-mobile-web-app-title"]').content = 'UM Admin DEV'
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

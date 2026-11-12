@@ -2962,6 +2962,15 @@ The **admin console installs too, on its own host** (`admin.uniemax.com`,
 would point at the shop, so `main.tsx` removes the manifest link there and the
 console is not installable on that path.
 
+**Dev looks different from prod once installed.** Dev and prod run the same
+build, so a small inline script in the head of `index.html` and `admin.html`
+checks the host: on `*.dev.uniemax.zontechx.com` (and localhost) it points the
+manifest at `manifest-dev.json` ("UnieMax DEV", orange **DEV** badge) or
+`manifest-admin-dev.json` ("UM Admin DEV", teal **A-DEV** badge), and swaps
+`apple-touch-icon` and the iOS title to the dev versions. It runs while the
+head is parsed, so Chrome reads the dev manifest from the start. Prod hosts
+are untouched.
+
 `theme-color` (the status bar colour when standalone) is a single meta tag
 rewritten by `shared/theme/mode.ts`, not a `prefers-color-scheme` pair — the
 app's light/dark is a **stored choice**, so a media query would follow the
@@ -3553,17 +3562,19 @@ lockup at `h-11` — so they stay sharp on high-DPR phones:
 | `app_logo_with_name.png` | the lockup — mark + "UnieMax", 800×263 (~20 KB) | `AppLogoLockup` (light scheme); source of `og-image.jpg` |
 | `og-image.jpg` | the platform's 1200×630 link-preview card — the lockup on white, rendered by the backend's store-card function (`renderCardImage`) | the default `og:image` / `twitter:image` in `index.html` |
 | `app_logo_with_name_dark.png` | the same lockup with "Unie" lifted to white | `AppLogoLockup` (dark scheme + `tone="on-dark"`) |
-| `pwa-192.png` · `pwa-512.png` | square install icons | `manifest.json` (`purpose: any`) |
-| `pwa-maskable-512.png` | the same mark inset to 72% | `manifest.json` (`purpose: maskable`) |
-| `apple-touch-icon.png` | 180×180, opaque | iOS home screen |
+| `pwa-192.png` · `pwa-512.png` | square install icons, bag on white | `manifest.json`, `manifest-admin.json` (`purpose: any`) |
+| `pwa-maskable-512.png` | the same design inset to 72% | both manifests (`purpose: maskable`) |
+| `apple-touch-icon.png` | 180×180, opaque | iOS home screen (both HTML entries) |
+| `pwa-dev-*` · `apple-touch-icon-dev.png` | the same set with an orange DEV badge | `manifest-dev.json` (dev host only) |
+| `pwa-admin-dev-*` · `apple-touch-icon-admin-dev.png` | the same set with a teal A-DEV badge | `manifest-admin-dev.json` (dev admin host only) |
 
-The four icons are **generated from `app_logo.png`**, which is portrait and
-transparent — neither of which an install icon may be. A square crop cannot
-hold the whole bag (1100px tall in a 1024-wide image) without clipping the
-handle or the base, so each icon *contains* the logo and flattens it onto the
-palette's Black `#111111`: on white the glow disappears, and on the brand
-purple the bag itself would. The maskable one is inset to 72% because Android
-crops it to a circle or squircle.
+The install icons are **generated from `app_logo.png`** by
+`node frontend/scripts/make-app-icons.mjs` (rerun it after changing the logo).
+The logo is portrait and transparent — neither of which an install icon may
+be. A square crop cannot hold the whole bag without clipping the handle or the
+base, so each icon *contains* the logo and flattens it onto **white**. The
+maskable ones are inset to 72% because Android crops them to a circle or
+squircle.
 
 The lockup sets **Unie** in near-black and **Max** in the purple, so it needs
 the dark twin — the black half would vanish on the dark canvas. The swap is a

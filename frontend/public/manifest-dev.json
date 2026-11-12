@@ -1,0 +1,52 @@
+{
+  "id": "/",
+  "name": "UnieMax DEV",
+  "short_name": "UnieMax DEV",
+  "description": "Shop every UnieMax store in one place — browse, order and track your deliveries.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "theme_color": "#ffffff",
+  "background_color": "#f8f8f8",
+  "lang": "en-IN",
+  "dir": "ltr",
+  "categories": [
+    "shopping"
+  ],
+  "icons": [
+    {
+      "src": "/pwa-dev-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-dev-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-dev-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "My Orders",
+      "short_name": "Orders",
+      "url": "/orders"
+    },
+    {
+      "name": "My Cart",
+      "short_name": "Cart",
+      "url": "/cart"
+    }
+  ]
+}

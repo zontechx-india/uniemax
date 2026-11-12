@@ -79,6 +79,21 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="UnieMax" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!--
+      Dev and prod run the same build, so the dev look is chosen by host: on
+      dev.uniemax.zontechx.com (and localhost) the installed app is
+      "UnieMax DEV" with a DEV badge, so it can't be mistaken for prod.
+      Icons come from `scripts/make-app-icons.mjs`.
+    -->
+    <script>
+      (function () {
+        var h = location.hostname
+        if (!/(^|\.)dev\.uniemax\.zontechx\.com$/.test(h) && h !== 'localhost' && !/\.localhost$/.test(h)) return
+        document.querySelector('link[rel="manifest"]').href = '/manifest-dev.json'
+        document.querySelector('link[rel="apple-touch-icon"]').href = '/apple-touch-icon-dev.png'
+        document.querySelector('meta[name="apple-mobile-web-app-title"]').content = 'UnieMax DEV'
+      })()
+    </script>
     <meta name="facebook-domain-verification" content="hzwrc7p4jokp01me9bp8euoddg1j7i" />
 
     <!-- Meta Pixel Code -->
