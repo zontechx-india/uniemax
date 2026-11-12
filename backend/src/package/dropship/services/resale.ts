@@ -276,7 +276,14 @@ export async function addResales(store: StoreRef, customerId: string, input: Res
       const key = await deps.host.copyMedia(m.key, store.id);
       if (!key) continue;
       mediaIndex.set(m.id, media.length);
-      media.push({ key, type: m.type, altText: m.altText, displayOrder: m.displayOrder });
+      media.push({
+        key,
+        type: m.type,
+        altText: m.altText,
+        displayOrder: m.displayOrder,
+        lookOption: m.lookOption,
+        lookValue: m.lookValue,
+      });
     }
     const hasImage = media.some((m) => m.type === "IMAGE");
 
@@ -453,7 +460,16 @@ export async function refreshResale(store: StoreRef, id: string) {
   const media: CopyMediaInput[] = [];
   for (const m of source.media) {
     const key = await deps.host.copyMedia(m.key, store.id);
-    if (key) media.push({ key, type: m.type, altText: m.altText, displayOrder: m.displayOrder });
+    if (key) {
+      media.push({
+        key,
+        type: m.type,
+        altText: m.altText,
+        displayOrder: m.displayOrder,
+        lookOption: m.lookOption,
+        lookValue: m.lookValue,
+      });
+    }
   }
   try {
     const oldKeys = await deps.prisma.$transaction((tx) =>

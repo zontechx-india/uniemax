@@ -1432,9 +1432,13 @@ White-label design — one codebase, any business:
   phone (SMS) first, else email; a wrong code is `403` (not `401`, which web
   clients answer with a session refresh + replay).
 - **StoreProductMedia** — media attached to a store product (cascade delete):
-  up to **8 IMAGEs + 1 VIDEO** (service-enforced), each holding a storage
+  up to **20 IMAGEs + 1 VIDEO** (service-enforced), each holding a storage
   **object key** (never a URL), optional `altText` (accessibility) and
   `displayOrder`; a variant may point at one of the images as its own photo.
+  `lookOption` / `lookValue` (nullable) say which look the photo shows
+  ("Colour" / "Pink"); null = shared. Written only by the options PUT
+  (`mediaLooks`, the full set); the product page shows the picked look's
+  photos then the shared ones. Dropship copies carry them over.
   The image with the lowest `displayOrder` is the product's
   **cover** — there is no separate cover flag to fall out of sync. Reordering
   rewrites the image orders 0..n-1; the video sits at a high order outside

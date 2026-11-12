@@ -190,7 +190,16 @@ export interface ProductSnapshot {
   globalCategoryName: string | null;
   optionTypes: OptionTypeRef[];
   deliveryRule: DeliveryRuleRef;
-  media: { id: string; key: string; type: "IMAGE" | "VIDEO"; altText: string | null; displayOrder: number }[];
+  media: {
+    id: string;
+    key: string;
+    type: "IMAGE" | "VIDEO";
+    altText: string | null;
+    displayOrder: number;
+    /** The look the photo shows ("Colour" / "Pink"); null = shared. */
+    lookOption: string | null;
+    lookValue: string | null;
+  }[];
   variants: {
     id: string;
     name: string;
@@ -222,6 +231,9 @@ export interface CopyMediaInput {
   type: "IMAGE" | "VIDEO";
   altText: string | null;
   displayOrder: number;
+  /** The look the photo shows ("Colour" / "Pink"); null = shared. */
+  lookOption: string | null;
+  lookValue: string | null;
 }
 
 export interface CopyVariantInput {

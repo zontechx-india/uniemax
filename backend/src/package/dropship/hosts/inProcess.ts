@@ -244,7 +244,7 @@ export function createInProcessHost(prisma: PrismaClient): DropshipHost {
           store: { select: { shipping: true } },
           media: {
             orderBy: { displayOrder: "asc" },
-            select: { id: true, key: true, type: true, altText: true, displayOrder: true },
+            select: { id: true, key: true, type: true, altText: true, displayOrder: true, lookOption: true, lookValue: true },
           },
           variants: {
             orderBy: { createdAt: "asc" },

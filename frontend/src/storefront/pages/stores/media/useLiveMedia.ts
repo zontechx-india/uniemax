@@ -5,7 +5,7 @@ import type { StoreProduct } from '../../../features/stores/storesApi'
 import type { BoardPhoto, BoardVideo, MediaDriver } from './types'
 
 /** Mirror of the backend limit (also enforced server-side). */
-export const MAX_LIVE_PHOTOS = 8
+export const MAX_LIVE_PHOTOS = 20
 
 interface Upload {
   id: string

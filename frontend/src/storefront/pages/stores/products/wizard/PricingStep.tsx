@@ -31,7 +31,15 @@ import { OptionTypesEditor } from '../OptionTypesEditor'
 import type { OptionsDraft } from '../OptionTypesEditor'
 import { VariantMatrix } from '../VariantMatrix'
 import { PlatformFeeNote } from './PlatformFeeNote'
-import { LooksQuestion, VariantPhotos, photoChoiceFor, valueWithoutPhoto } from './VariantPhotos'
+import {
+  LooksQuestion,
+  VariantPhotos,
+  initialLooks,
+  mediaLooksFor,
+  photoChoiceFor,
+  valueWithoutPhoto,
+} from './VariantPhotos'
+import type { LookMap } from './VariantPhotos'
 import { ChoicesPreview, exampleChoice, listWords } from './choicesHelp'
 import { Field, ChoiceCard, Hint, inputClass, StepButtons, StepError, StepShell } from './shared'
 import type { StepKey, VersionPlan } from './shared'
@@ -141,6 +149,10 @@ export function PricingStep({
   })
   /** The value Continue stopped at on the Photos screen. */
   const [missingPhoto, setMissingPhoto] = useState<string | null>(null)
+  /** Which value each photo shows (mediaId → value key); saved as `mediaLooks`. */
+  const [photoLooks, setPhotoLooks] = useState<LookMap>(() =>
+    initialLooks(product, initial.d.types, initial.d.rows),
+  )
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -291,7 +303,12 @@ export function PricingStep({
     if (d.types.length > 0) {
       const result = draftToInput(d.types, d.rows)
       if ('error' in result) throw new Error(result.error)
-      saved = await storeCatalogApi.replaceProductOptions(storeId, product.id, result.input)
+      const lookType = needsPhotos ? (d.types.find((t) => t.key === photoType?.key) ?? null) : null
+      saved = await storeCatalogApi.replaceProductOptions(storeId, product.id, {
+        ...result.input,
+        // The full set every time — names are current, so a rename can't orphan a photo.
+        mediaLooks: mediaLooksFor(lookType, d.rows, photoLooks, images, result.input.optionTypes),
+      })
     } else {
       const fields = readSingleFields()
       if ('error' in fields) throw new Error(fields.error)
@@ -412,7 +429,7 @@ export function PricingStep({
       return setError(`Tap Yes or No first — does each ${photoType?.name.trim().toLowerCase()} look different?`)
     }
     if (needsPhotos && photoType) {
-      const missing = valueWithoutPhoto(photoType, draft.rows, images)
+      const missing = valueWithoutPhoto(photoType, draft.rows, photoLooks, images)
       if (missing) {
         setMissingPhoto(missing.key)
         return setError(`Add a photo for ${missing.value} — tap its box.`)
@@ -664,8 +681,10 @@ export function PricingStep({
               product={product}
               type={photoType}
               rows={draft.rows}
-              onRowsChange={(rows) => {
+              looks={photoLooks}
+              onChange={({ rows, looks }) => {
                 setDraft({ ...draft, rows })
+                setPhotoLooks(looks)
                 setError(null)
               }}
               onSaved={onSaved}

@@ -63,6 +63,7 @@ import { MediaImg } from '../../../shared/media/MediaImg'
 import { buttonClass } from '../../../shared/ui/Button'
 import { displayName, plainLetters } from '../../features/publicStore/shopShape'
 import { ContactActions, shopContact } from '../../features/publicStore/ShopContact'
+import { galleryFor } from '../../features/stores/productLooks'
 
 /**
  * `/store/{storeSlug}/product/{productSlug}` — full product detail.
@@ -217,6 +218,7 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
   const price = variant ? variant.price : (product.price ?? '0')
   const compareAt = variant ? variant.compareAtPrice : product.compareAtPrice
   const sku = variant ? variant.sku : product.sku
+  const gallery = galleryFor(product.media, product.optionTypes, selection, variant?.mediaId ?? null)
   // The variant's own photo leads (the pink saree shows pink); else the cover.
   const variantImage = variant?.mediaId
     ? (product.media.find((item) => item.id === variant.mediaId)?.url ?? null)
@@ -284,7 +286,13 @@ function ProductDetail({ product }: { product: PublicProductDetail }) {
       <div className="grid items-start gap-8 lg:grid-cols-2 lg:gap-14">
         {/* The gallery stays put while the long right column scrolls. */}
         <div className="min-w-0 lg:sticky lg:top-[5.5rem]">
-          <MediaGallery product={product} focusId={variant?.mediaId ?? null} />
+          {/* Pink chosen → Pink's photos, then the shared ones (keyed so it starts at the first). */}
+          <MediaGallery
+            key={gallery.map((item) => item.id).join('|')}
+            product={product}
+            media={gallery}
+            focusId={variant?.mediaId ?? null}
+          />
         </div>
 
         {/* Everything about buying, set straight on the page beside the
@@ -881,13 +889,15 @@ function useIsVisible<T extends HTMLElement>(
  */
 function MediaGallery({
   product,
+  media,
   focusId,
 }: {
   product: PublicProductDetail
+  /** What to show — the picked look's photos and the shared ones (`galleryFor`). */
+  media: PublicProductDetail['media']
   focusId: string | null
 }) {
   const { skin } = usePublicStore()
-  const media = product.media
   const [index, setIndex] = useState(0)
   const active = media[index] ?? media[0] ?? null
   const [zoom, setZoom] = useState<{ x: number; y: number } | null>(null)

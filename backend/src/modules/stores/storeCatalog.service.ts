@@ -57,7 +57,7 @@ import {
 export const DEFAULT_VARIANT_NAME = "Default";
 
 /** Media limits per product (service-enforced, mirrored in the owner UI). */
-export const MAX_PRODUCT_IMAGES = 8;
+export const MAX_PRODUCT_IMAGES = 20;
 export const MAX_PRODUCT_VIDEOS = 1;
 
 /**
@@ -108,6 +108,8 @@ const productSelect = {
       key: true,
       altText: true,
       displayOrder: true,
+      lookOption: true,
+      lookValue: true,
     },
   },
   // The families this product is in, each with every member — the owner UI
@@ -274,6 +276,8 @@ function shapeProduct(row: ProductRow) {  const {
       url: mediaUrl("media", item.key),
       altText: item.altText,
       displayOrder: item.displayOrder,
+      lookOption: item.lookOption,
+      lookValue: item.lookValue,
     })),
     optionTypes,
     specifications: resolveSpecifications(specifications),
@@ -944,9 +948,28 @@ export async function replaceProductOptions(
     storeId,
     input.variants.map((variant) => ({ sku: variant.sku, variantId: variant.id })),
   );
-  await assertOwnImages(id, input.variants.map((variant) => variant.mediaId));
+  await assertOwnImages(id, [
+    ...input.variants.map((variant) => variant.mediaId),
+    ...(input.mediaLooks ?? []).map((look) => look.mediaId),
+  ]);
 
   await prisma.$transaction(async (tx) => {
+    // Photo looks: a simple product has none; otherwise the full set, when sent.
+    if (input.optionTypes.length === 0 || input.mediaLooks !== undefined) {
+      await tx.storeProductMedia.updateMany({
+        where: { productId: id },
+        data: { lookOption: null, lookValue: null },
+      });
+    }
+    if (input.optionTypes.length > 0) {
+      for (const look of input.mediaLooks ?? []) {
+        await tx.storeProductMedia.update({
+          where: { id: look.mediaId },
+          data: { lookOption: look.option, lookValue: look.value },
+        });
+      }
+    }
+
     if (input.optionTypes.length === 0) {
       // Back to a simple product. Keep the money honest: the cheapest price
       // and all the stock carry over; 0 only when there was nothing to inherit.
@@ -1443,7 +1466,7 @@ export async function updateVariant(
 }
 
 // ---------------------------------------------------------------------------
-// Product media — up to 8 images + 1 video per product. The image with the
+// Product media — up to 20 images + 1 video per product. The image with the
 // lowest displayOrder IS the cover (no separate flag to fall out of sync).
 // Objects live in the "media" bucket; rows store only the object key. Every
 // mutation returns the full parent product, like the variant endpoints.

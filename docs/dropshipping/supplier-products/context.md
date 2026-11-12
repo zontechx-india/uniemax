@@ -17,7 +17,10 @@ Status: ◐ built 20 Oct 2026 (Phase 3; API tests pass on dev, screen walkthroug
 2. **Adding** creates a real `StoreProduct` in the seller's store (D-9), live
    straight away:
    - photos copied (storage `get` + `put` to `products/{storeId}/supplied/…`;
-     sized versions render on first view); live only once it has a photo;
+     sized versions render on first view), each with the look it shows
+     (`lookOption` / `lookValue`, so Pink's photos stay Pink's — also on
+     **Get supplier's latest photos**; `services/resale.ts`); live only once
+     it has a photo;
    - options and option names copied;
    - **no SKU** copied (SKUs are unique per store);
    - delivery rule = the supplier's effective rule;

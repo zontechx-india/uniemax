@@ -1237,7 +1237,8 @@ Each:
   "variants": [ { "id", "name", "price", "compareAtPrice", "stockQuantity", "isActive", "sku",
                   "mediaId",                                  // one of media[] (IMAGE), or null = cover
                   "optionValues": { "Storage": "128 GB" }, "createdAt" } ],
-  "media":    [ { "id", "type": "IMAGE|VIDEO", "url", "altText", "displayOrder" } ],
+  "media":    [ { "id", "type": "IMAGE|VIDEO", "url", "altText", "displayOrder",
+                  "lookOption", "lookValue" } ],   // the look the photo shows ("Colour"/"Pink"); null = shared
   // Product families this one is in — the "Other products" option mode (see PUT …/groups)
   "groups":   [ { "id", "optionName": "Colour", "value": "Maroon",
                   "members": [ { "productId", "name", "slug", "imageUrl", "price", "isDraft",
@@ -1336,9 +1337,20 @@ at one revalidates to "no longer available").
     { "id": "cmr…", "optionValues": { "Size": "S" },  "price": 499, "stockQuantity": 3, "isActive": true, "sku": "TEE-S", "compareAtPrice": 699, "mediaId": "cmr…" },
     { "id": "cmr…", "optionValues": { "Size": "M" },  "price": 499, "stockQuantity": 0, "isActive": false },
     {               "optionValues": { "Size": "XL" }, "price": 549, "stockQuantity": 2 }   // new combination
-  ]
+  ],
+  // optional — which look each photo shows (see below)
+  "mediaLooks": [ { "mediaId": "cmr…", "option": "Colour", "value": "Pink" } ]
 }
 ```
+**Photos per look** — `mediaLooks` (optional) is the **full set** of photos
+that show one value of the product's look option (`option` must be one of
+`optionTypes`, `value` one of its values; a photo at most once — else `422`;
+every `mediaId` an image of this product — else `400`). Photos not listed
+become **shared** (shown with every look); omitting the field leaves every
+photo's look unchanged; `optionTypes: []` clears them all. The wizard sends it
+on every save with the current names, so a renamed value never orphans a
+photo. A variant's `mediaId` stays its own photo (the swatch, the cart
+thumbnail) — the wizard sets it to the look's first photo.
 Same `422` matrix rules as create; `400 "Variant "…" does not belong to this
 product"` for a foreign or stale `id`. `{ "optionTypes": [], "variants": [] }`
 turns the product **back into a simple one**: every variant is replaced by a
@@ -1410,14 +1422,14 @@ enabling this product") or without a price above ₹0 on an active variant
 publish stamps `publishedAt`; from then on `isDraft` is false for good, even
 when the product is disabled again. Disabling is always allowed.
 
-**Media** — up to **8 images + 1 video** per product; the image with the
+**Media** — up to **20 images + 1 video** per product; the image with the
 lowest `displayOrder` is the **cover**. Files go to the product-media bucket;
 rows store only object keys. Like variants, every mutation returns the **full
 parent product**:
 
 **`POST /api/v1/stores/:id/products/:productId/media`** (multipart) → `201`
 One `file` part — an image or a video (the content type picks the rule from
-`GET /public/media-config`). New images append after existing ones; a 9th
+`GET /public/media-config`). New images append after existing ones; a 21st
 image or 2nd video is a `409`. Oversized → `413`, unsupported type → `400`.
 
 **`PUT /api/v1/stores/:id/products/:productId/media/order`**
@@ -1879,7 +1891,8 @@ product page is where a customer picks one.
   "variants": [ { "id", "name", "price", "compareAtPrice", "sku", "stockQuantity",
                   "mediaId",                                      // the gallery item that shows this variant; null = cover
                   "optionValues": { "Size": "M" } } ],            // enabled combinations only, matrix order
-  "media": [ { "id", "type": "IMAGE|VIDEO", "url", "altText" } ], // gallery, cover first
+  "media": [ { "id", "type": "IMAGE|VIDEO", "url", "altText",
+               "lookOption", "lookValue" } ], // gallery, cover first; look = the colour it shows, null = shared
   "groups": [ { "optionName": "Colour", "value": "Maroon",         // product families this one is in
                 "members": [ { …listing shape…, "value": "Blue", "isCurrent": false } ] } ],
   "related": [ … ] }                                           // same category, max 8

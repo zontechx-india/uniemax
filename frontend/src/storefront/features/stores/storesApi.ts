@@ -647,6 +647,9 @@ export interface PublicProductMediaItem {
   type: 'IMAGE' | 'VIDEO'
   url: string | null
   altText: string | null
+  /** The look this photo shows ("Colour" / "Pink"); both null = shared. */
+  lookOption: string | null
+  lookValue: string | null
 }
 
 export interface PublicStoreVariant {
@@ -1654,7 +1657,7 @@ export interface StoreProductVariant {
 }
 
 /**
- * One media item of a product — up to 8 images + 1 video. `url` is derived
+ * One media item of a product — up to 20 images + 1 video. `url` is derived
  * server-side from storage configuration (the DB stores only object keys).
  * The image with the lowest displayOrder is the COVER image.
  */
@@ -1664,6 +1667,9 @@ export interface StoreProductMediaItem {
   url: string | null
   altText: string | null
   displayOrder: number
+  /** The look this photo shows ("Colour" / "Pink"); both null = shared. */
+  lookOption: string | null
+  lookValue: string | null
 }
 
 /**
@@ -1851,6 +1857,11 @@ export interface StoreProductCreateInput {
 export interface StoreProductOptionsInput {
   optionTypes: ProductOptionType[]
   variants: StoreVariantInput[]
+  /**
+   * Which look each photo shows, the FULL set (unlisted photos become
+   * shared). Omit to leave every photo's look unchanged.
+   */
+  mediaLooks?: { mediaId: string; option: string; value: string }[]
 }
 
 /**
@@ -2049,7 +2060,7 @@ export const storeCatalogApi = {
     )
   },
 
-  // Media — up to 8 images + 1 video per product; first image = cover. Like
+  // Media — up to 20 images + 1 video per product; first image = cover. Like
   // variants, every mutation returns the full parent product.
 
   /** Upload one image or video (the file's content type decides which). */

@@ -838,7 +838,7 @@ export async function getPublicProduct(
       },
       media: {
         orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
-        select: { id: true, type: true, key: true, altText: true },
+        select: { id: true, type: true, key: true, altText: true, lookOption: true, lookValue: true },
       },
       // The families this product is in, with every member a shopper may
       // see — the swatch row that switches to the Blue one.
@@ -969,6 +969,9 @@ export async function getPublicProduct(
       type: item.type,
       url: mediaUrl("media", item.key),
       altText: item.altText,
+      /** The look this photo shows ("Colour" / "Pink"); null = shared. */
+      lookOption: item.lookOption,
+      lookValue: item.lookValue,
     })),
     /**
      * The product families this one belongs to ("Colour": Maroon / Blue /

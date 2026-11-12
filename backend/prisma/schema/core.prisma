@@ -1001,7 +1001,7 @@ model StoreBankAccountEvent {
   @@schema("public")
 }
 
-/// Media attached to a store product — up to 8 images and 1 video
+/// Media attached to a store product — up to 20 images and 1 video
 /// (service-enforced). Stores only the storage OBJECT KEY (e.g.
 /// "products/{storeId}/{productId}/x.webp"), never a URL: the public URL is
 /// derived from configuration at read time, so the bucket, CDN, AWS account
@@ -1020,6 +1020,14 @@ model StoreProductMedia {
 
   /// Variants that show this photo (the pink saree → its pink photo).
   variants StoreProductVariant[]
+
+  /// The look this photo shows: the product's look option and one of its
+  /// values ("Colour" / "Pink"). Both null = shared, shown with every look.
+  /// When a shopper picks Pink, the gallery shows Pink's photos, then the
+  /// shared ones. Written only by the options PUT (`mediaLooks`), which
+  /// sends the full set with the CURRENT names, so a rename can't orphan it.
+  lookOption String?
+  lookValue  String?
 
   createdAt DateTime @default(now())
 

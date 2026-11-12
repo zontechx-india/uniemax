@@ -268,8 +268,40 @@ export const storeProductOptionsSchema = z
   .object({
     optionTypes: optionTypesSchema,
     variants: z.array(variantInputSchema).max(OPTION_LIMITS.variants),
+    /**
+     * Which look each photo shows ("Colour" / "Pink"), the FULL set: photos
+     * not listed become shared. Omitted = leave every photo's look as it is.
+     * `option` must be one of `optionTypes` and `value` one of its values.
+     */
+    mediaLooks: z
+      .array(
+        z.object({
+          mediaId: z.string().min(1),
+          option: z.string().trim().min(1).max(60),
+          value: z.string().trim().min(1).max(60),
+        }),
+      )
+      .max(50)
+      .optional(),
   })
-  .superRefine(refineOptionMatrix);
+  .superRefine(refineOptionMatrix)
+  .superRefine((input, ctx) => {
+    const seen = new Set<string>();
+    input.mediaLooks?.forEach((look, i) => {
+      if (seen.has(look.mediaId)) {
+        ctx.addIssue({ code: "custom", path: ["mediaLooks", i], message: "A photo can show one look only" });
+      }
+      seen.add(look.mediaId);
+      const type = input.optionTypes.find((t) => t.name === look.option);
+      if (!type || !type.values.includes(look.value)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["mediaLooks", i],
+          message: `"${look.option}: ${look.value}" is not one of this product's choices`,
+        });
+      }
+    });
+  });
 
 /** Price / MRP / stock / SKU / photo / on-off for one combination. `name` is derived, never edited. */
 export const storeVariantUpdateSchema = z.object({
