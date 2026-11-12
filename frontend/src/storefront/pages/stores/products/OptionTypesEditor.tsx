@@ -243,7 +243,7 @@ export function OptionTypesEditor({
                   <span className="mb-2 block text-sm font-medium text-muted">
                     {name ? `${name} products` : 'Products'}
                   </span>
-                  <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+                  <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
                     {group.members.map((member) => {
                       const self = member.productId === product.id
                       return (

@@ -13,7 +13,7 @@ import type {
 } from '../../features/stores/storesApi'
 import { ArrowUpIcon, ClipboardIcon, PlusIcon, TrashIcon } from '../../layout/icons'
 import { BigSwitch } from './ui/BigSwitch'
-import { GlassCard } from './ui/GlassCard'
+import { PanelCard } from './ui/PanelCard'
 
 /**
  * "Your own questions" on the Checkout page — extra things the seller's
@@ -135,7 +135,7 @@ export function CustomQuestionsCard({
     ])
 
   return (
-    <GlassCard
+    <PanelCard
       icon={ClipboardIcon}
       title="Your own questions"
       description="Need more details to deliver? Add your own questions. For villages, add Post Office, Tehsil and District so the parcel reaches the right place."
@@ -191,7 +191,7 @@ export function CustomQuestionsCard({
           </div>
         )}
       </div>
-    </GlassCard>
+    </PanelCard>
   )
 }
 
@@ -218,7 +218,7 @@ function QuestionEditor({
   const choicesProblem = problem && field.label.trim() ? problem : null
 
   return (
-    <div className="rounded-xl border border-line p-4">
+    <div className="rounded-xl border border-line p-4 bg-surface">
       <div className="mb-3 flex items-center gap-2">
         <p className="min-w-0 flex-1 whitespace-nowrap text-sm font-semibold text-muted">
           Question {number}

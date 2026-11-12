@@ -29,7 +29,7 @@ import { ShopNotLiveNudge } from './StorePublishCard'
 import { ActionRow } from './ui/ActionRow'
 import { BigSwitch } from './ui/BigSwitch'
 import { EmptyState } from './ui/EmptyState'
-import { GlassCard } from './ui/GlassCard'
+import { PanelCard } from './ui/PanelCard'
 import { PageHeader } from './ui/PageHeader'
 import { StatusPill } from './ui/StatusPill'
 import { showToast } from './ui/Toast'
@@ -238,7 +238,7 @@ export function StoreProductsPage() {
     return (
       <div className="space-y-4" aria-busy="true" aria-label="Loading products">
         <PageHeader icon={BoxIcon} title="Products" description="Loading your products…" />
-        <div className="glass-card h-64 animate-pulse rounded-glass" />
+        <div className="ws-card h-64 animate-pulse rounded-lg" />
       </div>
     )
   }
@@ -248,7 +248,7 @@ export function StoreProductsPage() {
     return (
       <div className="space-y-4">
         <PageHeader icon={BoxIcon} title="Products" description="Everything you sell." />
-        <GlassCard>
+        <PanelCard>
           <EmptyState
             icon={TagIcon}
             title="First, choose what you sell"
@@ -260,7 +260,7 @@ export function StoreProductsPage() {
               </Button>
             }
           />
-        </GlassCard>
+        </PanelCard>
         {/* Choose → the category is added → straight into the first product.
             The seller never has to find the Categories page first. */}
         <CategoryChooserSheet
@@ -355,7 +355,7 @@ export function StoreProductsPage() {
           supplyOnly={supplyOnly}
         />
       ) : products.length === 0 ? (
-        <GlassCard>
+        <PanelCard>
           <EmptyState
             icon={BoxIcon}
             title="Add your first product"
@@ -385,7 +385,7 @@ export function StoreProductsPage() {
               <SupplierProductsEntry />
             </div>
           )}
-        </GlassCard>
+        </PanelCard>
       ) : (
         <ProductList
           products={products}
@@ -530,7 +530,7 @@ function ProductList({
               value={query}
               onChange={(e) => onQuery(e.target.value)}
               placeholder="Search your products"
-              className="glass-inset h-field w-full rounded-xl pr-4 pl-11 text-base text-fg outline-none placeholder:text-muted focus:border-accent"
+              className="h-field w-full rounded-xl border border-line bg-input pr-4 pl-11 text-base text-fg outline-none placeholder:text-muted focus:border-accent"
             />
           </label>
           <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]" role="group" aria-label="Show">
@@ -567,11 +567,11 @@ function ProductList({
       )}
 
       {visible.length === 0 ? (
-        <p className="glass-card rounded-glass px-4 py-8 text-center text-base text-muted">
+        <p className="ws-card rounded-lg px-4 py-8 text-center text-base text-muted">
           No products match. Try another word{filter !== 'all' ? ' or tap “All”' : ''}.
         </p>
       ) : (
-        <ul className="glass-card divide-y divide-line overflow-hidden rounded-glass">
+        <ul className="ws-card divide-y divide-line overflow-hidden rounded-lg">
           {visible.map((product) => (
             <li key={product.id}>
               <ProductRow

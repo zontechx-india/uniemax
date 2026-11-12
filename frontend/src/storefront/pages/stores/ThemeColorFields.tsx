@@ -85,7 +85,7 @@ function ColorFieldInner({
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-md border border-line p-2.5 transition-colors hover:border-fg/30 focus-within:border-accent">
+    <div className="flex items-center gap-3 rounded-md border border-line p-2.5 transition-colors hover:border-fg/30 focus-within:border-accent bg-surface">
       <input
         type="color"
         value={value}
@@ -143,7 +143,7 @@ export function AutoColorField({
             Customize
           </button>
         </span>
-        <div className="flex h-[58px] items-center rounded-md border border-dashed border-line px-3.5">
+        <div className="flex h-[58px] items-center rounded-md border border-dashed border-line px-3.5 bg-surface">
           <span className="text-sm text-muted">Auto — {autoLabel}</span>
         </div>
         <span className="mt-1.5 block text-xs text-muted">{hint}</span>

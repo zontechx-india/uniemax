@@ -45,7 +45,7 @@ import type { OfferDraft } from '../../../../../packages/dropship'
  * missing before it can go live (a photo and a price — nothing else is
  * required).
  *
- * On a PHONE it takes the whole screen (portalled to <body>, so the glass
+ * On a PHONE it takes the whole screen (portalled to <body>, so the page
  * panel it is opened from cannot trap it): a slim frosted header — close,
  * the product, "Step 2 of 6 · Photos" (a button that lists every step), a
  * segmented progress bar — over a scrolling step whose Continue bar is
@@ -143,7 +143,7 @@ export function ProductWizard({
                     ? 'bg-brand-gradient text-brand-contrast'
                     : isDone
                       ? 'bg-success text-brand-contrast'
-                      : 'glass-inset text-muted'
+                      : 'ws-well text-muted'
                 }`}
               >
                 {isDone && !current ? <CheckIcon className="h-4 w-4" /> : i + 1}
@@ -278,7 +278,7 @@ export function ProductWizard({
   if (phone) {
     return (
       <FullScreen>
-        <header className="glass-strong shrink-0 rounded-none border-x-0 border-t-0 px-2 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2.5">
+        <header className="ws-bar shrink-0 rounded-none border-x-0 border-t-0 px-2 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2.5">
           <div className="flex items-center gap-1">
             <button
               type="button"
@@ -324,7 +324,7 @@ export function ProductWizard({
   }
 
   return (
-    <div className="glass-card mt-5 rounded-glass">
+    <div className="ws-card mt-5 rounded-lg">
       <header className="border-b border-line px-5 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex min-w-0 items-center gap-2 font-heading text-lg font-bold text-fg">
@@ -370,7 +370,7 @@ export function ProductWizard({
                         ? 'bg-brand-gradient text-brand-contrast'
                         : isDone
                           ? 'bg-success text-brand-contrast'
-                          : 'glass-inset text-muted'
+                          : 'ws-well text-muted'
                     }`}
                   >
                     {isDone && !current ? <CheckIcon className="h-3.5 w-3.5" /> : i + 1}
@@ -403,7 +403,7 @@ export function ProductWizard({
 
 /**
  * The phone frame: a full-screen layer on the seller canvas, portalled out of
- * the glass panel, with the page behind it locked so only the step scrolls.
+ * the workspace panel, with the page behind it locked so only the step scrolls.
  */
 function FullScreen({ children }: { children: ReactNode }) {
   useEffect(() => {
@@ -418,7 +418,7 @@ function FullScreen({ children }: { children: ReactNode }) {
       role="dialog"
       aria-modal="true"
       aria-label="Product editor"
-      className="seller-canvas fixed inset-0 z-40 flex flex-col"
+      className="bg-bg fixed inset-0 z-40 flex flex-col"
     >
       {children}
     </div>,
@@ -576,7 +576,7 @@ function ReviewStep({
                 <li key={check.key} className="flex min-h-[56px] items-center gap-3 px-3.5 py-2">
                   <span
                     className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
-                      done ? 'bg-success text-brand-contrast' : 'glass-inset text-muted'
+                      done ? 'bg-success text-brand-contrast' : 'ws-well text-muted'
                     }`}
                   >
                     {done ? <CheckIcon className="h-4 w-4" /> : '·'}

@@ -597,10 +597,9 @@ Signed-in account pages mount inside `RequireCustomer` → `AppLayout`
   ultrawides — the authed shell and the cart/checkout pages still use this and
   have NOT been brought onto `CONTENT_COLUMN`); form-heavy pages constrain
   themselves (`CreateStorePage` `max-w-lg`, `StoreManageLayout` `max-w-7xl`,
-  section forms `max-w-xl`). On `/mystores/**` the shell wears the seller
-  glass theme: the root gets `seller-canvas` and the top bar `glass-strong`
-  (see "Seller workspace glass + UI kit"); every other account page keeps the
-  flat `bg-bg` / `bg-surface` bar.
+  section forms `max-w-xl`). Every account page, `/mystores/**` included, has the
+  flat `bg-bg` page and `bg-surface` top bar (see "Seller workspace look + UI
+  kit").
 - **Account menu** (`layout/AccountMenu.tsx`) — the ONE place account
   navigation lives: Flipkart-style dropdown on the top-bar avatar, opens on
   hover (click/tap on touch), closes on Escape / outside tap / item click.
@@ -709,7 +708,7 @@ as long as those rows live. New seller notification URLs are emitted as
 `/mystores/…` (see BACKEND_CONTEXT). The admin console's own `/stores` route
 is a different app on a different mount and is unaffected.
 
-Routes: `/mystores` ("My shops": glass cards, each with the logo, a
+Routes: `/mystores` ("My shops": cards, each with the logo, a
 **Live / Not live yet** pill, the launch-setup progress — "3 of 5 steps done"
 with a ring, from the same `readiness` launch steps the checklist reads — and
 two actions, **Manage** and **Share** (labelled **Publish** until live; opens
@@ -727,10 +726,10 @@ status — **Supplying** / **Waiting for approval** / **Paused by UnieMax**
 the same status), `/mystores/new` (the **Create Store wizard**
 — name → logo → about you, see below), and
 `/mystores/:storeSlug` — **desktop**: a split inside the main outlet —
-`StoreManageLayout` renders a sticky left **glass** section card (it scrolls
-itself when taller than the window) and the selected section in a right glass
+`StoreManageLayout` renders a sticky left **flat** section card (it scrolls
+itself when taller than the window) and the selected section in a right
 card via a nested `<Outlet/>` (children read the loaded store through
-`useManagedStore()` outlet context). **Phone** (`< lg`): no sidebar — a glass
+`useManagedStore()` outlet context). **Phone** (`< lg`): no sidebar — a
 **store strip** (back to All stores · logo · name · Live / Not live yet ·
 **Share** once live, **Publish** before) over the section card, and a
 floating **bottom tab bar** (`StoreMobileNav`). The layout sets
@@ -781,17 +780,17 @@ One list, **three presentations**:
   Setup marks and the order badge become corner dots; `StorePublishCard`
   collapses to a single published/not-published dot.
 - **Mobile** (`< lg`) — `StoreMobileNav.tsx`: a fixed, floating
-  `glass-strong` tab bar with icon **and** word — **Home** (Dashboard) ·
+  `ws-bar` tab bar with icon **and** word — **Home** (Dashboard) ·
   **Orders** (pending badge) · **Products** · **Design** (Store Builder) ·
   **More**. More (highlighted when you are on one of its sections — it keeps the word "More"; a section name was cut to "Categori…") opens
   a `Dialog` sheet with `SectionSheetList` — every group flat and open, 52px
   rows — plus "Switch to another shop". Tabs a mode cannot open (admin hidden
   sections) are dropped. It replaced a one-row dropdown that put Orders and
   Products two taps away. The bar is mounted at the layout root, never inside
-  a glass panel (a `backdrop-filter` ancestor would trap a `fixed` child).
+  a transformed or filtered panel (it would trap a `fixed` child).
 
 Active rows (desktop and sheet) are a **Light-Purple pill with brand icon and
-label** — the old 3px left bar was dropped with the glass redesign.
+label** — the old 3px left bar was dropped in the seller redesign.
 
 Collapsing costs a click before a cross-group jump, so it is paid for three
 ways: **the group you navigate into opens itself** (keyed on the group
@@ -857,8 +856,8 @@ created/deleted, product enabled/disabled/deleted, product wizard closed) —
 card's "Before publishing, add…", is computed server-side from the catalog.
 It renders, top to bottom:
 
-- A **hero** — a tinted glass card (`glass-tint`: the glass fill with a soft
-  brand wash from the top-right and an accent wash from the bottom-left), so
+- A **hero** — a brand-tinted card (`ws-tint`: a flat brand-soft fill with a
+  brand-mixed border), so
   the next-step button is the only solid colour on it: today's date (no greeting)
   and the shop name; once a live shop has orders, three frosted stat tiles —
   **Today** / **Waiting** (orange dot when > 0) / **Total sales** (its own
@@ -870,12 +869,12 @@ It renders, top to bottom:
   **Share on WhatsApp** ("Get your first order" / "All caught up").
 - The `SetupChecklist` (above the numbers until the shop is live and has
   orders, below them after).
-- **Your orders** — the pipeline as `glass-card` chips with a coloured dot
+- **Your orders** — the pipeline as `ws-card` chips with a coloured dot
   (Waiting / Getting ready / Sent / Delivered / Cancelled / Refunded); one
   sideways-scrolling row with a right-edge fade on phones, a 3- then 6-column
   grid from `sm` / `lg`. Each deep-links into Orders filtered to its status
   (Getting ready spans Confirmed + Packed, so it opens the full list).
-- **Latest orders** — up to 8 `SellerOrderRow` cards in one `glass-card`
+- **Latest orders** — up to 8 `SellerOrderRow` cards in one `ws-card`
   list, with **See all**.
 - Live with no orders yet: an `EmptyState` ("No orders yet") under the hero
   (whose next step is already the WhatsApp share).
@@ -903,7 +902,7 @@ count; a card skeleton shows while the layout's fetch is in flight.
   `timeAgo()` ("25 min ago", "Yesterday", then the date) · items · order
   number, then the status and payment chips (12px); the whole ≥64px row is
   the tap target.
-- **Detail** — top to bottom: an at-a-glance `glass-tint` card (status
+- **Detail** — top to bottom: an at-a-glance `ws-tint` card (status
   pill, "25 min ago · date", the total large, items · payment in words —
   "Cash on delivery" / "Paid online" / "Cash received" — and the order
   number; flags dev-simulated payments); the **customer** card first, with
@@ -915,7 +914,7 @@ count; a card skeleton shows while the layout's fetch is in flight.
   **timeline stepper** (Order placed → Confirmed → Packed → Sent →
   Delivered, ticked with times; pickup shows "Picked up" and skips Sent; a
   cancelled order shows the stages it reached + Cancelled). The **status
-  action** is a sticky `glass-strong` bar at the bottom (above the tab bar
+  action** is a sticky `ws-bar` bar at the bottom (above the tab bar
   via `--seller-dock`): one `sheen` button — Confirm order → Mark as packed
   → Mark as sent → Mark as delivered (pickup: Packed → Mark as picked up) —
   and a "⋯" holding **Cancel this order** while the order hasn't been sent.
@@ -2016,7 +2015,7 @@ permanent store; this is the counterweight, and it is why returning to Create
 Store no longer mints a duplicate. Open checklist items (address, tax,
 products, bank account) do not make a store a draft — a seller coming back
 with only those outstanding wants a *second* store — the fetch is gated
-rather than rendered-then-swapped (a glass skeleton meanwhile) so the first
+rather than rendered-then-swapped (a card skeleton meanwhile) so the first
 screen never flashes and gets replaced,
 and `useStores` resolves to `[]` on failure so the wizard is never blocked
 by it.
@@ -2166,7 +2165,7 @@ is never shown a pickup-address item.
   Saving… / Saved / Not saved as a pill on **every** screen size (it used to
   be hidden on phones, so a failed save went unnoticed) and a failed write
   rolling the panel back to the server's answer. Colour is the deliberate
-  exception and has its own Save — a sticky glass bar ("You changed the
+  exception and has its own Save — a sticky floating bar ("You changed the
   colours but have not saved them yet" · Undo · Save colours), because it is
   the one change that can make a shop unreadable.
 
@@ -2241,7 +2240,7 @@ is never shown a pickup-address item.
   "© {year} {store name}. All Rights Reserved."),
   `StoreBankPage` (**Bank account** — the seller's payout accounts over
   `/stores/:id/bank-accounts`: up to 5 accounts as `ActionRow`s in one
-  glass card (bank + masked ····last-4, holder, branch, IFSC, optional UPI),
+  card (bank + masked ····last-4, holder, branch, IFSC, optional UPI),
   each with a check pill — Verified ("Name at bank: …") / Under review /
   Could not verify / Bank didn't answer / Unavailable / Not checked yet —
   and a **Main account** pill; **Edit** on the row (or **Check again** when
@@ -2260,9 +2259,9 @@ is never shown a pickup-address item.
   queued main account reads "Becomes your main account once it is
   verified". The full number is never shown after saving: the edit form
   starts with both number fields empty ("Leave empty to keep ····1234").
-  **Change history** (a `GlassCard`, loaded on "Show history") lists every
+  **Change history** (a `PanelCard`, loaded on "Show history") lists every
   event, newest first, with who did it (You / UnieMax / Automatic). The
-  add / edit form (a `GlassCard`) asks in the order
+  add / edit form (a `PanelCard`) asks in the order
   a seller holds the details — name on the account, then **Bank branch code
   (IFSC)** with an ⓘ sheet ("printed on your cheque book or passbook"),
   which **looks the branch up** (`useIfscLookup`: once the code has the
@@ -2290,7 +2289,7 @@ is never shown a pickup-address item.
   account exists while online payment is off, a "Your main account is
   ready … **Go to Payments**" note leads to the switch; editing,
   re-prioritising and deleting are never gated),
-  `StorePaymentsPage` (**Payments** — how customers PAY: one glass card per
+  `StorePaymentsPage` (**Payments** — how customers PAY: one card per
   method — **Cash on delivery** and **Online payment (UPI, cards)** (paid
   out to the main bank account) — each with an icon, one sentence and a
   labelled On / Off `BigSwitch`. Because a switch changes the live checkout,
@@ -2312,7 +2311,7 @@ is never shown a pickup-address item.
   accepted methods from the public shell's `payments`),
   `StoreShippingPage` (**Delivery** — how customers RECEIVE orders: a
   radio-card choice of Delivery / Customer collects / Both — delivery or
-  collect (72px glass cards with icon and radio) →
+  collect (72px cards with icon and radio) →
   `PATCH /stores/:id/shipping`, likewise confirmed via `ConfirmDialog`
   before saving. **Pickup / Both are disabled** while
   `readiness.gates.PICKUP` is blocked — previously this checked the
@@ -2344,7 +2343,7 @@ is never shown a pickup-address item.
   hidden for pickup-only shops), a Must/Optional switch, Up / Remove and a
   live "Customer sees" preview; problems show on the question after a save
   attempt. Seven Asked / Not asked switches (Name / Mobile number / Email /
-  Address / Pincode / State / Country, all on by default) in two glass
+  Address / Pincode / State / Country, all on by default) in two
   cards — "About the customer" and "Where to deliver" — drafted locally and
   saved through the shared sticky `SaveBar` (appears on change, warns before
   leaving) →
@@ -2399,7 +2398,7 @@ is never shown a pickup-address item.
   Sarees" one action. Shelves that predate the rule keep their
   free-text names and read "Not on UnieMax category pages", the seller's cue
   that only support can link them. Plus a **collapsible nested list** of any
-  depth in one `glass-card`: each row has a 44px expand button (branches
+  depth in one `ws-card`: each row has a 44px expand button (branches
   only), the name with an "On home page" pill when featured, product /
   "n inside" counts and the platform path, a labelled **Showing / Hidden**
   `BigSwitch`, and a "⋯" `RowMenu` with **Show on / Remove from home page**
@@ -2424,12 +2423,12 @@ is never shown a pickup-address item.
   otherwise the **`ProductWizard`**
   (`pages/stores/products/wizard/`) for adding *and* editing — one question
   per step, written for sellers who are not technical. **On a phone it is
-  full-screen** (portalled to `<body>` so the glass panel cannot trap it;
+  full-screen** (portalled to `<body>` so no ancestor can trap it;
   `useMediaQuery('(min-width: 640px)')` picks the frame): a frosted header
   with close, the product name, "Step 2 of 6 · Photos" — a button that opens
   an **All steps** sheet to jump anywhere — and a segmented progress bar,
   over a scrolling step whose Back / Continue bar (`StepButtons`) is sticky.
-  From `sm` up it stays inline in a `glass-card` with a 44px clickable step
+  From `sm` up it stays inline in a `ws-card` with a 44px clickable step
   row. Fields are 48px (`inputClass` = `h-field`), labels 15px, hints 13px.
   **1 What is it?** (the name, then the category in two labelled steps
   (`wizard/CategoryPick.tsx`): **① Main category** as chips (the shop's root
@@ -2559,7 +2558,7 @@ is never shown a pickup-address item.
   (photo, price, description, published) rather than position; a bar reads
   "Product N% complete". Every field
   has a one-line hint with an example — no tooltips. The product list
-  (`PageHeader` + **Add product**) is one `glass-card` of `ActionRow`s: a
+  (`PageHeader` + **Add product**) is one `ws-card` of `ActionRow`s: a
   56px photo, the name with a **Showing / Hidden / Not finished** pill, the
   price (or range) · stock · "n choices", the "Root › Sub" path, then a
   tappable orange nudge with the completeness bar and the one next thing to
@@ -3239,12 +3238,12 @@ frontend/
     │   │   │                     #   visible Add button, "S, M, L" splits on commas
     │   │   ├── Wizard.tsx        # Generic multi-step form shell: numbered rail
     │   │   │                     #   (sm+) / one segment per step + "Step 2 of 3"
-    │   │   │                     #   (mobile), glass panel, WizardActions (Back /
-    │   │   │                     #   Skip / Continue) — a sticky glass bar on
+    │   │   │                     #   (mobile), `ws-card` panel, WizardActions (Back /
+    │   │   │                     #   Skip / Continue) — a sticky floating bar on
     │   │   │                     #   phones so Continue stays under the thumb.
     │   │   │                     #   Domain-agnostic.
     │   │   ├── ConfirmDialog.tsx # Reusable confirmation modal (used by logout) —
-    │   │   │                     #   bottom sheet on phones, card from `sm`, glass.
+    │   │   │                     #   bottom sheet on phones, card from `sm`.
     │   │   ├── Dialog.tsx        # Content dialog (header / scrolling body / footer) — admin + seller pickers
     │   │   │                     #   Portals into document.body — callers mount it
     │   │   │                     #   beside their trigger, and a `backdrop-blur`
@@ -3453,16 +3452,16 @@ frontend/
     │       │   ├── OrderSuccessPage.tsx # /order/{slug}/{orderId} confirmation
     │       │   └── CartLine.tsx       # Shared line row (stepper, remove, total)
     │       └── stores/
-    │           ├── StoresPage.tsx       # "My shops": glass cards (Live pill, setup ring,
+    │           ├── StoresPage.tsx       # "My shops": cards (Live pill, setup ring,
     │           │                        #   Manage + Share/Publish sheet), FAB, empty state;
     │           │                        #   supplier accounts in their own group
     │           ├── CreateStorePage.tsx  # Wizard: name → logo → about you
     │           │                        #   (store created on the logo screen, so it
     │           │                        #   is resumable; address/tax gate
     │           │                        #   bank accounts instead)
-    │           ├── StoreManageLayout.tsx# Desktop: sticky glass sections card + <Outlet/>; phone: store strip + tab bar
+    │           ├── StoreManageLayout.tsx# Desktop: sticky sections card + <Outlet/>; phone: store strip + tab bar
     │           ├── StoreSectionNav.tsx  # Desktop collapsible groups / icon rail; SectionSheetList (phone More sheet)
-    │           ├── StoreMobileNav.tsx   # Phone glass tab bar (Home·Orders·Products·Design·More) + More sheet
+    │           ├── StoreMobileNav.tsx   # Phone tab bar (Home·Orders·Products·Design·More) + More sheet
     │           ├── usePublishActions.ts # Publish / offline-confirm / share state + whatsAppShareUrl
     │           ├── SetupChecklist.tsx   # Dashboard steppers: "Get your shop live" / "Take online payments"
     │           ├── setupSteps.ts        # launchSteps / payoutSteps / stepAction / stepMissing (readiness reading)
@@ -3541,7 +3540,7 @@ frontend/
     │           │   ├── CreateMemberDialog.tsx # "Create new product for this value" — draft twin
     │           │   ├── VariantMatrix.tsx     # Price per choice: grouped Price+Stock rows with a ⋯ sheet (phone) / table; bulk sheet
     │           │   └── SpecificationsEditor.tsx # Ordered label/value rows
-    │           ├── ui/                  # Seller UI kit (glass) — GlassCard, PageHeader,
+    │           ├── ui/                  # Seller UI kit (flat) — PanelCard, PageHeader,
     │           │                        #   SaveBar + useUnsavedChangesGuard, ActionRow,
     │           │                        #   RowMenu, BigSwitch, StatusPill, EmptyState,
     │           │                        #   Toast (showToast/ToastHost), HelpHint,
@@ -3687,7 +3686,7 @@ sizes — caption 13 · label 14 · body 16 · subtitle 18 · section 22 · titl
 Tailwind's own names remapped onto them in `@theme` (`text-xs` 13, `sm` 14,
 `base` 16, `lg` 18, `xl`/`2xl` 22, `3xl`/`4xl` 28, `5xl`/`6xl` 40). Four
 weights (400/500/600/700; `font-extrabold` is gone). Corners: 8px controls
-(`rounded-sm`/`md`), 12px cards (`rounded-lg`/`xl`, `rounded-glass`), 16px
+(`rounded-sm`/`md`), 12px cards (`rounded-lg`/`xl`), 16px
 sheets (`rounded-2xl`/`3xl`, `rounded-sheet`), full for pills. Two shadows:
 `shadow-floating` (things that float) and `shadow-lifted` (hover).
 **`npm run check:ui`** (CI) counts stray `text-[Npx]` sizes, gradients,
@@ -3712,7 +3711,7 @@ which put
 
 - `@theme` px tokens: `h-tap` / `min-h-tap` / `size-tap` **44px**, `h-field`
   **48px**, `text-field` **16px**, `text-hint` **13px** (the floor for helper
-  copy), `rounded-glass` 16px, `rounded-sheet` 22px.
+  copy), `rounded-sheet` 22px.
 - `Button` heights are px: `sm` 36 · `md` 44 (`h-tap`) · `lg` 48 (`h-field`).
 - `TextField` is `h-field` with a 14px label.
 - An **unlayered** rule in `index.css` sets every text `input` / `select` /
@@ -3794,7 +3793,7 @@ derived from it, and the secondary text is lifted to `#9a9a9a` because
 - **Brand gradient.** The signature brand treatment (`--brand-gradient`:
   `#6c3ef4`→`#5428d9` in light, its light steps in dark) is exposed as two
   utilities — `bg-brand-gradient` (since October 2026 **only inside the My
-  Shops glass workspace**, e.g. icon chips and wizard progress — buttons,
+  Shops workspace**, e.g. icon chips and wizard progress — buttons,
   avatars and marketplace surfaces are flat brand colour). Both stops carry
   `--brand-contrast` at ≥ 4.5:1 in either scheme. (`text-brand-gradient` was
   removed as unused in October 2026.) A second utility,
@@ -3995,63 +3994,53 @@ bar reads it. That bar must also be a *direct child* of the page column — a
 sticky element can only travel inside its parent's box, and the wrapper div it
 used to sit in was exactly as tall as the bar, so it scrolled away instantly.
 
-### Seller workspace glass + UI kit (`/mystores/**`)
+### Seller workspace look + UI kit (`/mystores/**`)
 
-The seller area is being redesigned phase by phase (plan, status and design
-rules: [`MYSTORES_UX_PLAN.md`](./MYSTORES_UX_PLAN.md)). Phase 0 laid the
-foundation below; the pages adopt it in later phases.
+The seller area's phase plan and design rules are in
+[`MYSTORES_UX_PLAN.md`](./MYSTORES_UX_PLAN.md).
 
-**Glass tokens** (`index.css`, light in `:root`, dark in `[data-theme='dark']`;
-JS mirror `glassByScheme` in `colors.ts`): `--glass-bg` (.70 white / .62 smoked),
-`--glass-strong` (.86 / .82), `--glass-inset`, `--glass-border`,
-`--glass-highlight`, `--glass-shadow`, `--glass-blur` 16px / `--glass-blur-strong`
-22px, the canvas lights `--canvas-1..3`, `--overlay-soft` (sheet backdrop),
-`--scrim` (dark wash over a *photo*, `bg-scrim`) and `--whatsapp` /
-`--whatsapp-contrast` (`bg-whatsapp text-whatsapp-contrast`: white bold
-text and icon on WhatsApp's deeper green `#1da851`, ~3:1 — white on the
-lighter `#25d366` was ~2:1).
+**Flat, in the admin console's pattern (since 12 Nov 2026).** The frosted-glass
+theme (glass panels over a colour field) was replaced by the admin console's
+look (`ADMIN_UI_THEME.md`, see "Admin console"): white cards with a 1px border
+and the faintest shadow on the grey `--bg` page, cards with a header bar,
+tinted status badges with a dot. **Sizes stay the seller's** — 16px text, 44px
+tap targets, 48px fields — because sellers are mostly on phones and new to
+apps; only the look changed. The same applies to the affiliate (seller tabs
+and partner portal) and supplier (dropship) screens, which render inside this
+shell or the plain account layout. Colours are unchanged.
 
-**Utilities** (real `@utility`s, so `lg:glass` works):
+Tokens kept from the old block: `--overlay-soft` (sheet backdrop), `--scrim`
+(dark wash over a *photo*, `bg-scrim`) and `--whatsapp` /
+`--whatsapp-contrast` (`bg-whatsapp text-whatsapp-contrast`: white bold text
+and icon on WhatsApp's deeper green `#1da851`, ~3:1 — white on the lighter
+`#25d366` was ~2:1). All `--glass-*` and `--canvas-*` tokens are gone.
+
+**Utilities** (real `@utility`s in `index.css`, so `max-sm:ws-bar` works):
 
 | Utility | Use |
 | ------- | --- |
-| `glass` | Cards and panels |
-| `glass-strong` | Chrome over moving content — top bar, tab bar, sticky bars, sheets, toasts |
-| `glass-inset` | Fields / wells inside glass (near-opaque, for legibility) |
-| `glass-tint` | The featured card (Dashboard hero): `glass-card` plus a 16% brand wash (top-right) and 10% accent wash (bottom-left) — muted text stays 4.8:1 at the brand corner. Colour utility `border-glass-border` for its inner panes. |
-| `glass-card` | A card INSIDE a glass panel: glass fill, edge, highlight and the glass-safe text steps, but **no** `backdrop-filter` (the panel already blurred the canvas) |
-| `seller-canvas` | On the workspace root: ONE fixed layer of radial brand light behind everything (painted once, no `filter: blur`) |
+| `ws-card` | Cards and panels: `--surface`, 1px `--line` border, faint shadow |
+| `ws-bar` | Chrome that floats over content — phone tab bar, sticky save / action bars, the wizard's top bar: surface + border + `shadow-floating` |
+| `ws-well` | Recessed wells and step dots inside a card (`--surface-alt` + border). Search fields are white (`bg-input`), not wells |
+| `ws-tint` | The one highlighted card on a page (dashboard hero, order hero): `--brand-soft` with a brand-mixed border |
 | `seller-aurora` | Homepage Become a Seller panel only: fixed deep base + purple / blue / magenta radial washes and grain (`::after`) — no glow shadow, no moving light. Re-points `--cta` to white (brand text) and `--accent` (focus ring) to white inside it |
 | `aurora-pane` · `aurora-frost` | Inside `seller-aurora`: the right column (faint fill + hairline, no blur) · the check marks and step numbers (hairline ring) |
 | `animate-sheet-in` | 200ms rise for sheets, bars, toasts |
 
-Rules that keep it legible and fast:
-
-- **Contrast is re-pointed inside glass.** `glass` / `glass-strong` set
-  `--fg-muted`, `--success`, `--danger` and `--pending` to glass-safe steps
-  (`--glass-fg-muted` #5c5c66 / #a4a4ae, `--glass-success` #007000 / #3fbf6a,
-  `--glass-danger` #c8281f / #ff6b63, `--glass-pending` #b03a0a / #f08c4b).
-  Measured at the most saturated point of the canvas (light purple light at
-  .40, dark at .24): muted 5.5:1 light / 6.2:1 dark, brand 4.8:1 / 4.5:1,
-  success 5.2:1, danger 4.6:1, pending 5.0:1. Outside glass nothing changes.
-  Raising the canvas alphas means re-running that check.
-- **Fallbacks re-point the tokens, not the utilities**: no
-  `backdrop-filter` support → solid `--surface`; `prefers-reduced-transparency`
-  → solid and zero blur. Every variant falls back together.
-- **Never nest blurred layers.** A child's `backdrop-filter` only sees up to
-  the nearest ancestor that has one, so the sheet overlays are a plain tint
-  (`--overlay-soft`) — a blurred overlay left the sheet showing the page
-  through unfrosted. Long lists are plain rows inside ONE `glass` card.
-- A `position: fixed` element inside a glass panel is trapped by it (the
-  filter makes a containing block) — use `sticky`, or portal to `<body>`.
+The workspace's main area is **not** a panel: `StoreManageLayout` renders the
+selected section straight onto the grey page, so each page's cards stand on
+their own (no card inside a card). A bordered box that sits on the page must
+carry `bg-surface` (or be a `ws-card`). A `position: fixed` bar must not
+render inside a transformed or filtered ancestor — use `sticky`, or portal
+to `<body>`.
 
 **Seller UI kit** — `storefront/pages/stores/ui/` (barrel `index.ts`):
 
 | Component | Purpose |
 | --------- | ------- |
-| `GlassCard` | The one card: optional icon chip + title + one plain sentence + `aside` (pill/action). `padded={false}` for row lists. Default fill is `glass-card` (no own blur — it sits in the already-frosted panel); `blur` for a card directly on the canvas. Replaces Business `Card`, Footer `SectionCard`, Shipping border-top sections. |
-| `PageHeader` | Section heading: flat `brand-soft` icon tile (no gradient or glow), 22px semibold title, required one-line description, optional action (full width on phones). |
-| `SaveBar` | THE save model for forms: hidden until `dirty`; then a sticky `glass-strong` bar (message, **Undo changes**, **Save changes**) that stays under the thumb; shows `error`. Sits above the mobile tab bar via `--seller-dock`. Renders the unsaved-changes guard. |
+| `PanelCard` | The one card (`ws-card`): with a `title` it gets a **header bar** — optional icon chip, title, one plain sentence, `aside` (pill/action) — divided from the body by a line; the body is padded unless `padded={false}` (row lists). `id` makes it a focusable deep-link target. Replaces Business `Card`, Footer `SectionCard`, Shipping border-top sections. |
+| `PageHeader` | Section heading: flat 40px `brand-soft` icon tile (no gradient or glow), 22px semibold title, required one-line description, optional action (full width on phones). |
+| `SaveBar` | THE save model for forms: hidden until `dirty`; then a sticky `ws-bar` (message, **Undo changes**, **Save changes**) that stays under the thumb; shows `error`. Sits above the mobile tab bar via `--seller-dock`. Renders the unsaved-changes guard. |
 | `useUnsavedChangesGuard(dirty)` | `beforeunload` + react-router `useBlocker` with a plain-words "Leave without saving?" sheet. The blocker half renders only under a data router (`UNSAFE_DataRouterContext`) — the admin console mounts these pages under `<BrowserRouter>`, where `useBlocker` would throw. Ignores same-path (query-only) moves. |
 | `ActionRow` | One list item: leading photo, title + status, ≤2 facts, an optional `below` line (a nudge, chips), then ONE labelled primary action, a `toggle` kept apart, and `menu` → `RowMenu`. Actions drop below the text on phones so the name keeps the width. |
 | `RowMenu` | "⋯ More" (44px; word shown from `sm`) → bottom sheet of 56px rows with icon, label and note; `danger` rows forced last and red. |

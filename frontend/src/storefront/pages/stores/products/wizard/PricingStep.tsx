@@ -562,7 +562,7 @@ export function PricingStep({
             >
               <span
                 className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold max-[359px]:hidden ${
-                  part === p ? 'bg-brand text-brand-contrast' : 'glass-inset'
+                  part === p ? 'bg-brand text-brand-contrast' : 'ws-well'
                 }`}
               >
                 {i + 1}

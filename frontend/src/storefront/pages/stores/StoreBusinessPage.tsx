@@ -206,7 +206,7 @@ export function StoreBusinessPage() {
       {/* The one number that survives a phone screen. The bar carries the
           animated gradient while anything is outstanding and settles to solid
           green when it is not — motion stops when the work does. */}
-      <div className="glass-card mt-4 flex items-center gap-3 rounded-glass p-3.5">
+      <div className="ws-card mt-4 flex items-center gap-3 rounded-lg p-3.5">
         <ProgressRing done={met} total={total} size={44} label />
         <div className="min-w-0 flex-1">
           <p className="text-base font-semibold text-fg">
@@ -287,7 +287,7 @@ function Card({
       id={id}
       // Focusable only programmatically (`jump`), never in the tab order.
       tabIndex={-1}
-      className={`glass-card scroll-mt-28 rounded-glass p-4 outline-none transition duration-300 sm:p-5 ${
+      className={`ws-card scroll-mt-28 rounded-lg p-4 outline-none transition duration-300 sm:p-5 ${
         flashing ? 'ring-2 ring-pending' : ''
       }`}
     >
@@ -486,7 +486,7 @@ function ContactCard({
           />
         </div>
 
-        <div className="glass-inset rounded-xl p-4">
+        <div className="ws-well rounded-xl p-4">
           <p className="text-base font-semibold text-fg">How we reach you</p>
           <p className="mt-0.5 text-hint text-muted">
             These come from your account and are already verified. To change

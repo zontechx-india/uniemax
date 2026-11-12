@@ -55,7 +55,7 @@ export function PartnersTab() {
         {invites.data?.length === 0 && <div className="mt-2"><Empty>No invitations sent yet.</Empty></div>}
         <ul className="mt-2 space-y-2">
           {invites.data?.map((invite) => (
-            <li key={invite.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-line p-3">
+            <li key={invite.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-line p-3 bg-surface">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-fg">{invite.name}</p>
                 <p className="text-xs text-muted">
@@ -113,7 +113,7 @@ function InviteForm({ storeId, onSent }: { storeId: string; onSent: () => void }
   }
 
   return (
-    <form onSubmit={submit} className="space-y-3 rounded-lg border border-line p-4">
+    <form onSubmit={submit} className="space-y-3 rounded-lg border border-line p-4 bg-surface">
       <h3 className="text-sm font-semibold text-fg">Invite a partner</h3>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Name">
@@ -181,7 +181,7 @@ function PartnerRow({
   const [rate, setRate] = useState(partner.hasOverride ? String(partner.commissionRate) : '')
 
   return (
-    <li className="rounded-lg border border-line p-3">
+    <li className="rounded-lg border border-line p-3 bg-surface">
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-fg">{partner.name}</p>

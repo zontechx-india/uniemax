@@ -122,10 +122,10 @@ export function StoreManageLayout() {
     // The shape of the page, not the word "Loading…".
     return (
       <div aria-busy="true" aria-label="Loading your shop" className="mx-auto max-w-7xl space-y-3">
-        <div className="glass h-[68px] animate-pulse rounded-glass lg:hidden" />
+        <div className="ws-card h-[68px] animate-pulse rounded-lg lg:hidden" />
         <div className="items-start gap-3 lg:grid lg:grid-cols-[264px_1fr]">
-          <div className="glass hidden h-[520px] animate-pulse rounded-glass lg:block" />
-          <div className="glass h-[420px] animate-pulse rounded-glass" />
+          <div className="ws-card hidden h-[520px] animate-pulse rounded-lg lg:block" />
+          <div className="ws-card h-[420px] animate-pulse rounded-lg" />
         </div>
       </div>
     )
@@ -178,10 +178,10 @@ export function StoreManageLayout() {
         All stores
       </Link>
 
-      {/* Phone: one glass strip naming the shop, whether it is live, and the
+      {/* Phone: one strip naming the shop, whether it is live, and the
           ONE thing to do with it — Share once live, Publish until then. It
           replaced the sidebar card that stacked above every section. */}
-      <div className="glass flex items-center gap-2 rounded-glass p-2 lg:hidden">
+      <div className="ws-card flex items-center gap-2 rounded-lg p-2 lg:hidden">
         <Link
           to={scope.indexPath}
           aria-label="All stores"
@@ -239,7 +239,7 @@ export function StoreManageLayout() {
       {scope.mode === 'admin' && (
         <div
           role="status"
-          className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-glass border border-pending/40 bg-pending-soft px-4 py-2.5 text-sm"
+          className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-pending/40 bg-pending-soft px-4 py-2.5 text-sm"
         >
           <ShieldCheckIcon className="h-4 w-4 shrink-0 text-pending" />
           <span className="font-semibold text-fg">Admin view</span>
@@ -259,7 +259,7 @@ export function StoreManageLayout() {
       >
         {/* Left: section picker — desktop only; phones use the tab bar.
             Sticky so the publish card stays in view beside a long form. */}
-        <aside className="glass hidden min-w-0 rounded-glass lg:sticky lg:top-[4.5rem] lg:block">
+        <aside className="ws-card hidden min-w-0 rounded-lg lg:sticky lg:top-[4.5rem] lg:block">
           {/* The sidebar scrolls itself once it is taller than the window. */}
           <div className="max-h-[calc(100dvh-5.5rem)] overflow-y-auto">
 
@@ -351,7 +351,7 @@ export function StoreManageLayout() {
             strip, a table, a long unbroken string) grows the `1fr` track past
             its share and pushes the whole panel off the right edge instead of
             scrolling or truncating within it. */}
-        <section className="glass min-h-[400px] min-w-0 rounded-glass p-4 sm:p-6">
+        <section className="min-h-[400px] min-w-0">
           <Outlet
             context={
               {
@@ -367,9 +367,9 @@ export function StoreManageLayout() {
         </section>
       </div>
 
-      {/* Phone navigation + its share sheet. Outside every glass panel on
-          purpose: the bar is `fixed`, and a `backdrop-filter` ancestor would
-          become its containing block. */}
+      {/* Phone navigation + its share sheet. Outside the content area on
+          purpose: the bar is `fixed` and must not be clipped by a section
+          below it. */}
       <StoreMobileNav
         storeName={store.name}
         pendingOrders={pendingOrders}

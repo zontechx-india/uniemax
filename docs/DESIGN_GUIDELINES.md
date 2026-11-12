@@ -395,6 +395,12 @@ shopping surface, so it follows `ADMIN_UI_THEME.md` (repo root) for
   `DataTable`.
 - Status = tinted badge with a dot (`Chip`), always with its label.
 - Every data page has loading (shimmer), empty and error-with-Retry states.
+- **The seller workspace, affiliate and supplier screens use the same PATTERN**
+  (flat white cards with a header bar on the grey page, tinted badges with a
+  dot, no glass) but keep the seller sizes from §4–§10 (16px text, 44px
+  taps), because sellers are mostly on phones. Utilities `ws-card` /
+  `ws-bar` / `ws-well` / `ws-tint`, card `PanelCard` — see
+  FRONTEND_CONTEXT.md "Seller workspace look".
 - Implementation: `frontend/src/admin/admin.css` + `admin/ui/` — see
   FRONTEND_CONTEXT.md "Admin console". The storefront and seller app keep the
   sizes in §4–§10; the console theme is never loaded there.

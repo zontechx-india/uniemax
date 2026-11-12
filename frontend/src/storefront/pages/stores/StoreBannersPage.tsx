@@ -266,7 +266,7 @@ export function StoreBannersPage({
       {banners === null ? (
         <div className={`mt-4 grid gap-4 ${cardGrid}`}>
           {[0, 1, 2].map((i) => (
-            <div key={i} className="glass-card h-72 animate-pulse rounded-glass" />
+            <div key={i} className="ws-card h-72 animate-pulse rounded-lg" />
           ))}
         </div>
       ) : banners.length === 0 ? (
@@ -485,7 +485,7 @@ function BannerCard({
         e.stopPropagation() // the list itself handles "dropped past the end"
         onDrop()
       }}
-      className={`glass-card flex flex-col overflow-hidden rounded-glass transition-colors ${
+      className={`ws-card flex flex-col overflow-hidden rounded-lg transition-colors ${
         over ? 'ring-2 ring-brand' : ''
       } ${dragging ? 'opacity-50' : ''}`}
     >

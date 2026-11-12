@@ -10,8 +10,11 @@ this file tracks the work.
 Status: ☐ planned · ◐ in progress · ☑ done
 
 ## Decisions (October 2026, product owner)
-1. ~~Glassmorphism is removed~~ — **reversed by the product owner (October
-   2026): the My Shops glass and blur STAY** as a deliberate part of the seller
+1. **Glassmorphism removed (12 Nov 2026).** In October 2026 the product owner
+   kept the My Shops glass; on 12 Nov 2026 they chose the admin console's flat
+   look (`ADMIN_UI_THEME.md`) for My Store, affiliate and supplier screens, at
+   the seller sizes. The `glass` budget is now driven down (8 left: the
+   homepage aurora panel and comments). Original note: the My Shops glass and blur STAY as a deliberate part of the seller
    workspace's identity (§6 allows effects that "fit the product identity").
    The `glass` budget in `check:ui` is therefore frozen, not driven to 0: the
    existing glass may stay, new glass outside My Shops may not be added.

@@ -396,15 +396,15 @@ function SectionRow({
       end={end}
       onClick={onNavigate}
       // Selection is a Light-Purple PILL with the icon and label in brand —
-      // the glass redesign dropped the old 3px left bar, which read as a
+      // the redesign dropped the old 3px left bar, which read as a
       // table-row highlight rather than "you are here".
       className={({ isActive }) =>
-        `group/row flex items-center gap-3 rounded-xl transition-colors ${
+        `group/row flex items-center gap-3 rounded-md transition-colors ${
           large ? 'min-h-[52px] px-2.5 text-base' : 'min-h-10 px-3 text-sm'
         } ${
           isActive
             ? 'bg-brand-soft font-semibold text-brand'
-            : 'font-medium text-fg/80 hover:bg-fg/5 hover:text-fg'
+            : 'font-medium text-fg/80 hover:bg-surface-alt hover:text-fg'
         }`
       }
     >
@@ -413,7 +413,7 @@ function SectionRow({
           <Icon className="h-[18px] w-[18px]" />
         </span>
       ) : (
-        <Icon className="h-[18px] w-[18px] shrink-0" />
+        <Icon className="h-[18px] w-[18px] shrink-0 text-muted group-aria-[current=page]/row:text-brand" />
       )}
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {setup && <StatusTag status={setup} section={label} />}
@@ -454,7 +454,7 @@ function SectionDisclosure({
         onClick={onToggle}
         aria-expanded={open}
         aria-controls={panelId}
-        className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-fg/5 ${
+        className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-surface-alt ${
           activeInside && !open ? 'text-brand' : 'text-fg'
         }`}
       >
@@ -654,7 +654,7 @@ export function StoreSectionNav({ rail, ...data }: NavData & { rail: boolean }) 
                       end={end}
                       title={`${group.caption} · ${label}`}
                       className={({ isActive }) =>
-                        `relative flex h-11 w-11 items-center justify-center rounded-xl transition-colors ${
+                        `relative flex h-11 w-11 items-center justify-center rounded-md transition-colors ${
                           isActive
                             ? 'bg-brand-soft text-brand'
                             : 'text-muted hover:bg-fg/5 hover:text-fg'

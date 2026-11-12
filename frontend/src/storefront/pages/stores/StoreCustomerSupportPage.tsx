@@ -113,7 +113,7 @@ export function StoreCustomerSupportPage() {
         ) : tickets === null ? (
           <p className="py-6 text-center text-sm text-muted">Loading requests…</p>
         ) : tickets.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-line px-4 py-10 text-center">
+          <div className="rounded-lg border border-dashed border-line px-4 py-10 text-center bg-surface">
             <LifebuoyIcon className="mx-auto h-7 w-7 text-muted" />
             <p className="mt-2 text-sm font-medium text-fg">
               {tab === 'open' ? 'Nothing waiting on you' : 'No requests here'}
@@ -125,7 +125,7 @@ export function StoreCustomerSupportPage() {
             </p>
           </div>
         ) : (
-          <ul className="divide-y divide-line rounded-lg border border-line">
+          <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
             {tickets.map((ticket) => (
               <li key={ticket.id}>
                 <Link

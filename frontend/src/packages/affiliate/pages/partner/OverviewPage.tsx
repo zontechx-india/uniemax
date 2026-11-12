@@ -20,7 +20,7 @@ export function OverviewPage() {
         <StatTile label="Paid" value={money(me.paid)} />
       </div>
 
-      <div className="mt-6 rounded-lg border border-line p-4 text-sm text-muted">
+      <div className="mt-6 rounded-lg border border-line p-4 text-sm text-muted bg-surface">
         <p>
           Partner since {shortDate(me.joinedAt)}. To earn, open{' '}
           <Link to="stores" className="font-semibold text-brand hover:underline">

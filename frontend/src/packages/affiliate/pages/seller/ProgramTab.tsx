@@ -64,7 +64,7 @@ export function ProgramTab() {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <div className="flex items-center justify-between gap-4 rounded-lg border border-line p-4">
+      <div className="flex items-center justify-between gap-4 rounded-lg border border-line p-4 bg-surface">
         <div>
           <p className="text-sm font-semibold text-fg">
             Programme is {enabled ? 'on' : 'off'}
@@ -98,7 +98,7 @@ export function ProgramTab() {
         </div>
       )}
 
-      <form onSubmit={submit} className="space-y-4 rounded-lg border border-line p-4">
+      <form onSubmit={submit} className="space-y-4 rounded-lg border border-line p-4 bg-surface">
         <h3 className="text-sm font-semibold text-fg">Default commission</h3>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Type">

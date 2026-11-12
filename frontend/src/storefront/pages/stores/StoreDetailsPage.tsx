@@ -14,7 +14,7 @@ import { storesApi } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import { ImageIcon, StoreIcon } from '../../layout/icons'
 import { MediaImg } from '../../../shared/media/MediaImg'
-import { GlassCard } from './ui/GlassCard'
+import { PanelCard } from './ui/PanelCard'
 import { PageHeader } from './ui/PageHeader'
 import { SaveBar } from './ui/SaveBar'
 import { showToast } from './ui/Toast'
@@ -66,7 +66,7 @@ export function StoreDetailsPage() {
       <LogoField />
 
       <form onSubmit={submit} noValidate>
-        <GlassCard title="Shop name">
+        <PanelCard title="Shop name">
           <TextField
             label="Name"
             value={name}
@@ -75,7 +75,7 @@ export function StoreDetailsPage() {
             hint="Changing the name does not change your shop link."
             error={error ?? undefined}
           />
-        </GlassCard>
+        </PanelCard>
         <SaveBar
           dirty={dirty}
           saving={busy}
@@ -126,7 +126,7 @@ function LogoField() {
   }
 
   return (
-    <GlassCard title="Logo" description="A small square picture for your shop.">
+    <PanelCard title="Logo" description="A small square picture for your shop.">
       <div className="flex flex-col items-center gap-4 sm:flex-row">
         {store.logoUrl ? (
           <MediaImg
@@ -195,6 +195,6 @@ function LogoField() {
           onDone={upload}
         />
       )}
-    </GlassCard>
+    </PanelCard>
   )
 }

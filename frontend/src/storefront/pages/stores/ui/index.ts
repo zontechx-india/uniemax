@@ -6,7 +6,7 @@
 export { ActionRow } from './ActionRow'
 export { BigSwitch } from './BigSwitch'
 export { EmptyState } from './EmptyState'
-export { GlassCard } from './GlassCard'
+export { PanelCard } from './PanelCard'
 export { HelpHint } from './HelpHint'
 export { PageHeader } from './PageHeader'
 export { ProgressRing } from './ProgressRing'

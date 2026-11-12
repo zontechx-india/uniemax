@@ -27,7 +27,7 @@ export function PageHeader({
         {Icon && (
           // A flat tint, no gradient or glow: the page's main button is the
           // one solid colour, and the icon only says where the seller is.
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-brand-soft text-brand">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-brand-soft text-brand">
             <Icon className="h-5 w-5" />
           </span>
         )}

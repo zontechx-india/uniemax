@@ -81,7 +81,7 @@ export function SuppliedPricingStep({
       title="Your price"
       lead={`Supplied by ${supplied.supplier.name}. You set the price; options, stock and MRP come from the supplier.`}
     >
-      <ul className="divide-y divide-line rounded-md border border-line">
+      <ul className="divide-y divide-line rounded-md border border-line bg-surface">
         {supplied.variants.map((v) => (
           <li key={v.variantId} className="flex flex-col gap-2 px-3 py-3 sm:flex-row sm:items-center">
             <div className="min-w-0 flex-1">
@@ -126,7 +126,7 @@ export function SuppliedPricingStep({
       </div>
 
       {supplied.newOptions.length > 0 && (
-        <section className="space-y-2 rounded-md border border-line p-3">
+        <section className="space-y-2 rounded-md border border-line p-3 bg-surface">
           <p className="text-sm font-semibold text-fg">New option available</p>
           {supplied.newOptions.map((o) => (
             <div key={o.supplyVariantId} className="flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -220,7 +220,7 @@ export function SuppliedDeliveryStep({
       title="Delivery & payment"
       lead={`Set by ${supplied.supplier.name}. They ship it from their place to your customer.`}
     >
-      <dl className="divide-y divide-line rounded-md border border-line px-3">
+      <dl className="divide-y divide-line rounded-md border border-line px-3 bg-surface">
         <div className="flex items-start justify-between gap-4 py-2.5">
           <dt className="text-sm text-muted">Delivers to</dt>
           <dd className="text-right text-sm font-medium text-fg">

@@ -24,7 +24,7 @@ import { MediaImg } from '../../../shared/media/MediaImg'
 import { BigSwitch } from './ui/BigSwitch'
 import { CategoryChooserSheet } from './ui/CategoryChooserSheet'
 import { EmptyState } from './ui/EmptyState'
-import { GlassCard } from './ui/GlassCard'
+import { PanelCard } from './ui/PanelCard'
 import { PageHeader } from './ui/PageHeader'
 import { RowMenu } from './ui/RowMenu'
 import { StatusPill } from './ui/StatusPill'
@@ -328,7 +328,7 @@ export function StoreCategoriesPage() {
           they had to find "Products" in the section menu themselves. */}
       {(categories?.length ?? 0) > 0 &&
         store.readiness.gates.PUBLISH.blockerKeys.includes('catalog.product') && (
-          <div className="flex flex-col gap-3 rounded-glass border border-success/30 bg-success/10 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 rounded-lg border border-success/30 bg-success/10 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-base text-fg">
               <span className="font-bold">Category added.</span> Next: add your
               first product.
@@ -342,7 +342,7 @@ export function StoreCategoriesPage() {
 
       {/* Add form — a picker, no free text: a shop cannot invent a category,
           so every shelf is findable across the whole platform. */}
-      <GlassCard
+      <PanelCard
         title="Add a category"
         description="Type what you sell, or look through the groups. Picking a smaller one (like Sarees) adds the bigger ones above it too."
       >
@@ -356,7 +356,7 @@ export function StoreCategoriesPage() {
           <PlusIcon className="h-5 w-5" />
           {(categories?.length ?? 0) === 0 ? 'Choose what you sell' : 'Add a category'}
         </Button>
-      </GlassCard>
+      </PanelCard>
 
       <CategoryChooserSheet
         open={choosing}
@@ -377,10 +377,10 @@ export function StoreCategoriesPage() {
         <div
           aria-busy="true"
           aria-label="Loading categories"
-          className="glass-card h-48 animate-pulse rounded-glass"
+          className="ws-card h-48 animate-pulse rounded-lg"
         />
       ) : categories.length === 0 ? (
-        <GlassCard>
+        <PanelCard>
           <EmptyState
             icon={TagIcon}
             title="No categories yet"
@@ -392,7 +392,7 @@ export function StoreCategoriesPage() {
               </Button>
             }
           />
-        </GlassCard>
+        </PanelCard>
       ) : (
         <section aria-labelledby="your-categories">
           <div className="mb-2 flex items-center justify-between gap-3">
@@ -409,7 +409,7 @@ export function StoreCategoriesPage() {
               </button>
             )}
           </div>
-          <ul className="glass-card divide-y divide-line overflow-hidden rounded-glass">
+          <ul className="ws-card divide-y divide-line overflow-hidden rounded-lg">
             {rows(null, 0)}
           </ul>
         </section>

@@ -61,7 +61,7 @@ export function LinksPage() {
             <button
               type="button"
               onClick={() => toggle(link)}
-              className="rounded-md border border-line px-2.5 py-1 text-xs font-medium text-fg hover:bg-surface-alt"
+              className="rounded-md border border-line px-2.5 py-1 text-xs font-medium text-fg hover:bg-surface-alt bg-surface"
             >
               {link.enabled ? 'Disable' : 'Enable'}
             </button>

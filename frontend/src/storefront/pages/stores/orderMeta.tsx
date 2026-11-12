@@ -12,7 +12,7 @@ import type { StatusTone } from './ui/StatusPill'
 
 /**
  * Plain words, and the same words the Dashboard uses ("Waiting", "Sent").
- * Tones come from the glass-safe status steps, so "Waiting" stays readable
+ * Tones come from the shared status steps, so "Waiting" stays readable
  * in dark mode (the old warning brown was 2.6:1 there).
  */
 export const ORDER_STATUS_META: Record<OrderStatus, { label: string; tone: StatusTone }> = {

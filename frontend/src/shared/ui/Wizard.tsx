@@ -16,8 +16,8 @@ import { Button, buttonClass } from './Button'
  *   - **sm+** — the full rail: numbered circles, titles, connectors, with
  *     completed steps ticked and clickable to jump back.
  *
- * The panel is frosted glass, and on a phone the action row is a sticky
- * glass bar so Continue never scrolls out from under the thumb — the seller
+ * The panel is a flat card (`ws-card`), and on a phone the action row is a sticky
+ * floating bar so Continue never scrolls out from under the thumb — the seller
  * area's design rules (docs/MYSTORES_UX_PLAN.md §3).
  */
 
@@ -102,7 +102,7 @@ export function Wizard({
                       ? 'bg-success text-brand-contrast'
                       : active
                         ? 'bg-brand-gradient text-brand-contrast shadow-[0_6px_16px_-6px_var(--cta-glow)]'
-                        : 'glass-inset text-muted'
+                        : 'ws-well text-muted'
                   }`}
                 >
                   {done ? <TickIcon /> : i + 1}
@@ -129,7 +129,7 @@ export function Wizard({
       </ol>
 
       {/* --- The panel ------------------------------------------------- */}
-      <div className="glass mt-3 rounded-glass p-5 sm:mt-6 sm:p-7">
+      <div className="ws-card mt-3 rounded-lg p-5 sm:mt-6 sm:p-7">
         {step && (
           <header className="mb-6">
             <h1 className="font-heading text-2xl leading-tight font-bold text-fg">
@@ -168,7 +168,7 @@ export function WizardActions({
   disabled?: boolean
 }) {
   return (
-    <div className="sticky bottom-[calc(var(--seller-dock,0px)+0.75rem)] z-10 -mx-2 mt-8 flex items-center gap-2 rounded-glass p-2 max-sm:glass-strong sm:static sm:mx-0 sm:justify-between sm:p-0">
+    <div className="sticky bottom-[calc(var(--seller-dock,0px)+0.75rem)] z-10 -mx-2 mt-8 flex items-center gap-2 rounded-lg p-2 max-sm:ws-bar sm:static sm:mx-0 sm:justify-between sm:p-0">
       <div className="flex shrink-0 items-center gap-2">
         {onBack && (
           <button

@@ -220,7 +220,7 @@ function ShareKit({ store }: { store: Store }) {
 
           <CaptionField value={choices.caption} onChange={choices.setCaption} />
 
-          <div className="flex items-center gap-3 rounded-lg border border-line px-4 py-3">
+          <div className="flex items-center gap-3 rounded-lg border border-line px-4 py-3 bg-surface">
             <div className="min-w-0 flex-1">
               <p className="text-base font-semibold text-fg">Logo in the QR code</p>
               <p className="text-sm text-muted">
@@ -468,7 +468,7 @@ function PatternSwatch({
       width={360}
       height={240}
       aria-hidden
-      className="block aspect-[3/2] w-full rounded-md border border-line"
+      className="block aspect-[3/2] w-full rounded-md border border-line bg-surface"
     />
   )
 }
@@ -485,7 +485,7 @@ function ProductPicker({ kit }: { kit: Kit }) {
           ))}
         </div>
       ) : products.status === 'error' ? (
-        <div className="rounded-lg border border-line">
+        <div className="rounded-lg border border-line bg-surface">
           <ErrorState
             compact
             title="Couldn’t load your products"

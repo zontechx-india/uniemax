@@ -150,7 +150,7 @@ export function VariantPhotos({
                       {list.map((photo, i) => (
                         <span
                           key={photo.id}
-                          className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-line"
+                          className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-line bg-surface"
                         >
                           <MediaImg sizes="64px" src={photo.url} alt="" className="h-full w-full object-cover" />
                           {i === 0 && (

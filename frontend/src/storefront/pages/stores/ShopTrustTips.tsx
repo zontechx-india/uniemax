@@ -60,7 +60,7 @@ export function ShopTrustTips({ store }: { store: Store }) {
       <p className="mb-3 text-hint text-muted">
         New customers order more from shops that show these
       </p>
-      <ul className="glass-card divide-y divide-line overflow-hidden rounded-glass">
+      <ul className="ws-card divide-y divide-line overflow-hidden rounded-lg">
         {tips.map(({ key, icon: Icon, title, why, to }) => (
           <li key={key}>
             <ActionRow

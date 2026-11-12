@@ -136,7 +136,7 @@ export function StepButtons({
   // however long the step — and an ordinary row from `sm` up. "Skip" is a
   // real 44px button, not a text link a thumb has to hunt for.
   return (
-    <div className="sticky bottom-3 z-10 -mx-2 flex flex-col gap-2 rounded-glass p-2 max-sm:glass-strong sm:static sm:mx-0 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:rounded-none sm:border-t sm:border-line sm:p-0 sm:pt-4">
+    <div className="sticky bottom-3 z-10 -mx-2 flex flex-col gap-2 rounded-lg p-2 max-sm:ws-bar sm:static sm:mx-0 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:rounded-none sm:border-t sm:border-line sm:p-0 sm:pt-4">
       <div className="flex items-center gap-2 sm:contents">
         {onBack && (
           <button

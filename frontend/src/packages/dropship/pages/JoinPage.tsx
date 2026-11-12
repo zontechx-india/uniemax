@@ -60,7 +60,7 @@ export function JoinPage() {
               {data.sellerName} sells your products in their online store. You ship the orders
               straight to their customers.
             </p>
-            <dl className="mt-4 divide-y divide-line rounded-md border border-line px-3">
+            <dl className="mt-4 divide-y divide-line rounded-md border border-line px-3 bg-surface">
               <Row label="Cash on delivery" value={data.codAllowed ? 'Yes — you collect the cash through your courier' : 'No — online payment only'} />
               <Row
                 label="If a parcel comes back, your shipping fee is paid by"

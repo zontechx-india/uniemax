@@ -34,7 +34,7 @@ import type { PickedPhoto } from './orders/DeliveredDialog'
 import { ParcelCard } from './orders/ParcelCard'
 import { ShipDialog } from './orders/ShipDialog'
 import { SupplierParts } from '../../../packages/dropship'
-import { GlassCard } from './ui/GlassCard'
+import { PanelCard } from './ui/PanelCard'
 import { RowMenu } from './ui/RowMenu'
 import type { RowMenuAction } from './ui/RowMenu'
 import { showToast } from './ui/Toast'
@@ -376,15 +376,15 @@ export function StoreOrderDetailPage() {
       {loadError && <ErrorNote>{loadError}</ErrorNote>}
       {order === null && !loadError && (
         <div aria-busy="true" aria-label="Loading order" className="space-y-3">
-          <div className="glass-card h-32 animate-pulse rounded-glass" />
-          <div className="glass-card h-48 animate-pulse rounded-glass" />
+          <div className="ws-card h-32 animate-pulse rounded-lg" />
+          <div className="ws-card h-48 animate-pulse rounded-lg" />
         </div>
       )}
 
       {order && (
         <>
           {/* The order at a glance */}
-          <section className="glass-tint rounded-glass p-4 sm:p-5">
+          <section className="ws-tint rounded-lg p-4 sm:p-5">
             <div className="flex flex-wrap items-center gap-2">
               <OrderStatusChip status={order.status} />
               <span className="text-hint text-muted">
@@ -422,7 +422,7 @@ export function StoreOrderDetailPage() {
           <div className="items-start gap-4 space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:space-y-0">
             <div className="space-y-4">
               {/* Customer — first, because a seller's next move is usually to call. */}
-              <GlassCard icon={UserIcon} title={order.customerName ?? 'Customer'}>
+              <PanelCard icon={UserIcon} title={order.customerName ?? 'Customer'}>
                 <div className="space-y-3">
                   {(order.customerPhone || order.customerEmail) && (
                     <p className="text-base text-fg">
@@ -521,7 +521,7 @@ export function StoreOrderDetailPage() {
                     </div>
                   )}
                 </div>
-              </GlassCard>
+              </PanelCard>
 
               {/* Parcel — courier, tracking, delivered / came back */}
               {showParcels && (
@@ -554,7 +554,7 @@ export function StoreOrderDetailPage() {
               )}
 
               {/* Items */}
-              <GlassCard
+              <PanelCard
                 icon={BoxIcon}
                 title={`What they ordered (${order.items.length})`}
                 padded={false}
@@ -622,11 +622,11 @@ export function StoreOrderDetailPage() {
                     <dd className="font-bold text-fg">{formatPrice(order.total)}</dd>
                   </div>
                 </dl>
-              </GlassCard>
+              </PanelCard>
             </div>
 
             {/* Timeline */}
-            <GlassCard title="What has happened">
+            <PanelCard title="What has happened">
               <ol>
                 <TimelineRow label="Order placed" at={order.placedAt} />
                 {order.status === 'CANCELLED' ? (
@@ -653,14 +653,14 @@ export function StoreOrderDetailPage() {
                   </>
                 )}
               </ol>
-            </GlassCard>
+            </PanelCard>
           </div>
 
           {/* The ONE next step, under the thumb. Sticky, not fixed: it lives
-              inside the glass panel, and rises above the phone tab bar. */}
+              inside the page, and rises above the phone tab bar. */}
           {(action || sendAgain || menuActions.length > 0) && (
             <div className="sticky bottom-[calc(var(--seller-dock,0px)+0.75rem)] z-20">
-              <div className="glass-strong flex items-center gap-2 rounded-glass p-2 sm:p-3">
+              <div className="ws-bar flex items-center gap-2 rounded-lg p-2 sm:p-3">
                 {sendAgain ? (
                   <Button
                     type="button"
@@ -922,7 +922,7 @@ function TimelineRow({
             ? cancelled
               ? 'bg-fg/20 text-fg'
               : 'bg-success text-brand-contrast'
-            : 'glass-inset'
+            : 'ws-well'
         }`}
       >
         {at && (cancelled ? <CloseIcon className="h-4 w-4" /> : <CheckIcon className="h-4 w-4" />)}

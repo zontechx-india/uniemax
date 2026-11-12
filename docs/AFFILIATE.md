@@ -231,7 +231,7 @@ frontend/src/packages/affiliate/
   config.ts             # AFFILIATE_API_BASE — one constant to repoint
   api.ts                # typed client: seller · partner · public · admin
   attribution.ts        # localStorage token from /a/:token, per store
-  ui.tsx                # useLoad, StatTile, StatusChip, Pager, TabNav, CopyButton…
+  ui.tsx                # useLoad, StatTile, StatusChip (shared Badge + dot), Pager, TabNav, CopyButton… — flat workspace look (FRONTEND_CONTEXT.md "Seller workspace look")
   pages/
     ClickPage.tsx       # /a/:token
     InvitePage.tsx      # /affiliate/invite/:token — public, pre-auth

@@ -199,7 +199,7 @@ export function StoreOrdersPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name, phone or order number"
-          className="glass-inset h-field w-full rounded-xl pr-4 pl-11 text-base text-fg outline-none placeholder:text-muted focus:border-accent"
+          className="h-field w-full rounded-xl border border-line bg-input pr-4 pl-11 text-base text-fg outline-none placeholder:text-muted focus:border-accent"
         />
       </label>
 
@@ -208,13 +208,13 @@ export function StoreOrdersPage() {
       {orders === null && !error && (
         <div aria-busy="true" aria-label="Loading orders" className="space-y-2">
           {[0, 1, 2].map((key) => (
-            <div key={key} className="glass-card h-[88px] animate-pulse rounded-2xl" />
+            <div key={key} className="ws-card h-[88px] animate-pulse rounded-2xl" />
           ))}
         </div>
       )}
 
       {orders !== null && orders.length === 0 && (
-        <div className="glass-card rounded-glass">
+        <div className="ws-card rounded-lg">
           <EmptyState
             icon={CartIcon}
             title={filtered ? 'No orders here' : 'No orders yet'}
@@ -229,7 +229,7 @@ export function StoreOrdersPage() {
 
       {orders !== null && orders.length > 0 && (
         <>
-          <ul className="glass-card divide-y divide-line overflow-hidden rounded-glass">
+          <ul className="ws-card divide-y divide-line overflow-hidden rounded-lg">
             {orders.map((order) => (
               <li key={order.id}>
                 <SellerOrderRow order={order} to={order.id} />

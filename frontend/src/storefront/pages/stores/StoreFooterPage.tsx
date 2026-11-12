@@ -127,7 +127,7 @@ function SectionCard({
   children: ReactNode
 }) {
   return (
-    <section className="glass-card rounded-glass p-4 sm:p-5">
+    <section className="ws-card rounded-lg p-4 sm:p-5">
       <h3 className="font-heading text-lg font-bold text-fg">{title}</h3>
       <p className="mt-0.5 text-hint text-muted">{description}</p>
       <div className="mt-4">{children}</div>
@@ -938,7 +938,7 @@ function LinksCard() {
           // row from `sm` up, where there is room for both side by side.
           <div
             key={index}
-            className="flex flex-col gap-2 rounded-2xl border border-line p-3 sm:flex-row sm:items-end sm:border-0 sm:p-0"
+            className="flex flex-col gap-2 rounded-2xl border border-line p-3 sm:flex-row sm:items-end sm:border-0 sm:p-0 bg-surface"
           >
             <div className="sm:w-2/5">
               <TextField

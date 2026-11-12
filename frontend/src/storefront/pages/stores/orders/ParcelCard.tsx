@@ -6,7 +6,7 @@ import { expectedDay, parcelStatus } from '../../../features/stores/ParcelTracki
 import type { OrderShipment, PlacedOrder } from '../../../features/stores/storesApi'
 import { ClipboardIcon, ExternalLinkIcon, PencilIcon, TruckIcon } from '../../../layout/icons'
 import { formatOrderDateTime } from '../orderMeta'
-import { GlassCard } from '../ui/GlassCard'
+import { PanelCard } from '../ui/PanelCard'
 import { showToast } from '../ui/Toast'
 
 /**
@@ -29,19 +29,19 @@ export function ParcelCard({
 
   if (parcels.length === 0) {
     return (
-      <GlassCard icon={TruckIcon} title="Tracking">
+      <PanelCard icon={TruckIcon} title="Tracking">
         <p className="text-base text-muted">
           No courier or tracking number was added when this order was sent.
         </p>
         <Button type="button" variant="secondary" size="md" className="mt-3" onClick={onAddTracking}>
           Add tracking
         </Button>
-      </GlassCard>
+      </PanelCard>
     )
   }
 
   return (
-    <GlassCard icon={TruckIcon} title={parcels.length === 1 ? 'Parcel' : `Parcels (${parcels.length})`}>
+    <PanelCard icon={TruckIcon} title={parcels.length === 1 ? 'Parcel' : `Parcels (${parcels.length})`}>
       <ul className="divide-y divide-line">
         {parcels.map((parcel, i) => (
           <SellerParcel
@@ -52,7 +52,7 @@ export function ParcelCard({
           />
         ))}
       </ul>
-    </GlassCard>
+    </PanelCard>
   )
 }
 
@@ -142,7 +142,7 @@ function SellerParcel({
           href={parcel.podUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-3 rounded-md border border-line p-2 transition hover:bg-fg/5"
+          className="flex items-center gap-3 rounded-md border border-line p-2 transition hover:bg-fg/5 bg-surface"
         >
           <MediaImg
             src={parcel.podUrl}

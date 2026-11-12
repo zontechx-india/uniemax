@@ -124,7 +124,7 @@ export function GroupMemberPicker({
             : 'No other products yet — create one for this value instead.'}
         </p>
       ) : (
-        <ul className="mt-3 divide-y divide-line rounded-md border border-line">
+        <ul className="mt-3 divide-y divide-line rounded-md border border-line bg-surface">
           {rows.map((row) => {
             const locked = selectedIds.has(row.id) || row.eligibility === 'in-this-group'
             const blocked =

@@ -13,7 +13,7 @@ import { useUnsavedChangesGuard } from './useUnsavedChangesGuard'
  * with **Save changes** (and **Undo changes**) wherever the seller scrolls.
  * Leaving with the bar up asks first (`useUnsavedChangesGuard`).
  *
- * `sticky`, not `fixed`: a fixed bar inside a glass panel would be trapped
+ * `sticky`, not `fixed`: a fixed bar inside a transformed panel would be trapped
  * by the panel's `backdrop-filter` (it becomes the containing block), and
  * sticky keeps it inside the form it belongs to. `--seller-dock` lifts it
  * above the mobile bottom tab bar once that exists (Phase 1).
@@ -61,7 +61,7 @@ export function SaveBar({
           role="region"
           aria-label="Save changes"
         >
-          <div className="glass-strong flex animate-sheet-in flex-col gap-3 rounded-glass p-3 sm:flex-row sm:items-center sm:gap-4 sm:pl-5">
+          <div className="ws-bar flex animate-sheet-in flex-col gap-3 rounded-lg p-3 sm:flex-row sm:items-center sm:gap-4 sm:pl-5">
             <p
               aria-live="polite"
               className={`min-w-0 flex-1 text-sm font-medium ${error ? 'text-danger' : 'text-fg'}`}

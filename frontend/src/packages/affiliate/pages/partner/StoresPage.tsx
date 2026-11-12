@@ -126,7 +126,7 @@ function ProductRow({
   usable: boolean
 }) {
   return (
-    <li className="flex items-center gap-3 rounded-lg border border-line p-3">
+    <li className="flex items-center gap-3 rounded-lg border border-line p-3 bg-surface">
       {product.imageUrl ? (
         <MediaImg sizes="48px" src={product.imageUrl} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" />
       ) : (

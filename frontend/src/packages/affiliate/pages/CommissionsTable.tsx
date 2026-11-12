@@ -92,7 +92,7 @@ export function CommissionsTable({
       )}
 
       {list.data && list.data.items.length > 0 && (
-        <div className="mt-3 hidden overflow-x-auto rounded-lg border border-line md:block">
+        <div className="mt-3 hidden overflow-x-auto rounded-lg border border-line bg-surface md:block">
           <table className="w-full text-sm">
             <thead className="bg-surface-alt text-left text-xs font-medium text-muted">
               <tr>

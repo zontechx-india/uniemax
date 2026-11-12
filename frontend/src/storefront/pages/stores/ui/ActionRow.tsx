@@ -18,7 +18,7 @@ import type { RowMenuAction } from './RowMenu'
  * icons; from `sm` up they sit on the right. Exactly ONE primary action is
  * shown with a word; everything rarer goes in `menu` (see `RowMenu`).
  *
- * Plain, not glass: rows live inside ONE `GlassCard` (`divide-y`), so a
+ * Plain rows: they live inside ONE `PanelCard` (`divide-y`), so a
  * forty-row list costs one blurred layer, not forty.
  */
 export function ActionRow({

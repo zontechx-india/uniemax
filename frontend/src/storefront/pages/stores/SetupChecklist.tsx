@@ -70,7 +70,7 @@ function LaunchCard({
   const currentKey = steps.find((step) => !step.complete)?.key ?? null
 
   return (
-    <section className="glass-card overflow-hidden rounded-glass">
+    <section className="ws-card overflow-hidden rounded-lg">
       <header className="flex items-center gap-3.5 border-b border-line p-4 sm:p-5">
         <ProgressRing done={done} total={total} size={52} label />
         <div className="min-w-0">
@@ -154,7 +154,7 @@ function LaunchCard({
 
 function OnlinePaymentsCard({ steps }: { steps: StepState[] }) {
   return (
-    <section className="glass-card overflow-hidden rounded-glass">
+    <section className="ws-card overflow-hidden rounded-lg">
       <header className="border-b border-line p-4 sm:p-5">
         <h3 className="font-heading text-lg font-semibold text-fg">
           Take online payments{' '}
@@ -267,7 +267,7 @@ function Row({
               ? 'bg-brand text-brand-contrast'
               : optional
                 ? 'bg-brand-soft text-brand'
-                : 'glass-inset text-muted'
+                : 'ws-well text-muted'
         }`}
       >
         {complete ? <CheckIcon className="h-4 w-4" /> : marker}

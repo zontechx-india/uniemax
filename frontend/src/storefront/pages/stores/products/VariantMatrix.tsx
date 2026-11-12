@@ -86,7 +86,7 @@ export function VariantMatrix({
 
   if (rows.length === 0) {
     return (
-      <p className="rounded-2xl border border-dashed border-line px-4 py-6 text-center text-base text-muted">
+      <p className="rounded-2xl border border-dashed border-line px-4 py-6 text-center text-base text-muted bg-surface">
         Go back and add an option to each choice — like S, M, L for Size.
       </p>
     )
@@ -162,7 +162,7 @@ export function VariantMatrix({
       </Dialog>
 
       {/* sm+: table */}
-      <div className="hidden overflow-x-auto rounded-md border border-line sm:block">
+      <div className="hidden overflow-x-auto rounded-md border border-line sm:block bg-surface">
         <table className="w-full text-sm">
           <thead className="bg-fg/[0.04] text-left text-xs font-semibold text-muted">
             <tr>
@@ -283,7 +283,7 @@ export function VariantMatrix({
 
       {/* Combinations the seller does not offer — one click brings any back. */}
       {removed.length > 0 && (
-        <div className="rounded-2xl border border-dashed border-line px-3.5 py-3">
+        <div className="rounded-2xl border border-dashed border-line px-3.5 py-3 bg-surface">
           <p className="text-sm font-semibold text-fg">Not selling</p>
           <p className="text-hint text-muted">Tap one to sell it again.</p>
           <ul className="mt-1.5 flex flex-wrap gap-1.5">

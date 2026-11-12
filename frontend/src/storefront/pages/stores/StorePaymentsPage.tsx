@@ -126,7 +126,7 @@ export function StorePaymentsPage() {
         {METHODS.map(({ key, title, description, icon: Icon }) => {
           const locked = key === 'acceptOnlinePayment' && onlineBlocked
           return (
-            <li key={key} className="glass-card rounded-glass p-4 sm:p-5">
+            <li key={key} className="ws-card rounded-lg p-4 sm:p-5">
               <div className="flex items-start gap-3">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
                   <Icon className="h-5 w-5" />

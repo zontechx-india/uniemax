@@ -120,7 +120,7 @@ function ShareActions({
         href={shareUrl}
         target="_blank"
         rel="noreferrer"
-        className="glass-inset flex min-h-tap items-center gap-2 rounded-md px-3 text-hint text-muted transition-colors hover:text-fg"
+        className="ws-well flex min-h-tap items-center gap-2 rounded-md px-3 text-hint text-muted transition-colors hover:text-fg"
       >
         <GlobeIcon className="h-4 w-4 shrink-0" />
         <span className="truncate">{shareUrl.replace(/^https?:\/\//, '')}</span>

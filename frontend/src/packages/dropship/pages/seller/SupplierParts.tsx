@@ -5,7 +5,7 @@ import { ConfirmDialog } from '../../../../shared/ui/ConfirmDialog'
 import { Dialog } from '../../../../shared/ui/Dialog'
 import { ErrorNote, InfoNote } from '../../../../shared/ui/form'
 import { TruckIcon } from '../../../../storefront/layout/icons'
-import { GlassCard, showToast } from '../../../../storefront/pages/stores/ui'
+import { PanelCard, showToast } from '../../../../storefront/pages/stores/ui'
 import { sellerPartsApi } from '../../api'
 import type { SellerPart, SellerParts } from '../../api'
 import { OrderStatusBadge, dateTime, money, shipByText } from '../../ui'
@@ -72,10 +72,10 @@ export function SupplierParts({
 
   return (
     <>
-      <GlassCard icon={TruckIcon} title="Shipped by supplier">
+      <PanelCard icon={TruckIcon} title="Shipped by supplier">
         <ul className="space-y-4">
           {data.parts.map((p) => (
-            <li key={p.id} className="space-y-3 rounded-lg border border-line p-3">
+            <li key={p.id} className="space-y-3 rounded-lg border border-line p-3 bg-surface">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-semibold text-fg">{p.supplier.name}</span>
                 <OrderStatusBadge status={p.status} side="seller" />
@@ -150,7 +150,7 @@ export function SupplierParts({
             </li>
           ))}
         </ul>
-      </GlassCard>
+      </PanelCard>
 
       <ConfirmDialog
         open={delivering !== null}

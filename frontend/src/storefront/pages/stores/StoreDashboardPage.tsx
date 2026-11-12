@@ -27,7 +27,7 @@ import { SupplierHome, useDropshipRole } from '../../../packages/dropship'
 /**
  * Dashboard — the landing view of store management.
  *
- * It opens on a HERO — a tinted glass card (`glass-tint`), not a solid block,
+ * It opens on a HERO — a brand-tinted card (`ws-tint`), not a solid block,
  * so the one strong colour on it is the next-step button; it is titled with
  * the shop name under today's date (no greeting) — that answers the
  * only two questions a seller has when
@@ -132,7 +132,7 @@ export function StoreDashboardPage() {
                     </>
                   )
                   const chip =
-                    'glass-card block min-w-[124px] shrink-0 snap-start rounded-xl px-4 py-3 sm:min-w-0'
+                    'ws-card block min-w-[124px] shrink-0 snap-start rounded-xl px-4 py-3 sm:min-w-0'
                   return to ? (
                     <Link key={key} to={to} className={`${chip} transition-colors hover:border-brand/40`}>
                       {body}
@@ -161,7 +161,7 @@ export function StoreDashboardPage() {
               </Link>
             </div>
             {dashboard.recentOrders.length > 0 && (
-              <ul className="glass-card divide-y divide-line overflow-hidden rounded-glass">
+              <ul className="ws-card divide-y divide-line overflow-hidden rounded-lg">
                 {dashboard.recentOrders.map((order) => (
                   <li key={order.id}>
                     <SellerOrderRow order={order} to={`orders/${order.id}`} />
@@ -178,7 +178,7 @@ export function StoreDashboardPage() {
       {/* Live with no orders yet: say so plainly under the hero (which
           already offers the WhatsApp share) instead of a blank page. */}
       {dashboard && !hasOrders && store.isPublished && (
-        <div className="glass-card rounded-glass">
+        <div className="ws-card rounded-lg">
           <EmptyState
             icon={CartIcon}
             title="No orders yet"
@@ -220,7 +220,7 @@ function Hero({
   const showStats = store.isPublished && stats !== undefined && stats.totalOrders > 0
 
   return (
-    <section className="glass-tint rounded-glass p-4 sm:p-6">
+    <section className="ws-tint rounded-lg p-4 sm:p-6">
       <p className="text-sm text-muted">{todayLabel()}</p>
       <h2 className="mt-1 font-heading text-2xl leading-tight font-semibold break-words text-fg">
         {store.name}
@@ -252,7 +252,7 @@ function Hero({
 
 /**
  * One number in the hero: a frosted tile (a light pane, not a fill) so the
- * numbers float on the glass. `dot` marks a number that wants attention.
+ * numbers sit in small bordered tiles. `dot` marks a number that wants attention.
  */
 function HeroStat({
   label,
@@ -271,7 +271,7 @@ function HeroStat({
   return (
     // 8px corners inside the hero card's 12px — an inner radius is smaller
     // than the one around it.
-    <div className={`min-w-0 ${className} rounded-md border border-glass-border bg-surface/55 px-3 py-3 shadow-[inset_0_1px_0_var(--glass-border)]`}>
+    <div className={`min-w-0 ${className} rounded-md border border-line bg-surface px-3 py-3`}>
       <dt className="flex items-center gap-1.5 text-xs font-medium text-muted">
         {dot && <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${dot}`} />}
         {label}
@@ -363,7 +363,7 @@ function NextStep({
 
   const Icon = icon
   return (
-    <div className="mt-4 rounded-md border border-glass-border bg-surface/70 p-4 shadow-[inset_0_1px_0_var(--glass-border)]">
+    <div className="mt-4 rounded-md border border-line bg-surface p-4">
       <div className="flex items-start gap-3">
         {/* Flat tile, no gradient or glow: the button below is the one
             solid colour on the card. */}
@@ -393,7 +393,7 @@ function DashboardSkeleton() {
       <div className="h-5 w-32 animate-pulse rounded-md bg-fg/10" />
       <div className="flex gap-2.5">
         {[0, 1, 2].map((key) => (
-          <div key={key} className="glass-card h-[76px] flex-1 animate-pulse rounded-xl" />
+          <div key={key} className="ws-card h-[76px] flex-1 animate-pulse rounded-xl" />
         ))}
       </div>
     </div>

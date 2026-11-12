@@ -47,7 +47,7 @@ export function SpecificationsEditor({
             // line from `sm` up.
             <li
               key={index}
-              className="flex flex-col gap-2 rounded-2xl border border-line p-3 sm:flex-row sm:items-center sm:border-0 sm:p-0"
+              className="flex flex-col gap-2 rounded-2xl border border-line p-3 sm:flex-row sm:items-center sm:border-0 sm:p-0 bg-surface"
             >
               <input
                 value={row.label}

@@ -37,7 +37,7 @@ import {
 import { Button, buttonClass } from '../../../shared/ui/Button'
 import { ActionRow } from './ui/ActionRow'
 import { EmptyState } from './ui/EmptyState'
-import { GlassCard } from './ui/GlassCard'
+import { PanelCard } from './ui/PanelCard'
 import { HelpHint } from './ui/HelpHint'
 import { PageHeader } from './ui/PageHeader'
 import { StatusPill } from './ui/StatusPill'
@@ -277,14 +277,14 @@ export function StoreBankPage() {
       />
 
       {accounts === null && !loadError && (
-        <div aria-busy="true" aria-label="Loading bank accounts" className="glass-card h-28 animate-pulse rounded-glass" />
+        <div aria-busy="true" aria-label="Loading bank accounts" className="ws-card h-28 animate-pulse rounded-lg" />
       )}
       {loadError && <ErrorNote>{loadError}</ErrorNote>}
 
       {/* Adding is withheld by something this page cannot ask for; this says
           what, and links to where it is filled in. */}
       {addBlocked && accounts !== null && (
-        <div className="rounded-glass bg-pending-soft p-4">
+        <div className="rounded-lg bg-pending-soft p-4">
           <p className="text-base font-semibold text-fg">First, add your business details</p>
           <p className="mt-0.5 text-hint text-muted">
             Before adding a bank account, add: {elsewhere.map((b) => b.label).join(', ')}.
@@ -300,7 +300,7 @@ export function StoreBankPage() {
       )}
 
       {accounts !== null && accounts.length === 0 && editing !== 'new' && (
-        <GlassCard>
+        <PanelCard>
           <EmptyState
             icon={BankIcon}
             title="No bank account yet"
@@ -323,7 +323,7 @@ export function StoreBankPage() {
               ) : undefined
             }
           />
-        </GlassCard>
+        </PanelCard>
       )}
 
       {noPrimary && (
@@ -363,7 +363,7 @@ export function StoreBankPage() {
         ))}
 
       {(accounts ?? []).length > 0 && (
-        <ul className="glass-card divide-y divide-line overflow-hidden rounded-glass">
+        <ul className="ws-card divide-y divide-line overflow-hidden rounded-lg">
           {(accounts ?? []).map((account) =>
             editing === account.id ? (
               <li key={account.id} className="p-3 sm:p-4">
@@ -637,7 +637,7 @@ const ACTOR_LABEL: Record<BankHistoryEvent['actor'], string> = {
 function BankHistory({ history, onOpen }: { history: BankHistoryEvent[] | null; onOpen: () => void }) {
   const [open, setOpen] = useState(false)
   return (
-    <GlassCard icon={ClockIcon} title="Change history" description="Every change to your bank accounts, newest first.">
+    <PanelCard icon={ClockIcon} title="Change history" description="Every change to your bank accounts, newest first.">
       {!open ? (
         <Button
           variant="secondary"
@@ -671,7 +671,7 @@ function BankHistory({ history, onOpen }: { history: BankHistoryEvent[] | null; 
           ))}
         </ul>
       )}
-    </GlassCard>
+    </PanelCard>
   )
 }
 
@@ -722,7 +722,7 @@ function AddressStep({
 
   return (
     <form onSubmit={submit} noValidate>
-      <GlassCard
+      <PanelCard
         icon={MapPinIcon}
         title="Your business address"
         description="Needed once, before your first bank account."
@@ -750,7 +750,7 @@ function AddressStep({
             </Button>
           </div>
         </div>
-      </GlassCard>
+      </PanelCard>
     </form>
   )
 }
@@ -878,7 +878,7 @@ export function AccountForm({
 
   return (
     <form onSubmit={submit} noValidate>
-      <GlassCard
+      <PanelCard
         icon={BankIcon}
         title={initial ? 'Change bank account' : 'Add bank account'}
         description="Copy the details from your passbook or cheque book."
@@ -1032,7 +1032,7 @@ export function AccountForm({
             </Button>
           </div>
         </div>
-      </GlassCard>
+      </PanelCard>
     </form>
   )
 }

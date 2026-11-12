@@ -3,6 +3,11 @@
 > **October 2026:** `docs/DESIGN_GUIDELINES.md` now rules UI work (type scale,
 > buttons, components). The **glassmorphism** direction below was kept by the
 > product owner's decision; see `docs/DESIGN_SYSTEM_PLAN.md`.
+>
+> **12 Nov 2026:** the glass look is **gone**. The workspace now uses the admin
+> console's flat pattern (white cards with header bars on a grey page) at the
+> seller sizes in §3 — see FRONTEND_CONTEXT.md "Seller workspace look + UI kit".
+> Everything below about glass, the colour canvas and blur is history.
 
 The roadmap for redesigning the seller area (`/mystores/**`): the store list, Create
 Store, and every store-management section. It covers what is wrong today, the design

@@ -176,7 +176,7 @@ export function CreateStorePage() {
         <div
           aria-busy="true"
           aria-label="Checking for unfinished shops"
-          className="glass mx-auto h-72 w-full max-w-2xl animate-pulse rounded-glass"
+          className="ws-card mx-auto h-72 w-full max-w-2xl animate-pulse rounded-lg"
         />
       ) : offerResume ? (
         <ResumePanel
@@ -269,7 +269,7 @@ function ResumePanel({
 }) {
   const one = drafts.length === 1
   return (
-    <div className="glass mx-auto w-full max-w-2xl rounded-glass p-5 sm:p-7">
+    <div className="ws-card mx-auto w-full max-w-2xl rounded-lg p-5 sm:p-7">
       <h2 className="font-heading text-xl leading-tight font-bold text-fg">
         {one ? 'Pick up where you left off?' : 'You have unfinished shops'}
       </h2>
@@ -444,7 +444,7 @@ function StoreStep({
           />
 
           {/* What the name becomes: the link the seller will share. */}
-          <div className="glass-inset flex items-start gap-3 rounded-xl px-3.5 py-3">
+          <div className="ws-well flex items-start gap-3 rounded-xl px-3.5 py-3">
             <GlobeIcon className="mt-0.5 h-5 w-5 shrink-0 text-brand" />
             <div className="min-w-0">
               <p className="text-hint font-semibold text-fg">Your shop link</p>
@@ -649,7 +649,7 @@ function BusinessStep({
         autoComplete="name"
       />
 
-      <div className="glass-inset rounded-xl p-4">
+      <div className="ws-well rounded-xl p-4">
         <p className="text-base font-semibold text-fg">How we reach you</p>
         <p className="mt-0.5 text-hint text-muted">
           New order alerts go here, and customers see them on your shop. They

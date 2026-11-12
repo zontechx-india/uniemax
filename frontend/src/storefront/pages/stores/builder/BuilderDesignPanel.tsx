@@ -164,7 +164,7 @@ export function BuilderDesignPanel({
       {dirty && (
         // Sticky inside the panel's own padding (the old -mx bled 4px past
         // the edge on phones), and worded for wherever the preview is.
-        <div className="glass-strong sticky bottom-3 flex flex-wrap items-center gap-2 rounded-glass p-2.5">
+        <div className="ws-bar sticky bottom-3 flex flex-wrap items-center gap-2 rounded-lg p-2.5">
           <span className="min-w-0 flex-1 basis-40 text-hint font-medium text-fg">
             You changed the colours but have not saved them yet.
           </span>

@@ -146,8 +146,8 @@ export function StoreShippingPage() {
                     selected
                       ? 'border-brand bg-brand-soft ring-2 ring-brand/25'
                       : locked
-                        ? 'glass-card opacity-60'
-                        : 'glass-card hover:border-brand/50'
+                        ? 'ws-card opacity-60'
+                        : 'ws-card hover:border-brand/50'
                   }`}
                 >
                   <span
@@ -264,7 +264,7 @@ function ShippingCharges({
   }
 
   return (
-    <section className="glass-card rounded-glass p-4 sm:p-5">
+    <section className="ws-card rounded-lg p-4 sm:p-5">
       <h3 className="font-heading text-lg font-bold text-fg">
         Delivery charge
       </h3>
@@ -375,7 +375,7 @@ function DeliveryAreas({
   }
 
   return (
-    <section className="glass-card rounded-glass p-4 sm:p-5">
+    <section className="ws-card rounded-lg p-4 sm:p-5">
       <h3 className="font-heading text-lg font-bold text-fg">
         Where you deliver
       </h3>

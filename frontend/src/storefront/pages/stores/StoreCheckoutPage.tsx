@@ -11,7 +11,7 @@ import { useManagedStore } from '../../features/stores/useManagedStore'
 import { ClipboardIcon, MapPinIcon, UserIcon } from '../../layout/icons'
 import { CustomQuestionsCard, customQuestionProblems } from './CustomQuestionsCard'
 import { BigSwitch } from './ui/BigSwitch'
-import { GlassCard } from './ui/GlassCard'
+import { PanelCard } from './ui/PanelCard'
 import { PageHeader } from './ui/PageHeader'
 import { SaveBar } from './ui/SaveBar'
 import { showToast } from './ui/Toast'
@@ -114,17 +114,17 @@ export function StoreCheckoutPage() {
         description="Choose what customers fill in when they order. Anything you switch off is not asked."
       />
 
-      <GlassCard icon={UserIcon} title="About the customer">
+      <PanelCard icon={UserIcon} title="About the customer">
         {group(CONTACT_KEYS)}
-      </GlassCard>
+      </PanelCard>
 
-      <GlassCard
+      <PanelCard
         icon={MapPinIcon}
         title="Where to deliver"
         description="Only asked when you deliver — pickup orders skip these."
       >
         {group(CHECKOUT_FIELD_KEYS.filter((key) => !CONTACT_KEYS.includes(key)))}
-      </GlassCard>
+      </PanelCard>
 
       {deliveryAllOff && store.shipping.mode !== 'PICKUP' && (
         <InfoNote>

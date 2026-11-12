@@ -22,7 +22,7 @@ import {
 import type { NavData } from './StoreSectionNav'
 
 /**
- * Phone navigation for store management: a floating glass tab bar with the
+ * Phone navigation for store management: a floating tab bar (`ws-bar`) with the
  * four jobs a seller does daily, and **More** for everything else.
  *
  * It replaced a single dropdown at the top of the page, which put Orders and
@@ -31,7 +31,7 @@ import type { NavData } from './StoreSectionNav'
  * start from (Home = Dashboard, Design = Store Builder). Every tab is an icon
  * WITH a word — an icon alone asks a seller to guess.
  *
- * The bar is `fixed`, so it must never render inside a glass panel (a
+ * The bar is `fixed`, so it must never render inside a transformed or filtered panel (a
  * `backdrop-filter` ancestor would trap it); the layout mounts it at its root.
  * It publishes its height as `--seller-dock` (set by the layout) so sticky
  * save bars and toasts sit above it instead of under it.
@@ -67,7 +67,7 @@ export function StoreMobileNav({
         aria-label="Store sections"
         className="fixed inset-x-0 bottom-0 z-30 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] lg:hidden"
       >
-        <div className="glass-strong mx-auto grid max-w-md grid-cols-5 gap-1 rounded-sheet p-1.5">
+        <div className="ws-bar mx-auto grid max-w-md grid-cols-5 gap-1 rounded-sheet p-1.5">
           {tabs.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}

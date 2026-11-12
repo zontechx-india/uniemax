@@ -203,7 +203,7 @@ export function AddSheet({
               </div>
             )}
             {one && (
-              <ul className="divide-y divide-line rounded-md border border-line">
+              <ul className="divide-y divide-line rounded-md border border-line bg-surface">
                 {rows[0]!.prices.map(({ v, price }) => (
                   <li key={v.supplyVariantId} className="flex items-center justify-between gap-3 px-3 py-2">
                     <div className="min-w-0">
@@ -252,7 +252,7 @@ export function AddSheet({
             {rows[0]!.tone === 'loss' && <span className="block text-xs text-danger">You'd lose money on each sale at this price.</span>}
           </div>
         ) : (
-          <ul className="divide-y divide-line rounded-md border border-line">
+          <ul className="divide-y divide-line rounded-md border border-line bg-surface">
             {rows.map(({ item, prices, line, tone }) => (
               <li key={item.supplyProductId} className="flex items-center justify-between gap-3 px-3 py-2">
                 <div className="min-w-0">

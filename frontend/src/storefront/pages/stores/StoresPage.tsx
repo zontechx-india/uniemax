@@ -15,7 +15,7 @@ import { EmptyState, PageHeader, ProgressRing, StatusPill, ToastHost } from './u
 
 /**
  * My Stores ("My Store" in the account menu): every shop the customer owns,
- * as glass cards that each answer the seller's first two questions — *is it
+ * as flat cards that each answer the seller's first two questions — *is it
  * live?* and *what is left to do?* — and offer the two things they come here
  * for: **Manage** it, or **Share** it (Publish, until it is live).
  *
@@ -49,7 +49,7 @@ export function StoresPage() {
       {list === null || suppliers === null ? (
         <LoadingCards />
       ) : list.length === 0 ? (
-        <div className="glass mx-auto max-w-2xl rounded-glass">
+        <div className="ws-card mx-auto max-w-2xl rounded-lg">
           <EmptyState
             icon={StoreIcon}
             title="Open your first shop"
@@ -221,9 +221,9 @@ function StoreCard({ store, onShare }: { store: Store; onShare: () => void }) {
   )
 }
 
-/** The glass frame both kinds of card sit in. */
+/** The card frame both kinds of card sit in. */
 function CardShell({ children }: { children: ReactNode }) {
-  return <article className="glass flex flex-col rounded-glass p-4 sm:p-5">{children}</article>
+  return <article className="ws-card flex flex-col rounded-lg p-4 sm:p-5">{children}</article>
 }
 
 /** A titled grid of cards; untitled when the list has only one kind. */
@@ -312,7 +312,7 @@ function LoadingCards() {
       <div className="h-14 w-56 animate-pulse rounded-xl bg-fg/10" />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {[0, 1, 2].map((key) => (
-          <div key={key} className="glass h-[232px] animate-pulse rounded-glass" />
+          <div key={key} className="ws-card h-[232px] animate-pulse rounded-lg" />
         ))}
       </div>
     </div>
