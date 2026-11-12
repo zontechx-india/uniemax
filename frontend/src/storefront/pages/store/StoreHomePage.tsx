@@ -407,7 +407,7 @@ function StoreIntro({ store, skin }: { store: PublicStore; skin: Skin }) {
   const about = store.footer.info.about
   return (
     <section className={STORE_CONTAINER}>
-      <div className="py-4 sm:py-6">
+      <div className={BAND_PADDING}>
         <div className="flex items-center gap-4 sm:gap-5">
           {store.logoUrl ? (
             <MediaImg
@@ -440,7 +440,7 @@ function StoreIntro({ store, skin }: { store: PublicStore; skin: Skin }) {
           </div>
         </div>
         {facts.length > 0 && (
-          <ul className="mt-5 flex flex-wrap gap-2">
+          <ul className="mt-4 flex flex-wrap gap-2">
             {facts.map((fact) => (
               <li
                 key={fact}
@@ -523,10 +523,10 @@ function ContactBand({
   const { whatsapp, phone, hours } = shopContact(store)
   if (!whatsapp && !phone) return null
   return (
-    <Band tone={tone} skin={skin} pad="compact">
+    <Band tone={tone} skin={skin}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
         <div className="min-w-0">
-          <h2 className={`font-display text-xl font-semibold ${skin.text}`}>
+          <h2 className={`font-display text-xl font-semibold tracking-tight ${skin.text}`}>
             Need help before you order?
           </h2>
           <p className={`mt-1 text-sm ${skin.muted}`}>
@@ -745,7 +745,7 @@ function HomeSection({
           className={tone === 'alt' ? skin.surface : ''}
           // Artwork stays inside the same column as everything else: left
           // edge-to-edge it grew to 800px tall on a 2560px monitor.
-          containerClassName={`${STORE_CONTAINER} py-4 sm:py-6`}
+          containerClassName={`${STORE_CONTAINER} ${BAND_PADDING}`}
           frameClassName="overflow-hidden rounded-lg"
           wellClassName={skin.well}
           {...builder}
@@ -854,21 +854,23 @@ function productLayout(layout: string | null): SectionLayout {
 
 type BandTone = 'base' | 'alt'
 
+/** The one top/bottom air of every homepage band: 16px phone, 24px from `sm`. */
+const BAND_PADDING = 'py-4 sm:py-6'
+
 /**
  * Full-bleed section band: the page canvas or the raised surface tone, with
  * the shared content column inside. The band is part of the section, so a
  * section that renders nothing leaves no empty strip.
  *
  * Separation is the tone change plus modest air — no divider rules (bands
- * with a line under each read as a settings screen). The air is kept small
- * on purpose: 56px above and below every band wasted most of a screen on
- * empty space.
+ * with a line under each read as a settings screen). **Every band — and the
+ * banners and store intro — uses the same `BAND_PADDING`**, so the page has
+ * one even rhythm instead of each section picking its own air.
  */
 function Band({
   id,
   tone = 'base',
   skin,
-  pad = 'normal',
   className = '',
   builder,
   children,
@@ -876,26 +878,18 @@ function Band({
   id?: string
   tone?: BandTone
   skin: Skin
-  /** `dense` = one row of controls, no heading. */
-  pad?: 'dense' | 'compact' | 'normal'
   className?: string
   /** Store Builder hit-target; absent on the public storefront. */
   builder?: Record<string, string> | undefined
   children: React.ReactNode
 }) {
-  const padding =
-    pad === 'dense'
-      ? 'py-3.5 sm:py-4'
-      : pad === 'compact'
-        ? 'py-4 sm:py-5'
-        : 'py-5 sm:py-7 lg:py-8'
   return (
     <section
       id={id}
       className={`${SCROLL_UNDER_HEADER} ${tone === 'alt' ? skin.surface : ''} ${className}`}
       {...builder}
     >
-      <div className={`${STORE_CONTAINER} ${padding}`}>{children}</div>
+      <div className={`${STORE_CONTAINER} ${BAND_PADDING}`}>{children}</div>
     </section>
   )
 }
@@ -950,14 +944,10 @@ function CategoryStrip({
       id="shop-by-category"
       tone={tone}
       skin={skin}
-      // A strip of signposts, not a section of products: it takes the
-      // compact band so the first products land higher on a phone.
-      pad={layout === 'chips' ? 'compact' : 'normal'}
       builder={builder}
     >
       <SectionHeading
         title={title}
-        size="sm"
         action={{ label: 'Browse all', to: storeShopUrl(store.slug) }}
         skin={skin}
       />
@@ -973,7 +963,7 @@ function CategoryStrip({
         // cable or a tub's label is not cropped by a circle. Names get two
         // lines at caption size: "Computers & Accessories" reads in full
         // instead of stopping at "Computers &…".
-        <ul className={`mt-4 flex gap-3 pb-1 sm:gap-4 ${EDGE_SCROLLER}`}>
+        <ul className={`mt-3 flex gap-3 pb-1 sm:mt-4 sm:gap-4 ${EDGE_SCROLLER}`}>
           {categories.map((category) => {
             const picture = categoryPicture(category, products)
             return (
@@ -1051,7 +1041,7 @@ function CategoryTiles({
   products: PublicProduct[]
 }) {
   return (
-    <ul className="mt-4 grid grid-cols-3 gap-2 sm:mt-6 sm:grid-cols-4 sm:gap-4 lg:grid-cols-6">
+    <ul className="mt-3 grid grid-cols-3 gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-4 lg:grid-cols-6">
       {categories.slice(0, CATEGORY_TILE_CAP).map((category) => (
         <CategoryCard
           key={category.id}
@@ -1196,7 +1186,7 @@ function ProductSection({
     return (
       <Band id={id} tone={tone} skin={skin} builder={builder}>
         <SectionHeading title={title} eyebrow={eyebrow} skin={skin} />
-        <ul className={`mt-4 sm:mt-6 ${PRODUCT_GRID}`}>
+        <ul className={`mt-3 sm:mt-4 ${PRODUCT_GRID}`}>
           {products.map((product, index) => (
             <ProductCard
               key={product.id}
@@ -1249,7 +1239,7 @@ function ProductSection({
       {effective === 'spotlight' ? (
         <Spotlight store={store} products={products} skin={skin} />
       ) : (
-        <ul className={`mt-4 sm:mt-6 ${PRODUCT_GRID}`}>
+        <ul className={`mt-3 sm:mt-4 ${PRODUCT_GRID}`}>
           {products.slice(0, ROW_SIZE * rows).map((product, index) => (
             <ProductCard
               key={product.id}
@@ -1290,7 +1280,7 @@ function Spotlight({
 }) {
   const [lead, ...rest] = products
   return (
-    <ul className="mt-4 grid gap-x-5 gap-y-6 sm:mt-6 sm:gap-y-8 lg:grid-cols-3">
+    <ul className="mt-3 grid gap-x-5 gap-y-6 sm:mt-4 sm:gap-y-8 lg:grid-cols-3">
       <ProductCard store={store} product={lead} skin={skin} size="lg" />
       {/* A list item holding the supporting grid, so the whole section stays
           one well-formed list rather than two side by side. */}
@@ -1393,7 +1383,7 @@ function ProductRail({
       <ul
         ref={scroller}
         onScroll={sync}
-        className={`mt-4 flex snap-x snap-proximity gap-3 pb-1 sm:mt-6 sm:gap-5 ${EDGE_SCROLLER}`}
+        className={`mt-3 flex snap-x snap-proximity gap-3 pb-1 sm:mt-4 sm:gap-5 ${EDGE_SCROLLER}`}
       >
         {products.map((product) => (
           <ProductCard
@@ -1515,7 +1505,7 @@ function CategoryShelf({
           action={{ label: 'View all', to }}
           skin={skin}
         />
-        <ul className={`mt-4 sm:mt-6 ${PRODUCT_GRID}`}>
+        <ul className={`mt-3 sm:mt-4 ${PRODUCT_GRID}`}>
           {shown.map((product) => (
             <ProductCard
               key={product.id}
@@ -1544,14 +1534,14 @@ function CategoryShelf({
       <div className="grid gap-x-5 gap-y-6 lg:grid-cols-4">
         <Link
           to={to}
-          className={`group flex items-center justify-between gap-4 overflow-hidden rounded-lg border p-4 card-hover sm:p-5 lg:flex-col lg:items-start lg:justify-between lg:p-7 ${split.panel} ${skin.border} ${skin.surface}`}
+          className={`group flex items-center justify-between gap-4 overflow-hidden rounded-lg border p-4 card-hover sm:p-5 lg:flex-col lg:items-start lg:justify-between ${split.panel} ${skin.border} ${skin.surface}`}
         >
           <span className="min-w-0">
             <span className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">
               Collection
             </span>
             <span
-              className={`mt-2 block truncate font-display text-xl font-semibold sm:text-2xl lg:whitespace-normal lg:text-3xl ${skin.text}`}
+              className={`mt-1 block truncate font-display text-xl font-semibold tracking-tight lg:whitespace-normal ${skin.text}`}
             >
               {row.name}
             </span>
@@ -1562,7 +1552,7 @@ function CategoryShelf({
             )}
           </span>
           {peek.length >= 2 && (
-            <span aria-hidden className="hidden w-full grid-cols-2 gap-2 lg:mt-6 lg:grid">
+            <span aria-hidden className="hidden w-full grid-cols-2 gap-2 lg:mt-4 lg:grid">
               {peek.map((photo, index) => (
                 <span
                   key={photo.id}
@@ -1585,7 +1575,7 @@ function CategoryShelf({
               ))}
             </span>
           )}
-          <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm font-semibold text-brand lg:mt-6">
+          <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm font-semibold text-brand lg:mt-4">
             Shop all
             <ChevronRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
           </span>

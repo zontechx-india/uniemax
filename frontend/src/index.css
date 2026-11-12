@@ -1104,8 +1104,12 @@
 
 /* Form controls show the same focus ring as every other control
  * (docs/DESIGN_GUIDELINES.md §12). Unlayered on purpose: a component's
- * `outline-none` (a utility) cannot hide it. */
-input:not([type='checkbox']):not([type='radio']):not([type='range']):focus-visible,
+ * `outline-none` (a utility) cannot hide it.
+ *
+ * The one opt-out: `data-focus-ring="parent"` on a borderless input sitting
+ * inside its own bordered box (a pill search bar). That box draws the ring
+ * with `focus-within:`, so a second square ring inside it is not drawn. */
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([data-focus-ring='parent']):focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: 2px solid var(--accent);

@@ -108,7 +108,6 @@ export function SectionHeading({
   eyebrow,
   action,
   aside,
-  size = 'md',
   skin,
 }: {
   title: string
@@ -117,8 +116,6 @@ export function SectionHeading({
   action?: { label: string; to: string }
   /** Controls that sit beside the action (rail arrows). */
   aside?: React.ReactNode
-  /** `sm` for a strip that heads one row of chips rather than a section. */
-  size?: 'sm' | 'md'
   skin: Skin
 }) {
   return (
@@ -128,16 +125,10 @@ export function SectionHeading({
       className={`flex justify-between gap-4 ${eyebrow ? 'items-end' : 'items-center'}`}
     >
       <div className="min-w-0">
-        {/* Section titles at the scale's section size (22), semibold, on
-            every screen — big enough to
-            mark a section, small enough not to out-shout the products — and
-            a quiet line under them. `sm` steps it down for a chip strip,
-            which is a signpost rather than a section of its own. */}
-        <h2
-          className={`font-display font-semibold tracking-tight ${
-            size === 'sm' ? 'text-lg' : 'text-xl'
-          } ${skin.text}`}
-        >
+        {/* ONE title size for every section on every screen — big enough
+            to mark a section, small enough not to out-shout the products —
+            and a quiet line under it. */}
+        <h2 className={`font-display text-xl font-semibold tracking-tight ${skin.text}`}>
           {title}
         </h2>
         {eyebrow && (
@@ -145,7 +136,9 @@ export function SectionHeading({
         )}
       </div>
       {(action || aside) && (
-        <div className="flex shrink-0 items-center gap-3">
+        // `-my-2`: the 44px tap target spills into the band's air instead of
+        // making every heading row 44px tall around a 28px title.
+        <div className="-my-2 flex shrink-0 items-center gap-3">
           {action && (
             <Link
               to={action.to}

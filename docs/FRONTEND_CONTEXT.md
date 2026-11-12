@@ -1335,10 +1335,14 @@ full-bleed section bands instead.
   `GET …/home`. Sections render in the **owner-arranged order** (the payload's
   ordered `sections` list); each is skipped when disabled or empty. Every
   section is a **full-bleed band** (alternating page-canvas / surface tone,
-  **no divider rule**, `py-5/7/8`; `compact` `py-4/5` for the category
-  chip strip and the contact band, `dense` `py-3.5/4` for a one-row strip;
-  the banners sit in `py-4/6`, the store intro in `py-4/6`; cut from
-  `py-8/12/14` on 18 Oct 2026, which wasted most of a screen on air) — separation comes from the tone change plus air (the classic
+  **no divider rule**; **one even rhythm** since 13 Nov 2026: every band,
+  the banners and the store intro share `BAND_PADDING` `py-4 sm:py-6`, every
+  section title is `SectionHeading`'s one `text-xl` (no small variant; the
+  Category Highlights panel name matches it), heading → content is always
+  `mt-3 sm:mt-4`, and the heading's 44px "View all" tap target is pulled in
+  with `-my-2` so it no longer makes the row taller than the title; the store
+  footer is `py-8 lg:py-10`. Earlier `py-5/7/8` / `compact` / `dense` variants
+  and the `py-8/12/14` before them wasted a screen on air) — separation comes from the tone change plus air (the classic
   restyle of 15 Oct 2026 dropped the per-band rules, which read as a settings
   screen), and the band lives inside the section so a hidden one leaves no
   empty strip. Sections are filtered for *content* before the tones are
@@ -3933,7 +3937,11 @@ owner's hue.
 **Focus** (§12): every control shows the accent outline on keyboard focus.
 Form fields get it from an unlayered rule in `index.css`
 (`input/select/textarea:focus-visible`), so a component's `outline-none`
-cannot hide it.
+cannot hide it. The one opt-out is `data-focus-ring="parent"`, for a
+borderless input inside its own bordered box (the homepage pill search):
+the box draws the ring instead (`focus-within:border-accent
+focus-within:ring-1 focus-within:ring-accent`), so there is no second square
+ring inside the pill.
 
 The `SKIN` object in `storeTheme.ts` maps semantic slots (`surface`, `well`,
 `chip` — all flat — plus `cta` → `btn-primary` and `ctaSecondary` →

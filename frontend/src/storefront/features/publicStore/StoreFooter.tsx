@@ -107,7 +107,7 @@ export function StoreFooter({ store, skin }: { store: PublicStore; skin: Skin })
             Stacking every block in one column made the footer the tallest
             thing on a small shop's page. */}
         <div
-          className={`grid grid-cols-2 gap-x-6 gap-y-8 py-10 sm:gap-x-10 lg:py-14 ${BLOCK_COLUMNS[blocks] ?? 'lg:grid-cols-4'}`}
+          className={`grid grid-cols-2 gap-x-6 gap-y-8 py-8 sm:gap-x-10 lg:py-10${BLOCK_COLUMNS[blocks] ?? 'lg:grid-cols-4'}`}
         >
           <BrandBlock store={store} socials={socials} />
           <ShopBlock store={store} wide={!hasLinks} />

@@ -330,9 +330,17 @@ export function MarketHeader() {
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-3 md:ml-0 md:gap-4 lg:gap-6">
-            <CreateStoreLink placement="home_header" className="hidden whitespace-nowrap text-sm font-semibold text-muted transition-colors hover:text-fg lg:block">
-              Sell on UnieMax
-            </CreateStoreLink>
+            {/* An outlined (secondary) button, not a plain text link — it read
+                as a label. The wrapper does the hiding: the button's own
+                `inline-flex` would fight a `hidden` class on it. */}
+            <span className="hidden lg:block">
+              <CreateStoreLink
+                placement="home_header"
+                className={buttonClass({ variant: 'secondary', size: 'sm', className: 'whitespace-nowrap' })}
+              >
+                Sell on UnieMax
+              </CreateStoreLink>
+            </span>
             <Button
               variant="ghost"
               size="sm"
@@ -528,7 +536,9 @@ function GlobalSearchBox({ autoFocus = false }: { autoFocus?: boolean }) {
 
   return (
     <div ref={rootRef} className="relative text-left">
-      <div className="flex items-center gap-3 rounded-pill border border-line bg-input px-5 py-3 transition-colors focus-within:border-accent">
+      {/* The pill itself is the focus ring (accent border + 1px ring = 2px,
+          like every other control); the input inside opts out of its own. */}
+      <div className="flex items-center gap-3 rounded-pill border border-line bg-input px-5 py-3 transition-colors focus-within:border-accent focus-within:ring-1 focus-within:ring-accent">
         <SearchIcon className="h-4 w-4 shrink-0 text-muted" />
         <input
           ref={inputRef}
@@ -542,6 +552,7 @@ function GlobalSearchBox({ autoFocus = false }: { autoFocus?: boolean }) {
           enterKeyHint="search"
           placeholder="Search stores and products"
           aria-label="Search stores, products, or categories"
+          data-focus-ring="parent"
           className="w-full bg-transparent text-sm text-fg outline-none placeholder:text-muted"
         />
         {q && (
