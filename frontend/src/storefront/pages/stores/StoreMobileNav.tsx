@@ -65,9 +65,12 @@ export function StoreMobileNav({
     <>
       <nav
         aria-label="Store sections"
-        className="fixed inset-x-0 bottom-0 z-30 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] lg:hidden"
+        // The bar stands on a band of the PAGE colour, so the white cards
+        // scrolling under it stop short of it — it never reads as one more
+        // card. Only the bar itself takes taps.
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-30 bg-bg/95 px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] lg:hidden"
       >
-        <div className="ws-bar mx-auto grid max-w-md grid-cols-5 gap-1 rounded-sheet p-1.5">
+        <div className="ws-dock pointer-events-auto mx-auto grid max-w-md grid-cols-5 gap-1 rounded-sheet p-1.5">
           {tabs.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}

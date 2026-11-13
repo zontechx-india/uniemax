@@ -153,12 +153,12 @@ export function OptionTypesEditor({
         if (kind === 'typed') {
           const type = types.find((t) => t.key === key)!
           return (
-            <div key={key} className="rounded-2xl border border-line bg-surface/70 p-4">
-              <div className="space-y-4">
+            <div key={key} className="rounded-lg border border-line bg-surface p-3">
+              <div className="space-y-3">
                 <TextField
                   label={label}
                   placeholder={placeholder}
-                  hint="What customers choose — like Size, Colour or Weight."
+                  hint="Like Size, Colour or Weight."
                   value={type.name}
                   onChange={(e) =>
                     updateType(key, (t) => ({ ...t, name: e.target.value }))
@@ -221,16 +221,16 @@ export function OptionTypesEditor({
         const name = group.name.trim()
         const memberIds = new Set(group.members.map((m) => m.productId))
         return (
-          <div key={key} className="rounded-2xl border border-brand/25 bg-surface/70 p-4">
+          <div key={key} className="rounded-lg border border-brand/25 bg-surface p-3">
             <div>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <p className="inline-flex items-center gap-1.5 rounded-pill bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand">
                   Linked products
                 </p>
                 <TextField
                   label={label}
                   placeholder={placeholder}
-                  hint="Each option is a separate product in your shop."
+                  hint="Each option is its own product."
                   value={group.name}
                   onChange={(e) =>
                     updateGroup(key, (g) => ({ ...g, name: e.target.value }))
@@ -350,9 +350,7 @@ export function OptionTypesEditor({
                   <p className="text-hint text-muted">Type a name above first, like “Colour”.</p>
                 )}
                 <p className="text-hint text-muted">
-                  Each one keeps its own photos, price and stock. On each
-                  product’s page customers see the others as options to tap,
-                  in this order.
+                  Each keeps its own photos, price and stock.
                 </p>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <RemoveButton
@@ -411,15 +409,17 @@ export function OptionTypesEditor({
           type="button"
           onClick={addTyped}
           disabled={disabled || full}
-          className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-brand/40 px-4 text-base font-semibold text-brand transition hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex min-h-tap w-full items-center justify-center gap-2 rounded-md border border-dashed border-brand/50 px-4 text-sm font-semibold text-brand transition hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <PlusIcon className="h-5 w-5" />
+          <PlusIcon className="h-4 w-4" />
           {cards.length === 0 ? 'Add a choice, like Size or Colour' : 'Add another choice'}
         </button>
-        <p className="text-hint text-muted">
-          Up to {OPTION_LIMITS.types} choices.
-          {full && ' Remove one to add another.'}
-        </p>
+        {/* The limit is only news once it is reached. */}
+        {full && (
+          <p className="text-hint text-muted">
+            Up to {OPTION_LIMITS.types} choices — remove one to add another.
+          </p>
+        )}
 
         {/* The advanced path — linking separate products — stays out of the
             way until asked for. */}
@@ -432,14 +432,12 @@ export function OptionTypesEditor({
           <ChevronDownIcon className={`h-4 w-4 transition-transform ${advanced ? 'rotate-180' : ''}`} />
         </Button>
         {advanced && (
-          <div className="rounded-2xl bg-fg/[0.04] p-3.5">
+          <div className="rounded-md bg-fg/[0.04] p-3">
             <p className="text-sm font-semibold text-fg">
               Link my other products (advanced)
             </p>
             <p className="mt-0.5 text-hint text-muted">
-              Use this when each colour or size is already a separate product
-              in your shop, with its own photos — for example a saree you
-              sell in Maroon, Blue and Tan as three products.
+              When each colour is already its own product in your shop.
             </p>
             <button
               type="button"

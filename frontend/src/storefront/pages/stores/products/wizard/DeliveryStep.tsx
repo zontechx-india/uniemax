@@ -19,8 +19,36 @@ import type {
 import { useManagedStore } from '../../../../features/stores/useManagedStore'
 import { ProductDeliveryField } from '../../DeliveryRuleEditor'
 import { ProductShippingField } from '../../ShippingRateEditor'
-import { SlidersIcon, TruckIcon } from '../../../../layout/icons'
-import { ChoiceCard, Hint, StepButtons, StepError, StepShell } from './shared'
+import type { ComponentType } from 'react'
+import {
+  BoxIcon,
+  CheckIcon,
+  MapPinIcon,
+  RupeeIcon,
+  SlidersIcon,
+  StoreIcon,
+  TruckIcon,
+} from '../../../../layout/icons'
+import { ChoiceCard, Hint, Section, StepButtons, StepError, StepShell } from './shared'
+
+/** One of the shop's settings: a mark, what it is, and its value. */
+function SettingLine({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: ComponentType<{ className?: string }>
+  label: string
+  value: string
+}) {
+  return (
+    <li className="flex items-start gap-2.5">
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
+      <span className="w-28 shrink-0 text-muted">{label}</span>
+      <span className="min-w-0 flex-1 font-medium text-fg">{value}</span>
+    </li>
+  )
+}
 
 /**
  * Step 5 — delivery & payment, which almost every product inherits from the
@@ -102,64 +130,51 @@ export function DeliveryStep({
   }
 
   return (
-    <StepShell
-      title={supplyOnly ? 'Where you deliver' : 'Delivery & payment'}
-      lead={
-        supplyOnly
-          ? "Your sellers' customers can order this wherever you deliver. Most products simply follow your delivery settings."
-          : "Most products simply follow your shop's settings. Change them here only if this product is different."
-      }
-    >
-      <div className="rounded-2xl border border-line bg-surface/70 p-4">
-        <p className="text-base font-semibold text-fg">{supplyOnly ? 'Your delivery settings' : "Your shop's settings"}</p>
-        <ul className="mt-2 space-y-1.5 text-base text-muted">
-          <li>
-            Delivers to:{' '}
-            <span className="text-fg">{describeDeliveryRule(store.shipping.deliveryRule)}</span>
-          </li>
+    <StepShell title={supplyOnly ? 'Where you deliver' : 'Delivery & payment'}>
+      {/* The shop's settings as three marked lines — what this product gets
+          unless the seller changes it below. */}
+      <Section title={supplyOnly ? 'Your delivery settings' : "Your shop's settings"} icon={StoreIcon}>
+        <ul className="space-y-2 text-sm">
+          <SettingLine icon={MapPinIcon} label="Delivers to" value={describeDeliveryRule(store.shipping.deliveryRule)} />
           {!supplyOnly && (
             <>
-              <li>
-                Shipping charge:{' '}
-                <span className="text-fg">{describeShippingRate(store.shipping.rate)}</span>
-              </li>
-              <li>
-                Cash on delivery:{' '}
-                <span className="text-fg">{store.payments.acceptCod ? 'accepted' : 'switched off'}</span>
-              </li>
+              <SettingLine icon={TruckIcon} label="Shipping" value={describeShippingRate(store.shipping.rate)} />
+              <SettingLine
+                icon={RupeeIcon}
+                label="Cash on delivery"
+                value={store.payments.acceptCod ? 'Accepted' : 'Off'}
+              />
             </>
           )}
         </ul>
         <Hint>
           {supplyOnly
-            ? 'Change them any time under Delivery and Payments. Cash on delivery is agreed with each seller, and your shipping fee is in Supplier settings.'
-            : "Change your shop's settings any time under Delivery and Payments."}
+            ? 'Change under Delivery. COD is agreed with each seller.'
+            : 'Change under Delivery and Payments.'}
         </Hint>
-      </div>
+      </Section>
 
-      <div
-        role="radiogroup"
-        aria-label="Delivery for this product"
-        className="grid gap-3 sm:grid-cols-2"
-      >
-        <ChoiceCard
-          active={!custom}
-          icon={TruckIcon}
-          title={supplyOnly ? 'Same as my settings' : 'Same as my shop'}
-          body="Nothing to change. Most products."
-          onClick={useStoreSettings}
-        />
-        <ChoiceCard
-          active={custom}
-          icon={SlidersIcon}
-          title="Different for this product"
-          body={supplyOnly ? 'Its own delivery area.' : 'Its own delivery area or charge, or no cash on delivery.'}
-          onClick={() => setCustom(true)}
-        />
-      </div>
+      <Section title="For this product" icon={BoxIcon}>
+        <div role="radiogroup" aria-label="Delivery for this product" className="grid gap-2 sm:grid-cols-2">
+          <ChoiceCard
+            active={!custom}
+            icon={CheckIcon}
+            title={supplyOnly ? 'Same as my settings' : 'Same as my shop'}
+            body="Most products"
+            onClick={useStoreSettings}
+          />
+          <ChoiceCard
+            active={custom}
+            icon={SlidersIcon}
+            title="Different"
+            body={supplyOnly ? 'Its own delivery area' : 'Own area, charge or COD'}
+            onClick={() => setCustom(true)}
+          />
+        </div>
+      </Section>
 
       {custom && (
-        <div className="space-y-5">
+        <Section title="This product’s delivery" icon={SlidersIcon}>
           <ProductDeliveryField
             storeRule={store.shipping.deliveryRule}
             value={deliveryRule}
@@ -180,26 +195,26 @@ export function DeliveryStep({
                 }}
                 disabled={busy}
               />
-              <label className="flex min-h-tap cursor-pointer items-start gap-3 rounded-xl py-1">
+              <label className="flex min-h-tap cursor-pointer items-start gap-2.5 py-1">
                 <input
                   type="checkbox"
                   checked={codAvailable}
                   onChange={(e) => setCodAvailable(e.target.checked)}
                   disabled={busy}
-                  className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-[var(--brand)]"
+                  className="mt-0.5 h-[18px] w-[18px] shrink-0 cursor-pointer accent-[var(--brand)]"
                 />
-                <span className="text-base">
-                  <span className="font-medium text-fg">Cash on delivery for this product</span>
-                  <span className="mt-0.5 block text-hint text-muted">
+                <span className="text-sm">
+                  <span className="font-semibold text-fg">Cash on delivery</span>
+                  <span className="block text-hint text-muted">
                     {store.payments.acceptCod
-                      ? 'Untick for items you only sell prepaid.'
-                      : 'Your store has cash on delivery switched off; this applies once you turn it on.'}
+                      ? 'Untick if prepaid only.'
+                      : 'COD is off for your shop — applies once on.'}
                   </span>
                 </span>
               </label>
             </>
           )}
-        </div>
+        </Section>
       )}
 
       {error && <StepError>{error}</StepError>}

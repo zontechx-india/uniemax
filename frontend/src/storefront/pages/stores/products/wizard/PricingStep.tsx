@@ -8,7 +8,6 @@ import {
 } from '../../../../features/stores/productGroups'
 import type { GroupDraft } from '../../../../features/stores/productGroups'
 import {
-  cleanAmount,
   cleanCount,
   draftLabel,
   draftToInput,
@@ -26,7 +25,8 @@ import type {
   StoreCategory,
   StoreProduct,
 } from '../../../../features/stores/storesApi'
-import { CheckIcon, PlusIcon, SlidersIcon, TagIcon } from '../../../../layout/icons'
+import { CheckIcon, PaletteIcon, PlusIcon, SlidersIcon, TagIcon } from '../../../../layout/icons'
+import { CameraIcon } from '../../media/icons'
 import { OptionTypesEditor } from '../OptionTypesEditor'
 import type { OptionsDraft } from '../OptionTypesEditor'
 import { VariantMatrix } from '../VariantMatrix'
@@ -39,8 +39,8 @@ import {
   rowsWithPhotos,
   valueWithoutPhoto,
 } from './VariantPhotos'
-import { ChoicesPreview, exampleChoice, listWords } from './choicesHelp'
-import { Field, ChoiceCard, Hint, inputClass, StepButtons, StepError, StepShell } from './shared'
+import { ChoicesPreview, exampleChoice, listWords, VersionCard } from './choicesHelp'
+import { Field, Hint, inputClass, MoneyInput, Section, StepButtons, StepError, StepShell } from './shared'
 import type { StepKey, VersionPlan } from './shared'
 
 /** null = not answered yet: a new, unpriced product starts with no answer picked. */
@@ -177,8 +177,6 @@ export function PricingStep({
     : (['choices', 'prices'] as const)
   const cardCount = draft.types.length + groups.length
   const example = exampleChoice(presets)
-  // The seller's own name reads best in the example, unless it is long.
-  const thisOne = product.name.length <= 32 ? product.name : 'this product'
 
   /**
    * Every change from the editor comes through here so the matrix is
@@ -466,57 +464,40 @@ export function PricingStep({
     void saveOptions()
   }
 
+  // Two per row even on a phone: short labels, a ₹ inside the money fields,
+  // and a few words of hint only where the field is not obvious.
   const singleFields = (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <Field
-        label={supplyOnly ? 'Suggested price (₹)' : 'Selling price (₹)'}
-        hint={
-          supplyOnly
-            ? 'What a customer usually pays. Sellers start from this; your price for sellers is asked in the last step.'
-            : 'What the customer pays you.'
-        }
-      >
-        <input
-          value={price}
-          onChange={(e) => setPrice(cleanAmount(e.target.value))}
-          inputMode="decimal"
-          placeholder="e.g. 1499"
-          className={inputClass}
-        />
-        {supplyOnly ? null : <PlatformFeeNote storeId={storeId} price={price} />}
+    <div className="grid grid-cols-2 gap-x-3 gap-y-3.5">
+      <Field label={supplyOnly ? 'Suggested price' : 'Selling price'}>
+        <MoneyInput value={price} onChange={setPrice} placeholder="1499" />
       </Field>
-      <Field
-        label="Printed price / MRP (₹)"
-        optional
-        hint="The price printed on the pack. Customers see it crossed out, with how much they save."
-      >
-        <input
-          value={compareAt}
-          onChange={(e) => setCompareAt(cleanAmount(e.target.value))}
-          inputMode="decimal"
-          placeholder="e.g. 1999"
-          className={inputClass}
-        />
+      <Field label="MRP" optional hint="Shown crossed out">
+        <MoneyInput value={compareAt} onChange={setCompareAt} placeholder="1999" />
       </Field>
-      <Field label="How many you have" hint="Customers see “only 2 left” when it runs low. Put 0 if it is sold out.">
+      {supplyOnly ? (
+        <p className="col-span-2 -mt-1.5 text-hint text-muted">
+          Sellers start from this. Your price for sellers comes in the last step.
+        </p>
+      ) : (
+        <div className="col-span-2 -mt-1.5">
+          <PlatformFeeNote storeId={storeId} price={price} />
+        </div>
+      )}
+      <Field label="Stock" hint="0 = sold out">
         <input
           value={stock}
           onChange={(e) => setStock(cleanCount(e.target.value))}
           inputMode="numeric"
-          placeholder="e.g. 10"
+          placeholder="10"
           className={inputClass}
         />
       </Field>
-      <Field
-        label="Product code"
-        optional
-        hint="Only if you use your own codes. Most sellers leave this empty."
-      >
+      <Field label="Product code" optional hint="Your own code">
         <input
           value={sku}
           onChange={(e) => setSku(e.target.value)}
           maxLength={64}
-          placeholder="e.g. SAR-PINK-01"
+          placeholder="SAR-01"
           className={inputClass}
         />
       </Field>
@@ -541,27 +522,27 @@ export function PricingStep({
         mode === 'options' && part === 'photos' && photoType
           ? needsPhotos
             ? `Customers tap a ${photoType.name.trim().toLowerCase()} and see its photos.`
-            : 'One question, then the prices.'
+            : undefined
           : mode === 'options' && part === 'prices'
           ? supplyOnly
-            ? 'Type the suggested price and how many you have for each one. Your price for sellers is asked in the last step.'
-            : 'Type a price and how many you have for each one. Use “Same price for all” if most are the same.'
-          : 'Same product in different colours, sizes or weights? Put them all in this one product — don’t make a new product for each.'
+            ? 'Suggested price and stock for each. Your price for sellers comes last.'
+            : 'A price and stock for each one.'
+          : undefined
       }
     >
       {/* Where the seller is on the two-screen path. */}
       {mode === 'options' && draft.types.length > 0 && (
-        <ol className="flex gap-2" aria-label="Price step">
+        <ol className="flex gap-1.5" aria-label="Price step">
           {parts.map((p, i) => (
             <li
               key={p}
               aria-current={part === p ? 'step' : undefined}
-              className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-sm font-semibold sm:justify-start sm:gap-2 sm:px-3 ${
+              className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold sm:justify-start sm:px-3 ${
                 part === p ? 'bg-brand-soft text-brand' : 'bg-fg/5 text-muted'
               }`}
             >
               <span
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold max-[359px]:hidden ${
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold max-[359px]:hidden ${
                   part === p ? 'bg-brand text-brand-contrast' : 'ws-well'
                 }`}
               >
@@ -575,29 +556,42 @@ export function PricingStep({
         </ol>
       )}
 
+      {/* One or many — as two pictures: one shirt, or the same shirt in the
+          category's own colours (or sizes). The picture carries the meaning;
+          the words are a title and a few more. */}
       {part === 'choices' && (
-        <div role="radiogroup" aria-label="Does it come in choices?" className="grid gap-3 sm:grid-cols-2">
-          <ChoiceCard
-            active={mode === 'single'}
-            icon={TagIcon}
-            title="Just one version"
-            body="One price and one stock count."
-            onClick={() => {
-              setMode('single')
-              setError(null)
-            }}
-          />
-          <ChoiceCard
-            active={mode === 'options'}
-            icon={SlidersIcon}
-            title="Many colours, sizes or weights"
-            body={`Like ${thisOne} in ${listWords(example.values)}. Customers pick one on the same page.`}
-            onClick={() => {
-              setMode('options')
-              setError(null)
-            }}
-          />
-        </div>
+        <Section title="How many versions?" icon={PaletteIcon}>
+          <div role="radiogroup" aria-label="How many versions?" className="grid grid-cols-2 gap-2.5">
+            <VersionCard
+              many={false}
+              values={example.values}
+              active={mode === 'single'}
+              title="Just one"
+              body="One price, one stock"
+              onClick={() => {
+                setMode('single')
+                setError(null)
+              }}
+            />
+            <VersionCard
+              many
+              values={example.values}
+              active={mode === 'options'}
+              title="Many versions"
+              body={listWords(example.values)}
+              onClick={() => {
+                setMode('options')
+                setError(null)
+              }}
+            />
+          </div>
+          {mode !== 'single' && (
+            <p className="text-hint text-muted">
+              Colours or sizes go in <span className="font-semibold text-fg">this one product</span> — not a
+              new product for each.
+            </p>
+          )}
+        </Section>
       )}
 
       {/* Show, don't explain — while the seller decides. Once they pick, it
@@ -607,12 +601,14 @@ export function PricingStep({
       )}
 
       {mode === null ? null : mode === 'single' ? (
-        singleFields
+        <Section title="Price & stock" icon={TagIcon}>
+          {singleFields}
+        </Section>
       ) : part === 'choices' ? (
-        <div className="space-y-5">
+        <Section title="Choices" icon={SlidersIcon}>
           {unusedPresets.length > 0 && (
             <div>
-              <p className="text-base font-semibold text-fg">What do customers choose? Tap one</p>
+              <p className="text-sm font-semibold text-fg">Tap what customers choose</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {unusedPresets.map((preset) => (
                   <button
@@ -620,24 +616,21 @@ export function PricingStep({
                     type="button"
                     onClick={() => addPreset(preset)}
                     disabled={busy || cardCount >= 3}
-                    className="inline-flex min-h-tap items-center gap-1.5 rounded-pill border border-line bg-surface px-4 text-sm font-semibold text-fg transition hover:border-brand hover:text-brand disabled:opacity-50"
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-pill border border-line bg-surface px-3 text-sm font-semibold text-fg transition hover:border-brand hover:text-brand disabled:opacity-50"
                   >
                     <PlusIcon className="h-3.5 w-3.5" />
                     {preset.name}
                     {preset.values.length > 0 && (
                       <span className="font-normal text-muted">
                         {' '}
-                        · {preset.values.slice(0, 4).join(', ')}
-                        {preset.values.length > 4 ? '…' : ''}
+                        · {preset.values.slice(0, 3).join(', ')}
+                        {preset.values.length > 3 ? '…' : ''}
                       </span>
                     )}
                   </button>
                 ))}
               </div>
-              <Hint>
-                It comes with the usual options filled in — remove any you
-                don’t sell, or add your own below.
-              </Hint>
+              <Hint>Comes filled in — remove what you don’t sell.</Hint>
             </div>
           )}
 
@@ -651,27 +644,24 @@ export function PricingStep({
           />
 
           {draft.types.length > 0 && draft.rows.length > 0 && (
-            <p className="flex items-center gap-2 rounded-xl bg-success/10 px-3 py-2.5 text-hint font-medium text-fg">
+            <p className="flex items-center gap-2 rounded-md bg-success/10 px-3 py-2 text-hint font-medium text-fg">
               <CheckIcon className="h-4 w-4 shrink-0 text-success" />
               {draft.rows.filter((row) => !row.removed).length} choice
-              {draft.rows.filter((row) => !row.removed).length === 1 ? '' : 's'}.
-              Tap Continue to {photoType ? 'add their photos' : 'set the prices'}.
+              {draft.rows.filter((row) => !row.removed).length === 1 ? '' : 's'} · next:{' '}
+              {photoType ? 'photos' : 'prices'}
             </p>
           )}
 
           {draft.types.length === 0 && groups.length > 0 && (
-            <div>
-              <p className="text-base font-semibold text-fg">This product’s price</p>
-              <Hint>
-                The linked products carry their own — set each one from its
-                own editor.
-              </Hint>
+            <div className="border-t border-line pt-3.5">
+              <p className="text-sm font-semibold text-fg">This product’s price</p>
+              <Hint>Linked products keep their own.</Hint>
               <div className="mt-3">{singleFields}</div>
             </div>
           )}
-        </div>
+        </Section>
       ) : part === 'photos' && photoType ? (
-        <div className="space-y-5">
+        <Section title={`Photos for each ${photoType.name.trim().toLowerCase()}`} icon={CameraIcon}>
           {photoChoice?.ask && (
             <LooksQuestion
               name={photoType.name}
@@ -703,22 +693,23 @@ export function PricingStep({
               disabled={busy}
             />
           )}
-        </div>
+        </Section>
       ) : (
-        <VariantMatrix
-          types={draft.types}
-          rows={draft.rows}
-          media={images}
-          onChange={(rows) => {
-            setDraft({ ...draft, rows })
-            setError(null)
-          }}
-          disabled={busy}
-        />
+        <Section title="Price & stock for each" icon={TagIcon}>
+          <VariantMatrix
+            types={draft.types}
+            rows={draft.rows}
+            media={images}
+            onChange={(rows) => {
+              setDraft({ ...draft, rows })
+              setError(null)
+            }}
+            disabled={busy}
+          />
+          {/* Each choice has its own price — one note for all of them. */}
+          {!supplyOnly && <PlatformFeeNote storeId={storeId} />}
+        </Section>
       )}
-
-      {/* Each choice has its own price — one note for all of them. */}
-      {mode === 'options' && part === 'prices' && !supplyOnly ? <PlatformFeeNote storeId={storeId} /> : null}
 
       {error && <StepError>{error}</StepError>}
 

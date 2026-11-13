@@ -1,6 +1,7 @@
 import { MediaImg } from '../../../../../shared/media/MediaImg'
 import type { ProductOptionType, StoreProductMediaItem } from '../../../../features/stores/storesApi'
-import { PaletteIcon } from '../../../../layout/icons'
+import { EyeIcon, PaletteIcon } from '../../../../layout/icons'
+import { RadioDot, Section } from './shared'
 
 /**
  * Teaching "one product, many colours" without a demo. Sellers new to
@@ -104,7 +105,7 @@ function Shirt({ fill, transform }: { fill: string; transform?: string }) {
         d={SHIRT}
         fill={fill}
         stroke="var(--fg)"
-        strokeOpacity={0.22}
+        strokeOpacity={0.35}
         strokeWidth={1.5}
         strokeLinejoin="round"
       />
@@ -146,9 +147,10 @@ function VersionPicture({ many, values }: { many: boolean; values: string[] }) {
 }
 
 /**
- * Step 1's "one or many?" answer as a picture card: a single shirt, or the
- * same shirt in three colours (or sizes). Sellers read the drawing before
- * the words. Wrap a pair in a `role="radiogroup"`.
+ * The "one or many?" answer as a picture card (steps 1 and 3): a single
+ * shirt, or the same shirt in three colours (or sizes). Sellers read the
+ * drawing before the words, so the words are a title and a few more. Wrap a
+ * pair in a `role="radiogroup"`.
  */
 export function VersionCard({
   many,
@@ -172,31 +174,22 @@ export function VersionCard({
       role="radio"
       aria-checked={active}
       onClick={onClick}
-      className={`relative flex flex-col rounded-2xl border p-2.5 text-left transition ${
-        active
-          ? 'border-brand bg-brand-soft ring-2 ring-brand/25'
-          : 'border-line bg-surface/70 hover:border-brand/60'
+      className={`relative flex flex-col overflow-hidden rounded-lg border text-left transition ${
+        active ? 'border-brand bg-brand-soft' : 'border-line bg-surface hover:border-brand/60'
       }`}
     >
       <span
         aria-hidden
-        className={`flex h-24 items-end justify-center rounded-xl pb-3 transition-colors ${
-          active ? 'bg-surface/80' : 'bg-fg/5'
+        className={`flex h-[72px] items-center justify-center transition-colors ${
+          active ? 'bg-surface/70' : 'bg-fg/5'
         }`}
       >
         <VersionPicture many={many} values={values} />
       </span>
-      <span
-        aria-hidden
-        className={`absolute top-4 right-4 flex h-5 w-5 items-center justify-center rounded-full border-2 bg-surface ${
-          active ? 'border-brand' : 'border-fg/25'
-        }`}
-      >
-        {active && <span className="h-2.5 w-2.5 rounded-full bg-brand" />}
-      </span>
-      <span className="px-1 pt-2.5 pb-1">
-        <span className="block text-base font-bold text-fg">{title}</span>
-        <span className="mt-0.5 block text-hint text-muted">{body}</span>
+      <RadioDot on={active} className="absolute top-2 right-2" />
+      <span className="px-2.5 py-2">
+        <span className="block text-sm font-semibold text-fg">{title}</span>
+        <span className="block text-hint text-muted">{body}</span>
       </span>
     </button>
   )
@@ -216,28 +209,24 @@ export function ChoicesPreview({
   choice: { name: string; values: string[] }
 }) {
   return (
-    <figure className="rounded-2xl border border-line bg-surface/70 p-4">
-      <figcaption className="text-xs font-semibold tracking-wide text-muted uppercase">
-        What your customer will see
-      </figcaption>
-      <div className="mt-3 flex gap-3" aria-hidden>
-        <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-fg/5 text-muted">
+    // The drawing says it: one page, a row of choices the customer taps.
+    <Section title="What customers see" icon={EyeIcon}>
+      <div className="flex gap-3" aria-hidden>
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-fg/5 text-muted">
           {photo?.url ? (
-            <MediaImg sizes="64px" src={photo.url} alt="" className="h-full w-full object-cover" />
+            <MediaImg sizes="56px" src={photo.url} alt="" className="h-full w-full object-cover" />
           ) : (
-            <PaletteIcon className="h-6 w-6" />
+            <PaletteIcon className="h-5 w-5" />
           )}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-base font-semibold text-fg">{name}</span>
-          <span className="mt-1 block text-sm text-muted">
-            {choice.name}: <span className="font-semibold text-fg">{choice.values[0]}</span>
-          </span>
-          <span className="mt-1.5 flex flex-wrap gap-1.5">
+          <span className="block truncate text-sm font-semibold text-fg">{name}</span>
+          <span className="block text-hint text-muted">{choice.name}</span>
+          <span className="mt-1 flex flex-wrap gap-1.5">
             {choice.values.map((value, i) => (
               <span
                 key={value}
-                className={`rounded-pill border px-3 py-1 text-sm font-semibold ${
+                className={`rounded-pill border px-2.5 py-0.5 text-xs font-semibold ${
                   i === 0 ? 'border-brand bg-brand-soft text-brand' : 'border-line text-fg'
                 }`}
               >
@@ -247,20 +236,16 @@ export function ChoicesPreview({
           </span>
         </span>
       </div>
-      <p className="mt-3 text-hint text-muted">
-        One product, one page. The customer taps a {choice.name.toLowerCase()} and buys — you
-        see which one in the order.
-      </p>
       {CHOICES_VIDEO_URL && (
         <a
           href={CHOICES_VIDEO_URL}
           target="_blank"
           rel="noreferrer"
-          className="mt-2 inline-block text-sm font-semibold text-brand underline-offset-2 hover:underline"
+          className="inline-block text-sm font-semibold text-brand underline-offset-2 hover:underline"
         >
           Watch how (30 sec)
         </a>
       )}
-    </figure>
+    </Section>
   )
 }

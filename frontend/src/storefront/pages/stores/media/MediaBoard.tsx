@@ -280,7 +280,7 @@ export function MediaBoard({
             className={`flex h-12 items-center justify-center gap-2 rounded-md text-sm font-semibold transition disabled:cursor-not-allowed ${
               touch
                 ? 'border border-line bg-surface text-fg hover:bg-surface-alt'
-                : 'bg-brand-gradient text-brand-contrast shadow-floating hover:opacity-90'
+                : 'bg-brand text-brand-contrast hover:opacity-90'
             } ${dragging ? 'outline outline-2 outline-offset-2 outline-accent' : ''}`}
           >
             <ImageIcon className="h-4.5 w-4.5" />

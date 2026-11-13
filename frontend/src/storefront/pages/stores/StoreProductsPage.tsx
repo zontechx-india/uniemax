@@ -18,7 +18,6 @@ import {
   PencilIcon,
   PlusIcon,
   RupeeIcon,
-  SearchIcon,
   StarIcon,
   TagIcon,
   TrashIcon,
@@ -35,6 +34,7 @@ import { StatusPill } from './ui/StatusPill'
 import { showToast } from './ui/Toast'
 import { CategoryChooserSheet } from './ui/CategoryChooserSheet'
 import { ProductWizard } from './products/wizard/ProductWizard'
+import { ProductSearch } from './products/ProductSearch'
 import type { StepKey } from './products/wizard/shared'
 import { Button, buttonClass } from '../../../shared/ui/Button'
 import { MediaImg } from '../../../shared/media/MediaImg'
@@ -307,18 +307,25 @@ export function StoreProductsPage() {
         }
         action={
           !wizard && products.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
+            // One row on a phone (two 44px buttons side by side), not two
+            // stacked 48px rows.
+            <div className="flex gap-2">
               {supplied.hasSuppliers && (
-                <Link to="../suppliers/products" className={buttonClass({ variant: 'secondary', size: 'lg' })}>
-                  Add from suppliers
+                <Link
+                  to="../suppliers/products"
+                  className={buttonClass({ variant: 'secondary', size: 'md', className: 'flex-1 px-3 sm:flex-none sm:px-5' })}
+                >
+                  <span className="sm:hidden">From suppliers</span>
+                  <span className="hidden sm:inline">Add from suppliers</span>
                 </Link>
               )}
               <Button
                 type="button"
-                size="lg"
+                size="md"
+                className="flex-1 px-3 sm:flex-none sm:px-5"
                 onClick={() => setWizard({ product: null, startAt: 'basics' })}
               >
-                <PlusIcon className="h-5 w-5" />
+                <PlusIcon className="h-4 w-4" />
                 Add product
               </Button>
             </div>
@@ -522,17 +529,14 @@ function ProductList({
     <div className="space-y-3">
       {searchable && (
         <div className="space-y-2.5">
-          <label className="relative block">
-            <span className="sr-only">Search products</span>
-            <SearchIcon className="pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-muted" />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => onQuery(e.target.value)}
-              placeholder="Search your products"
-              className="h-field w-full rounded-xl border border-line bg-input pr-4 pl-11 text-base text-fg outline-none placeholder:text-muted focus:border-accent"
-            />
-          </label>
+          <ProductSearch
+            query={query}
+            onQuery={onQuery}
+            matches={visible}
+            priceOf={priceLabel}
+            onPick={(product) => onEdit(product, 'basics')}
+            supplyOnly={supplyOnly}
+          />
           <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]" role="group" aria-label="Show">
             {FILTERS.map(({ key, label, test }) => {
               const count = products.filter(test).length
@@ -544,7 +548,7 @@ function ProductList({
                   type="button"
                   aria-pressed={on}
                   onClick={() => onFilter(key)}
-                  className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-pill border px-4 text-sm font-semibold transition ${
+                  className={`inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-pill border px-3.5 text-sm font-semibold transition ${
                     on
                       ? 'border-brand bg-brand text-brand-contrast'
                       : 'border-line bg-surface/70 text-fg hover:border-brand/50'
@@ -783,15 +787,16 @@ function ProductRow({
         </div>
       }
       primary={
-        <button
+        <Button
           type="button"
           onClick={() => onEdit('basics')}
           aria-label={`Edit ${product.name}`}
-          className={buttonClass({ variant: 'secondary', size: 'md', className: 'px-4' })}
+          variant="secondary"
+          className="px-4"
         >
           <PencilIcon className="h-4 w-4" />
           Edit
-        </button>
+        </Button>
       }
       toggle={
         <BigSwitch

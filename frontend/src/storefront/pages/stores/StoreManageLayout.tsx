@@ -11,7 +11,7 @@ import type { ManagedStoreContext } from '../../features/stores/useManagedStore'
 import { StorePublishCard, StoreShareSheet } from './StorePublishCard'
 import { StoreSectionNav, useNavRail } from './StoreSectionNav'
 import { StoreMobileNav } from './StoreMobileNav'
-import { buttonClass } from '../../../shared/ui/Button'
+import { Button } from '../../../shared/ui/Button'
 import {
   ArrowLeftIcon,
   PanelLeftIcon,
@@ -122,7 +122,7 @@ export function StoreManageLayout() {
     // The shape of the page, not the word "Loading…".
     return (
       <div aria-busy="true" aria-label="Loading your shop" className="mx-auto max-w-7xl space-y-3">
-        <div className="ws-card h-[68px] animate-pulse rounded-lg lg:hidden" />
+        <div className="ws-card h-[54px] animate-pulse rounded-lg lg:hidden" />
         <div className="items-start gap-3 lg:grid lg:grid-cols-[264px_1fr]">
           <div className="ws-card hidden h-[520px] animate-pulse rounded-lg lg:block" />
           <div className="ws-card h-[420px] animate-pulse rounded-lg" />
@@ -181,7 +181,7 @@ export function StoreManageLayout() {
       {/* Phone: one strip naming the shop, whether it is live, and the
           ONE thing to do with it — Share once live, Publish until then. It
           replaced the sidebar card that stacked above every section. */}
-      <div className="ws-card flex items-center gap-2 rounded-lg p-2 lg:hidden">
+      <div className="ws-card flex items-center gap-2 rounded-lg p-1 pr-2 lg:hidden">
         <Link
           to={scope.indexPath}
           aria-label="All stores"
@@ -191,18 +191,18 @@ export function StoreManageLayout() {
         </Link>
         {store.logoUrl ? (
           <MediaImg
-            sizes="40px"
+            sizes="32px"
             src={store.logoUrl}
             alt=""
-            className="h-10 w-10 shrink-0 rounded-md object-cover"
+            className="h-8 w-8 shrink-0 rounded-md object-cover"
           />
         ) : (
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-brand-soft text-brand">
-            <StoreIcon className="h-5 w-5" />
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-soft text-brand">
+            <StoreIcon className="h-4 w-4" />
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <p className="truncate font-heading text-base font-semibold text-fg">{store.name}</p>
+          <p className="truncate font-heading text-sm font-semibold leading-tight text-fg">{store.name}</p>
           <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${stripTone.text}`}>
             <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${stripTone.dot}`} />
             {supplierPill
@@ -213,19 +213,17 @@ export function StoreManageLayout() {
           </span>
         </div>
         {!supplyOnly && (
-          <button
+          <Button
             type="button"
             onClick={() => setShareOpen(true)}
             aria-haspopup="dialog"
-            className={buttonClass({
-              variant: store.isPublished ? 'secondary' : 'primary',
-              size: 'md',
-              className: 'px-3.5',
-            })}
+            variant={store.isPublished ? 'secondary' : 'primary'}
+            size="sm"
+            className="px-3"
           >
             <ShareIcon className="h-4 w-4" />
             {store.isPublished ? 'Share' : 'Publish'}
-          </button>
+          </Button>
         )}
       </div>
 

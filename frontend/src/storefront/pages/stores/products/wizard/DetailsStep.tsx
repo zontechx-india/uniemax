@@ -7,7 +7,8 @@ import type {
   StoreProduct,
 } from '../../../../features/stores/storesApi'
 import { SpecificationsEditor, cleanSpecifications } from '../SpecificationsEditor'
-import { Field, StepButtons, StepError, StepShell } from './shared'
+import { ClipboardIcon, PencilIcon } from '../../../../layout/icons'
+import { Hint, Section, StepButtons, StepError, StepShell } from './shared'
 
 /**
  * Step 4 — optional words: a description and a few facts. The specification
@@ -65,26 +66,25 @@ export function DetailsStep({
   }
 
   return (
-    <StepShell
-      title="Tell customers more"
-      lead="Optional, but products with a few lines and a couple of facts sell better. You can come back to this any time."
-    >
-      <Field
-        label="Description"
-        optional
-        hint="Two or three lines are plenty: what it is, what it is made of, who it is for. Each new line shows as a point on the page."
-      >
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={4}
-          maxLength={2000}
-          placeholder={'Pure Banarasi silk with zari border\nComes with an unstitched blouse piece\nDry clean only'}
-          className="w-full rounded-md border border-line bg-input px-3.5 py-3 text-base leading-relaxed text-fg outline-none transition placeholder:text-muted focus:border-accent"
-        />
-      </Field>
+    <StepShell title="Tell customers more" lead="Optional — helps it sell.">
+      <Section title="Description" icon={PencilIcon}>
+        <div>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={4}
+            maxLength={2000}
+            aria-label="Description"
+            placeholder={'Pure Banarasi silk with zari border\nComes with an unstitched blouse piece\nDry clean only'}
+            className="w-full rounded-md border border-line bg-input px-3 py-2.5 text-base leading-relaxed text-fg outline-none transition placeholder:text-muted focus:border-accent"
+          />
+          <Hint>2–3 lines. Each line shows as a point.</Hint>
+        </div>
+      </Section>
 
-      <SpecificationsEditor value={specs} onChange={setSpecs} disabled={busy} />
+      <Section title="Product facts" icon={ClipboardIcon}>
+        <SpecificationsEditor value={specs} onChange={setSpecs} disabled={busy} />
+      </Section>
 
       {error && <StepError>{error}</StepError>}
 

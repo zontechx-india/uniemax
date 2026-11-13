@@ -2,7 +2,9 @@ import { formatPrice } from '../../../../features/stores/storesApi'
 import type { StoreProduct } from '../../../../features/stores/storesApi'
 import { MediaBoard } from '../../media/MediaBoard'
 import { useLiveMedia } from '../../media/useLiveMedia'
-import { StepButtons, StepShell } from './shared'
+import { ImageIcon, PaletteIcon, StarIcon } from '../../../../layout/icons'
+import { CameraIcon } from '../../media/icons'
+import { Section, StepButtons, StepShell } from './shared'
 import type { VersionPlan } from './shared'
 
 /**
@@ -32,21 +34,41 @@ export function PhotosStep({
   const uploading = driver.photos.some((p) => p.status === 'sending')
 
   return (
-    <StepShell
-      title="Add photos"
-      lead={
-        plan === 'many'
-          ? 'Add a photo of every colour you sell — the first one is the cover. In the next step you say which photo is which colour. Only sizes? One good photo is enough.'
-          : 'Good photos sell. The first one is the cover customers see in the list — a clear shot on a plain background works best.'
-      }
-    >
-      <MediaBoard
-        driver={driver}
-        preview={{
-          name: product.name,
-          price: product.price && Number(product.price) > 0 ? formatPrice(product.price) : null,
-        }}
-      />
+    <StepShell title="Add photos">
+      {/* No section title: the board opens with its own ("Photos & video",
+          the required mark and the 0 / 20 count). */}
+      <Section>
+        {/* The tips as marks, not a paragraph. */}
+        <ul className="flex flex-wrap gap-x-3 gap-y-1 text-hint text-muted">
+          {plan === 'many' && (
+            <li className="flex items-center gap-1 font-semibold text-fg">
+              <CameraIcon className="h-3.5 w-3.5 text-brand" />
+              A photo of each colour
+            </li>
+          )}
+          <li className="flex items-center gap-1">
+            <StarIcon className="h-3.5 w-3.5 text-brand" filled />
+            First = cover
+          </li>
+          <li className="flex items-center gap-1">
+            <ImageIcon className="h-3.5 w-3.5" />
+            Plain background
+          </li>
+          {plan === 'many' && (
+            <li className="flex items-center gap-1">
+              <PaletteIcon className="h-3.5 w-3.5" />
+              Match colours next step
+            </li>
+          )}
+        </ul>
+        <MediaBoard
+          driver={driver}
+          preview={{
+            name: product.name,
+            price: product.price && Number(product.price) > 0 ? formatPrice(product.price) : null,
+          }}
+        />
+      </Section>
 
       <StepButtons
         onBack={onBack}

@@ -730,8 +730,8 @@ the same status), `/mystores/new` (the **Create Store wizard**
 itself when taller than the window) and the selected section in a right
 card via a nested `<Outlet/>` (children read the loaded store through
 `useManagedStore()` outlet context). **Phone** (`< lg`): no sidebar — a
-**store strip** (back to All stores · logo · name · Live / Not live yet ·
-**Share** once live, **Publish** before) over the section card, and a
+**store strip** (back to All stores · 32px logo · name · Live / Not live yet ·
+a small (`sm`) **Share** once live, **Publish** before) over the section card, and a
 floating **bottom tab bar** (`StoreMobileNav`). The layout sets
 `--seller-dock` (tab-bar height incl. safe area; `0px` from `lg`) and pads the
 page by it, so sticky `SaveBar`s and toasts sit above the bar.
@@ -780,7 +780,10 @@ One list, **three presentations**:
   Setup marks and the order badge become corner dots; `StorePublishCard`
   collapses to a single published/not-published dot.
 - **Mobile** (`< lg`) — `StoreMobileNav.tsx`: a fixed, floating
-  `ws-bar` tab bar with icon **and** word — **Home** (Dashboard) ·
+  `ws-dock` tab bar (stronger edge and shadow than `ws-bar`; a raised
+  `#2a2a2a` step in dark mode) standing on a band of the page colour, so it
+  never blends into the white cards scrolling under it. Only the bar takes
+  taps (the band is `pointer-events-none`). Icon **and** word — **Home** (Dashboard) ·
   **Orders** (pending badge) · **Products** · **Design** (Store Builder) ·
   **More**. More (highlighted when you are on one of its sections — it keeps the word "More"; a section name was cut to "Categori…") opens
   a `Dialog` sheet with `SectionSheetList` — every group flat and open, 52px
@@ -2428,12 +2431,24 @@ is never shown a pickup-address item.
   (`pages/stores/products/wizard/`) for adding *and* editing — one question
   per step, written for sellers who are not technical. **On a phone it is
   full-screen** (portalled to `<body>` so no ancestor can trap it;
-  `useMediaQuery('(min-width: 640px)')` picks the frame): a frosted header
+  `useMediaQuery('(min-width: 640px)')` picks the frame): a slim flat header
   with close, the product name, "Step 2 of 6 · Photos" — a button that opens
   an **All steps** sheet to jump anywhere — and a segmented progress bar,
-  over a scrolling step whose Back / Continue bar (`StepButtons`) is sticky.
-  From `sm` up it stays inline in a `ws-card` with a 44px clickable step
-  row. Fields are 48px (`inputClass` = `h-field`), labels 15px, hints 13px.
+  over a scrolling step whose Back / Continue bar (`StepButtons`, a flush
+  `<footer>`) is pinned to the bottom of the screen.
+  From `sm` up it stays inline in a `ws-card` with a clickable step row.
+  **Console look (ADMIN_UI_THEME.md):** the frame carries `ws-dense` — the
+  console's dense size scale scoped to the wizard (14px body, 13px labels,
+  12px hints, 10px cards) but thumb-safe: fields and buttons 40px, phone
+  inputs keep the 16px floor. Each step is a stack of `Section`s
+  (`wizard/shared.tsx`): a flat card with a header bar (28px icon tile +
+  title + optional aside) that runs **edge to edge on a phone** — no side
+  gutter, no rounded corners (`StepShell`'s body is `ws-step-body`: anything
+  that is not a `<section>`, the `<footer>` or `data-bleed` keeps a 16px
+  gutter). The step title shows from `sm` only (the phone header names the
+  step); a lead is at most one short line. Labels are short ("Selling
+  price", "MRP", "Stock"); hints are a few words; money fields are
+  `MoneyInput` (₹ inside the field). No gradients in the wizard.
   **1 What is it?** (the name, then the category in two labelled steps
   (`wizard/CategoryPick.tsx`): **① Main category** as chips (the shop's root
   categories; hidden when there is only one) and **② Sub-category in
@@ -2467,20 +2482,24 @@ is never shown a pickup-address item.
   server, so every later step saves on Continue and "Finish later" always
   keeps what was done) · **2 Photos** (the shared Media Board on
   `useLiveMedia`, uploading straight onto the draft) · **3 Price & choices**
-  (lead: "Same product in different colours, sizes or weights? Put them all
-  in this one product". Two radio cards, and on a **new unpriced** product
+  (a **How many versions?** section with the same two `VersionCard` pictures
+  as step 1 — **Just one** / **Many versions** — and one line "Colours or
+  sizes go in this one product". On a **new unpriced** product
   **neither is pre-selected** unless step 1 answered — a pre-selected "No"
   was tapped straight past. Until one is picked, `ChoicesPreview` draws what
   a customer sees: the seller's own cover photo and name with a choice row
   from the category's option templates (`exampleChoice` — Colour first), and
-  Continue asks the seller to pick. **"Just one version"** = selling price, printed price /
-  MRP, how many you have, product code (optional). "How many you have" starts
+  Continue asks the seller to pick. **Just one** = a **Price & stock** section,
+  two fields per row even on a phone: Selling price · MRP (optional), the
+  platform-fee note (`PlatformFeeNote`: "Platform fee n% · You get ₹x" and the
+  online-payment-fee line, each with an icon), then Stock · Product code
+  (optional). Stock starts
   **empty** on a never-priced draft and is required — a prefilled 0 used to
-  be saved untouched and the product went live sold out; **"Many colours,
-  sizes or weights"** (body: "Like {product} in Red, Maroon and Pink") = up to THREE screens inside one `PricingStep` (state survives between
+  be saved untouched and the product went live sold out; **Many versions**
+  (its picture card names the category's example values) = up to THREE screens inside one `PricingStep` (state survives between
   them; a "1 Choices · 2 Photos · 3 Prices" strip shows where you are):
-  **Choices** — the category's **suggested options** as one-tap 44px chips
-  ("What do customers choose? Tap one") and the `OptionTypesEditor`; Continue
+  **Choices** — the category's **suggested options** as one-tap 36px chips
+  ("Tap what customers choose") and the `OptionTypesEditor`; Continue
   checks every choice is named and has options, then **Photos**
   (`wizard/VariantPhotos.tsx`) — only when a choice changes how the product
   LOOKS (`photoChoiceFor`: Colour / Shade / Design / Pattern / Print / Style /
@@ -2541,10 +2560,12 @@ is never shown a pickup-address item.
   (or the single price fields when the product has only a family) and, if
   changed, the family through `PUT …/groups`; the product list reloads
   because other members' rows changed) · **4
-  Tell customers more** (optional: description, "product facts" rows
-  pre-filled from the category's suggested labels) · **5 Delivery &
-  payment** (the shop's settings in one card, then two `ChoiceCard`s —
-  **Same as my shop** / **Different for this product**, the second revealing
+  Tell customers more** (optional: a Description section, and a Product
+  facts section whose rows — pre-filled from the category's suggested labels
+  — are one line each: what · answer · ▲ · delete, with ▼ from `sm`) · **5 Delivery &
+  payment** (the shop's settings as three icon lines — Delivers to · Shipping ·
+  Cash on delivery — then two `ChoiceCard`s —
+  **Same as my shop** / **Different**, the second revealing
   `ProductDeliveryField`, `ProductShippingField` and the COD checkbox; no
   "Skip", since Continue with the defaults is the same thing) · **6 Review &
   publish** (the storefront card as it will look — a compact row on a phone,
@@ -2555,13 +2576,14 @@ is never shown a pickup-address item.
   greyed-out Publish always has its reason in view). Step errors render
   through `StepError` (`wizard/shared.tsx`), which scrolls each new message
   to the middle of the screen — an error under the sticky buttons made
-  Continue look dead. `ChoiceCard` (same file) is the shared big
-  icon-sentence-radio card used by Price and Delivery. The phone header's
+  Continue look dead. `ChoiceCard` (same file) is the console option card
+  (icon tile, title, a few words, radio dot) used by Delivery; questions with
+  a picture use `VersionCard`. The phone header's
   "Step n of 6 · name" is one truncated line. The step header lets the seller jump anywhere
   once the draft exists, and its ticks reflect the product's real state
   (photo, price, description, published) rather than position; a bar reads
-  "Product N% complete". Every field
-  has a one-line hint with an example — no tooltips. The product list
+  "Product N% complete". A field gets a hint only when it is not obvious,
+  and then a few words — no tooltips. The product list
   (`PageHeader` + **Add product**) is one `ws-card` of `ActionRow`s: a
   56px photo, the name with a **Showing / Hidden / Not finished** pill, the
   price (or range) · stock · "n choices", the "Root › Sub" path, then a
@@ -2570,9 +2592,15 @@ is never shown a pickup-address item.
   step), and pills for families ("Colour: Blue"), home-page rows, "Not in
   search", its own delivery / shipping rule and "No cash on delivery".
   Actions: **Edit**, a labelled Showing / Hidden `BigSwitch` (toast on save),
-  and "⋯" with **Home page & search** and **Delete product**. With more than
+  and "⋯" with **Home page & search** and **Delete product**. The header's
+  **Add from suppliers** ("From suppliers" on phones) and **Add product** are
+  44px buttons side by side. With more than
   five products a search box and filter chips (All · Showing · Hidden · Not
-  finished, with counts) appear. Empty / no-category states are
+  finished, with counts) appear. The search (`products/ProductSearch.tsx`) is
+  the storefront search's pill moved here: after two letters it lists up to
+  five matches (photo, name, price, status) under the field — a tap opens that
+  product's editor; Enter or "See all n results" closes the list and leaves
+  the page's list filtered. No request: it searches the products the page holds. Empty / no-category states are
   `EmptyState`s. Renames keep the slug/public URL. **Home page & search**
   opens a sheet of four switches (Featured · Best Seller · New Arrival ·
   Hide from Search), each naming the one storefront row it maps to; because
@@ -3538,9 +3566,10 @@ frontend/
     │           │   │   ├── choicesHelp.tsx      # Colour/weight-in-name hint, category example, ChoicesPreview
     │           │   │   ├── DetailsStep.tsx      # Description + suggested spec rows
     │           │   │   ├── DeliveryStep.tsx     # Store settings vs per-product overrides
-    │           │   │   └── shared.tsx           # Steps, Field/Hint/StepShell, categoryOptions
+    │           │   │   └── shared.tsx           # Steps, Field/Hint/MoneyInput, Section/StepShell/StepButtons, ChoiceCard, categoryOptions
     │           │   ├── OptionTypesEditor.tsx # ≤3 choices (chips); linked products (a family) behind "More ways"
     │           │   ├── GroupMemberPicker.tsx # Tick the store's products as a family's members
+    │           │   ├── ProductSearch.tsx # Products list search: storefront-style pill + suggestions
     │           │   ├── CreateMemberDialog.tsx # "Create new product for this value" — draft twin
     │           │   ├── VariantMatrix.tsx     # Price per choice: grouped Price+Stock rows with a ⋯ sheet (phone) / table; bulk sheet
     │           │   └── SpecificationsEditor.tsx # Ordered label/value rows
@@ -4028,7 +4057,10 @@ and icon on WhatsApp's deeper green `#1da851`, ~3:1 — white on the lighter
 | Utility | Use |
 | ------- | --- |
 | `ws-card` | Cards and panels: `--surface`, 1px `--line` border, faint shadow |
-| `ws-bar` | Chrome that floats over content — phone tab bar, sticky save / action bars, the wizard's top bar: surface + border + `shadow-floating` |
+| `ws-bar` | Chrome that floats over content — sticky save / action bars: surface + border + `shadow-floating` |
+| `ws-dense` | The console's dense SIZE scale (ADMIN_UI_THEME.md) for one subtree — the product wizard: re-points the text / radius / `tap` / `field` / button-height tokens (14px body, 40px controls). Colours untouched |
+| `ws-step-body` | A wizard step's body: `<section>`s, the `<footer>` and any `data-bleed` wrapper run edge to edge on a phone; every other child keeps a 16px gutter |
+| `ws-dock` | The seller phone tab bar only: `--dock-surface` + `--dock-line` edge + `--shadow-dock` (light: white, darker edge, real drop shadow; dark: raised `#2a2a2a`, light hairline) — so it stands out from the white cards under it |
 | `ws-well` | Recessed wells and step dots inside a card (`--surface-alt` + border). Search fields are white (`bg-input`), not wells |
 | `ws-tint` | The one highlighted card on a page (dashboard hero, order hero): `--brand-soft` with a brand-mixed border |
 | `seller-aurora` | Homepage Become a Seller panel only: fixed deep base + purple / blue / magenta radial washes and grain (`::after`) — no glow shadow, no moving light. Re-points `--cta` to white (brand text) and `--accent` (focus ring) to white inside it |
@@ -4047,7 +4079,7 @@ to `<body>`.
 | Component | Purpose |
 | --------- | ------- |
 | `PanelCard` | The one card (`ws-card`): with a `title` it gets a **header bar** — optional icon chip, title, one plain sentence, `aside` (pill/action) — divided from the body by a line; the body is padded unless `padded={false}` (row lists). `id` makes it a focusable deep-link target. Replaces Business `Card`, Footer `SectionCard`, Shipping border-top sections. |
-| `PageHeader` | Section heading: flat 40px `brand-soft` icon tile (no gradient or glow), 22px semibold title, required one-line description, optional action (full width on phones). |
+| `PageHeader` | Section heading: flat 40px `brand-soft` icon tile (no gradient or glow), 22px semibold title, required one-line description, optional action (full width on phones). Phones get a compact version: 32px tile, 18px title, 13px description. |
 | `SaveBar` | THE save model for forms: hidden until `dirty`; then a sticky `ws-bar` (message, **Undo changes**, **Save changes**) that stays under the thumb; shows `error`. Sits above the mobile tab bar via `--seller-dock`. Renders the unsaved-changes guard. |
 | `useUnsavedChangesGuard(dirty)` | `beforeunload` + react-router `useBlocker` with a plain-words "Leave without saving?" sheet. The blocker half renders only under a data router (`UNSAFE_DataRouterContext`) — the admin console mounts these pages under `<BrowserRouter>`, where `useBlocker` would throw. Ignores same-path (query-only) moves. |
 | `ActionRow` | One list item: leading photo, title + status, ≤2 facts, an optional `below` line (a nudge, chips), then ONE labelled primary action, a `toggle` kept apart, and `menu` → `RowMenu`. Actions drop below the text on phones so the name keeps the width. |

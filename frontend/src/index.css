@@ -321,6 +321,12 @@
   /* Lighter, tinted overlay for glass sheets — the frosted panel needs some
    * page left behind it to frost, which a 60% black leaves too little of. */
   --overlay-soft: rgba(17, 12, 46, 0.4);
+  /* The seller phone tab bar (`ws-dock`). It floats over WHITE cards, so the
+   * plain `ws-bar` (white + #e8e8e8 edge + a 6% shadow) melted into them. A
+   * darker edge and a real drop shadow lift it off the page. */
+  --dock-surface: #ffffff;
+  --dock-line: #d6d6dc;
+  --shadow-dock: 0 -1px 3px rgba(16, 12, 30, 0.05), 0 10px 32px rgba(16, 12, 30, 0.18);
   /* Dark wash over a PHOTO so a white label on it stays legible. Not themed:
    * it sits on the image, not on the page. */
   --scrim: rgba(0, 0, 0, 0.55);
@@ -412,6 +418,12 @@
   --pending-gradient: linear-gradient(120deg, #f8b078 0%, #f08c4b 50%, #f8b078 100%);
 
   --overlay-soft: rgba(0, 0, 0, 0.55);
+
+  /* On near-black a shadow cannot show, so the dock is a RAISED step
+   * (lighter than the #1e1e1e cards) with a light hairline edge. */
+  --dock-surface: #2a2a2a;
+  --dock-line: rgba(255, 255, 255, 0.14);
+  --shadow-dock: 0 10px 32px rgba(0, 0, 0, 0.7);
 
   color-scheme: dark;
 }
@@ -989,6 +1001,61 @@
   background-color: var(--surface);
   border: 1px solid var(--line);
   box-shadow: var(--shadow-floating);
+}
+
+/* The seller phone tab bar: like ws-bar, but it must stand out from the
+ * white cards scrolling under it in both schemes (see --dock-*). */
+@utility ws-dock {
+  background-color: var(--dock-surface);
+  border: 1px solid var(--dock-line);
+  box-shadow: var(--shadow-dock);
+}
+
+/* The console's dense size scale (ADMIN_UI_THEME.md §3–4), for ONE subtree:
+ * the product wizard. Same idea as admin/admin.css — it re-points the size
+ * tokens every `text-sm` / `rounded-lg` / `h-tap` reads — but scoped to the
+ * element that carries it, and kept thumb-safe: fields and buttons stay 40px
+ * (the console's 32px is a mouse size), and phone inputs keep the 16px floor
+ * below. Colours are untouched. */
+@utility ws-dense {
+  --text-xs: 12px;
+  --text-caption: 12px;
+  --text-hint: 12px;
+  --text-sm: 13px;
+  --text-label: 13px;
+  --text-base: 14px;
+  --text-body: 14px;
+  --text-lg: 15px;
+  --text-subtitle: 15px;
+  --text-xl: 17px;
+  --text-2xl: 17px;
+  --text-section: 17px;
+  --radius-lg: 10px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+  --radius-3xl: 12px;
+  --spacing-tap: 40px;
+  --spacing-field: 40px;
+  --btn-h-sm: 32px;
+  --btn-h-md: 40px;
+  --btn-h-lg: 40px;
+  font-size: 14px;
+}
+
+/* A wizard step's body. On a phone each `<section>` (wizard `Section`) runs
+ * edge to edge like a console card without the page gutter, and the
+ * `<footer>` button bar is flush too; anything else (a note, an error, a
+ * package's own block) keeps the 16px gutter so it never touches the glass.
+ * A wrapper that holds sections itself opts out with `data-bleed`. */
+@utility ws-step-body {
+  & > :not(section):not(footer):not([data-bleed]) {
+    margin-inline: 16px;
+  }
+  @media (min-width: 640px) {
+    & > :not(section):not(footer):not([data-bleed]) {
+      margin-inline: 0;
+    }
+  }
 }
 
 @utility ws-well {

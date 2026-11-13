@@ -31,71 +31,63 @@ export function SpecificationsEditor({
   }
 
   const inputClass =
-    'h-tap w-full rounded-md border border-line bg-input px-3 text-base text-fg outline-none transition placeholder:text-muted focus:border-accent disabled:opacity-60'
+    'h-tap rounded-md border border-line bg-input px-3 text-base text-fg outline-none transition placeholder:text-muted focus:border-accent disabled:opacity-60'
 
   return (
+    // The heading is the wizard Section's ("Product facts") — not repeated here.
     <div>
-      <span className="mb-2 block text-base font-semibold text-fg">
-        Product facts{' '}
-        <span className="font-normal text-muted">(optional)</span>
-      </span>
-
       {value.length > 0 && (
+        // One line per fact, like a key–value table: what | answer | move |
+        // delete. No box around each row. A phone keeps only "move up" (any
+        // order is reachable with it); "move down" joins from `sm`.
         <ul className="space-y-2">
           {value.map((row, index) => (
-            // A bordered group on a phone, where the two fields stack; one
-            // line from `sm` up.
-            <li
-              key={index}
-              className="flex flex-col gap-2 rounded-2xl border border-line p-3 sm:flex-row sm:items-center sm:border-0 sm:p-0 bg-surface"
-            >
+            <li key={index} className="flex items-center gap-1.5">
               <input
                 value={row.label}
                 onChange={(e) => set(index, { label: e.target.value })}
-                placeholder="What — e.g. Material"
+                placeholder="Material"
                 maxLength={OPTION_LIMITS.specLabelLength}
                 disabled={disabled}
                 aria-label={`Specification ${index + 1} label`}
-                className={`${inputClass} sm:w-48 sm:shrink-0`}
+                className={`${inputClass} w-[38%] shrink-0 font-semibold sm:w-48`}
               />
               <input
                 value={row.value}
                 onChange={(e) => set(index, { value: e.target.value })}
-                placeholder="Answer — e.g. Cotton"
+                placeholder="e.g. Cotton"
                 maxLength={OPTION_LIMITS.specValueLength}
                 disabled={disabled}
                 aria-label={`Specification ${index + 1} value`}
-                className={inputClass}
+                className={`${inputClass} min-w-0 flex-1`}
               />
-              <div className="flex shrink-0 items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => move(index, -1)}
-                  disabled={disabled || index === 0}
-                  aria-label="Move up"
-                  className="flex size-tap items-center justify-center rounded-xl text-muted transition hover:bg-surface-alt hover:text-fg disabled:opacity-30"
-                >
-                  ▲
-                </button>
-                <button
-                  type="button"
-                  onClick={() => move(index, 1)}
-                  disabled={disabled || index === value.length - 1}
-                  aria-label="Move down"
-                  className="flex size-tap items-center justify-center rounded-xl text-muted transition hover:bg-surface-alt hover:text-fg disabled:opacity-30"
-                >
-                  ▼
-                </button>
-                <button
-                  type="button"
-                  onClick={() => remove(index)}
-                  disabled={disabled}
-                  aria-label={`Remove specification ${index + 1}`}
-                  className="flex size-tap items-center justify-center rounded-xl text-muted transition hover:bg-danger/10 hover:text-danger disabled:opacity-40"
-                >
-                  <TrashIcon className="h-4 w-4" />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => move(index, -1)}
+                disabled={disabled || index === 0}
+                aria-label="Move up"
+                className="flex h-tap w-8 shrink-0 items-center justify-center rounded-md text-xs text-muted transition hover:bg-surface-alt hover:text-fg disabled:opacity-30"
+              >
+                ▲
+              </button>
+              <button
+                type="button"
+                onClick={() => move(index, 1)}
+                disabled={disabled || index === value.length - 1}
+                aria-label="Move down"
+                className="hidden h-tap w-8 shrink-0 items-center justify-center rounded-md text-xs text-muted transition hover:bg-surface-alt hover:text-fg disabled:opacity-30 sm:flex"
+              >
+                ▼
+              </button>
+              <button
+                type="button"
+                onClick={() => remove(index)}
+                disabled={disabled}
+                aria-label={`Remove specification ${index + 1}`}
+                className="flex h-tap w-8 shrink-0 items-center justify-center rounded-md text-muted transition hover:bg-danger/10 hover:text-danger disabled:opacity-40"
+              >
+                <TrashIcon className="h-4 w-4" />
+              </button>
             </li>
           ))}
         </ul>
@@ -105,17 +97,15 @@ export function SpecificationsEditor({
         type="button"
         onClick={() => onChange([...value, { label: '', value: '' }])}
         disabled={disabled || value.length >= OPTION_LIMITS.specs}
-        className={`inline-flex items-center gap-1.5 min-h-tap rounded-xl border-2 border-dashed border-brand/40 px-4 text-sm font-semibold text-brand transition hover:text-fg disabled:cursor-not-allowed disabled:opacity-50 ${
-          value.length > 0 ? 'mt-2' : ''
+        className={`inline-flex min-h-9 items-center gap-1.5 rounded-md border border-dashed border-brand/50 px-3 text-sm font-semibold text-brand transition hover:text-fg disabled:cursor-not-allowed disabled:opacity-50 ${
+          value.length > 0 ? 'mt-2.5' : ''
         }`}
       >
         <PlusIcon className="h-4 w-4" />
         Add a fact
       </button>
-      <p className="mt-2 text-hint text-muted">
-        Short facts shown as a table on the product page — like Material:
-        Cotton, or Weight: 500 g. Sizes and colours customers pick go in the
-        Price step instead.
+      <p className="mt-1.5 text-hint text-muted">
+        Like Material: Cotton. Sizes and colours go in the Price step.
       </p>
     </div>
   )

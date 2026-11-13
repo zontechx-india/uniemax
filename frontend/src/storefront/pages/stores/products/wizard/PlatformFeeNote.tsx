@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { storeFinanceApi } from '../../../../features/stores/storesApi'
 import type { StorePlatformFee } from '../../../../features/stores/storesApi'
+import { RupeeIcon, ShieldCheckIcon } from '../../../../layout/icons'
 
 /**
  * The note under a product's price: UnieMax's platform fee and what the
@@ -46,40 +47,45 @@ export function PlatformFeeNote({ storeId, price }: { storeId: string; price?: s
 
   const bp = toBp(fee.percent)
   const paise = price ? toPaise(price) : null
-  const example =
+  // What the seller keeps — the one number they care about.
+  const youGet =
     paise !== null && paise > 0n
-      ? bp === 0n
-        ? ` You receive the full ${rupees(paise)}.`
-        : ` On ${rupees(paise)} you receive ${rupees(paise - (paise * bp + 5000n) / 10000n)}.`
+      ? `You get ${rupees(bp === 0n ? paise : paise - (paise * bp + 5000n) / 10000n)}`
       : bp === 0n
-        ? ' You receive the full price.'
-        : ''
+        ? 'You get the full price'
+        : null
   const upcoming = fee.upcoming
-    ? ` From ${new Date(fee.upcoming.effectiveFrom).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} it becomes ${pct(fee.upcoming.percent)}.`
-    : ''
+    ? `${pct(fee.upcoming.percent)} from ${new Date(fee.upcoming.effectiveFrom).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
+    : null
 
   const gatewayBp = toBp(fee.gateway.percent)
 
+  // Short facts, one per line, each with a mark: a seller scans it in a second.
+  // The fee is on the product price only (never shipping), and customers never see it.
   return (
-    <div className="mt-2 space-y-1 rounded-md bg-fg/5 px-3 py-2 text-hint text-muted" role="note">
-      <p>
-        <span className="font-semibold text-fg">UnieMax platform fee: {pct(fee.percent)}</span> of the product
-        price (not shipping).{example}{upcoming} Customers don’t see this fee.
+    <div className="mt-1.5 space-y-0.5 text-hint text-muted" role="note">
+      <p className="flex items-center gap-1.5">
+        <RupeeIcon className="h-3.5 w-3.5 shrink-0" />
+        <span>
+          <span className="font-semibold text-fg">Platform fee {pct(fee.percent)}</span>
+          {youGet && <> · {youGet}</>}
+          {upcoming && <> · {upcoming}</>}
+        </span>
       </p>
       {gatewayBp > 0n ? (
-        fee.gateway.bearer === 'PLATFORM' ? (
-          <p>
+        <p className="flex items-center gap-1.5">
+          <ShieldCheckIcon className="h-3.5 w-3.5 shrink-0" />
+          {fee.gateway.bearer === 'PLATFORM' ? (
             <span className="font-semibold text-success">
-              Payment gateway fee {pct(fee.gateway.percent)} — paid by UnieMax
-            </span>{' '}
-            on online payments, as our discount to you. It is not taken from your money.
-          </p>
-        ) : (
-          <p>
-            <span className="font-semibold text-fg">Payment gateway fee: {pct(fee.gateway.percent)}</span> of
-            online payments, taken from your payout.
-          </p>
-        )
+              Online payment fee {pct(fee.gateway.percent)} paid by UnieMax
+            </span>
+          ) : (
+            <span>
+              <span className="font-semibold text-fg">Online payment fee {pct(fee.gateway.percent)}</span> · from
+              your payout
+            </span>
+          )}
+        </p>
       ) : null}
     </div>
   )
