@@ -2,9 +2,9 @@ import { formatPrice } from '../../../../features/stores/storesApi'
 import type { StoreProduct } from '../../../../features/stores/storesApi'
 import { MediaBoard } from '../../media/MediaBoard'
 import { useLiveMedia } from '../../media/useLiveMedia'
-import { ImageIcon, PaletteIcon, StarIcon } from '../../../../layout/icons'
+import { ImageIcon, InfoIcon, PaletteIcon, StarIcon } from '../../../../layout/icons'
 import { CameraIcon } from '../../media/icons'
-import { Section, StepButtons, StepShell } from './shared'
+import { Notice, Section, StepButtons, StepShell } from './shared'
 import type { VersionPlan } from './shared'
 
 /**
@@ -70,11 +70,22 @@ export function PhotosStep({
         />
       </Section>
 
+      {/* Skipping is allowed — but never silently: a product without a photo
+          cannot go live, and the seller should know that now, not at the end. */}
+      {photos === 0 && !uploading && (
+        <Notice
+          icon={InfoIcon}
+          title="No photo yet"
+          body="Your product stays hidden from customers until you add a photo."
+        />
+      )}
+
       <StepButtons
         onBack={onBack}
         onNext={onNext}
         busy={uploading}
-        nextLabel={photos === 0 ? 'Continue without photos' : 'Continue'}
+        nextLabel={photos === 0 ? 'Add photo later' : 'Continue'}
+        nextVariant={photos === 0 ? 'secondary' : 'primary'}
       />
     </StepShell>
   )

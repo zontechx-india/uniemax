@@ -147,7 +147,7 @@ export function OptionTypesEditor({
   return (
     <div className="space-y-3">
       {cards.map(({ key, kind }, index) => {
-        const label = `Choice ${index + 1}`
+        const label = `Option ${index + 1}`
         const placeholder = placeholders[index] ?? 'Name'
 
         if (kind === 'typed') {
@@ -169,7 +169,7 @@ export function OptionTypesEditor({
                 <ChipInput
                     label={type.name.trim() ? `${type.name.trim()} options` : 'Options to pick from'}
                     items={type.values}
-                    placeholder="Type one, then tap Add — e.g. S"
+                    placeholder="e.g. S"
                     maxItems={OPTION_LIMITS.valuesPerType}
                     maxLength={OPTION_LIMITS.nameLength}
                     disabled={disabled}
@@ -197,7 +197,7 @@ export function OptionTypesEditor({
                   />
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <RemoveButton
-                    label={`Remove ${type.name.trim() || `choice ${index + 1}`}`}
+                    label={`Remove ${type.name.trim() || `option ${index + 1}`}`}
                     disabled={disabled}
                     onClick={() => remove(key)}
                   />
@@ -329,7 +329,7 @@ export function OptionTypesEditor({
                     type="button"
                     onClick={() => setPicking(key)}
                     disabled={disabled || !name}
-                    title={name ? undefined : 'Name the choice first'}
+                    title={name ? undefined : 'Name the option first'}
                     className={buttonClass({ variant: 'secondary', size: 'md' })}
                   >
                     <PlusIcon className="h-4 w-4" />
@@ -339,7 +339,7 @@ export function OptionTypesEditor({
                     type="button"
                     onClick={() => setCreating(key)}
                     disabled={disabled || !name}
-                    title={name ? undefined : 'Name the choice first'}
+                    title={name ? undefined : 'Name the option first'}
                     className={buttonClass({ variant: 'secondary', size: 'md' })}
                   >
                     <PlusIcon className="h-4 w-4" />
@@ -354,7 +354,7 @@ export function OptionTypesEditor({
                 </p>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <RemoveButton
-                    label={`Remove ${group.name.trim() || `choice ${index + 1}`}`}
+                    label={`Remove ${group.name.trim() || `option ${index + 1}`}`}
                     disabled={disabled}
                     onClick={() => remove(key)}
                   />
@@ -412,12 +412,12 @@ export function OptionTypesEditor({
           className="flex min-h-tap w-full items-center justify-center gap-2 rounded-md border border-dashed border-brand/50 px-4 text-sm font-semibold text-brand transition hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-50"
         >
           <PlusIcon className="h-4 w-4" />
-          {cards.length === 0 ? 'Add a choice, like Size or Colour' : 'Add another choice'}
+          {cards.length === 0 ? 'Add an option, like Size or Colour' : 'Add another option'}
         </button>
         {/* The limit is only news once it is reached. */}
         {full && (
           <p className="text-hint text-muted">
-            Up to {OPTION_LIMITS.types} choices — remove one to add another.
+            Up to {OPTION_LIMITS.types} options — remove one to add another.
           </p>
         )}
 
@@ -428,7 +428,7 @@ export function OptionTypesEditor({
           aria-expanded={advanced}
           className="px-2"
         >
-          More ways to add choices
+          More ways to add options
           <ChevronDownIcon className={`h-4 w-4 transition-transform ${advanced ? 'rotate-180' : ''}`} />
         </Button>
         {advanced && (

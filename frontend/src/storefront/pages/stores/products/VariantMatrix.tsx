@@ -87,7 +87,7 @@ export function VariantMatrix({
   if (rows.length === 0) {
     return (
       <p className="rounded-2xl border border-dashed border-line px-4 py-6 text-center text-base text-muted bg-surface">
-        Go back and add an option to each choice — like S, M, L for Size.
+        Go back and add values to each option — like S, M, L for Size.
       </p>
     )
   }
@@ -308,7 +308,7 @@ export function VariantMatrix({
 
       <p className="text-hint text-muted">
         Selling <span className="font-semibold text-fg">{offered.length}</span> of{' '}
-        {rows.length} choice{rows.length === 1 ? '' : 's'} (up to{' '}
+        {rows.length} item{rows.length === 1 ? '' : 's'} (up to{' '}
         {OPTION_LIMITS.variants})
         {missing > 0 && (
           <>
@@ -428,7 +428,7 @@ function PhoneList({
     : [{ key: 'all', title: '', items: indexed }]
   const more = moreIndex !== null ? (rows[moreIndex] ?? null) : null
   const moreLabel = more ? draftLabel(types, more) : ''
-  const restName = rest[0]?.name.trim().toLowerCase() || 'choice'
+  const restName = rest[0]?.name.trim().toLowerCase() || 'option'
   // Price | Stock | ⋯ — fixed widths so every row lines up under the headings.
   const cols =
     'grid grid-cols-[minmax(0,1fr)_5rem_3.5rem_2.75rem] gap-1.5 min-[360px]:grid-cols-[minmax(0,1fr)_5.5rem_3.75rem_2.75rem]'
@@ -440,7 +440,7 @@ function PhoneList({
         return (
           <section
             key={group.key}
-            aria-label={group.title || 'Choices'}
+            aria-label={group.title || 'Options'}
             className="rounded-2xl border border-line bg-surface/80"
           >
             {group.title && (

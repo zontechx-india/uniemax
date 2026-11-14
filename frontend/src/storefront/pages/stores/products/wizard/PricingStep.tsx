@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Button } from '../../../../../shared/ui/Button'
 import { toApiError } from '../../../../../shared/auth/http'
 import { ConfirmDialog } from '../../../../../shared/ui/ConfirmDialog'
 import {
@@ -40,7 +41,7 @@ import {
   valueWithoutPhoto,
 } from './VariantPhotos'
 import { ChoicesPreview, exampleChoice, listWords, VersionCard } from './choicesHelp'
-import { Field, Hint, inputClass, MoneyInput, Section, StepButtons, StepError, StepShell } from './shared'
+import { Field, Hint, inputClass, MoneyInput, Section, StepButtons, StepError, StepShell, Stepper } from './shared'
 import type { StepKey, VersionPlan } from './shared'
 
 /** null = not answered yet: a new, unpriced product starts with no answer picked. */
@@ -84,6 +85,7 @@ export function PricingStep({
   onOtherProductChange,
   onCatalogChanged,
   onSwitchProduct,
+  onPartChange,
   onBack,
   onNext,
   supplyOnly = false,
@@ -105,6 +107,8 @@ export function PricingStep({
   onCatalogChanged: () => void
   /** Continue the wizard on another product, at a step. */
   onSwitchProduct: (product: StoreProduct, step: StepKey) => void
+  /** The screen in view, for the wizard header ("Options", "Colour photos"); null = the step's own name. */
+  onPartChange?: (label: string | null) => void
   onBack: () => void
   onNext: () => void
 }) {
@@ -113,6 +117,8 @@ export function PricingStep({
     if (Number(product.defaultVariant?.price ?? 0) > 0) return 'single'
     return plan === 'many' ? 'options' : plan === 'one' ? 'single' : null
   })
+  /** Once answered (step 1, or saved), "one or many?" shows as a line with Change — not asked twice. */
+  const [askAgain, setAskAgain] = useState(false)
 
   // Single version — the implicit Default variant's four numbers.
   const base = product.defaultVariant
@@ -151,10 +157,7 @@ export function PricingStep({
   const [missingPhoto, setMissingPhoto] = useState<string | null>(null)
   /** "Same photos for all colours" — no lists; every photo shows with every colour. */
   const [samePhotos, setSamePhotos] = useState(() =>
-    initiallySame(
-      initial.d.rows,
-      product.media.filter((m) => m.type === 'IMAGE'),
-    ),
+    initiallySame(initial.d.rows),
   )
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -177,6 +180,17 @@ export function PricingStep({
     : (['choices', 'prices'] as const)
   const cardCount = draft.types.length + groups.length
   const example = exampleChoice(presets)
+  /** One name per screen, used by the header, the 1-2-3 strip and the title alike. */
+  const partLabel = (p: 'choices' | 'photos' | 'prices') =>
+    p === 'choices' ? 'Options' : p === 'photos' ? `${capitalise(photoType?.name ?? '')} photos`.trim() : 'Price & stock'
+  const headerLabel =
+    mode === 'options' ? (draft.types.length > 0 ? partLabel(part) : 'Options') : null
+  useEffect(() => {
+    onPartChange?.(headerLabel)
+  }, [headerLabel, onPartChange])
+  useEffect(() => () => onPartChange?.(null), [onPartChange])
+  /** Product code is rarely used — kept one tap away. */
+  const [showMore, setShowMore] = useState(() => !!base?.sku)
 
   /**
    * Every change from the editor comes through here so the matrix is
@@ -284,7 +298,7 @@ export function PricingStep({
    */
   const validateOptions = (d: Draft, g: GroupDraft[]): string | null => {
     if (d.types.length === 0 && g.length === 0) {
-      return 'Add at least one choice — Size, Colour, Weight… — or pick “Just one version”.'
+      return 'Add at least one option, like Size or Colour — or pick “Just one”.'
     }
     if (d.types.length > 0) {
       const result = draftToInput(d.types, d.rows)
@@ -419,11 +433,11 @@ export function PricingStep({
    * checked with everything else on the final Continue.
    */
   const toPrices = () => {
-    if (draft.types.length === 0) return setError('Add at least one choice, like Size or Colour.')
+    if (draft.types.length === 0) return setError('Add at least one option, like Size or Colour.')
     const unnamed = draft.types.find((t) => !t.name.trim())
-    if (unnamed) return setError('Give every choice a name, like “Size”.')
+    if (unnamed) return setError('Give every option a name, like “Size”.')
     const empty = draft.types.find((t) => t.values.length === 0)
-    if (empty) return setError(`Add at least one option to “${empty.name.trim()}” — for example S, M, L.`)
+    if (empty) return setError(`Add at least one value to “${empty.name.trim()}” — for example S, M, L.`)
     setError(null)
     setPart(photoType ? 'photos' : 'prices')
   }
@@ -437,7 +451,9 @@ export function PricingStep({
       const missing = samePhotos ? null : valueWithoutPhoto(photoType, draft.rows, images)
       if (missing) {
         setMissingPhoto(missing.key)
-        return setError(`Add a photo for ${missing.value} — tap its box.`)
+        return setError(
+          `Add a photo for ${missing.value} — or turn on “Same photos for all ${photoType.name.trim().toLowerCase()}s”.`,
+        )
       }
     }
     setMissingPhoto(null)
@@ -447,7 +463,7 @@ export function PricingStep({
 
   const next = () => {
     if (mode === null) {
-      return setError('Pick one first: “Just one version” or “Many colours, sizes or weights”.')
+      return setError('Pick one first: “Just one” or “Many options”.')
     }
     // Typed options are priced on their own screen.
     if (mode === 'options' && part === 'choices' && draft.types.length > 0) return toPrices()
@@ -464,15 +480,16 @@ export function PricingStep({
     void saveOptions()
   }
 
-  // Two per row even on a phone: short labels, a ₹ inside the money fields,
-  // and a few words of hint only where the field is not obvious.
+  // Price and MRP side by side, then stock with big − / + buttons. No grey
+  // example numbers in the fields: sellers read "1499" as a saved price.
+  // The product code is rare, so it waits behind "More".
   const singleFields = (
-    <div className="grid grid-cols-2 gap-x-3 gap-y-3.5">
-      <Field label={supplyOnly ? 'Suggested price' : 'Selling price'}>
-        <MoneyInput value={price} onChange={setPrice} placeholder="1499" />
+    <div className="grid grid-cols-2 gap-x-3 gap-y-4">
+      <Field label={supplyOnly ? 'Suggested price (₹)' : 'Selling price (₹)'}>
+        <MoneyInput value={price} onChange={setPrice} />
       </Field>
-      <Field label="MRP" optional hint="Shown crossed out">
-        <MoneyInput value={compareAt} onChange={setCompareAt} placeholder="1999" />
+      <Field label="MRP (₹)" optional hint="Shown crossed out">
+        <MoneyInput value={compareAt} onChange={setCompareAt} />
       </Field>
       {supplyOnly ? (
         <p className="col-span-2 -mt-1.5 text-hint text-muted">
@@ -483,24 +500,34 @@ export function PricingStep({
           <PlatformFeeNote storeId={storeId} price={price} />
         </div>
       )}
-      <Field label="Stock" hint="0 = sold out">
-        <input
-          value={stock}
-          onChange={(e) => setStock(cleanCount(e.target.value))}
-          inputMode="numeric"
-          placeholder="10"
-          className={inputClass}
-        />
-      </Field>
-      <Field label="Product code" optional hint="Your own code">
-        <input
-          value={sku}
-          onChange={(e) => setSku(e.target.value)}
-          maxLength={64}
-          placeholder="SAR-01"
-          className={inputClass}
-        />
-      </Field>
+      <div className="col-span-2">
+        <Field label="Stock — how many you have" hint="0 = sold out">
+          <Stepper value={stock} onChange={(v) => setStock(cleanCount(v))} label="Stock" />
+        </Field>
+      </div>
+      {showMore ? (
+        <div className="col-span-2">
+          <Field label="Product code" optional hint="Your own code for this product">
+            <input
+              value={sku}
+              onChange={(e) => setSku(e.target.value)}
+              maxLength={64}
+              className={inputClass}
+            />
+          </Field>
+        </div>
+      ) : (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowMore(true)}
+          className="col-span-2 justify-self-start px-2"
+        >
+          <PlusIcon className="h-4 w-4" />
+          More (product code)
+        </Button>
+      )}
     </div>
   )
 
@@ -509,15 +536,7 @@ export function PricingStep({
 
   return (
     <StepShell
-      title={
-        mode === 'options' && part === 'prices'
-          ? 'Price for each choice'
-          : mode === 'options' && part === 'photos' && photoType
-            ? needsPhotos
-              ? `Photos for each ${photoType.name.trim().toLowerCase()}`
-              : 'Photos'
-            : 'Price'
-      }
+      title={headerLabel ?? 'Price & stock'}
       lead={
         mode === 'options' && part === 'photos' && photoType
           ? needsPhotos
@@ -530,14 +549,14 @@ export function PricingStep({
           : undefined
       }
     >
-      {/* Where the seller is on the two-screen path. */}
+      {/* Where the seller is inside step 3 — the same names as the header. */}
       {mode === 'options' && draft.types.length > 0 && (
         <ol className="flex gap-1.5" aria-label="Price step">
           {parts.map((p, i) => (
             <li
               key={p}
               aria-current={part === p ? 'step' : undefined}
-              className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold sm:justify-start sm:px-3 ${
+              className={`flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs leading-tight font-semibold sm:justify-start sm:px-3 ${
                 part === p ? 'bg-brand-soft text-brand' : 'bg-fg/5 text-muted'
               }`}
             >
@@ -548,8 +567,8 @@ export function PricingStep({
               >
                 {i + 1}
               </span>
-              <span className="truncate">
-                {p === 'choices' ? 'Choices' : p === 'photos' ? 'Photos' : 'Prices'}
+              <span className="min-w-0 text-center break-words sm:text-left">
+                {partLabel(p)}
               </span>
             </li>
           ))}
@@ -559,9 +578,20 @@ export function PricingStep({
       {/* One or many — as two pictures: one shirt, or the same shirt in the
           category's own colours (or sizes). The picture carries the meaning;
           the words are a title and a few more. */}
-      {part === 'choices' && (
-        <Section title="How many versions?" icon={PaletteIcon}>
-          <div role="radiogroup" aria-label="How many versions?" className="grid grid-cols-2 gap-2.5">
+      {part === 'choices' && mode !== null && !askAgain && (
+        <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5">
+          <CheckIcon className="h-5 w-5 shrink-0 text-success" />
+          <p className="min-w-0 flex-1 text-base font-semibold text-fg">
+            {mode === 'single' ? 'Just one — one price, one stock' : 'Many options'}
+          </p>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setAskAgain(true)} className="px-2.5">
+            Change
+          </Button>
+        </div>
+      )}
+      {part === 'choices' && (mode === null || askAgain) && (
+        <Section title="One or many options?" icon={PaletteIcon}>
+          <div role="radiogroup" aria-label="One or many options?" className="grid grid-cols-2 gap-2.5">
             <VersionCard
               many={false}
               values={example.values}
@@ -570,6 +600,7 @@ export function PricingStep({
               body="One price, one stock"
               onClick={() => {
                 setMode('single')
+                setAskAgain(false)
                 setError(null)
               }}
             />
@@ -577,10 +608,11 @@ export function PricingStep({
               many
               values={example.values}
               active={mode === 'options'}
-              title="Many versions"
+              title="Many options"
               body={listWords(example.values)}
               onClick={() => {
                 setMode('options')
+                setAskAgain(false)
                 setError(null)
               }}
             />
@@ -605,7 +637,7 @@ export function PricingStep({
           {singleFields}
         </Section>
       ) : part === 'choices' ? (
-        <Section title="Choices" icon={SlidersIcon}>
+        <Section title="Options" icon={SlidersIcon}>
           {unusedPresets.length > 0 && (
             <div>
               <p className="text-sm font-semibold text-fg">Tap what customers choose</p>
@@ -646,9 +678,9 @@ export function PricingStep({
           {draft.types.length > 0 && draft.rows.length > 0 && (
             <p className="flex items-center gap-2 rounded-md bg-success/10 px-3 py-2 text-hint font-medium text-fg">
               <CheckIcon className="h-4 w-4 shrink-0 text-success" />
-              {draft.rows.filter((row) => !row.removed).length} choice
-              {draft.rows.filter((row) => !row.removed).length === 1 ? '' : 's'} · next:{' '}
-              {photoType ? 'photos' : 'prices'}
+              {draft.rows.filter((row) => !row.removed).length} item
+              {draft.rows.filter((row) => !row.removed).length === 1 ? '' : 's'} to price · next:{' '}
+              {photoType ? 'photos' : 'price & stock'}
             </p>
           )}
 
@@ -661,7 +693,7 @@ export function PricingStep({
           )}
         </Section>
       ) : part === 'photos' && photoType ? (
-        <Section title={`Photos for each ${photoType.name.trim().toLowerCase()}`} icon={CameraIcon}>
+        <Section title={partLabel('photos')} icon={CameraIcon}>
           {photoChoice?.ask && (
             <LooksQuestion
               name={photoType.name}
@@ -695,7 +727,7 @@ export function PricingStep({
           )}
         </Section>
       ) : (
-        <Section title="Price & stock for each" icon={TagIcon}>
+        <Section title="Price & stock of each" icon={TagIcon}>
           <VariantMatrix
             types={draft.types}
             rows={draft.rows}
@@ -728,13 +760,13 @@ export function PricingStep({
 
       <ConfirmDialog
         open={pendingDrop !== null}
-        title="Stop selling these choices?"
+        title="Stop selling these options?"
         description={
           pendingDrop ? (
             <>
               {pendingDrop.dropped.length === 1
-                ? 'One saved choice'
-                : `${pendingDrop.dropped.length} saved choices`}{' '}
+                ? 'One saved option'
+                : `${pendingDrop.dropped.length} saved options`}{' '}
               will be removed. Customers with one in their cart will see it as
               no longer available; past orders keep their details.
               <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm">
@@ -801,4 +833,10 @@ export function PricingStep({
       />
     </StepShell>
   )
+}
+
+/** "colour" → "Colour", for screen names built from an option name. */
+function capitalise(word: string): string {
+  const w = word.trim()
+  return w ? w[0]!.toUpperCase() + w.slice(1) : w
 }

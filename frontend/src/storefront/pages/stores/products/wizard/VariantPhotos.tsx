@@ -14,7 +14,8 @@ import type {
   VariantDraft,
 } from '../../../../features/stores/productOptions'
 import { BigSwitch } from '../../ui/BigSwitch'
-import { CheckIcon, ImageIcon, PlusIcon } from '../../../../layout/icons'
+import { CheckIcon, ImageIcon, InfoIcon, PlusIcon } from '../../../../layout/icons'
+import { CameraIcon } from '../../media/icons'
 import { MAX_LIVE_PHOTOS } from '../../media/useLiveMedia'
 import { ChoiceCard } from './shared'
 
@@ -22,7 +23,7 @@ import { ChoiceCard } from './shared'
 export const MAX_VARIANT_PHOTOS = 10
 
 /**
- * The middle screen of "Price & choices" (Choices → **Photos** → Prices),
+ * The middle screen of step 3 (Options → **Colour photos** → Price & stock),
  * shown when a choice changes how the product LOOKS (Colour, Print…).
  *
  * The product owns a photo library; each colour picks ANY photos from it, in
@@ -38,8 +39,12 @@ export const MAX_VARIANT_PHOTOS = 10
  * "Same photos for all colours" is the one switch for a seller whose photos
  * show every colour together.
  *
- * Required, never a dead end: each colour needs at least one photo, a reused
- * photo counts, the switch counts, and upload sits inside the sheet.
+ * "Same photos for all colours" starts ON for a new product: most small
+ * sellers have one photo of the product, and asking for a photo per colour
+ * stopped them cold. Turning it OFF is the deliberate choice to photograph
+ * each colour — then each colour needs one (a reused photo counts), and an
+ * empty colour offers **Take photo** and **Gallery** right in its row, so a
+ * photo is two taps away. Upload also sits inside the tick sheet.
  */
 export function VariantPhotos({
   storeId,
@@ -72,7 +77,7 @@ export function VariantPhotos({
   const [openKey, setOpenKey] = useState<string | null>(null)
   const media = product.media.filter((m) => m.type === 'IMAGE')
   const values = valuesOnSale(type, rows)
-  const label = type.name.trim() || 'Choice'
+  const label = type.name.trim() || 'Option'
   const lower = label.toLowerCase()
   const listOf = (valueKey: string) => valueList(rows, type.key, valueKey, media)
   const done = values.filter((v) => listOf(v.key).length > 0).length
@@ -93,15 +98,24 @@ export function VariantPhotos({
           offText={`Same photos for all ${lower}s`}
           onChange={onSameChange}
         />
-        <p className="mt-1 text-hint text-muted">Turn on if your photos show every {lower} together.</p>
+        <p className="mt-1 text-hint text-muted">
+          {same ? `Turn off to add a photo for each ${lower}.` : `Turn on if your photos show every ${lower} together.`}
+        </p>
       </div>
 
       {same ? (
-        <p className="flex items-start gap-2 rounded-xl bg-success/10 px-3 py-2.5 text-hint text-fg">
-          <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-success" />
-          All {media.length} photo{media.length === 1 ? '' : 's'} show with every {lower}. Customers pick a {lower} by its
-          name.
-        </p>
+        media.length > 0 ? (
+          <p className="flex items-start gap-2 rounded-xl bg-success/10 px-3 py-2.5 text-hint text-fg">
+            <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+            Your {media.length === 1 ? 'photo shows' : `${media.length} photos show`} with every {lower}. Customers pick a{' '}
+            {lower} by its name.
+          </p>
+        ) : (
+          <p className="flex items-start gap-2 rounded-xl border border-pending/40 bg-pending/10 px-3 py-2.5 text-hint text-fg">
+            <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-pending" />
+            No photo yet. You can go on — the product stays hidden until you add one.
+          </p>
+        )
       ) : (
         <>
           <div role="group" aria-label="Arrange photos" className="flex gap-1 rounded-xl bg-fg/5 p-1">
@@ -135,7 +149,41 @@ export function VariantPhotos({
                         {list.length ? `${list.length} photo${list.length === 1 ? '' : 's'}` : 'Needs a photo'}
                       </p>
                     </div>
-                    {/* The whole strip is one button: every photo and the + open the same sheet. */}
+                    {list.length === 0 ? (
+                      // Empty colour: the camera and the gallery, one tap each.
+                      <div className="mt-2.5 grid grid-cols-2 gap-2">
+                        <QuickAdd
+                          kind="camera"
+                          uploader={uploader}
+                          room={MAX_LIVE_PHOTOS - media.length}
+                          disabled={disabled}
+                          onUploaded={(ids) => setList(v.key, ids.slice(0, MAX_VARIANT_PHOTOS))}
+                        />
+                        <QuickAdd
+                          kind="gallery"
+                          uploader={uploader}
+                          room={MAX_LIVE_PHOTOS - media.length}
+                          disabled={disabled}
+                          onUploaded={(ids) => setList(v.key, ids.slice(0, MAX_VARIANT_PHOTOS))}
+                        />
+                        {media.length > 0 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={disabled}
+                            onClick={() => setOpenKey(v.key)}
+                            className="col-span-2 justify-self-start px-2"
+                          >
+                            <span className="inline-flex items-center gap-1.5 text-brand">
+                              <ImageIcon className="h-4 w-4" />
+                              Use a photo already added
+                            </span>
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                    /* The whole strip is one button: every photo and the + open the same sheet. */
                     <button
                       type="button"
                       onClick={() => setOpenKey(v.key)}
@@ -166,9 +214,9 @@ export function VariantPhotos({
                         } ${flagged ? 'border-danger text-danger' : 'border-brand/50 bg-brand-soft/40 text-brand'}`}
                       >
                         <PlusIcon className="h-5 w-5" />
-                        {list.length === 0 && <span className="text-sm">Add photos</span>}
                       </span>
                     </button>
+                    )}
                   </li>
                 )
               })}
@@ -224,6 +272,12 @@ export function VariantPhotos({
           <p className={`text-sm font-semibold ${done === values.length ? 'text-success' : 'text-muted'}`}>
             {done === values.length ? `All ${values.length} ${lower}s ready` : `${done} of ${values.length} ${lower}s ready`}
           </p>
+          {view === 'colour' && uploader.busy && (
+            <p className="text-hint font-semibold text-brand">
+              Uploading {uploader.busy.n} of {uploader.busy.of}…
+            </p>
+          )}
+          {view === 'colour' && uploader.error && <p className="text-hint text-danger">{uploader.error}</p>}
         </>
       )}
 
@@ -265,7 +319,7 @@ export function LooksQuestion({
   answer: boolean | null
   onAnswer: (looksDifferent: boolean) => void
 }) {
-  const label = name.trim() || 'choice'
+  const label = name.trim() || 'option'
   return (
     <div role="radiogroup" aria-label={`Does each ${label} look different?`}>
       <p className="mb-2 text-base font-semibold text-fg">Does each {label.toLowerCase()} look different?</p>
@@ -554,6 +608,56 @@ export function rowsWithPhotos(
 }
 
 /** A saved product whose combinations have no photos of their own already uses the same photos for all. */
-export function initiallySame(rows: VariantDraft[], media: StoreProductMediaItem[]): boolean {
-  return media.length > 0 && rows.some((row) => row.id) && rows.every((row) => row.removed || row.mediaIds.length === 0)
+export function initiallySame(rows: VariantDraft[]): boolean {
+  return rows.every((row) => row.removed || row.mediaIds.length === 0)
+}
+
+/**
+ * "Take photo" / "Gallery" for one colour: picks straight from the phone and
+ * hands the new photo ids back, so the colour fills in without a sheet.
+ */
+function QuickAdd({
+  kind,
+  uploader,
+  room,
+  disabled,
+  onUploaded,
+}: {
+  kind: 'camera' | 'gallery'
+  uploader: Uploader
+  room: number
+  disabled: boolean
+  onUploaded: (ids: string[]) => void
+}) {
+  const blocked = disabled || room <= 0 || uploader.busy !== null
+  const onPick = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = [...(e.target.files ?? [])]
+    e.target.value = ''
+    if (files.length === 0) return
+    const ids = await uploader.upload(files, room)
+    if (ids.length > 0) onUploaded(ids)
+  }
+  const camera = kind === 'camera'
+  return (
+    <label
+      className={`flex min-h-12 items-center justify-center gap-2 rounded-md px-3 text-base font-semibold transition ${
+        blocked
+          ? 'cursor-default border border-line text-muted opacity-60'
+          : camera
+            ? 'cursor-pointer bg-brand text-brand-contrast hover:opacity-90'
+            : 'cursor-pointer border border-line bg-surface text-fg hover:bg-surface-alt'
+      }`}
+    >
+      {camera ? <CameraIcon className="h-5 w-5 shrink-0" /> : <ImageIcon className="h-5 w-5 shrink-0" />}
+      {camera ? 'Take photo' : 'Gallery'}
+      <input
+        type="file"
+        accept="image/*"
+        {...(camera ? { capture: 'environment' as const } : { multiple: true })}
+        className="sr-only"
+        disabled={blocked}
+        onChange={(e) => void onPick(e)}
+      />
+    </label>
+  )
 }

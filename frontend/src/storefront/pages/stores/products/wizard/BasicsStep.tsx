@@ -106,7 +106,7 @@ export function BasicsStep({
 
   const next = async () => {
     if (!name.trim()) return setError('Give the product a name first.')
-    if (!categoryId) return setError('Choose the sub-category it belongs in — tap one under “Which category is it in?”.')
+    if (!categoryId) return setError('Choose the sub-category it belongs in — tap one under Category.')
     setError(null)
 
     const unchanged =
@@ -143,10 +143,9 @@ export function BasicsStep({
             maxLength={120}
             autoFocus
             aria-label="Product name"
-            placeholder="e.g. Banarasi silk saree"
             className={inputClass}
           />
-          <Hint>The words a customer would search for.</Hint>
+          <Hint>The words a customer would search for. Example: Banarasi silk saree</Hint>
         </div>
 
         {tip && (
@@ -194,7 +193,7 @@ export function BasicsStep({
               many
               values={example.values}
               active={plan === 'many'}
-              title="Many versions"
+              title="Many options"
               body={listWords(example.values)}
               onClick={() => onPlanChange('many')}
             />

@@ -401,12 +401,15 @@ shopping surface, so it follows `ADMIN_UI_THEME.md` (repo root) for
   taps), because sellers are mostly on phones. Utilities `ws-card` /
   `ws-bar` / `ws-well` / `ws-tint`, card `PanelCard` — see
   FRONTEND_CONTEXT.md "Seller workspace look".
-- **The product wizard goes one step further:** it takes the console's
-  dense SIZES too (`ws-dense`: 14px body, 13px labels, 12px hints) but keeps
-  40px fields and buttons and the 16px phone-input floor. Its steps are
-  `Section`s — header-bar cards that run edge to edge on a phone, no gutter
-  or rounded corners. Short labels, few-word hints, a picture or icon
-  before a sentence.
+- **The product wizard is phone-first and slightly LARGER, never denser:**
+  its sellers are mostly on phones and many read slowly, so `ws-form` gives
+  16px body, 15px labels, 14px hints, 48px fields and main buttons, 44px
+  smallest tap (it replaced the console-dense `ws-dense`, 14 Nov 2026). Its
+  steps are `Section`s — header-bar cards that run edge to edge on a phone,
+  no gutter or rounded corners. Short labels, few-word hints, a picture or
+  icon before a sentence; what blocks the seller is a big `Notice` with one
+  action, never a small grey line; no example values as placeholder text;
+  one word for one thing ("options").
 - Implementation: `frontend/src/admin/admin.css` + `admin/ui/` — see
   FRONTEND_CONTEXT.md "Admin console". The storefront and seller app keep the
   sizes in §4–§10; the console theme is never loaded there.

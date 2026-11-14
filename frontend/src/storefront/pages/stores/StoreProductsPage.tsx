@@ -734,17 +734,19 @@ function ProductRow({
             <button
               type="button"
               onClick={() => onEdit(nextUp ? nextUp.step : 'review')}
-              className="flex min-h-tap w-full items-center gap-2.5 rounded-xl bg-pending-soft px-3 text-left transition hover:brightness-95"
+              // Big on a phone on purpose: this one line is how most sellers
+              // find their way back into an unfinished product.
+              className="flex min-h-12 w-full items-center gap-2.5 rounded-xl bg-pending-soft px-3 py-2 text-left transition hover:brightness-95"
             >
               {nextUp && (
-                <span className="h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-fg/10">
+                <span className="h-2 w-14 shrink-0 overflow-hidden rounded-full bg-fg/10">
                   <span
                     className="block h-full rounded-full bg-pending"
                     style={{ width: `${complete}%` }}
                   />
                 </span>
               )}
-              <span className="text-hint font-semibold text-pending">
+              <span className="text-base font-semibold text-pending sm:text-hint">
                 {nextUp
                   ? `${complete}% done — next: ${nextUp.label}`
                   : 'Sellers can’t see it yet — next: set your price for sellers and offer it'}

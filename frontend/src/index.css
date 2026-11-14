@@ -1011,35 +1011,37 @@
   box-shadow: var(--shadow-dock);
 }
 
-/* The console's dense size scale (ADMIN_UI_THEME.md §3–4), for ONE subtree:
- * the product wizard. Same idea as admin/admin.css — it re-points the size
- * tokens every `text-sm` / `rounded-lg` / `h-tap` reads — but scoped to the
- * element that carries it, and kept thumb-safe: fields and buttons stay 40px
- * (the console's 32px is a mouse size), and phone inputs keep the 16px floor
- * below. Colours are untouched. */
-@utility ws-dense {
-  --text-xs: 12px;
-  --text-caption: 12px;
-  --text-hint: 12px;
-  --text-sm: 13px;
-  --text-label: 13px;
-  --text-base: 14px;
-  --text-body: 14px;
-  --text-lg: 15px;
-  --text-subtitle: 15px;
-  --text-xl: 17px;
-  --text-2xl: 17px;
-  --text-section: 17px;
+/* The Add / Edit product flow's size scale, for ONE subtree (the wizard and
+ * every sheet opened from it). Its sellers are mostly on phones and many read
+ * slowly, so it is the seller scale made a little LARGER, never denser:
+ * 16px body, 15px labels, 14px hints (no copy under 13px), 48px fields, 48px
+ * main buttons, 40px small buttons, 44px smallest tap. It keeps the console's
+ * calmer corners (10px cards, 12px sheets — ADMIN_UI_THEME.md §4); colours
+ * are untouched. Replaced `ws-form` (14px / 40px) on 14 Nov 2026. */
+@utility ws-form {
+  --text-xs: 13px;
+  --text-caption: 13px;
+  --text-hint: 14px;
+  --text-sm: 15px;
+  --text-label: 15px;
+  --text-base: 16px;
+  --text-body: 16px;
+  --text-lg: 18px;
+  --text-subtitle: 18px;
+  --text-xl: 20px;
+  --text-2xl: 20px;
+  --text-section: 20px;
   --radius-lg: 10px;
   --radius-xl: 10px;
   --radius-2xl: 12px;
   --radius-3xl: 12px;
-  --spacing-tap: 40px;
-  --spacing-field: 40px;
-  --btn-h-sm: 32px;
-  --btn-h-md: 40px;
-  --btn-h-lg: 40px;
-  font-size: 14px;
+  --radius-sheet: 12px;
+  --spacing-tap: 44px;
+  --spacing-field: 48px;
+  --btn-h-sm: 40px;
+  --btn-h-md: 48px;
+  --btn-h-lg: 48px;
+  font-size: 16px;
 }
 
 /* A wizard step's body. On a phone each `<section>` (wizard `Section`) runs

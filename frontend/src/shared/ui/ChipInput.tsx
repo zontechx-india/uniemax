@@ -20,10 +20,13 @@ export interface ChipItem {
  *
  * Renders no `<form>` so it can sit inside one; Enter is handled locally.
  *
- * Phones: an explicit **Add** button appears while something is typed (many
- * on-screen keyboards make Enter hard to find, or show "Go"), and "S, M, L"
- * typed in one go becomes three chips. Chips are 36px with a 44px remove
- * target.
+ * Layout: the chips sit ABOVE, and the field with its **Add** button is one
+ * fixed row under them. The Add button used to live inside the wrapping chip
+ * box, so every new chip moved it and a second tap on the old spot missed;
+ * now it never moves and is always shown (greyed until something is typed).
+ * A short line under the row says how ("Type, then press Enter or tap Add").
+ * "S, M, L" typed in one go becomes three chips. Chips are 36px with a 44px
+ * remove target.
  */
 export function ChipInput({
   label,
@@ -125,11 +128,8 @@ export function ChipInput({
       {label && (
         <span className="mb-2 block text-sm font-medium text-muted">{label}</span>
       )}
-      <div
-        className={`flex min-h-field w-full flex-wrap items-center gap-1.5 rounded-md border border-line bg-input px-2 py-1.5 text-sm transition-colors focus-within:border-accent ${
-          disabled ? 'opacity-60' : 'hover:border-fg/30'
-        }`}
-      >
+      {items.length > 0 && (
+      <div className={`mb-2 flex flex-wrap items-center gap-1.5 ${disabled ? 'opacity-60' : ''}`}>
         {items.map((item) =>
           editingKey === item.key ? (
             <input
@@ -178,6 +178,9 @@ export function ChipInput({
             </span>
           ),
         )}
+      </div>
+      )}
+      <div className="flex items-center gap-2">
         <input
           value={draft}
           onChange={(e) => {
@@ -186,30 +189,33 @@ export function ChipInput({
           }}
           onKeyDown={onKeyDown}
           onBlur={commit}
-          placeholder={items.length === 0 ? placeholder : undefined}
+          placeholder={placeholder}
           maxLength={maxLength}
           disabled={disabled || full}
+          enterKeyHint="done"
           aria-label={ariaLabel ?? (typeof label === 'string' ? label : 'Add a value')}
-          className="h-9 min-w-24 flex-1 bg-transparent px-1.5 text-base text-fg outline-none placeholder:text-muted disabled:cursor-not-allowed"
+          className="h-field min-w-0 flex-1 rounded-md border border-line bg-input px-3 text-base text-fg outline-none transition-colors placeholder:text-muted focus:border-accent disabled:cursor-not-allowed disabled:opacity-60"
         />
-        {draft.trim() !== '' && (
-          <button
-            type="button"
-            // mousedown, not click: the input's blur would commit first and
-            // the button would vanish under the finger.
-            onMouseDown={(e) => {
-              e.preventDefault()
-              commit()
-            }}
-            onClick={commit}
-            disabled={disabled}
-            className="h-9 shrink-0 rounded-lg bg-brand px-4 text-sm font-bold text-brand-contrast transition hover:bg-brand-hover"
-          >
-            Add
-          </button>
-        )}
+        <button
+          type="button"
+          // mousedown, not click: keeps the field focused (and the keyboard
+          // up) so the next value can be typed straight away.
+          onMouseDown={(e) => {
+            e.preventDefault()
+            commit()
+          }}
+          onClick={commit}
+          disabled={disabled || full || draft.trim() === ''}
+          className="h-field shrink-0 rounded-md bg-brand px-5 text-base font-bold text-brand-contrast transition hover:bg-brand-hover disabled:opacity-40"
+        >
+          Add
+        </button>
       </div>
-      {hint && <p className="mt-1.5 text-hint font-medium text-danger">{hint}</p>}
+      {hint ? (
+        <p className="mt-1.5 text-hint font-medium text-danger">{hint}</p>
+      ) : (
+        !full && <p className="mt-1.5 text-hint text-muted">Type, then press Enter or tap Add.</p>
+      )}
     </div>
   )
 }

@@ -66,7 +66,7 @@ export function DetailsStep({
   }
 
   return (
-    <StepShell title="Tell customers more" lead="Optional — helps it sell.">
+    <StepShell title="Description" lead="Optional — helps it sell.">
       <Section title="Description" icon={PencilIcon}>
         <div>
           <textarea
@@ -75,10 +75,11 @@ export function DetailsStep({
             rows={4}
             maxLength={2000}
             aria-label="Description"
-            placeholder={'Pure Banarasi silk with zari border\nComes with an unstitched blouse piece\nDry clean only'}
-            className="w-full rounded-md border border-line bg-input px-3 py-2.5 text-base leading-relaxed text-fg outline-none transition placeholder:text-muted focus:border-accent"
+            className="w-full rounded-md border border-line bg-input px-3 py-2.5 text-base leading-relaxed text-fg outline-none transition focus:border-accent"
           />
-          <Hint>2–3 lines. Each line shows as a point.</Hint>
+          {/* The example lives here, not as grey text in the box: sellers
+              took the placeholder for text already written, or kept it. */}
+          <Hint>Write 2 to 3 short lines. Each line shows as a point. Example: Blue ink, pack of 1.</Hint>
         </div>
       </Section>
 

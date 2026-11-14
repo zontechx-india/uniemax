@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { toApiError } from '../../../../../shared/auth/http'
@@ -9,13 +9,14 @@ import type {
   StoreCategory,
   StoreProduct,
 } from '../../../../features/stores/storesApi'
-import { BoxIcon, CheckIcon, ChevronDownIcon, ClipboardIcon, CloseIcon } from '../../../../layout/icons'
+import { BoxIcon, CheckIcon, ChevronDownIcon, ClipboardIcon, CloseIcon, TagIcon } from '../../../../layout/icons'
 import { BasicsStep } from './BasicsStep'
 import { DeliveryStep } from './DeliveryStep'
 import { DetailsStep } from './DetailsStep'
 import { PhotosStep } from './PhotosStep'
 import { PricingStep } from './PricingStep'
-import { categoryOptions, Section, StepButtons, StepError, stepLabel, STEPS, StepShell } from './shared'
+import { categoryOptions, Notice, Section, StepButtons, StepError, stepLabel, STEPS, StepShell } from './shared'
+import { CameraIcon } from '../../media/icons'
 import type { StepKey, VersionPlan } from './shared'
 import { MediaImg } from '../../../../../shared/media/MediaImg'
 import { Button } from '../../../../../shared/ui/Button'
@@ -79,12 +80,32 @@ export function ProductWizard({
   const [product, setProduct] = useState<StoreProduct | null>(initial)
   const [step, setStep] = useState<StepKey>(initial ? startAt : 'basics')
   const [plan, setPlan] = useState<VersionPlan>(null)
+  /** Step 3's screen in view ("Options", "Colour photos", "Price & stock"). */
+  const [subLabel, setSubLabel] = useState<string | null>(null)
   const { supplied, setSupplied } = useSuppliedFor(storeId, product?.id)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const frameRef = useRef<HTMLDivElement>(null)
 
   const index = STEPS.findIndex((s) => s.key === step)
   const go = (delta: number) => {
     const target = STEPS[index + delta]
     if (target) setStep(target.key)
+  }
+
+  // Every new screen starts at its top with nothing focused: a step opened
+  // half-scrolled (the last one's position) hid its first question, and a
+  // field still focused kept the phone keyboard over the buttons.
+  useEffect(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    if (scrollRef.current) scrollRef.current.scrollTop = 0
+    else if (frameRef.current && frameRef.current.getBoundingClientRect().top < 0)
+      frameRef.current.scrollIntoView({ block: 'start' })
+  }, [step, subLabel])
+
+  /** Leaving with the product kept as a draft says so — sellers weren't sure it saved. */
+  const closeAsDraft = () => {
+    if (product && !product.isActive) showToast('Saved as draft. You can finish it later.')
+    onClose()
   }
   const saved = (next: StoreProduct) => {
     setProduct(next)
@@ -113,6 +134,7 @@ export function ProductWizard({
   const [stepsOpen, setStepsOpen] = useState(false)
   const phone = !useMediaQuery('(min-width: 640px)')
   const title = product ? product.name : 'Add a product'
+  const currentLabel = (step === 'pricing' && subLabel) || stepLabel(step, supplyOnly)
   const closeLabel = product ? 'Finish later' : 'Cancel'
 
   const stepList = (onPick?: () => void) => (
@@ -217,6 +239,7 @@ export function ProductWizard({
               onOtherProductChange={onProductChange}
               onCatalogChanged={() => onCatalogChanged?.()}
               onSwitchProduct={switchTo}
+              onPartChange={setSubLabel}
               onBack={() => go(-1)}
               onNext={() => go(1)}
               supplyOnly={supplyOnly}
@@ -261,6 +284,7 @@ export function ProductWizard({
             onBack={() => go(-1)}
             onJump={setStep}
             onDone={onClose}
+            onDraft={closeAsDraft}
             supplyOnly={supplyOnly}
           />
         )}
@@ -281,7 +305,7 @@ export function ProductWizard({
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={onClose}
+              onClick={closeAsDraft}
               aria-label={product ? 'Close — your work is saved' : 'Cancel'}
               className="flex size-tap shrink-0 items-center justify-center rounded-md text-muted transition hover:bg-fg/5 hover:text-fg"
             >
@@ -293,19 +317,19 @@ export function ProductWizard({
                 type="button"
                 onClick={() => setStepsOpen(true)}
                 aria-haspopup="dialog"
-                className="-ml-1 inline-flex min-h-6 max-w-full items-center gap-1 rounded-md px-1 text-xs font-semibold text-brand"
+                className="-ml-1 inline-flex min-h-7 max-w-full items-center gap-1 rounded-md px-1 text-sm font-semibold text-brand"
               >
                 {/* One line always — a wrapped step name pushed the chevron
                     off on its own and doubled the header's height. */}
                 <span className="truncate">
-                  Step {index + 1} of {STEPS.length} · {stepLabel(STEPS[index]!.key, supplyOnly)}
+                  Step {index + 1} of {STEPS.length} · {currentLabel}
                 </span>
                 <ChevronDownIcon className="h-4 w-4 shrink-0" />
               </button>
             </div>
             {product && (
               <Button variant="ghost" size="sm"
-                onClick={onClose}
+                onClick={closeAsDraft}
                 className="shrink-0 px-2.5"
               >
                 {closeLabel}
@@ -316,7 +340,7 @@ export function ProductWizard({
         </header>
         {/* No side padding: each step's sections run edge to edge, and its
             button bar is flush with the bottom of the screen. */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-3 [&>*]:flex-1">
+        <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-3 [&>*]:flex-1">
           {steps}
         </div>
         {stepSheet}
@@ -325,7 +349,7 @@ export function ProductWizard({
   }
 
   return (
-    <div className="ws-card ws-dense mt-5 rounded-lg">
+    <div ref={frameRef} className="ws-card ws-form mt-5 rounded-lg">
       <header className="border-b border-line px-5 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex min-w-0 items-center gap-2 font-heading text-lg font-bold text-fg">
@@ -337,7 +361,7 @@ export function ProductWizard({
             )}
           </h2>
           <Button variant="ghost"
-            onClick={onClose}
+            onClick={closeAsDraft}
             className="px-3"
           >
             {closeLabel}
@@ -419,7 +443,7 @@ function FullScreen({ children }: { children: ReactNode }) {
       role="dialog"
       aria-modal="true"
       aria-label="Product editor"
-      className="ws-dense bg-bg fixed inset-0 z-40 flex flex-col"
+      className="ws-form bg-bg fixed inset-0 z-40 flex flex-col"
     >
       {children}
     </div>,
@@ -451,6 +475,7 @@ function ReviewStep({
   onBack,
   onJump,
   onDone,
+  onDraft,
   supplyOnly,
 }: {
   storeId: string
@@ -460,6 +485,8 @@ function ReviewStep({
   onBack: () => void
   onJump: (step: StepKey) => void
   onDone: () => void
+  /** "Save as draft": leave, saying it was kept. */
+  onDraft: () => void
   supplyOnly: boolean
 }) {
   const [error, setError] = useState<string | null>(null)
@@ -512,23 +539,50 @@ function ReviewStep({
 
   const words = supplyOnly
     ? {
-        title: offered ? 'Offered to sellers' : 'Review & offer to sellers',
+        title: offered ? 'Offered to sellers' : 'Offer to sellers',
         lead: offered ? 'Sellers can add it. Change your price for sellers below.' : 'Set your price for sellers, then offer it.',
         needed: 'Still needed to offer it',
         required: 'Needed',
         price: 'A suggested price',
       }
     : {
-        title: product.isActive ? 'All set' : 'Review & publish',
-        lead: product.isActive ? 'It is live. Changes are saved.' : 'Check it, then publish. You can keep improving it later.',
+        title: product.isActive ? 'All set' : 'Publish',
+        lead: product.isActive ? 'It is live. Changes are saved.' : 'Check it, then publish. You can change it later.',
         needed: 'Still needed to go live',
         required: 'Needed',
         price: 'A selling price',
       }
   const doneCount = CHECKS.filter((check) => !missing.has(check.key)).length
 
+  const blockers = CHECKS.filter((check) => check.required && missing.has(check.key))
+
   return (
     <StepShell title={words.title} lead={words.lead}>
+      {!product.isActive &&
+        blockers.map((check) => (
+          <Notice
+            key={check.key}
+            icon={check.key === 'photo' ? CameraIcon : TagIcon}
+            title={
+              check.key === 'photo'
+                ? 'Add 1 photo to show this product in your shop'
+                : supplyOnly
+                  ? 'Add a suggested price to offer it'
+                  : 'Add a price to sell this product'
+            }
+            body={
+              check.key === 'photo'
+                ? 'Customers only see products with a photo. It stays hidden until then.'
+                : 'Customers need a price to buy it.'
+            }
+            action={
+              <Button type="button" onClick={() => onJump(check.step)} full>
+                {check.key === 'photo' ? <CameraIcon className="h-5 w-5" /> : <TagIcon className="h-5 w-5" />}
+                {check.key === 'photo' ? 'Add a photo' : 'Add a price'}
+              </Button>
+            }
+          />
+        ))}
       <div data-bleed className="flex flex-col gap-2 sm:gap-3 lg:grid lg:grid-cols-[16rem_1fr]">
         {/* The storefront card, honestly. A compact row on a phone — a
             full-width square (empty, before a photo) pushed the checklist
@@ -553,11 +607,40 @@ function ReviewStep({
             </p>
             {product.hasVariants && (
               <p className="text-hint text-muted">
-                {product.variants.length} choice{product.variants.length === 1 ? '' : 's'}
+                {product.variants.length} option{product.variants.length === 1 ? '' : 's'}
               </p>
             )}
           </div>
         </section>
+
+        {product.hasVariants && product.variants.length > 0 && (
+          <Section
+            title="Price of each option"
+            icon={TagIcon}
+            aside={
+              <Button type="button" variant="ghost" size="sm" onClick={() => onJump('pricing')} className="px-2.5">
+                Change
+              </Button>
+            }
+            flush
+          >
+            <ul className="divide-y divide-line">
+              {product.variants.map((variant) => (
+                <li key={variant.id} className="flex min-h-11 items-center gap-3 px-4 py-2">
+                  <span className={`min-w-0 flex-1 text-sm break-words ${variant.isActive ? 'text-fg' : 'text-muted line-through'}`}>
+                    {variant.name}
+                  </span>
+                  <span className="shrink-0 text-hint text-muted">
+                    {variant.stockQuantity > 0 ? `${variant.stockQuantity} in stock` : 'Sold out'}
+                  </span>
+                  <span className="w-20 shrink-0 text-right font-figure text-base font-bold text-fg">
+                    {formatPrice(variant.price)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
 
         {/* What still blocks publishing comes FIRST on a phone, so the
             greyed-out Publish button always has its reason in view. */}
@@ -576,9 +659,9 @@ function ReviewStep({
               {CHECKS.map((check) => {
                 const done = !missing.has(check.key)
                 return (
-                  <li key={check.key} className="flex min-h-12 items-center gap-2.5 px-4 py-1.5">
+                  <li key={check.key} className="flex min-h-14 items-center gap-2.5 px-4 py-2">
                     <span
-                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
                         done ? 'bg-success text-brand-contrast' : 'ws-well text-muted'
                       }`}
                     >
@@ -640,7 +723,7 @@ function ReviewStep({
             nextLabel="Offer to sellers"
             busy={busy}
             canNext={canPublish && !!offer.item}
-            skip={onDone}
+            skip={product.isActive ? onDone : onDraft}
             skipLabel={product.isActive ? 'Finish later' : 'Save as draft'}
           />
         )
@@ -653,7 +736,7 @@ function ReviewStep({
           nextLabel="Publish to my shop"
           busy={busy}
           canNext={canPublish}
-          skip={onDone}
+          skip={onDraft}
           skipLabel="Save as draft"
         />
       )}

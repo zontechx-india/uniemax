@@ -2444,19 +2444,32 @@ is never shown a pickup-address item.
   over a scrolling step whose Back / Continue bar (`StepButtons`, a flush
   `<footer>`) is pinned to the bottom of the screen.
   From `sm` up it stays inline in a `ws-card` with a clickable step row.
-  **Console look (ADMIN_UI_THEME.md):** the frame carries `ws-dense` — the
-  console's dense size scale scoped to the wizard (14px body, 13px labels,
-  12px hints, 10px cards) but thumb-safe: fields and buttons 40px, phone
-  inputs keep the 16px floor. Each step is a stack of `Section`s
+  **Phone-first sizes:** the frame carries `ws-form` (index.css) — the
+  seller scale made a little LARGER for sellers who read slowly: 16px body,
+  15px labels, 14px hints, 48px fields and main buttons, 40px small buttons,
+  44px smallest tap; the console's calmer corners (10px cards, 12px sheets).
+  It replaced `ws-dense` (14px / 40px) on 14 Nov 2026. Every new screen
+  (step, or step 3's inner screen) opens **at its top with nothing focused**,
+  and the bottom buttons keep focus while pressed (`keepFocus`): a tap
+  that first closed the phone keyboard made the bar jump and missed, so
+  Continue needed two taps. Fields carry **no grey example values** —
+  sellers read "1499" or a sample description as already filled in — an
+  example goes in the hint under the field. Each step is a stack of `Section`s
   (`wizard/shared.tsx`): a flat card with a header bar (28px icon tile +
   title + optional aside) that runs **edge to edge on a phone** — no side
   gutter, no rounded corners (`StepShell`'s body is `ws-step-body`: anything
   that is not a `<section>`, the `<footer>` or `data-bleed` keeps a 16px
   gutter). The step title shows from `sm` only (the phone header names the
   step); a lead is at most one short line. Labels are short ("Selling
-  price", "MRP", "Stock"); hints are a few words; money fields are
-  `MoneyInput` (₹ inside the field). No gradients in the wizard.
-  **1 What is it?** (the name, then the category in two labelled steps
+  price (₹)", "MRP (₹)", "Stock — how many you have"); hints are a few words;
+  money fields are `MoneyInput` (₹ inside the field). No gradients in the
+  wizard. Step names are the same everywhere (header, All steps, titles):
+  **Name & type · Photos · Price & stock · Description · Delivery ·
+  Publish**; inside step 3 the header names the screen in view ("Step 3 of 6
+  · Colour photos", reported by `PricingStep` as `onPartChange`). The
+  flow says **options** for colours, sizes and so on (never "choices" or
+  "versions"); each combination is an "item to price".
+  **1 Name & type** (the name, then the category in two labelled steps
   (`wizard/CategoryPick.tsx`): **① Main category** as chips (the shop's root
   categories; hidden when there is only one) and **② Sub-category in
   {main}** as radio cards grouped under small headings for the levels in
@@ -2491,26 +2504,34 @@ is never shown a pickup-address item.
   choices; Continue creates the product as a **draft** on the
   server, so every later step saves on Continue and "Finish later" always
   keeps what was done) · **2 Photos** (the shared Media Board on
-  `useLiveMedia`, uploading straight onto the draft) · **3 Price & choices**
-  (a **How many versions?** section with the same two `VersionCard` pictures
-  as step 1 — **Just one** / **Many versions** — and one line "Colours or
-  sizes go in this one product". On a **new unpriced** product
+  `useLiveMedia`, uploading straight onto the draft; with no photo a big
+  **No photo yet** notice says the product stays hidden until it has one,
+  and the button reads **Add photo later** in the plain secondary style, so
+  skipping is never mistaken for the normal path) · **3 Price & stock**
+  (a **One or many options?** section with the same two `VersionCard` pictures
+  as step 1 — **Just one** / **Many options** — and one line "Colours or
+  sizes go in this one product". It is asked only while unanswered: once
+  step 1 (or a saved price / options) answered it, step 3 shows one line
+  "✓ Many options" with **Change**. On a **new unpriced** product
   **neither is pre-selected** unless step 1 answered — a pre-selected "No"
   was tapped straight past. Until one is picked, `ChoicesPreview` draws what
   a customer sees: the seller's own cover photo and name with a choice row
   from the category's option templates (`exampleChoice` — Colour first), and
-  Continue asks the seller to pick. **Just one** = a **Price & stock** section,
-  two fields per row even on a phone: Selling price · MRP (optional), the
+  Continue asks the seller to pick. **Just one** = a **Price & stock** section:
+  Selling price (₹) · MRP (₹, optional) side by side, the
   platform-fee note (`PlatformFeeNote`: "Platform fee n% · You get ₹x" and the
-  online-payment-fee line, each with an icon), then Stock · Product code
-  (optional). Stock starts
+  online-payment-fee line, each with an icon), then **Stock — how many you
+  have** as a `Stepper` (48px − and + around the number, which can still be
+  typed), and **+ More (product code)** that reveals the optional code
+  (open already when the product has one). Stock starts
   **empty** on a never-priced draft and is required — a prefilled 0 used to
-  be saved untouched and the product went live sold out; **Many versions**
+  be saved untouched and the product went live sold out; **Many options**
   (its picture card names the category's example values) = up to THREE screens inside one `PricingStep` (state survives between
-  them; a "1 Choices · 2 Photos · 3 Prices" strip shows where you are):
-  **Choices** — the category's **suggested options** as one-tap 36px chips
+  them; a "1 Options · 2 Colour photos · 3 Price & stock" strip — the same
+  names as the header, wrapping rather than cut off — shows where you are):
+  **Options** — the category's **suggested options** as one-tap 36px chips
   ("Tap what customers choose") and the `OptionTypesEditor`; Continue
-  checks every choice is named and has options, then **Photos**
+  checks every option is named and has values, then **Colour photos**
   (`wizard/VariantPhotos.tsx`) — only when a choice changes how the product
   LOOKS (`photoChoiceFor`: Colour / Shade / Design / Pattern / Print / Style /
   Finish are certain; any other name not size-like — Type, Model — is asked
@@ -2521,9 +2542,16 @@ is never shown a pickup-address item.
   from it, in order** — the marketplace model. Reuse is free (one photo can
   show Pink and Green). Top: a **Same photos for all colours** switch (for
   photos that show every colour together; no lists are saved and customers
-  pick by name). Then **By colour / By photo**: *By colour* is a row per value
-  ("Pink · 2 photos" / "Needs a photo") whose whole photo strip (photo 1
-  labelled **Main**) plus "+" is one button opening **Photos of Pink** — a
+  pick by name) — **ON by default** for a product whose combinations have no
+  photo lists yet, because most small sellers have one photo of a product;
+  with it on and no photo at all, a notice says the product stays hidden
+  until it has one, and Continue still goes on. Turning it OFF is the choice
+  to photograph each colour. Then **By colour / By photo**: *By colour* is a
+  row per value ("Pink · 2 photos" / "Needs a photo"). An EMPTY value shows
+  **Take photo** (camera, `capture`) and **Gallery** buttons right in its
+  row — the photo lands on that colour in two taps — plus "Use a photo
+  already added" when the product has photos; a value with photos shows its
+  strip (photo 1 labelled **Main**) plus "+", one button opening **Photos of Pink** — a
   numbered tick sheet (tap in order; 1 = main; a photo other values use says
   "Also in Blue" and stays theirs) with **Take or upload photos** (several
   files, ticked as they land; "Uploading 2 of 3…"; max 10 per value, 20 per
@@ -2532,10 +2560,10 @@ is never shown a pickup-address item.
   Lists live on the draft rows (`VariantDraft.mediaIds`); on save
   `rowsWithPhotos` writes each value's list to every size of it (or clears all
   for the switch / "they look the same"), sent as `variants[].mediaIds`.
-  `initiallySame` turns the switch on for a saved product whose combinations
-  have no photos of their own. **Required** — each value needs one photo
-  (a reused one counts) unless the switch is on; Continue outlines the first
-  value without one. On a phone the preview
+  `initiallySame` turns the switch on whenever no combination has its own
+  photo list. With the switch OFF each value needs one photo (a reused one
+  counts); Continue outlines the first value without one and says it can be
+  added — or the switch turned on. On a phone the preview
   swatches are one sideways-scrolling row and the step strip drops its
   number circles under 360px. Then **Prices** — the
   `VariantMatrix` (a blank stock counts as 0, but ALL blank is refused —
@@ -2551,12 +2579,14 @@ is never shown a pickup-address item.
   colours × 3 sizes ten screens long; this is about a third. It replaced a
   photo box on every price card, pre-filled with the cover, that sellers did
   not know to tap.
-  Saved as one `PUT …/options`; dropped saved choices confirmed
-  first. In the editor a choice is "Choice 1: Size" with "Size options" as
-  chips (`ChipInput`: 36px chips, a visible **Add** button while typing,
-  "S, M, L" typed at once becomes three) and a worded **Remove**. The
-  second kind — **linked products** — is an advanced path behind "More ways
-  to add choices": the values are other products of the store, a *family*
+  Saved as one `PUT …/options`; dropped saved options confirmed
+  first. In the editor an option is "Option 1: Size" with "Size options" as
+  chips (`ChipInput`: the chips sit above, and the field with its **Add**
+  button is one fixed row under them — Add never moves as chips wrap, and is
+  always shown, greyed until something is typed; "Type, then press Enter or
+  tap Add." under it; "S, M, L" typed at once becomes three) and a worded
+  **Remove**. The second kind — **linked products** — is an advanced path
+  behind "More ways to add options": the values are other products of the store, a *family*
   (`features/stores/productGroups.ts` draft — one row per member with its
   cover and an editable value, in swatch order, and two buttons: **Pick from
   my products** opens `GroupMemberPicker`, a ticked list of the store's
@@ -2570,26 +2600,34 @@ is never shown a pickup-address item.
   (or the single price fields when the product has only a family) and, if
   changed, the family through `PUT …/groups`; the product list reloads
   because other members' rows changed) · **4
-  Tell customers more** (optional: a Description section, and a Product
+  Description** (optional: a Description box that starts empty — "Write 2 to
+  3 short lines… Example: Blue ink, pack of 1." is the hint under it — and a Product
   facts section whose rows — pre-filled from the category's suggested labels
-  — are one line each: what · answer · ▲ · delete, with ▼ from `sm`) · **5 Delivery &
-  payment** (the shop's settings as three icon lines — Delivers to · Shipping ·
+  — are one line each: what · answer · ▲ · delete, with ▼ from `sm`) · **5
+  Delivery** (the shop's settings as three icon lines — Delivers to · Shipping ·
   Cash on delivery — then two `ChoiceCard`s —
   **Same as my shop** / **Different**, the second revealing
   `ProductDeliveryField`, `ProductShippingField` and the COD checkbox; no
-  "Skip", since Continue with the defaults is the same thing) · **6 Review &
-  publish** (the storefront card as it will look — a compact row on a phone,
+  "Skip", since Continue with the defaults is the same thing) · **6
+  Publish** (the storefront card as it will look — a compact row on a phone,
   the square card from `lg` — a checklist from the server's
   `completeness`, and Publish — enabled once a photo and a price exist, the
-  only two requirements. While either is missing the checklist moves **above**
-  the card on a phone, titled "Still needed before it can go live", so the
-  greyed-out Publish always has its reason in view). Step errors render
+  only two requirements. Each missing one is FIRST a big `Notice` (icon,
+  "Add 1 photo to show this product in your shop", one line why, and a
+  full-width **Add a photo** / **Add a price** button that jumps to that
+  step); the checklist follows, moved **above** the card on a phone. A
+  product with options lists **Price of each option** — every combination
+  with its stock ("Sold out") and price, and **Change** back to step 3.
+  **Save as draft** — and the header's close / Finish later on an unpublished
+  product — toast "Saved as draft. You can finish it later."). Step errors render
   through `StepError` (`wizard/shared.tsx`), which scrolls each new message
   to the middle of the screen — an error under the sticky buttons made
-  Continue look dead. `ChoiceCard` (same file) is the console option card
+  Continue look dead. `Notice` (same file) is the big can't-miss message
+  (40px icon disc, bold title, a line, one action) for what blocks the
+  seller. `ChoiceCard` (same file) is the console option card
   (icon tile, title, a few words, radio dot) used by Delivery; questions with
   a picture use `VersionCard`. The phone header's
-  "Step n of 6 · name" is one truncated line. The step header lets the seller jump anywhere
+  "Step n of 6 · name" is one truncated 15px line. The step header lets the seller jump anywhere
   once the draft exists, and its ticks reflect the product's real state
   (photo, price, description, published) rather than position; a bar reads
   "Product N% complete". A field gets a hint only when it is not obvious,
@@ -2597,7 +2635,7 @@ is never shown a pickup-address item.
   (`PageHeader` + **Add product**) is one `ws-card` of `ActionRow`s: a
   56px photo, the name with a **Showing / Hidden / Not finished** pill, the
   price (or range) · stock · "n choices", the "Root › Sub" path, then a
-  tappable orange nudge with the completeness bar and the one next thing to
+  tappable orange nudge (48px, 16px text on a phone) with the completeness bar and the one next thing to
   do ("50% done — next: add a description", opening the wizard at that
   step), and pills for families ("Colour: Blue"), home-page rows, "Not in
   search", its own delivery / shipping rule and "No cash on delivery".
@@ -2941,7 +2979,7 @@ what the host apps see:
     through `ProductRow`'s `extra` slot; the empty list adds
     `SupplierProductsEntry` once the store has a supplier.
   - `ProductWizard` asks `useSuppliedFor(storeId, product.id)`. On a copy its
-    **Price & choices** and **Delivery & payment** steps are the package's
+    **Price & stock** and **Delivery** steps are the package's
     `SuppliedPricingStep` / `SuppliedDeliveryStep` (D-34); while the answer
     is loading those two steps render nothing, and a 404 (package off) means
     an ordinary product.
@@ -4068,7 +4106,7 @@ and icon on WhatsApp's deeper green `#1da851`, ~3:1 — white on the lighter
 | ------- | --- |
 | `ws-card` | Cards and panels: `--surface`, 1px `--line` border, faint shadow |
 | `ws-bar` | Chrome that floats over content — sticky save / action bars: surface + border + `shadow-floating` |
-| `ws-dense` | The console's dense SIZE scale (ADMIN_UI_THEME.md) for one subtree — the product wizard: re-points the text / radius / `tap` / `field` / button-height tokens (14px body, 40px controls). Colours untouched |
+| `ws-form` | The Add / Edit product flow's size scale for one subtree: re-points the text / radius / `tap` / `field` / button-height tokens to a phone-first, slightly LARGER scale (16px body, 14px hints, 48px fields and main buttons) with the console's 10 / 12px corners. Colours untouched |
 | `ws-step-body` | A wizard step's body: `<section>`s, the `<footer>` and any `data-bleed` wrapper run edge to edge on a phone; every other child keeps a 16px gutter |
 | `ws-dock` | The seller phone tab bar only: `--dock-surface` + `--dock-line` edge + `--shadow-dock` (light: white, darker edge, real drop shadow; dark: raised `#2a2a2a`, light hairline) — so it stands out from the white cards under it |
 | `ws-well` | Recessed wells and step dots inside a card (`--surface-alt` + border). Search fields are white (`bg-input`), not wells |

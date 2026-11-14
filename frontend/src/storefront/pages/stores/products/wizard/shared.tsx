@@ -10,13 +10,16 @@ import { ErrorNote } from '../../../../../shared/ui/form'
  * product is a draft on the server from the end of step 1), so leaving at any
  * point loses nothing and "finish later" is always honest.
  */
+// Short, plain names — the same words on the header, the "All steps" list
+// and each screen's title. Step 3 has up to three screens inside it; the
+// header names the one in view (`PricingStep` reports it as `subLabel`).
 export const STEPS = [
-  { key: 'basics', label: 'What is it?' },
+  { key: 'basics', label: 'Name & type' },
   { key: 'photos', label: 'Photos' },
-  { key: 'pricing', label: 'Price & choices' },
-  { key: 'details', label: 'Tell customers more' },
-  { key: 'delivery', label: 'Delivery & payment' },
-  { key: 'review', label: 'Review & publish' },
+  { key: 'pricing', label: 'Price & stock' },
+  { key: 'details', label: 'Description' },
+  { key: 'delivery', label: 'Delivery' },
+  { key: 'review', label: 'Publish' },
 ] as const
 
 export type StepKey = (typeof STEPS)[number]['key']
@@ -28,7 +31,7 @@ export type StepKey = (typeof STEPS)[number]['key']
  */
 const SUPPLIER_LABELS: Partial<Record<StepKey, string>> = {
   delivery: 'Delivery area',
-  review: 'Review & offer',
+  review: 'Offer to sellers',
 }
 
 export const stepLabel = (key: StepKey, supplyOnly: boolean): string =>
@@ -42,15 +45,16 @@ export const stepLabel = (key: StepKey, supplyOnly: boolean): string =>
 export type VersionPlan = 'one' | 'many' | null
 
 /*
- * The wizard follows the console theme (ADMIN_UI_THEME.md): the frame
- * carries `ws-dense`, so every size below lands on the dense scale (14px
- * body, 13px labels, 12px hints, 40px fields and buttons). Each step is a
- * stack of `Section`s — a flat card with a header bar — that run edge to edge
- * on a phone, so no space goes to card gutters and rounded corners.
+ * Written for sellers on phones, many of whom read slowly: the frame carries
+ * `ws-form` (16px body, 15px labels, 14px hints, 48px fields and buttons —
+ * index.css). Each step is a stack of `Section`s — a flat card with a header
+ * bar — that run edge to edge on a phone. Fields never carry an example
+ * value as grey placeholder text (sellers took "1499" for a saved price);
+ * an example, if any, goes in the hint under the field.
  */
 
-// 40px in the wizard (`--spacing-field` under ws-dense); phones keep the
-// 16px input floor from index.css, so focusing never zooms the page.
+// 48px in the wizard (`--spacing-field` under ws-form), 16px text, so
+// focusing never zooms the page on iOS.
 export const inputClass =
   'h-field w-full rounded-md border border-line bg-input px-3 text-base text-fg outline-none transition placeholder:text-muted focus:border-accent disabled:opacity-60'
 
@@ -206,10 +210,13 @@ export function StepButtons({
   canNext = true,
   skip,
   skipLabel,
+  nextVariant = 'primary',
 }: {
   onBack?: () => void
   onNext: () => void
   nextLabel?: string
+  /** 'secondary' when going on is the less-wanted path ("Add photo later"). */
+  nextVariant?: 'primary' | 'secondary'
   busy?: boolean
   canNext?: boolean
   /** "Skip for now" — for optional steps. */
@@ -219,16 +226,24 @@ export function StepButtons({
 }) {
   // A flush bar pinned to the bottom of a phone screen — Continue is always
   // under the thumb, however long the step — and an ordinary row from `sm` up.
+  //
+  // `keepFocus` is the one-tap fix: tapping a button while a field is focused
+  // used to blur the field first, the phone keyboard closed, the screen
+  // jumped, and the tap landed on nothing — sellers had to tap Continue
+  // twice. Holding focus through the press keeps the bar still; the wizard
+  // drops focus itself when the screen changes.
   return (
     <footer className="sticky bottom-0 z-10 mt-auto flex flex-col gap-1.5 border-t border-line bg-surface px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:static sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:bg-transparent sm:px-0 sm:pt-4 sm:pb-0">
       <div className="flex items-center gap-2 sm:contents">
         {onBack && (
-          <Button type="button" variant="secondary" onClick={onBack} disabled={busy} className="px-5">
+          <Button type="button" variant="secondary" onMouseDown={keepFocus} onClick={onBack} disabled={busy} className="px-5">
             Back
           </Button>
         )}
         <Button
           type="button"
+          variant={nextVariant}
+          onMouseDown={keepFocus}
           onClick={onNext}
           loading={busy}
           disabled={!canNext}
@@ -238,11 +253,103 @@ export function StepButtons({
         </Button>
       </div>
       {skip && (
-        <Button variant="ghost" size="sm" onClick={skip} disabled={busy} className="px-3">
+        <Button variant="ghost" size="sm" onMouseDown={keepFocus} onClick={skip} disabled={busy} className="px-3">
           {skipLabel ?? 'Skip for now'}
         </Button>
       )}
     </footer>
+  )
+}
+
+/** Press without taking focus — see StepButtons. */
+export const keepFocus = (e: { preventDefault: () => void }) => e.preventDefault()
+
+/**
+ * A count with big − and + buttons — stock is mostly "a few more" or "a few
+ * less", and a 48px button is easier than the number keyboard. The number
+ * itself can still be typed.
+ */
+export function Stepper({
+  value,
+  onChange,
+  label,
+  disabled,
+}: {
+  value: string
+  onChange: (value: string) => void
+  /** Read out with the buttons ("Stock"). */
+  label: string
+  disabled?: boolean
+}) {
+  const n = Number(value) || 0
+  return (
+    <div className="flex items-stretch gap-2">
+      <Button
+        type="button"
+        variant="secondary"
+        aria-label={`${label}: one less`}
+        disabled={disabled || n <= 0}
+        onClick={() => onChange(String(Math.max(0, n - 1)))}
+        className="w-12 shrink-0 px-0 text-xl"
+      >
+        −
+      </Button>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 7))}
+        inputMode="numeric"
+        aria-label={label}
+        disabled={disabled}
+        className={`${inputClass} min-w-0 flex-1 text-center text-lg font-semibold`}
+      />
+      <Button
+        type="button"
+        variant="secondary"
+        aria-label={`${label}: one more`}
+        disabled={disabled}
+        onClick={() => onChange(String(n + 1))}
+        className="w-12 shrink-0 px-0 text-xl"
+      >
+        +
+      </Button>
+    </div>
+  )
+}
+
+/**
+ * A big, can't-miss message with an icon and one action — for what blocks
+ * the seller ("Add 1 photo to show this product") rather than a small grey
+ * line they read past.
+ */
+export function Notice({
+  icon: Icon,
+  title,
+  body,
+  action,
+  tone = 'pending',
+}: {
+  icon: ComponentType<{ className?: string }>
+  title: string
+  body?: ReactNode
+  action?: ReactNode
+  tone?: 'pending' | 'success'
+}) {
+  const box =
+    tone === 'success'
+      ? 'border-success/30 bg-success/8'
+      : 'border-pending/40 bg-pending/10'
+  const tile = tone === 'success' ? 'bg-success text-brand-contrast' : 'bg-pending text-brand-contrast'
+  return (
+    <div role="status" className={`flex items-start gap-3 rounded-lg border p-3.5 ${box}`}>
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${tile}`}>
+        <Icon className="h-5 w-5" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-base font-bold text-fg">{title}</p>
+        {body && <div className="mt-0.5 text-sm text-muted">{body}</div>}
+        {action && <div className="mt-2.5">{action}</div>}
+      </div>
+    </div>
   )
 }
 
