@@ -74,13 +74,8 @@ export function ReviewQueue({
           />
         </div>
 
-        <p className="mt-2 flex justify-between text-xs text-muted">
-          <span className="truncate">{item.original.name}</span>
-          <span className="shrink-0 pl-2 font-medium">
-            {[item.ratioLabel, item.sizeLabel].filter(Boolean).join(' · ')}
-          </span>
-        </p>
-
+        {/* No file name or "0.4 MB" here: technical details sellers can't act
+            on, and a camera file name ("IMG_2031.jpg") reads like an error. */}
         <div className="mt-4 grid gap-2">
           <Button type="button" size="lg" full onClick={() => onUse(item)}>
             <CheckIcon className="h-4 w-4" />

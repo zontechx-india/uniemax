@@ -1630,7 +1630,9 @@ full-bleed section bands instead.
   keeping abbreviations like LED / USB / XL and lower-casing "of", "for"…;
   display only) in the **interface sans at 14px with two lines always
   reserved** (`min-h-10`), so prices and buttons line up across a row; then a
-  **"From ₹X"** price (16px semibold, text colour), the MRP smaller and muted,
+  **"From ₹X"** price (16px semibold, text colour; "From" only when the
+  options really cost different amounts — `catalog.hasPriceRange`, also used
+  by the header search — so a shirt at ₹299 in every size reads "₹299"), the MRP smaller and muted,
   struck through, and **"N% off"** in the success colour beside it — in
   words, and only when `discountPercent` finds a real saving; then one quiet
   line — "Only a few left" in the warning colour when stock is low (the
@@ -2452,7 +2454,9 @@ is never shown a pickup-address item.
   (step, or step 3's inner screen) opens **at its top with nothing focused**,
   and the bottom buttons keep focus while pressed (`keepFocus`): a tap
   that first closed the phone keyboard made the bar jump and missed, so
-  Continue needed two taps. Fields carry **no grey example values** —
+  Continue needed two taps. A second press within 700ms is ignored (a double
+  tap never skips a step), and steps 3 and 5 show grey loading boxes — never
+  a blank screen — while they load. Fields carry **no grey example values** —
   sellers read "1499" or a sample description as already filled in — an
   example goes in the hint under the field. Each step is a stack of `Section`s
   (`wizard/shared.tsx`): a flat card with a header bar (28px icon tile +
@@ -2495,13 +2499,15 @@ is never shown a pickup-address item.
   colours when every value is a drawable colour (a small product-swatch map,
   data not theme tokens), else in three sizes) — sellers who met that question only at step 3 had
   named and photographed one colour and made a product per colour. The
-  answer (`VersionPlan`, wizard state only, never saved) changes step 2's
+  answer (`VersionPlan`, never saved on the product but kept on the device —
+  `wizard/localDraft.ts`, so a reopened draft still knows it) changes step 2's
   lead to "a photo of every colour" and pre-picks step 3's answer. A colour
   or weight typed into the name ("…saree, pink", "rice 5kg" —
   `choicesHelp.findNameHint`) gets a note with one-tap **Take "pink" out**
-  (also answers "Yes") or **No, keep the name**. Nothing here blocks
-  Continue; it is asked only while the product is unpriced and has no
-  choices; Continue creates the product as a **draft** on the
+  (also answers "Yes") or **No, keep the name**. The one-or-many answer is
+  **required** ("Tap “Just one” or “Many options” first.") — step 3 builds on
+  it and never asks again; the name note never blocks. Both are asked only
+  while the product is unpriced and has no options; Continue creates the product as a **draft** on the
   server, so every later step saves on Continue and "Finish later" always
   keeps what was done) · **2 Photos** (the shared Media Board on
   `useLiveMedia`, uploading straight onto the draft; with no photo a big
@@ -2567,9 +2573,16 @@ is never shown a pickup-address item.
   swatches are one sideways-scrolling row and the step strip drops its
   number circles under 360px. Then **Prices** — the
   `VariantMatrix` (a blank stock counts as 0, but ALL blank is refused —
-  `draftToInput` asks for counts and points at "Same stock for all"), whose
-  bulk tools ("Same price for all…", MRP, stock,
-  Turn all on) live in ONE sheet. From `sm` it is a table whose rows only
+  `draftToInput` asks for counts and points at "Same price for all…"), whose
+  bulk tools live in ONE sheet, **Same for all**: Price · Stock · MRP
+  (optional) boxes that open EMPTY every time (old text once turned "10"
+  into "1010"), one **Apply to all N** button for every filled box (a
+  per-box Apply let typed values vanish), "Turn all on" only when some are
+  paused, a toast saying what changed ("Price ₹299 and stock 10 set for all
+  6"), and — closing with numbers typed — **Use these for all?** (Apply to
+  all / Throw away). Empty price boxes are red (`data-needs-price`); a
+  "needs a price" error ("Add a price in every red box — 6 still empty.")
+  scrolls the first one into view. Stock boxes have no grey "0". From `sm` it is a table whose rows only
   SHOW their photo (read-only, column hidden when no row has one). **On a
   phone** rows are grouped by the look (a "Pink · 3 sizes" header with its
   photo, then S / M / L), each row only **Price** and **Stock** (44px) and a
@@ -2580,7 +2593,12 @@ is never shown a pickup-address item.
   photo box on every price card, pre-filled with the cover, that sellers did
   not know to tap.
   Saved as one `PUT …/options`; dropped saved options confirmed
-  first. In the editor an option is "Option 1: Size" with "Size options" as
+  first. **Step 3 never loses typed work:** the server only stores options
+  as priced variants, so until step 3's last Continue its draft (mode,
+  options and values, prices typed so far, the photo switch) is kept on the
+  device (`wizard/localDraft.ts`, localStorage `uniemax.productDraft.*`),
+  restored when the unpriced product is reopened and cleared once saved —
+  closing half-way used to come back to nothing. In the editor an option is "Option 1: Size" (an empty name box suggests a name not used yet — "e.g. Size" under a Colour option, never "e.g. Colour" again; a value box suggests "e.g. Red" for a colour, "e.g. 500 g" for a weight, else "e.g. S") with "Size options" as
   chips (`ChipInput`: the chips sit above, and the field with its **Add**
   button is one fixed row under them — Add never moves as chips wrap, and is
   always shown, greyed until something is typed; "Type, then press Enter or
@@ -2615,7 +2633,16 @@ is never shown a pickup-address item.
   only two requirements. Each missing one is FIRST a big `Notice` (icon,
   "Add 1 photo to show this product in your shop", one line why, and a
   full-width **Add a photo** / **Add a price** button that jumps to that
-  step); the checklist follows, moved **above** the card on a phone. A
+  step). The checklist is split: **Ready to publish ✓** counts only the two
+  required things (a "2/4" on a product that could go live made sellers
+  think they were not done), and **Make it better (optional)** lists
+  description and product facts, each with **Add**; moved **above** the card
+  on a phone while something required is missing. After **Publish to my
+  shop** the step becomes **Your product is live!** — a big tick, **Share
+  on WhatsApp** (`WhatsAppShareLink`, a ready message with the product
+  link), **Add another product** (the list page remounts a fresh wizard via
+  `onAddAnother`) and **Done** — instead of dropping back to the list
+  silently. A
   product with options lists **Price of each option** — every combination
   with its stock ("Sold out") and price, and **Change** back to step 3.
   **Save as draft** — and the header's close / Finish later on an unpublished
@@ -2670,7 +2697,8 @@ is never shown a pickup-address item.
   - **Camera first on touch devices** (`capture="environment"`), gallery
     second; on a pointer device only the gallery button shows.
   - **The crop question** (`ReviewQueue.tsx`): every picked photo stops on a
-    card showing it whole, with **Use this photo** as the primary button and
+    card showing it whole (no file name or size — technical details sellers
+    cannot act on), with **Use this photo** as the primary button and
     **Cut or turn it first** as the detour, plus "Use all N as they are" for a
     batch. Cropping is never applied without being asked for.
   - **One sheet per photo** (`PhotoSheet.tsx`), opened by tapping the tile:

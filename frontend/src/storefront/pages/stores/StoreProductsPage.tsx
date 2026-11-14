@@ -81,6 +81,8 @@ export function StoreProductsPage() {
   const [wizard, setWizard] = useState<{
     product: StoreProduct | null
     startAt: StepKey
+    /** Bumped by "Add another product" so a fresh wizard mounts. */
+    round?: number
   } | null>(null)
   const [toDelete, setToDelete] = useState<StoreProduct | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -343,7 +345,7 @@ export function StoreProductsPage() {
 
       {wizard ? (
         <ProductWizard
-          key={wizard.product?.id ?? 'new'}
+          key={`${wizard.product?.id ?? 'new'}-${wizard.round ?? 0}`}
           storeId={store.id}
           categories={categories}
           product={wizard.product}
@@ -358,6 +360,10 @@ export function StoreProductsPage() {
             setWizard(null)
             refreshStore?.()
             offers.reload()
+          }}
+          onAddAnother={() => {
+            refreshStore?.()
+            setWizard({ product: null, startAt: 'basics', round: (wizard.round ?? 0) + 1 })
           }}
           supplyOnly={supplyOnly}
         />

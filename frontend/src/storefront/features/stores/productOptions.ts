@@ -374,18 +374,18 @@ export function draftToInput(
   }))
   if (cartesianSize(optionTypes) > OPTION_LIMITS.variants) {
     return {
-      error: `That makes ${cartesianSize(optionTypes)} combinations — the limit is ${OPTION_LIMITS.variants}.`,
+      error: `That makes ${cartesianSize(optionTypes)} items to sell — the most is ${OPTION_LIMITS.variants}. Remove some values.`,
     }
   }
 
   const offered = rows.filter((row) => !row.removed)
   if (offered.length === 0) {
-    return { error: 'Offer at least one combination.' }
+    return { error: 'Sell at least one of them.' }
   }
   const missing = rowsNeedingPrice(rows)
   if (missing > 0) {
     return {
-      error: `${missing} combination${missing === 1 ? ' still needs' : 's still need'} a price.`,
+      error: `Add a price in every red box — ${missing} still empty.`,
     }
   }
   // A blank count is saved as 0, which is fine for one row — but when EVERY
@@ -394,7 +394,7 @@ export function draftToInput(
   if (offered.every((row) => row.stock.trim() === '')) {
     return {
       error:
-        'Enter how many you have of each choice. To fill them all at once, tap “Same price for all…” and use “Same stock for all”.',
+        'Enter the stock (how many you have) for each one. To fill all at once, tap “Same price for all…”.',
     }
   }
   const badStock = offered.find((row) => !isValidStock(row.stock))

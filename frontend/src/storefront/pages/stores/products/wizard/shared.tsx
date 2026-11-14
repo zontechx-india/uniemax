@@ -224,6 +224,16 @@ export function StepButtons({
   /** Wording for `skip` where "skip" would be unclear (e.g. "Save as draft"). */
   skipLabel?: string
 }) {
+  // One press = one move. A second tap while the step is still changing (or
+  // saving) is ignored, so a double tap never skips a step.
+  const lastPress = useRef(0)
+  const once = (action: () => void) => () => {
+    const now = Date.now()
+    if (now - lastPress.current < 700) return
+    lastPress.current = now
+    action()
+  }
+
   // A flush bar pinned to the bottom of a phone screen — Continue is always
   // under the thumb, however long the step — and an ordinary row from `sm` up.
   //
@@ -236,7 +246,7 @@ export function StepButtons({
     <footer className="sticky bottom-0 z-10 mt-auto flex flex-col gap-1.5 border-t border-line bg-surface px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:static sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:bg-transparent sm:px-0 sm:pt-4 sm:pb-0">
       <div className="flex items-center gap-2 sm:contents">
         {onBack && (
-          <Button type="button" variant="secondary" onMouseDown={keepFocus} onClick={onBack} disabled={busy} className="px-5">
+          <Button type="button" variant="secondary" onMouseDown={keepFocus} onClick={once(onBack)} disabled={busy} className="px-5">
             Back
           </Button>
         )}
@@ -244,7 +254,7 @@ export function StepButtons({
           type="button"
           variant={nextVariant}
           onMouseDown={keepFocus}
-          onClick={onNext}
+          onClick={once(onNext)}
           loading={busy}
           disabled={!canNext}
           className="min-w-0 flex-1 sm:flex-none sm:px-8"

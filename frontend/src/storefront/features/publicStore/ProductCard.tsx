@@ -10,7 +10,7 @@ import { ImageIcon } from '../../layout/icons'
 import { CardAction } from './CartControls'
 import { storeAuthRequest } from '../auth/authDialogStore'
 import { SaveButton } from '../wishlist/SaveButton'
-import { stockLevel } from './catalog'
+import { hasPriceRange, stockLevel } from './catalog'
 import type { Skin } from './storeTheme'
 import { MediaImg } from '../../../shared/media/MediaImg'
 import { displayName, plainLetters } from './shopShape'
@@ -358,7 +358,9 @@ export function PriceLabel({
   const off = discountPercent(product)
   return (
     <p className="flex flex-wrap items-baseline gap-x-1.5">
-      {product.variantCount > 0 && (
+      {/* "From" only when the options really cost different amounts — a
+          shirt at ₹299 in every size is just ₹299. */}
+      {hasPriceRange(product) && (
         <span className="text-xs text-muted">From</span>
       )}
       <span

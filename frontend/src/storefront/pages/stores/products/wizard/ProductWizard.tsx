@@ -4,18 +4,21 @@ import { createPortal } from 'react-dom'
 import { toApiError } from '../../../../../shared/auth/http'
 import { useMediaQuery } from '../../../../../shared/useMediaQuery'
 import { Dialog } from '../../../../../shared/ui/Dialog'
-import { formatPrice, storeCatalogApi } from '../../../../features/stores/storesApi'
+import { formatPrice, publicStoreUrl, storeCatalogApi } from '../../../../features/stores/storesApi'
 import type {
   StoreCategory,
   StoreProduct,
 } from '../../../../features/stores/storesApi'
-import { BoxIcon, CheckIcon, ChevronDownIcon, ClipboardIcon, CloseIcon, TagIcon } from '../../../../layout/icons'
+import { BoxIcon, CheckIcon, ChevronDownIcon, ClipboardIcon, CloseIcon, PlusIcon, StarIcon, TagIcon } from '../../../../layout/icons'
+import { useManagedStore } from '../../../../features/stores/useManagedStore'
+import { WhatsAppShareLink } from '../../ui/WhatsAppShareLink'
 import { BasicsStep } from './BasicsStep'
 import { DeliveryStep } from './DeliveryStep'
 import { DetailsStep } from './DetailsStep'
 import { PhotosStep } from './PhotosStep'
 import { PricingStep } from './PricingStep'
 import { categoryOptions, Notice, Section, StepButtons, StepError, stepLabel, STEPS, StepShell } from './shared'
+import { readLocalDraft, writeLocalDraft } from './localDraft'
 import { CameraIcon } from '../../media/icons'
 import type { StepKey, VersionPlan } from './shared'
 import { MediaImg } from '../../../../../shared/media/MediaImg'
@@ -61,6 +64,7 @@ export function ProductWizard({
   onCatalogChanged,
   onCategoriesChange,
   onClose,
+  onAddAnother,
   supplyOnly = false,
 }: {
   storeId: string
@@ -74,12 +78,21 @@ export function ProductWizard({
   /** A category was added from inside the wizard. */
   onCategoriesChange?: (categories: StoreCategory[]) => void
   onClose: () => void
+  /** "Add another product" on the success screen — opens a fresh wizard. */
+  onAddAnother?: () => void
   /** A supplier account: no shop to publish to — the last step offers the product to sellers (D-28). */
   supplyOnly?: boolean
 }) {
   const [product, setProduct] = useState<StoreProduct | null>(initial)
   const [step, setStep] = useState<StepKey>(initial ? startAt : 'basics')
-  const [plan, setPlan] = useState<VersionPlan>(null)
+  // The step-1 answer is wizard state, never saved on the product — so it is
+  // kept on this device too, and a reopened draft still knows it.
+  const [plan, setPlan] = useState<VersionPlan>(() =>
+    initial ? readLocalDraft<VersionPlan>(initial.id, 'plan') : null,
+  )
+  useEffect(() => {
+    if (product && plan) writeLocalDraft(product.id, 'plan', plan)
+  }, [product, plan])
   /** Step 3's screen in view ("Options", "Colour photos", "Price & stock"). */
   const [subLabel, setSubLabel] = useState<string | null>(null)
   const { supplied, setSupplied } = useSuppliedFor(storeId, product?.id)
@@ -215,7 +228,14 @@ export function ProductWizard({
           />
         )}
         {product && step === 'pricing' && (
-          supplied === undefined ? null : supplied ? (
+          supplied === undefined ? (
+            // Never a blank screen while the step loads — it read as "my tap did nothing".
+            <div aria-busy="true" aria-label="Loading" className="space-y-3 px-4 sm:px-0">
+              {[0, 1, 2].map((n) => (
+                <div key={n} className="h-20 animate-pulse rounded-lg bg-fg/5" />
+              ))}
+            </div>
+          ) : supplied ? (
             <SuppliedPricingStep
               storeId={storeId}
               product={product}
@@ -257,7 +277,13 @@ export function ProductWizard({
           />
         )}
         {product && step === 'delivery' && (
-          supplied === undefined ? null : supplied ? (
+          supplied === undefined ? (
+            <div aria-busy="true" aria-label="Loading" className="space-y-3 px-4 sm:px-0">
+              {[0, 1].map((n) => (
+                <div key={n} className="h-20 animate-pulse rounded-lg bg-fg/5" />
+              ))}
+            </div>
+          ) : supplied ? (
             <SuppliedDeliveryStep
               product={product}
               supplied={supplied}
@@ -285,6 +311,7 @@ export function ProductWizard({
             onJump={setStep}
             onDone={onClose}
             onDraft={closeAsDraft}
+            onAddAnother={onAddAnother}
             supplyOnly={supplyOnly}
           />
         )}
@@ -476,6 +503,7 @@ function ReviewStep({
   onJump,
   onDone,
   onDraft,
+  onAddAnother,
   supplyOnly,
 }: {
   storeId: string
@@ -487,10 +515,14 @@ function ReviewStep({
   onDone: () => void
   /** "Save as draft": leave, saying it was kept. */
   onDraft: () => void
+  onAddAnother?: () => void
   supplyOnly: boolean
 }) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  /** Just published: the "Your product is live!" screen. */
+  const [live, setLive] = useState(false)
+  const { store } = useManagedStore()
   const offer = useSupplyItem(storeId, product.id, supplyOnly)
   const [draft, setDraft] = useState<OfferDraft | null>(null)
   if (offer.item && draft === null) setDraft(offerDraftOf(offer.item))
@@ -508,7 +540,10 @@ function ReviewStep({
     setBusy(true)
     try {
       onSaved(await storeCatalogApi.updateProduct(storeId, product.id, { isActive: true }))
-      onDone()
+      // A moment to celebrate and the two things sellers do next — share
+      // it, or add the next one — instead of dropping back to the list.
+      setLive(true)
+      setBusy(false)
     } catch (err) {
       setError(toApiError(err).message)
       setBusy(false)
@@ -552,7 +587,35 @@ function ReviewStep({
         required: 'Needed',
         price: 'A selling price',
       }
-  const doneCount = CHECKS.filter((check) => !missing.has(check.key)).length
+  const requiredDone = CHECKS.filter((check) => check.required && !missing.has(check.key)).length
+
+  if (live) {
+    const url = `${publicStoreUrl(store.slug)}/product/${product.slug}`
+    const message = `🛍️ ${product.name}${product.price ? ` — ${formatPrice(product.price)}` : ''}\n\nOrder here 👉 ${url}`
+    return (
+      <StepShell title="Your product is live!">
+        <div className="flex flex-col items-center px-4 pt-4 pb-2 text-center">
+          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-success text-brand-contrast">
+            <CheckIcon className="h-9 w-9" />
+          </span>
+          <p className="mt-3 text-xl font-bold text-fg">Your product is live!</p>
+          <p className="mt-1 text-base text-muted">Customers can see and buy {product.name} now.</p>
+        </div>
+        <div className="space-y-2.5 px-4 sm:px-0">
+          <WhatsAppShareLink href={`https://wa.me/?text=${encodeURIComponent(message)}`} />
+          {onAddAnother && (
+            <Button type="button" variant="secondary" size="lg" full onClick={onAddAnother}>
+              <PlusIcon className="h-5 w-5" />
+              Add another product
+            </Button>
+          )}
+          <Button type="button" variant="ghost" size="lg" full onClick={onDone}>
+            Done
+          </Button>
+        </div>
+      </StepShell>
+    )
+  }
 
   const blockers = CHECKS.filter((check) => check.required && missing.has(check.key))
 
@@ -645,18 +708,27 @@ function ReviewStep({
         {/* What still blocks publishing comes FIRST on a phone, so the
             greyed-out Publish button always has its reason in view. */}
         <div className={!canPublish && !product.isActive ? 'order-first lg:order-none' : ''}>
+          {/* Only what is REQUIRED decides "ready": "Checklist 2/4" on a
+              product that could go live made sellers think they weren't done.
+              The rest is "Make it better", clearly optional. */}
           <Section
-            title={canPublish || product.isActive ? 'Checklist' : words.needed}
+            title={canPublish ? (supplyOnly ? 'Ready to offer' : 'Ready to publish') : words.needed}
             icon={ClipboardIcon}
             aside={
-              <span className="text-xs font-semibold text-muted">
-                {doneCount}/{CHECKS.length}
-              </span>
+              canPublish ? (
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-success text-brand-contrast">
+                  <CheckIcon className="h-4 w-4" />
+                </span>
+              ) : (
+                <span className="text-sm font-semibold text-muted">
+                  {requiredDone}/{CHECKS.filter((check) => check.required).length}
+                </span>
+              )
             }
             flush
           >
             <ul className="divide-y divide-line">
-              {CHECKS.map((check) => {
+              {CHECKS.filter((check) => check.required).map((check) => {
                 const done = !missing.has(check.key)
                 return (
                   <li key={check.key} className="flex min-h-14 items-center gap-2.5 px-4 py-2">
@@ -693,6 +765,32 @@ function ReviewStep({
               })}
             </ul>
           </Section>
+          <div className="mt-2 sm:mt-3">
+            <Section title="Make it better (optional)" icon={StarIcon} flush>
+              <ul className="divide-y divide-line">
+                {CHECKS.filter((check) => !check.required).map((check) => {
+                  const done = !missing.has(check.key)
+                  return (
+                    <li key={check.key} className="flex min-h-14 items-center gap-2.5 px-4 py-2">
+                      <span
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+                          done ? 'bg-success text-brand-contrast' : 'ws-well text-muted'
+                        }`}
+                      >
+                        {done ? <CheckIcon className="h-3.5 w-3.5" /> : '·'}
+                      </span>
+                      <span className={`min-w-0 flex-1 text-sm ${done ? 'text-fg' : 'text-muted'}`}>{check.label}</span>
+                      {!done && (
+                        <Button type="button" onClick={() => onJump(check.step)} variant="secondary" size="sm" className="px-3.5">
+                          Add
+                        </Button>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            </Section>
+          </div>
         </div>
       </div>
 

@@ -107,6 +107,8 @@ export function BasicsStep({
   const next = async () => {
     if (!name.trim()) return setError('Give the product a name first.')
     if (!categoryId) return setError('Choose the sub-category it belongs in — tap one under Category.')
+    // One question, answered once: step 3 builds on it and never asks again.
+    if (askPlan && plan === null) return setError('Tap “Just one” or “Many options” first.')
     setError(null)
 
     const unchanged =

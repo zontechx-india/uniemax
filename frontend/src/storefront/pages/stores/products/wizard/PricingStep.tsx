@@ -14,6 +14,7 @@ import {
   draftToInput,
   newKey,
   reconcileDraft,
+  rowsNeedingPrice,
   toDraft,
 } from '../../../../features/stores/productOptions'
 import type {
@@ -42,6 +43,7 @@ import {
 } from './VariantPhotos'
 import { ChoicesPreview, exampleChoice, listWords, VersionCard } from './choicesHelp'
 import { Field, Hint, inputClass, MoneyInput, Section, StepButtons, StepError, StepShell, Stepper } from './shared'
+import { clearLocalDraft, readLocalDraft, writeLocalDraft } from './localDraft'
 import type { StepKey, VersionPlan } from './shared'
 
 /** null = not answered yet: a new, unpriced product starts with no answer picked. */
@@ -112,7 +114,13 @@ export function PricingStep({
   onBack: () => void
   onNext: () => void
 }) {
+  // Not yet priced or split on the server: what the seller typed here last
+  // time (kept on this device — `localDraft.ts`) comes back.
+  const fresh =
+    !product.hasVariants && product.groups.length === 0 && !(Number(product.defaultVariant?.price ?? 0) > 0)
+  const [restored] = useState(() => (fresh ? readLocalDraft<LocalPricing>(product.id, 'pricing') : null))
   const [mode, setMode] = useState<Mode>(() => {
+    if (restored?.mode) return restored.mode
     if (product.hasVariants || product.groups.length > 0) return 'options'
     if (Number(product.defaultVariant?.price ?? 0) > 0) return 'single'
     return plan === 'many' ? 'options' : plan === 'one' ? 'single' : null
@@ -122,19 +130,23 @@ export function PricingStep({
 
   // Single version — the implicit Default variant's four numbers.
   const base = product.defaultVariant
-  const [price, setPrice] = useState(base && Number(base.price) > 0 ? base.price : '')
-  const [compareAt, setCompareAt] = useState(base?.compareAtPrice ?? '')
+  const [price, setPrice] = useState(restored?.price ?? (base && Number(base.price) > 0 ? base.price : ''))
+  const [compareAt, setCompareAt] = useState(restored?.compareAt ?? base?.compareAtPrice ?? '')
   // A draft that was never priced starts with an EMPTY count, not the
   // server's 0: a prefilled 0 got saved untouched and the product went live
   // as sold out.
   const [stock, setStock] = useState(
-    base && Number(base.price) > 0 ? String(base.stockQuantity) : '',
+    restored?.stock ?? (base && Number(base.price) > 0 ? String(base.stockQuantity) : ''),
   )
-  const [sku, setSku] = useState(base?.sku ?? '')
+  const [sku, setSku] = useState(restored?.sku ?? base?.sku ?? '')
 
   // With choices — typed options (the matrix), families, and the order the
   // seller sees the cards in.
   const [initial] = useState(() => {
+    if (restored && restored.types.length > 0) {
+      const d = { types: restored.types, rows: restored.rows }
+      return { d, g: [] as GroupDraft[], order: d.types.map((t) => t.key) }
+    }
     const d = toDraft(product)
     const g = toGroupDrafts(product)
     return { d, g, order: [...d.types.map((t) => t.key), ...g.map((x) => x.key)] }
@@ -156,9 +168,22 @@ export function PricingStep({
   /** The value Continue stopped at on the Photos screen. */
   const [missingPhoto, setMissingPhoto] = useState<string | null>(null)
   /** "Same photos for all colours" — no lists; every photo shows with every colour. */
-  const [samePhotos, setSamePhotos] = useState(() =>
-    initiallySame(initial.d.rows),
-  )
+  const [samePhotos, setSamePhotos] = useState(() => restored?.samePhotos ?? initiallySame(initial.d.rows))
+
+  // Keep the unsaved work on this device on every change (cleared on save).
+  useEffect(() => {
+    if (!fresh || mode === null) return
+    writeLocalDraft(product.id, 'pricing', {
+      mode,
+      types: draft.types,
+      rows: draft.rows,
+      samePhotos,
+      price,
+      compareAt,
+      stock,
+      sku,
+    } satisfies LocalPricing)
+  }, [fresh, product.id, mode, draft, samePhotos, price, compareAt, stock, sku])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -351,6 +376,7 @@ export function PricingStep({
     setBusy(true)
     try {
       let saved = await writeSingle(fields)
+      clearLocalDraft(product.id, 'pricing')
       onSaved(saved)
       if (product.groups.length > 0) {
         saved = await storeCatalogApi.replaceProductGroups(storeId, product.id, { groups: [] })
@@ -365,13 +391,27 @@ export function PricingStep({
     }
   }
 
+  /** After a "needs a price" error, bring the first empty (red) price box into view. */
+  const pointAtEmptyPrice = () =>
+    window.setTimeout(() => {
+      const box = [...document.querySelectorAll<HTMLElement>('[data-needs-price]')].find(
+        (el) => el.offsetParent !== null,
+      )
+      box?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }, 400)
+
   const saveOptions = async () => {
     const problem = validateOptions(draft, groups)
-    if (problem) return setError(problem)
+    if (problem) {
+      setError(problem)
+      if (rowsNeedingPrice(draft.rows) > 0) pointAtEmptyPrice()
+      return
+    }
     setError(null)
     setBusy(true)
     try {
       await persist(draft, groups)
+      clearLocalDraft(product.id, 'pricing')
       onNext()
     } catch (err) {
       setError(toApiError(err).message)
@@ -833,6 +873,18 @@ export function PricingStep({
       />
     </StepShell>
   )
+}
+
+/** Step 3's unsaved work as kept on this device. */
+type LocalPricing = {
+  mode: Mode
+  types: OptionTypeDraft[]
+  rows: VariantDraft[]
+  samePhotos: boolean
+  price: string
+  compareAt: string
+  stock: string
+  sku: string
 }
 
 /** "colour" → "Colour", for screen names built from an option name. */

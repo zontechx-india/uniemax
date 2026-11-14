@@ -105,7 +105,7 @@ export function SpecificationsEditor({
         Add a fact
       </button>
       <p className="mt-1.5 text-hint text-muted">
-        Like Material: Cotton. Sizes and colours go in the Price step.
+        Like Material: Cotton. Sizes and colours go in step 3, Price & stock.
       </p>
     </div>
   )

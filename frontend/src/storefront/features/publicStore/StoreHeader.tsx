@@ -25,6 +25,7 @@ import { AccountMenu } from '../../layout/AccountMenu'
 import { Avatar } from '../../layout/Avatar'
 import { useSignOutConfirm } from '../../layout/useSignOutConfirm'
 import { openAuthDialog, storeAuthRequest } from '../auth/authDialogStore'
+import { hasPriceRange } from './catalog'
 import { ShareButton } from './ShareButton'
 import { ContactActions, shopContact } from './ShopContact'
 import { HEADER_ICON_BUTTON, STORE_CONTAINER } from './storeLayout'
@@ -642,7 +643,7 @@ function SearchBox({
                       </span>
                       {product.price !== null && (
                         <span className="block text-sm font-bold text-brand">
-                          {product.variantCount > 0 ? 'From ' : ''}
+                          {hasPriceRange(product) ? 'From ' : ''}
                           {formatPrice(product.price)}
                         </span>
                       )}

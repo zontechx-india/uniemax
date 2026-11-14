@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Dialog } from '../../../../shared/ui/Dialog'
+import { ConfirmDialog } from '../../../../shared/ui/ConfirmDialog'
+import { showToast } from '../ui'
 import { Button, buttonClass } from '../../../../shared/ui/Button'
 import { BigSwitch } from '../ui/BigSwitch'
 import {
@@ -36,7 +38,12 @@ import { MediaImg } from '../../../../shared/media/MediaImg'
  * Bulk helpers exist because a 6 × 4 matrix is 24 prices to type and most of
  * them are the same. They live in ONE sheet ("Same price for all…")
  * rather than a panel above the list, where four bulk fields and two
- * selects pushed the actual prices a screen down on a phone.
+ * selects pushed the actual prices a screen down on a phone. The sheet opens
+ * EMPTY every time (old text left in it once turned "10" into "1010"), and
+ * has ONE "Apply to all" button for every filled box — a per-box Apply let
+ * a typed stock vanish when the sheet was closed. Closing with typed numbers
+ * asks "Use these for all?" instead of dropping them; applying closes the
+ * sheet and says what changed ("Price ₹299 and stock 10 set for all 6").
  *
  * On a phone the rows are GROUPED by the look (a "Pink" header with its
  * photo, then S, M, L under it) and each row has only the two fields every
@@ -62,6 +69,8 @@ export function VariantMatrix({
   const [bulkMrp, setBulkMrp] = useState('')
   const [bulkStock, setBulkStock] = useState('')
   const [bulkOpen, setBulkOpen] = useState(false)
+  /** Closing the sheet with numbers typed in it — ask, don't drop them. */
+  const [confirmClose, setConfirmClose] = useState(false)
 
   const patchRow = (index: number, patch: Partial<VariantDraft>) =>
     onChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)))
@@ -70,6 +79,39 @@ export function VariantMatrix({
 
   const offered = rows.filter((row) => !row.removed)
   const removed = rows.filter((row) => row.removed)
+  const bulkTyped = [bulkPrice, bulkMrp, bulkStock].some((v) => v.trim() !== '')
+
+  const openBulk = () => {
+    setBulkPrice('')
+    setBulkMrp('')
+    setBulkStock('')
+    setBulkOpen(true)
+  }
+  /** Every filled box, to every row on sale — then close and say what changed. */
+  const applyBulk = () => {
+    const patch: Partial<VariantDraft> = {}
+    const said: string[] = []
+    if (bulkPrice.trim()) {
+      patch.price = bulkPrice.trim()
+      said.push(`price ₹${bulkPrice.trim()}`)
+    }
+    if (bulkMrp.trim()) {
+      patch.compareAt = bulkMrp.trim()
+      said.push(`MRP ₹${bulkMrp.trim()}`)
+    }
+    if (bulkStock.trim()) {
+      patch.stock = bulkStock.trim()
+      said.push(`stock ${bulkStock.trim()}`)
+    }
+    if (said.length > 0) {
+      setOffered(patch)
+      const text = said.join(' and ')
+      showToast(`${text[0]!.toUpperCase()}${text.slice(1)} set for all ${offered.length}`)
+    }
+    setConfirmClose(false)
+    setBulkOpen(false)
+  }
+  const closeBulk = () => (bulkTyped ? setConfirmClose(true) : setBulkOpen(false))
   const missing = rowsNeedingPrice(rows)
   const photoOf = (row: VariantDraft) =>
     row.mediaIds[0] ? (media.find((item) => item.id === row.mediaIds[0]) ?? null) : null
@@ -97,7 +139,7 @@ export function VariantMatrix({
       {/* Bulk helpers — one number for the whole list, then only the exceptions. */}
       <button
         type="button"
-        onClick={() => setBulkOpen(true)}
+        onClick={openBulk}
         disabled={disabled}
         aria-haspopup="dialog"
         className={buttonClass({ variant: 'secondary', size: 'md', className: 'w-full sm:w-auto' })}
@@ -107,59 +149,70 @@ export function VariantMatrix({
       </button>
       <Dialog
         open={bulkOpen}
-        title="Fill in all at once"
-        subtitle="Type once, then tap Apply. Change any single one afterwards."
-        onClose={() => setBulkOpen(false)}
+        title="Same for all"
+        subtitle={`Fill only what is the same for all ${offered.length}. You can change any one later.`}
+        onClose={closeBulk}
+        footer={
+          <Button variant="primary" size="lg" full disabled={disabled || !bulkTyped} onClick={applyBulk}>
+            Apply to all {offered.length}
+          </Button>
+        }
       >
       <div className="space-y-4">
         <div className="grid gap-4">
           <BulkField
-            label="Same price for all (₹)"
+            label="Price for all (₹)"
             value={bulkPrice}
             onChange={(v) => setBulkPrice(cleanAmount(v))}
-            placeholder="₹"
             inputMode="decimal"
             disabled={disabled}
             inputClass={inputClass}
-            buttonClass={helperButton}
             labelClass={helperLabel}
-            onApply={() => setOffered({ price: bulkPrice.trim() })}
           />
           <BulkField
-            label="Same printed price / MRP for all (₹)"
-            value={bulkMrp}
-            onChange={(v) => setBulkMrp(cleanAmount(v))}
-            placeholder="₹"
-            inputMode="decimal"
-            disabled={disabled}
-            inputClass={inputClass}
-            buttonClass={helperButton}
-            labelClass={helperLabel}
-            onApply={() => setOffered({ compareAt: bulkMrp.trim() })}
-          />
-          <BulkField
-            label="Same stock for all"
+            label="Stock for all"
             value={bulkStock}
             onChange={(v) => setBulkStock(cleanCount(v))}
-            placeholder="Qty"
             inputMode="numeric"
             disabled={disabled}
             inputClass={inputClass}
-            buttonClass={helperButton}
             labelClass={helperLabel}
-            onApply={() => setOffered({ stock: bulkStock.trim() })}
           />
-          <button
-            type="button"
-            onClick={() => setOffered({ isActive: true })}
-            disabled={disabled || offered.every((row) => row.isActive)}
-            className={`${helperButton} w-full`}
-          >
-            Turn all on
-          </button>
+          <BulkField
+            label="MRP for all (₹) — optional"
+            value={bulkMrp}
+            onChange={(v) => setBulkMrp(cleanAmount(v))}
+            inputMode="decimal"
+            disabled={disabled}
+            inputClass={inputClass}
+            labelClass={helperLabel}
+          />
+          {!offered.every((row) => row.isActive) && (
+            <button
+              type="button"
+              onClick={() => setOffered({ isActive: true })}
+              disabled={disabled}
+              className={`${helperButton} w-full`}
+            >
+              Turn all on
+            </button>
+          )}
         </div>
       </div>
       </Dialog>
+      <ConfirmDialog
+        open={confirmClose}
+        title="Use these for all?"
+        description="You typed numbers but did not tap Apply."
+        confirmLabel={`Apply to all ${offered.length}`}
+        cancelLabel="Throw away"
+        tone="neutral"
+        onConfirm={applyBulk}
+        onCancel={() => {
+          setConfirmClose(false)
+          setBulkOpen(false)
+        }}
+      />
 
       {/* sm+: table */}
       <div className="hidden overflow-x-auto rounded-md border border-line sm:block bg-surface">
@@ -215,6 +268,7 @@ export function VariantMatrix({
                       inputMode="decimal"
                       placeholder="Required"
                       disabled={disabled}
+                      data-needs-price={row.price.trim() === '' ? '' : undefined}
                       aria-label={`Price for ${draftLabel(types, row)}`}
                       className={`${inputClass} w-28 ${
                         row.price.trim() === '' ? 'border-danger/60' : ''
@@ -237,7 +291,6 @@ export function VariantMatrix({
                       value={row.stock}
                       onChange={(e) => patchRow(index, { stock: cleanCount(e.target.value) })}
                       inputMode="numeric"
-                      placeholder="0"
                       disabled={disabled}
                       aria-label={`Stock for ${draftLabel(types, row)}`}
                       className={`${inputClass} w-20`}
@@ -318,7 +371,7 @@ export function VariantMatrix({
             </span>
           </>
         )}
-        . Your shop shows the lowest price as “from ₹…”.
+        . If the prices are different, your shop shows the lowest as “From ₹…”.
       </p>
     </div>
   )
@@ -337,52 +390,34 @@ function RowPhoto({ url }: { url: string | null }) {
   )
 }
 
+/** One box of the "Same for all" sheet — no button of its own; the sheet applies them together. */
 function BulkField({
   label,
   value,
   onChange,
-  placeholder,
   inputMode,
   disabled,
   inputClass,
-  buttonClass,
   labelClass,
-  onApply,
 }: {
   label: string
   value: string
   onChange: (value: string) => void
-  placeholder: string
   inputMode: 'decimal' | 'numeric'
   disabled: boolean
   inputClass: string
-  buttonClass: string
   labelClass: string
-  onApply: () => void
 }) {
   return (
     <label className="block min-w-0">
       <span className={labelClass}>{label}</span>
-      <div className="flex gap-2">
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          inputMode={inputMode}
-          placeholder={placeholder}
-          disabled={disabled}
-          className={`${inputClass} min-w-0`}
-        />
-        <button
-          type="button"
-          onClick={() => {
-            if (value.trim()) onApply()
-          }}
-          disabled={disabled || !value.trim()}
-          className={buttonClass}
-        >
-          Apply
-        </button>
-      </div>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        inputMode={inputMode}
+        disabled={disabled}
+        className={`${inputClass} min-w-0`}
+      />
     </label>
   )
 }
@@ -490,6 +525,7 @@ function PhoneList({
                       inputMode="decimal"
                       placeholder="₹"
                       disabled={disabled}
+                      data-needs-price={row.price.trim() === '' ? '' : undefined}
                       aria-label={`Price for ${full}`}
                       className={`${inputClass} px-2 ${row.price.trim() === '' ? 'border-danger/60' : ''}`}
                     />
@@ -497,7 +533,6 @@ function PhoneList({
                       value={row.stock}
                       onChange={(e) => patchRow(index, { stock: cleanCount(e.target.value) })}
                       inputMode="numeric"
-                      placeholder="0"
                       disabled={disabled}
                       aria-label={`Stock for ${full}`}
                       className={`${inputClass} px-2`}

@@ -23,9 +23,9 @@ import { Button } from '../../../../shared/ui/Button'
 
 /** Everything the editor edits, changed together so the cards stay one list. */
 export interface OptionsDraft {
-  /** Typed options — their values become variants inside this product. */
+  /** Typed options â€” their values become variants inside this product. */
   types: OptionTypeDraft[]
-  /** Products options — their values are other products of the store. */
+  /** Products options â€” their values are other products of the store. */
   groups: GroupDraft[]
   /** Card keys in display order (a key belongs to one of the two lists). */
   order: string[]
@@ -34,20 +34,20 @@ export interface OptionsDraft {
 type Kind = 'typed' | 'products'
 
 /**
- * The seller's options — up to three, each one of two kinds:
+ * The seller's options â€” up to three, each one of two kinds:
  *
- *   - **Type the values** — "Size: S, M, L". The values become variants of
+ *   - **Type the values** â€” "Size: S, M, L". The values become variants of
  *     THIS product, each with its own price and stock (the matrix below).
- *   - **Other products** — "Colour: Maroon (this one), Blue, Tan". The values
+ *   - **Other products** â€” "Colour: Maroon (this one), Blue, Tan". The values
  *     are other products of the store, each a full product with its own
  *     photos, price and variants; this card only ties them into a family.
  *
- * Both kinds sit in one ordered list, and a card can switch kind in place —
+ * Both kinds sit in one ordered list, and a card can switch kind in place â€”
  * "Colour" typed by mistake becomes "Colour" from products without retyping.
  * The parent owns every list and reconciles the matrix on each change.
  *
  * In the seller's words the first kind is simply a **choice** ("Choice 1:
- * Size — S, M, L"). The second is an ADVANCED path, behind "More ways to add
+ * Size â€” S, M, L"). The second is an ADVANCED path, behind "More ways to add
  * choices": "Typed here / Other products" side by side on every card was the
  * most abstract decision in the whole product flow, and most sellers only
  * ever need the first.
@@ -61,11 +61,11 @@ export function OptionTypesEditor({
   disabled = false,
 }: {
   draft: OptionsDraft
-  /** The product being edited — always a member of its own families. */
+  /** The product being edited â€” always a member of its own families. */
   product: StoreProduct
   storeId: string
   onChange: (next: OptionsDraft) => void
-  /** "Create new product for this value" — the parent copies, groups and switches. */
+  /** "Create new product for this value" â€” the parent copies, groups and switches. */
   onCreateMember: (groupKey: string, value: string, name: string) => void
   disabled?: boolean
 }) {
@@ -142,13 +142,20 @@ export function OptionTypesEditor({
     })
   }
 
-  const placeholders = ['e.g. Size', 'e.g. Colour', 'e.g. Material']
+  // Each empty name box suggests a name NOT already used â€” the second box
+  // said "e.g. Colour" right under a Colour option.
+  const usedNames = new Set(
+    [...types.map((t) => t.name), ...groups.map((g) => g.name)].map((n) => n.trim().toLowerCase()),
+  )
+  const freeNames = ['Size', 'Colour', 'Weight', 'Material', 'Pack'].filter(
+    (name) => !usedNames.has(name.toLowerCase()),
+  )
 
   return (
     <div className="space-y-3">
       {cards.map(({ key, kind }, index) => {
         const label = `Option ${index + 1}`
-        const placeholder = placeholders[index] ?? 'Name'
+        const placeholder = freeNames[0] ? `e.g. ${freeNames[0]}` : 'Name'
 
         if (kind === 'typed') {
           const type = types.find((t) => t.key === key)!
@@ -169,7 +176,7 @@ export function OptionTypesEditor({
                 <ChipInput
                     label={type.name.trim() ? `${type.name.trim()} options` : 'Options to pick from'}
                     items={type.values}
-                    placeholder="e.g. S"
+                    placeholder={/colou?r|shade/i.test(type.name) ? 'e.g. Red' : /weight/i.test(type.name) ? 'e.g. 500 g' : 'e.g. S'}
                     maxItems={OPTION_LIMITS.valuesPerType}
                     maxLength={OPTION_LIMITS.nameLength}
                     disabled={disabled}
@@ -347,7 +354,7 @@ export function OptionTypesEditor({
                   </button>
                 </div>
                 {!name && (
-                  <p className="text-hint text-muted">Type a name above first, like “Colour”.</p>
+                  <p className="text-hint text-muted">Type a name above first, like â€œColourâ€.</p>
                 )}
                 <p className="text-hint text-muted">
                   Each keeps its own photos, price and stock.
@@ -417,11 +424,11 @@ export function OptionTypesEditor({
         {/* The limit is only news once it is reached. */}
         {full && (
           <p className="text-hint text-muted">
-            Up to {OPTION_LIMITS.types} options — remove one to add another.
+            Up to {OPTION_LIMITS.types} options â€” remove one to add another.
           </p>
         )}
 
-        {/* The advanced path — linking separate products — stays out of the
+        {/* The advanced path â€” linking separate products â€” stays out of the
             way until asked for. */}
         <Button variant="ghost"
           onClick={() => setAdvanced((open) => !open)}
@@ -485,7 +492,7 @@ export function OptionTypesEditor({
 }
 
 /**
- * Remove — with the word on it (a bare bin icon was the most-missed meaning
+ * Remove â€” with the word on it (a bare bin icon was the most-missed meaning
  * in the flow). `small` is the member-row version: icon-only at 44px, since
  * its row already names the product it removes.
  */

@@ -7,6 +7,8 @@
  * selection before it is sent to the API, and how a stock number is presented.
  */
 
+import type { PublicProduct } from '../stores/storesApi'
+
 export type StockLevel = 'in' | 'low' | 'out'
 
 /** Below this (but above 0) total stock a product reads as "Low Stock". */
@@ -42,4 +44,14 @@ export function activeFilterCount(filters: CatalogFilters): number {
   if (filters.minPrice !== null) n += 1
   if (filters.maxPrice !== null) n += 1
   return n
+}
+
+/** True when a product's options sell at different prices ("From ₹299"). */
+export function hasPriceRange(product: Pick<PublicProduct, 'price' | 'priceMax' | 'variantCount'>): boolean {
+  return (
+    product.variantCount > 0 &&
+    product.price !== null &&
+    product.priceMax !== null &&
+    Number(product.priceMax) > Number(product.price)
+  )
 }
