@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Dialog } from '../../../../shared/ui/Dialog'
 import { Button } from '../../../../shared/ui/Button'
 import { taxonomyApi, formatPath } from '../../../../shared/categories/taxonomyApi'
 import type { CategoryNode } from '../../../../shared/categories/taxonomyApi'
-import { CheckIcon, PlusIcon, SearchIcon } from '../../../layout/icons'
+import { CheckIcon, ChevronRightIcon, PlusIcon, SearchIcon } from '../../../layout/icons'
 
 /**
  * Choosing what you sell: the seller's way into the platform category list.
@@ -23,6 +23,12 @@ import { CheckIcon, PlusIcon, SearchIcon } from '../../../layout/icons'
  * One tap on a row adds it (there is one answer, so there are no checkboxes
  * and no Apply button). Search sits on top (most sellers type "saree") and,
  * while typing, replaces both columns with one list of hits and their paths.
+ * A hit that has categories inside it (Electrical, Fashion › Women) does NOT
+ * add on tap: it OPENS — the search clears, the left column jumps to its main
+ * category and the right column scrolls to it, so the seller still picks the
+ * sub-category. Adding a whole group stays one step further ("Add all of …"),
+ * because a group added from a search hit left sellers with no sub-category
+ * to choose in the product wizard.
  * Categories the shop already has are ticked and can't be picked twice.
  * `busy` keeps the sheet open with a spinner on the tapped row while the
  * caller adds the pick.
@@ -56,6 +62,9 @@ export function CategoryChooserSheet({
   const [searchError, setSearchError] = useState(false)
   const [pickedId, setPickedId] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
+  /** A group opened from a search hit: scrolled to and highlighted. */
+  const [focusId, setFocusId] = useState<string | null>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
 
   // Fresh every time it opens: no search, back on the starting main category.
   useEffect(() => {
@@ -64,7 +73,16 @@ export function CategoryChooserSheet({
     setResults(null)
     setRootId(null)
     setPickedId(null)
+    setFocusId(null)
   }, [open])
+
+  // Bring the opened group into view once the right column has drawn it.
+  useEffect(() => {
+    if (!focusId) return
+    panelRef.current
+      ?.querySelector(`[data-group="${focusId}"]`)
+      ?.scrollIntoView({ block: 'start' })
+  }, [focusId, rootId])
 
   // The whole tree, once per page visit (it rarely changes).
   useEffect(() => {
@@ -105,6 +123,13 @@ export function CategoryChooserSheet({
   const pick = (node: CategoryNode) => {
     setPickedId(node.id)
     onPick(node)
+  }
+  /** A search hit with categories inside: show it in the columns instead of adding it. */
+  const openGroup = (node: CategoryNode) => {
+    setRootId(node.path[0]?.id ?? node.id)
+    setFocusId(node.parentId ? node.id : null)
+    setQuery('')
+    setResults(null)
   }
   const rowProps = (node: CategoryNode) => ({
     node,
@@ -164,7 +189,19 @@ export function CategoryChooserSheet({
             <ul className="divide-y divide-line">
               {results.map((node) => (
                 <li key={node.id}>
-                  <Row {...rowProps(node)} path={formatPath(node)} />
+                  {node.childCount > 0 ? (
+                    <Row
+                      node={node}
+                      added={false}
+                      disabled={false}
+                      spinning={false}
+                      opens
+                      path={`${formatPath(node)} · ${node.childCount} inside`}
+                      onTap={() => openGroup(node)}
+                    />
+                  ) : (
+                    <Row {...rowProps(node)} path={formatPath(node)} />
+                  )}
                 </li>
               ))}
             </ul>
@@ -189,7 +226,10 @@ export function CategoryChooserSheet({
                   type="button"
                   role="tab"
                   aria-selected={on}
-                  onClick={() => setRootId(r.id)}
+                  onClick={() => {
+                    setRootId(r.id)
+                    setFocusId(null)
+                  }}
                   className={`flex min-h-14 w-full items-center gap-1.5 border-b border-l-4 border-b-line px-3 py-2 text-left text-sm break-words transition-colors ${
                     on
                       ? 'border-l-brand bg-surface font-semibold text-brand'
@@ -208,15 +248,30 @@ export function CategoryChooserSheet({
             })}
           </div>
 
-          <div key={root.id} role="tabpanel" aria-label={root.name} className="min-w-0 flex-1 overflow-y-auto">
+          <div
+            key={root.id}
+            ref={panelRef}
+            role="tabpanel"
+            aria-label={root.name}
+            className="min-w-0 flex-1 overflow-y-auto"
+          >
             {root.children.length === 0 ? (
               <Row {...rowProps(root)} />
             ) : (
               <>
                 {groupsOf(root).map((group) => (
-                  <section key={group.id} aria-label={group.label || root.name} className="pb-1">
+                  <section
+                    key={group.id}
+                    data-group={group.id}
+                    aria-label={group.label || root.name}
+                    className={`pb-1 ${group.id === focusId ? 'bg-brand-soft/40' : ''}`}
+                  >
                     {group.label && (
-                      <p className="flex items-center gap-2 px-4 pt-4 pb-1 text-xs font-semibold tracking-wide text-muted uppercase">
+                      <p
+                        className={`flex items-center gap-2 px-4 pt-4 pb-1 text-xs font-semibold tracking-wide uppercase ${
+                          group.id === focusId ? 'text-brand' : 'text-muted'
+                        }`}
+                      >
                         {group.label}
                         <span aria-hidden className="h-px flex-1 bg-line" />
                       </p>
@@ -258,12 +313,16 @@ function Skeleton() {
   )
 }
 
-/** One choice: name (and its path in search hits) with Add / Added on the right. */
+/**
+ * One choice: name (and its path in search hits) with Add / Added on the
+ * right — or, for a search hit with categories inside (`opens`), "Open ›".
+ */
 function Row({
   node,
   added,
   disabled,
   spinning,
+  opens = false,
   path,
   onTap,
 }: {
@@ -271,6 +330,7 @@ function Row({
   added: boolean
   disabled: boolean
   spinning: boolean
+  opens?: boolean
   path?: string
   onTap: () => void
 }) {
@@ -285,7 +345,12 @@ function Row({
         <span className="block text-base font-semibold break-words text-fg">{node.name}</span>
         {path && <span className="block text-hint text-muted">{path}</span>}
       </span>
-      {spinning ? (
+      {opens ? (
+        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-pill border border-brand/40 px-2.5 py-1 text-xs font-bold text-brand">
+          Open
+          <ChevronRightIcon className="h-3.5 w-3.5" />
+        </span>
+      ) : spinning ? (
         <span
           aria-hidden
           className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-brand border-r-transparent"

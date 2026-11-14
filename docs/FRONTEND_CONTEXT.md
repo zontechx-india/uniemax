@@ -2396,7 +2396,14 @@ is never shown a pickup-address item.
   when it opens, so switching the left column never waits. `startAt` (a
   platform category id) opens it on that id's main category. A 48px search
   on top replaces both columns with one list of hits and their full paths;
-  categories the shop already has are ticked "Added". **Tapping a row is
+  categories the shop already has are ticked "Added". A hit that has
+  categories inside it (`childCount > 0`, e.g. "Electrical", "Fashion ›
+  Women") shows **Open ›** with "n inside" instead of Add: tapping it clears
+  the search, switches the left column to its main category and scrolls the
+  right column to that group (highlighted). Adding a whole group from a
+  search hit used to leave the product wizard with no sub-category to pick;
+  "Add all of …" inside the columns is still there for sellers who mean it.
+  **Tapping a leaf row is
   adding** (one answer, so no checkboxes or Apply bar), with a spinner on
   that row, then a toast ("Sarees added"), and a
   failure toasts over the sheet. There is no name field: a seller chooses a
@@ -2455,7 +2462,10 @@ is never shown a pickup-address item.
   {main}** as radio cards grouped under small headings for the levels in
   between (WOMEN: Sarees, Kurtis · MEN: Shirts). Middle levels are headings,
   not choices, each with a quiet "Something else in Women" row; a main with
-  nothing inside is itself the answer; a search box appears past 12
+  nothing inside is itself the answer, but (when it is a platform category)
+  ② still shows "None added yet" + a **Choose a sub-category** button that
+  opens `CategoryChooserSheet` on that main, so a shop that added all of
+  Electrical can still go narrower; a search box appears past 12
   sub-categories; a green line shows the full path ("Fashion › Women ›
   **Sarees**"). A flat list of identical cards mixed Sarees, Women and
   Fashion and sellers could not tell them apart. A **new** product starts
@@ -4091,7 +4101,7 @@ to `<body>`.
 | `EmptyState` | Re-export of the shared `EmptyState` (flat icon chip, title, sentence, optional `steps`, one action). |
 | `showToast()` / `ToastHost` | "Saved ✓" for instant saves. Module store (`useSyncExternalStore`), no provider; `ToastHost` is mounted once in `StoreManageLayout`. |
 | `HelpHint` | ⓘ (44px hit, inline in a label) → a sheet explaining a term in plain words. |
-| `CategoryChooserSheet` | The seller's category chooser (two columns: main categories left, their contents right; search with paths, "Add all of …", ticks for added). Used by Categories, the Products first-category gate and the product wizard. |
+| `CategoryChooserSheet` | The seller's category chooser (two columns: main categories left, their contents right; search with paths — group hits open, leaf hits add — "Add all of …", ticks for added). Used by Categories, the Products first-category gate and the product wizard. |
 
 `ActiveSwitch` keeps its compact visual for the rows not yet migrated, but its
 hit area is now 44px tall (`before:` inset).

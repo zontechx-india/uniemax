@@ -18,7 +18,9 @@ import { inputClass } from './shared'
  * "Something else in Women" for the seller who means it.
  *
  * Fewer questions when the shop allows: one main category hides step ①,
- * and a main category with nothing inside is itself the answer.
+ * and a main category with nothing inside is itself the answer — with a
+ * "Choose a sub-category" button under it that opens the add sheet on that
+ * main category, so a seller who added all of Electrical can still go narrower.
  *
  * "+ Add a category" is the LAST main-category chip, where a seller whose
  * category is missing is already looking. When step ① is hidden it is the
@@ -202,6 +204,23 @@ export function CategoryPick({
         </section>
       )}
 
+      {main && isLeafMain && main.categoryId && (
+        // The shop added the whole main category (e.g. Electrical) but nothing
+        // inside it: offer the narrower ones here instead of a dead end.
+        <section aria-labelledby="pick-sub">
+          <StepLabel id="pick-sub" n={mains.length > 1 ? 2 : null}>
+            Sub-category in <span className="text-brand">{main.name}</span>
+          </StepLabel>
+          <p className="mt-1 text-hint text-muted">
+            None added yet. A narrower one helps customers find it — or keep {main.name}.
+          </p>
+          <Button variant="secondary" size="sm" className="mt-2.5" onClick={() => onAdd(mainId)}>
+            <PlusIcon className="h-4 w-4" />
+            Choose a sub-category
+          </Button>
+        </section>
+      )}
+
       {path.length > 0 ? (
         <p className="flex items-start gap-2 rounded-xl bg-success/10 px-3 py-2.5 text-hint text-muted">
           <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-success" />
@@ -225,7 +244,7 @@ export function CategoryPick({
         )
       )}
 
-      {mains.length <= 1 && !tileInGrid && (
+      {mains.length <= 1 && !tileInGrid && !(isLeafMain && main?.categoryId) && (
         <div className="grid grid-cols-2 gap-2">
           <AddTile onClick={() => onAdd(mainId)} />
         </div>
