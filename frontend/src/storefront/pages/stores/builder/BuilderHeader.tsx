@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toApiError } from '../../../../shared/auth/http'
 import { Button } from '../../../../shared/ui/Button'
-import { ConfirmDialog } from '../../../../shared/ui/ConfirmDialog'
 import { publicStoreUrl, storesApi } from '../../../features/stores/storesApi'
 import type { Store } from '../../../features/stores/storesApi'
 import {
@@ -19,8 +18,8 @@ import { MediaImg } from '../../../../shared/media/MediaImg'
  * The builder's top bar: where you are, what it looks like on, whether your
  * work is safe, and the one button that puts the shop in front of customers.
  *
- * Saving and publishing are kept visibly apart. Everything in the builder
- * saves itself as it is changed — that is what the status text reports — while
+ * Saving and publishing are kept visibly apart. The builder's sections save
+ * themselves as they are changed — that is what the status text reports — while
  * **Publish** is a separate, deliberate act that decides whether the world can
  * see any of it. Conflating the two is how sellers end up either afraid to
  * touch anything or surprised that their shop went live.
@@ -54,9 +53,6 @@ export function BuilderHeader({
 }) {
   const [busy, setBusy] = useState(false)
   const [publishError, setPublishError] = useState<string | null>(null)
-  // Taking a live shop offline asks first — it used to happen on one tap of
-  // a button that merely read "Published".
-  const [confirmOffline, setConfirmOffline] = useState(false)
 
   /**
    * What stops this store going live, straight from the server's own
@@ -70,12 +66,11 @@ export function BuilderHeader({
   /** Each blocker as a link to the screen that fixes it. */
   const blockers = useGateBlockers(store, 'PUBLISH')
 
-  const togglePublished = async () => {
+  const publish = async () => {
     setPublishError(null)
     setBusy(true)
     try {
-      onStoreChange(await storesApi.setPublished(store.id, !store.isPublished))
-      setConfirmOffline(false)
+      onStoreChange(await storesApi.setPublished(store.id, true))
     } catch (err) {
       setPublishError(toApiError(err).message)
     } finally {
@@ -163,21 +158,22 @@ export function BuilderHeader({
           </a>
 
           {store.isPublished ? (
-            // Says what it IS ("Live") and what tapping DOES ("Take
-            // offline"), and asks before it does it.
-            <Button variant="secondary"
-              onClick={() => setConfirmOffline(true)}
-              disabled={busy}
-              className="px-3"
+            // A status, not a button. Closing the shop is a shop setting, not
+            // a design tool: it lives on the store page (StorePublishCard),
+            // where it asks first. Here it sat beside the colour controls and
+            // looked like a label while being an action.
+            <span
+              role="status"
+              className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-pill bg-success/10 px-3 text-xs font-semibold text-success"
             >
               <span className="h-2 w-2 rounded-full bg-success" aria-hidden />
-              <span className="hidden sm:inline">Live ·</span> Take offline
-            </Button>
+              Live
+            </span>
           ) : (
             <Button
               variant="primary"
               size="md"
-              onClick={togglePublished}
+              onClick={() => void publish()}
               disabled={busy || blocked}
               title={
                 blocked ? `Still needed: ${gate.blockers.join(', ')}` : undefined
@@ -208,16 +204,6 @@ export function BuilderHeader({
         </p>
       )}
 
-      <ConfirmDialog
-        open={confirmOffline}
-        title="Take your shop offline?"
-        description="Customers will not be able to see your shop or order until you publish it again. Your design, products and orders are kept."
-        confirmLabel="Take offline"
-        cancelLabel="Keep it live"
-        busy={busy}
-        onConfirm={() => void togglePublished()}
-        onCancel={() => setConfirmOffline(false)}
-      />
     </header>
   )
 }

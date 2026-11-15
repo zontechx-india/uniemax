@@ -4,6 +4,7 @@ import {
   EMPTY_ADDRESS,
   INDIAN_STATES,
   PINCODE_RE,
+  pinStates,
 } from './storeProfile'
 import type { StoreAddress } from './storeProfile'
 
@@ -61,6 +62,20 @@ export function AddressFields({
     fieldValue: StoreAddress[K],
   ) => onChange({ ...address, [key]: fieldValue })
 
+  // A full PIN fills an empty state when the PIN can only be in one state,
+  // and a PIN that cannot be in the chosen state is pointed out (it used to
+  // keep "Kanniyakumari, Tamil Nadu" under a Chennai PIN without a word).
+  const setPincode = (raw: string) => {
+    // Digits only, capped at six.
+    const pincode = raw.replace(/\D/g, '').slice(0, 6)
+    const states = pinStates(pincode)
+    const state = !address.state && states.length === 1 ? states[0]! : address.state
+    onChange({ ...address, pincode, state })
+  }
+  const candidates = pinStates(address.pincode)
+  const pinMismatch =
+    candidates.length > 0 && address.state !== '' && !candidates.includes(address.state)
+
   return (
     <div className="space-y-4">
       <Field error={errors.line1}>
@@ -96,9 +111,7 @@ export function AddressFields({
             value={address.pincode}
             // Digits only, capped at six — a numeric keypad on mobile and no
             // way to type a value the server would reject.
-            onChange={(e) =>
-              set('pincode', e.target.value.replace(/\D/g, '').slice(0, 6))
-            }
+            onChange={(e) => setPincode(e.target.value)}
             inputMode="numeric"
             disabled={disabled}
             autoComplete="postal-code"
@@ -153,6 +166,14 @@ export function AddressFields({
           className="cursor-not-allowed opacity-70"
         />
       </div>
+
+      {pinMismatch && (
+        <p role="status" className="rounded-xl bg-pending-soft px-3 py-2.5 text-hint text-pending">
+          PIN code {address.pincode} is in {candidates.join(' or ')}, but the
+          state is {address.state}. Please check the PIN code, the city and the
+          state.
+        </p>
+      )}
     </div>
   )
 }

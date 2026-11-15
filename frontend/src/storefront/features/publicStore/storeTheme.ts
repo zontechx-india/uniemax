@@ -115,6 +115,37 @@ function isDarkColor(hex: string): boolean {
 const HEX6 = /^#[0-9a-fA-F]{6}$/
 
 /**
+ * Why a palette would make the shop hard to read, in the seller's words —
+ * empty when it is fine. Uses the SAME rules `storeVars` paints with: text
+ * colour follows the background only, so a card colour of the opposite
+ * lightness (a dark card on a white page) puts dark text on a dark card.
+ * The Design panel refuses to save while this has anything in it.
+ */
+export function themeReadabilityProblems(theme: StoreThemeVars): string[] {
+  const bg = safeHex(theme.backgroundColor, FALLBACK_BG)
+  const primary = safeHex(theme.primaryColor, FALLBACK_PRIMARY)
+  const fg = isDarkColor(bg) ? '#ffffff' : '#101010'
+  const problems: string[] = []
+  if (theme.surfaceColor && HEX6.test(theme.surfaceColor)) {
+    if (contrast(fg, theme.surfaceColor) < 4.5) {
+      problems.push(
+        'Text on your product cards would be hard to read. Pick a card colour closer to your background, or set it back to Auto.',
+      )
+    }
+  }
+  const ctaText =
+    theme.buttonTextColor && HEX6.test(theme.buttonTextColor)
+      ? theme.buttonTextColor
+      : ctaTextOn(primary)
+  if (contrast(ctaText, primary) < 3) {
+    problems.push(
+      'The words on your buttons would be hard to read. Pick a different button colour, or set the button text back to Auto.',
+    )
+  }
+  return problems
+}
+
+/**
  * Every derived shade is *computed* from these two colors, so a malformed
  * value would render as flat mid-grey rather than being harmlessly ignored by
  * CSS. The API validates hex on write, so this only guards legacy/hand-edited

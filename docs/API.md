@@ -1719,7 +1719,10 @@ products**. Small and cacheable; fetched once per store visit.
                                   // path, see "Image derivatives" below); null without a logo
   "isPublished",                  // false only on an owner draft preview
   "footer": { … },                // owner-managed footer content, resolved to the
-                                  // full shape (see PATCH /stores/:id/footer)
+                                  // full shape (see PATCH /stores/:id/footer) — except
+                                  // info.gstNumber / info.registrationNumber, which come
+                                  // from Business details (profile.tax) when set there;
+                                  // the footer's own copies show only when it has none
   "payments": { "acceptOnlinePayment", "acceptCod" },
   "shipping": { "mode": "DELIVERY | PICKUP | BOTH",     // never the pincode lists
                 "rate": { "type": "FREE | FLAT", "amount", "freeAbove" } },  // the store's default charge

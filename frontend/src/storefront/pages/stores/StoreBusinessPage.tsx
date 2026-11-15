@@ -4,6 +4,7 @@ import { PageHeader } from './ui/PageHeader'
 import { ProgressRing } from './ui/ProgressRing'
 import { StatusPill } from './ui/StatusPill'
 import { showToast } from './ui/Toast'
+import { useUnsavedChangesGuard } from './ui/useUnsavedChangesGuard'
 import type { FormEvent, ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
@@ -26,6 +27,7 @@ import {
   GST_STATE_CODES,
   GSTIN_RE,
   PAN_RE,
+  gstStateMismatch,
   gstinContainsPan,
 } from '../../features/stores/storeProfile'
 import type {
@@ -80,7 +82,7 @@ const SECTIONS: {
   {
     id: setupAnchor('business'),
     title: 'Business & contact',
-    description: 'The trading entity and the person we reach about orders.',
+    description: 'Your business name and who we call about orders.',
     step: 'business',
   },
   {
@@ -114,17 +116,11 @@ export function StoreBusinessPage() {
   }, [])
 
   // Each card saves on its own, so a seller who fills two cards and taps
-  // only the last Save would lose the other on reload/close. Warn first.
+  // only the last Save would lose the other. Warn first — on reload/close
+  // AND on a move to another page inside the app (that one used to go
+  // through silently).
   const anyDirty = Object.values(dirty).some(Boolean)
-  useEffect(() => {
-    if (!anyDirty) return
-    const warn = (event: BeforeUnloadEvent) => {
-      event.preventDefault()
-      event.returnValue = ''
-    }
-    window.addEventListener('beforeunload', warn)
-    return () => window.removeEventListener('beforeunload', warn)
-  }, [anyDirty])
+  const leavePrompt = useUnsavedChangesGuard(anyDirty)
 
   // A new object per jump so tapping the same chip twice re-triggers the
   // highlight; a bare id would compare equal and the second tap would look
@@ -197,6 +193,7 @@ export function StoreBusinessPage() {
 
   return (
     <div>
+      {leavePrompt}
       <PageHeader
         icon={ShieldCheckIcon}
         title="Business details"
@@ -636,6 +633,19 @@ function TaxCard({
     gstinValid && gstin !== '' && panValid && pan !== ''
       ? !gstinContainsPan(gstin, pan)
       : false
+  // Against the SAVED address — the one the GSTIN will be checked against.
+  // A warning, not a block: a seller can trade from a branch in one state
+  // while registered in another.
+  const stateMismatch = gstin ? gstStateMismatch(gstin, store.profile.address?.state) : null
+
+  const changeGstin = (raw: string) => {
+    markEdited()
+    const next = raw.toUpperCase().slice(0, 15)
+    setGstin(next)
+    // A GSTIN carries the PAN (characters 3–12): fill an empty PAN from it
+    // rather than making the seller type the same ten letters twice.
+    if (!pan && GSTIN_RE.test(next)) setPan(next.slice(2, 12))
+  }
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -696,7 +706,7 @@ function TaxCard({
             className={`mt-1.5 text-hint ${panValid ? 'text-muted' : 'font-medium text-danger'}`}
           >
             {panValid
-              ? 'With a PAN, less tax is held back from online sales (1% instead of 5%).'
+              ? 'Add your PAN to get more money from online sales: 1% tax is held back instead of 5%.'
               : 'A PAN looks like ABCDE1234F — 5 letters, 4 numbers, 1 letter.'}
           </p>
         </div>
@@ -721,24 +731,27 @@ function TaxCard({
             }
             placeholder="33ABCDE1234F1Z5"
             value={gstin}
-            onChange={(e) => {
-              markEdited()
-              setGstin(e.target.value.toUpperCase().slice(0, 15))
-            }}
+            onChange={(e) => changeGstin(e.target.value)}
             disabled={busy}
           />
           <p
             className={`mt-1.5 text-hint ${
-              !gstinValid || panMismatch ? 'font-medium text-danger' : 'text-muted'
+              !gstinValid || panMismatch
+                ? 'font-medium text-danger'
+                : stateMismatch
+                  ? 'font-medium text-pending'
+                  : 'text-muted'
             }`}
           >
             {!gstinValid
               ? 'A GSTIN is 15 characters, e.g. 33ABCDE1234F1Z5.'
               : panMismatch
                 ? "This GST number doesn't match the PAN above."
-                : gstState
-                  ? `Registered in ${gstState}.`
-                  : 'Leave empty if you are not registered for GST.'}
+                : stateMismatch
+                  ? stateMismatch
+                  : gstState
+                    ? `Registered in ${gstState}.`
+                    : 'Leave empty if you are not registered for GST.'}
           </p>
         </div>
 

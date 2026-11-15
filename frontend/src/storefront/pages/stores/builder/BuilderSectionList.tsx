@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import type {
   HomepageSection,
   HomepageSectionKey,
@@ -8,11 +9,12 @@ import {
   ChevronRightIcon,
   FooterIcon,
   GripIcon,
+  InfoIcon,
   PanelLeftIcon,
-  PlusIcon,
 } from '../../../layout/icons'
 import { BigSwitch } from '../ui/BigSwitch'
 import { BUILDER_SECTIONS } from './builderSections'
+import type { SectionCounts } from './useSectionCounts'
 
 /**
  * The storefront's structure, as a list the seller can rearrange.
@@ -40,6 +42,8 @@ export function BuilderSectionList({
   sections,
   activeKey,
   busy,
+  counts,
+  storePath,
   onSelect,
   onToggle,
   onReorder,
@@ -47,16 +51,16 @@ export function BuilderSectionList({
   sections: HomepageSection[]
   activeKey: BuilderTarget | null
   busy: boolean
+  /** What each section has to show; null while loading (or if it failed). */
+  counts: SectionCounts | null
+  /** The store management root, for the "add products" links. */
+  storePath: string
   onSelect: (key: BuilderTarget) => void
   onToggle: (key: HomepageSectionKey, enabled: boolean) => void
   onReorder: (next: HomepageSection[]) => void
 }) {
   const [dragKey, setDragKey] = useState<HomepageSectionKey | null>(null)
   const [overKey, setOverKey] = useState<HomepageSectionKey | null>(null)
-  const [adding, setAdding] = useState(false)
-
-  const hidden = sections.filter((section) => !section.enabled)
-
   /** Move `from` so it lands immediately before `to`. */
   const drop = (from: HomepageSectionKey, to: HomepageSectionKey) => {
     if (from === to) return
@@ -81,7 +85,7 @@ export function BuilderSectionList({
     <div className="space-y-3">
       <PinnedRow
         icon={PanelLeftIcon}
-        label="Store header"
+        label="Top bar"
         hint="Logo, search, cart — always at the top"
         active={activeKey === 'header'}
         onClick={() => onSelect('header')}
@@ -91,6 +95,20 @@ export function BuilderSectionList({
         <p className="px-1 pb-1.5 text-xs font-bold uppercase tracking-[0.08em] text-muted">
           Your storefront
         </p>
+        {counts?.smallShop && (
+          // Without this a seller marks Best Sellers, sees no Best Sellers
+          // row in the shop, and decides the shop is broken. The rule itself
+          // lives in StoreHomePage (`shapeHome`).
+          <p className="mb-2 flex gap-2 rounded-lg bg-brand-soft px-3 py-2.5 text-hint text-fg">
+            <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+            <span>
+              Your shop has {counts.catalogSize} products, so they all show once
+              in <span className="font-semibold">All Products</span>. Products
+              you mark as Featured, Best Seller or New Arrival come first there.
+              They get rows of their own when you have more than 12 products.
+            </span>
+          </p>
+        )}
         <ul className="space-y-1.5">
           {sections.map((section, index) => {
             const meta = BUILDER_SECTIONS[section.key]
@@ -135,7 +153,7 @@ export function BuilderSectionList({
                   <span
                     // The handle is the drag affordance; the row as a whole is
                     // the click target, so the handle must not also open it.
-                    className="shrink-0 cursor-grab py-3 pl-2 pr-1 text-muted active:cursor-grabbing"
+                    className="hidden shrink-0 cursor-grab py-3 pl-2 pr-1 text-muted active:cursor-grabbing lg:block"
                     aria-hidden
                     title="Drag to reorder"
                   >
@@ -145,7 +163,7 @@ export function BuilderSectionList({
                   <button
                     type="button"
                     onClick={() => onSelect(section.key)}
-                    className="flex min-w-0 flex-1 items-center gap-2.5 py-2.5 text-left"
+                    className="flex min-w-0 flex-1 items-center gap-2.5 py-2.5 pl-3 text-left lg:pl-0"
                   >
                     <Icon
                       className={`h-[18px] w-[18px] shrink-0 ${
@@ -160,9 +178,12 @@ export function BuilderSectionList({
                       >
                         {meta.label}
                       </span>
-                      <span className="mt-0.5 line-clamp-2 block text-hint text-muted">
-                        {section.enabled ? meta.hint : 'Hidden from your shop'}
-                      </span>
+                      <SectionStatusLine
+                        sectionKey={section.key}
+                        enabled={section.enabled}
+                        hint={meta.hint}
+                        counts={counts}
+                      />
                     </span>
                   </button>
 
@@ -189,86 +210,120 @@ export function BuilderSectionList({
                     onChange={(next) => onToggle(section.key, next)}
                   />
                 </div>
+                {section.enabled &&
+                  counts &&
+                  counts.counts[section.key] === 0 &&
+                  meta.source && (
+                    <Link
+                      to={`${storePath}/${meta.source.to}`}
+                      className="ml-3 mt-1 inline-flex min-h-tap items-center gap-1 text-hint font-semibold text-brand hover:underline"
+                    >
+                      {meta.source.label}
+                      <ChevronRightIcon className="h-3.5 w-3.5" />
+                    </Link>
+                  )}
               </li>
             )
           })}
         </ul>
 
-        {/* Adding a section means bringing a hidden one back: the storefront
-            has a fixed, supported set, and offering to "add" anything else
-            would be offering something the shop cannot render. */}
-        <div className="mt-2">
-          {adding && hidden.length > 0 ? (
-            <div className="rounded-lg border border-line bg-surface p-2">
-              <p className="px-1 pb-1 text-xs font-semibold text-fg">
-                Add a section back
-              </p>
-              <ul className="space-y-1">
-                {hidden.map((section) => {
-                  const meta = BUILDER_SECTIONS[section.key]
-                  const Icon = meta.icon
-                  return (
-                    <li key={section.key}>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => {
-                          onToggle(section.key, true)
-                          onSelect(section.key)
-                          setAdding(false)
-                        }}
-                        className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors hover:bg-surface-alt disabled:opacity-50"
-                      >
-                        <Icon className="h-[18px] w-[18px] shrink-0 text-muted" />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium text-fg">
-                            {meta.label}
-                          </span>
-                          <span className="block truncate text-xs text-muted">
-                            {meta.hint}
-                          </span>
-                        </span>
-                        <PlusIcon className="h-4 w-4 shrink-0 text-muted" />
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-              <button
-                type="button"
-                onClick={() => setAdding(false)}
-                className="mt-1 w-full rounded-md px-2 py-1.5 text-xs font-semibold text-muted transition-colors hover:bg-surface-alt hover:text-fg"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              disabled={hidden.length === 0}
-              onClick={() => setAdding(true)}
-              title={
-                hidden.length === 0
-                  ? 'Every section is already on your homepage'
-                  : undefined
-              }
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-line py-2.5 text-sm font-semibold text-muted transition-colors hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:border-line disabled:text-muted/60 disabled:hover:border-line"
-            >
-              <PlusIcon className="h-4 w-4" />
-              {hidden.length === 0 ? 'All sections are on' : 'Add section'}
-            </button>
-          )}
-        </div>
+        {/* No "Add section" box: every section the shop can draw is already
+            in this list, and a hidden one comes back with its own switch.
+            Offering it a second time (the old "Add a section back") listed
+            rows the seller could already see. */}
+        {sections.some((section) => !section.enabled) && (
+          <p className="mt-2 px-1 text-xs text-muted">
+            Turn on a switch to show a hidden part again.
+          </p>
+        )}
       </div>
 
       <PinnedRow
         icon={FooterIcon}
-        label="Footer"
+        label="Bottom of your shop"
         hint="Contact details, links and social — always at the bottom"
         active={activeKey === 'footer'}
         onClick={() => onSelect('footer')}
       />
     </div>
+  )
+}
+
+/**
+ * The line under a section's name: what it will show in the shop right now
+ * ("4 products", "Empty: …"), from the same data the shop renders. Falls back
+ * to the section's plain description while the counts load.
+ */
+function SectionStatusLine({
+  sectionKey,
+  enabled,
+  hint,
+  counts,
+}: {
+  sectionKey: HomepageSectionKey
+  enabled: boolean
+  hint: string
+  counts: SectionCounts | null
+}) {
+  let text = hint
+  let empty = false
+  if (!enabled) {
+    text = 'Hidden from your shop'
+  } else if (counts) {
+    const n = counts.counts[sectionKey]
+    // Product rows load at most 12; more than that is simply "12+".
+    const products = (count: number) =>
+      count >= 12 ? '12+ products' : `${count} product${count === 1 ? '' : 's'}`
+    switch (sectionKey) {
+      case 'banners':
+        empty = n === 0
+        text = empty ? 'No banners yet: tap to add one' : `${n} banner${n === 1 ? '' : 's'}`
+        break
+      case 'categories':
+        empty = n === 0
+        text = empty
+          ? 'Not shown: needs products in 2 or more categories'
+          : `${n} categories`
+        break
+      case 'featured':
+      case 'newArrivals':
+      case 'bestSellers': {
+        const flag =
+          sectionKey === 'featured'
+            ? 'Featured'
+            : sectionKey === 'newArrivals'
+              ? 'New Arrival'
+              : 'Best Seller'
+        empty = n === 0
+        text = empty
+          ? `Empty: mark products as ${flag}`
+          : counts.smallShop
+            ? `${products(n)} · shown first in All Products`
+            : products(n)
+        break
+      }
+      case 'categoryRows':
+        empty = n === 0 || counts.smallShop
+        text = counts.smallShop
+          ? 'Not shown: All Products already shows everything'
+          : n === 0
+            ? 'Empty: add products to your categories'
+            : `${n} categor${n === 1 ? 'y' : 'ies'}`
+        break
+      case 'catalog':
+        empty = n === 0
+        text = empty ? 'Empty: add your first product' : products(n)
+        break
+    }
+  }
+  return (
+    <span
+      className={`mt-0.5 line-clamp-2 block text-hint ${
+        empty ? 'font-medium text-pending' : 'text-muted'
+      }`}
+    >
+      {text}
+    </span>
   )
 }
 

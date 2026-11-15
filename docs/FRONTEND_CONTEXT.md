@@ -1410,7 +1410,9 @@ full-bleed section bands instead.
     line (2 lines), and fact chips built only from seller settings and
     phrased to hold shop-wide (products may override delivery charges and
     COD): Home delivery · Store pickup · Cash on delivery available · UPI &
-    cards · Since {year}.
+    cards · Since {year}. With a banner on screen the intro is not drawn, but
+    the same chips still show as a slim strip right under the banner
+    (`StoreFactsStrip`) — they are what a first-time customer checks.
   - **Category Highlights / All Products** — the two sections that need no
     merchandising flags, and what a shop shows before its owner has curated
     anything. All Products is the capped grid at **two full rows** (newest shop-wide,
@@ -1976,8 +1978,11 @@ the moment to lift them).
   city, state, read-only country), used by both the wizard and Business
   Details. Exports `validateAddress` so every caller produces identical
   messages. PIN code sits above city/state because it is the field sellers
-  know by heart and the one that will later auto-fill the two below it. One
-  column on mobile, a 2-col grid from `sm`.
+  know by heart: a full PIN **fills an empty state** when its first two digits
+  allow only one (`pinStates` in `storeProfile.ts`, an offline India Post
+  region table — border regions list every state they touch), and a PIN that
+  cannot be in the chosen state shows a warning. The city is not filled (that
+  needs a full PIN directory). One column on mobile, a 2-col grid from `sm`.
 - `useStores.ts` — data hooks: `useStores` (list), `useStore` (by id;
   404/foreign → `null` → redirect to `/mystores`).
 
@@ -2083,8 +2088,9 @@ is never shown a pickup-address item.
   `StoreBusinessPage` (**Business Details** — three independently-saving
   cards over `PATCH /stores/:id/profile`, each sending only its own keys, with
   section-named buttons — "Save business & contact" / "Save address" / "Save
-  tax details" — and a `beforeunload` warning while any card has unsaved
-  edits, since saving one card never saves another:
+  tax details" — and a "Leave without saving?" guard (`useUnsavedChangesGuard`:
+  reload/close **and** in-app navigation) while any card has unsaved edits,
+  since saving one card never saves another:
   **Business & contact** (business name — defaulting to the store name, as in
   the wizard — and seller name as fields; phone and email read-only as the
   verified account identifiers, with an inline `VerifyPhoneForm` when no
@@ -2095,8 +2101,10 @@ is never shown a pickup-address item.
   platform holds) and **Tax & compliance** (PAN and
   GSTIN — both labelled "(optional)", nothing requires them — and a
   registration number, with live format hints, the GSTIN's state code
-  decoded, and a PAN-inside-GSTIN cross-check; there is no "not registered
-  for GST" box any more, an empty GSTIN says it).
+  decoded, a PAN-inside-GSTIN cross-check, a warning when the GSTIN's state
+  is not the saved address's state (`gstStateMismatch`), and an empty PAN
+  filled from a valid GSTIN; there is no "not registered for GST" box any
+  more, an empty GSTIN says it).
   Because the three save independently, each carries its **own status** in
   its header (`StatusBadge`: Complete / *n* of *m* done / Unsaved changes /
   **Optional**) plus, when incomplete, the missing requirements named in a
@@ -2137,18 +2145,27 @@ is never shown a pickup-address item.
   resolving.
 
   **Left: controls.** Two tabs. *Sections* is the storefront's structure —
-  every homepage section as a row with a drag handle, a `BigSwitch` (no state
-  word — the row's own subtitle says "Hidden from your shop"; titles wrap
-  rather than truncate on a phone) and a
-  click target, bracketed by pinned **Store header** and **Footer** rows (real
-  parts of the shop, but never moved or switched off). Reordering is offered
-  twice on purpose: native HTML5 drag for a mouse, 44px ▲/▼ buttons for
-  keyboard, screen readers and phones. Opening a row swaps the panel for that section's
-  editor. *Design* (`BuilderDesignPanel`) is colour and nothing else — it is
-  called **Color theme**, not "Template", because colour is genuinely all it
-  changes; a seller picks one of the platform's palettes in a click, and the
-  five pickers (shared with the storefront via `ThemeColorFields.tsx`) stay
-  folded behind *Customize colors*.
+  every homepage section as a row with a `BigSwitch` (no state word) and a
+  click target, bracketed by pinned **Top bar** and **Bottom of your shop**
+  rows (real parts of the shop, but never moved or switched off). Each row's
+  subtitle says what the section shows **right now** — "4 products",
+  "Empty: mark products as Best Seller" (plus a link to Products), "No
+  banners yet", "Hidden from your shop" — from `useSectionCounts`, which reads
+  the same `GET /public/stores/:slug/home` the shop renders and refetches
+  after every save. A **small shop** (≤ 12 products, see `shapeHome`) gets a
+  note above the list: everything shows once in All Products with the marked
+  products first, and separate rows start at 13 products. There is no "Add
+  section" box — a hidden section comes back with its own switch. Reordering:
+  native HTML5 drag (handle shown from `lg` only) and 44px ▲/▼ buttons for
+  keyboard, screen readers and phones. Opening a row swaps the panel for that
+  section's editor. *Design* (`BuilderDesignPanel`) is colour and nothing
+  else — **Shop colours**; a seller taps one of the platform's palettes to
+  *try* it, or **Choose my own colour** → 12 brand-colour swatches (sets
+  primary, the rest Auto), with the five hex pickers (`ThemeColorFields.tsx`)
+  behind **Advanced colours**. There is no "Name this theme" field.
+  `themeReadabilityProblems` (`storeTheme.ts`, same rules as `storeVars`)
+  blocks saving a palette whose card colour or button text would be
+  unreadable.
 
   **Right: the real storefront** (`BuilderPreview`) — `/store/{slug}?builder=1`
   in an iframe, not a mock-up, so the preview cannot disagree with the shop. It
@@ -2173,17 +2190,25 @@ is never shown a pickup-address item.
   keystroke before leaving is never lost), with the header reporting
   Saving… / Saved / Not saved as a pill on **every** screen size (it used to
   be hidden on phones, so a failed save went unnoticed) and a failed write
-  rolling the panel back to the server's answer. Colour is the deliberate
-  exception and has its own Save — a sticky floating bar ("You changed the
-  colours but have not saved them yet" · Undo · Save colours), because it is
-  the one change that can make a shop unreadable.
+  rolling the panel back to the server's answer; a click-save also shows the
+  toast "Saved. Your shop is updated." (typing does not). Colour is the
+  deliberate exception and has its own Save — a bar ("You are trying X. Your
+  shop has not changed yet." · Undo · **Use this look for my shop**), fixed
+  to the bottom of the screen below `lg` and sticky in the panel above it;
+  after saving it says "Your shop now uses X". "Not saved" is judged on the
+  colours only (`sameColors`), never on the theme name. Leaving the builder
+  with unsaved colours or unsaved footer text asks first
+  (`useUnsavedChangesGuard`); the panel's Back button out of the footer
+  editor asks too (`StoreFooterPage onDirtyChange`).
 
   **Header & phones.** The header (`BuilderHeader`) reads "Design your shop";
-  a live shop shows **Live · Take offline**, which asks first in a
-  `ConfirmDialog` (it used to unpublish on one tap of a button labelled
-  "Published"); an unpublished one shows **Publish** with the blockers as
+  a live shop shows a **Live** status pill — not a button: closing the shop
+  lives on the store page (`StorePublishCard`, which asks first), not beside
+  the design tools; an unpublished one shows **Publish** with the blockers as
   links. Below `lg` one column is switched with a 40px **Change / See my
-  shop** toggle; back buttons are 44px.
+  shop** toggle; both columns are `w-full` there (without it the preview
+  column shrank to 0 and the frame scaled to nothing), and the preview scale
+  never drops below 0.3. Back buttons are 44px.
 
   **Section editors** (`BuilderSectionEditor`) are generated from one table,
   `builderSections.ts`, which is most of the product: label, plain-English
@@ -2240,8 +2265,10 @@ is never shown a pickup-address item.
   lat/lng; without `VITE_GOOGLE_MAPS_API_KEY` it degrades to manual
   latitude/longitude fields) and guarded deletes; **Social Media** —
   Facebook/Instagram/YouTube up front plus a "More platforms" reveal
-  (WhatsApp number, X, LinkedIn, Telegram, Pinterest); **Store Information**
-  — About Us, established year, GST + registration numbers; **Customer
+  (WhatsApp number, X, LinkedIn, Telegram, Pinterest); **About your shop**
+  — About Us and "Started in" year; the GST + registration numbers are shown
+  read-only from Business details (the public shell uses those — see
+  `GET /public/stores/:slug`), with a link to change them there; **Customer
   Support** — email/phone/WhatsApp/working hours; **Store Policies** —
   optional external URLs per policy until dedicated pages land; **Additional
   Footer Links** — up to 10 custom label+URL rows (in-app paths allowed);
@@ -3597,10 +3624,11 @@ frontend/
     │           ├── builder/             # Store Builder — the one storefront workspace
     │           │   ├── StoreBuilderPage.tsx  # Shell: header + controls + live preview,
     │           │   │                        #   owns section state and autosave
-    │           │   ├── BuilderHeader.tsx     # Device switch, save-state pill, Publish / confirmed Take offline
-    │           │   ├── BuilderSectionList.tsx# Reorder / show / open, + pinned header & footer
+    │           │   ├── BuilderHeader.tsx     # Device switch, save-state pill, Publish / Live pill
+    │           │   ├── BuilderSectionList.tsx# Reorder / show / open + what each shows, pinned header & footer
+    │           │   ├── useSectionCounts.ts   # Per-section counts from the public home payload
     │           │   ├── BuilderSectionEditor.tsx # Layout + title, rest under More options
-    │           │   ├── BuilderDesignPanel.tsx# Color theme + the five pickers
+    │           │   ├── BuilderDesignPanel.tsx# Shop colours: ready looks, brand swatches, Advanced pickers
     │           │   ├── BuilderPreview.tsx    # The real /store/{slug} in a scaled iframe
     │           │   └── builderSections.ts    # One table: every control the builder offers
     │           ├── ThemeColorFields.tsx # The five color controls + the Auto rules

@@ -443,7 +443,9 @@ function LocationBlock({ location }: { location: FooterLocation }) {
           <a href={telLink(location.phone)} className="transition hover:text-brand">
             {location.phone}
           </a>
-          {location.altPhone && (
+          {/* The same number twice ("+91 77… · +91 77…") reads as a mistake. */}
+          {location.altPhone &&
+            location.altPhone.replace(/\D/g, '') !== location.phone.replace(/\D/g, '') && (
             <>
               {' · '}
               <a

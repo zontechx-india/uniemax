@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useId, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { ActionRow } from './ui/ActionRow'
 import { PageHeader } from './ui/PageHeader'
 import { StatusPill } from './ui/StatusPill'
@@ -23,6 +24,9 @@ import type {
   StoreFooterPatch,
 } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
+import { formatAddress } from '../../features/stores/storeProfile'
+import { useUnsavedChangesGuard } from './ui/useUnsavedChangesGuard'
+import { useStoreManageScope } from '../../features/stores/storeManageScope'
 import {
   FooterIcon,
   ChevronDownIcon,
@@ -42,9 +46,20 @@ import { Button } from '../../../shared/ui/Button'
  * information, customer support, policy links, custom links and the
  * copyright line. Each card saves independently via
  * `PATCH /stores/:id/footer` (the payload carries only that card's section).
+ *
+ * Because each card has its own Save, the page keeps track of which cards
+ * hold typed-but-unsaved text (`useReportDirty`, called from every card's
+ * Save button and from the location form) and asks "Leave without saving?"
+ * before that text can be lost — on its own page through the router guard,
+ * and inside the Store Builder through `onDirtyChange`, because there the
+ * builder's own Back button is what closes this page.
+ *
+ * The GST and registration numbers are NOT edited here: the shop shows the
+ * ones from Business details (one source — the two used to disagree).
  */
 export function StoreFooterPage({
   embedded = false,
+  onDirtyChange,
 }: {
   /**
    * Rendered inside the Store Builder's editor panel rather than as its own
@@ -52,24 +67,42 @@ export function StoreFooterPage({
    * the cards stop self-capping, because the panel is already narrow.
    */
   embedded?: boolean
+  /** Told whenever "some card has unsaved text" flips. */
+  onDirtyChange?: (dirty: boolean) => void
 } = {}) {
   const { store } = useManagedStore()
 
+  const [dirtyCards, setDirtyCards] = useState<Record<string, boolean>>({})
+  const report = useCallback((id: string, dirty: boolean) => {
+    setDirtyCards((current) =>
+      (current[id] ?? false) === dirty ? current : { ...current, [id]: dirty },
+    )
+  }, [])
+  const anyDirty = Object.values(dirtyCards).some(Boolean)
+  useEffect(() => {
+    onDirtyChange?.(anyDirty)
+  }, [anyDirty, onDirtyChange])
+  // Inside the builder, the builder guards (its Back button and the router).
+  const prompt = useUnsavedChangesGuard(!embedded && anyDirty)
+
   return (
+    <FooterDirtyContext.Provider value={report}>
     <div>
+      {prompt}
       {!embedded && (
         <>
           <PageHeader
             icon={FooterIcon}
             title="Shop footer"
-            description="What shows at the bottom of every page of your shop — your address, phone, social media and more. Each card saves on its own."
+            description="What shows at the bottom of every page of your shop — your address, phone, social media and more. Tap Save in a part after you change it."
           />
         </>
       )}
       {embedded && (
         <p className="text-hint text-muted">
-          Everything shown at the bottom of every page of your shop. Each card
-          saves on its own.
+          Everything shown at the bottom of every page of your shop. Tap Save
+          in a part after you change it — we ask before you leave with unsaved
+          text.
         </p>
       )}
 
@@ -83,7 +116,23 @@ export function StoreFooterPage({
         <CopyrightCard key={`cpy-${store.id}`} />
       </div>
     </div>
+    </FooterDirtyContext.Provider>
   )
+}
+
+/** Cards tell the page whether they hold unsaved text. */
+const FooterDirtyContext = createContext<(id: string, dirty: boolean) => void>(
+  () => {},
+)
+
+function useReportDirty(dirty: boolean) {
+  const id = useId()
+  const report = useContext(FooterDirtyContext)
+  useEffect(() => {
+    report(id, dirty)
+  }, [id, dirty, report])
+  // A card (or form) that closes takes its unsaved flag with it.
+  useEffect(() => () => report(id, false), [id, report])
 }
 
 // ---------------------------------------------------------------------------
@@ -153,6 +202,8 @@ function TextArea({
 }
 
 function SaveButton({ busy, dirty }: { busy: boolean; dirty: boolean }) {
+  // Every card renders one, so this is where each card reports itself.
+  useReportDirty(dirty)
   return (
     <Button type="submit" size="lg" loading={busy} disabled={!dirty} className="w-full sm:w-auto sm:px-8">
       {busy ? 'Saving…' : 'Save'}
@@ -225,7 +276,9 @@ const fromDraft = (draft: LocationDraft, id: string | null): FooterLocation => (
 })
 
 function LocationsCard() {
+  const { store } = useManagedStore()
   const { footer, busy, error, saved, save } = useFooterSave()
+  const business = store.profile.address
   // 'new' → the add form; a location id → that row's edit form.
   const [editing, setEditing] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<FooterLocation | null>(null)
@@ -260,6 +313,14 @@ function LocationsCard() {
       title="Contact Information"
       description="Your business locations — shown in the footer with a View on Google Maps link."
     >
+      {business && (
+        <BusinessAddressNote
+          pincode={business.pincode}
+          text={formatAddress(business)}
+          locations={locations}
+        />
+      )}
+
       {locations.length === 0 && editing !== 'new' && (
         <p className="rounded-md bg-surface-alt px-4 py-3 text-sm text-muted">
           No locations yet. Add your first business address so customers know
@@ -366,7 +427,20 @@ function LocationsCard() {
       {editing === 'new' ? (
         <div className="mt-2">
           <LocationForm
-            initial={emptyLocationDraft(locations.length === 0)}
+            initial={
+              // The first location starts from Business details, so the two
+              // addresses agree unless the seller means them to differ.
+              locations.length === 0
+                ? {
+                    ...emptyLocationDraft(true),
+                    address: business ? formatAddress(business) : '',
+                    phone: store.profile.phone ?? '',
+                    email: store.profile.email ?? '',
+                    lat: business?.lat ?? null,
+                    lng: business?.lng ?? null,
+                  }
+                : emptyLocationDraft(false)
+            }
             busy={busy}
             onCancel={() => setEditing(null)}
             onSubmit={(draft) =>
@@ -411,6 +485,31 @@ function LocationsCard() {
   )
 }
 
+/**
+ * Business details holds the shop's one official address. The footer can list
+ * other places (a second branch), but when NONE of them is that address the
+ * shop shows customers one address and its records another — so say so.
+ */
+function BusinessAddressNote({
+  pincode,
+  text,
+  locations,
+}: {
+  pincode: string
+  text: string
+  locations: FooterLocation[]
+}) {
+  if (locations.length === 0 || !pincode) return null
+  if (locations.some((location) => location.address.includes(pincode))) return null
+  return (
+    <p className="mb-3 rounded-xl bg-pending-soft px-3 py-2.5 text-hint text-pending">
+      <span className="font-semibold">This address does not match Business details.</span>{' '}
+      Business details says: {text}. Edit the address below if your shop has
+      moved, or change it in Business details.
+    </p>
+  )
+}
+
 function LocationForm({
   initial,
   busy,
@@ -424,6 +523,7 @@ function LocationForm({
 }) {
   const [draft, setDraft] = useState(initial)
   const [problem, setProblem] = useState<string | null>(null)
+  useReportDirty(JSON.stringify(draft) !== JSON.stringify(initial))
 
   const set = <K extends keyof LocationDraft>(key: K, value: LocationDraft[K]) =>
     setDraft((d) => ({ ...d, [key]: value }))
@@ -437,6 +537,14 @@ function LocationForm({
     }
     if (draft.altPhone.trim() && !/^\+?[\d\s\-()]{5,20}$/.test(draft.altPhone.trim())) {
       return setProblem('The alternate mobile number looks invalid.')
+    }
+    if (
+      draft.altPhone.trim() &&
+      draft.altPhone.replace(/\D/g, '') === draft.phone.replace(/\D/g, '')
+    ) {
+      return setProblem(
+        'The alternate number is the same as the main one. Leave it empty or enter a different number.',
+      )
     }
     if (!/^\S+@\S+\.\S+$/.test(draft.email.trim())) {
       return setProblem('A valid email address is required.')
@@ -663,21 +771,20 @@ function SocialCard() {
 // ---------------------------------------------------------------------------
 
 function InfoCard() {
+  const { store } = useManagedStore()
   const { footer, busy, error, saved, save } = useFooterSave()
+  const tax = store.profile.tax
+  const scope = useStoreManageScope()
   const [about, setAbout] = useState(fromNull(footer.info.about))
   const [year, setYear] = useState(
     footer.info.establishedYear === null ? '' : String(footer.info.establishedYear),
   )
-  const [gst, setGst] = useState(fromNull(footer.info.gstNumber))
-  const [reg, setReg] = useState(fromNull(footer.info.registrationNumber))
   const [problem, setProblem] = useState<string | null>(null)
 
   const yearValue = year.trim() === '' ? null : Number(year.trim())
   const dirty =
     orNull(about) !== footer.info.about ||
-    yearValue !== footer.info.establishedYear ||
-    orNull(gst) !== footer.info.gstNumber ||
-    orNull(reg) !== footer.info.registrationNumber
+    yearValue !== footer.info.establishedYear
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -692,16 +799,17 @@ function InfoCard() {
       info: {
         about: orNull(about),
         establishedYear: yearValue,
-        gstNumber: orNull(gst),
-        registrationNumber: orNull(reg),
+        // Kept as stored: the shop shows Business details' numbers instead.
+        gstNumber: footer.info.gstNumber,
+        registrationNumber: footer.info.registrationNumber,
       },
     })
   }
 
   return (
     <SectionCard
-      title="Store Information"
-      description="A short introduction and business identifiers for the footer."
+      title="About your shop"
+      description="A short introduction for the bottom of your shop."
     >
       <form onSubmit={submit} noValidate className="space-y-4">
         <TextArea
@@ -712,29 +820,33 @@ function InfoCard() {
           rows={3}
           maxLength={600}
         />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <TextField
-            label="Business since / established year (optional)"
-            value={year}
-            onChange={(e) => setYear(e.target.value)}
-            placeholder="2005"
-            inputMode="numeric"
-            maxLength={4}
-          />
-          <TextField
-            label="GST number (optional)"
-            value={gst}
-            onChange={(e) => setGst(e.target.value)}
-            placeholder="32ABCDE1234F1Z5"
-            maxLength={30}
-          />
-        </div>
         <TextField
-          label="Business registration number (optional)"
-          value={reg}
-          onChange={(e) => setReg(e.target.value)}
-          maxLength={60}
+          label="Started in (year, optional)"
+          value={year}
+          onChange={(e) => setYear(e.target.value)}
+          placeholder="2005"
+          inputMode="numeric"
+          maxLength={4}
         />
+        <div className="ws-well rounded-xl p-4 text-hint">
+          <p className="font-semibold text-fg">GST and registration number</p>
+          <p className="mt-1 text-muted">
+            {tax.gstin || tax.registrationNumber
+              ? [
+                  tax.gstin ? `GSTIN: ${tax.gstin}` : null,
+                  tax.registrationNumber ? `Reg. No: ${tax.registrationNumber}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
+              : 'Not added yet. They show at the bottom of your shop once you add them.'}
+          </p>
+          <Link
+            to={`${scope.storePath(store.slug)}/business#setup-tax`}
+            className="mt-1.5 inline-flex font-semibold text-brand hover:underline"
+          >
+            Change in Business details
+          </Link>
+        </div>
         {(problem || error) && <ErrorNote>{problem ?? error}</ErrorNote>}
         {saved && !dirty && <SuccessNote>Store information saved.</SuccessNote>}
         <SaveButton busy={busy} dirty={dirty} />

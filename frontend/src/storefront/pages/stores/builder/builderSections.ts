@@ -7,7 +7,7 @@ import {
   SlidersIcon,
   StarIcon,
   TagIcon,
-  TruckIcon,
+  TrophyIcon,
 } from '../../../layout/icons'
 
 /**
@@ -60,10 +60,10 @@ export interface BuilderSectionMeta {
 export const BUILDER_SECTIONS: Record<HomepageSectionKey, BuilderSectionMeta> = {
   banners: {
     label: 'Banners',
-    hint: 'Your promotional images',
+    hint: 'Big photos at the top of your shop',
     icon: ImageIcon,
     about:
-      'Wide promotional pictures near the top of your shop. With more than one they rotate on their own, and each can take a shopper to a product, a category or any web address.',
+      'Big photos at the top of your shop. With more than one they rotate on their own, and each can take a shopper to a product, a category or any web address.',
     title: false,
     subtitle: false,
     layouts: [],
@@ -139,7 +139,7 @@ export const BUILDER_SECTIONS: Record<HomepageSectionKey, BuilderSectionMeta> = 
   bestSellers: {
     label: 'Best Sellers',
     hint: 'Products you marked as Best Seller',
-    icon: TruckIcon,
+    icon: TrophyIcon,
     about:
       'What sells. Mark a product as Best Seller and it appears here.',
     title: true,
@@ -155,8 +155,8 @@ export const BUILDER_SECTIONS: Record<HomepageSectionKey, BuilderSectionMeta> = 
     },
   },
   categoryRows: {
-    label: 'Category Highlights',
-    hint: 'A shelf of products per category — fills itself',
+    label: 'Products by category',
+    hint: 'A row for each category (added automatically)',
     icon: SlidersIcon,
     about:
       'A shelf for each of your first three categories, showing that shelf’s newest products. It fills itself from your catalogue, so there is nothing to mark and nothing to keep up to date.',
@@ -166,7 +166,7 @@ export const BUILDER_SECTIONS: Record<HomepageSectionKey, BuilderSectionMeta> = 
   },
   catalog: {
     label: 'All Products',
-    hint: 'Your newest products — fills itself',
+    hint: 'All your products (added automatically)',
     icon: BoxIcon,
     about:
       'Your newest products across the whole shop, whatever you have marked. It fills itself, so a brand-new shop still has something to show.',

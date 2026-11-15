@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   publicStoreApi,
@@ -368,16 +368,21 @@ export function StoreHomeView({
     <>
       {intro ? <StoreIntro store={store} skin={skin} /> : heading}
       {visible.map((section, index) => (
-        <HomeSection
-          key={section.key}
-          section={section}
-          store={store}
-          home={shaped.home}
-          skin={skin}
-          tone={tones[index]}
-          catalogAll={shaped.catalogAll}
-          pictures={shaped.pictures}
-        />
+        <Fragment key={section.key}>
+          <HomeSection
+            section={section}
+            store={store}
+            home={shaped.home}
+            skin={skin}
+            tone={tones[index]}
+            catalogAll={shaped.catalogAll}
+            pictures={shaped.pictures}
+          />
+          {/* With a banner the intro is not drawn, and its trust facts
+              (delivery, COD, UPI) went with it — the very things a first-time
+              customer checks. They stay, as a slim strip under the banner. */}
+          {section.key === 'banners' && <StoreFactsStrip store={store} />}
+        </Fragment>
       ))}
       {shaped.showcase && (
         <ProductShowcase
@@ -439,21 +444,36 @@ function StoreIntro({ store, skin }: { store: PublicStore; skin: Skin }) {
             )}
           </div>
         </div>
-        {facts.length > 0 && (
-          <ul className="mt-4 flex flex-wrap gap-2">
-            {facts.map((fact) => (
-              <li
-                key={fact}
-                className="inline-flex items-center gap-1.5 rounded-full bg-surface-alt px-3 py-1.5 text-xs font-medium text-fg"
-              >
-                <CheckIcon className="h-3.5 w-3.5 text-success" />
-                {fact}
-              </li>
-            ))}
-          </ul>
-        )}
+        {facts.length > 0 && <FactChips facts={facts} className="mt-4" />}
       </div>
     </section>
+  )
+}
+
+/** The intro's trust facts on their own, for a homepage that opens on a banner. */
+function StoreFactsStrip({ store }: { store: PublicStore }) {
+  const facts = storeFacts(store)
+  if (facts.length === 0) return null
+  return (
+    <section aria-label="About this shop" className={STORE_CONTAINER}>
+      <FactChips facts={facts} className="py-3" />
+    </section>
+  )
+}
+
+function FactChips({ facts, className = '' }: { facts: string[]; className?: string }) {
+  return (
+    <ul className={`flex flex-wrap gap-2 ${className}`}>
+      {facts.map((fact) => (
+        <li
+          key={fact}
+          className="inline-flex items-center gap-1.5 rounded-full bg-surface-alt px-3 py-1.5 text-xs font-medium text-fg"
+        >
+          <CheckIcon className="h-3.5 w-3.5 text-success" />
+          {fact}
+        </li>
+      ))}
+    </ul>
   )
 }
 

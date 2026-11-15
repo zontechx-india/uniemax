@@ -16,6 +16,7 @@ import {
   resolveSpecifications,
 } from "./storeCatalog.schema.js";
 import { sortByOptionOrder } from "./productOptions.js";
+import { resolveProfile } from "./storeProfile.schema.js";
 import { activeShelfChain, loadShelves, shelfIndex } from "./shelfTree.js";
 import { MAX_CATEGORY_DEPTH } from "../category/categoryTree.js";
 import {
@@ -78,6 +79,9 @@ const storeShellSelect = {
   homepage: true,
   // Owner-managed footer content; the shell resolves it to the full shape.
   footer: true,
+  // Business details — read ONLY for the footer's GST / registration line,
+  // and never sent on (it holds the seller's private contact details).
+  profile: true,
   // Accepted payment methods — the checkout page shows what's available.
   payments: true,
   // Fulfilment mode (delivery/pickup/both) — same consumer.
@@ -473,7 +477,15 @@ export async function getPublicStoreShell(slug: string, viewerId?: string) {
   // Clients get a derived logo URL, never the storage key. The footer and
   // payments JSON are resolved to their complete shapes so the storefront
   // renders them directly.
-  const { logoKey, footer, payments, shipping, checkout, ...shell } = store;
+  const { logoKey, footer, profile, payments, shipping, checkout, ...shell } = store;
+  // GST and registration have ONE home: Business details. The footer's own
+  // copies (from before that rule) only show when Business details has none,
+  // so the two can no longer disagree on the shop.
+  const resolvedFooter = resolveFooter(footer);
+  const { tax } = resolveProfile(profile);
+  resolvedFooter.info.gstNumber = tax.gstin ?? resolvedFooter.info.gstNumber;
+  resolvedFooter.info.registrationNumber =
+    tax.registrationNumber ?? resolvedFooter.info.registrationNumber;
   // The MODE and the store's default RATE are public (the product page and
   // cart advertise them). The default delivery-area rule (which can be
   // thousands of pincodes) never ships with the shell — customers ask about
@@ -484,7 +496,7 @@ export async function getPublicStoreShell(slug: string, viewerId?: string) {
     logoUrl: mediaUrl("logo", logoKey),
     /** The logo on a wide 1200×630 card (small JPEG) — the store pages' `og:image`. */
     shareImageUrl: logoKey ? shareImagePath("logo", logoKey) : null,
-    footer: resolveFooter(footer),
+    footer: resolvedFooter,
     payments: resolvePayments(payments),
     shipping: { mode, rate },
     checkout: resolveCheckoutFields(checkout),

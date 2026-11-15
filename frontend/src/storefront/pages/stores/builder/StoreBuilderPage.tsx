@@ -21,7 +21,7 @@ import {
 } from '../../../layout/icons'
 import { StoreBannersPage } from '../StoreBannersPage'
 import { StoreFooterPage } from '../StoreFooterPage'
-import { BuilderDesignPanel } from './BuilderDesignPanel'
+import { BuilderDesignPanel, themeChanged } from './BuilderDesignPanel'
 import { BuilderHeader } from './BuilderHeader'
 import type { SaveState } from './BuilderHeader'
 import { BuilderPreview } from './BuilderPreview'
@@ -31,6 +31,10 @@ import { BuilderSectionList } from './BuilderSectionList'
 import type { BuilderTarget } from './BuilderSectionList'
 import { BUILDER_SECTIONS } from './builderSections'
 import { PageSkeleton } from '../../../../shared/ui/states'
+import { ConfirmDialog } from '../../../../shared/ui/ConfirmDialog'
+import { showToast } from '../ui/Toast'
+import { useUnsavedChangesGuard } from '../ui/useUnsavedChangesGuard'
+import { useSectionCounts } from './useSectionCounts'
 
 /**
  * **Store Builder** — one workspace for everything a seller's storefront looks
@@ -130,12 +134,17 @@ function Builder({
   const [theme, setTheme] = useState<StoreTheme>(store.theme)
   const [themeBusy, setThemeBusy] = useState(false)
   const [themeError, setThemeError] = useState<string | null>(null)
+  // Colours only: comparing the whole object (JSON.stringify) flagged "not
+  // saved" the moment Customize was opened, because that seeded a theme name
+  // the seller never typed.
   const themeDirty = useMemo(
-    () => JSON.stringify(theme) !== JSON.stringify(store.theme),
+    () => themeChanged(theme, store.theme),
     [theme, store.theme],
   )
+  // The look the shop switched to on the last save — shown until the next edit.
+  const [savedLook, setSavedLook] = useState<string | null>(null)
 
-  const saveTheme = async () => {
+  const saveTheme = async (lookName: string) => {
     setThemeError(null)
     setThemeBusy(true)
     try {
@@ -143,6 +152,8 @@ function Builder({
       onStoreChange(updated)
       setTheme(updated.theme)
       refreshPreview()
+      setSavedLook(lookName)
+      showToast(`Saved. Your shop now uses ${lookName}.`)
     } catch (err) {
       setThemeError(toApiError(err).message)
     } finally {
@@ -185,7 +196,7 @@ function Builder({
    * than a slow one.
    */
   const push = useCallback(
-    async (next: HomepageSection[]) => {
+    async (next: HomepageSection[], { notify = false } = {}) => {
       const previous = inFlight.current ?? store.homepage
       inFlight.current = next
       setSaveError(null)
@@ -196,6 +207,9 @@ function Builder({
         setSections(updated.homepage)
         inFlight.current = updated.homepage
         refreshPreview()
+        // A tap (switch, reorder) gets a toast; typing only gets the header
+        // pill, or every pause in a heading would pop a message.
+        if (notify) showToast('Saved. Your shop is updated.')
         setSaveState('saved')
         window.clearTimeout(savedNotice.current)
         savedNotice.current = window.setTimeout(
@@ -224,7 +238,7 @@ function Builder({
       if (!debounce) {
         pending.current = undefined
         queued.current = null
-        void push(next)
+        void push(next, { notify: true })
         return
       }
       setSaveState('saving')
@@ -267,11 +281,33 @@ function Builder({
       ? (sections.find((s) => s.key === target) ?? null)
       : null
 
-  const openTarget = (next: BuilderTarget) => {
+  // The footer editor's cards save one by one; leaving it with typed but
+  // unsaved text used to drop that text without a word.
+  const [footerDirty, setFooterDirty] = useState(false)
+  /** Where the seller asked to go while the footer had unsaved text. */
+  const [leaveFooterTo, setLeaveFooterTo] = useState<BuilderTarget | 'list' | null>(null)
+  const guardPrompt = useUnsavedChangesGuard(themeDirty || footerDirty)
+
+  // What each section will show — the list says "4 products" or "Empty".
+  const counts = useSectionCounts(store.slug, previewToken)
+
+  const goTo = (next: BuilderTarget | 'list') => {
+    if (next === 'list') {
+      setTarget(null)
+      return
+    }
     setTab('sections')
     setTarget(next)
     setLastTarget(next)
     setMobileView('edit')
+  }
+
+  const openTarget = (next: BuilderTarget | 'list') => {
+    if (target === 'footer' && footerDirty && next !== 'footer') {
+      setLeaveFooterTo(next)
+      return
+    }
+    goTo(next)
   }
 
   /** Context for the two editors that are whole screens of their own. */
@@ -316,7 +352,8 @@ function Builder({
         <div className="flex shrink-0 items-center gap-2 border-b border-line px-2 py-2.5 sm:px-3">
           <button
             type="button"
-            onClick={() => setTarget(null)}
+            onClick={() => openTarget('list')}
+            aria-label="Back to sections"
             className="flex size-tap shrink-0 items-center justify-center rounded-xl text-muted transition hover:bg-fg/5 hover:text-fg"
           >
             <ArrowLeftIcon className="h-5 w-5" />
@@ -339,13 +376,17 @@ function Builder({
               sections={sections}
               activeKey={lastTarget}
               busy={false}
+              counts={counts}
+              storePath={storePath}
               onSelect={openTarget}
               onToggle={toggle}
               onReorder={(next) => commit(next)}
             />
             <p className="mt-4 text-xs text-muted">
-              A section appears in your shop when it is switched on and has
-              something to show. Everything here saves as you change it.
+              Turned on + has something to show = shows in your shop. Changes
+              on this list save at once. Colours save when you tap{' '}
+              <span className="font-semibold">Use this look for my shop</span>{' '}
+              in the Design tab.
             </p>
           </>
         )}
@@ -354,8 +395,11 @@ function Builder({
           <BuilderDesignPanel
             store={store}
             theme={theme}
-            onThemeChange={setTheme}
-            onSave={() => void saveTheme()}
+            onThemeChange={(next) => {
+              setTheme(next)
+              setSavedLook(null)
+            }}
+            onSave={(lookName) => void saveTheme(lookName)}
             onDiscard={() => {
               setTheme(store.theme)
               setThemeError(null)
@@ -363,6 +407,7 @@ function Builder({
             dirty={themeDirty}
             busy={themeBusy}
             error={themeError}
+            savedName={savedLook}
           />
         )}
 
@@ -370,7 +415,7 @@ function Builder({
 
         {target === 'footer' && (
           <ManagedStoreProvider value={managed}>
-            <StoreFooterPage embedded />
+            <StoreFooterPage embedded onDirtyChange={setFooterDirty} />
           </ManagedStoreProvider>
         )}
 
@@ -458,8 +503,12 @@ function Builder({
       </div>
 
       <div className="flex min-h-0 flex-1 lg:grid lg:grid-cols-[minmax(320px,380px)_1fr]">
+        {/* `w-full` below `lg`: these are flex children of a row, and without
+            a width of their own they shrink to their content — the preview's
+            content takes ITS width from the column, so both settled at 0 and
+            the frame was scaled to nothing on phones. */}
         <div
-          className={`min-w-0 border-line bg-surface lg:block lg:h-full lg:border-r ${
+          className={`w-full min-w-0 border-line bg-surface lg:block lg:h-full lg:w-auto lg:border-r ${
             mobileView === 'edit' ? '' : 'hidden'
           }`}
         >
@@ -467,13 +516,29 @@ function Builder({
         </div>
 
         <div
-          className={`min-w-0 bg-surface-alt p-3 sm:p-4 lg:flex lg:h-full lg:items-start lg:justify-center lg:overflow-y-auto ${
+          className={`w-full min-w-0 bg-surface-alt p-3 sm:p-4 lg:flex lg:h-full lg:w-auto lg:items-start lg:justify-center lg:overflow-y-auto ${
             mobileView === 'preview' ? 'flex' : 'hidden'
           }`}
         >
           {preview}
         </div>
       </div>
+
+      {guardPrompt}
+      <ConfirmDialog
+        open={leaveFooterTo !== null}
+        title="Leave without saving?"
+        description="You typed something in the footer but did not save it. If you leave now, it will be lost."
+        confirmLabel="Leave"
+        cancelLabel="Stay here"
+        onConfirm={() => {
+          const next = leaveFooterTo
+          setLeaveFooterTo(null)
+          setFooterDirty(false)
+          if (next) goTo(next)
+        }}
+        onCancel={() => setLeaveFooterTo(null)}
+      />
     </div>
   )
 }

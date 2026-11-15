@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { Button } from '../../../../shared/ui/Button'
 import { useUnsavedChangesGuard } from './useUnsavedChangesGuard'
@@ -34,6 +35,7 @@ export function SaveBar({
   onDiscard,
   onSave,
   guard = true,
+  saveDisabled = false,
 }: {
   dirty: boolean
   saving?: boolean
@@ -48,9 +50,23 @@ export function SaveBar({
   /** Warn before leaving with unsaved edits. Off only when a page already
    *  guards itself. */
   guard?: boolean
+  /** The form has a problem the seller must fix first (e.g. an empty name). */
+  saveDisabled?: boolean
 }) {
   const prompt = useUnsavedChangesGuard(guard && dirty)
   const visible = dirty || saving || Boolean(error)
+
+  // While the bar is up, a field the browser scrolls into view (on focus, or
+  // when the phone keyboard opens) stops ABOVE the bar instead of behind it.
+  useEffect(() => {
+    if (!visible) return
+    const root = document.documentElement
+    const before = root.style.scrollPaddingBottom
+    root.style.scrollPaddingBottom = '9rem'
+    return () => {
+      root.style.scrollPaddingBottom = before
+    }
+  }, [visible])
 
   return (
     <>
@@ -85,6 +101,7 @@ export function SaveBar({
                 type={onSave ? 'button' : 'submit'}
                 size="lg"
                 loading={saving}
+                disabled={saveDisabled}
                 onClick={onSave}
                 className="flex-1 sm:flex-none"
               >

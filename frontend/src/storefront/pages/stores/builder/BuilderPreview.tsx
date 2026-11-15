@@ -37,6 +37,9 @@ const DEVICE_HEIGHT: Record<PreviewDevice, number> = {
   mobile: 844,
 }
 
+/** The smallest the frame is ever drawn — below this nothing is readable. */
+const MIN_SCALE = 0.3
+
 export function BuilderPreview({
   slug,
   device,
@@ -82,8 +85,11 @@ export function BuilderPreview({
     const fit = () => {
       const available = el.clientWidth
       // Never scale UP: a phone preview blown to 2x on a wide monitor looks
-      // like a rendering bug, not a phone.
-      setScale(Math.min(1, available / width))
+      // like a rendering bug, not a phone. Never 0 either: a box that has not
+      // been laid out yet (or a parent that forgot to give it a width) used
+      // to compute scale(0) and the preview vanished on phones.
+      if (available <= 0) return
+      setScale(Math.max(MIN_SCALE, Math.min(1, available / width)))
     }
     fit()
     const observer = new ResizeObserver(fit)
@@ -132,7 +138,7 @@ export function BuilderPreview({
   return (
     <div
       ref={box}
-      className="flex min-w-0 flex-1 justify-center overflow-hidden"
+      className="flex w-full min-w-0 flex-1 justify-center overflow-hidden"
     >
       <div
         // The scaled frame still occupies its FULL height in the layout, so

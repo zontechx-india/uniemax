@@ -304,6 +304,15 @@ export function StarIcon({
   )
 }
 
+export function TrophyIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z" />
+      <path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3" />
+    </Svg>
+  )
+}
+
 export function GripIcon({ className }: { className?: string }) {
   return (
     <svg

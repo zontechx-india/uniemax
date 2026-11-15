@@ -128,6 +128,113 @@ export const GST_STATE_CODES: Record<string, string> = {
   '38': 'Ladakh',
 }
 
+/**
+ * The states a PIN code can belong to, from its first two digits (India
+ * Post's postal regions). Border regions list every state they cover, so a
+ * PIN is never flagged wrong just because it sits near a state line. Empty
+ * for a prefix not listed — callers then say nothing.
+ *
+ * Offline on purpose: it fills the state and catches "PIN 600001 but state
+ * Kerala" with no outside service. It cannot name the city — that needs a
+ * full PIN directory.
+ */
+const PIN_PREFIX_STATES: Record<string, string[]> = {
+  '11': ['Delhi'],
+  '12': ['Haryana'],
+  '13': ['Haryana', 'Punjab'],
+  '14': ['Punjab'],
+  '15': ['Punjab'],
+  '16': ['Punjab', 'Chandigarh', 'Haryana'],
+  '17': ['Himachal Pradesh'],
+  '18': ['Jammu and Kashmir'],
+  '19': ['Jammu and Kashmir', 'Ladakh'],
+  '20': ['Uttar Pradesh'],
+  '21': ['Uttar Pradesh'],
+  '22': ['Uttar Pradesh'],
+  '23': ['Uttar Pradesh'],
+  '24': ['Uttar Pradesh', 'Uttarakhand'],
+  '25': ['Uttar Pradesh'],
+  '26': ['Uttarakhand', 'Uttar Pradesh'],
+  '27': ['Uttar Pradesh'],
+  '28': ['Uttar Pradesh'],
+  '30': ['Rajasthan'],
+  '31': ['Rajasthan'],
+  '32': ['Rajasthan'],
+  '33': ['Rajasthan'],
+  '34': ['Rajasthan'],
+  '36': ['Gujarat'],
+  '37': ['Gujarat'],
+  '38': ['Gujarat'],
+  '39': ['Gujarat', 'Dadra and Nagar Haveli and Daman and Diu'],
+  '40': ['Maharashtra', 'Goa'],
+  '41': ['Maharashtra'],
+  '42': ['Maharashtra'],
+  '43': ['Maharashtra'],
+  '44': ['Maharashtra'],
+  '45': ['Madhya Pradesh'],
+  '46': ['Madhya Pradesh'],
+  '47': ['Madhya Pradesh'],
+  '48': ['Madhya Pradesh'],
+  '49': ['Chhattisgarh'],
+  '50': ['Telangana', 'Andhra Pradesh'],
+  '51': ['Andhra Pradesh', 'Telangana'],
+  '52': ['Andhra Pradesh'],
+  '53': ['Andhra Pradesh'],
+  '56': ['Karnataka'],
+  '57': ['Karnataka'],
+  '58': ['Karnataka'],
+  '59': ['Karnataka'],
+  '60': ['Tamil Nadu', 'Puducherry'],
+  '61': ['Tamil Nadu', 'Puducherry'],
+  '62': ['Tamil Nadu'],
+  '63': ['Tamil Nadu'],
+  '64': ['Tamil Nadu'],
+  '67': ['Kerala', 'Puducherry'],
+  '68': ['Kerala', 'Lakshadweep'],
+  '69': ['Kerala'],
+  '70': ['West Bengal'],
+  '71': ['West Bengal'],
+  '72': ['West Bengal'],
+  '73': ['West Bengal', 'Sikkim'],
+  '74': ['West Bengal', 'Andaman and Nicobar Islands'],
+  '75': ['Odisha'],
+  '76': ['Odisha'],
+  '77': ['Odisha'],
+  '78': ['Assam', 'Arunachal Pradesh'],
+  '79': [
+    'Arunachal Pradesh',
+    'Assam',
+    'Manipur',
+    'Meghalaya',
+    'Mizoram',
+    'Nagaland',
+    'Tripura',
+  ],
+  '80': ['Bihar'],
+  '81': ['Jharkhand', 'Bihar'],
+  '82': ['Jharkhand', 'Bihar'],
+  '83': ['Jharkhand'],
+  '84': ['Bihar'],
+  '85': ['Bihar'],
+}
+
+export function pinStates(pincode: string): string[] {
+  if (!PINCODE_RE.test(pincode.trim())) return []
+  return PIN_PREFIX_STATES[pincode.trim().slice(0, 2)] ?? []
+}
+
+/**
+ * The warning to show when a GSTIN's state code is not the address's state —
+ * the most common reason a GSTIN is rejected later. Null when they agree or
+ * either is missing.
+ */
+export function gstStateMismatch(gstin: string, addressState: string | null | undefined): string | null {
+  if (!GSTIN_RE.test(gstin) || !addressState) return null
+  const gstState = GST_STATE_CODES[gstin.slice(0, 2)]
+  if (!gstState || gstState === addressState) return null
+  return `This GST number is for ${gstState}, but your address is in ${addressState}. Please check both.`
+}
+
 /** Characters 3–12 of a GSTIN are the holder's PAN — they must agree. */
 export function gstinContainsPan(gstin: string, pan: string): boolean {
   return gstin.slice(2, 12).toUpperCase() === pan.toUpperCase()

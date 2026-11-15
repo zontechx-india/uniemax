@@ -36,6 +36,8 @@ export function StoreDetailsPage() {
   const [busy, setBusy] = useState(false)
 
   const dirty = name.trim() !== store.name
+  // Said straight away, not only after Save is pressed.
+  const empty = name.trim() === ''
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -72,13 +74,16 @@ export function StoreDetailsPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={60}
+            required
             hint="Changing the name does not change your shop link."
-            error={error ?? undefined}
+            error={error ?? (empty ? 'Shop name is needed.' : undefined)}
           />
         </PanelCard>
         <SaveBar
           dirty={dirty}
           saving={busy}
+          saveDisabled={empty}
+          message={empty ? 'Type a shop name to save.' : undefined}
           onDiscard={() => {
             setName(store.name)
             setError(null)
