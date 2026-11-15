@@ -132,11 +132,16 @@ jobs:
       - name: Verify public production URLs
         run: |
           for url in https://uniemax.com/ https://admin.uniemax.com/ \
-                     https://uniemax.com/api/v1/public/stores https://www.uniemax.com/; do
+                     https://uniemax.com/api/v1/public/stores; do
             code=$(curl -s -o /dev/null -w '%{http_code}' "$url")
             echo "$url -> $code"
             [ "$code" = "200" ] || exit 1
           done
+          # www is not a second copy of the site: it 301s to the bare domain
+          # (one canonical host for SEO — docs/DEPLOYMENT.md, docs/SEO.md).
+          www=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' https://www.uniemax.com/)
+          echo "https://www.uniemax.com/ -> $www"
+          [ "$www" = "301 https://uniemax.com/" ] || exit 1
           # The admin console's own host must return the admin shell, not the storefront.
           curl -s -H 'Accept: text/html' https://admin.uniemax.com/orders | grep -q assets/admin \
             || { echo "FAIL: admin.uniemax.com does not serve the admin app"; exit 1; }
