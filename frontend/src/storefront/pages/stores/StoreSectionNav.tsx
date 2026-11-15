@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ComponentType } from 'react'
+import type { ComponentType, MouseEvent } from 'react'
 import { NavLink, useLocation, useParams, useResolvedPath } from 'react-router-dom'
+import { useBack } from '../../../shared/navTrail'
 import { useDropshipRole } from '../../../packages/dropship'
 import type { DropshipRole } from '../../../packages/dropship'
 import type { StepState } from '../../features/stores/storeProfile'
@@ -339,6 +340,36 @@ export function useActiveSection(): { group: SectionGroup; item: SectionItem } {
   }, [base, pathname, groups])
 }
 
+/**
+ * Section links behave like the tabs of a phone app, so the back button walks
+ * back through SCREENS, not through every tab the seller tapped:
+ *
+ *   - From the shop's home a section opens on top of it (a new history entry).
+ *   - From one section to another the page is swapped (replace), so back from
+ *     any section lands on the home, and back again on All stores.
+ *   - Home itself, from a section, steps BACK to the home entry instead of
+ *     stacking a second copy of it.
+ *
+ * Spread the result onto a `NavLink`: `<NavLink to={to} {...sectionLink(to)}>`.
+ */
+export function useSectionLink() {
+  const onHome = useActiveSection().item.to === '.'
+  const goHome = useBack('.')
+  return (to: string, after?: () => void) => ({
+    replace: !onHome || to === '.',
+    onClick: (event: MouseEvent<HTMLAnchorElement>) => {
+      after?.()
+      // A new-tab / modified click is the browser's, untouched.
+      const plain =
+        event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey
+      if (plain && to === '.' && !onHome) {
+        event.preventDefault()
+        goHome()
+      }
+    },
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Rows
 // ---------------------------------------------------------------------------
@@ -389,12 +420,13 @@ function SectionRow({
   const { label, to, icon: Icon, end, badge, count } = item
   const steps = data.setupSteps.get(to)
   const setup = steps ? sectionStatus(steps) : null
+  const sectionLink = useSectionLink()
 
   return (
     <NavLink
       to={to}
       end={end}
-      onClick={onNavigate}
+      {...sectionLink(to, onNavigate)}
       // Selection is a Light-Purple PILL with the icon and label in brand —
       // the redesign dropped the old 3px left bar, which read as a
       // table-row highlight rather than "you are here".
@@ -588,6 +620,7 @@ function SectionList({
 export function StoreSectionNav({ rail, ...data }: NavData & { rail: boolean }) {
   const active = useActiveSection()
   const groups = useSectionGroups()
+  const sectionLink = useSectionLink()
   const [collapsed, setCollapsed] = useState<string[]>(readCollapsed)
 
   /**
@@ -652,6 +685,7 @@ export function StoreSectionNav({ rail, ...data }: NavData & { rail: boolean }) 
                       key={label}
                       to={to}
                       end={end}
+                      {...sectionLink(to)}
                       title={`${group.caption} · ${label}`}
                       className={({ isActive }) =>
                         `relative flex h-11 w-11 items-center justify-center rounded-md transition-colors ${

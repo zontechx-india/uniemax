@@ -7,6 +7,7 @@ import {
 import { lazy, Suspense } from 'react'
 import { PublicStoreLayout } from '../features/publicStore/PublicStoreLayout'
 import { RouteError } from '../../shared/ui/RouteError'
+import { NavTrailRecorder } from '../../shared/navTrail'
 import { PageSkeleton } from '../../shared/ui/states'
 
 /**
@@ -98,6 +99,7 @@ function PublicRoot() {
   return (
     <>
       <ScrollRestoration />
+      <NavTrailRecorder />
       <Outlet />
     </>
   )

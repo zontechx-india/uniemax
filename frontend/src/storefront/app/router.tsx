@@ -10,6 +10,7 @@ import { AppLayout } from '../layout/AppLayout'
 import { RequireCustomer } from './RequireCustomer'
 import { LoginRoute } from '../pages/LoginRoute'
 import { RouteError } from '../../shared/ui/RouteError'
+import { NavTrailRecorder } from '../../shared/navTrail'
 import {
   affiliatePartnerRoutes,
   affiliatePublicRoutes,
@@ -68,6 +69,7 @@ export const router = createBrowserRouter([
     element: (
       <>
         <ScrollRestoration />
+        <NavTrailRecorder />
         <Outlet />
       </>
     ),

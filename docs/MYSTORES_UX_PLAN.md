@@ -374,7 +374,7 @@ Each phase ships on its own and is approved before the next one starts.
 - [x] Save status pill always visible on mobile (Saving… / Saved / Not saved)
 - [x] "Published" → "Live · Take offline", behind a confirmation
 - [x] 44 px ↑ / ↓ beside the drag handle; 56px section rows
-- [x] Sticky colour bar fixed (no edge overflow) with plain copy; Change / See my shop switch
+- [x] Sticky colour bar fixed (no edge overflow) with plain copy; Change / Preview my shop switch
 - [x] Glass save bar; the builder's own panels stay solid (they sit beside a live iframe)
 
 ### Phase 8 — Support pages & polish

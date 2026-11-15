@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
+import { useBackLayer } from '../../../shared/navTrail'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { ErrorNote } from '../../../shared/ui/form'
 import { describeDeliveryRule } from '../../features/stores/deliveryRules'
@@ -84,6 +85,19 @@ export function StoreProductsPage() {
     /** Bumped by "Add another product" so a fresh wizard mounts. */
     round?: number
   } | null>(null)
+  // The wizard covers the whole screen, so the phone's back button steps back
+  // through it (then closes it) instead of leaving the Products page.
+  const wizardBack = useRef<(() => boolean) | null>(null)
+  const closeWizard = () => {
+    setWizard(null)
+    refreshStore?.()
+    offers.reload()
+  }
+  useBackLayer(wizard !== null, () => {
+    if (wizardBack.current) return wizardBack.current()
+    closeWizard()
+    return false
+  })
   const [toDelete, setToDelete] = useState<StoreProduct | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
@@ -356,11 +370,8 @@ export function StoreProductsPage() {
             setCategories(list)
             refreshStore?.()
           }}
-          onClose={() => {
-            setWizard(null)
-            refreshStore?.()
-            offers.reload()
-          }}
+          onClose={closeWizard}
+          backRef={wizardBack}
           onAddAnother={() => {
             refreshStore?.()
             setWizard({ product: null, startAt: 'basics', round: (wizard.round ?? 0) + 1 })

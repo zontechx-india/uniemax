@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { BackLink } from '../../../shared/navTrail'
 import { toApiError } from '../../../shared/auth/http'
 import { ErrorNote, InfoNote, Select } from '../../../shared/ui/form'
 import { CATEGORY_LABELS, storeInboxApi } from '../../features/support/supportApi'
@@ -83,14 +84,14 @@ export function StoreCustomerSupportTicketPage() {
   }
 
   const backLink = (
-    <Link
+    <BackLink
       to=".."
       relative="path"
       className="inline-flex items-center gap-1.5 text-sm font-medium text-muted transition hover:text-fg"
     >
       <ArrowLeftIcon className="h-4 w-4" />
       All requests
-    </Link>
+    </BackLink>
   )
 
   if (loadError) {

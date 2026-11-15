@@ -1,6 +1,7 @@
 import { usePrivatePageTitle } from '../../../shared/seo'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, Navigate, Outlet, useParams } from 'react-router-dom'
+import { Link, Navigate, Outlet, useLocation, useParams } from 'react-router-dom'
+import { BackLink } from '../../../shared/navTrail'
 import { toApiError } from '../../../shared/auth/http'
 import { storesApi } from '../../features/stores/storesApi'
 import type { StoreDashboard } from '../../features/stores/storesApi'
@@ -182,13 +183,7 @@ export function StoreManageLayout() {
           ONE thing to do with it — Share once live, Publish until then. It
           replaced the sidebar card that stacked above every section. */}
       <div className="ws-card flex items-center gap-2 rounded-lg p-1 pr-2 lg:hidden">
-        <Link
-          to={scope.indexPath}
-          aria-label="All stores"
-          className="flex size-tap shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-fg/5 hover:text-fg"
-        >
-          <ArrowLeftIcon className="h-5 w-5" />
-        </Link>
+        <PhoneBackButton storePath={scope.storePath(store.slug)} indexPath={scope.indexPath} />
         {store.logoUrl ? (
           <MediaImg
             sizes="32px"
@@ -383,5 +378,42 @@ export function StoreManageLayout() {
       {/* "Saved ✓" confirmations for instant saves (stores/ui `showToast`). */}
       <ToastHost />
     </div>
+  )
+}
+
+/**
+ * The phone strip's back arrow — a phone app's back, not a fixed jump.
+ *
+ * On the shop's home (Dashboard) it goes up to All stores. On any other page
+ * it goes back to the screen the seller came from: Store details opened from
+ * the builder returns to the builder (at the same section), Business details
+ * opened from a Dashboard card returns to the Dashboard. It used to jump
+ * straight to All stores from everywhere, throwing the seller out of the shop.
+ * With nothing to go back to (a link opened in a new tab) it goes to the
+ * shop's home.
+ */
+function PhoneBackButton({
+  storePath,
+  indexPath,
+}: {
+  storePath: string
+  indexPath: string
+}) {
+  const { pathname } = useLocation()
+  const onHome = pathname.replace(/\/$/, '') === storePath.replace(/\/$/, '')
+  const label = onHome ? 'All stores' : 'Back'
+
+  return (
+    <BackLink
+      // Keyed: the two are different back steps, each with its own hook.
+      key={onHome ? 'stores' : 'previous'}
+      to={onHome ? indexPath : storePath}
+      anywhere={!onHome}
+      aria-label={label}
+      title={label}
+      className="flex size-tap shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-fg/5 hover:text-fg"
+    >
+      <ArrowLeftIcon className="h-5 w-5" />
+    </BackLink>
   )
 }

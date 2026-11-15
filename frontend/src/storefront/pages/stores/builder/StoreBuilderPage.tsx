@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import {
+  Link,
+  Navigate,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom'
+import type { Location } from 'react-router-dom'
 import { toApiError } from '../../../../shared/auth/http'
+import { useBack } from '../../../../shared/navTrail'
 import { usePageTitle } from '../../../../shared/usePageTitle'
 import { storesApi } from '../../../features/stores/storesApi'
 import type {
@@ -31,7 +40,6 @@ import { BuilderSectionList } from './BuilderSectionList'
 import type { BuilderTarget } from './BuilderSectionList'
 import { BUILDER_SECTIONS } from './builderSections'
 import { PageSkeleton } from '../../../../shared/ui/states'
-import { ConfirmDialog } from '../../../../shared/ui/ConfirmDialog'
 import { showToast } from '../ui/Toast'
 import { useUnsavedChangesGuard } from '../ui/useUnsavedChangesGuard'
 import { useSectionCounts } from './useSectionCounts'
@@ -110,11 +118,47 @@ function Builder({
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  const [tab, setTab] = useState<'sections' | 'design'>('sections')
-  const [target, setTarget] = useState<BuilderTarget | null>(null)
+  // Where the seller is lives in the URL, not in state: `?edit=` (the open
+  // section), `?tab=design`, `?view=preview`. Opening a section ADDS a history
+  // entry, so the phone's back button (or a swipe) closes it like a screen in
+  // an app instead of leaving the builder; and a seller who follows a link out
+  // (store details, products) comes back to the exact section they left.
+  const [params, setParams] = useSearchParams()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const target = asTarget(params.get('edit'))
+  const tab: 'sections' | 'design' =
+    target === null && params.get('tab') === 'design' ? 'design' : 'sections'
+  const mobileView: 'edit' | 'preview' =
+    params.get('view') === 'preview' ? 'preview' : 'edit'
+
+  /** Change some URL params. Switches (tab, phone view) replace — like a
+   *  segmented control in an app, they are not screens to go back through. */
+  const setUrl = (
+    patch: Record<string, string | null>,
+    { push = false }: { push?: boolean } = {},
+  ) => {
+    const next = new URLSearchParams(params)
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null) next.delete(key)
+      else next.set(key, value)
+    }
+    setParams(next, {
+      replace: !push,
+      // Remembered on the entry, so closing knows it can simply step back.
+      state: push ? { builderSection: true } : location.state,
+    })
+  }
+  const setTab = (next: 'sections' | 'design') =>
+    setUrl({ tab: next === 'design' ? 'design' : null })
+  const setMobileView = (next: 'edit' | 'preview') =>
+    setUrl({ view: next === 'preview' ? 'preview' : null })
+
   // Survives closing the editor, so coming back to the list still shows which
   // row you were just in — otherwise a seller loses their place every time.
-  const [lastTarget, setLastTarget] = useState<BuilderTarget | null>(null)
+  // (Adjusted while rendering, React's pattern for state that follows a prop.)
+  const [lastTarget, setLastTarget] = useState<BuilderTarget | null>(target)
+  if (target !== null && target !== lastTarget) setLastTarget(target)
   // A seller on a phone is previewing a phone; defaulting to the desktop
   // frame would hand them a 1440px shop scaled to a quarter size.
   const [device, setDevice] = useState<PreviewDevice>(() =>
@@ -122,10 +166,6 @@ function Builder({
       ? 'mobile'
       : 'desktop',
   )
-  // Below `lg` the panel and the preview cannot share a row, so they share a
-  // switch instead — never a two-column desktop layout squeezed onto a phone.
-  const [mobileView, setMobileView] = useState<'edit' | 'preview'>('edit')
-
   // Bumped after every successful write; the preview frame refetches on it.
   const [previewToken, setPreviewToken] = useState(0)
   const refreshPreview = useCallback(() => setPreviewToken((n) => n + 1), [])
@@ -282,33 +322,43 @@ function Builder({
       : null
 
   // The footer editor's cards save one by one; leaving it with typed but
-  // unsaved text used to drop that text without a word.
-  const [footerDirty, setFooterDirty] = useState(false)
-  /** Where the seller asked to go while the footer had unsaved text. */
-  const [leaveFooterTo, setLeaveFooterTo] = useState<BuilderTarget | 'list' | null>(null)
-  const guardPrompt = useUnsavedChangesGuard(themeDirty || footerDirty)
+  // unsaved text used to drop that text without a word. Closing the footer
+  // editor is a query change (`?edit=footer` → list), so it has its own rule.
+  // Counted only while the footer editor is open: once it closes, its text is gone.
+  const [footerEdits, setFooterDirty] = useState(false)
+  const footerDirty = footerEdits && target === 'footer'
+  // Unsaved colours survive moving around inside the builder (they live in
+  // this page's state), so only leaving the builder asks.
+  const themeGuard = useUnsavedChangesGuard(themeDirty && !footerDirty)
+  const footerGuard = useUnsavedChangesGuard(footerDirty, { leaving: leavesFooter })
 
   // What each section will show — the list says "4 products" or "Empty".
   const counts = useSectionCounts(store.slug, previewToken)
 
-  const goTo = (next: BuilderTarget | 'list') => {
-    if (next === 'list') {
-      setTarget(null)
+  /** Open a section's editor (or go back to the list). */
+  const openTarget = (next: BuilderTarget | 'list') => {
+    if (next === 'list') return closeTarget()
+    if (next === target) return setMobileView('edit')
+    if (target !== null) {
+      // Moving from one editor to another (a tap in the preview) swaps the
+      // screen rather than stacking it: back still lands on the list.
+      setUrl({ edit: next, tab: null, view: null })
       return
     }
-    setTab('sections')
-    setTarget(next)
-    setLastTarget(next)
-    setMobileView('edit')
+    setUrl({ edit: next, tab: null, view: null }, { push: true })
   }
 
-  const openTarget = (next: BuilderTarget | 'list') => {
-    if (target === 'footer' && footerDirty && next !== 'footer') {
-      setLeaveFooterTo(next)
-      return
-    }
-    goTo(next)
+  /** Back from an editor to the list — the same step the phone's back takes. */
+  const closeTarget = () => {
+    const pushed = (location.state as { builderSection?: boolean } | null)?.builderSection
+    if (pushed) navigate(-1)
+    else setUrl({ edit: null })
   }
+
+  /** Leave the builder for wherever the seller came from (the store's home
+   *  when they arrived from outside the app). */
+  const leaveBuilder = useBack(storePath, { anywhere: true })
+  const onHeaderBack = () => (target !== null ? closeTarget() : leaveBuilder())
 
   /** Context for the two editors that are whole screens of their own. */
   const managed = useMemo(
@@ -350,11 +400,14 @@ function Builder({
 
       {target !== null && (
         <div className="flex shrink-0 items-center gap-2 border-b border-line px-2 py-2.5 sm:px-3">
+          {/* Desktop only: on a phone the header's arrow, right above, does
+              this same step — two arrows stacked read as two different
+              "backs", and the top one used to leave the builder. */}
           <button
             type="button"
-            onClick={() => openTarget('list')}
+            onClick={closeTarget}
             aria-label="Back to sections"
-            className="flex size-tap shrink-0 items-center justify-center rounded-xl text-muted transition hover:bg-fg/5 hover:text-fg"
+            className="hidden size-tap shrink-0 items-center justify-center rounded-xl text-muted transition hover:bg-fg/5 hover:text-fg lg:flex"
           >
             <ArrowLeftIcon className="h-5 w-5" />
             <span className="sr-only">Back to sections</span>
@@ -474,7 +527,9 @@ function Builder({
       <BuilderHeader
         store={store}
         onStoreChange={onStoreChange}
+        onBack={onHeaderBack}
         backTo={storePath}
+        backLabel={target !== null ? 'Back to sections' : `Back to ${store.name}`}
         device={device}
         onDeviceChange={setDevice}
         saveState={saveState}
@@ -496,7 +551,7 @@ function Builder({
                   : 'text-muted hover:text-fg'
               }`}
             >
-              {view === 'edit' ? 'Change' : 'See my shop'}
+              {view === 'edit' ? 'Change' : 'Preview my shop'}
             </button>
           ))}
         </div>
@@ -524,24 +579,26 @@ function Builder({
         </div>
       </div>
 
-      {guardPrompt}
-      <ConfirmDialog
-        open={leaveFooterTo !== null}
-        title="Leave without saving?"
-        description="You typed something in the footer but did not save it. If you leave now, it will be lost."
-        confirmLabel="Leave"
-        cancelLabel="Stay here"
-        onConfirm={() => {
-          const next = leaveFooterTo
-          setLeaveFooterTo(null)
-          setFooterDirty(false)
-          if (next) goTo(next)
-        }}
-        onCancel={() => setLeaveFooterTo(null)}
-      />
+      {themeGuard}
+      {footerGuard}
     </div>
   )
 }
+
+/** The `?edit=` value, if it names something the builder can open. */
+function asTarget(value: string | null): BuilderTarget | null {
+  if (value === 'header' || value === 'footer') return value
+  if (value !== null && Object.hasOwn(BUILDER_SECTIONS, value)) {
+    return value as BuilderTarget
+  }
+  return null
+}
+
+/** Any move that closes the footer editor — another section, the list, or
+ *  another page. */
+const leavesFooter = (current: Location, next: Location) =>
+  current.pathname !== next.pathname ||
+  new URLSearchParams(next.search).get('edit') !== 'footer'
 
 function PanelTab({
   active,

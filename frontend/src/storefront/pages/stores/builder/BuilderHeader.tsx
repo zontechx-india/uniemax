@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { toApiError } from '../../../../shared/auth/http'
+import { BackLink } from '../../../../shared/navTrail'
 import { Button } from '../../../../shared/ui/Button'
 import { publicStoreUrl, storesApi } from '../../../features/stores/storesApi'
 import type { Store } from '../../../features/stores/storesApi'
@@ -37,6 +37,8 @@ export function BuilderHeader({
   store,
   onStoreChange,
   backTo,
+  onBack,
+  backLabel,
   device,
   onDeviceChange,
   saveState,
@@ -44,7 +46,11 @@ export function BuilderHeader({
 }: {
   store: Store
   onStoreChange: (store: Store) => void
-  /** The store's management home — where the back arrow goes. */
+  /** One step back: closes an open section, or leaves the builder for
+   *  wherever the seller came from. Never a fixed jump out. */
+  onBack: () => void
+  backLabel: string
+  /** Where the arrow links to (new tab, or nothing to go back to). */
   backTo: string
   device: PreviewDevice
   onDeviceChange: (device: PreviewDevice) => void
@@ -83,14 +89,15 @@ export function BuilderHeader({
     // workbench it is simply the top row of a fixed frame.
     <header className="sticky top-0 z-30 shrink-0 border-b border-line bg-surface">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 sm:px-4">
-        <Link
+        <BackLink
           to={backTo}
-          title={`Back to ${store.name}`}
+          onBack={onBack}
+          aria-label={backLabel}
+          title={backLabel}
           className="flex size-tap shrink-0 items-center justify-center rounded-xl text-muted transition hover:bg-fg/5 hover:text-fg"
         >
           <ArrowLeftIcon className="h-5 w-5" />
-          <span className="sr-only">Back to {store.name}</span>
-        </Link>
+        </BackLink>
 
         <div className="flex min-w-0 items-center gap-2.5">
           {store.logoUrl ? (

@@ -2,6 +2,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { adminAuth } from '../shared/auth/authApi'
 import { useSession } from '../shared/auth/useSession'
 import { adminBasename } from '../shared/appOrigin'
+import { NavTrailRecorder } from '../shared/navTrail'
 import { ThemeProvider } from '../shared/theme/ThemeProvider'
 import { AppLogoFull } from '../shared/ui/AppLogo'
 import { AdminSessionProvider } from './app/adminSession'
@@ -39,6 +40,7 @@ export function AdminApp() {
   return (
     <ThemeProvider>
       <BrowserRouter basename={adminBasename()}>
+        <NavTrailRecorder />
         <AdminSessionProvider admin={state.user} onSignedOut={() => void signOut()}>
           <AdminRouter />
         </AdminSessionProvider>

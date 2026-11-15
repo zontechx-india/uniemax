@@ -18,6 +18,7 @@ import {
   SectionSheetList,
   useActiveSection,
   useSectionGroups,
+  useSectionLink,
 } from './StoreSectionNav'
 import type { NavData } from './StoreSectionNav'
 
@@ -54,6 +55,7 @@ export function StoreMobileNav({
   const active = useActiveSection()
   const groups = useSectionGroups()
   const { indexPath } = useStoreManageScope()
+  const sectionLink = useSectionLink()
 
   // Only tabs this mode can open (an admin's mount hides some sections).
   const available = new Set(groups.flatMap((g) => g.items.map((i) => i.to)))
@@ -76,6 +78,7 @@ export function StoreMobileNav({
               key={to}
               to={to}
               end={to === '.'}
+              {...sectionLink(to)}
               className={({ isActive }) =>
                 `group/tab flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-2xl text-xs font-semibold transition-colors ${
                   isActive ? 'text-brand' : 'text-muted hover:text-fg'

@@ -788,7 +788,11 @@ One list, **three presentations**:
   **More**. More (highlighted when you are on one of its sections — it keeps the word "More"; a section name was cut to "Categori…") opens
   a `Dialog` sheet with `SectionSheetList` — every group flat and open, 52px
   rows — plus "Switch to another shop". Tabs a mode cannot open (admin hidden
-  sections) are dropped. It replaced a one-row dropdown that put Orders and
+  sections) are dropped. Section links (tabs, More, the desktop sidebar and
+  rail) behave like app tabs (`useSectionLink`): from the Dashboard a section
+  opens on top; from one section to another the page is replaced; Home from
+  a section steps back to the Dashboard entry. So back from any section is
+  the Dashboard, then All stores. It replaced a one-row dropdown that put Orders and
   Products two taps away. The bar is mounted at the layout root, never inside
   a transformed or filtered panel (it would trap a `fixed` child).
 
@@ -1924,6 +1928,21 @@ arrow deliberately keeps `window.history.back()`: the store header reaches
 it with a full page load (`<a href>`), which resets `idx` to 0 even though
 the store is one browser step back.
 
+**Seller pages go back like a phone app (`shared/navTrail.tsx`).**
+`NavTrailRecorder` (mounted once at the root of the storefront, public and
+admin routers) keeps a copy of this tab's history by `idx`. `useBack(to)`
+steps back when the page before is `to` (so a list keeps its filters and
+scroll), otherwise replaces this page with `to`; `{ anywhere: true }` steps
+back to whatever page came before. Entries of the same page that differ only
+in the query (`?edit=`, a tab) are skipped. `BackLink` is the same as a link
+(it still opens in a new tab), and `useBackLayer(open, onBack)` gives a
+full-screen layer its own history entry so the phone's back closes it (or
+steps inside it) instead of leaving the page. Used by: the store strip's
+phone arrow (`StoreManageLayout` — **All stores** on the Dashboard, **Back**
+to the previous screen everywhere else; it used to jump to All stores from
+every page), "All orders" / "All requests" / "All tickets", the Store
+Builder header, and the product wizard.
+
 **SEO / head tags — `shared/seo.ts`.** `useSeo({ title, description,
 canonical, image, type, robots, jsonLd })` owns the whole `<head>` per route;
 `usePageTitle(...parts)` is the title-only shorthand and `usePrivatePageTitle`
@@ -2197,15 +2216,27 @@ is never shown a pickup-address item.
   to the bottom of the screen below `lg` and sticky in the panel above it;
   after saving it says "Your shop now uses X". "Not saved" is judged on the
   colours only (`sameColors`), never on the theme name. Leaving the builder
-  with unsaved colours or unsaved footer text asks first
-  (`useUnsavedChangesGuard`); the panel's Back button out of the footer
-  editor asks too (`StoreFooterPage onDirtyChange`).
+  with unsaved colours asks first (`useUnsavedChangesGuard`); unsaved footer
+  text asks on ANY move out of the footer editor — another section, the
+  list, the phone's back — through the guard's `leaving` rule
+  (`StoreFooterPage onDirtyChange`).
+
+  **Navigation.** Where the seller is lives in the URL: `?edit=<section>`,
+  `?tab=design`, `?view=preview`. Opening a section pushes an entry, so the
+  phone's back closes it; moving from one editor to another (a tap in the
+  preview) replaces it, so back still lands on the list; the tab and the
+  phone Change / Preview switch replace (they are switches, not screens). A
+  link out (Store details, products) and back returns to the same section.
+  The header arrow is one step up: an open section → the list, the list →
+  the page the builder was opened from (`useBack(storePath, { anywhere })`).
+  On phones the panel's own back arrow is hidden (the header's does the same
+  step); it shows from `lg`.
 
   **Header & phones.** The header (`BuilderHeader`) reads "Design your shop";
   a live shop shows a **Live** status pill — not a button: closing the shop
   lives on the store page (`StorePublishCard`, which asks first), not beside
   the design tools; an unpublished one shows **Publish** with the blockers as
-  links. Below `lg` one column is switched with a 40px **Change / See my
+  links. Below `lg` one column is switched with a 40px **Change / Preview my
   shop** toggle; both columns are `w-full` there (without it the preview
   column shrank to 0 and the frame scaled to nothing), and the preview scale
   never drops below 0.3. Back buttons are 44px.
@@ -3342,6 +3373,8 @@ frontend/
     │   ├── useGoBack.ts         # Back controls that STEP BACK (navigate(-1)) instead
     │   │                        #   of pushing the previous page again, with a
     │   │                        #   replace-fallback for direct opens
+    │   ├── navTrail.tsx         # App-style back: NavTrailRecorder, useBack, BackLink,
+    │   │                        #   useBackLayer (phone back closes a full-screen layer)
     │   ├── theme/               # Design-system tokens + runtime theming — see below
     │   │   ├── index.ts          # Barrel: `theme` aggregate + re-exports
     │   │   ├── colors.ts         # palette + dark/light schemes + semantic colors
@@ -3661,7 +3694,8 @@ frontend/
     │           │                        #   Showing switch, ⋯ placement/delete); opens the wizard
     │           ├── products/             # Editors the product wizard composes
     │           │   ├── wizard/               # ProductWizard — steps, progress, review/publish
-    │           │   │   ├── ProductWizard.tsx    # Full-screen on phones (portal) / inline card; step sheet; Review
+    │           │   │   ├── ProductWizard.tsx    # Full-screen on phones (portal) / inline card; step sheet; Review;
+    │           │   │   │                        #   phone back = steps sheet → previous step → close (useBackLayer)
     │           │   │   ├── BasicsStep.tsx       # Name + "more than one colour?" + category → creates the draft
     │           │   │   ├── CategoryPick.tsx     # ① Main category chips → ② grouped sub-category cards
     │           │   │   ├── PhotosStep.tsx       # Media Board on the draft
@@ -4185,7 +4219,7 @@ to `<body>`.
 | `PanelCard` | The one card (`ws-card`): with a `title` it gets a **header bar** — optional icon chip, title, one plain sentence, `aside` (pill/action) — divided from the body by a line; the body is padded unless `padded={false}` (row lists). `id` makes it a focusable deep-link target. Replaces Business `Card`, Footer `SectionCard`, Shipping border-top sections. |
 | `PageHeader` | Section heading: flat 40px `brand-soft` icon tile (no gradient or glow), 22px semibold title, required one-line description, optional action (full width on phones). Phones get a compact version: 32px tile, 18px title, 13px description. |
 | `SaveBar` | THE save model for forms: hidden until `dirty`; then a sticky `ws-bar` (message, **Undo changes**, **Save changes**) that stays under the thumb; shows `error`. Sits above the mobile tab bar via `--seller-dock`. Renders the unsaved-changes guard. |
-| `useUnsavedChangesGuard(dirty)` | `beforeunload` + react-router `useBlocker` with a plain-words "Leave without saving?" sheet. The blocker half renders only under a data router (`UNSAFE_DataRouterContext`) — the admin console mounts these pages under `<BrowserRouter>`, where `useBlocker` would throw. Ignores same-path (query-only) moves. |
+| `useUnsavedChangesGuard(dirty)` | `beforeunload` + react-router `useBlocker` with a plain-words "Leave without saving?" sheet. The blocker half renders only under a data router (`UNSAFE_DataRouterContext`) — the admin console mounts these pages under `<BrowserRouter>`, where `useBlocker` would throw. Ignores same-path (query-only) moves unless `{ leaving }` says otherwise. The blocker is mounted only while `dirty` — a router honours just the newest blocker, so an always-mounted clean guard used to switch off the dirty one. |
 | `ActionRow` | One list item: leading photo, title + status, ≤2 facts, an optional `below` line (a nudge, chips), then ONE labelled primary action, a `toggle` kept apart, and `menu` → `RowMenu`. Actions drop below the text on phones so the name keeps the width. |
 | `RowMenu` | "⋯ More" (44px; word shown from `sm`) → bottom sheet of 56px rows with icon, label and note; `danger` rows forced last and red. |
 | `BigSwitch` | Successor to `ActiveSwitch` (same core props): 52×32 track, 44px hit area, the state *written* beside it (`onText` / `offText`, width reserved for the longer word so lists stay aligned). |

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { MutableRefObject, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { toApiError } from '../../../../../shared/auth/http'
 import { useMediaQuery } from '../../../../../shared/useMediaQuery'
@@ -66,6 +66,7 @@ export function ProductWizard({
   onClose,
   onAddAnother,
   supplyOnly = false,
+  backRef,
 }: {
   storeId: string
   categories: StoreCategory[]
@@ -82,6 +83,12 @@ export function ProductWizard({
   onAddAnother?: () => void
   /** A supplier account: no shop to publish to — the last step offers the product to sellers (D-28). */
   supplyOnly?: boolean
+  /**
+   * Filled with what the phone's back button does here: close the steps
+   * sheet, else go one step back (`true` = handled, the wizard stays open),
+   * else close the wizard as a draft (`false`). See `useBackLayer`.
+   */
+  backRef?: MutableRefObject<(() => boolean) | null>
 }) {
   const [product, setProduct] = useState<StoreProduct | null>(initial)
   const [step, setStep] = useState<StepKey>(initial ? startAt : 'basics')
@@ -145,6 +152,21 @@ export function ProductWizard({
   }
 
   const [stepsOpen, setStepsOpen] = useState(false)
+  useEffect(() => {
+    if (!backRef) return
+    backRef.current = () => {
+      if (stepsOpen) {
+        setStepsOpen(false)
+        return true
+      }
+      if (index > 0) {
+        go(-1)
+        return true
+      }
+      closeAsDraft()
+      return false
+    }
+  })
   const phone = !useMediaQuery('(min-width: 640px)')
   const title = product ? product.name : 'Add a product'
   const currentLabel = (step === 'pricing' && subLabel) || stepLabel(step, supplyOnly)

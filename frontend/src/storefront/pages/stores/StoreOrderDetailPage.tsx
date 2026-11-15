@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { BackLink } from '../../../shared/navTrail'
 import { toApiError } from '../../../shared/auth/http'
 import { copyToClipboard } from '../../../shared/share'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
@@ -364,14 +365,14 @@ export function StoreOrderDetailPage() {
 
   return (
     <div className="space-y-4">
-      <Link
+      <BackLink
         to=".."
         relative="path"
         className="-ml-2 inline-flex min-h-tap items-center gap-1.5 rounded-xl px-2 text-base font-semibold text-muted transition hover:bg-fg/5 hover:text-fg"
       >
         <ArrowLeftIcon className="h-5 w-5" />
         All orders
-      </Link>
+      </BackLink>
 
       {loadError && <ErrorNote>{loadError}</ErrorNote>}
       {order === null && !loadError && (
