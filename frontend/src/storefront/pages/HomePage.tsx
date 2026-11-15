@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useSeo } from '../../shared/seo'
+import { platformOrganizationJsonLd } from '../features/publicStore/structuredData'
 import { ThemeToggle } from '../../shared/theme/ThemeToggle'
 import { AppLogoLockup } from '../../shared/ui/AppLogo'
 import { SessionProvider } from '../app/SessionProvider'
@@ -132,12 +133,15 @@ export function HomePage() {
   useSeo({
     title: [],
     canonical: '/',
-    jsonLd: {
-      '@context': 'https://schema.org',
-      '@type': 'WebSite',
-      name: 'UnieMax',
-      url: window.location.origin,
-    },
+    jsonLd: [
+      {
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        name: 'UnieMax',
+        url: window.location.origin,
+      },
+      platformOrganizationJsonLd(),
+    ],
   })
   const { state } = useMarketSession()
   const authed = state.status === 'authed'

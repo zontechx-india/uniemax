@@ -118,9 +118,37 @@ function postalAddress(location: FooterLocation): Json {
 }
 
 /**
+ * The delivery charge for the quoted price, as `OfferShippingDetails` — or
+ * `null` when it cannot be stated honestly: a pickup-only store does not
+ * ship, and delivery limited to some pincodes cannot be written as "ships to
+ * IN". The amount is what the page advertises (`product.shipping`), FREE once
+ * the price reaches the free-above threshold — the product feed's rule. No
+ * `deliveryTime`: sellers set no handling or transit times.
+ */
+function shippingDetails(
+  mode: string,
+  product: Pick<PublicProductDetail, 'shipping' | 'delivery'>,
+  price: number,
+): Json | null {
+  if (mode === 'PICKUP' || product.delivery.restricted || !Number.isFinite(price)) return null
+  const { type, amount, freeAbove } = product.shipping
+  const charge = type === 'FREE' || (freeAbove !== null && price >= freeAbove) ? 0 : amount
+  return {
+    '@type': 'OfferShippingDetails',
+    shippingRate: { '@type': 'MonetaryAmount', value: charge, currency: 'INR' },
+    shippingDestination: { '@type': 'DefinedRegion', addressCountry: 'IN' },
+  }
+}
+
+/**
  * `Product` + `Offer`. An option product quotes an `AggregateOffer` across
  * its sellable variants (the "from ₹X" the listing already shows); a simple
  * product quotes the single `Offer`.
+ *
+ * No `hasMerchantReturnPolicy` here on purpose: the platform policy excludes
+ * whole kinds of product (food, innerwear, custom-made) and products carry no
+ * "returnable" flag, so a per-product claim would be false for some. The
+ * policy is stated once, on the platform's `Organization`.
  */
 export function productJsonLd(
   store: PublicStore,
@@ -131,12 +159,15 @@ export function productJsonLd(
   const inStock = product.stockQuantity > 0
   const availability = `https://schema.org/${inStock ? 'InStock' : 'OutOfStock'}`
   const seller = { '@type': 'Organization', name: store.name }
+  // Every listing is sold new — the same fact the product feed states.
+  const itemCondition = 'https://schema.org/NewCondition'
 
   const prices = product.variants
     .map((variant) => Number(variant.price))
     .filter((price) => Number.isFinite(price))
   const low = prices.length ? Math.min(...prices) : Number(product.price)
   const high = prices.length ? Math.max(...prices) : Number(product.priceMax ?? product.price)
+  const shipping = shippingDetails(store.shipping.mode, product, low)
 
   const offers =
     product.variants.length > 1 && prices.length > 1
@@ -148,6 +179,8 @@ export function productJsonLd(
           highPrice: Number.isFinite(high) ? high : null,
           offerCount: product.variants.length,
           availability,
+          itemCondition,
+          shippingDetails: shipping,
           seller,
         })
       : prune({
@@ -156,6 +189,8 @@ export function productJsonLd(
           priceCurrency: 'INR',
           price: Number.isFinite(low) ? low : null,
           availability,
+          itemCondition,
+          shippingDetails: shipping,
           seller,
         })
 
@@ -185,6 +220,32 @@ export function productJsonLd(
       })),
       offers,
     }),
+  }
+}
+
+/**
+ * UnieMax itself, for the homepage: name, logo and the one return policy
+ * that covers every order (`/refund-policy` — change both together). Only
+ * what that page states: 7 days from delivery, sent back by courier, in
+ * India. Return fees are left out (they depend on the reason, and the
+ * postage has no fixed amount). Server twin: `platformOrganizationJsonLd`.
+ */
+export function platformOrganizationJsonLd(): Json {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'UnieMax',
+    url: absolute('/'),
+    logo: absolute('/pwa-512.png'),
+    hasMerchantReturnPolicy: {
+      '@type': 'MerchantReturnPolicy',
+      applicableCountry: 'IN',
+      returnPolicyCountry: 'IN',
+      returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+      merchantReturnDays: 7,
+      returnMethod: 'https://schema.org/ReturnByMail',
+      merchantReturnLink: absolute('/refund-policy'),
+    },
   }
 }
 

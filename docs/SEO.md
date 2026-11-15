@@ -13,10 +13,15 @@
 > pages, [§4.7](#47-store-cards-wide-link-previews)), product images in the
 > store sitemaps, `/sell` in the sitemap, and the category-page **coverage**
 > report for admins ([§10](#10-known-gaps-and-caveats)).
-> **Built, not yet released** (23 Oct 2026): the **product feed** for Google
-> Merchant Center and the Meta catalogue ([§8.1](#81-product-feed)), page
-> shells for the footer info pages, and the Refund & Returns / Shipping
-> policy pages. Everything else in the [roadmap](#11-roadmap) is not started.
+> **Live on dev and production** since 24 Oct 2026: the **product feed** for
+> Google Merchant Center and the Meta catalogue ([§8.1](#81-product-feed)),
+> page shells for the footer info pages, and the Refund & Returns / Shipping
+> policy pages.
+> **Live on dev and production** (`v1.114.0`, 15 Nov 2026): `itemCondition` + `shippingDetails`
+> in the `Product` offer, the platform `Organization` (logo + return policy)
+> on the homepage, and a true shop count on `/c/` pages
+> ([§13](#13-change-log)). Everything else in the [roadmap](#11-roadmap) is
+> not started.
 >
 > **This file owns SEO.** What SEO is for this platform, how it is built, the
 > per-page rules, what is live, what is planned and why. Other docs point
@@ -132,7 +137,7 @@ For search, nobody googles a shop they have never heard of; they google
 | Capability | Where | Since |
 | --- | --- | --- |
 | Per-route head (title, description, canonical, robots, OG/Twitter, JSON-LD) written in the browser | `frontend/src/shared/seo.ts` (`useSeo`, `usePageTitle`, `usePrivatePageTitle`) | 23 Sep 2026 (titles only since 25 Jul) |
-| Structured data: `Product`/`Offer`/`AggregateOffer`, `Store`/`Organization`, `BreadcrumbList`, `ItemList`, `WebSite` | `frontend/src/storefront/features/publicStore/structuredData.ts` + page components | 23 Sep 2026 |
+| Structured data: `Product`/`Offer`/`AggregateOffer`, `Store`/`Organization`, `BreadcrumbList`, `ItemList`, `WebSite` | `frontend/src/storefront/features/publicStore/structuredData.ts` + page components | 23 Sep 2026; offer `itemCondition` + `shippingDetails` and the platform `Organization` with its return policy 15 Nov 2026 (`v1.114.0`) |
 | `robots.txt` (per-customer pages, consoles, affiliate and WhatsApp-campaign redirects, `?q=` disallowed; declares the sitemap) | `frontend/public/robots.txt` | 23 Sep 2026; `/api/v1/r/` 14 Oct 2026 |
 | XML sitemaps (index · stores · categories · one per store); per-store files list product photos and the logo as `<image:image>` | `backend/src/modules/seo/sitemap.service.ts` · contract in [`API.md`](./API.md) → Sitemaps | 23 Sep 2026; images and `/sell` 4 Oct 2026 (`v1.23.0`) |
 | Global category landing pages `/c/{slug}` | `frontend/src/storefront/pages/BrowseCategoryPage.tsx` · `backend/src/modules/discovery/browse.service.ts` | 23 Sep 2026 |
@@ -142,8 +147,8 @@ For search, nobody googles a shop they have never heard of; they google
 | Share button (native share sheet / copy link) on store header and product page | `frontend/src/storefront/features/publicStore/ShareButton.tsx` | before Sep 2026 |
 | **Share images**: every product page's `og:image` is a preview-safe JPEG (≤ 1200 px, < 300 KB) of the cover photo, so WhatsApp shows it — see [§4.5](#45-share-images-link-preview-images) | `backend/src/package/storage/images.ts`, `backend/src/modules/media/` · contract in [`API.md`](./API.md) → Share images | 4 Oct 2026, dev + prod (`v1.21.0`) |
 | **Sized photos**: every stored image is offered at 320/640/960/1280 px via `srcset`, so the browser downloads the copy that fits — see [§4.6](#46-sized-photos-srcset) | `frontend/src/shared/media/MediaImg.tsx`, `backend/src/package/storage/images.ts` · contract in [`API.md`](./API.md) → Image derivatives | 4 Oct 2026, dev + prod (`v1.22.0`) |
-| **Product feed** for Google Merchant Center + Meta catalogue — see [§8.1](#81-product-feed) | `backend/src/modules/seo/productFeed.ts` (+ `.service.ts`) · contract in [`API.md`](./API.md) → Product feed | Built 23 Oct 2026, not released |
-| Page shells for the footer info pages (`/about`, `/contact`, `/refund-policy`, `/shipping-policy`, `/privacy`, `/terms`) | `INFO_PAGES` in `pageShell.service.ts` ↔ `PAGES` in `InfoComingSoonPage.tsx`; nginx step in [`DEPLOYMENT.md`](./DEPLOYMENT.md) → Page shells | Built 23 Oct 2026, not released |
+| **Product feed** for Google Merchant Center + Meta catalogue — see [§8.1](#81-product-feed) | `backend/src/modules/seo/productFeed.ts` (+ `.service.ts`) · contract in [`API.md`](./API.md) → Product feed | 24 Oct 2026, dev + prod |
+| Page shells for the footer info pages (`/about`, `/contact`, `/refund-policy`, `/shipping-policy`, `/privacy`, `/terms`) | `INFO_PAGES` in `pageShell.service.ts` ↔ `PAGES` in `InfoComingSoonPage.tsx`; nginx step in [`DEPLOYMENT.md`](./DEPLOYMENT.md) → Page shells | 30 Oct 2026, dev + prod |
 | Measurement: GA4 + Meta Pixel (not SEO, but how SEO results are measured) | `frontend/index.html`, `frontend/src/shared/analytics/` · [`FRONTEND_CONTEXT.md`](./FRONTEND_CONTEXT.md) | 28 Sep 2026 |
 
 ---
@@ -387,8 +392,8 @@ canonical it is the current path **without** the query string.
 | Shop `/store/{s}/shop` **S** | `Shop` / `Search "{q}"` / section name, store | `Browse every product from {store} on UnieMax — …` (unscoped only) | `/store/{s}/shop` | `?q=` or `?section=` → noindex | store card | — | 404 "Store not available" |
 | Store support `/store/{s}/support` **S** | `Help & Support`, store | platform default | path | index | platform | — | — |
 | Support thread `/store/{s}/support/{id}` **S** | `Support request`, store | platform default | path | noindex | platform | — | — |
-| Global category `/c/{slug}` **S** | category, `Shop by category` | `Shop {cat} on UnieMax — {n} products from {k} independent shops. …` (or a no-count line when empty) | `/c/{slug}` | noindex when empty, `?page=` > 1, or `?sort=` ≠ newest | platform | `BreadcrumbList` + `ItemList` (indexable pages only) | 404, noindex |
-| Marketplace home `/` **S** | — (the platform title) | platform description | `/` | index | platform card (`og-image.jpg`) | `WebSite` | — |
+| Global category `/c/{slug}` **S** | category, `Shop by category` | `Shop {cat} on UnieMax — {n} products from {k} independent shops. …` — `k` = the API's `storeCount`, every page of the branch, shown only when > 1 (or a no-count line when empty) | `/c/{slug}` | noindex when empty, `?page=` > 1, or `?sort=` ≠ newest | platform | `BreadcrumbList` + `ItemList` (indexable pages only) | 404, noindex |
+| Marketplace home `/` **S** | — (the platform title) | platform description | `/` | index | platform card (`og-image.jpg`) | `WebSite` + platform `Organization` (logo, return policy) | — |
 | `/sell` **S** | `Create your free online store` | seller pitch | `/sell` | index | platform card | — | — |
 | `/about`, `/contact`, `/refund-policy`, `/shipping-policy` **S** | `About` / `Contact us` / `Refund & Returns Policy` / `Shipping Policy` | one fixed line each (`INFO_PAGES`) | path | index | platform card | — | — |
 | `/privacy`, `/terms` **S** | `Privacy Policy` / `Terms & Conditions` | platform | path | **noindex** while they are holding pages | platform card | — | — |
@@ -434,6 +439,27 @@ canonical it is the current path **without** the query string.
   variants); simple products a single `Offer`. `availability` comes from total
   stock.
 - Seller specifications map onto `additionalProperty`.
+- Every offer is `itemCondition: NewCondition` (no used/refurbished field —
+  the same fact as the feed's `g:condition`).
+- **`shippingDetails`** on the offer: the charge the page advertises
+  (`product.shipping` — its override, else the store rate), `0` once the
+  quoted price (the `AggregateOffer`'s `lowPrice`) reaches the store's
+  free-above threshold — the feed's rule — shipped to `addressCountry: IN`.
+  **Left out** for a pickup-only store (it does not ship) and for delivery
+  limited to some pincodes (that is not "ships to IN", and pincode lists are
+  never published). No `deliveryTime`: sellers set no handling or transit
+  times.
+- **Return policy is stated once, on the platform `Organization`** (homepage
+  JSON-LD, `platformOrganizationJsonLd` on both sides): 7 days from
+  delivery, `ReturnByMail`, India, linked to `/refund-policy`. Never on a
+  `Product`: the policy excludes whole kinds of product (food, innerwear,
+  custom-made) and products have no "returnable" flag, so a per-product
+  claim would be false for some. No `returnFees` (free for damaged items,
+  the customer's postage otherwise, with no fixed amount). Change it with
+  `RefundPolicy` in `InfoComingSoonPage.tsx`.
+- The platform `Organization` has no `sameAs` — there are no official social
+  profiles to list. Its logo is `/pwa-512.png` (square, 512 px; Google
+  needs ≥ 112 px).
 
 ---
 
@@ -501,8 +527,8 @@ Product feed.
 | ⚠️ Rolling production back past `747a9b3` | Remove the prod page-shell include **first** — an older backend answers those paths with a JSON 404. |
 | Google Search Console | **Set up**: domain property `sc-domain:uniemax.com` (owner account anwin@zontechx.com, verified by DNS). `sitemap.xml` **submitted 23 Oct 2026**. Indexing on 23 Oct: 41 indexed, 22 not — 8 `/cart?from=` (robots.txt, correct), 7 thin store pages ("crawled, not indexed"), 2 `/c/` pages that were empty when crawled, `/about` (no first-byte canonical — fixed by the info-page shells), and the `www` duplicates ([§10](#10-known-gaps-and-caveats)). |
 | Bing Webmaster Tools | **Not set up.** Import the site from Search Console, then submit `sitemap.xml`. |
-| Google Merchant Center | **Account created 23 Oct 2026** (id 5880896675, anwin@zontechx.com), 4 of 5 setup steps done. Left: the return policy (needs `/refund-policy` live — 7-day returns, customer pays change-of-mind return postage, matching the page) and the product source: add `https://uniemax.com/api/v1/public/feeds/products.xml` as a scheduled file fetch (daily, India, English) once released. |
-| Meta catalogue | **None yet** in the Zontechx business portfolio. Create a catalogue (E-commerce) and add the same feed URL as a scheduled data source once released. |
+| Google Merchant Center | **Account created 23 Oct 2026** (id 5880896675, anwin@zontechx.com). Feed fetched since 24 Oct (371 products on 1 Nov); return policy (7 days, matching `/refund-policy`) was under review on 1 Nov. |
+| Meta catalogue | **"UnieMax" catalogue** reads the same feed URL hourly (371 eligible on 1 Nov). |
 | `PUBLIC_WEB_URL` | Origin for canonicals, `og:url`, `og:image` and sitemap `<loc>`s. Prod: `https://uniemax.com`. |
 | Sized copies for existing images | **Done on dev and production, 4 Oct 2026** (`optimize-media -- --apply`): prod 121 images (86 product photos, 28 logos, 7 banners), dev 84; nothing failed. New uploads get them via `storeUpload`, so this is not a recurring job. |
 | Existing images (`npm run optimize-media`) | **Done on dev and production, 4 Oct 2026.** Prod: 8 product photos (KC Trends' 2–3 MB PNGs, 22.7 MB → 2.1 MB), 20 logos (1.4 MB → 0.6 MB) and 1 banner (1.4 MB → 59 KB) re-encoded; 57 share images rendered; nothing failed. Dev: 2 logos, 3 banners, 42 share images. New uploads are normalized on arrival, so this is not a recurring job — re-run only if images were written around the upload path. Commands: [`backend/README.md`](../backend/README.md). |
@@ -584,7 +610,7 @@ change-log line.
 | # | Step | What it involves | Status |
 | --- | --- | --- | --- |
 | 1 | **Per-page tags in the first byte** | Page shells for `/store/**`, `/c/**`; real 404s | ✅ Done 1 Oct 2026 |
-| 2 | **Free shopping listings** | Google Merchant Center + Meta catalog product feeds; new product fields `brand`, `gtin`/`mpn`, `condition`; `shippingDetails` + `hasMerchantReturnPolicy` in `Product` JSON-LD | ◐ Feed built 23 Oct 2026 ([§8.1](#81-product-feed)), Merchant Center account created; product fields and JSON-LD additions not started |
+| 2 | **Free shopping listings** | Google Merchant Center + Meta catalog product feeds; new product fields `brand`, `gtin`/`mpn`, `condition`; `shippingDetails` + `hasMerchantReturnPolicy` in JSON-LD | ◐ Feed live 24 Oct 2026 ([§8.1](#81-product-feed)); `itemCondition`, `shippingDetails` and the platform return policy (on `Organization`, [§7](#7-structured-data-rules)) live 15 Nov 2026 (`v1.114.0`); product fields `brand`/`gtin`/`mpn` and a per-product "returnable" flag not started |
 | 3 | **Image sizes** | Server-side normalization of every upload + share images for `og:image`; sized copies (320–1280 px) served with `srcset` through `MediaImg` ([§4.6](#46-sized-photos-srcset)) | ✅ Done 4 Oct 2026, dev + prod (`v1.22.0`) |
 | 4 | **Reviews & ratings** | Reviews only from buyers with a delivered order; then `aggregateRating` in JSON-LD (stars in results) | Not started |
 | 5 | **Better listings from sellers** | Listing quality score in the product editor; duplicate-description warning; optional seller SEO title/description/share image with a result preview; prompt to tag products on the global taxonomy; finish converting legacy shelves (progress measured on the admin Category mapping page) | Not started (per-photo alt text exists — "Describe this photo") |
@@ -622,6 +648,7 @@ search/filter URLs get indexed, mass-produced pages with nothing on them.
 | A page component's `useSeo` call | Its resolver in `backend/src/modules/seo/pageShell.service.ts`, and the [§5](#5-per-page-head-rules) table |
 | `structuredData.ts` (frontend) | `backend/src/modules/seo/structuredData.ts`, and [§7](#7-structured-data-rules) |
 | `productDescription.ts` / `formatPrice` | `backend/src/modules/seo/productText.ts` |
+| The refund policy (`RefundPolicy` in `InfoComingSoonPage.tsx`) — days, method, exclusions | `platformOrganizationJsonLd` in **both** `structuredData.ts` files, and [§7](#7-structured-data-rules) |
 | `applySeo` in `seo.ts` (which tags, fallbacks) | `renderHead` in `backend/src/modules/seo/pageHead.ts` |
 | `SECTION_TITLES` (`storesApi.ts`) or `PAGE_SIZE` (`BrowseCategoryPage.tsx`) | The copies at the top of `pageShell.service.ts` |
 | A storefront route under `/store/` or `/c/` | `storePage` / `browsePage` routing in `pageShell.service.ts` |
@@ -659,4 +686,5 @@ search/filter URLs get indexed, mass-produced pages with nothing on them.
 | 30 Oct 2026 | `/saved` (wishlist, per-customer) is `noindex` and disallowed in `robots.txt`. `GET /public/browse` gains `parentSlug` + `imageUrl` (homepage "Shop by category" tiles); no head or structured-data change. Released as `v1.66.0` |
 | 30 Oct 2026 | nginx now forwards the footer info pages (`/about`, `/contact`, `/refund-policy`, `/shipping-policy`, `/privacy`, `/terms`) and `/categories`, `/shops`, `/new` to their page shells on dev and prod — their own title, description and canonical are in the first byte |
 | 1 Nov 2026 | Homepage Popular row split out of the welcome bar into its own section (`popularCategories`), **off by default**. The `<h1>` stays in the always-on welcome bar; "Shop by category" still links to `/categories` and every `/c/{slug}`, so no internal link is lost |
+| 15 Nov 2026 | Structured data, both writers: offers gain `itemCondition: NewCondition` and `shippingDetails` (the advertised charge to IN; omitted for pickup-only stores and pincode-limited delivery). Homepage gains the platform `Organization` (name, `/pwa-512.png` logo, `hasMerchantReturnPolicy` — 7 days, by mail, IN, `/refund-policy`); never per product. `/c/` description's shop count now comes from `storeCount` on `GET /public/browse/:slug` (every page of the branch) instead of page 1's products. `page-shell.test.mjs` checks all three (and its refund-title regex is fixed). Stale "not released" notes for the feed and info-page shells corrected. Released as `v1.114.0` |
 | 1 Nov 2026 | Meta Pixel `content_ids` and GA4 `item_id` switched from the product slug to the product id, matching the feed's `g:id` (Meta catalogue reported "products not matching ad events"); placed-order lines now carry `productId`. Feed live on prod since 24 Oct: Merchant Center (371 products, return policy under review) and Meta catalogue "UnieMax" (371 eligible, hourly fetch). Released as `v1.78.0` |

@@ -2348,8 +2348,8 @@ Sorting is limited to what the denormalised columns answer without a join.
 There is deliberately no relevance/popularity option — neither exists as
 data, and an option that silently falls back to newest is worse than none.
 
-The response carries `category` and `children` **beside** the usual
-`data`/`meta`, so one request renders the whole page:
+The response carries `category`, `children` and `storeCount` **beside** the
+usual `data`/`meta`, so one request renders the whole page:
 
 ```jsonc
 { "success": true,
@@ -2357,8 +2357,12 @@ The response carries `category` and `children` **beside** the usual
   "meta": { "total", "page", "pageSize", "totalPages" },
   "category": { "id", "name", "slug",
                 "path": [ { "name", "slug" } ] },   // root first, SELF LAST
-  "children": [ { "name", "slug", "productCount" } ] }  // non-empty only
+  "children": [ { "name", "slug", "productCount" } ],  // non-empty only
+  "storeCount": 5 }  // distinct stores across the WHOLE branch (all pages)
 ```
+
+`storeCount` is the "from N independent shops" in the page's description —
+counted over every page, not just the products on this one.
 
 `children` omits any child whose branch is empty, so a crawler following
 these links never lands on a dead end.

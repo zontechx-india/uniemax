@@ -105,11 +105,45 @@ function postalAddress(location: FooterLocation): Json {
 }
 
 /**
+ * The delivery charge for the quoted price, as `OfferShippingDetails` — or
+ * `null` when it cannot be stated honestly:
+ *
+ *  - a pickup-only store does not ship at all;
+ *  - delivery limited to some pincodes cannot be written as "ships to IN",
+ *    and the pincode lists are never published.
+ *
+ * The amount is what the product page advertises (`product.shipping`, its
+ * override else the store rate), FREE once the price reaches the store's
+ * free-above threshold — the same rule the product feed applies. No
+ * `deliveryTime`: sellers set no handling or transit times.
+ */
+function shippingDetails(
+  mode: string,
+  product: Pick<PublicProduct, "shipping" | "delivery">,
+  price: number,
+): Json | null {
+  if (mode === "PICKUP" || product.delivery.restricted || !Number.isFinite(price)) return null;
+  const { type, amount, freeAbove } = product.shipping;
+  const charge = type === "FREE" || (freeAbove !== null && price >= freeAbove) ? 0 : amount;
+  return {
+    "@type": "OfferShippingDetails",
+    shippingRate: { "@type": "MonetaryAmount", value: charge, currency: "INR" },
+    shippingDestination: { "@type": "DefinedRegion", addressCountry: "IN" },
+  };
+}
+
+/**
  * `Product` + `Offer` — an `AggregateOffer` across the sellable variants for
  * an option product, a single `Offer` for a simple one.
+ *
+ * No `hasMerchantReturnPolicy` here on purpose: the platform policy
+ * (`/refund-policy`) excludes whole kinds of product (food, innerwear,
+ * custom-made) and products carry no "returnable" flag, so a per-product
+ * claim would be false for some. The policy is stated once, on the
+ * platform's `Organization` (`platformOrganizationJsonLd`).
  */
 export function productJsonLd(
-  store: { name: string; slug: string },
+  store: { name: string; slug: string; shippingMode: string },
   product: PublicProduct,
   description: string | null,
   origin: string,
@@ -118,12 +152,16 @@ export function productJsonLd(
   const inStock = product.stockQuantity > 0;
   const availability = `https://schema.org/${inStock ? "InStock" : "OutOfStock"}`;
   const seller = { "@type": "Organization", name: store.name };
+  // Every listing on the platform is sold new (no used/refurbished field) —
+  // the same fact the product feed states as `g:condition`.
+  const itemCondition = "https://schema.org/NewCondition";
 
   const prices = product.variants
     .map((variant) => Number(variant.price))
     .filter((price) => Number.isFinite(price));
   const low = prices.length ? Math.min(...prices) : Number(product.price);
   const high = prices.length ? Math.max(...prices) : Number(product.priceMax ?? product.price);
+  const shipping = shippingDetails(store.shippingMode, product, low);
 
   const offers =
     product.variants.length > 1 && prices.length > 1
@@ -135,6 +173,8 @@ export function productJsonLd(
           highPrice: Number.isFinite(high) ? high : null,
           offerCount: product.variants.length,
           availability,
+          itemCondition,
+          shippingDetails: shipping,
           seller,
         })
       : prune({
@@ -143,6 +183,8 @@ export function productJsonLd(
           priceCurrency: "INR",
           price: Number.isFinite(low) ? low : null,
           availability,
+          itemCondition,
+          shippingDetails: shipping,
           seller,
         });
 
@@ -168,6 +210,35 @@ export function productJsonLd(
       })),
       offers,
     }),
+  };
+}
+
+/**
+ * UnieMax itself, for the homepage: the name and logo Google may show for the
+ * site, and the one return policy that covers every order
+ * (`/refund-policy`, `RefundPolicy` in `InfoComingSoonPage.tsx` — change
+ * both together). Only what that page states: 7 days from delivery, sent
+ * back by courier, in India. Return fees are left out — they depend on the
+ * reason (free for damaged, the customer's postage otherwise) and the
+ * postage has no fixed amount. No `sameAs`: there are no official social
+ * profiles to list.
+ */
+export function platformOrganizationJsonLd(origin: string): Json {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "UnieMax",
+    url: absoluteUrl("/", origin),
+    logo: absoluteUrl("/pwa-512.png", origin),
+    hasMerchantReturnPolicy: {
+      "@type": "MerchantReturnPolicy",
+      applicableCountry: "IN",
+      returnPolicyCountry: "IN",
+      returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+      merchantReturnDays: 7,
+      returnMethod: "https://schema.org/ReturnByMail",
+      merchantReturnLink: absoluteUrl("/refund-policy", origin),
+    },
   };
 }
 

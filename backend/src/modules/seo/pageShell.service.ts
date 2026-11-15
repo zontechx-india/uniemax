@@ -8,6 +8,7 @@ import {
   getPublicStoreShell,
   getVisibleStore,
 } from "../stores/publicStore.service.js";
+import { resolveShipping } from "../stores/stores.schema.js";
 import type { PageHead } from "./pageHead.js";
 import type { PageShellQuery } from "./pageShell.schema.js";
 import { productMetaDescription } from "./productText.js";
@@ -15,6 +16,7 @@ import {
   absoluteUrl,
   breadcrumbJsonLd,
   categoryTrail,
+  platformOrganizationJsonLd,
   productJsonLd,
   storeBreadcrumbJsonLd,
   storeCategoryPath,
@@ -65,7 +67,7 @@ const SECTION_TITLES: Record<NonNullable<PageShellQuery["section"]>, string> = {
   bestSellers: "Best Sellers",
 };
 
-/** Must match `PAGE_SIZE` in `BrowseCategoryPage.tsx` — it decides the "shops" count. */
+/** Must match `PAGE_SIZE` in `BrowseCategoryPage.tsx` — it decides the `ItemList` (page 1's products). */
 const BROWSE_PAGE_SIZE = 24;
 
 const NOINDEX = "noindex, follow";
@@ -208,6 +210,7 @@ function homePage(origin: string): ResolvedPage {
           name: "UnieMax",
           url: origin,
         },
+        platformOrganizationJsonLd(origin),
       ],
     },
   };
@@ -337,8 +340,8 @@ async function storePage(
 }
 
 /**
- * Name, slug and the store card (the logo on a wide canvas) — all a non-home
- * store page's head needs. One query. Heads use preview images (small
+ * Name, slug, the store card (the logo on a wide canvas) and the fulfilment
+ * mode — all a non-home store page's head needs. One query. Heads use preview images (small
  * JPEGs), never originals: WhatsApp drops a preview image it cannot fetch
  * quickly.
  */
@@ -349,6 +352,8 @@ async function findStore(slug: string) {
         name: store.name,
         slug: store.slug,
         shareImageUrl: store.logoKey ? shareImagePath("logo", store.logoKey) : null,
+        // Pickup-only stores state no shipping in the `Product` JSON-LD.
+        shippingMode: resolveShipping(store.shipping).mode,
       }
     : null;
 }
@@ -529,8 +534,7 @@ async function browsePage(
   }
 
   const { name } = data.category;
-  const { total } = data;
-  const shops = new Set(data.products.map((product) => product.store.slug)).size;
+  const { total, storeCount: shops } = data;
   // Page 2+ and any non-default sort re-cut the same set: reachable, not indexable.
   const scoped = query.page > 1 || query.sort !== "newest";
 

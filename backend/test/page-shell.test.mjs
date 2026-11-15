@@ -78,6 +78,12 @@ test("product page: Product + BreadcrumbList, og:type product", async (t) => {
     ["Product", "BreadcrumbList"],
   );
   assert.equal(p.jsonLd[0].offers.priceCurrency, "INR");
+  assert.equal(p.jsonLd[0].offers.itemCondition, "https://schema.org/NewCondition");
+  // Shipping is optional (pickup-only / pincode-limited stores omit it); when
+  // present it is a charge to India.
+  const shipping = p.jsonLd[0].offers.shippingDetails;
+  if (shipping) assert.equal(shipping.shippingDestination.addressCountry, "IN");
+  assert.equal(p.jsonLd[0].hasMerchantReturnPolicy, undefined);
 });
 
 test("platform pages: / and /sell carry their own head with absolute URLs", async () => {
@@ -86,7 +92,11 @@ test("platform pages: / and /sell carry their own head with absolute URLs", asyn
   assert.equal(home.headers.get("referrer-policy"), null);
   assert.equal(home.robots, "index, follow");
   assert.match(home.canonical, /^https?:\/\/[^/]+\/$/);
-  assert.deepEqual(home.jsonLd.map((block) => block["@type"]), ["WebSite"]);
+  assert.deepEqual(home.jsonLd.map((block) => block["@type"]), ["WebSite", "Organization"]);
+  // The platform-wide return policy, stated once (never per product).
+  const policy = home.jsonLd[1].hasMerchantReturnPolicy;
+  assert.equal(policy.merchantReturnDays, 7);
+  assert.match(policy.merchantReturnLink, /^https?:\/\/[^/]+\/refund-policy$/);
   assert.match(home.html, /<div id="root">/);
 
   const sell = await page("/sell?utm_source=instagram");
@@ -103,7 +113,7 @@ test("platform pages: / and /sell carry their own head with absolute URLs", asyn
 test("footer info pages: own title + canonical; holding pages are noindex", async () => {
   const refund = await page("/refund-policy?utm_source=gmc");
   assert.equal(refund.status, 200);
-  assert.match(refund.title, /^Refund & (amp;)?Returns Policy · UnieMax/);
+  assert.match(refund.title, /^Refund &(amp;)? Returns Policy · UnieMax/);
   assert.match(refund.canonical, /^https?:\/\/[^/]+\/refund-policy$/);
   assert.equal(refund.robots, "index, follow");
 

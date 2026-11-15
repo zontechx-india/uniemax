@@ -102,7 +102,8 @@ function useBrowseSeo(
 ) {
   const name = data?.category.name
   const total = data?.meta.total ?? 0
-  const shops = data ? new Set(data.products.map((p) => p.store.slug)).size : 0
+  // Every store in the branch, not just this page's — the server counts it.
+  const shops = data?.storeCount ?? 0
   // Page 2+ and any sort other than the default are the same set of products
   // re-cut. They are real pages a visitor can reach, and duplicate pages a
   // crawler should not index.

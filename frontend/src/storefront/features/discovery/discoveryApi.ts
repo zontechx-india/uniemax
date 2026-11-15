@@ -140,6 +140,8 @@ export interface BrowseCategoryPage {
   children: { name: string; slug: string; productCount: number }[]
   products: MarketProduct[]
   meta: ListMeta
+  /** Distinct stores across the whole branch (every page) — the head's "from N shops". */
+  storeCount: number
 }
 
 export type BrowseSort = 'newest' | 'priceAsc' | 'priceDesc'
@@ -266,6 +268,7 @@ export const discoveryApi = {
       meta: ListMeta
       category: BrowseCategoryPage['category']
       children: BrowseCategoryPage['children']
+      storeCount: number
     }>(
       http.get(`${PUBLIC}/browse/${encodeURIComponent(slug)}${qs ? `?${qs}` : ''}`),
     )
@@ -274,6 +277,7 @@ export const discoveryApi = {
       children: envelope.children,
       products: envelope.data,
       meta: envelope.meta,
+      storeCount: envelope.storeCount,
     }
   },
 }

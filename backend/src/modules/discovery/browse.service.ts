@@ -122,6 +122,8 @@ export interface BrowseCategoryResult {
   children: { name: string; slug: string; productCount: number }[];
   products: ReturnType<typeof shape>[];
   total: number;
+  /** Distinct stores across the WHOLE branch (every page), not just this page's products. */
+  storeCount: number;
 }
 
 /**
@@ -141,8 +143,10 @@ export async function browseCategory(
     globalCategoryId: { in: branch.descendantIds },
   };
 
-  const [total, rows] = await Promise.all([
+  const [total, stores, rows] = await Promise.all([
     prisma.storeProduct.count({ where }),
+    // One row per store — the head's "from N shops" must count every page.
+    prisma.storeProduct.groupBy({ by: ["storeId"], where }),
     prisma.storeProduct.findMany({
       where,
       select: browseProductSelect,
@@ -165,6 +169,7 @@ export async function browseCategory(
     children: await childCounts(branch.children),
     products: rows.map(shape),
     total,
+    storeCount: stores.length,
   };
 }
 
