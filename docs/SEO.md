@@ -588,11 +588,6 @@ Automated tests: `backend/test/page-shell.test.mjs` (read-only; part of
   most (`GET /admin/catalog/coverage`); sellers see such shelves flagged
   "not shown on UnieMax category pages". Dev, 4 Oct 2026: 35 of 38 live
   products reached, 3 missing on 3 shelves.
-- **`www.uniemax.com` serves the whole site** instead of redirecting to
-  `uniemax.com`, so Google sees two copies (Search Console, 23 Oct 2026).
-  Canonicals already point at `uniemax.com`; the fix is a 301 in nginx —
-  [`DEPLOYMENT.md`](./DEPLOYMENT.md) → `www.uniemax.com` → `uniemax.com`.
-  Not applied yet.
 - **`/privacy` and `/terms` are holding pages** (`noindex`) until the
   business supplies the legal text. Merchant Center and Cashfree both look
   for them.
@@ -687,4 +682,5 @@ search/filter URLs get indexed, mass-produced pages with nothing on them.
 | 30 Oct 2026 | nginx now forwards the footer info pages (`/about`, `/contact`, `/refund-policy`, `/shipping-policy`, `/privacy`, `/terms`) and `/categories`, `/shops`, `/new` to their page shells on dev and prod — their own title, description and canonical are in the first byte |
 | 1 Nov 2026 | Homepage Popular row split out of the welcome bar into its own section (`popularCategories`), **off by default**. The `<h1>` stays in the always-on welcome bar; "Shop by category" still links to `/categories` and every `/c/{slug}`, so no internal link is lost |
 | 15 Nov 2026 | Structured data, both writers: offers gain `itemCondition: NewCondition` and `shippingDetails` (the advertised charge to IN; omitted for pickup-only stores and pincode-limited delivery). Homepage gains the platform `Organization` (name, `/pwa-512.png` logo, `hasMerchantReturnPolicy` — 7 days, by mail, IN, `/refund-policy`); never per product. `/c/` description's shop count now comes from `storeCount` on `GET /public/browse/:slug` (every page of the branch) instead of page 1's products. `page-shell.test.mjs` checks all three (and its refund-title regex is fixed). Stale "not released" notes for the feed and info-page shells corrected. Released as `v1.114.0` |
+| 15 Nov 2026 | nginx: `www.uniemax.com` (HTTP and HTTPS) 301s to `https://uniemax.com` with the path kept — one copy of the site for search engines ([`DEPLOYMENT.md`](./DEPLOYMENT.md) → `www.uniemax.com` → `uniemax.com`) |
 | 1 Nov 2026 | Meta Pixel `content_ids` and GA4 `item_id` switched from the product slug to the product id, matching the feed's `g:id` (Meta catalogue reported "products not matching ad events"); placed-order lines now carry `productId`. Feed live on prod since 24 Oct: Merchant Center (371 products, return policy under review) and Meta catalogue "UnieMax" (371 eligible, hourly fetch). Released as `v1.78.0` |

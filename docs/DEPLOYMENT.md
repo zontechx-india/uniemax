@@ -741,13 +741,16 @@ curl -s http://127.0.0.1:8081/sell | grep -o 'og:image" content="[^"]*'         
 
 ### `www.uniemax.com` → `uniemax.com` (301)
 
-**Status: not applied.** `https://www.uniemax.com/` serves the whole site
-itself, so Google sees two copies of every page (Search Console, 23 Oct 2026:
-`www` URLs reported as duplicates, and Google picked a different canonical
-than ours for `https://www.uniemax.com/`). Every canonical already says
+**Status: applied 15 Nov 2026** (backup
+`/etc/nginx/sites-available/uniemax-com.pre-www-20261115`). Before it,
+`https://www.uniemax.com/` served the whole site itself, so Google saw two
+copies of every page (Search Console, 23 Oct 2026: `www` URLs reported as
+duplicates, and Google picked a different canonical than ours for
+`https://www.uniemax.com/`). Every canonical already says
 `https://uniemax.com/…`; the redirect makes the host agree. In the
-`uniemax-com` vhost, give `www` its own HTTPS `server` block that only
-redirects (the certificate already covers both names):
+`uniemax-com` vhost, `www` has its own HTTPS `server` block that only
+redirects (the certificate covers both names; the live block also has
+`listen [::]:443 ssl` and Certbot's `options-ssl-nginx.conf` + `ssl_dhparam`):
 
 ```nginx
 server {
@@ -759,10 +762,11 @@ server {
 }
 ```
 
-…and remove `www.uniemax.com` from the main block's `server_name` (the HTTP
-→ HTTPS block may keep it; it will then hop `http://www` → `https://www` →
-`https://uniemax.com`). Check the certificate path with
-`sudo certbot certificates` first. Verify:
+…and `www.uniemax.com` is removed from the main block's `server_name`. The
+HTTP block keeps both names (Certbot renews through it); its `www` branch
+redirects straight to `https://uniemax.com$request_uri`, one hop. Roll back:
+copy the backup over `uniemax-com`, `sudo nginx -t`, `sudo systemctl reload
+nginx`. Verify:
 
 ```bash
 curl -sI https://www.uniemax.com/store/x | grep -i '^location'   # https://uniemax.com/store/x
