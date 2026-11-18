@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { OPERATOR } from '../../shared/operator'
 import { useSeo } from '../../shared/seo'
 import { platformOrganizationJsonLd } from '../features/publicStore/structuredData'
 import { ThemeToggle } from '../../shared/theme/ThemeToggle'
@@ -1831,9 +1832,24 @@ export function MarketFooter() {
         </div>
 
         <div className="mt-10 flex flex-col gap-4 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-muted">
-            © {new Date().getFullYear()} UnieMax · All rights reserved
-          </p>
+          {/* Who runs UnieMax — also in the page shells for no-JS crawlers
+              (backend seo/pageHead.ts → operatorBlock). */}
+          <div className="space-y-1 text-xs text-muted">
+            <p>
+              UnieMax is a product of{' '}
+              <a
+                href={OPERATOR.url}
+                target="_blank"
+                rel="noopener"
+                className="font-medium text-fg hover:text-brand hover:underline"
+              >
+                {OPERATOR.name}
+              </a>
+            </p>
+            <p>
+              © {new Date().getFullYear()} {OPERATOR.name}. All rights reserved.
+            </p>
+          </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted">
             <span className="flex items-center gap-1.5">
               <CheckIcon className="h-3.5 w-3.5" />

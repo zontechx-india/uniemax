@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FastifyBaseLogger } from "fastify";
 import { env } from "../../config/env.js";
+import { OPERATOR, operatorAddressLine } from "./operator.js";
 import { absoluteUrl, type Json } from "./structuredData.js";
 
 /**
@@ -50,6 +51,12 @@ export interface PageHead {
   /** Falsy = "index, follow". */
   robots?: string | null;
   jsonLd?: Json[];
+  /**
+   * A page of the marketplace itself (never a seller's store): adds
+   * `<meta name="author" content="Zontechx">` and fills the body's
+   * `shell:operator` marker with who runs UnieMax (`operatorBlock`).
+   */
+  platform?: boolean;
 }
 
 /** The platform fallbacks, read out of the shell's own managed region. */
@@ -146,7 +153,30 @@ export function renderPage(
   context: { origin: string; path: string },
 ): string {
   if (shell.kind === "static") return shell.html;
-  return `${shell.before}\n${renderHead(head, shell.defaults, context)}\n    ${shell.after}`;
+  const after = head.platform ? shell.after.replace(OPERATOR_MARKER, operatorBlock()) : shell.after;
+  return `${shell.before}\n${renderHead(head, shell.defaults, context)}\n    ${after}`;
+}
+
+/** Inside `<div id="root">` in `frontend/index.html`, after the loading spinner. */
+export const OPERATOR_MARKER = "<!-- shell:operator -->";
+
+/**
+ * Who runs UnieMax, as plain HTML in the first byte — for crawlers that run
+ * no JavaScript (Meta's WhatsApp display-name review reads this). It sits
+ * inside `#root`, so React replaces it on mount; the SPA shows the same facts
+ * in `MarketFooter` and on /about and /contact. Inline styles only, like the
+ * spinner: no CSS has loaded yet. Below the spinner's 100vh, so a visitor on
+ * a slow connection still sees only the spinner.
+ */
+export function operatorBlock(year = new Date().getFullYear()): string {
+  const tel = OPERATOR.phone.replace(/\s+/g, "");
+  return [
+    `<footer style="padding:24px 16px;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#6b7280;font-size:13px;line-height:1.6;text-align:center">`,
+    `<p style="margin:0">UnieMax is a product of <a href="${OPERATOR.url}" style="color:inherit">${OPERATOR.name}</a>. UnieMax is built and operated by ${OPERATOR.name}.</p>`,
+    `<address style="font-style:normal;margin:4px 0">${text(OPERATOR.name)}, ${text(operatorAddressLine())}<br />Phone: <a href="tel:${tel}" style="color:inherit">${OPERATOR.phone}</a> · Email: <a href="mailto:${OPERATOR.email}" style="color:inherit">${OPERATOR.email}</a></address>`,
+    `<p style="margin:0">© ${year} ${OPERATOR.name}. All rights reserved.</p>`,
+    `</footer>`,
+  ].join("");
 }
 
 /**
@@ -171,6 +201,7 @@ export function renderHead(
     `<title data-default="${attr(defaults.title)}">${text(title)}</title>`,
     `<meta name="description" content="${attr(description)}" data-default="${attr(defaults.description)}" />`,
     meta("name", "robots", robots),
+    ...(head.platform ? [meta("name", "author", OPERATOR.name)] : []),
     `<link rel="canonical" href="${attr(canonical)}" />`,
     meta("property", "og:type", head.type ?? "website"),
     meta("property", "og:site_name", APP_NAME),

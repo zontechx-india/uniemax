@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { OPERATOR, operatorAddressLine } from '../../shared/operator'
 import { useSeo } from '../../shared/seo'
+import { platformOrganizationJsonLd } from '../features/publicStore/structuredData'
 import { AppLogoLockup } from '../../shared/ui/AppLogo'
 import { buttonClass } from '../../shared/ui/Button'
 import { SupportContactCard } from '../features/support/SupportContactCard'
@@ -58,6 +60,14 @@ const PAGES: Record<string, InfoPage> = {
           products, pick a look, and share one link. No technical knowledge
           needed, and it&apos;s free to start.
         </p>
+        <section className="space-y-2 pt-2">
+          <h2 className="font-heading text-lg font-semibold text-fg">Who runs UnieMax</h2>
+          <p>
+            UnieMax is built and operated by{' '}
+            <OperatorLink />, a company based in Chennai, India.
+          </p>
+          <OperatorAddress />
+        </section>
         <div className="flex flex-wrap justify-center gap-3 pt-2">
           <Link to="/" className={buttonClass({ size: 'md' })}>
             Explore stores
@@ -93,6 +103,12 @@ const PAGES: Record<string, InfoPage> = {
           </Link>{' '}
           and follow the reply in your account.
         </p>
+        <section className="space-y-2 pt-2">
+          <h2 className="font-heading text-lg font-semibold text-fg">
+            Operated by <OperatorLink />
+          </h2>
+          <OperatorAddress />
+        </section>
       </>
     ),
   },
@@ -126,6 +142,40 @@ const PAGES: Record<string, InfoPage> = {
     seo: { title: 'Terms & Conditions', robots: HOLDING },
     body: <PendingLegal />,
   },
+}
+
+/**
+ * Pages that also state who runs UnieMax in their JSON-LD. Must match
+ * `ORGANIZATION_PAGES` in `backend/src/modules/seo/pageShell.service.ts`.
+ */
+const ORGANIZATION_PAGES = new Set(['/about', '/contact'])
+
+/** "Zontechx", linking to the company's own site. */
+function OperatorLink() {
+  return (
+    <a
+      href={OPERATOR.url}
+      target="_blank"
+      rel="noopener"
+      className="font-semibold text-brand hover:underline"
+    >
+      {OPERATOR.name}
+    </a>
+  )
+}
+
+/** The company's registered address and phone (`shared/operator.ts`). */
+function OperatorAddress() {
+  return (
+    <address className="not-italic">
+      {OPERATOR.name}, {operatorAddressLine()}
+      <br />
+      Phone:{' '}
+      <a href={`tel:${OPERATOR.phone.replace(/\s+/g, '')}`} className="text-fg hover:underline">
+        {OPERATOR.phone}
+      </a>
+    </address>
+  )
 }
 
 /** A titled block inside a long policy page. */
@@ -274,7 +324,12 @@ export function InfoComingSoonPage() {
     seo: { title: 'Coming soon', robots: HOLDING },
     body: <PendingLegal />,
   }
-  useSeo({ title: [page.seo.title], description: page.seo.description, robots: page.seo.robots })
+  useSeo({
+    title: [page.seo.title],
+    description: page.seo.description,
+    robots: page.seo.robots,
+    jsonLd: ORGANIZATION_PAGES.has(pathname) ? [platformOrganizationJsonLd()] : null,
+  })
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-4 py-12 text-center">

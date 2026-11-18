@@ -6,6 +6,7 @@ import {
   type PublicProductDetail,
   type PublicStore,
 } from '../stores/storesApi'
+import { OPERATOR } from '../../../shared/operator'
 
 /**
  * schema.org JSON-LD for the public storefront.
@@ -245,6 +246,21 @@ export function platformOrganizationJsonLd(): Json {
       merchantReturnDays: 7,
       returnMethod: 'https://schema.org/ReturnByMail',
       merchantReturnLink: absolute('/refund-policy'),
+    },
+    // UnieMax is a product of Zontechx (`shared/operator.ts`).
+    parentOrganization: {
+      '@type': 'Organization',
+      name: OPERATOR.name,
+      url: OPERATOR.url,
+      telephone: OPERATOR.phone,
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: OPERATOR.address.street,
+        addressLocality: OPERATOR.address.locality,
+        addressRegion: OPERATOR.address.region,
+        postalCode: OPERATOR.address.postalCode,
+        addressCountry: OPERATOR.address.countryCode,
+      },
     },
   }
 }

@@ -393,9 +393,9 @@ canonical it is the current path **without** the query string.
 | Store support `/store/{s}/support` **S** | `Help & Support`, store | platform default | path | index | platform | — | — |
 | Support thread `/store/{s}/support/{id}` **S** | `Support request`, store | platform default | path | noindex | platform | — | — |
 | Global category `/c/{slug}` **S** | category, `Shop by category` | `Shop {cat} on UnieMax — {n} products from {k} independent shops. …` — `k` = the API's `storeCount`, every page of the branch, shown only when > 1 (or a no-count line when empty) | `/c/{slug}` | noindex when empty, `?page=` > 1, or `?sort=` ≠ newest | platform | `BreadcrumbList` + `ItemList` (indexable pages only) | 404, noindex |
-| Marketplace home `/` **S** | — (the platform title) | platform description | `/` | index | platform card (`og-image.jpg`) | `WebSite` + platform `Organization` (logo, return policy) | — |
-| `/sell` **S** | `Create your free online store` | seller pitch | `/sell` | index | platform card | — | — |
-| `/about`, `/contact`, `/refund-policy`, `/shipping-policy` **S** | `About` / `Contact us` / `Refund & Returns Policy` / `Shipping Policy` | one fixed line each (`INFO_PAGES`) | path | index | platform card | — | — |
+| Marketplace home `/` **S** | — (the platform title) | platform description | `/` | index | platform card (`og-image.jpg`) | `WebSite` + platform `Organization` (logo, return policy, `parentOrganization` Zontechx) | — |
+| `/sell` **S** | `Create your free online store` | seller pitch | `/sell` | index | platform card | platform `Organization` | — |
+| `/about`, `/contact`, `/refund-policy`, `/shipping-policy` **S** | `About` / `Contact us` / `Refund & Returns Policy` / `Shipping Policy` | one fixed line each (`INFO_PAGES`) | path | index | platform card | platform `Organization` on `/about` and `/contact` only (`ORGANIZATION_PAGES`) | — |
 | `/privacy`, `/terms` **S** | `Privacy Policy` / `Terms & Conditions` | platform | path | **noindex** while they are holding pages | platform card | — | — |
 | All categories `/categories` **S** | `All categories` | "Browse every product category on UnieMax …" | `/categories` | index | platform | — | — |
 | All shops `/shops` **S** | `All shops` | "Every independent shop on UnieMax in one place …" | `/shops` | `?page=` > 1 → noindex, follow | platform | — | — |
@@ -457,6 +457,15 @@ canonical it is the current path **without** the query string.
   claim would be false for some. No `returnFees` (free for damaged items,
   the customer's postage otherwise, with no fixed amount). Change it with
   `RefundPolicy` in `InfoComingSoonPage.tsx`.
+- **UnieMax is a product of Zontechx.** The platform `Organization` carries
+  `parentOrganization` (Zontechx: name, url, telephone, `PostalAddress`;
+  facts in `seo/operator.ts` ↔ `shared/operator.ts`). Every marketplace page
+  shell (`/`, `/sell`, `/c/**`, the footer info pages, the "View all" pages —
+  never `/store/**`) also gets `<meta name="author" content="Zontechx">` and a
+  plain-HTML block in the body ("UnieMax is a product of Zontechx", the
+  address, phone, "© {year} Zontechx. All rights reserved.") written at the
+  `<!-- shell:operator -->` marker inside `#root` — for crawlers that run no
+  JavaScript (Meta's WhatsApp display-name review). React replaces it on mount.
 - The platform `Organization` has no `sameAs` — there are no official social
   profiles to list. Its logo is `/pwa-512.png` (square, 512 px; Google
   needs ≥ 112 px).
@@ -683,4 +692,5 @@ search/filter URLs get indexed, mass-produced pages with nothing on them.
 | 1 Nov 2026 | Homepage Popular row split out of the welcome bar into its own section (`popularCategories`), **off by default**. The `<h1>` stays in the always-on welcome bar; "Shop by category" still links to `/categories` and every `/c/{slug}`, so no internal link is lost |
 | 15 Nov 2026 | Structured data, both writers: offers gain `itemCondition: NewCondition` and `shippingDetails` (the advertised charge to IN; omitted for pickup-only stores and pincode-limited delivery). Homepage gains the platform `Organization` (name, `/pwa-512.png` logo, `hasMerchantReturnPolicy` — 7 days, by mail, IN, `/refund-policy`); never per product. `/c/` description's shop count now comes from `storeCount` on `GET /public/browse/:slug` (every page of the branch) instead of page 1's products. `page-shell.test.mjs` checks all three (and its refund-title regex is fixed). Stale "not released" notes for the feed and info-page shells corrected. Released as `v1.114.0` |
 | 15 Nov 2026 | nginx: `www.uniemax.com` (HTTP and HTTPS) 301s to `https://uniemax.com` with the path kept — one copy of the site for search engines ([`DEPLOYMENT.md`](./DEPLOYMENT.md) → `www.uniemax.com` → `uniemax.com`) |
+| 19 Nov 2026 | "UnieMax is a product of Zontechx" in the first byte of every marketplace page shell (body block at `<!-- shell:operator -->`, `<meta name="author">`), never on `/store/**`; platform `Organization` gains `parentOrganization` (both writers) and is also on `/sell`, `/about`, `/contact`. Marketplace footer, `/about` ("Who runs UnieMax") and `/contact` ("Operated by Zontechx") show the same facts. For Meta's WhatsApp display-name review. Tests: `test/unit/page-shell-operator.test.ts`, `page-shell.test.mjs` |
 | 1 Nov 2026 | Meta Pixel `content_ids` and GA4 `item_id` switched from the product slug to the product id, matching the feed's `g:id` (Meta catalogue reported "products not matching ad events"); placed-order lines now carry `productId`. Feed live on prod since 24 Oct: Merchant Center (371 products, return policy under review) and Meta catalogue "UnieMax" (371 eligible, hourly fetch). Released as `v1.78.0` |

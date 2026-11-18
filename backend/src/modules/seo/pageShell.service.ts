@@ -155,13 +155,13 @@ function pageFor(
 ): Promise<ResolvedPage> {
   switch (kind) {
     case "info":
-      return Promise.resolve(infoPage(path));
+      return Promise.resolve(infoPage(path, origin));
     case "listing":
       return Promise.resolve(listingPage(path, query));
     case "home":
       return Promise.resolve(homePage(origin));
     case "sell":
-      return Promise.resolve(sellPage);
+      return Promise.resolve(sellPage(origin));
     case "store":
       return storePage(segments, query, origin);
     case "browse":
@@ -203,6 +203,7 @@ function homePage(origin: string): ResolvedPage {
     head: {
       title: [],
       canonical: "/",
+      platform: true,
       jsonLd: [
         {
           "@context": "https://schema.org",
@@ -217,15 +218,19 @@ function homePage(origin: string): ResolvedPage {
 }
 
 /** `SellPage`. */
-const sellPage: ResolvedPage = {
-  status: 200,
-  head: {
-    title: ["Create your free online store"],
-    description:
-      "Open your own online store on UnieMax — free to start. Your own branding and store link, Cash on Delivery and online payments, delivery by pincode and instant order alerts. Set it all up from your phone.",
-    canonical: "/sell",
-  },
-};
+function sellPage(origin: string): ResolvedPage {
+  return {
+    status: 200,
+    head: {
+      title: ["Create your free online store"],
+      description:
+        "Open your own online store on UnieMax — free to start. Your own branding and store link, Cash on Delivery and online payments, delivery by pincode and instant order alerts. Set it all up from your phone.",
+      canonical: "/sell",
+      platform: true,
+      jsonLd: [platformOrganizationJsonLd(origin)],
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // The footer info pages
@@ -263,9 +268,26 @@ export const INFO_PAGES: Record<string, PageHead> = {
   "/terms": { title: ["Terms & Conditions"], robots: NOINDEX },
 };
 
-function infoPage(path: string): ResolvedPage {
-  const head = INFO_PAGES[path.replace(/\/+$/, "") || "/"];
-  return head ? { status: 200, head: { ...head, canonical: path.replace(/\/+$/, "") } } : pageNotFound;
+/**
+ * About and Contact also state who runs UnieMax (the `Organization` with its
+ * `parentOrganization`) — must match `ORGANIZATION_PAGES` in
+ * `InfoComingSoonPage.tsx`.
+ */
+const ORGANIZATION_PAGES = new Set(["/about", "/contact"]);
+
+function infoPage(path: string, origin: string): ResolvedPage {
+  const canonical = path.replace(/\/+$/, "") || "/";
+  const head = INFO_PAGES[canonical];
+  if (!head) return pageNotFound;
+  return {
+    status: 200,
+    head: {
+      ...head,
+      canonical,
+      platform: true,
+      ...(ORGANIZATION_PAGES.has(canonical) ? { jsonLd: [platformOrganizationJsonLd(origin)] } : {}),
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -313,6 +335,7 @@ function listingPage(path: string, query: PageShellQuery): ResolvedPage {
     head: {
       ...listing.head,
       canonical,
+      platform: true,
       ...(listing.paged && query.page > 1 ? { robots: NOINDEX } : {}),
     },
   };
@@ -549,6 +572,7 @@ async function browsePage(
             }. Buy direct from the seller with cash on delivery or secure online payment.`
           : `${name} on UnieMax — buy direct from independent sellers with cash on delivery or secure online payment.`,
       canonical,
+      platform: true,
       robots: total === 0 || scoped ? NOINDEX : null,
       jsonLd:
         total > 0 && !scoped

@@ -6,6 +6,7 @@ import { useSeo } from '../../shared/seo'
 import { AppLogoLockup } from '../../shared/ui/AppLogo'
 import { Button } from '../../shared/ui/Button'
 import { useMarketSession } from '../app/marketSession'
+import { platformOrganizationJsonLd } from '../features/publicStore/structuredData'
 import { openAuthDialog } from '../features/auth/authDialogStore'
 import { ChatToOrder } from '../features/selling/ChatToOrder'
 import { ClaimStoreForm } from '../features/selling/ClaimStoreForm'
@@ -66,6 +67,7 @@ export function SellPage() {
     description:
       'Open your own online store on UnieMax — free to start. Your own branding and store link, Cash on Delivery and online payments, delivery by pincode and instant order alerts. Set it all up from your phone.',
     canonical: '/sell',
+    jsonLd: [platformOrganizationJsonLd()],
   })
 
   // One name for the whole page: typed in the hero, it is already in the

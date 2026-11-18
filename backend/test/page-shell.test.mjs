@@ -126,6 +126,29 @@ test("footer info pages: own title + canonical; holding pages are noindex", asyn
   }
 });
 
+test("marketplace pages say who runs UnieMax without JavaScript (Zontechx)", async (t) => {
+  for (const path of ["/", "/about", "/contact", "/sell"]) {
+    const p = await page(path);
+    assert.equal(p.status, 200, path);
+    // Text a no-JS crawler reads in the body, not just in a script.
+    const body = p.html.slice(p.html.indexOf("<body>"));
+    assert.match(body, /UnieMax is a product of <a href="https:\/\/zontechx\.com"[^>]*>Zontechx<\/a>/, path);
+    assert.match(body, /© \d{4} Zontechx\. All rights reserved\./, path);
+    assert.match(body, /Chennai, Tamil Nadu 600096, India/, path);
+    assert.match(p.html, /<meta name="author" content="Zontechx" \/>/, path);
+    const org = p.jsonLd.find((block) => block["@type"] === "Organization");
+    assert.equal(org?.parentOrganization?.name, "Zontechx", path);
+    assert.equal(org?.parentOrganization?.url, "https://zontechx.com", path);
+  }
+
+  // Seller stores never carry it.
+  const live = await liveStore();
+  if (!live) return t.skip("no published store to check the negative case");
+  const store = await page(`/store/${live.store.slug}`);
+  assert.ok(!store.html.includes("is a product of"));
+  assert.ok(!store.html.includes('<meta name="author"'));
+});
+
 test("link-preview images are small JPEGs (WhatsApp drops big ones)", async (t) => {
   const live = await liveStore();
   if (!live) return t.skip("no published store with products on this target");

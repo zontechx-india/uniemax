@@ -1,5 +1,6 @@
 import type { FooterLocation, StoreFooter } from "../stores/stores.schema.js";
 import type { getPublicProduct } from "../stores/publicStore.service.js";
+import { OPERATOR } from "./operator.js";
 
 /**
  * schema.org JSON-LD for the page shells.
@@ -238,6 +239,21 @@ export function platformOrganizationJsonLd(origin: string): Json {
       merchantReturnDays: 7,
       returnMethod: "https://schema.org/ReturnByMail",
       merchantReturnLink: absoluteUrl("/refund-policy", origin),
+    },
+    // UnieMax is a product of Zontechx (`operator.ts`).
+    parentOrganization: {
+      "@type": "Organization",
+      name: OPERATOR.name,
+      url: OPERATOR.url,
+      telephone: OPERATOR.phone,
+      address: {
+        "@type": "PostalAddress",
+        streetAddress: OPERATOR.address.street,
+        addressLocality: OPERATOR.address.locality,
+        addressRegion: OPERATOR.address.region,
+        postalCode: OPERATOR.address.postalCode,
+        addressCountry: OPERATOR.address.countryCode,
+      },
     },
   };
 }

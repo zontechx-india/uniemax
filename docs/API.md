@@ -2552,7 +2552,11 @@ from `PUBLIC_WEB_URL` (else the request's host).
 policy nginx gives `index.html`), no helmet headers. The region between
 `<!-- seo:start -->` and `<!-- seo:end -->` is replaced with the page's
 `<title>`, `description`, `robots`, `canonical`, Open Graph + Twitter tags and
-JSON-LD — the same values the page's `useSeo` call writes after mount. The
+JSON-LD — the same values the page's `useSeo` call writes after mount.
+Marketplace pages (everything above except `/store/*`) also get
+`<meta name="author" content="Zontechx">`, and the `<!-- shell:operator -->`
+marker inside `#root` is replaced with a plain-HTML "UnieMax is a product of
+Zontechx" block (address, phone, © line) for crawlers without JavaScript. The
 title, description and `og:image` also carry the platform default in
 `data-default`; JSON-LD blocks carry `data-seo`.
 
