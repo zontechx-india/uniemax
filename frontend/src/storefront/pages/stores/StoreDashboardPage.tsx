@@ -98,7 +98,7 @@ export function StoreDashboardPage() {
   if (supplyOnly) return <SupplierHome storeName={store.name} storeSlug={store.slug} />
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 sm:space-y-5">
       <Hero store={store} dashboard={dashboard} onStoreChange={onStoreChange} />
 
       {error && <ErrorNote>{error}</ErrorNote>}
@@ -112,27 +112,27 @@ export function StoreDashboardPage() {
       {dashboard && hasOrders && (
         <>
           <section aria-labelledby="pipeline-heading">
-            <h3 id="pipeline-heading" className="mb-3 text-base font-semibold text-fg">
+            <h3 id="pipeline-heading" className="mb-2 text-sm font-semibold text-fg sm:mb-3 sm:text-base">
               Your orders
             </h3>
             {/* Phone: one row that scrolls sideways (the fade on the right
                 says there is more). From sm: a grid, nothing hidden. */}
             <div className="-mx-4 [mask-image:linear-gradient(to_right,#000_85%,transparent)] sm:mx-0 sm:[mask-image:none]">
-              <div className="flex snap-x gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:grid sm:grid-cols-3 sm:px-0 lg:grid-cols-6">
+              <div className="flex snap-x gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:grid sm:grid-cols-3 sm:gap-3 sm:px-0 lg:grid-cols-6">
                 {PIPELINE.map(({ key, label, to, dot }) => {
                   const body = (
                     <>
-                      <span className="flex items-center gap-1.5 text-hint font-medium text-muted">
-                        <span aria-hidden className={`h-2 w-2 rounded-full ${dot}`} />
+                      <span className="flex items-center gap-1.5 text-xs font-medium whitespace-nowrap text-muted">
+                        <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${dot}`} />
                         {label}
                       </span>
-                      <span className="mt-2 block font-figure text-3xl leading-none font-semibold tabular-nums text-fg">
+                      <span className="mt-1.5 block font-figure text-lg leading-none font-semibold tabular-nums text-fg sm:mt-2 sm:text-3xl">
                         {dashboard.stats[key]}
                       </span>
                     </>
                   )
                   const chip =
-                    'ws-card block min-w-[124px] shrink-0 snap-start rounded-xl px-4 py-3 sm:min-w-0'
+                    'ws-card block min-w-[104px] shrink-0 snap-start rounded-lg px-3 py-2.5 sm:min-w-0 sm:rounded-xl sm:px-4 sm:py-3'
                   return to ? (
                     <Link key={key} to={to} className={`${chip} transition-colors hover:border-brand/40`}>
                       {body}
@@ -148,8 +148,8 @@ export function StoreDashboardPage() {
           </section>
 
           <section aria-labelledby="latest-heading">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h3 id="latest-heading" className="text-base font-semibold text-fg">
+            <div className="mb-1 flex items-center justify-between gap-3 sm:mb-3">
+              <h3 id="latest-heading" className="text-sm font-semibold text-fg sm:text-base">
                 Latest orders
               </h3>
               <Link
@@ -220,28 +220,18 @@ function Hero({
   const showStats = store.isPublished && stats !== undefined && stats.totalOrders > 0
 
   return (
-    <section className="ws-tint rounded-lg p-4 sm:p-6">
-      <p className="text-sm text-muted">{todayLabel()}</p>
-      <h2 className="mt-1 font-heading text-2xl leading-tight font-semibold break-words text-fg">
+    <section className="ws-tint rounded-lg p-3 sm:p-6">
+      <p className="text-xs text-muted sm:text-sm">{todayLabel()}</p>
+      <h2 className="mt-0.5 font-heading text-lg leading-tight font-semibold break-words text-fg sm:mt-1 sm:text-2xl">
         {store.name}
       </h2>
 
       {showStats && (
-        <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-          {/* Phone: Today + Waiting side by side, sales on its own full row
-              so any amount fits; three across from sm. */}
+        <dl className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3">
+          {/* No Waiting tile: the Next step pane and the Waiting chip under
+              the hero already say how many orders are waiting. */}
           <HeroStat label="Today" value={stats.today} />
-          <HeroStat
-            label="Waiting"
-            value={stats.pending}
-            dot={stats.pending > 0 ? 'bg-pending' : undefined}
-          />
-          <HeroStat
-            label="Total sales"
-            value={formatPrice(stats.revenue)}
-            small
-            className="col-span-2 sm:col-span-1"
-          />
+          <HeroStat label="Total sales" value={formatPrice(stats.revenue)} small />
         </dl>
       )}
 
@@ -252,33 +242,25 @@ function Hero({
 
 /**
  * One number in the hero: a frosted tile (a light pane, not a fill) so the
- * numbers sit in small bordered tiles. `dot` marks a number that wants attention.
+ * numbers sit in small bordered tiles.
  */
 function HeroStat({
   label,
   value,
   small = false,
-  dot,
-  className = '',
 }: {
   label: string
   value: ReactNode
   small?: boolean
-  /** A status dot before the label (e.g. pending orange when waiting > 0). */
-  dot?: string
-  className?: string
 }) {
   return (
     // 8px corners inside the hero card's 12px — an inner radius is smaller
     // than the one around it.
-    <div className={`min-w-0 ${className} rounded-md border border-line bg-surface px-3 py-3`}>
-      <dt className="flex items-center gap-1.5 text-xs font-medium text-muted">
-        {dot && <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${dot}`} />}
-        {label}
-      </dt>
+    <div className="min-w-0 rounded-md border border-line bg-surface px-3 py-2 sm:py-3">
+      <dt className="text-xs font-medium text-muted">{label}</dt>
       <dd
-        className={`mt-1 font-figure leading-tight font-semibold tabular-nums text-fg ${
-          small ? 'break-words text-xl' : 'truncate text-2xl'
+        className={`mt-0.5 font-figure text-lg leading-tight font-semibold tabular-nums text-fg sm:mt-1 ${
+          small ? 'break-words sm:text-xl' : 'truncate sm:text-2xl'
         }`}
       >
         {value}
@@ -318,7 +300,7 @@ function NextStep({
       title = go.label
       detail = `To open your shop, add: ${stepMissing(next).join(' · ')}`
       action = hiddenSections.includes(next.href) ? null : (
-        <Link to={go.to} className={buttonClass({ size: 'lg', full: true })}>
+        <Link to={go.to} className={buttonClass({ size: 'md', full: true })}>
           {go.label}
           <ArrowRightIcon className="h-4 w-4" />
         </Link>
@@ -332,7 +314,7 @@ function NextStep({
           type="button"
           onClick={actions.publish}
           disabled={actions.busy || !store.readiness.gates.PUBLISH.allowed}
-          className={buttonClass({ variant: 'primary', size: 'lg', full: true })}
+          className={buttonClass({ variant: 'primary', size: 'md', full: true })}
         >
           {actions.busy ? 'Publishing…' : 'Publish my shop'}
         </button>
@@ -344,7 +326,7 @@ function NextStep({
     title = `${waiting} order${waiting === 1 ? ' is' : 's are'} waiting`
     detail = 'Confirm them so your customers know their order is coming'
     action = (
-      <Link to="orders?status=PENDING" className={buttonClass({ size: 'lg', full: true })}>
+      <Link to="orders?status=PENDING" className={buttonClass({ size: 'md', full: true })}>
         See waiting orders
         <ArrowRightIcon className="h-4 w-4" />
       </Link>
@@ -363,17 +345,17 @@ function NextStep({
 
   const Icon = icon
   return (
-    <div className="mt-4 rounded-md border border-line bg-surface p-4">
+    <div className="mt-3 rounded-md border border-line bg-surface p-3 sm:mt-4 sm:p-4">
       <div className="flex items-start gap-3">
         {/* Flat tile, no gradient or glow: the button below is the one
             solid colour on the card. */}
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-brand-soft text-brand">
-          <Icon className="h-5 w-5" />
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-soft text-brand sm:h-10 sm:w-10">
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
         </span>
         <div className="min-w-0">
           <p className="text-xs font-medium text-brand">Next step</p>
-          <p className="text-base leading-snug font-semibold text-fg">{title}</p>
-          <p className="mt-1 text-hint text-muted">{detail}</p>
+          <p className="text-sm leading-snug font-semibold text-fg sm:text-base">{title}</p>
+          <p className="mt-0.5 text-hint text-muted sm:mt-1">{detail}</p>
         </div>
       </div>
       {action && <div className="mt-3">{action}</div>}
@@ -391,9 +373,9 @@ function DashboardSkeleton() {
   return (
     <div aria-busy="true" aria-label="Loading your orders" className="space-y-3">
       <div className="h-5 w-32 animate-pulse rounded-md bg-fg/10" />
-      <div className="flex gap-2.5">
+      <div className="flex gap-2 sm:gap-3">
         {[0, 1, 2].map((key) => (
-          <div key={key} className="ws-card h-[76px] flex-1 animate-pulse rounded-xl" />
+          <div key={key} className="ws-card h-[60px] flex-1 animate-pulse rounded-lg sm:h-[76px] sm:rounded-xl" />
         ))}
       </div>
     </div>

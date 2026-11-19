@@ -866,9 +866,9 @@ It renders, top to bottom:
 - A **hero** — a brand-tinted card (`ws-tint`: a flat brand-soft fill with a
   brand-mixed border), so
   the next-step button is the only solid colour on it: today's date (no greeting)
-  and the shop name; once a live shop has orders, three frosted stat tiles —
-  **Today** / **Waiting** (orange dot when > 0) / **Total sales** (its own
-  full-width row on a phone, so the whole amount shows); and a lighter
+  and the shop name; once a live shop has orders, two frosted stat tiles
+  side by side — **Today** / **Total sales** (no Waiting tile: the Next step
+  pane and the Waiting chip below already show that count); and a lighter
   **Next step** pane (flat `brand-soft` icon tile, sentence-case label) with ONE action picked from the
   shop's state — the first
   unfinished launch step (its `stepAction` button), **Publish my shop**
@@ -888,6 +888,13 @@ It renders, top to bottom:
 
 Stats, pipeline and latest orders stay hidden until there is an order to
 count; a card skeleton shows while the layout's fetch is in flight.
+
+Phone sizing is denser than `sm` and up (the console sizes in
+`ADMIN_UI_THEME.md` §3–4): shop name 18px, stat and pipeline figures 18px,
+section headings 14px, 12px hero padding and a 32px next-step icon tile.
+From `sm` the larger sizes return (22px name and stats, 28px pipeline
+figures, 24px hero padding). The next-step button is 44px (`md`) on every
+screen.
 
 **Orders** (`StoreOrdersPage` at `/mystores/{slug}/orders` +
 `StoreOrderDetailPage` at `…/orders/{orderId}`, shared chips/labels in
