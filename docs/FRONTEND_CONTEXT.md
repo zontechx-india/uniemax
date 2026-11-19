@@ -731,7 +731,11 @@ itself when taller than the window) and the selected section in a right
 card via a nested `<Outlet/>` (children read the loaded store through
 `useManagedStore()` outlet context). **Phone** (`< lg`): no sidebar — a
 **store strip** (back to All stores · 32px logo · name · Live / Not live yet ·
-a small (`sm`) **Share** once live, **Publish** before) over the section card, and a
+a small (`sm`) **Share** once live, **Publish** before) — a full-width band
+joined to the top bar and **sticky** under it (no card, hairline under it; the
+admin console keeps it a plain card). Its 52px height is published as
+`--seller-strip`, and page sticky bars sit at
+`top-[calc(3.5rem+var(--seller-strip,0px))]` to clear it — over the section card, and a
 floating **bottom tab bar** (`StoreMobileNav`). The layout sets
 `--seller-dock` (tab-bar height incl. safe area; `0px` from `lg`) and pads the
 page by it, so sticky `SaveBar`s and toasts sit above the bar.

@@ -136,7 +136,8 @@ export function StoreBusinessPage() {
   const jump = useCallback((id: string) => {
     const el = document.getElementById(id)
     if (!el) return
-    // `scroll-mt-28` on the card keeps the heading clear of both sticky bars.
+    // The card's `scroll-mt` keeps the heading clear of the sticky bars
+    // (top bar + setup status, plus the phone store strip's `--seller-strip`).
     el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     // Keyboard and screen-reader users land IN the section, not back at the
     // top of the page on their next Tab. `preventScroll` because the smooth
@@ -284,7 +285,7 @@ function Card({
       id={id}
       // Focusable only programmatically (`jump`), never in the tab order.
       tabIndex={-1}
-      className={`ws-card scroll-mt-28 rounded-lg p-4 outline-none transition duration-300 sm:p-5 ${
+      className={`ws-card scroll-mt-[calc(7rem+var(--seller-strip,0px))] rounded-lg p-4 outline-none transition duration-300 sm:p-5 ${
         flashing ? 'ring-2 ring-pending' : ''
       }`}
     >

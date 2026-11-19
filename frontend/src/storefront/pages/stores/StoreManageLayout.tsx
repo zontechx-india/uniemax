@@ -33,6 +33,18 @@ const STRIP_TONE = {
 } as const
 
 /**
+ * The phone strip joined to the app's top bar: the negative margins cancel
+ * `AppLayout`'s <main> padding (px-3 / sm:px-5, top py-4) so it runs edge to
+ * edge right under the bar. Change both together.
+ *
+ * Sticky under that bar (`top-14` = the bar's `h-14`). Its fixed 52px height
+ * is published as `--seller-strip` (see the layout's root) so the sticky bars
+ * and scroll offsets of the pages below can clear it.
+ */
+const ATTACHED_STRIP =
+  'sticky top-14 z-10 -mx-3 -mt-4 h-[52px] border-b border-line bg-surface pl-1 pr-3 sm:-mx-5 sm:pl-3 sm:pr-5'
+
+/**
  * Store management — Flipkart-account style split inside the app's main
  * outlet: a left card listing the manage sections, and a right card where
  * the selected section renders (nested routes → inner <Outlet/>).
@@ -123,7 +135,11 @@ export function StoreManageLayout() {
     // The shape of the page, not the word "Loading…".
     return (
       <div aria-busy="true" aria-label="Loading your shop" className="mx-auto max-w-7xl space-y-3">
-        <div className="ws-card h-[54px] animate-pulse rounded-lg lg:hidden" />
+        <div
+          className={`h-[52px] animate-pulse lg:hidden ${
+            scope.mode === 'owner' ? ATTACHED_STRIP : 'ws-card rounded-lg'
+          }`}
+        />
         <div className="items-start gap-3 lg:grid lg:grid-cols-[264px_1fr]">
           <div className="ws-card hidden h-[520px] animate-pulse rounded-lg lg:block" />
           <div className="ws-card h-[420px] animate-pulse rounded-lg" />
@@ -170,7 +186,17 @@ export function StoreManageLayout() {
     // the page pads by it so the last row is not hidden under the bar, and
     // sticky save bars / toasts read it to sit above the bar. Zero from `lg`,
     // where there is no bar.
-    <div className="mx-auto max-w-7xl space-y-3 pb-[var(--seller-dock)] [--seller-dock:calc(84px+env(safe-area-inset-bottom))] lg:pb-0 lg:[--seller-dock:0px]">
+    //
+    // `--seller-strip` is the height of the sticky phone store strip
+    // (`ATTACHED_STRIP`): page-level sticky bars sit at
+    // `top-[calc(3.5rem+var(--seller-strip,0px))]` to stay below it. Set only
+    // for the seller app (the admin console's strip is a non-sticky card) and
+    // zero from `lg`, where there is no strip.
+    <div
+      className={`mx-auto max-w-7xl space-y-3 pb-[var(--seller-dock)] [--seller-dock:calc(84px+env(safe-area-inset-bottom))] lg:pb-0 lg:[--seller-dock:0px] ${
+        scope.mode === 'owner' ? '[--seller-strip:52px] lg:[--seller-strip:0px]' : ''
+      }`}
+    >
       <Link
         to={scope.indexPath}
         className="hidden min-h-tap items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:text-fg lg:inline-flex"
@@ -181,8 +207,15 @@ export function StoreManageLayout() {
 
       {/* Phone: one strip naming the shop, whether it is live, and the
           ONE thing to do with it — Share once live, Publish until then. It
-          replaced the sidebar card that stacked above every section. */}
-      <div className="ws-card flex items-center gap-2 rounded-lg p-1 pr-2 lg:hidden">
+          replaced the sidebar card that stacked above every section.
+          It is a band joined to the app's top bar (`ATTACHED_STRIP`), not a
+          floating card. The admin console pads its pages differently, so
+          there it stays a card. */}
+      <div
+        className={`flex items-center gap-2 lg:hidden ${
+          scope.mode === 'owner' ? ATTACHED_STRIP : 'ws-card rounded-lg p-1 pr-2'
+        }`}
+      >
         <PhoneBackButton storePath={scope.storePath(store.slug)} indexPath={scope.indexPath} />
         {store.logoUrl ? (
           <MediaImg

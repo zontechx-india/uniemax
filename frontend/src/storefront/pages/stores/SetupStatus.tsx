@@ -293,9 +293,10 @@ export function SectionJumpBar({
       className={`mt-4 -mx-4 border-b border-line px-4 py-2.5 sm:-mx-5 sm:px-5 ${
         pending > 0
           ? // Bleeds to the panel edges so the pinned background covers the
-            // full width as content scrolls under it; `top-14` clears the
-            // app's own sticky header.
-            'sticky top-14 z-10 bg-surface'
+            // full width as content scrolls under it; the offset clears the
+            // app's own sticky header (3.5rem) and, on phones, the sticky
+            // store strip (`--seller-strip`, set by StoreManageLayout).
+            'sticky top-[calc(3.5rem+var(--seller-strip,0px))] z-10 bg-surface'
           : ''
       }`}
     >

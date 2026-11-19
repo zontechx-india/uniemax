@@ -35,7 +35,9 @@ export function AppLayout() {
       </header>
 
       {/* Full-width like the storefront — soft cap for ultrawides only.
-          Form-heavy pages constrain themselves (max-w-xl etc.). */}
+          Form-heavy pages constrain themselves (max-w-xl etc.).
+          `StoreManageLayout`'s phone strip cancels this padding with
+          negative margins (`ATTACHED_STRIP`) — change both together. */}
       <main className="px-3 py-4 sm:px-5 lg:px-8">
         <div className="mx-auto w-full max-w-[1920px]">
           <Suspense
