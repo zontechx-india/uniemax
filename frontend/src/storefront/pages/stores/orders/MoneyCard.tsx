@@ -47,12 +47,12 @@ export function MoneyCard({ storeId, orderId, version }: { storeId: string; orde
       aside={status ? <StatusPill tone={status.tone}>{status.label}</StatusPill> : undefined}
     >
       {error ? (
-        <p className="text-sm text-muted">Could not load the money details. {error}</p>
+        <p className="text-hint text-muted">Could not load the money details. {error}</p>
       ) : !row ? (
-        <div aria-busy="true" aria-label="Loading money details" className="ws-well h-28 animate-pulse rounded-md" />
+        <div aria-busy="true" aria-label="Loading money details" className="ws-well h-24 animate-pulse rounded-md" />
       ) : (
-        <div className="space-y-3">
-          <dl className="space-y-1.5 text-base">
+        <div className="space-y-2.5">
+          <dl className="space-y-1 text-sm">
             <Line label="Bill amount" value={money(row.billAmount)} />
             <Line label="Paid by" value={paymentModeLabel(row.paymentMethod)} />
             {moneyCounts(row) && (
@@ -67,22 +67,22 @@ export function MoneyCard({ storeId, orderId, version }: { storeId: string; orde
                       label={
                         <>
                           Gateway fee
-                          <span className="block text-sm text-success">Paid by UnieMax</span>
+                          <span className="block text-hint text-success">Paid by UnieMax</span>
                         </>
                       }
                       value={<span className="text-muted line-through">{money(row.gatewayFee)}</span>}
                     />
                   ))}
-                <div className="flex justify-between gap-3 border-t border-line pt-2">
-                  <dt className="font-bold text-fg">You get</dt>
-                  <dd className="font-figure font-bold text-fg">{money(row.youGet)}</dd>
+                <div className="mt-1.5 flex justify-between gap-3 border-t border-line pt-2">
+                  <dt className="font-semibold text-fg">You get</dt>
+                  <dd className="font-figure font-semibold tabular-nums text-fg">{money(row.youGet)}</dd>
                 </div>
               </>
             )}
           </dl>
-          <p className="ws-well rounded-md px-3 py-2.5 text-sm text-fg">{settlementNote(row)}</p>
+          <p className="ws-well rounded-md px-3 py-2 text-hint text-fg">{settlementNote(row)}</p>
           {!hiddenSections.includes('transactions') && (
-            <Link to="../transactions" className="inline-block text-sm font-medium text-brand hover:underline">
+            <Link to="../transactions" className="inline-block text-hint font-medium text-brand hover:underline">
               See all transactions
             </Link>
           )}
@@ -96,7 +96,7 @@ function Line({ label, value }: { label: ReactNode; value: ReactNode }) {
   return (
     <div className="flex justify-between gap-3">
       <dt className="text-muted">{label}</dt>
-      <dd className="text-right font-figure text-fg">{value}</dd>
+      <dd className="text-right font-figure tabular-nums text-fg">{value}</dd>
     </div>
   )
 }

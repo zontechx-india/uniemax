@@ -135,8 +135,8 @@ customer paid, and whether the money has reached the seller. It reads only
 (orders, `order_financials` or the same on-the-fly numbers, payouts,
 refunds); it posts nothing. Endpoint: `GET /stores/:id/transactions`
 (`docs/API.md`). Page: Payments & delivery → **Transactions**
-(`StoreTransactionsPage`), filters This month (default) / Last month / Last
-7 days / All time × All / Online / Cash on delivery, search, Load more.
+(`StoreTransactionsPage`), dense in the admin pattern at seller sizes: one filter bar (search · period select This month (default) / Last month / Last
+7 days / All time · All / Online / Cash switch), four stat tiles, a table from `md` and three-line rows on a phone (a few words per status from `settlementShort`), Load more.
 The order page shows the same row as its **Money** card
 (`GET /stores/:id/transactions/:orderId`).
 

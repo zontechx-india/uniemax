@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useEffect, useId, useRef, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
 import { Button } from '../../../shared/ui/Button'
-import { Card } from '../../../shared/ui/Card'
+import { fieldClass } from '../../../shared/ui/field'
 import { ErrorNote } from '../../../shared/ui/form'
 import { storeFinanceApi } from '../../features/stores/storesApi'
 import type { SellerTransaction, SellerTransactions, SellerTransactionsQuery } from '../../features/stores/storesApi'
@@ -13,9 +13,11 @@ import {
   moneyCounts,
   moneyDay,
   paymentModeLabel,
+  paymentModeShort,
   sellerFee,
-  settlementNote,
   settlementPill,
+  settlementShort,
+  shortDay,
 } from './orders/settlementMeta'
 import { EmptyState } from './ui/EmptyState'
 import { PageHeader } from './ui/PageHeader'
@@ -26,6 +28,11 @@ import { StatusPill } from './ui/StatusPill'
  * per order: what the customer paid, how they paid, and whether the money
  * has reached the seller yet. Earnings shows the same money as balances and
  * ledger entries; this page answers "what about THIS order?".
+ *
+ * Dense, in the admin console's pattern (ADMIN_UI_THEME.md) at seller sizes
+ * (DESIGN_GUIDELINES §18a): one filter bar, stat tiles, then a table on wide
+ * screens and three-line rows on a phone. The full sentence for each status
+ * lives on the order's Money card; rows carry a few words.
  *
  * Filters live in the URL (?period=&mode=) so a link opens the same view.
  * Every amount and every status comes from the server.
@@ -66,10 +73,11 @@ function periodRange(period: Period): { from?: string; to?: string } {
 
 type Mode = 'ALL' | 'ONLINE' | 'COD'
 
-const MODES: { key: Mode; label: string }[] = [
-  { key: 'ALL', label: 'All payments' },
-  { key: 'ONLINE', label: 'Online' },
-  { key: 'COD', label: 'Cash on delivery' },
+/** Short labels — they share one 44px switch on a phone. */
+const MODES: { key: Mode; label: string; title: string }[] = [
+  { key: 'ALL', label: 'All', title: 'All payments' },
+  { key: 'ONLINE', label: 'Online', title: 'Paid online' },
+  { key: 'COD', label: 'Cash', title: 'Cash on delivery' },
 ]
 
 export function StoreTransactionsPage() {
@@ -87,7 +95,7 @@ export function StoreTransactionsPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [reload, setReload] = useState(0)
-  // Out-of-order responses (fast typing, chip hopping) must never win.
+  // Out-of-order responses (fast typing, filter hopping) must never win.
   const requestSeq = useRef(0)
 
   useEffect(() => {
@@ -159,33 +167,40 @@ export function StoreTransactionsPage() {
       <PageHeader
         icon={ReceiptIcon}
         title="Transactions"
-        description="Every order's bill: how much, how the customer paid, and whether the money has reached you."
+        description="Each order's bill, how it was paid, and whether the money has reached you."
       />
 
-      <ChipRow
-        label="Time period"
-        items={PERIODS}
-        value={period}
-        onChange={(key) => setParam('period', key === 'month' ? null : key)}
-      />
-      <ChipRow
-        label="Payment mode"
-        items={MODES}
-        value={mode}
-        onChange={(key) => setParam('mode', key === 'ALL' ? null : key)}
-      />
-
-      <label className="relative block">
-        <span className="sr-only">Search transactions</span>
-        <SearchIcon className="pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-muted" />
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by order number or customer name"
-          className="h-field w-full rounded-xl border border-line bg-input pr-4 pl-11 text-base text-fg outline-none placeholder:text-muted focus:border-accent"
-        />
-      </label>
+      {/* Filter bar — search, period, payment mode. One row from `sm`. */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <label className="relative block min-w-0 flex-1">
+          <span className="sr-only">Search transactions</span>
+          <SearchIcon className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Order number or customer"
+            className={fieldClass({ dense: true, className: 'pl-9' })}
+          />
+        </label>
+        <div className="grid grid-cols-2 gap-2 sm:flex">
+          <label className="block">
+            <span className="sr-only">Time period</span>
+            <select
+              value={period}
+              onChange={(e) => setParam('period', e.target.value === 'month' ? null : e.target.value)}
+              className={fieldClass({ dense: true, className: 'sm:w-36' })}
+            >
+              {PERIODS.map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <ModeSwitch value={mode} onChange={(key) => setParam('mode', key === 'ALL' ? null : key)} />
+        </div>
+      </div>
 
       {error && (
         <div className="space-y-2">
@@ -197,39 +212,34 @@ export function StoreTransactionsPage() {
       )}
 
       {data && (
-        <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Tile
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+            <Stat
               label="Total billed"
               value={money(data.summary.billed.amount)}
-              hint={`${data.summary.billed.orders} ${data.summary.billed.orders === 1 ? 'order' : 'orders'}, not counting cancelled`}
+              sub={`${data.summary.billed.orders} ${data.summary.billed.orders === 1 ? 'order' : 'orders'}`}
             />
-            <Tile label="Paid online" value={money(data.summary.online.amount)} hint={`${data.summary.online.orders} orders`} />
-            <Tile label="Cash on delivery" value={money(data.summary.cod.amount)} hint={`${data.summary.cod.orders} orders`} />
-            <Tile
+            <Stat label="Paid online" value={money(data.summary.online.amount)} sub={`${data.summary.online.orders} orders`} />
+            <Stat label="Cash on delivery" value={money(data.summary.cod.amount)} sub={`${data.summary.cod.orders} orders`} />
+            <Stat
               label="Sent to your bank"
               value={money(data.summary.paidToYou)}
-              hint={
-                Number(data.summary.onItsWay) > 0
-                  ? `+ ${money(data.summary.onItsWay)} on its way`
-                  : 'For the orders in this list'
-              }
+              sub={Number(data.summary.onItsWay) > 0 ? `+ ${money(data.summary.onItsWay)} on its way` : 'For these orders'}
             />
           </div>
-          <p className="text-sm text-muted">
-            To see your full balance and what UnieMax pays you next, open{' '}
+          <p className="text-hint text-muted">
+            Cancelled orders are not counted. Your full balance is on{' '}
             <Link to="../earnings" className="font-medium text-brand hover:underline">
               Earnings
             </Link>
-            .
           </p>
-        </>
+        </div>
       )}
 
       {rows === null && !error && (
-        <div aria-busy="true" aria-label="Loading transactions" className="space-y-2">
-          {[0, 1, 2].map((key) => (
-            <div key={key} className="ws-card h-[104px] animate-pulse rounded-2xl" />
+        <div aria-busy="true" aria-label="Loading transactions" className="ws-card divide-y divide-line overflow-hidden rounded-lg">
+          {[0, 1, 2, 3].map((key) => (
+            <div key={key} className="h-[76px] animate-pulse bg-fg/3" />
           ))}
         </div>
       )}
@@ -250,7 +260,8 @@ export function StoreTransactionsPage() {
 
       {rows !== null && rows.length > 0 && (
         <>
-          <ul className="ws-card divide-y divide-line overflow-hidden rounded-lg">
+          {/* Phone: three-line rows */}
+          <ul className="ws-card divide-y divide-line overflow-hidden rounded-lg md:hidden">
             {rows.map((row) => (
               <li key={row.id}>
                 <TransactionRow row={row} />
@@ -258,9 +269,12 @@ export function StoreTransactionsPage() {
             ))}
           </ul>
 
+          {/* Wider screens: a table */}
+          <TransactionTable rows={rows} />
+
           {meta && meta.page < meta.totalPages && (
             <div className="flex justify-center">
-              <Button variant="secondary" size="lg" className="w-full sm:w-auto" loading={loadingMore} onClick={() => void loadMore()}>
+              <Button variant="secondary" size="md" className="w-full sm:w-auto" loading={loadingMore} onClick={() => void loadMore()}>
                 {`Show more (${meta.total - rows.length} left)`}
               </Button>
             </div>
@@ -271,66 +285,136 @@ export function StoreTransactionsPage() {
   )
 }
 
+/** One order on a phone: who + amount, number · date · mode, status + a few words. */
 function TransactionRow({ row }: { row: SellerTransaction }) {
   const status = settlementPill(row)
+  const short = settlementShort(row)
   return (
-    <Link to={`../orders/${row.id}`} className="flex items-center gap-3 px-4 py-3.5 transition hover:bg-fg/3">
-      <div className="min-w-0 flex-1 space-y-1">
-        {/* Amount + status first: the two things a seller scans the list for. */}
-        <div className="flex items-center justify-between gap-3">
-          <p className="font-figure text-lg font-bold text-fg">{money(row.billAmount)}</p>
-          <StatusPill tone={status.tone}>{status.label}</StatusPill>
+    <Link to={`../orders/${row.id}`} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-fg/3">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="min-w-0 truncate text-sm font-semibold text-fg">{row.customerName ?? row.orderNumber}</p>
+          <p className="shrink-0 font-figure text-sm font-semibold tabular-nums text-fg">{money(row.billAmount)}</p>
         </div>
-        <p className="text-sm break-all text-fg">
-          <span className="font-semibold">{row.orderNumber}</span>
-          {row.customerName ? <span className="break-normal text-muted"> · {row.customerName}</span> : null}
+        <p className="mt-0.5 truncate text-hint text-muted">
+          {row.customerName ? `${row.orderNumber} · ` : ''}
+          {shortDay(row.placedAt)} · {paymentModeShort(row.paymentMethod)}
         </p>
-        <p className="text-sm text-muted">
-          {moneyDay(row.placedAt)} · <span className="font-medium text-fg">{paymentModeLabel(row.paymentMethod)}</span>
-        </p>
-        {moneyCounts(row) && (
-          <p className="font-figure text-sm text-muted">
-            Fee {money(sellerFee(row))} · You get {money(row.youGet)}
-          </p>
-        )}
-        <p className="text-sm text-muted">{settlementNote(row)}</p>
+        <div className="mt-1.5 flex min-w-0 items-center gap-2">
+          <StatusPill tone={status.tone}>{status.label}</StatusPill>
+          {short && <span className="min-w-0 truncate text-hint text-muted">{short}</span>}
+        </div>
       </div>
-      <ChevronRightIcon className="h-5 w-5 shrink-0 text-muted" />
+      <ChevronRightIcon className="h-4 w-4 shrink-0 text-muted" />
     </Link>
   )
 }
 
-function ChipRow<K extends string>({
-  label,
-  items,
-  value,
-  onChange,
-}: {
-  label: string
-  items: { key: K; label: string }[]
-  value: K
-  onChange: (key: K) => void
-}) {
+function TransactionTable({ rows }: { rows: SellerTransaction[] }) {
+  const navigate = useNavigate()
+  const th = 'px-4 py-2.5 text-left text-hint font-medium whitespace-nowrap text-muted'
   return (
-    <div role="group" aria-label={label} className="flex flex-wrap gap-2">
-      {items.map((item) => {
-        const on = item.key === value
+    <div className="ws-card hidden overflow-x-auto rounded-lg md:block">
+      <table className="w-full text-sm">
+        <thead className="border-b border-line bg-fg/3">
+          <tr>
+            <th className={th}>Order</th>
+            <th className={th}>Placed</th>
+            <th className={th}>Paid by</th>
+            <th className={`${th} text-right`}>Bill</th>
+            <th className={`${th} text-right`}>You get</th>
+            <th className={th}>Status</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line">
+          {rows.map((row) => {
+            const status = settlementPill(row)
+            const short = settlementShort(row)
+            const counts = moneyCounts(row)
+            return (
+              <tr
+                key={row.id}
+                onClick={() => navigate(`../orders/${row.id}`)}
+                className="cursor-pointer align-top transition-colors hover:bg-fg/3"
+              >
+                <td className="px-4 py-3">
+                  <Link
+                    to={`../orders/${row.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="font-medium text-fg hover:underline"
+                  >
+                    {row.customerName ?? row.orderNumber}
+                  </Link>
+                  {row.customerName && <span className="block text-hint text-muted">{row.orderNumber}</span>}
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap text-muted">{moneyDay(row.placedAt)}</td>
+                <td className="px-4 py-3 whitespace-nowrap text-fg">{paymentModeLabel(row.paymentMethod)}</td>
+                <td className="px-4 py-3 text-right font-figure font-medium whitespace-nowrap tabular-nums text-fg">
+                  {money(row.billAmount)}
+                </td>
+                <td className="px-4 py-3 text-right font-figure whitespace-nowrap tabular-nums">
+                  {counts ? (
+                    <>
+                      <span className="text-fg">{money(row.youGet)}</span>
+                      <span className="block text-hint text-muted">Fee {money(sellerFee(row))}</span>
+                    </>
+                  ) : (
+                    <span className="text-muted">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <StatusPill tone={status.tone}>{status.label}</StatusPill>
+                  {short && <span className="mt-1 block max-w-64 text-hint text-muted">{short}</span>}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+/**
+ * All / Online / Cash — a segmented switch (ADMIN_UI_THEME §7.5 `segc`):
+ * native radios, so arrow keys move between them. 44px tall for a thumb.
+ */
+function ModeSwitch({ value, onChange }: { value: Mode; onChange: (key: Mode) => void }) {
+  const name = useId()
+  return (
+    <div role="radiogroup" aria-label="Payment mode" className="flex h-tap rounded-md border border-line bg-input p-1">
+      {MODES.map((m) => {
+        const on = m.key === value
         return (
-          <Button key={item.key} size="sm" variant={on ? 'primary' : 'secondary'} aria-pressed={on} onClick={() => onChange(item.key)}>
-            {item.label}
-          </Button>
+          <label
+            key={m.key}
+            title={m.title}
+            className={`flex flex-1 cursor-pointer items-center justify-center rounded-sm px-3 text-sm font-medium whitespace-nowrap transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent/40 ${
+              on ? 'bg-brand-soft text-brand' : 'text-muted hover:text-fg'
+            }`}
+          >
+            <input
+              type="radio"
+              name={name}
+              value={m.key}
+              checked={on}
+              onChange={() => onChange(m.key)}
+              className="sr-only"
+            />
+            {m.label}
+          </label>
         )
       })}
     </div>
   )
 }
 
-function Tile({ label, value, hint }: { label: string; value: string; hint: string }) {
+function Stat({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
-    <Card>
-      <p className="text-sm font-medium text-muted">{label}</p>
-      <p className="mt-1 font-figure text-xl font-bold text-fg">{value}</p>
-      <p className="mt-1 text-sm text-muted">{hint}</p>
-    </Card>
+    <div className="ws-card rounded-lg px-3.5 py-3 sm:px-4">
+      <p className="truncate text-hint font-medium text-muted">{label}</p>
+      <p className="mt-1 font-figure text-lg font-semibold tabular-nums text-fg">{value}</p>
+      <p className="mt-0.5 truncate text-hint text-muted">{sub}</p>
+    </div>
   )
 }

@@ -61,6 +61,54 @@ export function moneyCounts(row: SellerTransaction): boolean {
   return row.settlement.status !== 'CANCELLED' && row.settlement.status !== 'REFUNDED' && row.settlement.status !== 'REFUND_PENDING'
 }
 
+export const shortDay = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+
+/** The payment mode in a narrow phone row — "Cash" (the filter's word) for COD. */
+export function paymentModeShort(method: string): string {
+  return method === 'COD' ? 'Cash' : paymentModeLabel(method)
+}
+
+/**
+ * A few words under the status in a dense list or table row ("₹881.02 to
+ * come", "Paid 18 Nov · UTR …"). The full sentence is on the order's Money
+ * card. Empty when the pill already says it all.
+ */
+export function settlementShort(row: SellerTransaction): string {
+  const s = row.settlement
+  const pickup = row.fulfilment === 'PICKUP'
+  const parts: string[] = []
+  switch (s.status) {
+    case 'AWAITING_DELIVERY':
+      parts.push(pickup ? 'Yours after pickup' : 'Yours after delivery')
+      break
+    case 'READY_TO_PAY':
+      parts.push(s.lastPayoutFailed ? 'Last payment failed, sending again' : `${money(s.remaining)} to come`)
+      break
+    case 'ON_ITS_WAY':
+      parts.push(`${money(s.onItsWay)} on its way`)
+      break
+    case 'PARTLY_SETTLED':
+      parts.push(`${money(s.paidOut)} paid, ${money(s.remaining)} to come`)
+      break
+    case 'SETTLED':
+      if (s.paidAt) parts.push(`Paid ${shortDay(s.paidAt)}`)
+      if (s.utr) parts.push(`UTR ${s.utr}`)
+      break
+    case 'CASH_TO_COLLECT':
+      parts.push(pickup ? 'Collect at pickup' : 'Collect on delivery')
+      break
+    case 'CASH_COLLECTED':
+      if (sellerFee(row) > 0) parts.push(`Fee ${money(sellerFee(row))} from next payout`)
+      break
+    default:
+      break
+  }
+  if (Number(row.refundedAmount) > 0 && s.status !== 'REFUNDED' && s.status !== 'REFUND_PENDING') {
+    parts.push(`${money(row.refundedAmount)} refunded`)
+  }
+  return parts.join(' · ')
+}
+
 /** One plain sentence under the status — what it means for this order. */
 export function settlementNote(row: SellerTransaction): string {
   const note = baseNote(row)
