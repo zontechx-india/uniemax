@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma.js";
 import { mediaUrl } from "../../package/storage/index.js";
 import { buildListMeta } from "../../utils/response.js";
 import { SELLER_VISIBLE } from "../orders/orders.service.js";
+import { PAYMENT_WINDOW_MS } from "../payments/payments.jobs.js";
 import { decimalToPaise, paiseToAmount } from "../payouts/payouts.rules.js";
 import { PUBLIC_PRODUCT_VISIBILITY } from "../stores/publicStore.service.js";
 import {
@@ -73,6 +74,15 @@ async function paymentLeads(storeId: string, now: Date) {
     at: order.placedAt,
     /** PAYING (window still open) · FAILED · EXPIRED (window closed). */
     state: paymentLeadState(order),
+    /**
+     * When the payment window closes — the shopper can still pay this order
+     * until then (payments.jobs.ts closes it on its next run after). Null
+     * once the order is closed.
+     */
+    closesAt:
+      order.status === "AWAITING_PAYMENT"
+        ? new Date(order.placedAt.getTime() + PAYMENT_WINDOW_MS)
+        : null,
     customerName: order.customerName,
     customerPhone: order.customerPhone,
     amount: order.total.toFixed(2),

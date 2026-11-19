@@ -916,7 +916,15 @@ count beside the label from `sm`. Then a one-line explanation, then dense
 rows: name or "A shopper", amount, order number / last activity, a status
 pill (+ phone for unpaid checkouts), up to three 36px product photos and the
 item names (unbuyable ones struck through), and **Call** / **WhatsApp** on
-unpaid-checkout rows only:
+unpaid-checkout rows only. An unpaid checkout's pill comes from `closesAt`
+(the API's payment window end), not from a guess that the shopper is still
+on the payment page: **Payment open · N min left** (pending) or **Payment
+failed · N min to retry** (danger) while the window is open — "· closing"
+once past it until the server closes the order — then **Not paid**. A
+30-second clock re-renders the minutes while such a row is on screen. Open
+rows add "They can still pay. A quick call often helps." above the buttons,
+and their WhatsApp text says the order "is waiting for payment" instead of
+"was not paid":
 
 - **List** — `PageHeader`, then status chips (All + the six statuses in
   plain words — Waiting · Confirmed · Packed · Sent · Delivered · Cancelled —

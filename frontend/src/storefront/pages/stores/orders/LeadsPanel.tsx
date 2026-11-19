@@ -33,7 +33,8 @@ const KINDS: { key: LeadKind; label: string; about: string }[] = [
   {
     key: 'PAYMENT_PENDING',
     label: 'Not paid',
-    about: 'Started paying online but did not finish. They gave you their details at checkout. Shown for 7 days.',
+    about:
+      'Started paying online but did not finish. The order stays open for 1 hour, so they can still pay. Shown for 7 days.',
   },
   {
     key: 'ACTIVE',
@@ -62,10 +63,32 @@ const EMPTY: Record<LeadKind, { title: string; description: string }> = {
   },
 }
 
-const PAYMENT_STATE: Record<PaymentLead['state'], { label: string; tone: StatusTone }> = {
-  PAYING: { label: 'Paying now', tone: 'pending' },
-  FAILED: { label: 'Payment failed', tone: 'danger' },
-  EXPIRED: { label: 'Not paid', tone: 'neutral' },
+/**
+ * The pill on an unpaid checkout. "Paying now" was wrong most of the time —
+ * the server can't tell an open payment page from a closed tab, only that
+ * the payment window (`closesAt`, 60 min) is still open. So: "Payment open"
+ * with the minutes left, then "Not paid" once the server has closed it.
+ * Past `closesAt` the server closes it on its next run (up to ~10 min), so
+ * the pill says "closing" meanwhile instead of a negative count.
+ */
+function paymentPill(lead: PaymentLead, now: number): { label: string; tone: StatusTone } {
+  if (lead.state === 'EXPIRED' || !lead.closesAt) return { label: 'Not paid', tone: 'neutral' }
+  const left = Math.ceil((new Date(lead.closesAt).getTime() - now) / 60_000)
+  if (lead.state === 'FAILED') {
+    return { label: left > 0 ? `Payment failed · ${left} min to retry` : 'Payment failed · closing', tone: 'danger' }
+  }
+  return { label: left > 0 ? `Payment open · ${left} min left` : 'Payment open · closing', tone: 'pending' }
+}
+
+/** A clock for the minutes-left pills; ticks only while one is on screen. */
+function useMinuteClock(active: boolean): number {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!active) return
+    const timer = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(timer)
+  }, [active])
+  return now
 }
 
 function isKind(value: string | null): value is LeadKind {
@@ -134,6 +157,7 @@ export function LeadsPanel() {
 
   const about = KINDS.find((k) => k.key === kind)!.about
   const meta = data?.meta
+  const now = useMinuteClock(rows?.some((row) => row.kind === 'PAYMENT_PENDING' && row.closesAt !== null) ?? false)
 
   return (
     <div className="space-y-3">
@@ -169,7 +193,7 @@ export function LeadsPanel() {
             {rows.map((row) => (
               <li key={row.id}>
                 {row.kind === 'PAYMENT_PENDING' ? (
-                  <PaymentLeadRow lead={row} storeName={store.name} />
+                  <PaymentLeadRow lead={row} storeName={store.name} now={now} />
                 ) : (
                   <CartLeadRow lead={row} />
                 )}
@@ -189,11 +213,19 @@ export function LeadsPanel() {
   )
 }
 
-/** Unpaid checkout: who, amount, state, items — Call / WhatsApp. */
-function PaymentLeadRow({ lead, storeName }: { lead: PaymentLead; storeName: string }) {
-  const state = PAYMENT_STATE[lead.state]
+/**
+ * Unpaid checkout: who, amount, state, items — Call / WhatsApp. While the
+ * order is still open the shopper can pay that same order, so the row says
+ * so: it is the best moment to call.
+ */
+function PaymentLeadRow({ lead, storeName, now }: { lead: PaymentLead; storeName: string; now: number }) {
+  const state = paymentPill(lead, now)
+  const open = lead.closesAt !== null && lead.state !== 'EXPIRED'
   const phone = lead.customerPhone
-  const message = `Hello${lead.customerName ? ` ${lead.customerName}` : ''}, this is ${storeName}. Your order ${lead.orderNumber} was not paid. Can I help you finish it?`
+  const hello = `Hello${lead.customerName ? ` ${lead.customerName}` : ''}, this is ${storeName}.`
+  const message = open
+    ? `${hello} Your order ${lead.orderNumber} is waiting for payment. Can I help you finish it?`
+    : `${hello} Your order ${lead.orderNumber} was not paid. Can I help you finish it?`
   return (
     <div className="px-4 py-3">
       <div className="flex items-baseline justify-between gap-3">
@@ -208,6 +240,11 @@ function PaymentLeadRow({ lead, storeName }: { lead: PaymentLead; storeName: str
         {phone && <span className="min-w-0 truncate font-figure text-hint tabular-nums text-fg">{phone}</span>}
       </div>
       <Items items={lead.items} />
+      {phone && open && (
+        <p className="mt-2 text-hint text-muted">
+          They can still pay. A quick call often helps.
+        </p>
+      )}
       {phone && (
         <div className="mt-2.5 grid grid-cols-2 gap-2 sm:flex">
           <a href={`tel:${phone}`} className={buttonClass({ variant: 'secondary', size: 'sm' })}>

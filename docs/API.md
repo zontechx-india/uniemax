@@ -518,6 +518,10 @@ every kind.
   placed in the last 7 days, not cancelled by the shopper. Dropped when the
   same shopper (account, or last 10 digits of the phone) placed a
   seller-visible order in this store later; one per shopper (the newest).
+  While the order is still `AWAITING_PAYMENT` the shopper can pay it until
+  `closesAt` (`PAYMENT_WINDOW_MS`, 60 min after placing); the payment job
+  (every 10 min) then checks the gateway once more and cancels it, so a row
+  can read past `closesAt` for up to ~10 min before turning `EXPIRED`.
 - `ACTIVE` / `ABANDONED` — ACTIVE cart lines of this store, one lead per cart,
   last activity ≤ 24 h / 1–30 days. The store owner's own cart and blocked
   customers are left out. **Anonymous:** no name, phone or customer id; `id`
@@ -529,6 +533,7 @@ every kind.
   "rows": [
     { "kind": "PAYMENT_PENDING", "id": "<orderId>", "orderNumber", "at": "<placedAt>",
       "state": "PAYING" | "FAILED" | "EXPIRED",   // window open · failed · window closed
+      "closesAt": "<placedAt + 60 min>" | null,   // payment window end; null once closed
       "customerName", "customerPhone", "amount": "1350.00", "quantity": 3,
       "items": [ { "name", "variantName", "quantity", "imageUrl" } ] },
     { "kind": "ACTIVE", "id": "<cartId>", "at": "<last activity>", "addedAt",

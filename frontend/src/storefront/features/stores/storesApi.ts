@@ -1535,6 +1535,8 @@ export interface PaymentLead {
   orderNumber: string
   at: string
   state: 'PAYING' | 'FAILED' | 'EXPIRED'
+  /** End of the payment window (the shopper can still pay until then); null once closed. */
+  closesAt: string | null
   customerName: string | null
   customerPhone: string | null
   amount: string
