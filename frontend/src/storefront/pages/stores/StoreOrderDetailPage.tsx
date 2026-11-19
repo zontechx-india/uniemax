@@ -31,6 +31,7 @@ import { OrderStatusChip, formatOrderDateTime, paymentLabel, timeAgo } from './o
 import { Button, buttonClass } from '../../../shared/ui/Button'
 import { MediaImg } from '../../../shared/media/MediaImg'
 import { DeliveredDialog } from './orders/DeliveredDialog'
+import { MoneyCard } from './orders/MoneyCard'
 import type { PickedPhoto } from './orders/DeliveredDialog'
 import { ParcelCard } from './orders/ParcelCard'
 import { ShipDialog } from './orders/ShipDialog'
@@ -626,35 +627,44 @@ export function StoreOrderDetailPage() {
               </PanelCard>
             </div>
 
-            {/* Timeline */}
-            <PanelCard title="What has happened">
-              <ol>
-                <TimelineRow label="Order placed" at={order.placedAt} />
-                {order.status === 'CANCELLED' ? (
-                  <>
-                    {order.confirmedAt && <TimelineRow label="Confirmed" at={order.confirmedAt} />}
-                    {order.packedAt && <TimelineRow label="Packed" at={order.packedAt} />}
-                    {order.shippedAt && <TimelineRow label="Sent" at={order.shippedAt} note={sentNote(parcels)} />}
-                    {cameBackAt(parcels) && <TimelineRow label="Came back" at={cameBackAt(parcels)} />}
-                    <TimelineRow label="Cancelled" at={order.cancelledAt} cancelled last />
-                  </>
-                ) : (
-                  <>
-                    <TimelineRow label="Confirmed" at={order.confirmedAt} />
-                    <TimelineRow label="Packed" at={order.packedAt} />
-                    {order.fulfilment === 'DELIVERY' && (
-                      <TimelineRow label="Sent" at={order.shippedAt} note={sentNote(parcels)} />
-                    )}
-                    {cameBackAt(parcels) && <TimelineRow label="Came back" at={cameBackAt(parcels)} />}
-                    <TimelineRow
-                      label={order.fulfilment === 'PICKUP' ? 'Picked up' : 'Delivered'}
-                      at={order.deliveredAt}
-                      last
-                    />
-                  </>
-                )}
-              </ol>
-            </PanelCard>
+            <div className="space-y-4">
+              {/* Money — bill, how paid, fee, what the seller gets, settled or not */}
+              <MoneyCard
+                storeId={store.id}
+                orderId={order.id}
+                version={`${order.status}:${order.paymentStatus}`}
+              />
+
+              {/* Timeline */}
+              <PanelCard title="What has happened">
+                <ol>
+                  <TimelineRow label="Order placed" at={order.placedAt} />
+                  {order.status === 'CANCELLED' ? (
+                    <>
+                      {order.confirmedAt && <TimelineRow label="Confirmed" at={order.confirmedAt} />}
+                      {order.packedAt && <TimelineRow label="Packed" at={order.packedAt} />}
+                      {order.shippedAt && <TimelineRow label="Sent" at={order.shippedAt} note={sentNote(parcels)} />}
+                      {cameBackAt(parcels) && <TimelineRow label="Came back" at={cameBackAt(parcels)} />}
+                      <TimelineRow label="Cancelled" at={order.cancelledAt} cancelled last />
+                    </>
+                  ) : (
+                    <>
+                      <TimelineRow label="Confirmed" at={order.confirmedAt} />
+                      <TimelineRow label="Packed" at={order.packedAt} />
+                      {order.fulfilment === 'DELIVERY' && (
+                        <TimelineRow label="Sent" at={order.shippedAt} note={sentNote(parcels)} />
+                      )}
+                      {cameBackAt(parcels) && <TimelineRow label="Came back" at={cameBackAt(parcels)} />}
+                      <TimelineRow
+                        label={order.fulfilment === 'PICKUP' ? 'Picked up' : 'Delivered'}
+                        at={order.deliveredAt}
+                        last
+                      />
+                    </>
+                  )}
+                </ol>
+              </PanelCard>
+            </div>
           </div>
 
           {/* The ONE next step, under the thumb. Sticky, not fixed: it lives

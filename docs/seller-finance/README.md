@@ -15,7 +15,7 @@ between UnieMax and a seller is an entry on the **seller ledger**.
 | Who | Sees |
 | --- | --- |
 | Admin | **Finance → Fee settings** (platform + gateway fee %), **Seller balances** (per store, with the full ledger and corrections), the fee breakdown and COD-dues deduction on each order's **Seller payout** card |
-| Seller | The fee % and "You get ₹…" under the price when adding a product; **Earnings** page (balances, delivered totals, payouts, every entry) |
+| Seller | The fee % and "You get ₹…" under the price when adding a product; **Earnings** page (balances, delivered totals, payouts, every entry); **Transactions** page (one row per order — §8) |
 | Customer | Nothing |
 
 ## 2. Decisions (agreed 5 Nov 2026)
@@ -126,3 +126,37 @@ first, the rest sent); `amount + duesDeducted ≤ left to pay` and
 - Every posting goes through `postLegs` with a stable idempotency key.
 - Fees are never added to a customer-facing response.
 - Update this file in the same task; endpoint details go to `docs/API.md`.
+
+## 8. Transactions (seller, per order)
+
+Earnings shows the store's money as **balances and ledger entries**.
+Transactions shows the same money **one row per order** — the bill, how the
+customer paid, and whether the money has reached the seller. It reads only
+(orders, `order_financials` or the same on-the-fly numbers, payouts,
+refunds); it posts nothing. Endpoint: `GET /stores/:id/transactions`
+(`docs/API.md`). Page: Payments & delivery → **Transactions**
+(`StoreTransactionsPage`), filters This month (default) / Last month / Last
+7 days / All time × All / Online / Cash on delivery, search, Load more.
+The order page shows the same row as its **Money** card
+(`GET /stores/:id/transactions/:orderId`).
+
+Status (`finance.rules.ts → settlementStatus`, unit-tested in
+`test/unit/settlement.test.ts`), first match wins:
+
+| Status | When |
+| --- | --- |
+| `REFUNDED` | payment REFUNDED (the refund covered the order), or a cancelled order with a SUCCEEDED refund. A **part** refund on a delivered order keeps the normal status; the row shows `refundedAmount` |
+| `REFUND_PENDING` / `CANCELLED` | order cancelled, with / without a PENDING refund |
+| `CASH_TO_COLLECT` / `CASH_COLLECTED` | COD, before / after delivery |
+| `AWAITING_DELIVERY` | online, not delivered (UnieMax holds the money, D6) |
+| `ON_ITS_WAY` | a payout is PENDING / PROCESSING |
+| `SETTLED` | nothing left to pay (`payoutTotals.remaining = 0`; COD dues kept count as paid) |
+| `PARTLY_SETTLED` | some paid, some left |
+| `READY_TO_PAY` | delivered, nothing paid (`lastPayoutFailed` when the newest payout failed / came back) |
+
+On COD, cancelled and refunded orders UnieMax owes nothing, so `remaining` is 0.
+
+**Payment mode** is only Online / Cash on delivery today: the order stores
+`ONLINE`, and PaymentHub's webhook does not say UPI / card / net banking.
+Showing those needs the hub to send the instrument and a new order column
+(Phase 2, not built).

@@ -104,9 +104,11 @@ export const storeRoutes: FastifyPluginAsync<StoreRoutesOptions> = async (
   }
   app.get("/:id", controller.getStore);
   // Seller finance, read-only: the platform fee % (the product form's note)
-  // and the Earnings page. Both mounts — support can read what the seller sees.
+  // and the Earnings / Transactions pages. Both mounts — support can read what the seller sees.
   app.get("/:id/platform-fee", financeController.getPlatformFee);
   app.get("/:id/earnings", financeController.getEarnings);
+  app.get("/:id/transactions", financeController.getTransactions);
+  app.get("/:id/transactions/:orderId", financeController.getTransaction);
   app.patch("/:id", controller.updateStore);
   app.patch("/:id/theme", controller.updateStoreTheme);
   app.patch("/:id/homepage", controller.updateStoreHomepage);

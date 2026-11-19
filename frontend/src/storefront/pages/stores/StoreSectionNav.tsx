@@ -20,6 +20,7 @@ import {
   LifebuoyIcon,
   MegaphoneIcon,
   PaletteIcon,
+  ReceiptIcon,
   RupeeIcon,
   SlidersIcon,
   StoreIcon,
@@ -131,6 +132,9 @@ const SECTION_GROUPS: SectionGroup[] = [
     caption: 'Payments & delivery',
     items: [
       { label: 'Earnings', to: 'earnings', icon: RupeeIcon },
+      // One row per order (bill, payment mode, settled or not) — Earnings is
+      // the same money as balances; sellers asked for the per-order view.
+      { label: 'Transactions', to: 'transactions', icon: ReceiptIcon },
       { label: 'Payments', to: 'payments', icon: CardIcon },
       { label: 'Bank account', to: 'bank-accounts', icon: BankIcon },
       { label: 'Delivery', to: 'shipping', icon: TruckIcon },
@@ -168,7 +172,7 @@ export function sectionItem(to: string): SectionItem | undefined {
  * Rows a supply-only store doesn't use: it never sells to customers, so it has
  * no customer orders (its work is Orders to ship) and no buyers writing in.
  */
-const SELLING_ONLY = new Set(['earnings', 'payments', 'shipping', 'checkout', 'orders', 'customer-support'])
+const SELLING_ONLY = new Set(['earnings', 'transactions', 'payments', 'shipping', 'checkout', 'orders', 'customer-support'])
 
 /**
  * The supplier rows (docs/dropshipping/): one **Suppliers** row under Catalog for a

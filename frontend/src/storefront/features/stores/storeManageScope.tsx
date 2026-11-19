@@ -68,8 +68,8 @@ export const ADMIN_STORE_SCOPE: StoreManageScope = {
   storePath: (slug) => `/stores/${slug}/manage`,
   // `affiliate` too: the seller-only affiliate API has no admin mount yet.
   // `share`: the Share Kit is the seller's own marketing tool (no admin route).
-  // `earnings`: admins read a seller's money on Finance → Seller balances.
-  hiddenSections: ['bank-accounts', 'business', 'customer-support', 'support', 'affiliate', 'share', 'earnings'],
+  // `earnings` / `transactions`: admins read a seller's money on Finance → Seller balances.
+  hiddenSections: ['bank-accounts', 'business', 'customer-support', 'support', 'affiliate', 'share', 'earnings', 'transactions'],
 }
 
 const StoreManageScopeContext =

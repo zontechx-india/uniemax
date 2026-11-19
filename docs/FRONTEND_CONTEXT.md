@@ -748,7 +748,7 @@ once-ever setting look as important as a daily job:
 | **Overview** | Dashboard · Orders *(pending-count badge)* |
 | **Catalog** | Categories · Products |
 | **Storefront** | Shop name & logo · Business details · **Design your shop** |
-| **Payments & delivery** | Payments · Bank account · Delivery · Checkout |
+| **Payments & delivery** | Earnings · **Transactions** *(one row per order: bill, payment mode, settled or not — `StoreTransactionsPage`)* · Payments · Bank account · Delivery · Checkout |
 | **Marketing** | Affiliate marketing |
 | **Help** | Customer messages · Help from UnieMax |
 
@@ -917,7 +917,12 @@ count; a card skeleton shows while the layout's fetch is in flight.
   this is {shop} about your order …" message; a bare 10-digit number gets
   91) buttons and the delivery address with **Copy address** (name, address,
   phone — for the courier slip) or the pickup note; the items with 56px
-  photos, choice name, "qty × price · Code …" and the money summary; and a
+  photos, choice name, "qty × price · Code …" and the money summary; a
+  **Money** card (`orders/MoneyCard.tsx`, right column above the timeline —
+  this order's Transactions row: bill, paid by, platform / gateway fee, You
+  get, the settled-or-not pill and sentence, "See all transactions"; reloads
+  when status or payment changes; wording shared with the Transactions page
+  in `orders/settlementMeta.ts`); and a
   **timeline stepper** (Order placed → Confirmed → Packed → Sent →
   Delivered, ticked with times; pickup shows "Picked up" and skips Sent; a
   cancelled order shows the stages it reached + Cancelled). The **status

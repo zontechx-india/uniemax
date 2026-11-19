@@ -4,7 +4,7 @@ import * as controller from "./finance.controller.js";
 /**
  * Seller finance — admin. Mounted at /api/v1/admin inside the
  * `requireAdmin` subtree (routes.ts). The seller's own read lives on the
- * store routes (GET /stores/:id/earnings, /platform-fee).
+ * store routes (GET /stores/:id/earnings, /transactions, /platform-fee).
  */
 export const adminFinanceRoutes: FastifyPluginAsync = async (app) => {
   app.get("/finance/fee-rules", controller.listFeeRules);

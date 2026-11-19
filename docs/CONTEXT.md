@@ -1051,7 +1051,8 @@ revoked from anywhere else.
   what the seller owes UnieMax. Those COD dues are taken from the seller's
   next manual payout. **Seller balances** shows each store's balances and
   every entry, with corrections (reason required). Sellers see the same on
-  their **Earnings** page.
+  their **Earnings** page, and each order's bill, payment mode and whether
+  the money reached them on **Transactions**.
 - **Products** — the seller catalog across all stores, with inventory views
   (low stock, out of stock) and the platform's one moderation lever:
   **hide a listing** (with a reason the seller is told). It flips the same

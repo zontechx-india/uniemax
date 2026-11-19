@@ -307,6 +307,12 @@ export const router = createBrowserRouter([
                     }),
                   },
                   {
+                    path: 'transactions',
+                    lazy: async () => ({
+                      Component: (await import('../pages/stores/StoreTransactionsPage')).StoreTransactionsPage,
+                    }),
+                  },
+                  {
                     path: 'bank-accounts',
                     lazy: async () => ({
                       Component: (await import('../pages/stores/StoreBankPage')).StoreBankPage,

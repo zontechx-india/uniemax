@@ -3,7 +3,7 @@
  * test/unit/finance.test.ts. Money is integer PAISE (bigint); a percent is
  * integer BASIS POINTS (1% = 100 bp) so no float ever touches money.
  */
-import { amountToPaise, paiseToAmount } from "../payouts/payouts.rules.js";
+import { amountToPaise, paiseToAmount, payoutTotals, type PayoutTotals } from "../payouts/payouts.rules.js";
 
 export { amountToPaise, paiseToAmount };
 
@@ -313,4 +313,77 @@ export function payoutLegs(p: PayoutForLedger): Leg[] {
   }
 
   return legs.filter((leg) => leg.amount !== 0n);
+}
+
+// ---------------------------------------------------------------------------
+// Per-order settlement — the seller's Transactions page
+// ---------------------------------------------------------------------------
+
+/**
+ * Where one order's money stands for the seller — one word per order.
+ *   Online: AWAITING_DELIVERY → READY_TO_PAY → ON_ITS_WAY → SETTLED
+ *           (PARTLY_SETTLED when only some of it went out)
+ *   COD:    CASH_TO_COLLECT → CASH_COLLECTED (the seller has the cash)
+ *   Either: CANCELLED · REFUND_PENDING · REFUNDED
+ */
+export type Settlement =
+  | "AWAITING_DELIVERY"
+  | "READY_TO_PAY"
+  | "ON_ITS_WAY"
+  | "PARTLY_SETTLED"
+  | "SETTLED"
+  | "CASH_TO_COLLECT"
+  | "CASH_COLLECTED"
+  | "REFUND_PENDING"
+  | "REFUNDED"
+  | "CANCELLED";
+
+export interface SettlementFacts {
+  method: Method;
+  /** OrderStatus */
+  status: string;
+  /** PaymentStatus */
+  paymentStatus: string;
+  /** What the seller earns on the order (snapshot or computed). */
+  earningPaise: bigint;
+  payouts: { status: PayoutForLedger["status"]; amountPaise: bigint; duesPaise: bigint; createdAt: Date }[];
+  refunds: { status: "PENDING" | "SUCCEEDED" | "FAILED" }[];
+}
+
+export interface SettlementResult {
+  status: Settlement;
+  totals: PayoutTotals;
+  /** The newest payout failed or came back and money is still to pay. */
+  lastPayoutFailed: boolean;
+}
+
+export function settlementStatus(f: SettlementFacts): SettlementResult {
+  // REFUNDED only when the refund covered the order — the refunds module sets
+  // paymentStatus REFUNDED then. A PART refund (made by hand in the hub
+  // dashboard) on a delivered order leaves it PAID: the seller is still owed,
+  // so it keeps its normal status (the row shows the refunded amount).
+  const refunded =
+    f.paymentStatus === "REFUNDED" || (f.status === "CANCELLED" && f.refunds.some((r) => r.status === "SUCCEEDED"));
+  // UnieMax owes nothing on a cash order (the seller has the cash) or on one
+  // that was cancelled / refunded — so nothing is "remaining" to pay there.
+  const owesNothing = f.method === "COD" || f.status === "CANCELLED" || refunded;
+  const totals = payoutTotals(
+    owesNothing ? 0n : f.earningPaise,
+    f.payouts.map((p) => ({ status: p.status, amountPaise: p.amountPaise, duesPaise: p.duesPaise })),
+  );
+  const newest = [...f.payouts].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+  const lastPayoutFailed =
+    totals.remaining > 0n && Boolean(newest && (newest.status === "FAILED" || newest.status === "REVERSED"));
+  const result = (status: Settlement): SettlementResult => ({ status, totals, lastPayoutFailed });
+
+  if (refunded) return result("REFUNDED");
+  if (f.status === "CANCELLED") {
+    return result(f.refunds.some((r) => r.status === "PENDING") ? "REFUND_PENDING" : "CANCELLED");
+  }
+  if (f.method === "COD") return result(f.status === "DELIVERED" ? "CASH_COLLECTED" : "CASH_TO_COLLECT");
+  if (f.status !== "DELIVERED") return result("AWAITING_DELIVERY");
+  if (totals.inProgress > 0n) return result("ON_ITS_WAY");
+  if (totals.remaining === 0n) return result("SETTLED");
+  if (totals.paidOut + totals.duesDeducted > 0n) return result("PARTLY_SETTLED");
+  return result("READY_TO_PAY");
 }

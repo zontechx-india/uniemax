@@ -4,7 +4,8 @@ import { ok } from "../../utils/response.js";
 import { idParamSchema } from "../../utils/zodHelpers.js";
 import { storeActor } from "./storeActor.js";
 import { getMyStore } from "./stores.service.js";
-import { currentRates, getSellerEarnings } from "../finance/finance.service.js";
+import { currentRates, getSellerEarnings, getSellerTransaction, getSellerTransactions } from "../finance/finance.service.js";
+import { transactionListQuery } from "../finance/finance.schema.js";
 
 /**
  * The seller's side of seller finance (modules/finance). Read-only. Fees
@@ -36,4 +37,19 @@ export async function getEarnings(request: FastifyRequest) {
   const { page, pageSize } = earningsQuery.parse(request.query);
   const store = await getMyStore(storeActor(request), id); // ownership check
   return ok(await getSellerEarnings(store.id, page, pageSize));
+}
+
+/** Transactions — one row per order: bill, payment mode, settled or not. */
+export async function getTransactions(request: FastifyRequest) {
+  const { id } = idParamSchema.parse(request.params);
+  const query = transactionListQuery.parse(request.query);
+  const store = await getMyStore(storeActor(request), id); // ownership check
+  return ok(await getSellerTransactions(store.id, query));
+}
+
+/** One order's Transactions row — the order page's Money card. */
+export async function getTransaction(request: FastifyRequest) {
+  const { id, orderId } = z.object({ id: z.string().min(1), orderId: z.string().min(1) }).parse(request.params);
+  const store = await getMyStore(storeActor(request), id); // ownership check
+  return ok(await getSellerTransaction(store.id, orderId));
 }

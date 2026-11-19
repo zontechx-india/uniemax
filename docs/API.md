@@ -3884,6 +3884,48 @@ ledger { rows (no actor / key / meta), meta }, payouts[20] { id, status,
 amount, duesDeducted, paidAt, paidAtTimeKnown, utr, method, createdAt,
 order { id, orderNumber } } }`.
 
+#### `GET /api/v1/stores/:id/transactions` · `GET …/transactions/:orderId` 🔒 owner
+
+`…/:orderId` → one row (the shape below) for the order page's **Money**
+card; `404` for an order of another store or an unpaid online order.
+
+The seller's **Transactions** page — one row per order (same orders as the
+seller order list: unpaid online orders are left out), newest first. Also on
+the admin manage mount. Query: `page`, `pageSize` (≤ 50), `from` / `to`
+(India days `YYYY-MM-DD`, on `placedAt`; `to` counts the whole day; `from >
+to` → 400), `mode` (`ONLINE` = every non-COD method · `COD`), `q` (order
+number or customer name; a leading `#` is ignored).
+
+```jsonc
+{
+  "summary": {                              // for every order matching the filters
+    "billed": { "orders": 15, "amount": "105026.00" },   // not counting cancelled
+    "online": { "orders": 3, "amount": "40001.00" },
+    "cod":    { "orders": 12, "amount": "65025.00" },
+    "paidToYou": "39999.00",                // SUCCEEDED payouts on these orders
+    "onItsWay": "0.00"                      // PENDING + PROCESSING payouts
+  },
+  "rows": [ {
+    "id", "orderNumber", "placedAt", "deliveredAt", "customerName",
+    "orderStatus", "fulfilment",           // DELIVERY · PICKUP (pickup wording: "Waiting for pickup")
+    "refundedAmount": "0.00",              // SUCCEEDED refunds, part or full
+    "paymentMethod",                       // COD · ONLINE (old rows: UPI / CARD / NETBANKING / RAZORPAY)
+    "paymentStatus",
+    "billAmount": "1200.00",                // Order.total
+    "platformFee", "gatewayFee", "gatewayFeeBearer",
+    "youGet": "1200.00",                    // seller earning (snapshot, else computed)
+    "settlement": {
+      "status": "SETTLED",                  // see docs/seller-finance §8
+      "paidOut", "onItsWay", "duesDeducted",
+      "remaining",                          // 0 on COD / cancelled / refunded orders
+      "lastPayoutFailed": false,            // newest payout FAILED/REVERSED, money still due
+      "paidAt", "paidAtTimeKnown", "utr"    // newest SUCCEEDED payout, else null
+    }
+  } ],
+  "meta": { "total", "page", "pageSize", "totalPages" }
+}
+```
+
 ### `GET /api/v1/admin/catalog/products` · `GET …/:id`
 
 The **sellers'** products, platform-wide.

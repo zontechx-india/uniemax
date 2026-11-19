@@ -3,7 +3,8 @@ import { prisma } from "../../config/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../../utils/httpError.js";
 import { buildListMeta } from "../../utils/response.js";
-import { decimalToPaise } from "../payouts/payouts.rules.js";
+import { decimalToPaise, indiaDateTime } from "../payouts/payouts.rules.js";
+import { SELLER_VISIBLE } from "../orders/orders.service.js";
 import {
   bpToPercent,
   computeFinancials,
@@ -12,6 +13,7 @@ import {
   payoutLegs,
   percentToBp,
   resolveRule,
+  settlementStatus,
   amountToPaise,
   type ComputedFinancials,
   type Leg,
@@ -22,6 +24,7 @@ import type {
   BalanceListQuery,
   FeeRuleCreateInput,
   LedgerListQuery,
+  TransactionListQuery,
 } from "./finance.schema.js";
 
 /**
@@ -496,5 +499,187 @@ export async function getSellerEarnings(storeId: string, page: number, pageSize:
       meta: ledger.meta,
     },
     payouts,
+  };
+}
+
+const TRANSACTION_SELECT = {
+  ...ORDER_FOR_FIN,
+  customerName: true,
+  deliveredAt: true,
+  financials: true,
+  payouts: {
+    select: { status: true, amount: true, duesDeducted: true, paidAt: true, paidAtTimeKnown: true, utr: true, createdAt: true },
+    orderBy: { createdAt: "asc" },
+  },
+  fulfilment: true,
+  refunds: { select: { status: true, amount: true } },
+} satisfies Prisma.OrderSelect;
+
+type OrderForTransaction = Prisma.OrderGetPayload<{ select: typeof TRANSACTION_SELECT }>;
+
+/** One order's Transactions row — the list and the order page's Money card share it. */
+function shapeTransaction(order: OrderForTransaction, rules: Awaited<ReturnType<typeof loadRules>>) {
+  const { financials, payouts, refunds, customerName, deliveredAt, fulfilment, ...forFin } = order;
+  const fin = financials
+    ? fromSnapshot(financials)
+    : computeFinancials(
+        {
+          storeId: forFin.storeId,
+          method: method(forFin),
+          placedAt: forFin.placedAt,
+          totalPaise: decimalToPaise(forFin.total),
+          shippingPaise: decimalToPaise(forFin.shippingCharge),
+          lines: forFin.items.map((item) => ({ orderItemId: item.id, lineTotalPaise: decimalToPaise(item.lineTotal), categoryId: null })),
+        },
+        rules,
+      );
+  const settlement = settlementStatus({
+    method: method(forFin),
+    status: forFin.status,
+    paymentStatus: forFin.paymentStatus,
+    earningPaise: fin.sellerEarningPaise,
+    payouts: payouts.map((p) => ({
+      status: p.status,
+      amountPaise: decimalToPaise(p.amount),
+      duesPaise: decimalToPaise(p.duesDeducted),
+      createdAt: p.createdAt,
+    })),
+    refunds,
+  });
+  const lastPaid = [...payouts].reverse().find((p) => p.status === "SUCCEEDED") ?? null;
+  const refundedPaise = refunds
+    .filter((r) => r.status === "SUCCEEDED")
+    .reduce((acc, r) => acc + decimalToPaise(r.amount), 0n);
+  return {
+    id: forFin.id,
+    orderNumber: forFin.orderNumber,
+    placedAt: forFin.placedAt,
+    deliveredAt,
+    customerName,
+    orderStatus: forFin.status,
+    /** DELIVERY · PICKUP (the customer collects — wording changes). */
+    fulfilment,
+    /** Money sent back to the customer (SUCCEEDED refunds), part or full. */
+    refundedAmount: paiseToAmount(refundedPaise),
+    /** COD · ONLINE (legacy rows may hold UPI / CARD / NETBANKING / RAZORPAY). */
+    paymentMethod: forFin.paymentMethod,
+    paymentStatus: forFin.paymentStatus,
+    billAmount: forFin.total.toFixed(2),
+    platformFee: paiseToAmount(fin.platformFeePaise),
+    gatewayFee: paiseToAmount(fin.gatewayFeePaise),
+    gatewayFeeBearer: fin.gatewayFeeBearer,
+    youGet: paiseToAmount(fin.sellerEarningPaise),
+    settlement: {
+      status: settlement.status,
+      paidOut: paiseToAmount(settlement.totals.paidOut),
+      onItsWay: paiseToAmount(settlement.totals.inProgress),
+      duesDeducted: paiseToAmount(settlement.totals.duesDeducted),
+      remaining: paiseToAmount(settlement.totals.remaining),
+      lastPayoutFailed: settlement.lastPayoutFailed,
+      paidAt: lastPaid?.paidAt ?? null,
+      paidAtTimeKnown: lastPaid?.paidAtTimeKnown ?? false,
+      utr: lastPaid?.utr ?? null,
+    },
+  };
+}
+
+/** One order's Transactions row — the order page's Money card. 404 like the order itself. */
+export async function getSellerTransaction(storeId: string, orderId: string) {
+  const [order, rules] = await Promise.all([
+    prisma.order.findFirst({ where: { id: orderId, storeId, ...SELLER_VISIBLE }, select: TRANSACTION_SELECT }),
+    loadRules(prisma),
+  ]);
+  if (!order) throw HttpError.notFound("Order not found");
+  return shapeTransaction(order, rules);
+}
+
+/**
+ * Transactions — one row per order (the seller's "bill book"): what the
+ * customer paid, how, and whether the seller has the money yet
+ * (`settlementStatus`). Earnings is the same money seen as balances and
+ * ledger entries; this is the per-order view. Same orders as the seller's
+ * order list (SELLER_VISIBLE), newest first.
+ */
+export async function getSellerTransactions(storeId: string, query: TransactionListQuery) {
+  const placedAt =
+    query.from || query.to
+      ? {
+          ...(query.from ? { gte: indiaDateTime(query.from).at } : {}),
+          // The whole `to` day counts: before midnight that ends it.
+          ...(query.to ? { lt: new Date(indiaDateTime(query.to).at.getTime() + 24 * 60 * 60 * 1000) } : {}),
+        }
+      : undefined;
+  // Sellers often type "#UM-…" — the order number itself has no "#".
+  const q = query.q?.replace(/^#+/, "").trim() || null;
+  const where: Prisma.OrderWhereInput = {
+    storeId,
+    ...SELLER_VISIBLE,
+    ...(placedAt ? { placedAt } : {}),
+    ...(query.mode === "COD" ? { paymentMethod: "COD" } : {}),
+    ...(query.mode === "ONLINE" ? { paymentMethod: { not: "COD" } } : {}),
+    ...(q
+      ? {
+          OR: [
+            { orderNumber: { contains: q, mode: "insensitive" } },
+            { customerName: { contains: q, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
+
+  const [total, orders, billed, payoutSums, rules] = await Promise.all([
+    prisma.order.count({ where }),
+    prisma.order.findMany({
+      where,
+      orderBy: [{ placedAt: "desc" }, { id: "desc" }],
+      skip: (query.page - 1) * query.pageSize,
+      take: query.pageSize,
+      select: TRANSACTION_SELECT,
+    }),
+    // Billed = every order in range except cancelled ones.
+    prisma.order.groupBy({
+      by: ["paymentMethod"],
+      where: { AND: [where, { status: { not: "CANCELLED" } }] },
+      _count: { _all: true },
+      _sum: { total: true },
+    }),
+    prisma.orderPayout.groupBy({
+      by: ["status"],
+      where: { order: where, status: { in: ["SUCCEEDED", "PENDING", "PROCESSING"] } },
+      _sum: { amount: true },
+    }),
+    loadRules(prisma),
+  ]);
+
+  const sumPayouts = (statuses: string[]) =>
+    paiseToAmount(
+      payoutSums
+        .filter((row) => statuses.includes(row.status))
+        .reduce((acc, row) => acc + decimalToPaise(row._sum.amount ?? new Prisma.Decimal(0)), 0n),
+    );
+  const sumBilled = (cod: boolean) => {
+    const rows = billed.filter((row) => (row.paymentMethod === "COD") === cod);
+    return {
+      orders: rows.reduce((acc, row) => acc + row._count._all, 0),
+      paise: rows.reduce((acc, row) => acc + decimalToPaise(row._sum.total ?? new Prisma.Decimal(0)), 0n),
+    };
+  };
+  const online = sumBilled(false);
+  const cod = sumBilled(true);
+  const shapeBilled = (b: { orders: number; paise: bigint }) => ({ orders: b.orders, amount: paiseToAmount(b.paise) });
+
+  const rows = orders.map((order) => shapeTransaction(order, rules));
+
+  return {
+    summary: {
+      billed: shapeBilled({ orders: online.orders + cod.orders, paise: online.paise + cod.paise }),
+      online: shapeBilled(online),
+      cod: shapeBilled(cod),
+      /** Payouts on these orders: SUCCEEDED · PENDING + PROCESSING. */
+      paidToYou: sumPayouts(["SUCCEEDED"]),
+      onItsWay: sumPayouts(["PENDING", "PROCESSING"]),
+    },
+    rows,
+    meta: buildListMeta(total, query.page, query.pageSize),
   };
 }

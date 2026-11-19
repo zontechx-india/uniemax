@@ -1448,6 +1448,72 @@ export interface SellerEarnings {
   }[]
 }
 
+/** Where one order's money stands (docs/seller-finance §Transactions). */
+export type SettlementStatus =
+  | 'AWAITING_DELIVERY'
+  | 'READY_TO_PAY'
+  | 'ON_ITS_WAY'
+  | 'PARTLY_SETTLED'
+  | 'SETTLED'
+  | 'CASH_TO_COLLECT'
+  | 'CASH_COLLECTED'
+  | 'REFUND_PENDING'
+  | 'REFUNDED'
+  | 'CANCELLED'
+
+export interface SellerTransactionsQuery {
+  page?: number
+  pageSize?: number
+  /** India day, "2026-11-19". */
+  from?: string
+  to?: string
+  mode?: 'ONLINE' | 'COD'
+  q?: string
+}
+
+export interface SellerTransaction {
+  id: string
+  orderNumber: string
+  placedAt: string
+  deliveredAt: string | null
+  customerName: string | null
+  orderStatus: string
+  fulfilment: 'DELIVERY' | 'PICKUP'
+  /** Money sent back to the customer (part or full). */
+  refundedAmount: string
+  /** COD · ONLINE (old rows may hold UPI / CARD / NETBANKING / RAZORPAY). */
+  paymentMethod: string
+  paymentStatus: string
+  billAmount: string
+  platformFee: string
+  gatewayFee: string
+  gatewayFeeBearer: 'SELLER' | 'PLATFORM'
+  youGet: string
+  settlement: {
+    status: SettlementStatus
+    paidOut: string
+    onItsWay: string
+    duesDeducted: string
+    remaining: string
+    lastPayoutFailed: boolean
+    paidAt: string | null
+    paidAtTimeKnown: boolean
+    utr: string | null
+  }
+}
+
+export interface SellerTransactions {
+  summary: {
+    billed: { orders: number; amount: string }
+    online: { orders: number; amount: string }
+    cod: { orders: number; amount: string }
+    paidToYou: string
+    onItsWay: string
+  }
+  rows: SellerTransaction[]
+  meta: ListMeta
+}
+
 /** Platform fee cache per store — the product form asks once per session. */
 const platformFeeRequests = new Map<string, Promise<StorePlatformFee>>()
 
@@ -1463,6 +1529,13 @@ export const storeFinanceApi = {
   },
   earnings(storeRef: string, page = 1): Promise<SellerEarnings> {
     return call<SellerEarnings>(http.get(`${base()}/${storeRef}/earnings`, { params: { page } }))
+  },
+  transactions(storeRef: string, query: SellerTransactionsQuery): Promise<SellerTransactions> {
+    return call<SellerTransactions>(http.get(`${base()}/${storeRef}/transactions`, { params: query }))
+  },
+  /** One order's row — the order page's Money card. */
+  transaction(storeRef: string, orderId: string): Promise<SellerTransaction> {
+    return call<SellerTransaction>(http.get(`${base()}/${storeRef}/transactions/${orderId}`))
   },
 }
 

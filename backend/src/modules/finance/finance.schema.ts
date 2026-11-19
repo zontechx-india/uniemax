@@ -71,9 +71,27 @@ export const adjustmentSchema = z.object({
   idempotencyKey: z.string().trim().min(8).max(100),
 });
 
+/** An India calendar day, "2026-11-19". */
+const indiaDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-11-19");
+
+/** The seller's Transactions page — one row per order. */
+export const transactionListQuery = paginationQuery
+  .extend({
+    pageSize: z.coerce.number().int().min(1).max(50).default(20),
+    /** Placed on or after this India day. */
+    from: indiaDay.optional(),
+    /** Placed on or before this India day (the whole day counts). */
+    to: indiaDay.optional(),
+    mode: z.enum(["ONLINE", "COD"]).optional(),
+    /** Order number or customer name. */
+    q: z.string().trim().min(1).max(100).optional(),
+  })
+  .refine((v) => !v.from || !v.to || v.from <= v.to, { message: "The start date is after the end date", path: ["from"] });
+
 export const storeIdParams = z.object({ storeId: z.string().min(1) });
 
 export type FeeRuleCreateInput = z.infer<typeof feeRuleCreateSchema>;
 export type BalanceListQuery = z.infer<typeof balanceListQuery>;
 export type LedgerListQuery = z.infer<typeof ledgerListQuery>;
+export type TransactionListQuery = z.infer<typeof transactionListQuery>;
 export type AdjustmentInput = z.infer<typeof adjustmentSchema>;
