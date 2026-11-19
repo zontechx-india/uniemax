@@ -27,7 +27,7 @@ import {
   TruckIcon,
   UserIcon,
 } from '../../layout/icons'
-import { OrderStatusChip, formatOrderDateTime, paymentLabel, timeAgo } from './orderMeta'
+import { OrderStatusChip, formatOrderDateTime, paymentLabel, timeAgo, whatsAppNumber } from './orderMeta'
 import { Button, buttonClass } from '../../../shared/ui/Button'
 import { MediaImg } from '../../../shared/media/MediaImg'
 import { DeliveredDialog } from './orders/DeliveredDialog'
@@ -116,12 +116,6 @@ const SHIP_SHEET_COPY: Record<ShipSheet['kind'], { title: string; submit: string
 }
 
 const onTheWay = (parcel: OrderShipment) => !parcel.deliveredAt && !parcel.returnedAt
-
-/** wa.me wants digits with the country code; a bare 10-digit number is Indian. */
-function whatsAppNumber(phone: string): string {
-  const digits = phone.replace(/\D/g, '')
-  return digits.length === 10 ? `91${digits}` : digits
-}
 
 export function StoreOrderDetailPage() {
   // `refreshDashboard` keeps the nav's pending-order badge (and the dashboard

@@ -1514,6 +1514,60 @@ export interface SellerTransactions {
   meta: ListMeta
 }
 
+// --- Leads (Orders → Leads) -------------------------------------------------
+
+/** PAYMENT_PENDING = checkout not paid · ACTIVE = in cart ≤ 24 h · ABANDONED = 1–30 days. */
+export type LeadKind = 'PAYMENT_PENDING' | 'ACTIVE' | 'ABANDONED'
+
+export interface LeadItem {
+  name: string
+  variantName: string | null
+  quantity: number
+  imageUrl: string | null
+  /** Cart leads only — false when it can't be bought now. */
+  available?: boolean
+}
+
+/** An online checkout that was never paid — the shopper gave the shop these details. */
+export interface PaymentLead {
+  kind: 'PAYMENT_PENDING'
+  id: string
+  orderNumber: string
+  at: string
+  state: 'PAYING' | 'FAILED' | 'EXPIRED'
+  customerName: string | null
+  customerPhone: string | null
+  amount: string
+  quantity: number
+  items: LeadItem[]
+}
+
+/** A signed-in shopper's cart — anonymous: no name, phone or customer id. */
+export interface CartLead {
+  kind: 'ACTIVE' | 'ABANDONED'
+  /** The cart's id (opaque). */
+  id: string
+  /** Last activity. */
+  at: string
+  addedAt: string
+  /** Buyable items at today's price. */
+  value: string
+  quantity: number
+  items: LeadItem[]
+}
+
+export interface StoreLeads {
+  counts: Record<LeadKind, number>
+  rows: (PaymentLead | CartLead)[]
+  meta: ListMeta
+}
+
+export const storeLeadsApi = {
+  list(storeRef: string, kind: LeadKind, page = 1): Promise<StoreLeads> {
+    return call<StoreLeads>(http.get(`${base()}/${storeRef}/leads`, { params: { kind, page, pageSize: 20 } }))
+  },
+}
+
 /** Platform fee cache per store — the product form asks once per session. */
 const platformFeeRequests = new Map<string, Promise<StorePlatformFee>>()
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { toApiError } from '../../../shared/auth/http'
 import type { ListMeta } from '../../../shared/auth/http'
 import { buttonClass } from '../../../shared/ui/Button'
@@ -13,6 +13,7 @@ import type {
 import { useManagedStore } from '../../features/stores/useManagedStore'
 import { CartIcon, SearchIcon } from '../../layout/icons'
 import { ORDER_STATUS_META, SellerOrderRow } from './orderMeta'
+import { LeadsPanel } from './orders/LeadsPanel'
 import { EmptyState } from './ui/EmptyState'
 import { PageHeader } from './ui/PageHeader'
 
@@ -68,6 +69,8 @@ function isOrderStatus(value: string | null): value is OrderStatus {
 export function StoreOrdersPage() {
   const { store, dashboard } = useManagedStore()
   const [params, setParams] = useSearchParams()
+  // Orders | Leads (?tab=leads) — Leads lists people who nearly bought.
+  const leadsTab = params.get('tab') === 'leads'
   const statusParam = params.get('status')
   const status: OrderStatus | 'ALL' = isOrderStatus(statusParam)
     ? statusParam
@@ -88,6 +91,7 @@ export function StoreOrdersPage() {
   }, [search])
 
   useEffect(() => {
+    if (leadsTab) return
     const seq = ++requestSeq.current
     setOrders(null)
     setMeta(null)
@@ -108,7 +112,7 @@ export function StoreOrdersPage() {
         if (requestSeq.current !== seq) return
         setError(toApiError(err).message)
       })
-  }, [store.id, status, q])
+  }, [store.id, status, q, leadsTab])
 
   const loadMore = async () => {
     if (!meta || meta.page >= meta.totalPages || loadingMore) return
@@ -145,13 +149,29 @@ export function StoreOrdersPage() {
 
   const filtered = q !== '' || status !== 'ALL'
 
-  return (
-    <div className="space-y-4">
+  const header = (
+    <>
       <PageHeader
         icon={CartIcon}
         title="Orders"
         description="New orders show here. Open one to confirm it, then mark it packed and sent."
       />
+      <OrdersTabs leads={leadsTab} />
+    </>
+  )
+
+  if (leadsTab) {
+    return (
+      <div className="space-y-4">
+        {header}
+        <LeadsPanel />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {header}
 
       {/* Status chips — one row that scrolls sideways on a phone. */}
       <div className="-mx-4 [mask-image:linear-gradient(to_right,#000_88%,transparent)] sm:mx-0 sm:[mask-image:none]">
@@ -254,5 +274,26 @@ export function StoreOrdersPage() {
         </>
       )}
     </div>
+  )
+}
+
+/**
+ * Orders | Leads — underline tabs (ADMIN_UI_THEME §7.5 `tabs`), links so the
+ * tab is in the URL and Back works. Switching drops the other tab's filters.
+ */
+function OrdersTabs({ leads }: { leads: boolean }) {
+  const tab = (on: boolean) =>
+    `-mb-px inline-flex min-h-tap items-center border-b-2 px-1 text-sm font-medium transition-colors ${
+      on ? 'border-brand text-fg' : 'border-transparent text-muted hover:text-fg'
+    }`
+  return (
+    <nav aria-label="Orders and leads" className="flex gap-6 border-b border-line">
+      <Link to={{ search: '' }} replace aria-current={leads ? undefined : 'page'} className={tab(!leads)}>
+        Orders
+      </Link>
+      <Link to={{ search: '?tab=leads' }} replace aria-current={leads ? 'page' : undefined} className={tab(leads)}>
+        Leads
+      </Link>
+    </nav>
   )
 }

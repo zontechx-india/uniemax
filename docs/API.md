@@ -507,6 +507,38 @@ latest refund (always `null` in the redacted public view). The admin order
 detail carries `refunds[]` with `id`, `status`, `amount`, `reason`,
 `failureReason`, `hubRefundId`, `attempts`, `createdAt`, `processedAt`.
 
+### Seller leads — `GET /api/v1/stores/:id/leads` 🔒 owner
+
+The **Leads** tab on Orders: people who nearly bought. Read-only; also on the
+admin manage mount. Query: `kind` (required: `PAYMENT_PENDING` · `ACTIVE` ·
+`ABANDONED`), `page`, `pageSize` (≤ 50). One kind per page, plus the count of
+every kind.
+
+- `PAYMENT_PENDING` — ONLINE orders with `paymentStatus` PENDING / FAILED,
+  placed in the last 7 days, not cancelled by the shopper. Dropped when the
+  same shopper (account, or last 10 digits of the phone) placed a
+  seller-visible order in this store later; one per shopper (the newest).
+- `ACTIVE` / `ABANDONED` — ACTIVE cart lines of this store, one lead per cart,
+  last activity ≤ 24 h / 1–30 days. The store owner's own cart and blocked
+  customers are left out. **Anonymous:** no name, phone or customer id; `id`
+  is the cart's id. `value` counts only lines buyable now, at today's price.
+
+```jsonc
+{
+  "counts": { "PAYMENT_PENDING": 1, "ACTIVE": 2, "ABANDONED": 0 },
+  "rows": [
+    { "kind": "PAYMENT_PENDING", "id": "<orderId>", "orderNumber", "at": "<placedAt>",
+      "state": "PAYING" | "FAILED" | "EXPIRED",   // window open · failed · window closed
+      "customerName", "customerPhone", "amount": "1350.00", "quantity": 3,
+      "items": [ { "name", "variantName", "quantity", "imageUrl" } ] },
+    { "kind": "ACTIVE", "id": "<cartId>", "at": "<last activity>", "addedAt",
+      "value": "900.00", "quantity": 2,
+      "items": [ { "name", "variantName", "quantity", "imageUrl", "available": true } ] }
+  ],
+  "meta": { "total", "page", "pageSize", "totalPages" }
+}
+```
+
 ### Parcels — `/api/v1/stores/:id/orders/:orderId/shipments`
 
 A delivery order goes out in **parcels**: a courier, an optional tracking

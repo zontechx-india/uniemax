@@ -120,3 +120,9 @@ export function SellerOrderRow({ order, to }: { order: SellerOrderSummary; to: s
     </Link>
   )
 }
+
+/** wa.me wants digits with the country code; a bare 10-digit number is Indian. */
+export function whatsAppNumber(phone: string): string {
+  const digits = phone.replace(/\D/g, '')
+  return digits.length === 10 ? `91${digits}` : digits
+}

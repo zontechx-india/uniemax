@@ -6,6 +6,7 @@ import * as bankController from "./storeBank.controller.js";
 import * as bannerController from "./storeBanner.controller.js";
 import * as publicController from "./publicStore.controller.js";
 import * as financeController from "./storeFinance.controller.js";
+import * as leadsController from "../leads/leads.controller.js";
 import * as ordersController from "../orders/orders.controller.js";
 import { storeOwnerSupportRoutes } from "../support/support.routes.js";
 import { prisma } from "../../config/prisma.js";
@@ -109,6 +110,8 @@ export const storeRoutes: FastifyPluginAsync<StoreRoutesOptions> = async (
   app.get("/:id/earnings", financeController.getEarnings);
   app.get("/:id/transactions", financeController.getTransactions);
   app.get("/:id/transactions/:orderId", financeController.getTransaction);
+  // Leads (people who nearly bought) — read-only; cart leads are anonymous.
+  app.get("/:id/leads", leadsController.listLeads);
   app.patch("/:id", controller.updateStore);
   app.patch("/:id/theme", controller.updateStoreTheme);
   app.patch("/:id/homepage", controller.updateStoreHomepage);

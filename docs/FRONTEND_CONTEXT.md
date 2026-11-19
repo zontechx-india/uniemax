@@ -899,7 +899,14 @@ screen.
 **Orders** (`StoreOrdersPage` at `/mystores/{slug}/orders` +
 `StoreOrderDetailPage` at `…/orders/{orderId}`, shared chips/labels in
 `orderMeta.tsx`) — the seller's order management over
-`/api/v1/stores/:id/orders`:
+`/api/v1/stores/:id/orders`. Under the header, underline tabs **Orders |
+Leads** (`OrdersTabs`, links, `?tab=leads`). **Leads** (`orders/LeadsPanel.tsx`
+over `GET /stores/:id/leads`) has a three-cell switch with counts — Not paid ·
+In cart now · Left in cart (`?lead=`) — a one-line explanation, then dense
+rows: name or "A shopper", amount, order number / last activity, a status
+pill (+ phone for unpaid checkouts), up to three 36px product photos and the
+item names (unbuyable ones struck through), and **Call** / **WhatsApp** on
+unpaid-checkout rows only:
 
 - **List** — `PageHeader`, then status chips (All + the six statuses in
   plain words — Waiting · Confirmed · Packed · Sent · Delivered · Cancelled —

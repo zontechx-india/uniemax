@@ -183,6 +183,10 @@ backend/
 │   │   │                      #   + refunds.service.ts / refunds.rules.ts
 │   │   │                      #   (refunds through PaymentHub)
 │   │   │                      #   (see docs/CASHFREE_PAYMENTS.md)
+│   │   ├── leads/             # seller leads (Orders → Leads): unpaid
+│   │   │                      #   checkouts + anonymous cart leads ·
+│   │   │                      #   leads.rules.ts (pure, unit-tested);
+│   │   │                      #   route on stores.routes (GET /:id/leads)
 │   │   ├── finance/           # seller finance (docs/seller-finance/): fee
 │   │   │                      #   rules, order fee snapshots, seller ledger ·
 │   │   │                      #   finance.rules.ts (pure, unit-tested) ·
@@ -1553,7 +1557,11 @@ White-label design — one codebase, any business:
     wishlist), `Cart.metadata` (coupon code, gift note) and
     `CartLine.metadata` (gift wrap, engraving, subscription interval) —
     JSON like `Store.theme`. `@@index([updatedAt])` on `Cart` exists for
-    abandoned-cart sweeps; `@@index([storeId])` for seller demand signals.
+    abandoned-cart sweeps; `@@index([storeId])` for seller demand signals;
+    `@@index([storeId, status, updatedAt])` for seller leads (a store's
+    ACTIVE lines touched in the last 30 days — `modules/leads`). Every
+    cart sync re-writes every line, so a line's `updatedAt` means "the
+    shopper's cart was last synced", which leads read as last activity.
   - Deleting the store, product or variant cascades the line away: a cart
     line is a pointer at something buyable, and there is nothing to keep
     when that stops existing. Placing an order clears that store's lines

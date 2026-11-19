@@ -418,6 +418,8 @@ model CartLine {
   @@index([cartId, status])
   /// Seller-side demand signals ("in N carts") and store-scoped clears.
   @@index([storeId])
+  /// Seller leads: a store's ACTIVE lines touched in the last 30 days.
+  @@index([storeId, status, updatedAt])
   @@index([productId])
   @@map("cart_lines")
   @@schema("public")
