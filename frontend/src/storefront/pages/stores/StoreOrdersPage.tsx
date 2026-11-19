@@ -32,12 +32,19 @@ import { PageHeader } from './ui/PageHeader'
 
 const PAGE_SIZE = 20
 
-const STATUS_TABS: { key: OrderStatus | 'ALL'; label: string }[] = [
+/**
+ * The statuses a seller can filter by. AWAITING_PAYMENT is left out: the API
+ * hides unpaid online orders from the seller and rejects it as a filter —
+ * those checkouts are under Leads → Not paid instead.
+ */
+type SellerStatus = Exclude<OrderStatus, 'AWAITING_PAYMENT'>
+const SELLER_STATUSES = (Object.keys(ORDER_STATUS_META) as OrderStatus[]).filter(
+  (key): key is SellerStatus => key !== 'AWAITING_PAYMENT',
+)
+
+const STATUS_TABS: { key: SellerStatus | 'ALL'; label: string }[] = [
   { key: 'ALL', label: 'All' },
-  ...(Object.keys(ORDER_STATUS_META) as OrderStatus[]).map((key) => ({
-    key,
-    label: ORDER_STATUS_META[key].label,
-  })),
+  ...SELLER_STATUSES.map((key) => ({ key, label: ORDER_STATUS_META[key].label })),
 ]
 
 /** Counts the dashboard already has. Confirmed + Packed share one counter there. */
@@ -62,8 +69,9 @@ function countFor(
   }
 }
 
-function isOrderStatus(value: string | null): value is OrderStatus {
-  return value !== null && value in ORDER_STATUS_META
+/** An old `?status=AWAITING_PAYMENT` link falls back to All, never a 400. */
+function isSellerStatus(value: string | null): value is SellerStatus {
+  return SELLER_STATUSES.some((key) => key === value)
 }
 
 export function StoreOrdersPage() {
@@ -72,7 +80,7 @@ export function StoreOrdersPage() {
   // Orders | Leads (?tab=leads) — Leads lists people who nearly bought.
   const leadsTab = params.get('tab') === 'leads'
   const statusParam = params.get('status')
-  const status: OrderStatus | 'ALL' = isOrderStatus(statusParam)
+  const status: SellerStatus | 'ALL' = isSellerStatus(statusParam)
     ? statusParam
     : 'ALL'
 
@@ -135,7 +143,7 @@ export function StoreOrdersPage() {
     }
   }
 
-  const setStatus = (next: OrderStatus | 'ALL') => {
+  const setStatus = (next: SellerStatus | 'ALL') => {
     setParams(
       (prev) => {
         const copy = new URLSearchParams(prev)
