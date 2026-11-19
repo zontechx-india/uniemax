@@ -900,9 +900,15 @@ screen.
 `StoreOrderDetailPage` at `…/orders/{orderId}`, shared chips/labels in
 `orderMeta.tsx`) — the seller's order management over
 `/api/v1/stores/:id/orders`. Under the header, underline tabs **Orders |
-Leads** (`OrdersTabs`, links, `?tab=leads`). **Leads** (`orders/LeadsPanel.tsx`
-over `GET /stores/:id/leads`) has a three-cell switch with counts — Not paid ·
-In cart now · Left in cart (`?lead=`) — a one-line explanation, then dense
+Leads** (`OrdersTabs`, links, `?tab=leads`; two equal halves on a phone,
+content-width from `sm`; the active tab is semibold with a 2px brand line).
+**Leads** (`orders/LeadsPanel.tsx` over `GET /stores/:id/leads`) has a
+segmented control with counts — Not paid · In cart now · Left in cart
+(`?lead=`) — in the console `segc` style: a neutral `surface-alt` track, the
+chosen cell a raised `surface` pane in the text colour (no brand fill), each
+count a small pill (pending-tinted on Not paid when above 0); three equal
+cells with the count under the label on a phone, content-width with the
+count beside the label from `sm`. Then a one-line explanation, then dense
 rows: name or "A shopper", amount, order number / last activity, a status
 pill (+ phone for unpaid checkouts), up to three 36px product photos and the
 item names (unbuyable ones struck through), and **Call** / **WhatsApp** on

@@ -282,12 +282,14 @@ export function StoreOrdersPage() {
  * tab is in the URL and Back works. Switching drops the other tab's filters.
  */
 function OrdersTabs({ leads }: { leads: boolean }) {
+  // Phone: two halves of the width, so each tab is a full-width thumb target.
+  // From sm: content-width tabs, left-aligned, as in the console.
   const tab = (on: boolean) =>
-    `-mb-px inline-flex min-h-tap items-center border-b-2 px-1 text-sm font-medium transition-colors ${
-      on ? 'border-brand text-fg' : 'border-transparent text-muted hover:text-fg'
+    `-mb-px inline-flex min-h-tap flex-1 items-center justify-center border-b-2 px-3 text-sm transition-colors sm:flex-none ${
+      on ? 'border-brand font-semibold text-fg' : 'border-transparent font-medium text-muted hover:text-fg'
     }`
   return (
-    <nav aria-label="Orders and leads" className="flex gap-6 border-b border-line">
+    <nav aria-label="Orders and leads" className="flex gap-1 border-b border-line sm:gap-2">
       <Link to={{ search: '' }} replace aria-current={leads ? undefined : 'page'} className={tab(!leads)}>
         Orders
       </Link>

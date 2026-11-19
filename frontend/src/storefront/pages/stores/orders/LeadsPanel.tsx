@@ -289,9 +289,15 @@ function Items({ items }: { items: LeadItem[] }) {
 }
 
 /**
- * Not paid · In cart now · Left in cart — a segmented switch with counts
- * (the Transactions page's native-radio pattern). Three equal cells; the
- * count sits under the label so the cells stay narrow on a phone.
+ * Not paid · In cart now · Left in cart — a segmented control with counts
+ * (ADMIN_UI_THEME §7.5 `segc`, native radios). A neutral track; the chosen
+ * cell is a raised white pane in the text colour, never a brand fill, so the
+ * screen's colour stays on the content. Each count is a small pill — tinted
+ * pending when unpaid checkouts are waiting, the one count worth acting on.
+ *
+ * Phone: three equal cells, the count under the label (a label and a pill
+ * side by side do not fit a third of a phone). From sm: the control sizes to
+ * its content with the count beside the label.
  */
 function KindSwitch({
   value,
@@ -304,20 +310,31 @@ function KindSwitch({
 }) {
   const name = useId()
   return (
-    <div role="radiogroup" aria-label="Kind of lead" className="grid grid-cols-3 gap-1 rounded-md border border-line bg-input p-1 sm:max-w-md">
+    <div
+      role="radiogroup"
+      aria-label="Kind of lead"
+      className="grid grid-cols-3 gap-0.5 rounded-lg border border-line bg-surface-alt p-0.5 sm:inline-flex"
+    >
       {KINDS.map((k) => {
         const on = k.key === value
         const count = counts?.[k.key]
+        const alert = k.key === 'PAYMENT_PENDING' && (count ?? 0) > 0
         return (
           <label
             key={k.key}
-            className={`flex min-h-tap cursor-pointer flex-col items-center justify-center rounded-sm px-2 py-1 text-center transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent/40 ${
-              on ? 'bg-brand-soft text-brand' : 'text-muted hover:text-fg'
+            className={`flex min-h-tap cursor-pointer flex-col items-center justify-center gap-1 rounded-md px-1.5 py-1.5 text-center transition-[background-color,color,box-shadow] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent/40 sm:min-h-9 sm:flex-row sm:gap-2 sm:px-3 sm:py-0 ${
+              on ? 'bg-surface text-fg shadow-xs' : 'text-muted hover:text-fg'
             }`}
           >
             <input type="radio" name={name} value={k.key} checked={on} onChange={() => onChange(k.key)} className="sr-only" />
-            <span className="text-sm font-medium leading-tight">{k.label}</span>
-            <span className={`font-figure text-hint tabular-nums ${on ? 'text-brand' : 'text-muted'}`}>
+            <span className={`text-xs leading-tight whitespace-nowrap sm:text-sm ${on ? 'font-semibold' : 'font-medium'}`}>
+              {k.label}
+            </span>
+            <span
+              className={`inline-grid h-5 min-w-5 place-items-center rounded-pill px-1.5 font-figure text-xs leading-none font-semibold tabular-nums ${
+                alert ? 'bg-pending-soft text-pending' : on ? 'bg-fg/8 text-fg' : 'bg-fg/6 text-muted'
+              }`}
+            >
               {count === undefined ? '–' : count}
             </span>
           </label>
