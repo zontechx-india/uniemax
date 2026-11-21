@@ -6,6 +6,7 @@ import type {
   HomepageSectionSettings,
 } from '../../../features/stores/storesApi'
 import {
+  categoryLayoutFor,
   defaultLayout,
   SECTION_DEFAULT_COPY,
 } from '../../../features/publicStore/sectionCopy'
@@ -36,6 +37,7 @@ export function BuilderSectionEditor({
   busy,
   onToggle,
   onSettingsChange,
+  categoryShelves,
 }: {
   section: HomepageSection
   /** Base route for this store's management screens, for the content links. */
@@ -46,6 +48,11 @@ export function BuilderSectionEditor({
     key: HomepageSectionKey,
     settings: HomepageSectionSettings,
   ) => void
+  /**
+   * Shelves Shop by Category draws (from `useSectionCounts`) — its default
+   * layout depends on it. Unknown while the counts load.
+   */
+  categoryShelves?: number
 }) {
   const meta = BUILDER_SECTIONS[section.key]
   const defaults = SECTION_DEFAULT_COPY[section.key]
@@ -90,9 +97,13 @@ export function BuilderSectionEditor({
           <div className="space-y-2">
             {meta.layouts.map((layout, index) => {
               // Nothing stored = the section's own default, read from the same
-              // list the storefront falls back to.
-              const active =
-                (settings.layout ?? defaultLayout(section.key)) === layout.id
+              // rule the storefront falls back to. Shop by Category's default
+              // depends on how many shelves the shop has.
+              const shown =
+                section.key === 'categories' && categoryShelves !== undefined
+                  ? categoryLayoutFor(settings.layout ?? null, categoryShelves)
+                  : (settings.layout ?? defaultLayout(section.key))
+              const active = shown === layout.id
               return (
                 <button
                   key={layout.id}
@@ -101,8 +112,15 @@ export function BuilderSectionEditor({
                   onClick={() =>
                     // The default is stored as "no value", so choosing it back
                     // clears the field instead of pinning today's default into
-                    // the row for ever.
-                    set({ layout: index === 0 ? null : layout.id })
+                    // the row for ever. Shop by Category is the exception: its
+                    // default changes with the shop (Cards for a few shelves),
+                    // so "Compact row" stored as no value showed Cards.
+                    set({
+                      layout:
+                        index === 0 && section.key !== 'categories'
+                          ? null
+                          : layout.id,
+                    })
                   }
                   aria-pressed={active}
                   className={`flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors disabled:opacity-60 ${

@@ -489,6 +489,7 @@ function Builder({
               busy={false}
               onToggle={toggle}
               onSettingsChange={changeSettings}
+              categoryShelves={counts?.categoryShelves}
             />
           ))}
       </div>

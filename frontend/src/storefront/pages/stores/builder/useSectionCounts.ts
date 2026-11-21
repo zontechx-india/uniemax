@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { publicStoreApi } from '../../../features/stores/storesApi'
 import type { HomepageSectionKey } from '../../../features/stores/storesApi'
-import { SMALL_SHOP_MAX } from '../../../features/publicStore/shopShape'
+import {
+  browsableCategories,
+  SMALL_SHOP_MAX,
+} from '../../../features/publicStore/shopShape'
 
 /**
  * What each homepage section has to show, for the Store Builder's list —
@@ -22,6 +25,12 @@ export interface SectionCounts {
   smallShop: boolean
   /** Products shown in "All Products" (the whole shop when it is small). */
   catalogSize: number
+  /**
+   * Category shelves Shop by Category draws — counted the way the storefront
+   * does (`browsableCategories`, none below two), so the builder can tick the
+   * layout the shop really shows while nothing is stored (`categoryLayoutFor`).
+   */
+  categoryShelves: number
 }
 
 export function useSectionCounts(slug: string, refreshToken: number): SectionCounts | null {
@@ -33,6 +42,7 @@ export function useSectionCounts(slug: string, refreshToken: number): SectionCou
       .getHome(slug)
       .then((home) => {
         if (cancelled) return
+        const shelves = browsableCategories(home.featuredCategories)
         const catalogOn = home.sections.some(
           (section) => section.key === 'catalog' && section.enabled,
         )
@@ -48,6 +58,7 @@ export function useSectionCounts(slug: string, refreshToken: number): SectionCou
           },
           smallShop: catalogOn && home.catalog.length > 0 && home.catalog.length <= SMALL_SHOP_MAX,
           catalogSize: home.catalog.length,
+          categoryShelves: shelves.length >= 2 ? shelves.length : 0,
         })
       })
       // Counts are a hint; without them the list simply shows its usual text.

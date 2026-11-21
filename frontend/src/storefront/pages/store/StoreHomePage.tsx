@@ -65,6 +65,7 @@ import {
   useBuilderRefresh,
 } from '../../features/publicStore/builderBridge'
 import {
+  categoryLayoutFor,
   defaultLayout,
   sectionCopy,
 } from '../../features/publicStore/sectionCopy'
@@ -784,15 +785,11 @@ function HomeSection({
           categories={home.featuredCategories}
           products={pictures}
           title={copy.title}
-          // A shop with only a few shelves gets them as big picture tiles —
-          // two 80px chips left a desktop row almost empty. The owner's own
-          // choice in the Store Builder still wins.
-          layout={
-            copy.layout === null &&
-            home.featuredCategories.length <= FEW_CATEGORIES
-              ? 'tiles'
-              : categoryLayout(layout)
-          }
+          // The owner's choice, else the default for this many shelves — the
+          // same rule the Store Builder ticks (`categoryLayoutFor`).
+          layout={categoryLayout(
+            categoryLayoutFor(copy.layout, home.featuredCategories.length),
+          )}
           skin={skin}
           tone={tone}
           builder={builder}
@@ -1093,9 +1090,6 @@ function CategoryInitial({ name }: { name: string }) {
 
 /** How many tiles a band shows before the rest live on the Shop page. */
 const CATEGORY_TILE_CAP = 12
-
-/** Up to this many categories, the strip defaults to big picture tiles. */
-const FEW_CATEGORIES = 4
 
 /**
  * Categories as picture cards (`CategoryCard`) — the shelf's own artwork,

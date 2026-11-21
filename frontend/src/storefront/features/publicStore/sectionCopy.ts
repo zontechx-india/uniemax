@@ -55,6 +55,23 @@ export function defaultLayout(key: HomepageSectionKey): string | null {
   return (HOMEPAGE_SECTION_LAYOUTS[key] as readonly string[])[0] ?? null
 }
 
+/** Up to this many category shelves, Shop by Category defaults to Cards. */
+export const FEW_CATEGORIES = 4
+
+/**
+ * The Shop by Category layout a shop actually shows: the owner's stored
+ * choice, else **Cards (`tiles`) for a shop with only a few shelves** — two
+ * 80px chips left a desktop row almost empty — and the Compact row for more.
+ *
+ * Because this default depends on the shop, the Store Builder **always stores
+ * the seller's pick** for this section (never "no value" for the first
+ * option, as other sections do), and ticks the result of this function while
+ * nothing is stored. Both sides read it here so they cannot disagree.
+ */
+export function categoryLayoutFor(stored: string | null, shelves: number): string {
+  return stored ?? (shelves <= FEW_CATEGORIES ? 'tiles' : 'chips')
+}
+
 /**
  * What a section should actually render: the owner's choice where they made
  * one, the platform's default everywhere else.

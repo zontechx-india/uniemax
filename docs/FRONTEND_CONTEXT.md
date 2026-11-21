@@ -1438,7 +1438,13 @@ full-bleed section bands instead.
     poster on a gradient of the **store owner's** colour (`--cta` →
     `--cta-lo`, text `--cta-contrast`) with the initial as a large faded
     mark. **A shop with ≤ 4 categories** (`FEW_CATEGORIES`) gets tiles by
-    default — unless the owner chose a layout in the Store Builder.
+    default — unless the owner chose a layout in the Store Builder. That rule
+    is `categoryLayoutFor()` in `sectionCopy.ts`, read by both the storefront
+    and the builder (which ticks its result while nothing is stored, using
+    `useSectionCounts().categoryShelves`). Because this default depends on
+    the shop, the builder **always stores the pick** for this section — other
+    sections store "no value" for their first option, which here made
+    "Compact row" fall back to Cards.
     The seller picks one of **five** layouts in the Store Builder
     (`CategoryLayout`, narrowed by `categoryLayout()`): `chips` (default,
     the row above), `tiles` (the poster cards), **`pills`** (`CategoryPills`

@@ -174,8 +174,11 @@ test('Shop by Category draws the layout the seller picked', () => {
     subcategories: [],
   })
   const categories = [category('phones', 'Phones'), category('cases', 'Phone cases')]
-  // A marker only that layout draws.
+  // A marker only that layout draws. A shop with these two shelves defaults to
+  // Cards, so a stored "chips" (Compact row) must still draw the row.
   const markers: Record<string, string> = {
+    chips: 'w-[88px]',
+    tiles: 'aspect-[3/4]',
     pills: 'size-10',
     labels: 'bg-surface/95',
     tabs: 'role="tablist"',
