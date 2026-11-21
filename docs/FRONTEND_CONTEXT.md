@@ -1303,11 +1303,14 @@ full-bleed section bands instead.
   gave a number its foot carries the shop's **WhatsApp / Call** buttons
   (`ContactActions`). The menu
   lists **categories and subcategories only, never products**.
-  **Two rows on a phone, one from `md`**: the bar is
-  `[menu] [logo · store name] [share] [cart]` and search drops to a full-width
-  row underneath, because squeezed in beside five controls at 360px it was
-  barely wide enough for one word — and search is how anyone finds anything in
-  a large catalog. **Search only exists from `SEARCH_MIN_PRODUCTS` (7)
+  **On a phone the search row opens from an icon**: the bar is
+  `[menu] [logo · store name] [search] [share] [cart]`, and tapping the search
+  icon (it turns into a close ×) opens a full-width search row underneath,
+  focused so the keyboard comes up — as on the UniMax home. It is not a field
+  inside the bar because squeezed in beside five controls at 360px it was
+  barely wide enough for one word. The row starts open on a search results
+  page (`?q=`) and closes on any other navigation. From `md` search sits in
+  the bar itself. **Search only exists from `SEARCH_MIN_PRODUCTS` (7)
   products** (`shopHasSearch`): a smaller shop shows everything on its home
   page, so it gets a one-row header instead. **`SearchBox` suggests as you
   type** — after two letters and 250ms, up to five of the shop's matching

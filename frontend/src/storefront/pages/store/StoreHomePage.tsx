@@ -1406,7 +1406,10 @@ function CategoryTabs({
               aria-selected={on}
               aria-controls="shop-by-category-products"
               onClick={() => choose(category)}
-              className={`rounded-full whitespace-nowrap aria-selected:bg-fg aria-selected:text-bg aria-selected:shadow-none ${picture ? 'pl-1.5' : ''}`}
+              // `!`: the secondary button's own hover/press fills are more
+              // specific than `aria-selected:`, and painted the chosen tab
+              // light grey under its white text.
+              className={`rounded-full! whitespace-nowrap aria-selected:bg-fg! aria-selected:text-bg! aria-selected:shadow-none! ${picture ? 'pl-1.5' : ''}`}
             >
               {picture && (
                 <span

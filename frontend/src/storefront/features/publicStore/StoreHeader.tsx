@@ -33,6 +33,7 @@ import { builderSectionProps } from './builderBridge'
 import {
   CartIcon,
   ChevronDownIcon,
+  CloseIcon,
   LogoutIcon,
   MenuIcon,
   SearchIcon,
@@ -114,11 +115,18 @@ function StoreHeaderBar({
   const [drawerOpen, setDrawerOpen] = useState(false)
   const location = useLocation()
   const search = shopHasSearch(store)
+  // Phones: the search row opens from an icon in the bar (as on the UniMax
+  // home) instead of always taking a row. Open on a search results page, so
+  // the query being shown stays visible and editable.
+  const onSearchPage = new URLSearchParams(location.search).has('q')
+  const [searchOpen, setSearchOpen] = useState(onSearchPage)
 
-  // Any navigation closes the mobile drawer.
+  // Any navigation closes the mobile drawer, and the search row unless the
+  // new page is a search result.
   useEffect(() => {
     setDrawerOpen(false)
-  }, [location.pathname, location.search])
+    setSearchOpen(onSearchPage)
+  }, [location.pathname, location.search, onSearchPage])
 
   return (
     <header
@@ -197,6 +205,25 @@ function StoreHeaderBar({
         {/* The trailing icon pulls in by its own padding, so the cart's glyph
             lines up with the content column's edge rather than its circle. */}
         <div className="-mr-2.5 ml-auto flex shrink-0 items-center gap-0.5 sm:mr-0 sm:gap-2 md:ml-0 md:pl-1">
+          {/* Phones: opens the search row under the bar. */}
+          {search && (
+            <Button
+              variant="ghost"
+              size="md"
+              onClick={() => setSearchOpen((open) => !open)}
+              aria-label={searchOpen ? 'Close search' : 'Search products'}
+              aria-expanded={searchOpen}
+              aria-controls="store-mobile-search"
+              className="w-11 rounded-full! px-0! md:hidden"
+            >
+              {searchOpen ? (
+                <CloseIcon className="h-5 w-5" />
+              ) : (
+                <SearchIcon className="h-5 w-5" />
+              )}
+            </Button>
+          )}
+
           {/* Share this store (native sheet / copy link) */}
           <ShareButton
             title={store.name}
@@ -217,12 +244,14 @@ function StoreHeaderBar({
         </div>
       </div>
 
-      {/* Second row, phones and small tablets only: search on its own line.
-          Squeezing it into the bar beside five controls left a field barely
-          wide enough for one word. */}
-      {search && (
-        <div className={`${STORE_CONTAINER} pb-2.5 md:hidden`}>
-          <SearchBox store={store} skin={skin} />
+      {/* Second row, phones and small tablets only: search on its own line —
+          squeezing it into the bar beside five controls left a field barely
+          wide enough for one word. It opens from the search icon (focused,
+          so one tap brings up the keyboard) rather than always taking a row
+          of every screen. */}
+      {search && searchOpen && (
+        <div id="store-mobile-search" className={`${STORE_CONTAINER} pb-2.5 md:hidden`}>
+          <SearchBox store={store} skin={skin} autoFocus={!onSearchPage} />
         </div>
       )}
 
@@ -537,10 +566,13 @@ function SearchBox({
   store,
   skin,
   className = '',
+  autoFocus = false,
 }: {
   store: PublicStore
   skin: Skin
   className?: string
+  /** Focus on mount — the phone row, opened by a tap on the search icon. */
+  autoFocus?: boolean
 }) {
   const navigate = useNavigate()
   const [value, setValue] = useState('')
@@ -603,6 +635,7 @@ function SearchBox({
         onFocus={() => setOpen(true)}
         placeholder="Search products…"
         aria-label="Search products"
+        autoFocus={autoFocus}
         aria-expanded={shown}
         aria-controls="store-search-suggestions"
         autoComplete="off"
