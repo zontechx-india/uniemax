@@ -1438,7 +1438,22 @@ full-bleed section bands instead.
     poster on a gradient of the **store owner's** colour (`--cta` →
     `--cta-lo`, text `--cta-contrast`) with the initial as a large faded
     mark. **A shop with ≤ 4 categories** (`FEW_CATEGORIES`) gets tiles by
-    default — unless the owner chose a layout in the Store Builder. Tiles
+    default — unless the owner chose a layout in the Store Builder.
+    The seller picks one of **five** layouts in the Store Builder
+    (`CategoryLayout`, narrowed by `categoryLayout()`): `chips` (default,
+    the row above), `tiles` (the poster cards), **`pills`** (`CategoryPills`
+    — 40px round photo beside the name in a rounded pill, 48px tall / 56px
+    from `sm`, one sideways row on a phone, wraps from `sm`; the smallest),
+    **`labels`** (`CategoryLabels` — small 4:5 photo cards with the name on
+    a white label at the foot, 104px wide in a sideways row on a phone, 6
+    across from `sm`, 8 from `lg`, capped at `LABEL_CAP` 16) and **`tabs`**
+    (`CategoryTabs` — All + up to 12 category tabs as shared `Button`s,
+    round photo beside the name, selected = `bg-fg text-bg`, over one capped
+    product row; "All" shows the newest products already on the page, a
+    category first shows its products already on the page and then its
+    newest `ROW_SIZE` from `GET /public/stores/:slug/products?category=`,
+    fetched once per tab on the tap (no effect); "View all" follows the
+    tab). Every layout uses the same `categoryPicture()`. Tiles
     run 3/4/6 across (phone/`sm`/`lg`), capped at 12; on a phone the call
     reads just "↗ SHOP" so it never wraps. (2/3/4 across, 18 Oct 2026, made
     the cards too big; landscape cards with a coloured "N products · Shop ›" footer band,
@@ -1450,8 +1465,9 @@ full-bleed section bands instead.
     initial on the shop colour), the name as the visible `<h1>`, the About
     line (2 lines), and fact chips built only from seller settings and
     phrased to hold shop-wide (products may override delivery charges and
-    COD): Home delivery · Store pickup · Cash on delivery available · UPI &
-    cards · Since {year}. With a banner on screen the intro is not drawn, but
+    COD): Home delivery · Store pickup · Cash on delivery · UPI &
+    cards · Since {year}. **On a phone the chips stay on one line** and
+    scroll sideways (`EDGE_SCROLLER`); they wrap from `sm`. With a banner on screen the intro is not drawn, but
     the same chips still show as a slim strip right under the banner
     (`StoreFactsStrip`) — they are what a first-time customer checks.
   - **Category Highlights / All Products** — the two sections that need no

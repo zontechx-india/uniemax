@@ -1141,7 +1141,7 @@ White-label design — one codebase, any business:
   `{ key, enabled }` rows it always did. `layout` is validated against
   `HOMEPAGE_SECTION_LAYOUTS`, which lists per key the compositions the
   storefront can actually draw (`categories`:
-  chips·tiles; `featured`: spotlight·rail·grid; `newArrivals`/`bestSellers`:
+  chips·tiles·pills·labels·tabs; `featured`: spotlight·rail·grid; `newArrivals`/`bestSellers`:
   rail·grid; `catalog`: grid·rail; `banners`/`categoryRows`: none) — a value
   that section has no shape for is a `422`, so the column can never name a
   layout nobody renders.

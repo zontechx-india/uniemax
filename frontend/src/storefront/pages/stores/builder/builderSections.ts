@@ -88,6 +88,21 @@ export const BUILDER_SECTIONS: Record<HomepageSectionKey, BuilderSectionMeta> = 
         label: 'Cards',
         hint: 'A block of cards. Best when your categories are the main pitch',
       },
+      {
+        id: 'pills',
+        label: 'Photo pills',
+        hint: 'A small round photo beside each name. Takes the least space',
+      },
+      {
+        id: 'labels',
+        label: 'Small photo cards',
+        hint: 'Photo cards with the name on a label, up to 8 in a row',
+      },
+      {
+        id: 'tabs',
+        label: 'Tabs with products',
+        hint: 'Shoppers tap a category and its products show right below',
+      },
     ],
     source: {
       label: 'Manage categories',

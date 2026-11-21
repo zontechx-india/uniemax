@@ -723,7 +723,7 @@ has no composition for is a `422`:
 
 | Section        | Layouts                             |
 | -------------- | ----------------------------------- |
-| `categories`   | `chips` (default) · `tiles`          |
+| `categories`   | `chips` (default) · `tiles` · `pills` · `labels` · `tabs` |
 | `featured`     | `spotlight` (default) · `rail` · `grid` |
 | `newArrivals`  | `rail` (default) · `grid`            |
 | `bestSellers`  | `rail` (default) · `grid`            |

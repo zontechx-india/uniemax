@@ -158,6 +158,42 @@ test('trust facts show with AND without a banner', () => {
   for (const banners of [[], [banner]]) {
     const html = render(shop(30), home({ banners }))
     assert.ok(html.includes('Home delivery'), `no "Home delivery" with ${banners.length} banner(s)`)
-    assert.ok(html.includes('Cash on delivery available'))
+    assert.ok(html.includes('Cash on delivery'))
+    assert.ok(!html.includes('Cash on delivery available'))
+  }
+})
+
+test('Shop by Category draws the layout the seller picked', () => {
+  const category = (id: string, name: string) => ({
+    id,
+    name,
+    slug: id,
+    imageUrl: null,
+    isFeatured: false,
+    productCount: 3,
+    subcategories: [],
+  })
+  const categories = [category('phones', 'Phones'), category('cases', 'Phone cases')]
+  // A marker only that layout draws.
+  const markers: Record<string, string> = {
+    pills: 'size-10',
+    labels: 'bg-surface/95',
+    tabs: 'role="tablist"',
+  }
+  for (const [layout, marker] of Object.entries(markers)) {
+    const data = home({
+      featuredCategories: categories,
+      sections: api.HOMEPAGE_SECTION_KEYS.map((key) => ({
+        key,
+        enabled: true,
+        ...(key === 'categories' ? { settings: { layout } } : {}),
+      })),
+    })
+    const html = render(shop(30), data)
+    assert.ok(html.includes('Phone cases'), `${layout}: category missing`)
+    assert.ok(html.includes(marker), `${layout}: not drawn in its own shape`)
+    for (const [other, otherMarker] of Object.entries(markers)) {
+      if (other !== layout) assert.ok(!html.includes(otherMarker), `${layout} also drew ${other}`)
+    }
   }
 })

@@ -51,3 +51,18 @@ test("writes naming hero are rejected", () => {
   const withHero = [...valid.slice(1), { key: "hero", enabled: true }];
   assert.equal(storeHomepageSchema.safeParse({ sections: withHero }).success, false);
 });
+
+test("Shop by Category accepts all five layouts and nothing else", () => {
+  for (const layout of ["chips", "tiles", "pills", "labels", "tabs"]) {
+    assert.deepEqual(resolveSectionSettings("categories", { layout }), { layout });
+  }
+  assert.equal(resolveSectionSettings("categories", { layout: "rail" }), undefined);
+  const bad = storeHomepageSchema.safeParse({
+    sections: HOMEPAGE_SECTION_KEYS.map((key) => ({
+      key,
+      enabled: true,
+      settings: key === "categories" ? { layout: "carousel" } : undefined,
+    })),
+  });
+  assert.equal(bad.success, false);
+});

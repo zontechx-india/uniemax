@@ -78,7 +78,7 @@ export function findCategory(
 }
 
 /** The slugs of a category and everything beneath it. */
-function subtreeSlugs(category: PublicCategory): Set<string> {
+export function subtreeSlugs(category: PublicCategory): Set<string> {
   const slugs = new Set<string>([category.slug])
   for (const sub of category.subcategories) {
     for (const slug of subtreeSlugs(sub)) slugs.add(slug)

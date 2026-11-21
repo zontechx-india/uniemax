@@ -44,6 +44,7 @@ import {
   plainLetters,
   shopProductCount,
   shopSize,
+  subtreeSlugs,
   type ShopSize,
 } from '../../features/publicStore/shopShape'
 import {
@@ -68,7 +69,7 @@ import {
   sectionCopy,
 } from '../../features/publicStore/sectionCopy'
 import { MediaImg } from '../../../shared/media/MediaImg'
-import { buttonClass } from '../../../shared/ui/Button'
+import { Button, buttonClass } from '../../../shared/ui/Button'
 
 /**
  * Products shown in a capped single-row section. Only as many as fill the
@@ -461,13 +462,18 @@ function StoreFactsStrip({ store }: { store: PublicStore }) {
   )
 }
 
+/**
+ * The trust facts as chips. **One line on a phone** — they scroll sideways
+ * instead of wrapping into a second row that pushes the shop down; from `sm`
+ * there is room, so they wrap as usual.
+ */
 function FactChips({ facts, className = '' }: { facts: string[]; className?: string }) {
   return (
-    <ul className={`flex flex-wrap gap-2 ${className}`}>
+    <ul className={`flex gap-2 sm:flex-wrap ${EDGE_SCROLLER} ${className}`}>
       {facts.map((fact) => (
         <li
           key={fact}
-          className="inline-flex items-center gap-1.5 rounded-full bg-surface-alt px-3 py-1.5 text-xs font-medium text-fg"
+          className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-surface-alt px-3 py-1.5 text-xs font-medium text-fg"
         >
           <CheckIcon className="h-3.5 w-3.5 text-success" />
           {fact}
@@ -483,7 +489,7 @@ function storeFacts(store: PublicStore): string[] {
   const { mode } = store.shipping
   if (mode === 'DELIVERY' || mode === 'BOTH') facts.push('Home delivery')
   if (mode === 'PICKUP' || mode === 'BOTH') facts.push('Store pickup')
-  if (store.payments.acceptCod) facts.push('Cash on delivery available')
+  if (store.payments.acceptCod) facts.push('Cash on delivery')
   if (store.payments.acceptOnlinePayment) facts.push('UPI & cards')
   if (store.footer.info.establishedYear) {
     facts.push(`Since ${store.footer.info.establishedYear}`)
@@ -782,11 +788,10 @@ function HomeSection({
           // two 80px chips left a desktop row almost empty. The owner's own
           // choice in the Store Builder still wins.
           layout={
-            layout === 'tiles' ||
-            (copy.layout === null &&
-              home.featuredCategories.length <= FEW_CATEGORIES)
+            copy.layout === null &&
+            home.featuredCategories.length <= FEW_CATEGORIES
               ? 'tiles'
-              : 'chips'
+              : categoryLayout(layout)
           }
           skin={skin}
           tone={tone}
@@ -932,6 +937,28 @@ function Band({
  * color: the raised tone gets page-canvas chips, the canvas tone gets raised
  * ones.
  */
+/**
+ * The five shapes Shop by Category can take — the seller picks one in the
+ * Store Builder (`HOMEPAGE_SECTION_LAYOUTS.categories`):
+ *
+ * - `chips` — one scrolling row of soft-square pictures (the default).
+ * - `tiles` — portrait poster cards (`CategoryTiles`).
+ * - `pills` — a round photo beside each name, the smallest (`CategoryPills`).
+ * - `labels` — small photo cards with the name on a label (`CategoryLabels`).
+ * - `tabs` — the categories filter a row of products (`CategoryTabs`).
+ */
+type CategoryLayout = 'chips' | 'tiles' | 'pills' | 'labels' | 'tabs'
+
+/** A stored layout narrowed to the shapes above; anything else is `chips`. */
+function categoryLayout(layout: string | null): CategoryLayout {
+  return layout === 'tiles' ||
+    layout === 'pills' ||
+    layout === 'labels' ||
+    layout === 'tabs'
+    ? layout
+    : 'chips'
+}
+
 function CategoryStrip({
   store,
   categories,
@@ -948,17 +975,31 @@ function CategoryStrip({
   products: PublicProduct[]
   title: string
   /**
-   * `chips` is the scrolling row above — wayfinding that costs one line of
+   * `chips` is the scrolling row below — wayfinding that costs one line of
    * height whatever the count. `tiles` gives the shelves real estate, for a
    * shop whose categories ARE the pitch (a grocer, a parts supplier), and is
-   * capped so twenty of them cannot turn the homepage into a directory.
+   * capped so twenty of them cannot turn the homepage into a directory. See
+   * `CategoryLayout` for the rest.
    */
-  layout: 'chips' | 'tiles'
+  layout: CategoryLayout
   skin: Skin
   tone: BandTone
   builder?: Record<string, string> | undefined
 }) {
   if (categories.length === 0) return null
+  if (layout === 'tabs') {
+    return (
+      <CategoryTabs
+        store={store}
+        categories={categories}
+        products={products}
+        title={title}
+        skin={skin}
+        tone={tone}
+        builder={builder}
+      />
+    )
+  }
   return (
     <Band
       id="shop-by-category"
@@ -976,6 +1017,21 @@ function CategoryStrip({
           store={store}
           categories={categories}
           products={products}
+        />
+      ) : layout === 'pills' ? (
+        <CategoryPills
+          store={store}
+          categories={categories}
+          products={products}
+          skin={skin}
+          tone={tone}
+        />
+      ) : layout === 'labels' ? (
+        <CategoryLabels
+          store={store}
+          categories={categories}
+          products={products}
+          skin={skin}
         />
       ) : (
         // Soft-square pictures with the name underneath — the same neutral
@@ -1151,6 +1207,260 @@ function CategoryCard({
         </span>
       </Link>
     </li>
+  )
+}
+
+/** How many small photo cards (`labels`) show — two full rows of 8 on `lg`. */
+const LABEL_CAP = 16
+
+/**
+ * `pills` — each category as a rounded pill: a round photo (the same
+ * `categoryPicture` as every layout) beside the name. The smallest layout —
+ * one 48–56px row — so the products start almost straight away. One line
+ * that scrolls sideways on a phone; it wraps from `sm`.
+ *
+ * The pill fill is picked against the band tone (like the chips): page
+ * canvas on the raised tone, raised surface on the canvas.
+ */
+function CategoryPills({
+  store,
+  categories,
+  products,
+  skin,
+  tone,
+}: {
+  store: PublicStore
+  categories: PublicCategory[]
+  products: PublicProduct[]
+  skin: Skin
+  tone: BandTone
+}) {
+  const fill = tone === 'alt' ? 'bg-bg' : 'bg-surface'
+  return (
+    <ul className={`mt-3 flex gap-2 sm:mt-4 sm:flex-wrap sm:gap-3 ${EDGE_SCROLLER}`}>
+      {categories.map((category) => {
+        const picture = categoryPicture(category, products)
+        return (
+          <li key={category.id} className="shrink-0">
+            <Link
+              to={storeCategoryUrl(store.slug, category.slug)}
+              className={`flex h-12 items-center gap-2 whitespace-nowrap rounded-full border border-line py-1 pl-1 pr-4 text-sm font-medium transition-colors hover:border-fg/30 sm:h-14 sm:gap-3 sm:pl-2 sm:pr-5 ${fill} ${skin.text}`}
+            >
+              <span
+                className={`flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full ${skin.well}`}
+              >
+                {picture ? (
+                  <MediaImg
+                    sizes="40px"
+                    src={picture}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <CategoryInitial name={category.name} />
+                )}
+              </span>
+              {category.name}
+            </Link>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+/**
+ * `labels` — small portrait photo cards with the name on a white label at
+ * the foot of the photo, so it reads on any picture without a dark scrim.
+ * Smaller than `tiles`: up to 8 across on a desktop (capped at `LABEL_CAP`),
+ * and on a phone one sideways row of ~3.3 cards so the row clearly scrolls.
+ */
+function CategoryLabels({
+  store,
+  categories,
+  products,
+  skin,
+}: {
+  store: PublicStore
+  categories: PublicCategory[]
+  products: PublicProduct[]
+  skin: Skin
+}) {
+  return (
+    <ul
+      className={`mt-3 flex gap-2 sm:mt-4 sm:grid sm:grid-cols-6 sm:gap-4 lg:grid-cols-8 ${EDGE_SCROLLER}`}
+    >
+      {categories.slice(0, LABEL_CAP).map((category) => {
+        const picture = categoryPicture(category, products)
+        return (
+          <li key={category.id} className="w-26 shrink-0 sm:w-auto">
+            <Link
+              to={storeCategoryUrl(store.slug, category.slug)}
+              className={`group relative flex aspect-[4/5] items-center justify-center overflow-hidden rounded-lg ${skin.well}`}
+            >
+              {picture ? (
+                <MediaImg
+                  sizes="(min-width: 1024px) 12vw, (min-width: 640px) 16vw, 104px"
+                  src={picture}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="absolute inset-0 h-full w-full object-cover object-[center_25%] transition-transform duration-500 ease-out group-hover:scale-105 motion-reduce:transition-none"
+                />
+              ) : (
+                <CategoryInitial name={category.name} />
+              )}
+              <span className="absolute inset-x-1 bottom-1 line-clamp-2 rounded-md bg-surface/95 px-1.5 py-1 text-center text-xs font-medium leading-tight text-fg sm:inset-x-2 sm:bottom-2">
+                {category.name}
+              </span>
+            </Link>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+/** Category tabs shown before the rest live on the Shop page. */
+const TAB_CAP = 12
+
+/**
+ * `tabs` — Shop by Category and a product row in one band. A row of tabs
+ * (All + each category, a round photo beside the name) sits over one row of
+ * product cards; tapping a tab swaps the row to that category's products, and
+ * "View all" follows the tab to its category page.
+ *
+ * "All" shows the newest products the page already has. A category first
+ * shows the ones the page already has from that shelf (instant), then asks the
+ * server for its newest `ROW_SIZE` — fetched once per tab, on the tap itself
+ * (no effect), and kept for the visit. A failed fetch keeps the instant list.
+ */
+function CategoryTabs({
+  store,
+  categories,
+  products,
+  title,
+  skin,
+  tone,
+  builder,
+}: {
+  store: PublicStore
+  categories: PublicCategory[]
+  products: PublicProduct[]
+  title: string
+  skin: Skin
+  tone: BandTone
+  builder?: Record<string, string> | undefined
+}) {
+  /** Slug of the chosen category; `null` = All. */
+  const [active, setActive] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState<Record<string, PublicProduct[]>>({})
+  const tabs = categories.slice(0, TAB_CAP)
+
+  const onPage = (category: PublicCategory | null): PublicProduct[] => {
+    const slugs = category ? subtreeSlugs(category) : null
+    const seen = new Set<string>()
+    return products.filter((product) => {
+      if (seen.has(product.id)) return false
+      seen.add(product.id)
+      return slugs === null || slugs.has(product.category.slug)
+    })
+  }
+
+  const choose = (category: PublicCategory | null) => {
+    setActive(category?.slug ?? null)
+    if (!category || category.slug in loaded) return
+    publicStoreApi
+      .listProducts(store.slug, { category: category.slug, pageSize: ROW_SIZE })
+      .then((result) => result.items)
+      .catch(() => onPage(category))
+      .then((items) => setLoaded((prev) => ({ ...prev, [category.slug]: items })))
+  }
+
+  const current = tabs.find((category) => category.slug === active) ?? null
+  const loading = current !== null && !(current.slug in loaded)
+  const shown = current && !loading ? loaded[current.slug]! : onPage(current)
+
+  return (
+    <Band id="shop-by-category" tone={tone} skin={skin} builder={builder}>
+      <SectionHeading
+        title={title}
+        action={{
+          label: 'View all',
+          to: current
+            ? storeCategoryUrl(store.slug, current.slug)
+            : storeShopUrl(store.slug),
+        }}
+        skin={skin}
+      />
+      <div
+        role="tablist"
+        aria-label={title}
+        className={`mt-3 flex gap-2 sm:mt-4 ${EDGE_SCROLLER}`}
+      >
+        {[null, ...tabs].map((category) => {
+          const on = (category?.slug ?? null) === active
+          const picture = category ? categoryPicture(category, products) : null
+          return (
+            <Button
+              key={category?.id ?? 'all'}
+              variant="secondary"
+              size="md"
+              role="tab"
+              aria-selected={on}
+              aria-controls="shop-by-category-products"
+              onClick={() => choose(category)}
+              className={`rounded-full whitespace-nowrap aria-selected:bg-fg aria-selected:text-bg aria-selected:shadow-none ${picture ? 'pl-1.5' : ''}`}
+            >
+              {picture && (
+                <span
+                  className={`size-8 shrink-0 overflow-hidden rounded-full ${skin.well}`}
+                >
+                  <MediaImg
+                    sizes="32px"
+                    src={picture}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover"
+                  />
+                </span>
+              )}
+              {category?.name ?? 'All'}
+            </Button>
+          )
+        })}
+      </div>
+      {shown.length > 0 ? (
+        <ul
+          id="shop-by-category-products"
+          role="tabpanel"
+          aria-busy={loading}
+          className={`mt-4 sm:mt-5 ${PRODUCT_GRID} transition-opacity duration-150 ${loading ? 'opacity-60' : ''}`}
+        >
+          {shown.slice(0, ROW_SIZE).map((product, index) => (
+            <ProductCard
+              key={product.id}
+              store={store}
+              product={product}
+              skin={skin}
+              className={ROW_VISIBILITY[index] ?? ''}
+            />
+          ))}
+        </ul>
+      ) : (
+        <p
+          id="shop-by-category-products"
+          role="tabpanel"
+          aria-busy={loading}
+          className={`mt-4 py-10 text-center text-sm sm:mt-5 ${skin.muted}`}
+        >
+          {loading ? 'Loading products…' : 'No products here yet.'}
+        </p>
+      )}
+    </Band>
   )
 }
 

@@ -111,7 +111,7 @@ export type HomepageSectionKey = (typeof HOMEPAGE_SECTION_KEYS)[number]
  */
 export const HOMEPAGE_SECTION_LAYOUTS = {
   banners: [],
-  categories: ['chips', 'tiles'],
+  categories: ['chips', 'tiles', 'pills', 'labels', 'tabs'],
   featured: ['spotlight', 'rail', 'grid'],
   newArrivals: ['rail', 'grid'],
   bestSellers: ['rail', 'grid'],
