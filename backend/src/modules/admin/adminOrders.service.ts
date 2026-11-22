@@ -51,7 +51,7 @@ function buildWhere(query: OrderListQuery | PaymentListQuery) {
   const where: Prisma.OrderWhereInput = {};
   if (query.q) {
     where.OR = [
-      { orderNumber: { contains: query.q, mode: "insensitive" } },
+      { orderNumber: { contains: query.q.replace(/^#/, ""), mode: "insensitive" } },
       { customerName: { contains: query.q, mode: "insensitive" } },
       { customerPhone: { contains: query.q } },
       { storeName: { contains: query.q, mode: "insensitive" } },

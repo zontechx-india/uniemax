@@ -85,7 +85,7 @@ Cashfree hosted checkout → redirects to return_url
 Details:
 
 - The `order_id` registered with Cashfree is our `orderNumber`
-  (e.g. `UM-MDL3X9K2-7QHT`); a **retry after an expired session** registers
+  (a random 8-digit number, e.g. `48203917`; older orders `UM-MDL3X9K2-7QHT`); a **retry after an expired session** registers
   `orderNumber~R<n>` because Cashfree order ids are one-shot. The latest one
   is stored in `Order.cfOrderId`.
 - `customer_details.customer_phone` is mandatory at Cashfree; when the

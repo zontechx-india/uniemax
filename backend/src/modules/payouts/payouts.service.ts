@@ -280,7 +280,7 @@ export async function listPayouts(query: PayoutListQuery) {
       { utr: { contains: query.q, mode: "insensitive" } },
       { senderName: { contains: query.q, mode: "insensitive" } },
       { hubPayoutId: { contains: query.q, mode: "insensitive" } },
-      { order: { orderNumber: { contains: query.q, mode: "insensitive" } } },
+      { order: { orderNumber: { contains: query.q.replace(/^#/, ""), mode: "insensitive" } } },
       { order: { storeName: { contains: query.q, mode: "insensitive" } } },
     ];
   }
@@ -329,7 +329,7 @@ export async function listAwaitingPayout(query: AwaitingPayoutQuery) {
   };
   if (query.q) {
     where.OR = [
-      { orderNumber: { contains: query.q, mode: "insensitive" } },
+      { orderNumber: { contains: query.q.replace(/^#/, ""), mode: "insensitive" } },
       { storeName: { contains: query.q, mode: "insensitive" } },
     ];
   }

@@ -300,7 +300,7 @@ export async function getOrCreatePaySession(
   return { paymentStatus: "PENDING", payment };
 }
 
-/** "UM-X" → 1 (first retry), "UM-X~R2" → 3. */
+/** "48203917" → 1 (first retry), "48203917~R2" → 3. */
 function nextAttempt(orderNumber: string, cfOrderId: string | null): number {
   if (!cfOrderId || cfOrderId === orderNumber) return cfOrderId ? 1 : 0;
   const match = /~R(\d+)$/.exec(cfOrderId);
@@ -559,7 +559,7 @@ export async function processWebhook(payload: WebhookPayload): Promise<void> {
 
   const cfOrderId = payload.data?.order?.order_id;
   if (!cfOrderId) return;
-  // "UM-X~R2" → "UM-X" (retry attempts share the underlying order).
+  // "48203917~R2" → "48203917" (retry attempts share the underlying order).
   const orderNumber = cfOrderId.split("~")[0]!;
   const order = await prisma.order.findUnique({
     where: { orderNumber },

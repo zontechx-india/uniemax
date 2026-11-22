@@ -9,7 +9,7 @@ import { Reveal } from './Reveal'
  * the details a chat has to drag out one message at a time.
  *
  * Illustration only (both panels are single images to assistive tech). The
- * order panel mirrors the real one: the `UM-…` order-number format, a store's
+ * order panel mirrors the real one: the 8-digit order-number format, a store's
  * statuses, Cash on Delivery, a pincode-checked delivery address.
  */
 export function ChatToOrder() {
@@ -38,7 +38,7 @@ export function ChatToOrder() {
         <Panel tone="after" caption="Customers pick the size, check delivery to their pincode and order. You just confirm.">
           <div role="img" aria-label="The same order as a UnieMax order card: item, size, delivery pincode and Cash on Delivery">
             <div className="flex items-center justify-between gap-3">
-              <span className="font-mono text-xs text-muted">UM-MG7K2QX4-R8TP</span>
+              <span className="font-mono text-xs text-muted">48203917</span>
               <span className="rounded-pill bg-warning/10 px-2.5 py-0.5 text-xs font-semibold text-warning">
                 Pending
               </span>

@@ -108,14 +108,25 @@ const FIELD_LABELS: Record<CheckoutFieldKey, string> = {
   country: "Country",
 };
 
-/** "UM-<time base36>-<4 random>" — short, unique enough, customer-friendly. */
-function newOrderNumber(): string {
-  const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-  let suffix = "";
-  for (let i = 0; i < 4; i += 1) {
-    suffix += alphabet[randomInt(alphabet.length)];
+/**
+ * A random 8-digit number ("48203917") — easy to read out on a call, carries
+ * no customer data, and does not reveal how many orders a store gets.
+ * Uniqueness comes from the `orderNumber` unique index: createOrder retries
+ * with a fresh number on a clash (see ORDER_NUMBER_ATTEMPTS). Orders placed
+ * before Nov 2026 keep their old "UM-…" numbers.
+ */
+export function newOrderNumber(): string {
+  return String(randomInt(10_000_000, 100_000_000));
+}
+
+/** 90 M numbers make a clash rare; a few fresh draws make it a non-issue. */
+const ORDER_NUMBER_ATTEMPTS = 5;
+
+function isOrderNumberConflict(err: unknown): boolean {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") {
+    return false;
   }
-  return `UM-${Date.now().toString(36).toUpperCase()}-${suffix}`;
+  return JSON.stringify(err.meta ?? {}).includes("orderNumber");
 }
 
 const orderSelect = {
@@ -659,93 +670,99 @@ export async function createOrder(
   const simulated =
     input.paymentMethod === "ONLINE" && !isProduction && !gatewayConfigured;
 
-  let row: OrderRow;
-  try {
-    row = await prisma.$transaction(async (tx) => {
-      // Guarded decrement: the WHERE re-checks stock inside the transaction,
-      // so two simultaneous orders can never oversell a variant.
-      for (const line of lines) {
-        const updated = await tx.storeProductVariant.updateMany({
-          where: {
-            id: line.stockVariantId,
-            stockQuantity: { gte: line.quantity },
-          },
-          data: { stockQuantity: { decrement: line.quantity } },
-        });
-        if (updated.count === 0) {
-          throw HttpError.conflict(
-            `"${line.productName}" just sold out — refresh your cart`,
-          );
+  let row!: OrderRow; // set by the loop below, which only exits with an order or a throw
+  for (let attempt = 1; !row; attempt += 1) {
+    const orderNumber = newOrderNumber();
+    try {
+      row = await prisma.$transaction(async (tx) => {
+        // Guarded decrement: the WHERE re-checks stock inside the transaction,
+        // so two simultaneous orders can never oversell a variant.
+        for (const line of lines) {
+          const updated = await tx.storeProductVariant.updateMany({
+            where: {
+              id: line.stockVariantId,
+              stockQuantity: { gte: line.quantity },
+            },
+            data: { stockQuantity: { decrement: line.quantity } },
+          });
+          if (updated.count === 0) {
+            throw HttpError.conflict(
+              `"${line.productName}" just sold out — refresh your cart`,
+            );
+          }
         }
-      }
-      for (const productId of new Set(lines.map((l) => l.productId))) {
-        await recomputeProductAggregates(productId, tx);
-      }
+        for (const productId of new Set(lines.map((l) => l.productId))) {
+          await recomputeProductAggregates(productId, tx);
+        }
 
-      const created = await tx.order.create({
-        data: {
-          orderNumber: newOrderNumber(),
-          storeId: store.id,
-          storeName: store.name,
-          storeSlug: store.slug,
-          customerId,
-          fulfilment: input.fulfilment,
-          customerName: input.customer.name,
-          customerPhone: input.customer.phone,
-          customerEmail: input.customer.email,
-          addressLine: withAddress ? input.customer.address : null,
-          pincode: withAddress ? input.customer.pincode : null,
-          state: withAddress ? input.customer.state : null,
-          country: withAddress ? input.customer.country : null,
-          billingAddress: billingAddress ?? Prisma.DbNull,
-          customFields: customAnswers.length
-            ? (customAnswers as unknown as Prisma.InputJsonValue)
-            : Prisma.DbNull,
-          subtotal: money.subtotal,
-          shippingCharge: money.shippingCharge,
-          shippingMethod: money.shippingMethod,
-          shippingBasis: money.shippingBasis as unknown as Prisma.InputJsonValue,
-          tax: money.tax,
-          discount: money.discount,
-          total: money.total,
-          // A gateway order isn't an order for the seller until it is paid.
-          status: viaGateway ? "AWAITING_PAYMENT" : "PENDING",
-          paymentMethod: input.paymentMethod,
-          paymentStatus: simulated ? "PAID" : "PENDING",
-          paymentRef: simulated ? "DEV-SIMULATED" : null,
-          affiliateRef: input.affiliateRef,
-          idempotencyKey: idempotencyKey ?? null,
-          items: {
-            create: lines.map((line) => ({
-              productId: line.productId,
-              variantId: line.variantId,
-              productName: line.productName,
-              variantName: line.variantName,
-              sku: line.sku,
-              productSlug: line.productSlug,
-              imageKey: line.imageKey,
-              unitPrice: line.unitPrice,
-              quantity: line.quantity,
-              lineTotal: line.lineTotal,
-            })),
+        const created = await tx.order.create({
+          data: {
+            orderNumber,
+            storeId: store.id,
+            storeName: store.name,
+            storeSlug: store.slug,
+            customerId,
+            fulfilment: input.fulfilment,
+            customerName: input.customer.name,
+            customerPhone: input.customer.phone,
+            customerEmail: input.customer.email,
+            addressLine: withAddress ? input.customer.address : null,
+            pincode: withAddress ? input.customer.pincode : null,
+            state: withAddress ? input.customer.state : null,
+            country: withAddress ? input.customer.country : null,
+            billingAddress: billingAddress ?? Prisma.DbNull,
+            customFields: customAnswers.length
+              ? (customAnswers as unknown as Prisma.InputJsonValue)
+              : Prisma.DbNull,
+            subtotal: money.subtotal,
+            shippingCharge: money.shippingCharge,
+            shippingMethod: money.shippingMethod,
+            shippingBasis: money.shippingBasis as unknown as Prisma.InputJsonValue,
+            tax: money.tax,
+            discount: money.discount,
+            total: money.total,
+            // A gateway order isn't an order for the seller until it is paid.
+            status: viaGateway ? "AWAITING_PAYMENT" : "PENDING",
+            paymentMethod: input.paymentMethod,
+            paymentStatus: simulated ? "PAID" : "PENDING",
+            paymentRef: simulated ? "DEV-SIMULATED" : null,
+            affiliateRef: input.affiliateRef,
+            idempotencyKey: idempotencyKey ?? null,
+            items: {
+              create: lines.map((line) => ({
+                productId: line.productId,
+                variantId: line.variantId,
+                productName: line.productName,
+                variantName: line.variantName,
+                sku: line.sku,
+                productSlug: line.productSlug,
+                imageKey: line.imageKey,
+                unitPrice: line.unitPrice,
+                quantity: line.quantity,
+                lineTotal: line.lineTotal,
+              })),
+            },
           },
-        },
-        select: orderSelect,
+          select: orderSelect,
+        });
+        // A package takes its part inside the same transaction (e.g. reserving
+        // a supplier's stock) — or refuses, rolling the whole placement back.
+        await runHooks("order.placing", tx, created.id);
+        return created;
       });
-      // A package takes its part inside the same transaction (e.g. reserving
-      // a supplier's stock) — or refuses, rolling the whole placement back.
-      await runHooks("order.placing", tx, created.id);
-      return created;
-    });
-  } catch (err) {
-    // Two requests with the same key raced past the replay check: the
-    // unique (customerId, idempotencyKey) index let exactly one commit and
-    // rolled this one back — stock decrement included. Answer with the winner.
-    if (idempotencyKey && isIdempotencyConflict(err)) {
-      const replay = await findIdempotentOrder(customerId, idempotencyKey);
-      if (replay) return replay;
+    } catch (err) {
+      // Two requests with the same key raced past the replay check: the
+      // unique (customerId, idempotencyKey) index let exactly one commit and
+      // rolled this one back — stock decrement included. Answer with the winner.
+      if (idempotencyKey && isIdempotencyConflict(err)) {
+        const replay = await findIdempotentOrder(customerId, idempotencyKey);
+        if (replay) return replay;
+      }
+      // The random number was already taken: the whole placement rolled back
+      // (stock included), so simply go again with a fresh number.
+      if (isOrderNumberConflict(err) && attempt < ORDER_NUMBER_ATTEMPTS) continue;
+      throw err;
     }
-    throw err;
   }
 
   // Gateway orders: register the Cashfree order and hand the session id to
@@ -958,7 +975,7 @@ export async function listStoreOrders(
   if (query.status) where.status = query.status;
   if (query.q) {
     where.OR = [
-      { orderNumber: { contains: query.q, mode: "insensitive" } },
+      { orderNumber: { contains: query.q.replace(/^#/, ""), mode: "insensitive" } },
       { customerName: { contains: query.q, mode: "insensitive" } },
       { customerPhone: { contains: query.q } },
     ];

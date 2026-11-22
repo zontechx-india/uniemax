@@ -2106,7 +2106,7 @@ keys, the pre-gateway behavior holds: dev **simulates** (instantly `PAID`,
 
 Response: the full order —
 ```jsonc
-{ "id", "orderNumber",              // e.g. "UM-MDL3X9K2-7QHT"
+{ "id", "orderNumber",              // random 8 digits, e.g. "48203917" (orders before Nov 2026: "UM-MDL3X9K2-7QHT")
   "status": "PENDING",             // "AWAITING_PAYMENT" for a gateway order until paid
   "storeName", "storeSlug",
   "fulfilment", "customerName", "customerPhone", "customerEmail",
@@ -2131,7 +2131,7 @@ Response: the full order —
   "shipments": [],                  // parcels — shape under "Parcels" (Customer Stores)
   "payment": {                      // ONLY on a gateway ONLINE placement —
     "paymentSessionId": "session_…",// feed to the Cashfree web SDK checkout()
-    "cfOrderId": "UM-…",            // the order id registered with Cashfree
+    "cfOrderId": "48203917",            // the order id registered with Cashfree
     "mode": "sandbox"               // sandbox | production (SDK load mode)
   }                                 // null on COD / simulated placements
 }
@@ -3053,7 +3053,7 @@ The last 30 days plus the number's health from Meta (cached 5 min):
 #### `POST /api/v1/admin/whatsapp/send-template` 🔒 admin
 ```jsonc
 { "to": "+919876543210", "templateName": "order_update", "languageCode": "en",
-  "bodyParams": ["Asha", "UM-1042"],          // {{1}}… in order (≤ 50)
+  "bodyParams": ["Asha", "48203917"],          // {{1}}… in order (≤ 50)
   "buttonParams": ["sabse-kart/products"],    // one per dynamic URL button — the part after its fixed prefix
   "header": { "type": "image", "link": "https://…" } }   // required iff the template has a media header; else null
 ```
@@ -3327,7 +3327,7 @@ Shared shapes:
 ```jsonc
 // Commission — one per order line
 { "id": "…", "storeId": "…", "storeName": "ABC Fashion", "orderId": "…",
-  "orderNumber": "UM-…", "productName": "Premium Jacket", "lineTotal": 2499,
+  "orderNumber": "48203917", "productName": "Premium Jacket", "lineTotal": 2499,
   "commissionType": "PERCENTAGE",     // PERCENTAGE | FIXED (snapshot)
   "commissionRate": 10, "amount": 249.9,
   "status": "PENDING",                // PENDING | APPROVED | PAID | CANCELLED | REVERSED | REJECTED

@@ -316,7 +316,7 @@ It may take a few hours to show in your bank account. Tap below to see all your 
     params: [
       p(1, 'sellerName', 'Seller name', 'Ravi'),
       p(2, 'amountSent', 'Amount sent (number only)', '1,349.10'),
-      p(3, 'orderId', 'Order number (no #)', 'UM-1002'),
+      p(3, 'orderId', 'Order number (no #)', '48203917'),
       p(4, 'storeName', 'Store name', 'Fashion Hub'),
       p(5, 'orderTotal', 'Order total (number only)', '1,499.00'),
       p(6, 'platformFee', 'Platform fee (number only)', '149.90'),
@@ -359,7 +359,7 @@ It may take a few hours to show in your bank account. Tap below to see all your 
     params: [
       p(1, 'sellerName', 'Seller name', 'Ravi'),
       p(2, 'amountSent', 'Amount sent (number only)', '1,349.10'),
-      p(3, 'orderId', 'Order number (no #)', 'UM-1002'),
+      p(3, 'orderId', 'Order number (no #)', '48203917'),
       p(4, 'storeName', 'Store name', 'Fashion Hub'),
       p(5, 'orderTotal', 'Order total (number only)', '1,499.00'),
       p(6, 'platformFee', 'Platform fee (number only)', '149.90'),

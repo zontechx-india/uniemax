@@ -609,7 +609,7 @@ export async function getSellerTransactions(storeId: string, query: TransactionL
           ...(query.to ? { lt: new Date(indiaDateTime(query.to).at.getTime() + 24 * 60 * 60 * 1000) } : {}),
         }
       : undefined;
-  // Sellers often type "#UM-…" — the order number itself has no "#".
+  // Sellers often type "#48203917" — the order number itself has no "#".
   const q = query.q?.replace(/^#+/, "").trim() || null;
   const where: Prisma.OrderWhereInput = {
     storeId,

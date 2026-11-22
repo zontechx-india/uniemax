@@ -45,7 +45,7 @@ export function HeroVisual() {
               <span className="shrink-0 text-[11px] font-normal text-muted">now</span>
             </p>
             <p className="mt-0.5 text-[12px] leading-snug text-muted">
-              UM-MG7K2QX4-R8TP — 1 item, {rupees(HERO_PRODUCT.price)}. Confirm it to get started.
+              48203917 — 1 item, {rupees(HERO_PRODUCT.price)}. Confirm it to get started.
             </p>
           </div>
         </div>
@@ -116,7 +116,7 @@ export function OrderStatusVisual() {
   return (
     <div aria-hidden="true" className="rounded-xl border border-line bg-surface p-4">
       <div className="flex items-center justify-between gap-3">
-        <span className="font-mono text-xs text-muted">UM-MG7K2QX4-R8TP</span>
+        <span className="font-mono text-xs text-muted">48203917</span>
         <span className="text-xs font-semibold text-fg">{rupees(HERO_PRODUCT.price)}</span>
       </div>
       <ol className="mt-4 grid grid-cols-5">

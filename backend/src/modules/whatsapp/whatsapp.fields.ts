@@ -34,7 +34,7 @@ export const FIELD_CATALOGUE = {
   ],
   /** Order automations add these to the seller fields. */
   orders: [
-    { key: "order_number", label: "Order number", example: "UM-1042" },
+    { key: "order_number", label: "Order number", example: "48203917" },
     { key: "order_total", label: "Order total", example: "₹1,250" },
     { key: "customer_name", label: "Customer name", example: "Priya" },
   ],
