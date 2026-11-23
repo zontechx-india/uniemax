@@ -789,7 +789,11 @@ One list, **three presentations**:
   never blends into the white cards scrolling under it. Only the bar takes
   taps (the band is `pointer-events-none`). Icon **and** word — **Home** (Dashboard) ·
   **Orders** (pending badge) · **Products** · **Design** (Store Builder) ·
-  **More**. More (highlighted when you are on one of its sections — it keeps the word "More"; a section name was cut to "Categori…") opens
+  **More**. The chosen tab's icon sits on a solid ink pill (`bg-fg`, icon
+  `text-surface`, label `text-fg`; flipped in dark mode) — the same look as
+  `SegmentedControl`. `shared/ui/useSlidingPill.ts` slides that one pill to
+  a new tab with the same rubber stretch + squash (Web Animations API) and
+  makes the tapped icon hop once; "reduce motion" turns both off. More (highlighted when you are on one of its sections — it keeps the word "More"; a section name was cut to "Categori…") opens
   a `Dialog` sheet with `SectionSheetList` — every group flat and open, 52px
   rows — plus "Switch to another shop". Tabs a mode cannot open (admin hidden
   sections) are dropped. Section links (tabs, More, the desktop sidebar and
@@ -939,12 +943,14 @@ rows add "They can still pay. A quick call often helps." above the buttons,
 and their WhatsApp text says the order "is waiting for payment" instead of
 "was not paid":
 
-- **List** — `PageHeader`, then status chips (All + the six statuses in
+- **List** — `PageHeader`, then the status filter (All + the six statuses in
   plain words — Waiting · Confirmed · Packed · Sent · Delivered · Cancelled —
-  44px pills in one sideways-scrolling row with a right-edge fade,
+  the shared `SegmentedControl` with `equal={false}` (cells as wide as their
+  label) and `draggable={false}` (a swipe scrolls the row), 44px cells on a
+  phone / 36px from `sm`, in one sideways-scrolling row with a right-edge fade,
   deep-linkable via `?status=` so dashboard tiles land pre-filtered; counts
   from the layout's dashboard stats where it has them: All, Waiting (orange
-  badge), Sent, Delivered, Cancelled), a 48px debounced search (order number
+  `pending-soft` pill), Sent, Delivered, Cancelled), a 48px debounced search (order number
   / customer name / phone), newest first, server-paginated with "Show more
   orders"; card skeletons while loading, an `EmptyState` when empty. Status
   pills are `OrderStatusChip` → `StatusPill` tones (Waiting = pending
@@ -2311,8 +2317,8 @@ is never shown a pickup-address item.
   a live shop shows a **Live** status pill — not a button: closing the shop
   lives on the store page (`StorePublishCard`, which asks first), not beside
   the design tools; an unpublished one shows **Publish** with the blockers as
-  links. Below `lg` one column is switched with a 40px **Change / Preview my
-  shop** toggle; both columns are `w-full` there (without it the preview
+  links. Below `lg` one column is switched with a full-width 44px **Change /
+  Preview my shop** toggle (the shared `SegmentedControl`); both columns are `w-full` there (without it the preview
   column shrank to 0 and the frame scaled to nothing), and the preview scale
   never drops below 0.3. Back buttons are 44px.
 
@@ -2941,7 +2947,8 @@ apps use ONE component kit (docs/DESIGN_GUIDELINES.md §7):
 | `Card.tsx` | THE card (flat surface, 1px border, 12px corners, no shadow) + `CardHeader` |
 | `states.tsx` | `Skeleton`, `PageSkeleton`, `EmptyState` (flat icon chip, optional steps/action), `ErrorState` (message + Try again) — no bare "Loading…" |
 | `ModalShell.tsx` | THE modal base: portal (or `portal={false}` for storefront modals that must keep the shop's colours), flat `--overlay-soft`, Escape / backdrop close (switchable), scroll lock, focus trap + return, placements `sheet` · `center` · `drawer-left` · `drawer-right` · `fullscreen`; `ModalClose` (44px) |
-| `SegmentedControl.tsx` | Switch on a white `surface` track with a border (like the cards and buttons beside it); the chosen cell is a solid ink fill (`bg-fg`) with `text-surface` — near-black with white text in light mode, flipped in dark mode; neutral, so it suits any store colour (a chosen count pill is `bg-surface/20 text-surface`). A "rubber" thumb: on tap it stretches over both cells then lands with a small squash; it can be dragged and flicked; jumps when "reduce motion" is on. Native radios inside `<label>` cells (arrow keys, screen readers). Equal-width cells; `renderOption(option, active)` draws each option twice (inactive under, active copy clipped to the thumb), so colour changes exactly where the thumb is. Adapted from the RubberSegment library code without its `motion` dependency (`requestAnimationFrame`). Used by Orders → Leads |
+| `SegmentedControl.tsx` | Switch on a white `surface` track with a border (like the cards and buttons beside it); the chosen cell is a solid ink fill (`bg-fg`) with `text-surface` — near-black with white text in light mode, flipped in dark mode; neutral, so it suits any store colour (a chosen count pill is `bg-surface/20 text-surface`). A "rubber" thumb: on tap it stretches over both cells then lands with a small squash; it can be dragged and flicked; jumps when "reduce motion" is on. Native radios inside `<label>` cells (arrow keys, screen readers). Equal-width cells by default; `equal={false}` sizes each cell to its content (many options in a scrolling row) and `draggable={false}` lets a swipe scroll that row. `renderOption(option, active)` draws each option twice (inactive under, active copy clipped to the thumb and given the cells' measured widths), so colour changes exactly where the thumb is. Adapted from the RubberSegment library code without its `motion` dependency (`requestAnimationFrame`). Used by Orders → status filter, Orders → Leads and the Store Builder's phone Change / Preview switch |
+| `useSlidingPill.ts` | Hook for a highlight pill that slides between targets with the `SegmentedControl` rubber feel (stretch over both, land with a squash) and `hop(key)` to bounce a target's icon once; Web Animations API, nothing per-frame in React; off with "reduce motion". Used by the seller phone tab bar (`StoreMobileNav`) |
 | `Dialog.tsx` / `ConfirmDialog.tsx` | Content dialog and two-button question, both on `ModalShell`. `Dialog fill` (with `flush`) is full height with a non-scrolling body, for content with its own scrolling columns |
 | `Toast.tsx` | `showToast()` + `ToastHost`, `TOAST_CLASS` (flat, bordered) |
 

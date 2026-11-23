@@ -25,7 +25,7 @@ import { useReducedMotion } from '../../packages/animations/hooks'
  * to the thumb's edges. So a label turns from muted to white exactly where
  * the thumb passes. A fourth element draws the thumb's soft shadow.
  * `renderOption(option, active)` draws both copies (labels with count pills,
- * say); the cells are equal width, so both copies line up.
+ * say); the copy takes the cells' measured widths, so both line up.
  */
 
 export interface SegmentOption<T extends string> {
@@ -94,6 +94,7 @@ export function SegmentedControl<T extends string>({
   renderOption,
   cellClassName = 'min-h-9 gap-2 px-3',
   className = 'w-fit',
+  equal = true,
   draggable = true,
   disabled = false,
 }: {
@@ -106,8 +107,17 @@ export function SegmentedControl<T extends string>({
   renderOption?: (option: SegmentOption<T>, active: boolean) => ReactNode
   /** Size and inner layout of each cell (height, padding, direction, gap). */
   cellClassName?: string
-  /** Width of the whole control — `w-fit` (default) or `w-full sm:w-fit`. */
+  /** Width of the whole control — `w-fit` (default), `w-full sm:w-fit`, `w-max`. */
   className?: string
+  /**
+   * Equal-width cells (default). False: each cell as wide as its content —
+   * for many options in a sideways-scrolling row.
+   */
+  equal?: boolean
+  /**
+   * Drag / flick the thumb (default). Turn off inside a row that scrolls
+   * sideways, so a swipe scrolls the row instead of grabbing the thumb.
+   */
   draggable?: boolean
   disabled?: boolean
 }) {
@@ -191,6 +201,11 @@ export function SegmentedControl<T extends string>({
       return { l: r.left - left, r: r.right - left }
     })
     width.current = track.clientWidth - INSET * 2
+    // The chosen-look copy takes the cells' exact widths, so it lines up
+    // even when the cells are content-sized (`equal` off).
+    if (overlayRef.current) {
+      overlayRef.current.style.gridTemplateColumns = slots.current.map((s) => `${s.r - s.l}px`).join(' ')
+    }
     const first = cellRefs.current[0]
     if (first) radius.current = parseFloat(getComputedStyle(first).borderTopLeftRadius) || 8
     jumpTo(committed.current)
@@ -375,7 +390,7 @@ export function SegmentedControl<T extends string>({
       aria-label={label}
       aria-disabled={disabled || undefined}
       data-draggable={draggable && !disabled ? '' : undefined}
-      className={`group relative grid touch-pan-y auto-cols-[minmax(0,1fr)] grid-flow-col gap-0.5 rounded-lg border border-line bg-surface p-0.5 select-none [-webkit-tap-highlight-color:transparent] data-[held]:cursor-grabbing aria-disabled:pointer-events-none aria-disabled:opacity-50 ${className}`}
+      className={`group relative grid ${draggable ? 'touch-pan-y' : ''} ${equal ? 'auto-cols-[minmax(0,1fr)]' : 'auto-cols-max'} grid-flow-col gap-0.5 rounded-lg border border-line bg-surface p-0.5 select-none [-webkit-tap-highlight-color:transparent] data-[held]:cursor-grabbing aria-disabled:pointer-events-none aria-disabled:opacity-50 ${className}`}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
@@ -415,7 +430,7 @@ export function SegmentedControl<T extends string>({
         ref={overlayRef}
         aria-hidden
         style={{ clipPath: 'inset(0 100% 0 0)' }}
-        className="pointer-events-none absolute inset-0.5 grid auto-cols-[minmax(0,1fr)] grid-flow-col gap-0.5 rounded-md bg-fg text-surface"
+        className="pointer-events-none absolute inset-0.5 grid grid-flow-col gap-0.5 rounded-md bg-fg text-surface"
       >
         {options.map((option) => (
           <span key={option.value} className={cell}>

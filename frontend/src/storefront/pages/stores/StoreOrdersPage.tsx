@@ -4,6 +4,7 @@ import { toApiError } from '../../../shared/auth/http'
 import type { ListMeta } from '../../../shared/auth/http'
 import { buttonClass } from '../../../shared/ui/Button'
 import { ErrorNote } from '../../../shared/ui/form'
+import { SegmentedControl } from '../../../shared/ui/SegmentedControl'
 import { sellerOrderApi } from '../../features/stores/storesApi'
 import type {
   OrderStatus,
@@ -24,10 +25,10 @@ import { PageHeader } from './ui/PageHeader'
  * number / customer name / phone. Server-paginated with Load More; a card
  * opens the order's detail page where the status actions live.
  *
- * The status chips are 44px pills in one sideways-scrolling row (a fade on
- * the right says there are more), carrying the counts the layout's
- * dashboard fetch already knows — "Waiting 3" is the number a seller opens
- * this page for.
+ * The status filter is the shared SegmentedControl in one sideways-scrolling
+ * row (a fade on the right says there are more), carrying the counts the
+ * layout's dashboard fetch already knows — "Waiting 3" is the number a
+ * seller opens this page for.
  */
 
 const PAGE_SIZE = 20
@@ -181,41 +182,45 @@ export function StoreOrdersPage() {
     <div className="space-y-4">
       {header}
 
-      {/* Status chips — one row that scrolls sideways on a phone. */}
+      {/*
+        Status — the shared SegmentedControl (same look as Leads), cells as
+        wide as their label, in one row that scrolls sideways on a phone (a
+        fade on the right says there are more). No thumb dragging here, so a
+        swipe scrolls the row.
+      */}
       <div className="-mx-4 [mask-image:linear-gradient(to_right,#000_88%,transparent)] sm:mx-0 sm:[mask-image:none]">
-        <div
-          role="group"
-          aria-label="Show orders"
-          className="flex gap-2 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:flex-wrap sm:px-0"
-        >
-          {STATUS_TABS.map(({ key, label }) => {
-            const on = status === key
-            const count = countFor(key, dashboard?.stats)
-            return (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={on}
-                onClick={() => setStatus(key)}
-                className={`inline-flex min-h-tap shrink-0 items-center gap-1.5 rounded-pill border px-4 text-sm font-semibold transition ${
-                  on
-                    ? 'border-brand bg-brand text-brand-contrast'
-                    : 'border-line bg-surface/70 text-fg hover:border-brand/50'
-                }`}
-              >
-                {label}
-                {count !== null && count > 0 && (
-                  <span
-                    className={`rounded-pill px-1.5 text-xs font-bold ${
-                      on ? 'bg-brand-contrast/20' : key === 'PENDING' ? 'bg-pending text-brand-contrast' : 'bg-fg/8 text-muted'
-                    }`}
-                  >
-                    {count}
-                  </span>
-                )}
-              </button>
-            )
-          })}
+        <div className="overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:px-0">
+          <SegmentedControl
+            label="Show orders"
+            options={STATUS_TABS.map(({ key, label }) => ({ value: key, label }))}
+            value={status}
+            onChange={setStatus}
+            equal={false}
+            draggable={false}
+            className="w-max"
+            cellClassName="min-h-tap gap-1.5 px-3.5 sm:min-h-9"
+            renderOption={(option, on) => {
+              const count = countFor(option.value, dashboard?.stats)
+              return (
+                <>
+                  <span className={`text-sm ${on ? 'font-semibold' : 'font-medium'}`}>{option.label}</span>
+                  {count !== null && count > 0 && (
+                    <span
+                      className={`inline-grid h-5 min-w-5 place-items-center rounded-pill px-1.5 font-figure text-xs leading-none font-semibold tabular-nums ${
+                        option.value === 'PENDING'
+                          ? 'bg-pending-soft text-pending'
+                          : on
+                            ? 'bg-surface/20 text-surface'
+                            : 'bg-fg/6 text-muted'
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </>
+              )
+            }}
+          />
         </div>
       </div>
 

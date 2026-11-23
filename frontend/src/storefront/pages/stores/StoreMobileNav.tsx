@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ComponentType } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { Dialog } from '../../../shared/ui/Dialog'
+import { useSlidingPill } from '../../../shared/ui/useSlidingPill'
 import { useStoreManageScope } from '../../features/stores/storeManageScope'
 import {
   BoxIcon,
@@ -31,6 +32,11 @@ import type { NavData } from './StoreSectionNav'
  * sections sellers open most (Orders, Products) plus the two places they
  * start from (Home = Dashboard, Design = Store Builder). Every tab is an icon
  * WITH a word — an icon alone asks a seller to guess.
+ *
+ * The chosen tab's icon sits on a solid ink pill (`bg-fg`, white icon —
+ * flipped in dark mode), the same look as the `SegmentedControl` tabs. The
+ * pill SLIDES to a new tab with the same rubber stretch, and the tapped icon
+ * hops once (`useSlidingPill`); "reduce motion" turns both off.
  *
  * The bar is `fixed`, so it must never render inside a transformed or filtered panel (a
  * `backdrop-filter` ancestor would trap it); the layout mounts it at its root.
@@ -62,6 +68,8 @@ export function StoreMobileNav({
   const tabs = TABS.filter((tab) => available.has(tab.to))
   const toShip = groups.flatMap((g) => g.items).find((i) => i.to === 'orders-to-ship')?.count ?? 0
   const onMore = !tabs.some((tab) => tab.to === active.item.to)
+  const activeKey = onMore ? 'more' : active.item.to
+  const pill = useSlidingPill(activeKey)
 
   return (
     <>
@@ -72,20 +80,29 @@ export function StoreMobileNav({
         // card. Only the bar itself takes taps.
         className="pointer-events-none fixed inset-x-0 bottom-0 z-30 bg-bg/95 px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] lg:hidden"
       >
-        <div className="ws-dock pointer-events-auto mx-auto grid max-w-md grid-cols-5 gap-1 rounded-sheet p-1.5">
+        <div
+          ref={pill.containerRef}
+          className="ws-dock pointer-events-auto relative mx-auto grid max-w-md grid-cols-5 gap-1 rounded-sheet p-1.5"
+        >
+          {/* The chosen tab's pill — moved by useSlidingPill, under the icons. */}
+          <span ref={pill.pillRef} aria-hidden className="pointer-events-none absolute rounded-pill bg-fg opacity-0" />
           {tabs.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
               end={to === '.'}
               {...sectionLink(to)}
-              className={({ isActive }) =>
-                `group/tab flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-2xl text-xs font-semibold transition-colors ${
-                  isActive ? 'text-brand' : 'text-muted hover:text-fg'
-                }`
-              }
+              onClick={() => pill.hop(to)}
+              className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-2xl text-xs font-semibold transition-colors ${
+                activeKey === to ? 'text-fg' : 'text-muted hover:text-fg'
+              }`}
             >
-              <span className="relative flex h-7 w-12 items-center justify-center rounded-pill transition-colors group-aria-[current=page]/tab:bg-brand-soft">
+              <span
+                ref={pill.target(to)}
+                className={`relative flex h-7 w-12 items-center justify-center rounded-pill transition-colors duration-200 ${
+                  activeKey === to ? 'text-surface' : ''
+                }`}
+              >
                 <Icon className="h-[22px] w-[22px]" />
                 {to === 'orders' && data.pendingOrders > 0 && (
                   <OrderBadge count={data.pendingOrders} className="absolute -top-1.5 right-0" />
@@ -100,15 +117,19 @@ export function StoreMobileNav({
 
           <button
             type="button"
-            onClick={() => setMoreOpen(true)}
+            onClick={() => {
+              pill.hop('more')
+              setMoreOpen(true)
+            }}
             aria-haspopup="dialog"
             className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-2xl text-xs font-semibold transition-colors ${
-              onMore ? 'text-brand' : 'text-muted hover:text-fg'
+              onMore ? 'text-fg' : 'text-muted hover:text-fg'
             }`}
           >
             <span
-              className={`flex h-7 w-12 items-center justify-center rounded-pill ${
-                onMore ? 'bg-brand-soft' : ''
+              ref={pill.target('more')}
+              className={`relative flex h-7 w-12 items-center justify-center rounded-pill transition-colors duration-200 ${
+                onMore ? 'text-surface' : ''
               }`}
             >
               <DotsIcon className="h-[22px] w-[22px]" />

@@ -39,6 +39,7 @@ import { BuilderSectionEditor } from './BuilderSectionEditor'
 import { BuilderSectionList } from './BuilderSectionList'
 import type { BuilderTarget } from './BuilderSectionList'
 import { BUILDER_SECTIONS } from './builderSections'
+import { SegmentedControl } from '../../../../shared/ui/SegmentedControl'
 import { PageSkeleton } from '../../../../shared/ui/states'
 import { showToast } from '../ui/Toast'
 import { useUnsavedChangesGuard } from '../ui/useUnsavedChangesGuard'
@@ -537,25 +538,19 @@ function Builder({
         saveError={saveError}
       />
 
-      {/* Below `lg`: one column, switched. */}
+      {/* Below `lg`: one column, switched — the shared SegmentedControl. */}
       <div className="shrink-0 border-b border-line bg-surface px-3 py-2 lg:hidden">
-        <div className="flex rounded-md border border-line p-0.5">
-          {(['edit', 'preview'] as const).map((view) => (
-            <button
-              key={view}
-              type="button"
-              onClick={() => setMobileView(view)}
-              aria-pressed={mobileView === view}
-              className={`h-tap flex-1 rounded-lg text-sm font-semibold transition-colors ${
-                mobileView === view
-                  ? 'bg-brand text-brand-contrast'
-                  : 'text-muted hover:text-fg'
-              }`}
-            >
-              {view === 'edit' ? 'Change' : 'Preview my shop'}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Change or preview your shop"
+          options={[
+            { value: 'edit', label: 'Change' },
+            { value: 'preview', label: 'Preview my shop' },
+          ]}
+          value={mobileView}
+          onChange={setMobileView}
+          className="w-full"
+          cellClassName="min-h-tap px-3"
+        />
       </div>
 
       <div className="flex min-h-0 flex-1 lg:grid lg:grid-cols-[minmax(320px,380px)_1fr]">
