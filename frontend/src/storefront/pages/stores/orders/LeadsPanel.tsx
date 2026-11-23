@@ -385,7 +385,7 @@ function KindSwitch({
             </span>
             <span
               className={`inline-grid h-5 min-w-5 place-items-center rounded-pill px-1.5 font-figure text-xs leading-none font-semibold tabular-nums ${
-                alert ? 'bg-pending-soft text-pending' : on ? 'bg-fg/8 text-fg' : 'bg-fg/6 text-muted'
+                alert ? 'bg-pending-soft text-pending' : on ? 'bg-surface/20 text-surface' : 'bg-fg/6 text-muted'
               }`}
             >
               {count === undefined ? '–' : count}

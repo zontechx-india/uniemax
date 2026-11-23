@@ -3,9 +3,9 @@ import type { MouseEvent, PointerEvent, ReactNode } from 'react'
 import { useReducedMotion } from '../../packages/animations/hooks'
 
 /**
- * A segmented control with a "rubber" thumb — the ADMIN_UI_THEME §7.5 `segc`
- * look (neutral `surface-alt` track, the chosen cell a raised `surface` pane
- * in the text colour, never a brand fill), with motion:
+ * A segmented control with a "rubber" thumb: a white `surface` track with a
+ * border (like the cards and buttons around it); the chosen cell a solid
+ * ink fill (`fg`) with white (`surface`) text — flipped in dark mode.
  *
  *   - Tap another cell: the thumb first stretches over both cells, then the
  *     far edge lands and the near edge follows with a small squash.
@@ -22,8 +22,8 @@ import { useReducedMotion } from '../../packages/animations/hooks'
  *
  * How the colour changes under the thumb: every option is drawn twice — the
  * labels (inactive look) and, above them, a copy in the active look clipped
- * to the thumb's edges. So a label turns from muted to full ink exactly where
- * the thumb passes. A third element behind both draws the thumb's shadow.
+ * to the thumb's edges. So a label turns from muted to white exactly where
+ * the thumb passes. A fourth element draws the thumb's soft shadow.
  * `renderOption(option, active)` draws both copies (labels with count pills,
  * say); the cells are equal width, so both copies line up.
  */
@@ -375,19 +375,12 @@ export function SegmentedControl<T extends string>({
       aria-label={label}
       aria-disabled={disabled || undefined}
       data-draggable={draggable && !disabled ? '' : undefined}
-      className={`group relative grid touch-pan-y auto-cols-[minmax(0,1fr)] grid-flow-col gap-0.5 rounded-lg border border-line bg-surface-alt p-0.5 select-none [-webkit-tap-highlight-color:transparent] data-[held]:cursor-grabbing aria-disabled:pointer-events-none aria-disabled:opacity-50 ${className}`}
+      className={`group relative grid touch-pan-y auto-cols-[minmax(0,1fr)] grid-flow-col gap-0.5 rounded-lg border border-line bg-surface p-0.5 select-none [-webkit-tap-highlight-color:transparent] data-[held]:cursor-grabbing aria-disabled:pointer-events-none aria-disabled:opacity-50 ${className}`}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
       onLostPointerCapture={onPointerCancel}
     >
-      {/* The thumb's raised pane + shadow, behind the labels. */}
-      <div
-        ref={shadowRef}
-        aria-hidden
-        className="pointer-events-none absolute top-0.5 bottom-0.5 left-0.5 w-0 rounded-md bg-surface shadow-xs"
-      />
-
       {options.map((option, i) => (
         <label
           key={option.value}
@@ -412,12 +405,17 @@ export function SegmentedControl<T extends string>({
         </label>
       ))}
 
-      {/* The chosen look, clipped to the thumb. */}
+      {/*
+        The chosen look, clipped to the thumb: a solid ink fill with the
+        surface colour as text — near-black with white text in light mode,
+        flipped in dark mode. Neutral on purpose: it sits well beside any
+        store colour.
+      */}
       <div
         ref={overlayRef}
         aria-hidden
         style={{ clipPath: 'inset(0 100% 0 0)' }}
-        className="pointer-events-none absolute inset-0.5 grid auto-cols-[minmax(0,1fr)] grid-flow-col gap-0.5 rounded-md bg-surface text-fg"
+        className="pointer-events-none absolute inset-0.5 grid auto-cols-[minmax(0,1fr)] grid-flow-col gap-0.5 rounded-md bg-fg text-surface"
       >
         {options.map((option) => (
           <span key={option.value} className={cell}>
@@ -425,6 +423,13 @@ export function SegmentedControl<T extends string>({
           </span>
         ))}
       </div>
+
+      {/* The thumb's soft shadow, above the track — follows the same edges. */}
+      <div
+        ref={shadowRef}
+        aria-hidden
+        className="pointer-events-none absolute top-0.5 bottom-0.5 left-0.5 w-0 rounded-md shadow-xs"
+      />
     </div>
   )
 }
