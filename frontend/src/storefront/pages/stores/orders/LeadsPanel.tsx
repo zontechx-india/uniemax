@@ -1,8 +1,9 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { toApiError } from '../../../../shared/auth/http'
 import { MediaImg } from '../../../../shared/media/MediaImg'
 import { Button, buttonClass } from '../../../../shared/ui/Button'
+import { SegmentedControl } from '../../../../shared/ui/SegmentedControl'
 import { ErrorNote } from '../../../../shared/ui/form'
 import { storeLeadsApi } from '../../../features/stores/storesApi'
 import type { CartLead, LeadItem, LeadKind, PaymentLead, StoreLeads } from '../../../features/stores/storesApi'
@@ -348,15 +349,14 @@ function Items({ items }: { items: LeadItem[] }) {
 }
 
 /**
- * Not paid · In cart now · Left in cart — a segmented control with counts
- * (ADMIN_UI_THEME §7.5 `segc`, native radios). A neutral track; the chosen
- * cell is a raised white pane in the text colour, never a brand fill, so the
- * screen's colour stays on the content. Each count is a small pill — tinted
- * pending when unpaid checkouts are waiting, the one count worth acting on.
+ * Not paid · In cart now · Left in cart — the shared `SegmentedControl`
+ * (rubber thumb: stretches on tap, can be dragged or flicked on a phone).
+ * Each count is a small pill — tinted pending when unpaid checkouts are
+ * waiting, the one count worth acting on.
  *
- * Phone: three equal cells, the count under the label (a label and a pill
- * side by side do not fit a third of a phone). From sm: the control sizes to
- * its content with the count beside the label.
+ * Phone: three equal cells across the width, the count under the label (a
+ * label and a pill side by side do not fit a third of a phone). From sm: the
+ * control sizes to its content with the count beside the label.
  */
 function KindSwitch({
   value,
@@ -367,27 +367,21 @@ function KindSwitch({
   counts: StoreLeads['counts'] | null
   onChange: (kind: LeadKind) => void
 }) {
-  const name = useId()
   return (
-    <div
-      role="radiogroup"
-      aria-label="Kind of lead"
-      className="grid grid-cols-3 gap-0.5 rounded-lg border border-line bg-surface-alt p-0.5 sm:inline-flex"
-    >
-      {KINDS.map((k) => {
-        const on = k.key === value
-        const count = counts?.[k.key]
-        const alert = k.key === 'PAYMENT_PENDING' && (count ?? 0) > 0
+    <SegmentedControl
+      label="Kind of lead"
+      options={KINDS.map((k) => ({ value: k.key, label: k.label }))}
+      value={value}
+      onChange={onChange}
+      className="w-full sm:w-fit"
+      cellClassName="min-h-tap flex-col gap-1 px-1.5 py-1.5 sm:min-h-9 sm:flex-row sm:gap-2 sm:px-3 sm:py-0"
+      renderOption={(option, on) => {
+        const count = counts?.[option.value]
+        const alert = option.value === 'PAYMENT_PENDING' && (count ?? 0) > 0
         return (
-          <label
-            key={k.key}
-            className={`flex min-h-tap cursor-pointer flex-col items-center justify-center gap-1 rounded-md px-1.5 py-1.5 text-center transition-[background-color,color,box-shadow] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent/40 sm:min-h-9 sm:flex-row sm:gap-2 sm:px-3 sm:py-0 ${
-              on ? 'bg-surface text-fg shadow-xs' : 'text-muted hover:text-fg'
-            }`}
-          >
-            <input type="radio" name={name} value={k.key} checked={on} onChange={() => onChange(k.key)} className="sr-only" />
+          <>
             <span className={`text-xs leading-tight whitespace-nowrap sm:text-sm ${on ? 'font-semibold' : 'font-medium'}`}>
-              {k.label}
+              {option.label}
             </span>
             <span
               className={`inline-grid h-5 min-w-5 place-items-center rounded-pill px-1.5 font-figure text-xs leading-none font-semibold tabular-nums ${
@@ -396,9 +390,9 @@ function KindSwitch({
             >
               {count === undefined ? '–' : count}
             </span>
-          </label>
+          </>
         )
-      })}
-    </div>
+      }}
+    />
   )
 }

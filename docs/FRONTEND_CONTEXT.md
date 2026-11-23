@@ -908,11 +908,10 @@ Leads** (`OrdersTabs`, links, `?tab=leads`; two equal halves on a phone,
 content-width from `sm`; the active tab is semibold with a 2px brand line).
 **Leads** (`orders/LeadsPanel.tsx` over `GET /stores/:id/leads`) has a
 segmented control with counts — Not paid · In cart now · Left in cart
-(`?lead=`) — in the console `segc` style: a neutral `surface-alt` track, the
-chosen cell a raised `surface` pane in the text colour (no brand fill), each
-count a small pill (pending-tinted on Not paid when above 0); three equal
-cells with the count under the label on a phone, content-width with the
-count beside the label from `sm`. On Not paid and Left in cart, a **date
+(`?lead=`) — the shared `SegmentedControl` (rubber thumb, see the shared UI
+table), each count a small pill (pending-tinted on Not paid when above 0);
+three equal cells across the width with the count under the label on a
+phone, content-width with the count beside the label from `sm`. On Not paid and Left in cart, a **date
 filter** (`orders/LeadDateFilter.tsx`, rules in `orders/leadDates.ts`): a
 secondary button with a calendar icon and the chosen range ("Last 7 days";
 full width on a phone) opens a radio list — a `Dialog` bottom sheet on a
@@ -2942,6 +2941,7 @@ apps use ONE component kit (docs/DESIGN_GUIDELINES.md §7):
 | `Card.tsx` | THE card (flat surface, 1px border, 12px corners, no shadow) + `CardHeader` |
 | `states.tsx` | `Skeleton`, `PageSkeleton`, `EmptyState` (flat icon chip, optional steps/action), `ErrorState` (message + Try again) — no bare "Loading…" |
 | `ModalShell.tsx` | THE modal base: portal (or `portal={false}` for storefront modals that must keep the shop's colours), flat `--overlay-soft`, Escape / backdrop close (switchable), scroll lock, focus trap + return, placements `sheet` · `center` · `drawer-left` · `drawer-right` · `fullscreen`; `ModalClose` (44px) |
+| `SegmentedControl.tsx` | `segc`-look switch (neutral `surface-alt` track, the chosen cell a raised `surface` pane, no brand fill) with a "rubber" thumb: on tap it stretches over both cells then lands with a small squash; it can be dragged and flicked; jumps when "reduce motion" is on. Native radios inside `<label>` cells (arrow keys, screen readers). Equal-width cells; `renderOption(option, active)` draws each option twice (inactive under, active copy clipped to the thumb), so colour changes exactly where the thumb is. Adapted from the RubberSegment library code without its `motion` dependency (`requestAnimationFrame`). Used by Orders → Leads |
 | `Dialog.tsx` / `ConfirmDialog.tsx` | Content dialog and two-button question, both on `ModalShell`. `Dialog fill` (with `flush`) is full height with a non-scrolling body, for content with its own scrolling columns |
 | `Toast.tsx` | `showToast()` + `ToastHost`, `TOAST_CLASS` (flat, bordered) |
 
@@ -3486,6 +3486,8 @@ frontend/
     │   │   │                     #   Skip / Continue) — a sticky floating bar on
     │   │   │                     #   phones so Continue stays under the thumb.
     │   │   │                     #   Domain-agnostic.
+    │   │   ├── SegmentedControl.tsx # `segc` switch with a rubber (stretch / drag)
+    │   │   │                     #   thumb — see the shared UI table
     │   │   ├── ConfirmDialog.tsx # Reusable confirmation modal (used by logout) —
     │   │   │                     #   bottom sheet on phones, card from `sm`.
     │   │   ├── Dialog.tsx        # Content dialog (header / scrolling body / footer) — admin + seller pickers
