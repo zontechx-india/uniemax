@@ -511,19 +511,30 @@ detail carries `refunds[]` with `id`, `status`, `amount`, `reason`,
 
 The **Leads** tab on Orders: people who nearly bought. Read-only; also on the
 admin manage mount. Query: `kind` (required: `PAYMENT_PENDING` · `ACTIVE` ·
-`ABANDONED`), `page`, `pageSize` (≤ 50). One kind per page, plus the count of
-every kind.
+`ABANDONED`), `page`, `pageSize` (≤ 50), optional `from` / `to` (ISO dates —
+the date filter). One kind per page, plus the count of every kind.
+
+**Date filter** (`leadRange` in `leads.rules.ts`): applies to the chosen
+`kind` only; the other kinds' counts keep their default windows. No `from` =
+the kind's default (PAYMENT_PENDING 7 days, ABANDONED 30 days). A `from`
+further back than the kind keeps is moved up to its limit: PAYMENT_PENDING
+367 days (a year plus slack), ABANDONED 30 days (cart lines have no history).
+ACTIVE ignores it. `from` after `to` → 400. The response's `range` says what
+was applied (`null` for ACTIVE).
 
 - `PAYMENT_PENDING` — ONLINE orders with `paymentStatus` PENDING / FAILED,
-  placed in the last 7 days, not cancelled by the shopper. Dropped when the
+  placed in the date range, not cancelled by the shopper. Dropped when the
   same shopper (account, or last 10 digits of the phone) placed a
   seller-visible order in this store later; one per shopper (the newest).
   While the order is still `AWAITING_PAYMENT` the shopper can pay it until
   `closesAt` (`PAYMENT_WINDOW_MS`, 60 min after placing); the payment job
   (every 10 min) then checks the gateway once more and cancels it, so a row
   can read past `closesAt` for up to ~10 min before turning `EXPIRED`.
+  `canContact` is true only in the first 7 days after placing
+  (`CONTACT_WINDOW_MS`) — the app shows Call / WhatsApp only then.
 - `ACTIVE` / `ABANDONED` — ACTIVE cart lines of this store, one lead per cart,
-  last activity ≤ 24 h / 1–30 days. The store owner's own cart and blocked
+  last activity ≤ 24 h / 1–30 days (ABANDONED: last activity inside the date
+  range). The store owner's own cart and blocked
   customers are left out. **Anonymous:** no name, phone or customer id; `id`
   is the cart's id. `value` counts only lines buyable now, at today's price.
 
@@ -534,13 +545,14 @@ every kind.
     { "kind": "PAYMENT_PENDING", "id": "<orderId>", "orderNumber", "at": "<placedAt>",
       "state": "PAYING" | "FAILED" | "EXPIRED",   // window open · failed · window closed
       "closesAt": "<placedAt + 60 min>" | null,   // payment window end; null once closed
-      "customerName", "customerPhone", "amount": "1350.00", "quantity": 3,
+      "customerName", "customerPhone", "canContact": true, "amount": "1350.00", "quantity": 3,
       "items": [ { "name", "variantName", "quantity", "imageUrl" } ] },
     { "kind": "ACTIVE", "id": "<cartId>", "at": "<last activity>", "addedAt",
       "value": "900.00", "quantity": 2,
       "items": [ { "name", "variantName", "quantity", "imageUrl", "available": true } ] }
   ],
-  "meta": { "total", "page", "pageSize", "totalPages" }
+  "meta": { "total", "page", "pageSize", "totalPages" },
+  "range": { "from": "<ISO>", "to": "<ISO>" | null } | null
 }
 ```
 

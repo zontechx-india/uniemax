@@ -912,11 +912,25 @@ segmented control with counts — Not paid · In cart now · Left in cart
 chosen cell a raised `surface` pane in the text colour (no brand fill), each
 count a small pill (pending-tinted on Not paid when above 0); three equal
 cells with the count under the label on a phone, content-width with the
-count beside the label from `sm`. Then a one-line explanation, then dense
+count beside the label from `sm`. On Not paid and Left in cart, a **date
+filter** (`orders/LeadDateFilter.tsx`, rules in `orders/leadDates.ts`): a
+secondary button with a calendar icon and the chosen range ("Last 7 days";
+full width on a phone) opens a radio list — a `Dialog` bottom sheet on a
+phone, a 320px dropdown under the button from `sm` (`useMediaQuery`). Each
+choice shows its real dates under its name ("16 Nov, 2026 - 23 Nov, 2026");
+the radio is an accent ring + dot. A preset applies on tap and closes;
+"Custom date range" opens From / To date fields (min/max limited to what the
+kind keeps: 12 months for Not paid, 30 days for Left in cart) and a primary
+Apply. In the URL as `?dates=90d` or `?dates=custom&from=…&to=…` (the
+default leaves it out); switching kind clears it. Presets start at local
+midnight. A filtered empty list reads "Nothing in these dates". Then a
+one-line explanation, then dense
 rows: name or "A shopper", amount, order number / last activity, a status
 pill (+ phone for unpaid checkouts), up to three 36px product photos and the
 item names (unbuyable ones struck through), and **Call** / **WhatsApp** on
-unpaid-checkout rows only. An unpaid checkout's pill comes from `closesAt`
+unpaid-checkout rows only, and only while the API's `canContact` is true
+(first 7 days) — older rows say "Over 7 days old, so Call and WhatsApp are
+off." An unpaid checkout's pill comes from `closesAt`
 (the API's payment window end), not from a guess that the shopper is still
 on the payment page: **Payment open · N min left** (pending) or **Payment
 failed · N min to retry** (danger) while the window is open — "· closing"

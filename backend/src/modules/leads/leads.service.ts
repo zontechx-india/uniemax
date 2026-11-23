@@ -7,11 +7,14 @@ import { decimalToPaise, paiseToAmount } from "../payouts/payouts.rules.js";
 import { PUBLIC_PRODUCT_VISIBILITY } from "../stores/publicStore.service.js";
 import {
   CART_MAX_AGE_MS,
-  PAYMENT_MAX_AGE_MS,
+  canContact,
   groupCartLeads,
+  inRange,
+  leadRange,
   paymentLeadState,
   pickPaymentLeads,
   type CartLead,
+  type LeadRange,
 } from "./leads.rules.js";
 import type { LeadListQuery } from "./leads.schema.js";
 
@@ -20,9 +23,14 @@ import type { LeadListQuery } from "./leads.schema.js";
  * Read-only. Cart leads never carry the shopper's name, phone or id — see
  * leads.rules.ts.
  *
- * Volumes per store are small (a week of unpaid checkouts, a month of carts),
- * so both kinds are read whole (capped) and paginated in memory after the
- * grouping and de-duplication that SQL can't express simply.
+ * Volumes per store are small (unpaid checkouts in the chosen dates — at most
+ * a year — and a month of carts), so both kinds are read whole (capped) and
+ * paginated in memory after the grouping and de-duplication that SQL can't
+ * express simply.
+ *
+ * The date filter (`from` / `to`) applies to the chosen kind only. The other
+ * kinds' counts keep their default windows, so a tab's badge matches what
+ * that tab shows when the seller opens it (the filter resets on switch).
  */
 
 /** Hard caps on what one request reads — far above a real store's volume. */
@@ -33,15 +41,15 @@ const MAX_ORDERS = 2000;
 // Payment not completed
 // ---------------------------------------------------------------------------
 
-async function paymentLeads(storeId: string, now: Date) {
-  const since = new Date(now.getTime() - PAYMENT_MAX_AGE_MS);
+async function paymentLeads(storeId: string, range: LeadRange, now: Date) {
+  const since = range.from;
   const [unpaid, later] = await Promise.all([
     prisma.order.findMany({
       where: {
         storeId,
         paymentMethod: "ONLINE",
         paymentStatus: { in: ["PENDING", "FAILED"] },
-        placedAt: { gte: since },
+        placedAt: { gte: since, ...(range.to ? { lte: range.to } : {}) },
         // The shopper cancelled it themselves — they changed their mind.
         cancelledByCustomer: false,
       },
@@ -61,6 +69,7 @@ async function paymentLeads(storeId: string, now: Date) {
       },
     }),
     // Real orders since — a shopper who came back and bought is not a lead.
+    // No upper bound: buying after the chosen dates still counts.
     prisma.order.findMany({
       where: { storeId, ...SELLER_VISIBLE, placedAt: { gte: since } },
       take: MAX_ORDERS,
@@ -85,6 +94,8 @@ async function paymentLeads(storeId: string, now: Date) {
         : null,
     customerName: order.customerName,
     customerPhone: order.customerPhone,
+    /** Call / WhatsApp offered — only in the first 7 days (CONTACT_WINDOW_MS). */
+    canContact: canContact(order.placedAt, now),
     amount: order.total.toFixed(2),
     quantity: order.items.reduce((acc, item) => acc + item.quantity, 0),
     items: order.items.map((item) => ({
@@ -193,9 +204,20 @@ function shapeCartLead(lead: CartLead) {
 
 /** One kind of lead, one page, plus the count of every kind (the tab badges). */
 export async function listLeads(storeId: string, query: LeadListQuery, now = new Date()) {
-  const [payments, carts] = await Promise.all([paymentLeads(storeId, now), cartLeads(storeId, now)]);
+  // The filter for the chosen kind; the default window for the others.
+  const rangeFor = (kind: "PAYMENT_PENDING" | "ABANDONED") =>
+    leadRange(kind, query.kind === kind ? query : {}, now)!;
+  const paymentRange = rangeFor("PAYMENT_PENDING");
+  const cartRange = rangeFor("ABANDONED");
+  const [payments, carts] = await Promise.all([
+    paymentLeads(storeId, paymentRange, now),
+    cartLeads(storeId, now),
+  ]);
   const active = carts.filter((lead) => lead.kind === "ACTIVE");
-  const abandoned = carts.filter((lead) => lead.kind === "ABANDONED");
+  // Filtered by last activity — "when they left it".
+  const abandoned = carts.filter(
+    (lead) => lead.kind === "ABANDONED" && inRange(lead.lastActiveAt, cartRange),
+  );
   const all =
     query.kind === "PAYMENT_PENDING"
       ? payments
@@ -205,5 +227,8 @@ export async function listLeads(storeId: string, query: LeadListQuery, now = new
     counts: { PAYMENT_PENDING: payments.length, ACTIVE: active.length, ABANDONED: abandoned.length },
     rows: all.slice(start, start + query.pageSize),
     meta: buildListMeta(all.length, query.page, query.pageSize),
+    /** The dates this list covers, after the server's caps; null for ACTIVE. */
+    range:
+      query.kind === "PAYMENT_PENDING" ? paymentRange : query.kind === "ABANDONED" ? cartRange : null,
   };
 }

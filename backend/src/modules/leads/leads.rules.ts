@@ -22,8 +22,52 @@ const DAY = 24 * HOUR;
 export const ACTIVE_WINDOW_MS = DAY;
 /** Carts untouched for longer are not leads any more. */
 export const CART_MAX_AGE_MS = 30 * DAY;
-/** Unpaid checkouts older than this are not leads any more. */
+/** Unpaid checkouts shown when the seller picks no dates. */
 export const PAYMENT_MAX_AGE_MS = 7 * DAY;
+/**
+ * How far back the date filter can reach for unpaid checkouts: a year
+ * ("Last 12 months" starts at the shopper's local midnight a year ago), plus
+ * slack for time zones and leap years.
+ */
+export const PAYMENT_HISTORY_MS = 367 * DAY;
+/** Call / WhatsApp only this long after the checkout — later feels like spam. */
+export const CONTACT_WINDOW_MS = 7 * DAY;
+
+/** Can the seller still call or WhatsApp about an unpaid checkout? */
+export function canContact(placedAt: Date, now: Date): boolean {
+  return now.getTime() - placedAt.getTime() <= CONTACT_WINDOW_MS;
+}
+
+/** A date filter after the server's caps; `to` null = up to now. */
+export interface LeadRange {
+  from: Date;
+  to: Date | null;
+}
+
+/**
+ * The window a list of one kind covers. No dates = the kind's default
+ * (unpaid: 7 days; left in cart: 30 days). A `from` further back than the
+ * kind keeps is moved up to its limit — carts have no history past 30 days
+ * (a cart line is deleted when it leaves the cart), unpaid orders stay a
+ * year. ACTIVE (last 24 h) takes no filter: null.
+ */
+export function leadRange(
+  kind: LeadKind,
+  query: { from?: Date | undefined; to?: Date | undefined },
+  now: Date,
+): LeadRange | null {
+  if (kind === "ACTIVE") return null;
+  const [defaultAge, maxAge] =
+    kind === "PAYMENT_PENDING" ? [PAYMENT_MAX_AGE_MS, PAYMENT_HISTORY_MS] : [CART_MAX_AGE_MS, CART_MAX_AGE_MS];
+  const earliest = now.getTime() - maxAge;
+  const from = query.from ? Math.max(query.from.getTime(), earliest) : now.getTime() - defaultAge;
+  return { from: new Date(from), to: query.to ?? null };
+}
+
+/** Is this moment inside the range? */
+export function inRange(at: Date, range: LeadRange): boolean {
+  return at >= range.from && (range.to === null || at <= range.to);
+}
 
 /** ACTIVE or ABANDONED by the cart's last activity; null = too old to be a lead. */
 export function cartLeadKind(lastActiveAt: Date, now: Date): "ACTIVE" | "ABANDONED" | null {

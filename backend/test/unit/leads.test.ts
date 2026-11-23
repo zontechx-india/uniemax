@@ -1,11 +1,14 @@
 // Unit tests for seller leads' pure rules (modules/leads/leads.rules.ts):
-// cart lead windows and grouping, unpaid-checkout picking.
+// cart lead windows and grouping, unpaid-checkout picking, the date filter.
 // No server, no database: `npm run test:unit`.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  canContact,
   cartLeadKind,
   groupCartLeads,
+  inRange,
+  leadRange,
   paymentLeadState,
   pickPaymentLeads,
   type CartLineFact,
@@ -66,6 +69,28 @@ test("payment leads: one per shopper, newest kept; gone once they bought", () =>
     { placedAt: ago(30), customerId: "b", customerPhone: null }, // before o4 — doesn't count
   ];
   assert.deepEqual(pickPaymentLeads(unpaid, later).map((o) => o.id), ["o2", "o4"]);
+});
+
+const DAY_H = 24;
+
+test("date filter: defaults per kind, caps how far back, none for ACTIVE", () => {
+  assert.equal(leadRange("ACTIVE", { from: ago(5) }, now), null);
+  assert.deepEqual(leadRange("PAYMENT_PENDING", {}, now), { from: ago(7 * DAY_H), to: null });
+  assert.deepEqual(leadRange("ABANDONED", {}, now), { from: ago(30 * DAY_H), to: null });
+  // Unpaid orders reach back a year (+ slack); carts only 30 days.
+  assert.deepEqual(leadRange("PAYMENT_PENDING", { from: ago(90 * DAY_H) }, now)!.from, ago(90 * DAY_H));
+  assert.deepEqual(leadRange("PAYMENT_PENDING", { from: ago(900 * DAY_H) }, now)!.from, ago(367 * DAY_H));
+  assert.deepEqual(leadRange("ABANDONED", { from: ago(90 * DAY_H) }, now)!.from, ago(30 * DAY_H));
+  const custom = leadRange("PAYMENT_PENDING", { from: ago(48), to: ago(24) }, now)!;
+  assert.ok(inRange(ago(30), custom));
+  assert.ok(!inRange(ago(10), custom), "after `to`");
+  assert.ok(!inRange(ago(50), custom), "before `from`");
+});
+
+test("call / WhatsApp only in the first 7 days", () => {
+  assert.equal(canContact(ago(1), now), true);
+  assert.equal(canContact(ago(7 * DAY_H), now), true);
+  assert.equal(canContact(ago(7 * DAY_H + 1), now), false);
 });
 
 test("payment lead state", () => {

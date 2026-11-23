@@ -180,11 +180,13 @@ A single account can own multiple stores and switch between them.
   (status only for gateway payments — the money is refunded from the
   Cashfree dashboard until the automatic refund call ships).
 - **Leads (Orders → Leads tab)** — people who nearly bought, read-only:
-  **Not paid** (online checkouts whose payment never went through, last 7
-  days — the shopper gave the shop their name and phone at checkout, so
-  the seller can call or WhatsApp them), **In cart now** (signed-in
+  **Not paid** (online checkouts whose payment never went through — the
+  shopper gave the shop their name and phone at checkout, so the seller
+  can call or WhatsApp them in the first 7 days), **In cart now** (signed-in
   shoppers with the shop's items in their cart, active in the last 24
-  hours) and **Left in cart** (the same, 1 to 30 days). Cart leads are
+  hours) and **Left in cart** (the same, 1 to 30 days). A **date filter**
+  on Not paid (Today · 7 / 30 / 90 days · 12 months · custom; default 7
+  days) and Left in cart (7 / 30 days · custom, within 30 days). Cart leads are
   **anonymous** — no name or phone — because the shopper never shared
   them with the shop. Guest carts live only in the browser and never
   show. Not built yet: a UnieMax-sent "you left items in your cart"

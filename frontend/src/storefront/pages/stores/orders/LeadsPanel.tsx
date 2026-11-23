@@ -12,6 +12,9 @@ import { formatOrderDate, timeAgo, whatsAppNumber } from '../orderMeta'
 import { EmptyState } from '../ui/EmptyState'
 import { StatusPill } from '../ui/StatusPill'
 import type { StatusTone } from '../ui/StatusPill'
+import { LeadDateFilter } from './LeadDateFilter'
+import { clearDates, hasDateFilter, isDefaultDates, readDates, toApiRange, writeDates } from './leadDates'
+import type { LeadDates } from './leadDates'
 import { money } from './settlementMeta'
 
 /**
@@ -26,7 +29,9 @@ import { money } from './settlementMeta'
  *
  * Dense, in the Transactions page's pattern. The product photos are the one
  * rich thing on the screen; everything else is quiet. `?lead=` keeps the
- * chosen kind in the URL.
+ * chosen kind in the URL, `?dates=` (leadDates.ts) the date filter, which
+ * "Not paid" and "Left in cart" have. The filter resets when the kind
+ * changes; the other tabs' counts are their default windows.
  */
 
 const KINDS: { key: LeadKind; label: string; about: string }[] = [
@@ -34,7 +39,7 @@ const KINDS: { key: LeadKind; label: string; about: string }[] = [
     key: 'PAYMENT_PENDING',
     label: 'Not paid',
     about:
-      'Started paying online but did not finish. The order stays open for 1 hour, so they can still pay. Shown for 7 days.',
+      'Started paying online but did not finish. The order stays open for 1 hour, so they can still pay. You can call or WhatsApp them for 7 days.',
   },
   {
     key: 'ACTIVE',
@@ -100,6 +105,9 @@ export function LeadsPanel() {
   const [params, setParams] = useSearchParams()
   const leadParam = params.get('lead')
   const kind: LeadKind = isKind(leadParam) ? leadParam : 'PAYMENT_PENDING'
+  const dates = readDates(params, kind)
+  // Presets start at local midnight, so this string is stable all day.
+  const rangeKey = hasDateFilter(kind) ? JSON.stringify(toApiRange(dates)) : '{}'
 
   const [data, setData] = useState<StoreLeads | null>(null)
   const [rows, setRows] = useState<StoreLeads['rows'] | null>(null)
@@ -114,7 +122,7 @@ export function LeadsPanel() {
     setRows(null)
     setError(null)
     storeLeadsApi
-      .list(store.id, kind, 1)
+      .list(store.id, kind, 1, JSON.parse(rangeKey))
       .then((result) => {
         if (requestSeq.current !== seq) return
         setData(result)
@@ -124,7 +132,7 @@ export function LeadsPanel() {
       .catch((err: unknown) => {
         if (requestSeq.current === seq) setError(toApiError(err).message)
       })
-  }, [store.id, kind, reload])
+  }, [store.id, kind, rangeKey, reload])
 
   const loadMore = async () => {
     const meta = data?.meta
@@ -132,7 +140,7 @@ export function LeadsPanel() {
     const seq = requestSeq.current
     setLoadingMore(true)
     try {
-      const next = await storeLeadsApi.list(store.id, kind, meta.page + 1)
+      const next = await storeLeadsApi.list(store.id, kind, meta.page + 1, JSON.parse(rangeKey))
       if (requestSeq.current !== seq) return
       setRows((prev) => [...(prev ?? []), ...next.rows])
       setData(next)
@@ -146,7 +154,8 @@ export function LeadsPanel() {
   const setKind = (next: LeadKind) => {
     setParams(
       (prev) => {
-        const copy = new URLSearchParams(prev)
+        // Each kind keeps different dates — start the new one on its default.
+        const copy = clearDates(prev)
         if (next === 'PAYMENT_PENDING') copy.delete('lead')
         else copy.set('lead', next)
         return copy
@@ -155,13 +164,21 @@ export function LeadsPanel() {
     )
   }
 
+  const setDates = (next: LeadDates) => {
+    setParams((prev) => writeDates(prev, kind, next), { replace: true })
+  }
+
   const about = KINDS.find((k) => k.key === kind)!.about
+  const empty = isDefaultDates(kind, dates)
+    ? EMPTY[kind]
+    : { title: 'Nothing in these dates', description: 'Try a longer date range.' }
   const meta = data?.meta
   const now = useMinuteClock(rows?.some((row) => row.kind === 'PAYMENT_PENDING' && row.closesAt !== null) ?? false)
 
   return (
     <div className="space-y-3">
       <KindSwitch value={kind} counts={counts} onChange={setKind} />
+      {hasDateFilter(kind) && <LeadDateFilter kind={kind} value={dates} onChange={setDates} />}
       <p className="text-hint text-muted">{about}</p>
 
       {error && (
@@ -183,7 +200,7 @@ export function LeadsPanel() {
 
       {rows !== null && rows.length === 0 && (
         <div className="ws-card rounded-lg">
-          <EmptyState icon={CartIcon} title={EMPTY[kind].title} description={EMPTY[kind].description} />
+          <EmptyState icon={CartIcon} title={empty.title} description={empty.description} />
         </div>
       )}
 
@@ -216,7 +233,9 @@ export function LeadsPanel() {
 /**
  * Unpaid checkout: who, amount, state, items — Call / WhatsApp. While the
  * order is still open the shopper can pay that same order, so the row says
- * so: it is the best moment to call.
+ * so: it is the best moment to call. Call / WhatsApp only in the first 7
+ * days (`canContact`, from the server) — later it feels like spam; older
+ * rows are for looking back only.
  */
 function PaymentLeadRow({ lead, storeName, now }: { lead: PaymentLead; storeName: string; now: number }) {
   const state = paymentPill(lead, now)
@@ -245,7 +264,10 @@ function PaymentLeadRow({ lead, storeName, now }: { lead: PaymentLead; storeName
           They can still pay. A quick call often helps.
         </p>
       )}
-      {phone && (
+      {phone && !lead.canContact && (
+        <p className="mt-2 text-hint text-muted">Over 7 days old, so Call and WhatsApp are off.</p>
+      )}
+      {phone && lead.canContact && (
         <div className="mt-2.5 grid grid-cols-2 gap-2 sm:flex">
           <a href={`tel:${phone}`} className={buttonClass({ variant: 'secondary', size: 'sm' })}>
             <PhoneCallIcon className="h-4 w-4" />

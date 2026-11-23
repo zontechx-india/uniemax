@@ -1539,6 +1539,8 @@ export interface PaymentLead {
   closesAt: string | null
   customerName: string | null
   customerPhone: string | null
+  /** Call / WhatsApp offered — only in the first 7 days after the checkout. */
+  canContact: boolean
   amount: string
   quantity: number
   items: LeadItem[]
@@ -1562,11 +1564,21 @@ export interface StoreLeads {
   counts: Record<LeadKind, number>
   rows: (PaymentLead | CartLead)[]
   meta: ListMeta
+  /** The dates the list covers after the server's caps (ISO); null for ACTIVE. */
+  range: { from: string; to: string | null } | null
 }
 
 export const storeLeadsApi = {
-  list(storeRef: string, kind: LeadKind, page = 1): Promise<StoreLeads> {
-    return call<StoreLeads>(http.get(`${base()}/${storeRef}/leads`, { params: { kind, page, pageSize: 20 } }))
+  /** `range` (ISO dates) filters the chosen kind only; missing = its default window. */
+  list(
+    storeRef: string,
+    kind: LeadKind,
+    page = 1,
+    range: { from?: string; to?: string } = {},
+  ): Promise<StoreLeads> {
+    return call<StoreLeads>(
+      http.get(`${base()}/${storeRef}/leads`, { params: { kind, page, pageSize: 20, ...range } }),
+    )
   },
 }
 
