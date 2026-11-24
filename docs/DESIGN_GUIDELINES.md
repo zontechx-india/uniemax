@@ -192,6 +192,8 @@ Buttons must clearly communicate their purpose.
 Use:
 
 - Primary button → main action
+- Ink button (`variant="ink"`, solid black) → the main action on a seller's
+  own tool where the shop colour would be noise (Seller bills) — still one per screen
 - Secondary button → supporting action
 - Ghost button → low-priority action
 - Destructive button → dangerous action

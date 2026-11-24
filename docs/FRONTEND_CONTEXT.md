@@ -2898,7 +2898,12 @@ the customer pays it like a checkout order. API client `features/bills/billsApi.
   in-stock combination fits the other choices, a typed value ("kurti teal")
   and a lone in-stock value are pre-chosen — then quantity + "Add N to bill";
   "On the bill" lists the product's added variants with − / +. Chosen cells
-  are solid ink (`bg-fg text-surface`); every action is a `Button`.
+  are solid ink (`bg-fg text-surface`); every action is a `Button`, and the
+  Bills screens' main action is the **`ink`** variant (solid black — no shop
+  colour on the seller's own tool; the customer's `/b/` page keeps the shop's
+  `primary`). Icon-only buttons (steppers, +) are `size="md"` +
+  `className="w-11 px-0!"` — without the `!` the size's `px-5` wins and the
+  icon is squeezed to a dot.
 - **Customer** — `BillPayPage` at `/b/:token` on the **public** router
   (`PUBLIC_PATH` / `LoginRoute`'s `SHOPPING_PATH` include `b`), in the shop's
   colours (`useStoreShell` + `storeVars`), `usePrivatePageTitle` (noindex).

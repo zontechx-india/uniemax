@@ -84,7 +84,7 @@ export function StoreBillsPage() {
   }
 
   const create = (
-    <Link to="new" className={buttonClass({ size: 'lg' })}>
+    <Link to="new" className={buttonClass({ variant: 'ink', size: 'lg' })}>
       <PlusIcon className="h-5 w-5" />
       Create a bill
     </Link>

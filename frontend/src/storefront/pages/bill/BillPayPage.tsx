@@ -275,7 +275,7 @@ export function BillPayPage({ token }: { token: string }) {
     )
     return frame(
       <>
-        <Button variant="ghost" size="sm" className="-ml-2 mb-2 px-2" onClick={() => setStep('bill')}>
+        <Button variant="ghost" size="sm" className="-ml-2 mb-2 px-2!" onClick={() => setStep('bill')}>
           <ArrowLeftIcon className="h-4 w-4" />
           Back to the bill
         </Button>

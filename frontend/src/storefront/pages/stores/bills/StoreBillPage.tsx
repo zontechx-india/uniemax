@@ -48,7 +48,7 @@ export function StoreBillPage() {
   }, [store.id, billId])
 
   const back = (
-    <Button variant="ghost" size="md" className="-ml-2 px-2" onClick={goBack}>
+    <Button variant="ghost" size="md" className="-ml-2 px-2!" onClick={goBack}>
       <ArrowLeftIcon className="h-5 w-5" />
       Bills
     </Button>
@@ -229,7 +229,7 @@ export function StoreBillPage() {
       <div className="sticky bottom-[calc(var(--seller-dock,0px)+0.75rem)] z-20">
         <div className="ws-bar flex items-center gap-2 rounded-lg p-2 sm:p-3">
           {bill.order ? (
-            <Link to={`/mystores/${store.slug}/orders/${bill.order.id}`} className={buttonClass({ size: 'lg', className: 'min-w-0 flex-1' })}>
+            <Link to={`/mystores/${store.slug}/orders/${bill.order.id}`} className={buttonClass({ variant: 'ink', size: 'lg', className: 'min-w-0 flex-1' })}>
               Open order {bill.order.orderNumber}
               <ArrowRightIcon className="h-4 w-4" />
             </Link>
@@ -252,7 +252,7 @@ export function StoreBillPage() {
               </Button>
             </>
           ) : (
-            <Button size="lg" className="min-w-0 flex-1" onClick={again}>
+            <Button variant="ink" size="lg" className="min-w-0 flex-1" onClick={again}>
               Make a new bill like this
             </Button>
           )}

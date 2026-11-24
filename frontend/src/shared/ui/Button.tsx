@@ -10,6 +10,7 @@ import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
  * | Variant     | Use for                                        | Per view |
  * | ----------- | ---------------------------------------------- | -------- |
  * | `primary`   | the main action — Save, Buy Now, Place Order   | one*     |
+ * | `ink`       | the main action in solid ink (neutral, no shop colour) — the seller's Bills | one* |
  * | `secondary` | a supporting action — Cancel, Add to Cart      | any      |
  * | `ghost`     | a low-priority action — Skip, Clear filters    | any      |
  * | `danger`    | a destructive action — Delete, Cancel order    | rare     |
@@ -26,7 +27,7 @@ import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
  * ```
  */
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
+export type ButtonVariant = 'primary' | 'ink' | 'secondary' | 'ghost' | 'danger'
 export type ButtonSize = 'sm' | 'md' | 'lg'
 
 // Heights in px: sm 36 (dense rows only), md 44 (the tap minimum), lg 48.
@@ -41,6 +42,7 @@ const SIZE: Record<ButtonSize, string> = {
 
 const VARIANT: Record<ButtonVariant, string> = {
   primary: 'btn-primary',
+  ink: 'btn-ink',
   secondary: 'btn-secondary',
   ghost: 'btn-ghost',
   danger: 'btn-danger',

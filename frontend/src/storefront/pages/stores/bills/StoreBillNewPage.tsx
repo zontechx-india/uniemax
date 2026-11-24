@@ -11,7 +11,7 @@ import { billsApi } from '../../../features/bills/billsApi'
 import type { PickerProduct, PickerVariant } from '../../../features/bills/billsApi'
 import { publicOrderApi } from '../../../features/stores/storesApi'
 import { useManagedStore } from '../../../features/stores/useManagedStore'
-import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, PlusIcon, ReceiptIcon, SearchIcon } from '../../../layout/icons'
+import { ArrowLeftIcon, ArrowRightIcon, ClockIcon, PlusIcon, ReceiptIcon, SearchIcon } from '../../../layout/icons'
 import { PageHeader } from '../ui/PageHeader'
 import { PanelCard } from '../ui/PanelCard'
 import { ItemPicker, Stepper } from './ItemPicker'
@@ -26,6 +26,12 @@ import type { BillDraft } from './billUi'
  */
 
 const digits = (s: string) => s.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '').slice(-10)
+
+/** "+91 98400 11223" for the review header. */
+const spacedPhone = (s: string) => {
+  const d = digits(s)
+  return d.length === 10 ? `+91 ${d.slice(0, 5)} ${d.slice(5)}` : s
+}
 
 export function StoreBillNewPage() {
   const { store } = useManagedStore()
@@ -154,7 +160,7 @@ export function StoreBillNewPage() {
 
   return (
     <div className="ws-form space-y-4">
-      <Button variant="ghost" size="md" className="-ml-2 px-2" onClick={goBack}>
+      <Button variant="ghost" size="md" className="-ml-2 px-2!" onClick={goBack}>
         <ArrowLeftIcon className="h-5 w-5" />
         Bills
       </Button>
@@ -213,7 +219,7 @@ export function StoreBillNewPage() {
             ))}
           </ul>
         )}
-        <Button variant={draft.lines.length ? 'secondary' : 'primary'} size="lg" full onClick={() => setPickerOpen(true)}>
+        <Button variant={draft.lines.length ? 'secondary' : 'ink'} size="lg" full onClick={() => setPickerOpen(true)}>
           {draft.lines.length ? <PlusIcon className="h-5 w-5" /> : <SearchIcon className="h-5 w-5" />}
           {draft.lines.length ? 'Add more items' : 'Add items'}
         </Button>
@@ -298,7 +304,7 @@ export function StoreBillNewPage() {
             </p>
             <p className="font-figure text-xl leading-tight font-semibold tabular-nums text-fg">{rupees(total)}</p>
           </div>
-          <Button size="lg" onClick={review}>
+          <Button variant="ink" size="lg" onClick={review}>
             Review bill
             <ArrowRightIcon className="h-4 w-4" />
           </Button>
@@ -310,40 +316,63 @@ export function StoreBillNewPage() {
       <Dialog
         open={reviewOpen}
         onClose={() => !saving && setReviewOpen(false)}
-        title="Make this bill?"
-        subtitle={`${draft.name.trim() || `+91 ${digits(draft.phone)}`} · +91 ${digits(draft.phone)}`}
+        title="Review bill"
+        // Who it is for, once: the name when given, and the number readable.
+        subtitle={[draft.name.trim(), spacedPhone(draft.phone)].filter(Boolean).join(' · ')}
         footer={
-          <>
-            <Button variant="secondary" onClick={() => setReviewOpen(false)} disabled={saving}>
-              Change something
+          <div className="flex w-full gap-2 sm:w-auto">
+            <Button variant="secondary" size="lg" className="flex-1 sm:flex-none" onClick={() => setReviewOpen(false)} disabled={saving}>
+              Edit
             </Button>
-            <Button loading={saving} onClick={make}>
-              <CheckIcon className="h-5 w-5" />
+            <Button variant="ink" size="lg" className="flex-1 sm:flex-none" loading={saving} onClick={make}>
               Make bill
             </Button>
-          </>
+          </div>
         }
       >
         <div className="ws-form space-y-4">
-          <ul className="space-y-1.5 text-base">
+          <ul className="-my-1 divide-y divide-line">
             {draft.lines.map((l) => (
-              <li key={l.key} className="flex justify-between gap-3">
-                <span className="min-w-0 text-fg">
-                  {l.qty} × {l.name}
-                  {l.variantLabel && <span className="text-muted"> ({l.variantLabel})</span>}
-                </span>
-                <span className="shrink-0 font-figure tabular-nums text-fg">{rupees(Number(l.price) * l.qty)}</span>
+              <li key={l.key} className="flex items-center gap-3 py-3">
+                <Thumb src={l.imageUrl} size="h-10 w-10" px="40px" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-base font-medium text-fg">{l.name}</p>
+                  <p className="mt-0.5 text-sm text-muted">
+                    {l.variantLabel && <>{l.variantLabel} · </>}
+                    {l.qty} × {rupees(l.price)}
+                  </p>
+                </div>
+                <span className="shrink-0 font-figure text-base font-medium tabular-nums text-fg">{rupees(Number(l.price) * l.qty)}</span>
               </li>
             ))}
           </ul>
-          <dl className="space-y-1.5 border-t border-line pt-3 text-base">
-            <div className="flex justify-between"><dt className="text-muted">Items</dt><dd className="font-figure tabular-nums">{rupees(subtotal)}</dd></div>
-            <div className="flex justify-between"><dt className="text-muted">Delivery</dt><dd className="font-figure tabular-nums">{shipping === null ? 'Your usual rate' : shipping === 0 ? 'Free' : rupees(shipping)}</dd></div>
-            {discount > 0 && <div className="flex justify-between"><dt className="text-muted">Discount</dt><dd className="font-figure tabular-nums">− {rupees(discount)}</dd></div>}
-            <div className="flex justify-between border-t border-line pt-2 font-semibold"><dt>Total</dt><dd className="font-figure tabular-nums">{rupees(total)}</dd></div>
+
+          <dl className="space-y-2 rounded-lg bg-surface-alt px-4 py-3 text-sm">
+            <div className="flex justify-between text-muted">
+              <dt>Items ({itemCount})</dt>
+              <dd className="font-figure tabular-nums text-fg">{rupees(subtotal)}</dd>
+            </div>
+            <div className="flex justify-between text-muted">
+              <dt>Delivery</dt>
+              <dd className="font-figure tabular-nums text-fg">{shipping === null ? 'Your usual rate' : shipping === 0 ? 'Free' : rupees(shipping)}</dd>
+            </div>
+            {discount > 0 && (
+              <div className="flex justify-between text-muted">
+                <dt>Discount</dt>
+                <dd className="font-figure tabular-nums text-fg">− {rupees(discount)}</dd>
+              </div>
+            )}
+            <div className="flex items-baseline justify-between border-t border-line pt-2">
+              <dt className="text-base font-semibold text-fg">Total</dt>
+              <dd className="font-figure text-xl font-semibold tabular-nums text-fg">{rupees(total)}</dd>
+            </div>
           </dl>
-          <p className="text-sm text-muted">
-            Next you send it from your WhatsApp. The link stays open for {draft.expiryDays} day{draft.expiryDays === 1 ? '' : 's'}; when they pay, it becomes a confirmed order.
+
+          <p className="flex items-start gap-2 text-sm text-muted">
+            <ClockIcon className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              Link open for {draft.expiryDays} day{draft.expiryDays === 1 ? '' : 's'}. You send it from your WhatsApp next; it becomes a confirmed order when they pay.
+            </span>
           </p>
           {saveError && <ErrorNote>{saveError}</ErrorNote>}
         </div>

@@ -690,6 +690,19 @@
   .btn-secondary:active:not(:disabled) {
     background-color: color-mix(in oklab, var(--fg) 8%, var(--surface));
   }
+  /* btn-ink — a neutral main action in solid ink (near-black; near-white in
+   * dark), the same ink as a chosen SegmentedControl cell. For the seller's
+   * own tools where the shop colour would be noise (Seller bills). */
+  .btn-ink {
+    background-color: var(--fg);
+    color: var(--surface);
+  }
+  .btn-ink:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--fg) 86%, var(--surface));
+  }
+  .btn-ink:active:not(:disabled) {
+    background-color: color-mix(in oklab, var(--fg) 78%, var(--surface));
+  }
   .btn-ghost {
     background-color: transparent;
     color: var(--fg);

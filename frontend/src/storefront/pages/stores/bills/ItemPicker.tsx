@@ -69,12 +69,12 @@ export function Stepper({
   const bin = removeAtOne && qty <= 1
   return (
     <div role="group" aria-label={`Quantity of ${label}`} className="inline-flex shrink-0 items-center rounded-md border border-line bg-surface">
-      <Button variant="ghost" size="md" className="w-11 px-0" onClick={() => onChange(-1)} disabled={!removeAtOne && qty <= 1} aria-label={bin ? 'Remove' : 'One less'}>
-        {bin ? <TrashIcon className="h-4 w-4" /> : <MinusIcon className="h-4 w-4" />}
+      <Button variant="ghost" size="md" className="w-11 px-0!" onClick={() => onChange(-1)} disabled={!removeAtOne && qty <= 1} aria-label={bin ? 'Remove' : 'One less'}>
+        {bin ? <TrashIcon className="h-5 w-5 shrink-0" /> : <MinusIcon className="h-5 w-5 shrink-0" />}
       </Button>
       <span className="w-7 text-center font-figure text-base font-semibold tabular-nums text-fg">{qty}</span>
-      <Button variant="ghost" size="md" className="w-11 px-0" onClick={() => onChange(1)} disabled={qty >= max} aria-label="One more">
-        <PlusIcon className="h-4 w-4" />
+      <Button variant="ghost" size="md" className="w-11 px-0!" onClick={() => onChange(1)} disabled={qty >= max} aria-label="One more">
+        <PlusIcon className="h-5 w-5 shrink-0" />
       </Button>
     </div>
   )
@@ -207,8 +207,8 @@ export function ItemPicker({
   }
 
   const addButton = (p: PickerProduct, v: PickerVariant, label: string) => (
-    <Button variant="secondary" size="md" className="w-11 px-0" onClick={() => onAdd(p, v, 1)} disabled={v.stock === 0} aria-label={`Add ${label}`}>
-      <PlusIcon className="h-5 w-5" />
+    <Button variant="secondary" size="md" className="w-11 px-0!" onClick={() => onAdd(p, v, 1)} disabled={v.stock === 0} aria-label={`Add ${label}`}>
+      <PlusIcon className="h-5 w-5 shrink-0" />
     </Button>
   )
 
@@ -267,6 +267,7 @@ export function ItemPicker({
               )}
             </div>
             <Button
+              variant="ink"
               size="md"
               full
               className="mt-3"
@@ -456,7 +457,7 @@ export function ItemPicker({
             <p className="text-xs text-muted">{itemCount ? `${itemCount} item${itemCount === 1 ? '' : 's'} on the bill` : 'Nothing added yet'}</p>
             <p className="font-figure text-lg font-semibold tabular-nums text-fg">{rupees(subtotal)}</p>
           </div>
-          <Button size="md" variant={choice && openId === choice.productId ? 'secondary' : 'primary'} onClick={onClose}>
+          <Button size="md" variant={choice && openId === choice.productId ? 'secondary' : 'ink'} onClick={onClose}>
             Done
           </Button>
         </div>
