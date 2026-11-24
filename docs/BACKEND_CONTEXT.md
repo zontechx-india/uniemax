@@ -635,6 +635,9 @@ no endpoint, no UI and no migration change.
 
 ### Seller bills — `modules/bills`
 
+> The whole feature (decisions, every data flow, files, money rules, not
+> built) lives in [`docs/bills/README.md`](./bills/README.md). Start there.
+
 A seller makes a bill for a phone / in-shop customer from the store's own
 products; the customer pays it from a link. Owner routes under
 `/stores/:id/bills` (a separate plugin from `storeRoutes`, never on the admin
