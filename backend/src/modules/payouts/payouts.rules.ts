@@ -76,6 +76,9 @@ export interface PayoutOrderFacts {
  * already holds the cash.
  */
 export function payoutBlockers(order: PayoutOrderFacts): string[] {
+  if (order.paymentMethod === "OFFLINE") {
+    return ["Paid to the seller directly (a seller's bill) — UnieMax never held this money, so there is nothing to pay out."];
+  }
   if (order.paymentMethod === "COD") {
     return ["Cash on delivery — the seller collected the money from the customer, so there is nothing to pay out."];
   }

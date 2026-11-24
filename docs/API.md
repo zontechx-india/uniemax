@@ -512,22 +512,26 @@ detail carries `refunds[]` with `id`, `status`, `amount`, `reason`,
 
 A bill is an order the **seller** fills in from the store's own products for a
 phone / in-shop customer; the customer pays it from its link (public section
-below). Owner only — never on the admin store mount. Design: `docs/BACKEND_CONTEXT.md`
+below) — or, `payWay: OFFLINE`, the seller was already paid (cash / UPI to
+their own number / bank) and the bill is saved as a paid order at once, sent
+as a receipt. Owner only — never on the admin store mount. Design: `docs/BACKEND_CONTEXT.md`
 → Seller bills.
 
 The **bill** shape: `{ id, number, link, state: OPEN|PAID|CANCELLED|EXPIRED,
 stage: NEW|SHARED|OPENED, store { id, name, slug }, customerName, customerPhone,
-fulfilment, items[{ productId, variantId, productName, variantName, sku,
+fulfilment, payWay: LINK|OFFLINE, offlineMode: CASH|UPI|BANK|OTHER|null,
+offlineRef, handedOver, address: { address, pincode, state } | null, items[{ productId, variantId, productName, variantName, sku,
 productSlug, imageUrl, unitPrice, quantity, lineTotal }], itemCount, subtotal,
 shippingCharge, discountType, discountValue, discount, total, note, expiresAt,
 sharedAt, shares[{ at, via }], openedAt, paidAt, cancelledAt, createdAt,
-order: { id, orderNumber, status, paymentRef } | null }`. `link` is
+order: { id, orderNumber, status, paymentRef, paidByName, paidByPhone } | null }`
+(`paidBy*` = someone other than the bill's customer paid). `link` is
 `PUBLIC_WEB_URL/b/{token}`. `EXPIRED` = OPEN past `expiresAt`.
 
 | Method | Path | Notes |
 | --- | --- | --- |
 | `GET` | `/:id/bills?tab=ALL\|WAITING\|PAID\|CLOSED&page&pageSize` | Newest first; the list envelope plus `summary { waiting, waitingTotal, notShared, tabs { ALL, WAITING, PAID, CLOSED } }` |
-| `POST` | `/:id/bills` → `201` | Body `{ customerPhone, customerName?, items[{ productId, variantId \| null, quantity }] (1–50), shippingCharge: number \| null (null = the store's delivery rate), discountType: AMOUNT\|PERCENT, discountValue, note? (≤200), expiryDays: 1\|3\|7 }`. Priced once from the live catalog (visible products, active variants, stock checked — checkout's pricing) and kept. `409` paused / unpublished shop or online payment off; `409` stock / vanished item; `400` discount over the items or total ≤ 0 |
+| `POST` | `/:id/bills` → `201` | Body `{ customerPhone, customerName?, items[{ productId, variantId \| null, quantity }] (1–50), shippingCharge: number \| null (null = the store's delivery rate), discountType: AMOUNT\|PERCENT, discountValue, note? (≤200), expiryDays: 1\|3\|7, payWay: LINK\|OFFLINE (default LINK), offlineMode?: CASH\|UPI\|BANK\|OTHER, offlineRef? (≤60), handover?: DELIVER\|TAKEN, address?, pincode?, state? }`. Priced once from the live catalog (visible products, active variants, stock checked — checkout's pricing) and kept. **OFFLINE**: `offlineMode` required; `DELIVER` needs address (≥10), a 6-digit pincode and state; `TAKEN` = PICKUP, no delivery charge. The order is made at once (`paymentMethod: OFFLINE`, `PAID`, `paymentRef` = `offlineRef`, stock taken) — `DELIVERED` when TAKEN, else `CONFIRMED` — and the bill answers `PAID`; the published / online-payment checks are skipped. `409` (LINK) paused / unpublished shop or online payment off; `409` stock / vanished item; `409` (OFFLINE) a line the supplier ships (dropship); `400` discount over the items or total ≤ 0 |
 | `GET` | `/:id/bills/:billId` | One bill |
 | `POST` | `/:id/bills/:billId/share` | Body `{ via: WHATSAPP\|COPY\|SHARE }` — records the seller's tap (first one sets `sharedAt`); `409` on a closed bill |
 | `POST` | `/:id/bills/:billId/cancel` | OPEN only (`409` otherwise). Cancels any payment attempt still open (stock back, checkout closed) |
@@ -2226,8 +2230,9 @@ auth) answers `{ number, state, store { name, slug }, customerName,
 customerPhone (masked "+91 98400 •••23"), fulfilment, items[{ variantId,
 productName, variantName, sku, imageUrl, unitPrice, quantity, lineTotal }],
 subtotal, shippingCharge, discount, total, note, expiresAt, createdAt, paidAt,
-order: { id, orderNumber } | null }` — `order` only for the account that paid
-it. The first `GET` of an OPEN bill stamps `openedAt`. `404` unknown token.
+order: { id, orderNumber } | null, payWay, offlineMode }` — `order` only for
+the account that owns it. The first `GET` of an OPEN bill (or of an OFFLINE
+receipt) stamps `openedAt`. `404` unknown token.
 
 `POST /:token/pay` 🔒 customer — body `{ name, phone, address?, pincode?,
 state? }` (address, 6-digit pincode and state required for a DELIVERY bill).
@@ -2237,6 +2242,11 @@ orderNumber, storeSlug, paid, payment: PaymentSession | null }`; the web
 client launches Cashfree checkout with `payment`, which returns to
 `/order/{storeSlug}/{orderId}`. Paying again (same account) reuses the open
 attempt. Paid (webhook) → the order is `CONFIRMED` and the bill `PAID`.
+**Whose order:** the bill's customer (its phone), not the payer — a verified
+account with that phone owns it and the payer is kept as `paidByName` /
+`paidByPhone`; with no such account it stays the payer's when the phones
+match, else it has no owner until someone signs in (OTP) with that phone,
+when every unowned BILL order for it moves to their account.
 `409` paid / expired / cancelled bill, a paused shop, or another account
 paying right now; `409` sold out; `503` no gateway in production.
 
@@ -3696,9 +3706,11 @@ outlives it. Unblocking notifies the customer. Already in that state → `409`.
 ### `GET /api/v1/admin/orders` · `GET /api/v1/admin/orders/:id`
 
 List query: `q` (order number / customer / phone / store / payment reference),
-`status`, `paymentStatus`, `paymentMethod`, `storeId`, `source`
+`status`, `paymentStatus`, `paymentMethod` (`ONLINE` | `COD` | `OFFLINE` — a
+seller's bill paid to the seller), `storeId`, `source`
 (`CHECKOUT` | `BILL` — a seller's bill), `from`, `to`, `page`,
-`pageSize`. Rows and detail carry `source` and `billId`. The list also returns **`filteredRevenue`** — the revenue of the
+`pageSize`. Rows and detail carry `source` and `billId`; the detail also
+`offlineMode`, `paidByName`, `paidByPhone`. The list also returns **`filteredRevenue`** — the revenue of the
 current filter, so the header answers "what is this slice worth".
 Detail adds the money breakdown, contact + delivery snapshot, lifecycle
 timestamps, `cfOrderId`, the linked customer/store, items with `imageUrl`,
@@ -3927,9 +3939,12 @@ Fees are admin + seller only — never in a customer or public response.
 
 #### `GET /api/v1/admin/finance/fee-rules` · `POST /api/v1/admin/finance/fee-rules`
 
-`GET` → `{ current: { platform, platformCod, gateway, upcoming[] }, rules[] }`.
+`GET` → `{ current: { platform, platformCod, platformOffline, gateway, upcoming[] }, rules[] }`.
+`platformCod` / `platformOffline` = the platform fee on COD / OFFLINE (a seller's
+bill paid to the seller) orders — the same as `platform` until a rule for that
+method exists.
 Each of `platform` / `gateway` = `{ ruleId, percent: "10.00", bearer, effectiveFrom }`
-in force now; `upcoming` = scheduled GLOBAL versions `{ kind, percent, bearer,
+in force now; `upcoming` = scheduled GLOBAL versions `{ kind, paymentMethod, percent, bearer,
 effectiveFrom }`; `rules` = every version newest first (`id, kind, scope,
 storeId, categoryId, paymentMethod, percent, bearer, effectiveFrom, retiredAt,
 note, createdByEmail, createdAt`).
@@ -3942,6 +3957,8 @@ note, createdByEmail, createdAt`).
   "percent": "10",             // 0–100, ≤ 2 decimals
   "effectiveFrom": null,       // ISO date-time; null/"" = now; never in the past (422)
   "bearer": "PLATFORM",        // GATEWAY only (SELLER | PLATFORM); PLATFORM fee is always SELLER
+  "paymentMethod": "OFFLINE",  // PLATFORM only, optional: ONLINE | COD | OFFLINE — this method only;
+                               // beats the any-method rule for it (e.g. "0" waives it on bills paid to the seller)
   "note": "…"                  // optional
 }
 ```

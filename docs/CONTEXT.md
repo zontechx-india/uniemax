@@ -190,8 +190,18 @@ A single account can own multiple stores and switch between them.
   no stock; prices are fixed when it is made. The seller sees each bill as
   not shared / shared / opened / paid, can cancel it, or make a new one like
   it. Not a payment link for any amount — every bill is products from the
-  shop. Not yet: cash bills (the seller already took the money) and one-off
-  items that are not in the shop.
+  shop. **Already paid to the seller** (cash, UPI to their own number, bank):
+  the seller picks "Already paid me" and how, then "Deliver to them" (types
+  the address) or "Took it now"; no link to pay — the order is made at once,
+  paid (Confirmed, or Delivered when taken), stock goes down, and the bill is
+  sent on WhatsApp as a receipt. UnieMax never holds that money, so nothing
+  is paid out; the platform fee is added to the seller's dues like cash on
+  delivery, and an admin can set its own rate (e.g. 0%). Items a supplier
+  ships (dropship) can't go on such a bill. **Whose order:** always the bill's
+  customer (by phone), even when someone else paid the link — the payer is
+  shown as "Paid by"; a customer without an account gets the order when they
+  sign in with that phone. Not yet: a PDF receipt and one-off items that are
+  not in the shop.
 - **Leads (Orders → Leads tab)** — people who nearly bought, read-only:
   **Not paid** (online checkouts whose payment never went through — the
   shopper gave the shop their name and phone at checkout, so the seller

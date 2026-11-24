@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { adminApi } from '../../features/adminApi'
-import type { FeeBearer, FeeKind, FeeRule, FeeRules, RateNow } from '../../features/adminApi'
+import type { FeeBearer, FeeKind, FeeMethod, FeeRule, FeeRules, RateNow } from '../../features/adminApi'
 import { useAdminQuery } from '../../features/useAdminQuery'
 import { Dialog } from '../../../shared/ui/Dialog'
 import { Alert } from '../../../shared/ui/Alert'
@@ -25,7 +25,15 @@ import { formatDate, formatDateTime } from '../../ui/format'
  * every order keeps the fee in force when it was placed (and old orders keep
  * theirs). Customers never see either fee. Today one rate applies to every
  * store; per-store and per-category rates plug into the same rules later.
+ *
+ * A third card: the platform fee on a seller's bill paid to the seller
+ * directly (cash / UPI — method OFFLINE). It follows the platform fee until
+ * an admin gives it its own rate (e.g. 0% to waive it); from then on that
+ * rate wins for those bills. Like COD, it is added to the seller's dues.
  */
+
+/** What the admin is changing: a fee kind, or the OFFLINE-only platform fee. */
+type Editing = FeeKind | 'OFFLINE'
 
 const KIND_COPY: Record<FeeKind, { title: string; base: string }> = {
   PLATFORM: {
@@ -38,6 +46,11 @@ const KIND_COPY: Record<FeeKind, { title: string; base: string }> = {
   },
 }
 
+const OFFLINE_COPY = {
+  title: 'Fee on bills paid to the seller',
+  base: "of the product price on a seller's bill paid to them directly (cash, UPI). Added to the seller's dues, like cash on delivery.",
+}
+
 const BEARER_LABEL: Record<FeeBearer, string> = {
   SELLER: 'Taken from the seller',
   PLATFORM: 'Paid by UnieMax',
@@ -47,7 +60,7 @@ const pct = (value: string) => `${Number(value)}%`
 
 export default function FeeSettingsPage() {
   const { data, loading, error, refresh } = useAdminQuery(() => adminApi.listFeeRules(), [])
-  const [editing, setEditing] = useState<FeeKind | null>(null)
+  const [editing, setEditing] = useState<Editing | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
 
   return (
@@ -66,6 +79,7 @@ export default function FeeSettingsPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <RateCard kind="PLATFORM" rate={data.current.platform} data={data} onChange={() => setEditing('PLATFORM')} primary />
             <RateCard kind="GATEWAY" rate={data.current.gateway} data={data} onChange={() => setEditing('GATEWAY')} />
+            <RateCard kind="PLATFORM" method="OFFLINE" rate={data.current.platformOffline} data={data} onChange={() => setEditing('OFFLINE')} />
           </div>
           <History rules={data.rules} />
         </div>
@@ -73,8 +87,9 @@ export default function FeeSettingsPage() {
 
       {editing && data ? (
         <ChangeDialog
-          kind={editing}
-          current={editing === 'PLATFORM' ? data.current.platform : data.current.gateway}
+          kind={editing === 'GATEWAY' ? 'GATEWAY' : 'PLATFORM'}
+          method={editing === 'OFFLINE' ? 'OFFLINE' : undefined}
+          current={editing === 'PLATFORM' ? data.current.platform : editing === 'OFFLINE' ? data.current.platformOffline : data.current.gateway}
           onClose={() => setEditing(null)}
           onSaved={(message) => {
             setEditing(null)
@@ -89,22 +104,28 @@ export default function FeeSettingsPage() {
 
 function RateCard({
   kind,
+  method,
   rate,
   data,
   onChange,
   primary = false,
 }: {
   kind: FeeKind
+  /** Set for a one-method platform fee card (OFFLINE). */
+  method?: FeeMethod
   rate: RateNow
   data: FeeRules
   onChange: () => void
   primary?: boolean
 }) {
-  const next = data.current.upcoming.find((rule) => rule.kind === kind)
+  const next = data.current.upcoming.find((rule) => rule.kind === kind && (rule.paymentMethod ?? undefined) === method)
+  const copy = method === 'OFFLINE' ? OFFLINE_COPY : KIND_COPY[kind]
+  // No rule of its own yet: it simply follows the platform fee.
+  const own = !method || data.rules.some((rule) => rule.kind === kind && rule.paymentMethod === method)
   return (
     <Card>
       <CardHeader
-        title={KIND_COPY[kind].title}
+        title={copy.title}
         action={
           <Button variant={primary ? 'primary' : 'secondary'} onClick={onChange}>
             Change
@@ -112,11 +133,13 @@ function RateCard({
         }
       />
       <p className="font-figure text-4xl font-bold text-fg">{pct(rate.percent)}</p>
-      <p className="mt-1 text-sm text-muted">{KIND_COPY[kind].base}</p>
+      <p className="mt-1 text-sm text-muted">{copy.base}</p>
       <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
         <Chip tone={rate.bearer === 'PLATFORM' ? 'info' : 'neutral'}>{BEARER_LABEL[rate.bearer]}</Chip>
         <span className="text-muted">
-          {rate.effectiveFrom && new Date(rate.effectiveFrom).getFullYear() > 2020
+          {!own
+            ? 'Same as the platform fee'
+            : rate.effectiveFrom && new Date(rate.effectiveFrom).getFullYear() > 2020
             ? `Since ${formatDateTime(rate.effectiveFrom)}`
             : 'Starting rate'}
         </span>
@@ -139,7 +162,9 @@ function History({ rules }: { rules: FeeRule[] }) {
           <li key={rule.id} className="flex flex-wrap items-start justify-between gap-2 py-3 first:pt-0 last:pb-0">
             <div className="min-w-0">
               <p className="text-sm font-medium text-fg">
-                {KIND_COPY[rule.kind].title} · <span className="font-figure">{pct(rule.percent)}</span>
+                {rule.paymentMethod === 'OFFLINE' ? OFFLINE_COPY.title : KIND_COPY[rule.kind].title}
+                {rule.paymentMethod && rule.paymentMethod !== 'OFFLINE' ? ` (${rule.paymentMethod === 'COD' ? 'cash on delivery' : 'online'} only)` : ''} ·{' '}
+                <span className="font-figure">{pct(rule.percent)}</span>
                 <span className="font-normal text-muted"> · {BEARER_LABEL[rule.bearer]}</span>
               </p>
               <p className="text-xs text-muted wrap-anywhere">
@@ -158,11 +183,13 @@ function History({ rules }: { rules: FeeRule[] }) {
 
 function ChangeDialog({
   kind,
+  method,
   current,
   onClose,
   onSaved,
 }: {
   kind: FeeKind
+  method?: FeeMethod
   current: RateNow
   onClose: () => void
   onSaved: (message: string) => void
@@ -178,6 +205,7 @@ function ChangeDialog({
   const percentOk = /^\d{1,3}(\.\d{1,2})?$/.test(percent.trim()) && Number(percent) <= 100
   const whenOk = when === 'now' || (startsAt !== '' && new Date(startsAt) > new Date())
   const canSave = percentOk && whenOk
+  const copy = method === 'OFFLINE' ? OFFLINE_COPY : KIND_COPY[kind]
 
   async function save() {
     setBusy(true)
@@ -188,10 +216,11 @@ function ChangeDialog({
         percent: percent.trim(),
         effectiveFrom: when === 'now' ? null : new Date(startsAt).toISOString(),
         ...(kind === 'GATEWAY' ? { bearer } : {}),
+        ...(method ? { paymentMethod: method } : {}),
         note: note.trim() || null,
       })
       onSaved(
-        `${KIND_COPY[kind].title} set to ${pct(percent.trim())} ${when === 'now' ? 'from now' : `from ${formatDateTime(new Date(startsAt))}`}.`,
+        `${copy.title} set to ${pct(percent.trim())} ${when === 'now' ? 'from now' : `from ${formatDateTime(new Date(startsAt))}`}.`,
       )
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Could not save the fee')
@@ -202,8 +231,8 @@ function ChangeDialog({
   return (
     <Dialog
       open
-      title={`Change ${KIND_COPY[kind].title.toLowerCase()}`}
-      subtitle={`Now ${pct(current.percent)}. Orders already placed keep their fee.`}
+      title={`Change ${copy.title.toLowerCase()}`}
+      subtitle={`Now ${pct(current.percent)}. Orders already placed keep their fee.${method ? ' From now on these bills keep their own rate — a later platform fee change does not touch them.' : ''}`}
       onClose={() => {
         if (!busy) onClose()
       }}
@@ -225,7 +254,7 @@ function ChangeDialog({
           inputMode="decimal"
           value={percent}
           onChange={(e) => setPercent(e.target.value.replace(/[^\d.]/g, ''))}
-          hint={percentOk ? `${pct(percent || '0')} ${KIND_COPY[kind].base}` : 'Enter 0 to 100, at most 2 decimals (e.g. 2.5).'}
+          hint={percentOk ? `${pct(percent || '0')} ${copy.base}` : 'Enter 0 to 100, at most 2 decimals (e.g. 2.5).'}
           aria-invalid={!percentOk}
         />
         <SelectInput

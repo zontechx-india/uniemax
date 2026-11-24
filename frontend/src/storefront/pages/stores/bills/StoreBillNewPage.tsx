@@ -7,14 +7,15 @@ import { Dialog } from '../../../../shared/ui/Dialog'
 import { ErrorNote } from '../../../../shared/ui/form'
 import { FIELD_LABEL, fieldClass } from '../../../../shared/ui/field'
 import { SegmentedControl } from '../../../../shared/ui/SegmentedControl'
-import { billsApi } from '../../../features/bills/billsApi'
-import type { PickerProduct, PickerVariant } from '../../../features/bills/billsApi'
+import { billsApi, OFFLINE_MODE } from '../../../features/bills/billsApi'
+import type { OfflineMode, PickerProduct, PickerVariant } from '../../../features/bills/billsApi'
 import { publicOrderApi } from '../../../features/stores/storesApi'
+import { INDIAN_STATES } from '../../../features/stores/storeProfile'
 import { useManagedStore } from '../../../features/stores/useManagedStore'
-import { ArrowLeftIcon, ArrowRightIcon, ClockIcon, PlusIcon, ReceiptIcon, SearchIcon } from '../../../layout/icons'
+import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, ClockIcon, PlusIcon, ReceiptIcon, SearchIcon } from '../../../layout/icons'
 import { PageHeader } from '../ui/PageHeader'
 import { PanelCard } from '../ui/PanelCard'
-import { ItemPicker, Stepper } from './ItemPicker'
+import { ChoiceChip, ItemPicker, Stepper } from './ItemPicker'
 import { lineKey, loadDraft, rupees, saveDraft, Thumb, variantLabel } from './billUi'
 import type { BillDraft } from './billUi'
 
@@ -83,7 +84,10 @@ export function StoreBillNewPage() {
   const itemCount = draft.lines.reduce((s, l) => s + l.qty, 0)
   const discountRaw = Number(draft.discount) || 0
   const discount = Math.min(subtotal, Math.round(draft.discountType === 'PERCENT' ? (subtotal * Math.min(discountRaw, 100)) / 100 : discountRaw))
-  const shipping = draft.shipping.trim() === '' ? autoShipping : Math.max(0, Math.round(Number(draft.shipping) || 0))
+  const offline = draft.payWay === 'OFFLINE'
+  // Taken in the shop: nothing to deliver, so no delivery charge (the server agrees).
+  const taken = offline && draft.handover === 'TAKEN'
+  const shipping = taken ? 0 : draft.shipping.trim() === '' ? autoShipping : Math.max(0, Math.round(Number(draft.shipping) || 0))
   const total = subtotal - discount + (shipping ?? 0)
 
   const addLine = (p: PickerProduct, v: PickerVariant, qty: number) => {
@@ -123,6 +127,14 @@ export function StoreBillNewPage() {
     if (draft.discountType === 'PERCENT' && discountRaw > 100) e.discount = 'A discount cannot be more than 100%.'
     if (draft.discountType === 'AMOUNT' && subtotal > 0 && discountRaw > subtotal) e.discount = `A discount cannot be more than the items (${rupees(subtotal)}).`
     if (!e.items && !e.discount && subtotal - discount + (shipping ?? 0) <= 0) e.discount = 'The total must be more than ₹0.'
+    if (offline) {
+      if (!draft.offlineMode) e.offlineMode = 'Choose how they paid you.'
+      if (!taken) {
+        if (draft.address.trim().length < 10) e.address = 'Enter the delivery address.'
+        if (!/^[1-9]\d{5}$/.test(draft.pincode.trim())) e.pincode = 'Enter a 6-digit PIN code.'
+        if (!draft.state) e.state = 'Choose the state.'
+      }
+    }
     setErrors(e)
     if (Object.keys(e).length === 0) {
       setSaveError(null)
@@ -138,11 +150,18 @@ export function StoreBillNewPage() {
         customerPhone: digits(draft.phone),
         customerName: draft.name.trim() || undefined,
         items: draft.lines.map((l) => ({ productId: l.productId, variantId: l.variantId, quantity: l.qty })),
-        shippingCharge: draft.shipping.trim() === '' ? null : Math.max(0, Number(draft.shipping) || 0),
+        shippingCharge: taken ? 0 : draft.shipping.trim() === '' ? null : Math.max(0, Number(draft.shipping) || 0),
         discountType: draft.discountType,
         discountValue: discountRaw,
         note: draft.note.trim() || undefined,
         expiryDays: draft.expiryDays,
+        payWay: draft.payWay,
+        ...(offline && {
+          offlineMode: draft.offlineMode || undefined,
+          offlineRef: draft.offlineRef.trim() || undefined,
+          handover: draft.handover,
+          ...(!taken && { address: draft.address.trim(), pincode: draft.pincode.trim(), state: draft.state }),
+        }),
       })
       saveDraft(store.id, null)
       navigate(`/mystores/${store.slug}/bills/${bill.id}`, { replace: true })
@@ -164,7 +183,7 @@ export function StoreBillNewPage() {
         <ArrowLeftIcon className="h-5 w-5" />
         Bills
       </Button>
-      <PageHeader icon={ReceiptIcon} title="Create a bill" description="Pick what they are buying from your shop. Prices come from your products." />
+      <PageHeader icon={ReceiptIcon} title="Create a bill" description="Pick what they are buying from your shop. Prices come from your products. Already paid in cash or UPI? Choose that in step 3." />
 
       <PanelCard title={step(1, 'Customer')} description="Their WhatsApp number — you send them the bill.">
         <div className="space-y-4">
@@ -226,8 +245,130 @@ export function StoreBillNewPage() {
         {errors.items && <p role="alert" className="mt-1.5 text-sm font-medium text-danger">{errors.items}</p>}
       </PanelCard>
 
-      <PanelCard title={step(3, 'Delivery, discount and note')}>
+      <PanelCard
+        title={step(3, 'Payment')}
+        description={offline ? 'They already paid you. The bill is saved as a paid order — you send it as a receipt.' : 'You send them a link on WhatsApp. They pay online from it.'}
+      >
         <div className="space-y-4">
+          <SegmentedControl
+            label="How is it paid?"
+            value={draft.payWay}
+            onChange={(v) => set('payWay', v)}
+            options={[
+              { value: 'LINK', label: 'Send a pay link' },
+              { value: 'OFFLINE', label: 'Already paid me' },
+            ]}
+            className="w-full"
+            cellClassName="min-h-11 px-3"
+          />
+          {offline && (
+            <>
+              <div>
+                <span className={FIELD_LABEL}>They paid by</span>
+                {/* Nothing chosen at first — the seller says how, never a silent "Cash". */}
+                <div role="radiogroup" aria-label="They paid by" className="grid grid-cols-4 gap-2">
+                  {(Object.keys(OFFLINE_MODE) as OfflineMode[]).map((m) => (
+                    <ChoiceChip
+                      key={m}
+                      name="bill-offline-mode"
+                      label={m === 'BANK' ? 'Bank' : OFFLINE_MODE[m]}
+                      checked={draft.offlineMode === m}
+                      disabled={false}
+                      onPick={() => set('offlineMode', m)}
+                    />
+                  ))}
+                </div>
+                {errors.offlineMode && <p role="alert" className="mt-1.5 text-sm font-medium text-danger">{errors.offlineMode}</p>}
+              </div>
+              {draft.offlineMode && draft.offlineMode !== 'CASH' && (
+                <label className="block">
+                  <span className={FIELD_LABEL}>
+                    Reference <span className="font-normal text-muted">(optional)</span>
+                  </span>
+                  <input
+                    value={draft.offlineRef}
+                    onChange={(e) => set('offlineRef', e.target.value)}
+                    maxLength={60}
+                    autoComplete="off"
+                    placeholder={draft.offlineMode === 'UPI' ? 'UPI ref no., e.g. 4321 0987 6543' : 'Any note to find this payment'}
+                    className={fieldClass()}
+                  />
+                </label>
+              )}
+              <div>
+                <span className={FIELD_LABEL}>How do they get it?</span>
+                <SegmentedControl
+                  label="How do they get it?"
+                  value={draft.handover}
+                  onChange={(v) => set('handover', v)}
+                  options={[
+                    { value: 'DELIVER', label: 'Deliver to them' },
+                    { value: 'TAKEN', label: 'Took it now' },
+                  ]}
+                  className="w-full"
+                  cellClassName="min-h-10 px-3"
+                />
+                <span className="mt-1.5 block text-sm text-muted">
+                  {taken ? 'Saved as delivered. Stock goes down now.' : 'Saved as a confirmed order — pack and ship it like any order. Stock goes down now.'}
+                </span>
+              </div>
+              {!taken && (
+                <>
+                  <label className="block">
+                    <span className={FIELD_LABEL}>House, street and area</span>
+                    <textarea
+                      value={draft.address}
+                      onChange={(e) => set('address', e.target.value)}
+                      rows={3}
+                      maxLength={300}
+                      autoComplete="off"
+                      aria-invalid={errors.address ? true : undefined}
+                      className={fieldClass({ multiline: true, invalid: !!errors.address })}
+                    />
+                    {errors.address && <p role="alert" className="mt-1.5 text-sm font-medium text-danger">{errors.address}</p>}
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="block">
+                      <span className={FIELD_LABEL}>PIN code</span>
+                      <input
+                        value={draft.pincode}
+                        onChange={(e) => set('pincode', e.target.value.replace(/\D/g, ''))}
+                        inputMode="numeric"
+                        maxLength={6}
+                        autoComplete="off"
+                        aria-invalid={errors.pincode ? true : undefined}
+                        className={fieldClass({ invalid: !!errors.pincode })}
+                      />
+                      {errors.pincode && <p role="alert" className="mt-1.5 text-sm font-medium text-danger">{errors.pincode}</p>}
+                    </label>
+                    <label className="block">
+                      <span className={FIELD_LABEL}>State</span>
+                      <select
+                        value={draft.state}
+                        onChange={(e) => set('state', e.target.value)}
+                        aria-invalid={errors.state ? true : undefined}
+                        className={fieldClass({ invalid: !!errors.state })}
+                      >
+                        <option value="">Choose</option>
+                        {INDIAN_STATES.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.state && <p role="alert" className="mt-1.5 text-sm font-medium text-danger">{errors.state}</p>}
+                    </label>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </PanelCard>
+
+      <PanelCard title={step(4, taken ? 'Discount and note' : 'Delivery, discount and note')}>
+        <div className="space-y-4">
+          {!taken && (
           <label className="block">
             <span className={FIELD_LABEL}>Delivery charge (₹)</span>
             <input
@@ -241,6 +382,7 @@ export function StoreBillNewPage() {
             />
             <span className="mt-1.5 block text-sm text-muted">Leave empty to use your usual delivery rate.</span>
           </label>
+          )}
           <div>
             <span className={FIELD_LABEL}>
               Discount <span className="font-normal text-muted">(optional)</span>
@@ -276,6 +418,7 @@ export function StoreBillNewPage() {
             </span>
             <textarea value={draft.note} onChange={(e) => set('note', e.target.value)} maxLength={200} rows={2} placeholder="e.g. Blouse stitched to your size" className={fieldClass({ multiline: true })} />
           </label>
+          {!offline && (
           <div>
             <span className={FIELD_LABEL}>Link stays open for</span>
             <SegmentedControl
@@ -292,6 +435,7 @@ export function StoreBillNewPage() {
             />
             <span className="mt-1.5 block text-sm text-muted">They add their address when they pay. Stock goes down only when they pay.</span>
           </div>
+          )}
         </div>
       </PanelCard>
 
@@ -325,7 +469,7 @@ export function StoreBillNewPage() {
               Edit
             </Button>
             <Button variant="ink" size="lg" className="flex-1 sm:flex-none" loading={saving} onClick={make}>
-              Make bill
+              {offline ? 'Save as paid' : 'Make bill'}
             </Button>
           </div>
         }
@@ -352,10 +496,12 @@ export function StoreBillNewPage() {
               <dt>Items ({itemCount})</dt>
               <dd className="font-figure tabular-nums text-fg">{rupees(subtotal)}</dd>
             </div>
-            <div className="flex justify-between text-muted">
-              <dt>Delivery</dt>
-              <dd className="font-figure tabular-nums text-fg">{shipping === null ? 'Your usual rate' : shipping === 0 ? 'Free' : rupees(shipping)}</dd>
-            </div>
+            {!taken && (
+              <div className="flex justify-between text-muted">
+                <dt>Delivery</dt>
+                <dd className="font-figure tabular-nums text-fg">{shipping === null ? 'Your usual rate' : shipping === 0 ? 'Free' : rupees(shipping)}</dd>
+              </div>
+            )}
             {discount > 0 && (
               <div className="flex justify-between text-muted">
                 <dt>Discount</dt>
@@ -368,12 +514,30 @@ export function StoreBillNewPage() {
             </div>
           </dl>
 
-          <p className="flex items-start gap-2 text-sm text-muted">
-            <ClockIcon className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>
-              Link open for {draft.expiryDays} day{draft.expiryDays === 1 ? '' : 's'}. You send it from your WhatsApp next; it becomes a confirmed order when they pay.
-            </span>
-          </p>
+          {offline ? (
+            <div className="space-y-1 text-sm">
+              <p className="flex items-start gap-2 text-muted">
+                <CheckIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  <span className="font-medium text-fg">Paid to you{draft.offlineMode ? ` · ${OFFLINE_MODE[draft.offlineMode]}` : ''}</span>
+                  {draft.offlineRef.trim() && <> · Ref {draft.offlineRef.trim()}</>}
+                </span>
+              </p>
+              <p className="pl-6 text-muted">
+                {taken
+                  ? 'They took it in the shop. Saved as a delivered order; stock goes down now.'
+                  : `Deliver to ${draft.address.trim()}, ${draft.state} ${draft.pincode.trim()}. Saved as a confirmed order to pack and ship.`}{' '}
+                You send the receipt on WhatsApp next. Your platform fee is added to your dues, like cash on delivery.
+              </p>
+            </div>
+          ) : (
+            <p className="flex items-start gap-2 text-sm text-muted">
+              <ClockIcon className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                Link open for {draft.expiryDays} day{draft.expiryDays === 1 ? '' : 's'}. You send it from your WhatsApp next; it becomes a confirmed order when they pay.
+              </span>
+            </p>
+          )}
           {saveError && <ErrorNote>{saveError}</ErrorNote>}
         </div>
       </Dialog>

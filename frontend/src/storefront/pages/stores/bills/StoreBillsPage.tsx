@@ -5,7 +5,7 @@ import type { ListMeta } from '../../../../shared/auth/http'
 import { Button, buttonClass } from '../../../../shared/ui/Button'
 import { ErrorNote } from '../../../../shared/ui/form'
 import { SegmentedControl } from '../../../../shared/ui/SegmentedControl'
-import { billsApi, spacedNumber } from '../../../features/bills/billsApi'
+import { billsApi, OFFLINE_MODE, spacedNumber } from '../../../features/bills/billsApi'
 import type { Bill, BillListSummary, BillTab } from '../../../features/bills/billsApi'
 import { useManagedStore } from '../../../features/stores/useManagedStore'
 import { ChevronRightIcon, ClockIcon, PlusIcon, ReceiptIcon } from '../../../layout/icons'
@@ -185,6 +185,7 @@ export function StoreBillsPage() {
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <BillStatePill state={bill.state} />
                         {bill.state === 'OPEN' && <QuietTag>{BILL_STAGE[bill.stage]}</QuietTag>}
+                        {bill.payWay === 'OFFLINE' && <QuietTag>To you · {bill.offlineMode ? OFFLINE_MODE[bill.offlineMode] : 'Direct'}</QuietTag>}
                       </div>
                     </div>
                     <ChevronRightIcon className="h-5 w-5 shrink-0 text-muted" />

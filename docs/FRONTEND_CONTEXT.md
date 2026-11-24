@@ -2890,6 +2890,20 @@ the customer pays it like a checkout order. API client `features/bills/billsApi.
   link + Copy link — both recorded via `/share` — timeline, Cancel low on the
   page, "Make a new bill like this" for closed ones). Order rows show "From a
   bill" (`source: 'BILL'`).
+- **Already paid** — `StoreBillNewPage` step 3 "Payment" is a
+  `SegmentedControl` Send a pay link · Already paid me. Already paid: "They
+  paid by" `ChoiceChip` radios (Cash · UPI · Bank · Other — none chosen until
+  the seller taps one), an optional reference (not for cash), "How do they get
+  it?" Deliver to them (address + PIN + `INDIAN_STATES`) · Took it now (no
+  delivery charge); no link days; the review button reads "Save as paid".
+  `StoreBillPage` then shows "Paid to you · Cash", the receipt text
+  (`billMessage` with `payWay`), "Send receipt" + Order, and a timeline made →
+  paid → receipt sent → opened. Labels: `paymentLabel` "Paid to you directly",
+  the customer's Orders "Paid at the shop", admin `PAYMENT_METHOD_LABEL`
+  "Paid to seller" + a Payment-method filter option; order pages show
+  `offlineMode` and **Paid by** (`paidByName`) when someone else paid. Admin
+  Fee settings has a third card "Fee on bills paid to the seller" (a PLATFORM
+  rule with `paymentMethod: OFFLINE`).
 - **Item picker** (`ItemPicker.tsx`, a `fill` + `flush` `Dialog`) for big
   catalogs: server search (30 a page, Show more), category list (radio rows
   with counts), "Often billed". A product without options adds with + then a

@@ -120,6 +120,10 @@ export async function getOrder(orderId: string) {
       customFields: true,
       cfOrderId: true,
       paymentIntentId: true,
+      // A seller's bill: how the seller was paid (OFFLINE), who paid (link).
+      offlineMode: true,
+      paidByName: true,
+      paidByPhone: true,
       confirmedAt: true,
       packedAt: true,
       shippedAt: true,

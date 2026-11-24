@@ -7,6 +7,7 @@ import { copyToClipboard } from '../../../shared/share'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { ErrorNote, InfoNote } from '../../../shared/ui/form'
 import { formatPrice, sellerOrderApi } from '../../features/stores/storesApi'
+import { OFFLINE_MODE } from '../../features/bills/billsApi'
 import type {
   OrderShipment,
   PlacedOrder,
@@ -392,9 +393,18 @@ export function StoreOrderDetailPage() {
             </h2>
             <p className="mt-0.5 text-base text-fg">
               {order.items.length} item{order.items.length === 1 ? '' : 's'} ·{' '}
-              <span className="font-semibold">{paymentLabel(order.paymentMethod, order.paymentStatus)}</span>
+              <span className="font-semibold">
+                {paymentLabel(order.paymentMethod, order.paymentStatus)}
+                {order.offlineMode && ` · ${OFFLINE_MODE[order.offlineMode]}`}
+              </span>
               {order.fulfilment === 'PICKUP' && <> · Customer collects</>}
             </p>
+            {order.paidByName && (
+              <p className="mt-0.5 text-hint text-muted">
+                Paid by {order.paidByName}
+                {order.paidByPhone && ` (${order.paidByPhone})`}
+              </p>
+            )}
             <p className="mt-0.5 text-hint text-muted">
               Order {order.orderNumber}
               {order.paymentRef === 'DEV-SIMULATED' && <> · simulated payment (development)</>}

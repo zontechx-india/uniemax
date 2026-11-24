@@ -3,7 +3,7 @@ import { MediaImg } from '../../../../shared/media/MediaImg'
 import { StatusPill } from '../ui/StatusPill'
 import type { StatusTone } from '../ui/StatusPill'
 import { formatPrice } from '../../../features/stores/storesApi'
-import type { Bill, BillStage, BillState, PickerProduct, PickerVariant } from '../../../features/bills/billsApi'
+import type { Bill, BillPayWay, BillStage, BillState, OfflineMode, PickerProduct, PickerVariant } from '../../../features/bills/billsApi'
 
 /**
  * Shared pieces of the seller's Bills screens (/mystores/{slug}/bills/**).
@@ -70,6 +70,15 @@ export interface BillDraft {
   discount: string
   note: string
   expiryDays: 1 | 3 | 7
+  /** LINK = they pay from the link; OFFLINE = already paid to the seller. */
+  payWay: BillPayWay
+  offlineMode: OfflineMode | ''
+  offlineRef: string
+  /** OFFLINE: DELIVER (seller types the address) or TAKEN (in the shop, now). */
+  handover: 'DELIVER' | 'TAKEN'
+  address: string
+  pincode: string
+  state: string
 }
 
 export const emptyDraft = (): BillDraft => ({
@@ -81,6 +90,13 @@ export const emptyDraft = (): BillDraft => ({
   discount: '',
   note: '',
   expiryDays: 3,
+  payWay: 'LINK',
+  offlineMode: '',
+  offlineRef: '',
+  handover: 'DELIVER',
+  address: '',
+  pincode: '',
+  state: '',
 })
 
 /** The draft survives a reload or a quick trip elsewhere (this tab only). */
@@ -123,6 +139,12 @@ export function draftFromBill(bill: Bill): BillDraft {
     discountType: bill.discountType ?? 'AMOUNT',
     discount: bill.discountValue && Number(bill.discountValue) > 0 ? String(Number(bill.discountValue)) : '',
     note: bill.note ?? '',
+    // Same way of paying and address; a new payment is never copied (mode, reference).
+    payWay: bill.payWay,
+    handover: bill.handedOver ? 'TAKEN' : 'DELIVER',
+    address: bill.address?.address ?? '',
+    pincode: bill.address?.pincode ?? '',
+    state: bill.address?.state ?? '',
   }
 }
 

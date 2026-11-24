@@ -10,7 +10,13 @@ export { amountToPaise, paiseToAmount };
 export type FeeKind = "PLATFORM" | "GATEWAY";
 export type FeeScope = "GLOBAL" | "STORE" | "CATEGORY";
 export type FeeBearer = "SELLER" | "PLATFORM";
-export type Method = "ONLINE" | "COD";
+/** ONLINE = paid through UnieMax; COD = cash to the courier / at pickup;
+ *  OFFLINE = paid to the seller directly on a seller's bill (modules/bills). */
+export type Method = "ONLINE" | "COD" | "OFFLINE";
+
+/** The seller already holds the customer's money (COD, OFFLINE): nothing to
+ *  pay out, the platform fee is the seller's dues (OWED). */
+export const sellerHoldsMoney = (method: string): boolean => method === "COD" || method === "OFFLINE";
 
 export interface RuleLike {
   id: string;
@@ -206,7 +212,7 @@ export interface Leg {
 
 /**
  * What a delivered order posts. Online (paid): the sale and the fees into
- * PAYABLE. COD: the platform fee into OWED (the seller holds the cash).
+ * PAYABLE. COD / OFFLINE: the platform fee into OWED (the seller holds the money).
  * Zero-amount legs are dropped.
  */
 export function orderLegs(
@@ -253,7 +259,10 @@ export function orderLegs(
             type: "COD_PLATFORM_FEE",
             amount: fin.platformFeePaise,
             key: `order:${order.id}:cod-fee`,
-            description: `Platform fee on cash order ${order.orderNumber}`,
+            description:
+              order.method === "OFFLINE"
+                ? `Platform fee on order ${order.orderNumber} paid to you directly`
+                : `Platform fee on cash order ${order.orderNumber}`,
           },
         ];
   return legs.filter((leg) => leg.amount !== 0n);
@@ -366,7 +375,7 @@ export function settlementStatus(f: SettlementFacts): SettlementResult {
     f.paymentStatus === "REFUNDED" || (f.status === "CANCELLED" && f.refunds.some((r) => r.status === "SUCCEEDED"));
   // UnieMax owes nothing on a cash order (the seller has the cash) or on one
   // that was cancelled / refunded — so nothing is "remaining" to pay there.
-  const owesNothing = f.method === "COD" || f.status === "CANCELLED" || refunded;
+  const owesNothing = sellerHoldsMoney(f.method) || f.status === "CANCELLED" || refunded;
   const totals = payoutTotals(
     owesNothing ? 0n : f.earningPaise,
     f.payouts.map((p) => ({ status: p.status, amountPaise: p.amountPaise, duesPaise: p.duesPaise })),
@@ -381,6 +390,8 @@ export function settlementStatus(f: SettlementFacts): SettlementResult {
     return result(f.refunds.some((r) => r.status === "PENDING") ? "REFUND_PENDING" : "CANCELLED");
   }
   if (f.method === "COD") return result(f.status === "DELIVERED" ? "CASH_COLLECTED" : "CASH_TO_COLLECT");
+  // Paid to the seller when the bill was made — nothing left to collect.
+  if (f.method === "OFFLINE") return result("CASH_COLLECTED");
   if (f.status !== "DELIVERED") return result("AWAITING_DELIVERY");
   if (totals.inProgress > 0n) return result("ON_ITS_WAY");
   if (totals.remaining === 0n) return result("SETTLED");

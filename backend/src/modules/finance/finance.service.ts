@@ -15,6 +15,8 @@ import {
   resolveRule,
   settlementStatus,
   amountToPaise,
+  sellerHoldsMoney,
+  type Method,
   type ComputedFinancials,
   type Leg,
 } from "./finance.rules.js";
@@ -58,9 +60,10 @@ function loadRules(db: Db) {
 export async function currentRates(storeId: string | null = null) {
   const rules = await loadRules(prisma);
   const now = new Date();
-  const ctx = (method: "ONLINE" | "COD") => ({ storeId, categoryId: null, method, at: now });
+  const ctx = (method: Method) => ({ storeId, categoryId: null, method, at: now });
   const platform = resolveRule(rules, "PLATFORM", ctx("ONLINE"));
   const platformCod = resolveRule(rules, "PLATFORM", ctx("COD"));
+  const platformOffline = resolveRule(rules, "PLATFORM", ctx("OFFLINE"));
   const gateway = resolveRule(rules, "GATEWAY", ctx("ONLINE"));
   const upcoming = rules.filter((rule) => rule.effectiveFrom > now && rule.scope === "GLOBAL" && !rule.retiredAt);
   const show = (rule: (typeof rules)[number] | null) =>
@@ -71,9 +74,12 @@ export async function currentRates(storeId: string | null = null) {
     platform: show(platform),
     /** Same as `platform` until a COD-only rule exists. */
     platformCod: show(platformCod),
+    /** Bills paid to the seller directly — `platform` until an OFFLINE rule exists. */
+    platformOffline: show(platformOffline),
     gateway: show(gateway),
     upcoming: upcoming.map((rule) => ({
       kind: rule.kind,
+      paymentMethod: rule.paymentMethod,
       percent: rule.percent.toFixed(2),
       bearer: rule.bearer,
       effectiveFrom: rule.effectiveFrom,
@@ -103,6 +109,8 @@ export async function createFeeRule(input: FeeRuleCreateInput, actor: PostActor)
     data: {
       kind: input.kind,
       scope: "GLOBAL",
+      // A platform fee for one payment method only (e.g. OFFLINE bills).
+      paymentMethod: input.kind === "PLATFORM" ? (input.paymentMethod ?? null) : null,
       percent: new Prisma.Decimal(bpToPercent(bp)),
       // The platform fee is always the seller's; the gateway fee is whoever's chosen.
       bearer: input.kind === "PLATFORM" ? "SELLER" : (input.bearer ?? "PLATFORM"),
@@ -133,7 +141,8 @@ const ORDER_FOR_FIN = {
 
 type OrderForFin = Prisma.OrderGetPayload<{ select: typeof ORDER_FOR_FIN }>;
 
-const method = (order: { paymentMethod: string }) => (order.paymentMethod === "COD" ? "COD" : "ONLINE") as "ONLINE" | "COD";
+const method = (order: { paymentMethod: string }): Method =>
+  order.paymentMethod === "COD" ? "COD" : order.paymentMethod === "OFFLINE" ? "OFFLINE" : "ONLINE";
 
 async function compute(db: Db, order: OrderForFin): Promise<ComputedFinancials> {
   return computeFinancials(
@@ -401,13 +410,16 @@ export async function getStoreFinance(storeId: string) {
     currentRates(storeId),
   ]);
   if (!store && !balance) throw HttpError.notFound("Store not found");
+  // "cod" = every sale the seller holds the money for (COD + OFFLINE bills).
   const pick = (m: "ONLINE" | "COD") => {
-    const row = fees.find((f) => (m === "COD" ? f.paymentMethod === "COD" : f.paymentMethod !== "COD"));
+    const rows = fees.filter((f) => (m === "COD") === sellerHoldsMoney(f.paymentMethod ?? ""));
+    const sum = (k: "orderTotal" | "platformFee" | "gatewayFee") =>
+      rows.reduce((acc, r) => acc.add(r._sum[k] ?? new Prisma.Decimal(0)), new Prisma.Decimal(0));
     return {
-      orders: row?._count._all ?? 0,
-      sales: money(row?._sum.orderTotal ?? new Prisma.Decimal(0)),
-      platformFees: money(row?._sum.platformFee ?? new Prisma.Decimal(0)),
-      gatewayFees: money(row?._sum.gatewayFee ?? new Prisma.Decimal(0)),
+      orders: rows.reduce((acc, r) => acc + r._count._all, 0),
+      sales: money(sum("orderTotal")),
+      platformFees: money(sum("platformFee")),
+      gatewayFees: money(sum("gatewayFee")),
     };
   };
   return {
@@ -615,8 +627,9 @@ export async function getSellerTransactions(storeId: string, query: TransactionL
     storeId,
     ...SELLER_VISIBLE,
     ...(placedAt ? { placedAt } : {}),
-    ...(query.mode === "COD" ? { paymentMethod: "COD" } : {}),
-    ...(query.mode === "ONLINE" ? { paymentMethod: { not: "COD" } } : {}),
+    // "Cash" = the seller holds the money: COD and OFFLINE (paid on a bill).
+    ...(query.mode === "COD" ? { paymentMethod: { in: ["COD", "OFFLINE"] } } : {}),
+    ...(query.mode === "ONLINE" ? { paymentMethod: { notIn: ["COD", "OFFLINE"] } } : {}),
     ...(q
       ? {
           OR: [
@@ -658,7 +671,7 @@ export async function getSellerTransactions(storeId: string, query: TransactionL
         .reduce((acc, row) => acc + decimalToPaise(row._sum.amount ?? new Prisma.Decimal(0)), 0n),
     );
   const sumBilled = (cod: boolean) => {
-    const rows = billed.filter((row) => (row.paymentMethod === "COD") === cod);
+    const rows = billed.filter((row) => sellerHoldsMoney(row.paymentMethod) === cod);
     return {
       orders: rows.reduce((acc, row) => acc + row._count._all, 0),
       paise: rows.reduce((acc, row) => acc + decimalToPaise(row._sum.total ?? new Prisma.Decimal(0)), 0n),

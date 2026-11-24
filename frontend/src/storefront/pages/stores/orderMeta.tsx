@@ -33,11 +33,13 @@ export function OrderStatusChip({ status }: { status: OrderStatus }) {
 
 /** One line summarizing how (and whether) the order is paid. */
 export function paymentLabel(
-  method: 'ONLINE' | 'COD',
+  method: 'ONLINE' | 'COD' | 'OFFLINE',
   status: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED',
 ): string {
   if (status === 'REFUNDED') return 'Refunded'
   if (status === 'FAILED') return 'Payment failed'
+  // A seller's bill paid to the seller (cash / UPI / bank) — never through UnieMax.
+  if (method === 'OFFLINE') return 'Paid to you directly'
   if (method === 'ONLINE') {
     return status === 'PAID' ? 'Paid online' : 'Payment pending'
   }

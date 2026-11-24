@@ -18,6 +18,8 @@ export interface AppEvents {
   "catalog.variant.changed": { variantId: string; deleted?: boolean };
   /** A store's payment / shipping settings, or its suspension, changed. */
   "catalog.store.changed": { storeId: string };
+  /** A customer signed in (any strategy). Bills link orders made for their phone. */
+  "customer.signedIn": { customerId: string };
 }
 
 type EventName = keyof AppEvents;

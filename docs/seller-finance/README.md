@@ -9,7 +9,8 @@
 
 UnieMax takes a **platform fee** on each seller's product price. The fee is
 never shown to customers — it is taken from what UnieMax pays the seller (online
-orders) or owed by the seller (cash-on-delivery orders). Every money movement
+orders) or owed by the seller (cash-on-delivery orders, and seller's bills paid
+to the seller directly — payment method `OFFLINE`). Every money movement
 between UnieMax and a seller is an entry on the **seller ledger**.
 
 | Who | Sees |
@@ -44,9 +45,12 @@ optional `paymentMethod`, `storeId`, `categoryId`, `retiredAt`.
   force at the order's `placedAt`, matching its store / category / payment
   method → **most specific wins** (STORE > CATEGORY > GLOBAL, a method-specific
   rule beats an any-method one) → then the latest `effectiveFrom`.
-- **Today only GLOBAL rules are offered** in the console. STORE / CATEGORY /
-  per-method rules already resolve correctly; adding them = a form + the API
-  accepting the scope. CATEGORY needs `categoryId` filled on each order line
+- **Today only GLOBAL rules are offered** in the console, plus one
+  per-method platform rule: **"Fee on bills paid to the seller"** (`paymentMethod:
+  OFFLINE`). Until it exists those bills follow the platform fee; once set it
+  wins for them (e.g. 0% to waive it), and later platform fee changes no longer
+  touch them. STORE / CATEGORY rules already resolve correctly; adding them =
+  a form + the API accepting the scope. CATEGORY needs `categoryId` filled on each order line
   (`compute()` in `finance.service.ts` passes `null` today).
 - The migration seeds `feerule_platform_initial` and `feerule_gateway_initial`
   (0%, effective 2020-01-01), so every existing order resolves to them.
@@ -73,7 +77,7 @@ entries (`seller_ledger_entries`) per bucket:
 | --- | --- |
 | `PAYABLE` | UnieMax owes the seller — ready to pay |
 | `IN_PAYOUT` | Taken out of PAYABLE for a payout not finished (stops double payment) |
-| `OWED` | The seller owes UnieMax (COD platform fees, corrections) |
+| `OWED` | The seller owes UnieMax (COD and OFFLINE platform fees, corrections) |
 
 Entries are **never edited or deleted**; each has a signed amount, balance
 before/after, a unique `idempotencyKey`, order / payout links, who made it.
@@ -83,7 +87,7 @@ keys already posted).
 | Event | Entries |
 | --- | --- |
 | Online order delivered + paid | `ORDER_SALE` +total, `PLATFORM_FEE` −fee (and `GATEWAY_FEE` −fee if the seller bears it) → PAYABLE |
-| COD order delivered | `COD_PLATFORM_FEE` +fee → OWED |
+| COD or OFFLINE order delivered | `COD_PLATFORM_FEE` +fee → OWED (no gateway fee; `sellerHoldsMoney` in `finance.rules.ts`) |
 | Payout created | `DUES_SETTLED` (PAYABLE −dues, OWED −dues) · `PAYOUT_RESERVED` (PAYABLE −amount, IN_PAYOUT +amount) |
 | Payout reaches SUCCEEDED | `PAYOUT_PAID` IN_PAYOUT −amount |
 | Payout FAILED / CANCELLED before paid | `PAYOUT_RELEASED` back to PAYABLE · `DUES_RESTORED` |
@@ -147,16 +151,17 @@ Status (`finance.rules.ts → settlementStatus`, unit-tested in
 | --- | --- |
 | `REFUNDED` | payment REFUNDED (the refund covered the order), or a cancelled order with a SUCCEEDED refund. A **part** refund on a delivered order keeps the normal status; the row shows `refundedAmount` |
 | `REFUND_PENDING` / `CANCELLED` | order cancelled, with / without a PENDING refund |
-| `CASH_TO_COLLECT` / `CASH_COLLECTED` | COD, before / after delivery |
+| `CASH_TO_COLLECT` / `CASH_COLLECTED` | COD, before / after delivery · OFFLINE is `CASH_COLLECTED` from the start (the seller already has the money; never paid out) |
 | `AWAITING_DELIVERY` | online, not delivered (UnieMax holds the money, D6) |
 | `ON_ITS_WAY` | a payout is PENDING / PROCESSING |
 | `SETTLED` | nothing left to pay (`payoutTotals.remaining = 0`; COD dues kept count as paid) |
 | `PARTLY_SETTLED` | some paid, some left |
 | `READY_TO_PAY` | delivered, nothing paid (`lastPayoutFailed` when the newest payout failed / came back) |
 
-On COD, cancelled and refunded orders UnieMax owes nothing, so `remaining` is 0.
+On COD, OFFLINE, cancelled and refunded orders UnieMax owes nothing, so `remaining` is 0.
 
-**Payment mode** is only Online / Cash on delivery today: the order stores
-`ONLINE`, and PaymentHub's webhook does not say UPI / card / net banking.
+**Payment mode** is Online / Cash — the Cash filter and tile include OFFLINE
+(a seller's bill paid to them by cash / UPI / bank; its `offlineMode` says which).
+An online order stores `ONLINE`, and PaymentHub's webhook does not say UPI / card / net banking.
 Showing those needs the hub to send the instrument and a new order column
 (Phase 2, not built).

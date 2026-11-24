@@ -75,7 +75,7 @@ export const orderListQuery = searchQuery.extend({
     .enum(["AWAITING_PAYMENT", "PENDING", "CONFIRMED", "PACKED", "SHIPPED", "DELIVERED", "CANCELLED"])
     .optional(),
   paymentStatus: z.enum(["PENDING", "PAID", "FAILED", "REFUNDED"]).optional(),
-  paymentMethod: z.enum(["ONLINE", "COD"]).optional(),
+  paymentMethod: z.enum(["ONLINE", "COD", "OFFLINE"]).optional(),
   storeId: z.string().min(1).optional(),
   // Storefront checkout or a seller's bill (modules/bills).
   source: z.enum(["CHECKOUT", "BILL"]).optional(),
@@ -144,7 +144,7 @@ export const shelfConvertSchema = z.object({
 
 export const paymentListQuery = searchQuery.extend({
   paymentStatus: z.enum(["PENDING", "PAID", "FAILED", "REFUNDED"]).optional(),
-  paymentMethod: z.enum(["ONLINE", "COD"]).optional(),
+  paymentMethod: z.enum(["ONLINE", "COD", "OFFLINE"]).optional(),
   from: isoDate,
   to: isoDate,
 });

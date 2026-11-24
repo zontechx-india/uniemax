@@ -135,7 +135,9 @@ never ships to a shopper.
   the seller makes a bill from the shop's products (search a big catalog,
   pick sizes / colours), adds delivery and a discount, and sends the link
   from their own WhatsApp; the customer pays it at `/b/{token}` and it becomes
-  a confirmed order. Admin reads every bill under Commerce → Seller bills.
+  a confirmed order. Already paid in cash / UPI? The seller saves the bill as
+  paid — the order is made at once and the bill goes out as a receipt.
+  Admin reads every bill under Commerce → Seller bills.
 
 ### For platform staff (`/admin`)
 

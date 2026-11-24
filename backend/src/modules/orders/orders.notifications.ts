@@ -157,7 +157,9 @@ function customerPlacedMail(order: OrderMailData, to: string): MailMessage {
   const paymentLine =
     order.paymentMethod === "COD"
       ? "Payment: Cash on Delivery"
-      : "Payment: Online";
+      : order.paymentMethod === "OFFLINE"
+        ? "Payment: Paid to the shop"
+        : "Payment: Online";
   const fulfilmentLine =
     order.fulfilment === "PICKUP"
       ? "You chose store pickup."
@@ -201,7 +203,7 @@ function sellerPlacedMail(order: OrderMailData, to: string): MailMessage {
        <p style="margin:12px 0 0;font-size:14px;color:#111">
          <strong>Total: ${formatTotal(order.total)}</strong></p>
        <p style="margin:4px 0 0;font-size:13px;color:#444">
-         ${order.paymentMethod === "COD" ? "Cash on Delivery" : "Online payment"} ·
+         ${order.paymentMethod === "COD" ? "Cash on Delivery" : order.paymentMethod === "OFFLINE" ? "Paid to you directly" : "Online payment"} ·
          ${order.fulfilment === "PICKUP" ? "Store pickup" : "Delivery"}</p>
        ${manageUrl ? linkHtml(manageUrl, "Confirm this order") : ""}`,
     ),

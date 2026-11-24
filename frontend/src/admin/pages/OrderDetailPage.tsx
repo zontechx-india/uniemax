@@ -3,7 +3,8 @@ import { adminApi } from '../features/adminApi'
 import type { OrderDetail } from '../features/adminApi'
 import { useAdminQuery } from '../features/useAdminQuery'
 import { Card, CardHeader, Chip, Detail, ErrorState, PageHeader, Skeleton } from '../ui/primitives'
-import { OrderStatusChip, PaymentChip } from '../ui/statusMeta'
+import { OrderStatusChip, PAYMENT_METHOD_LABEL, PaymentChip } from '../ui/statusMeta'
+import { OFFLINE_MODE } from '../../storefront/features/bills/billsApi'
 import { formatDateTime, formatMoneyExact } from '../ui/format'
 import { BackIcon } from '../layout/icons'
 import { MediaImg } from '../../shared/media/MediaImg'
@@ -320,8 +321,15 @@ export default function OrderDetailPage() {
             <CardHeader title="Payment" />
             <dl>
               <Detail label="Method">
-                {order.paymentMethod === 'COD' ? 'Cash on delivery' : 'Online'}
+                {PAYMENT_METHOD_LABEL[order.paymentMethod]}
+                {order.offlineMode && ` · ${OFFLINE_MODE[order.offlineMode]}`}
               </Detail>
+              {order.paidByName && (
+                <Detail label="Paid by">
+                  {order.paidByName}
+                  {order.paidByPhone && ` · ${order.paidByPhone}`}
+                </Detail>
+              )}
               <Detail label="Status">
                 <PaymentChip status={order.paymentStatus} method={order.paymentMethod} />
               </Detail>

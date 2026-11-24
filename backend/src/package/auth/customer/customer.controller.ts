@@ -2,6 +2,7 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 import { ok, list } from "../../../utils/response.js";
 import { HttpError } from "../../../utils/httpError.js";
 import { issueSession } from "../core/session.service.js";
+import { emit } from "../../events/index.js";
 import { sessionMeta } from "../core/cookies.js";
 import { deliverWeb, deliverMobile } from "../core/delivery.js";
 import {
@@ -39,6 +40,8 @@ async function deliverLogin(
   extra: Record<string, unknown> = {},
 ) {
   const tokens = await issueSession(result.principal, sessionMeta(request));
+  // Listeners (e.g. seller bills linking orders made for this phone) never block a login.
+  emit("customer.signedIn", { customerId: result.customer.id });
   const payload = { customer: result.customer, isNewUser: result.isNewUser, ...extra };
   return reply ? deliverWeb(reply, tokens, payload) : deliverMobile(tokens, payload);
 }

@@ -113,7 +113,7 @@ export function StoreEarningsPage() {
               t={data.delivered.online}
               gateway={ourDiscount ? 'Gateway fee paid by UnieMax (your discount)' : 'Gateway fee'}
             />
-            <Totals title="Cash on delivery orders delivered" t={data.delivered.cod} />
+            <Totals title="Cash orders (COD and bills paid to you)" t={data.delivered.cod} />
           </div>
 
           <Card>

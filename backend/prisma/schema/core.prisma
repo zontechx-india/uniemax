@@ -36,6 +36,11 @@ enum PaymentMethod {
   /// Platform-processed payment (gateway; dev builds simulate it).
   ONLINE
   COD
+  /// Paid to the SELLER directly — cash, UPI to their own number, bank
+  /// transfer — recorded on a seller's bill (modules/bills). UnieMax never
+  /// held the money: no payout, no gateway fee, the platform fee is the
+  /// seller's dues (like COD), and no courier collects anything.
+  OFFLINE
   UPI
   RAZORPAY
   CARD
@@ -1275,6 +1280,13 @@ model Order {
   /// The bill this order pays (source = BILL). Not unique: a payment attempt
   /// whose window closed is cancelled, and the next attempt is a new order.
   billId              String?
+  /// OFFLINE orders: how the seller was paid — CASH | UPI | BANK | OTHER.
+  offlineMode         String?
+  /// Someone other than the order's customer paid (a bill paid by link by
+  /// another account) — a snapshot of who, for the seller. Null = the
+  /// customer paid.
+  paidByName          String?
+  paidByPhone         String?
   estimatedDeliveryAt DateTime?
   placedAt            DateTime        @default(now())
   items               OrderItem[]
@@ -1322,6 +1334,13 @@ enum BillStatus {
   @@schema("public")
 }
 
+enum BillPayWay {
+  LINK
+  OFFLINE
+
+  @@schema("public")
+}
+
 /// A seller's bill (modules/bills): an order the SELLER fills in from the
 /// store's own products, for a customer who ordered by phone or in the shop.
 /// The seller shares its link (`/b/{token}`) from their own WhatsApp; the
@@ -1345,6 +1364,16 @@ model Bill {
   /// DELIVERY (the customer adds the address when paying) or PICKUP for a
   /// pickup-only store.
   fulfilment    OrderFulfilment @default(DELIVERY)
+  /// LINK = the customer pays online from the link; OFFLINE = the seller was
+  /// already paid (its order is made at once, PAID, method OFFLINE).
+  payWay        BillPayWay      @default(LINK)
+  /// OFFLINE: CASH | UPI | BANK | OTHER, and an optional reference (UPI txn id).
+  offlineMode   String?
+  offlineRef    String?
+  /// OFFLINE + PICKUP: the customer took it in the shop (order DELIVERED at once).
+  handedOver    Boolean         @default(false)
+  /// OFFLINE + DELIVERY: the address the seller typed { address, pincode, state }.
+  address       Json?
   /// Line snapshots: [{ productId, variantId, productName, variantName, sku,
   /// productSlug, imageKey, unitPrice, quantity, lineTotal }]. Money as strings.
   items         Json

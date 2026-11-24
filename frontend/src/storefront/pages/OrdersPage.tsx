@@ -124,7 +124,9 @@ export function OrdersPage() {
                   {status.label}
                 </span>
                 <span className="rounded-pill bg-surface-alt px-2.5 py-1 text-xs font-semibold text-muted">
-                  {order.paymentMethod === 'ONLINE'
+                  {order.paymentMethod === 'OFFLINE'
+                    ? 'Paid at the shop'
+                    : order.paymentMethod === 'ONLINE'
                     ? order.paymentStatus === 'PAID'
                       ? 'Paid online'
                       : 'Online payment pending'

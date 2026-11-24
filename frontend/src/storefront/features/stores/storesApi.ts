@@ -2600,7 +2600,7 @@ export interface PlacedOrder {
   discount: string
   /** Grand total. */
   total: string
-  paymentMethod: 'ONLINE' | 'COD'
+  paymentMethod: 'ONLINE' | 'COD' | 'OFFLINE'
   paymentStatus: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED'
   /** "DEV-SIMULATED" on development-mode online payments. */
   paymentRef: string | null
@@ -2608,6 +2608,11 @@ export interface PlacedOrder {
   source?: 'CHECKOUT' | 'BILL'
   /** The seller's bill this order paid (source BILL). */
   billId?: string | null
+  /** OFFLINE (a seller's bill paid to the seller directly): CASH / UPI / BANK / OTHER. */
+  offlineMode?: 'CASH' | 'UPI' | 'BANK' | 'OTHER' | null
+  /** A seller's bill paid by someone other than its customer. */
+  paidByName?: string | null
+  paidByPhone?: string | null
   /** The refund of a cancelled paid order: on its way, sent, or needing
    *  UnieMax's help. Null when no money was owed back. */
   refund?: {
@@ -2736,7 +2741,7 @@ export interface SellerOrderSummary {
   status: OrderStatus
   fulfilment: 'DELIVERY' | 'PICKUP'
   customerName: string | null
-  paymentMethod: 'ONLINE' | 'COD'
+  paymentMethod: 'ONLINE' | 'COD' | 'OFFLINE'
   paymentStatus: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED'
   /** Decimal string. */
   total: string

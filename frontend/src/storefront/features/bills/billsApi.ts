@@ -14,6 +14,10 @@ export type BillState = 'OPEN' | 'PAID' | 'CANCELLED' | 'EXPIRED'
 /** Where an OPEN bill is: not shared yet, shared, opened by the customer. */
 export type BillStage = 'NEW' | 'SHARED' | 'OPENED'
 export type ShareVia = 'WHATSAPP' | 'COPY' | 'SHARE'
+/** LINK = the customer pays online from the link; OFFLINE = the seller was already paid. */
+export type BillPayWay = 'LINK' | 'OFFLINE'
+export type OfflineMode = 'CASH' | 'UPI' | 'BANK' | 'OTHER'
+export const OFFLINE_MODE: Record<OfflineMode, string> = { CASH: 'Cash', UPI: 'UPI', BANK: 'Bank transfer', OTHER: 'Other' }
 
 export interface BillLine {
   productId: string
@@ -40,6 +44,13 @@ export interface Bill {
   customerName: string | null
   customerPhone: string
   fulfilment: 'DELIVERY' | 'PICKUP'
+  payWay: BillPayWay
+  offlineMode: OfflineMode | null
+  offlineRef: string | null
+  /** OFFLINE: the customer took it in the shop. */
+  handedOver: boolean
+  /** OFFLINE + delivery: the address the seller typed. */
+  address: { address: string; pincode: string; state: string } | null
   items: BillLine[]
   itemCount: number
   subtotal: string
@@ -56,7 +67,15 @@ export interface Bill {
   paidAt: string | null
   cancelledAt: string | null
   createdAt: string
-  order: { id: string; orderNumber: string; status: string; paymentRef: string | null } | null
+  order: {
+    id: string
+    orderNumber: string
+    status: string
+    paymentRef: string | null
+    /** Someone other than the bill's customer paid the link. */
+    paidByName: string | null
+    paidByPhone: string | null
+  } | null
 }
 
 export type BillTab = 'ALL' | 'WAITING' | 'PAID' | 'CLOSED'
@@ -78,6 +97,14 @@ export interface BillCreateInput {
   discountValue: number
   note?: string
   expiryDays: 1 | 3 | 7
+  payWay: BillPayWay
+  /** OFFLINE only. */
+  offlineMode?: OfflineMode
+  offlineRef?: string
+  handover?: 'DELIVER' | 'TAKEN'
+  address?: string
+  pincode?: string
+  state?: string
 }
 
 /** A product as the item picker sees it: options + every active variant. */
@@ -119,6 +146,8 @@ export interface PublicBill {
   /** Masked: "+91 98400 •••23". */
   customerPhone: string
   fulfilment: 'DELIVERY' | 'PICKUP'
+  payWay: BillPayWay
+  offlineMode: OfflineMode | null
   items: Omit<BillLine, 'productId' | 'productSlug'>[]
   subtotal: string
   shippingCharge: string
@@ -188,10 +217,17 @@ export const publicBillApi = {
 export const spacedNumber = (n: string) => (/^\d{8}$/.test(n) ? `${n.slice(0, 4)} ${n.slice(4)}` : n)
 
 /** The text the seller sends from their own WhatsApp. */
-export function billMessage(bill: Pick<Bill, 'customerName' | 'itemCount' | 'total' | 'link' | 'expiresAt' | 'store'>, rupees: (v: string) => string) {
+export function billMessage(
+  bill: Pick<Bill, 'customerName' | 'itemCount' | 'total' | 'link' | 'expiresAt' | 'store' | 'number'> & { payWay?: BillPayWay },
+  rupees: (v: string) => string,
+) {
   const hi = bill.customerName ? `Hi ${bill.customerName.split(' ')[0]}` : 'Hi'
   const until = new Date(bill.expiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
   const items = `${bill.itemCount} item${bill.itemCount === 1 ? '' : 's'}`
+  // Already paid: a receipt, no "pay here".
+  if (bill.payWay === 'OFFLINE') {
+    return `${hi}, thank you for shopping at ${bill.store.name}. Your bill ${spacedNumber(bill.number)}: ${items}, ${rupees(bill.total)}, paid. See it here: ${bill.link}`
+  }
   return `${hi}, here is your bill from ${bill.store.name}: ${items}, ${rupees(bill.total)}. See it and pay here: ${bill.link} (open till ${until})`
 }
 

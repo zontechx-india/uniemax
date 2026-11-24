@@ -158,6 +158,10 @@ const orderSelect = {
   // CHECKOUT, or BILL with the seller's bill it paid (modules/bills).
   source: true,
   billId: true,
+  // OFFLINE: how the seller was paid; someone else paid a bill: who.
+  offlineMode: true,
+  paidByName: true,
+  paidByPhone: true,
   placedAt: true,
   // Lifecycle stamps — null until the seller reaches that stage (a skipped
   // stage, e.g. SHIPPED on a pickup order, stays null forever).
@@ -1197,6 +1201,7 @@ async function cancelOrderCore(
     select: {
       status: true,
       paymentStatus: true,
+      paymentMethod: true,
       customerId: true,
       items: {
         select: { productId: true, variantId: true, quantity: true, shipmentId: true },
@@ -1285,7 +1290,11 @@ async function cancelOrderCore(
     }
     // A paid online order: the money goes back. Queued here, in the cancel's
     // own transaction, so a cancelled paid order always has its refund row.
-    return current.paymentStatus === "PAID" ? queueRefund(tx, orderId, reason) : null;
+    // Only money UnieMax took online can go back through PaymentHub — an
+    // OFFLINE bill was paid to the seller, who returns it themselves.
+    return current.paymentStatus === "PAID" && current.paymentMethod === "ONLINE"
+      ? queueRefund(tx, orderId, reason)
+      : null;
   });
 
   // Close the payment window before answering: the stock is back on sale, so
@@ -1763,4 +1772,126 @@ export async function placeBillOrder(
     paid: simulated,
     payment: payment ?? null,
   };
+}
+
+/**
+ * A bill the seller was ALREADY PAID for (cash / UPI to their own number /
+ * bank) — its order is made at once: paymentMethod OFFLINE, PAID, the bill's
+ * fixed prices, the same guarded stock decrement and package hooks. Taken in
+ * the shop (`handedOver`) = DELIVERED now (a PICKUP order); otherwise
+ * CONFIRMED, to pack and send. UnieMax never held the money, so no payment
+ * session and no payout; finance treats it like COD (seller dues).
+ *
+ * Lines a package ships (a dropship supplier) are refused: the supplier would
+ * expect UnieMax to have collected the money. The bill is marked PAID inside
+ * the same transaction.
+ */
+export async function placeOfflineBillOrder(input: {
+  bill: BillForPayment;
+  customerId: string | null;
+  customer: OrderCustomerInput;
+  offlineMode: string;
+  offlineRef: string | null;
+  handedOver: boolean;
+}) {
+  const { bill } = input;
+  const delivery = bill.fulfilment === "DELIVERY";
+  let row!: OrderRow; // set by the loop below, which only exits with an order or a throw
+  for (let attempt = 1; !row; attempt += 1) {
+    const orderNumber = attempt === 1 ? bill.number : newOrderNumber();
+    try {
+      row = await prisma.$transaction(async (tx) => {
+        for (const line of bill.lines) {
+          const updated = await tx.storeProductVariant.updateMany({
+            where: { id: line.stockVariantId, isActive: true, stockQuantity: { gte: line.quantity } },
+            data: { stockQuantity: { decrement: line.quantity } },
+          });
+          if (updated.count === 0) {
+            const label = line.variantName ? `${line.productName} (${line.variantName})` : line.productName;
+            throw HttpError.conflict(`Only part of "${label}" is in stock now — lower the quantity`);
+          }
+        }
+        for (const productId of new Set(bill.lines.map((l) => l.productId))) {
+          await recomputeProductAggregates(productId, tx);
+        }
+        const now = new Date();
+        const done = input.handedOver;
+        const created = await tx.order.create({
+          data: {
+            orderNumber,
+            source: "BILL",
+            billId: bill.id,
+            storeId: bill.store.id,
+            storeName: bill.store.name,
+            storeSlug: bill.store.slug,
+            customerId: input.customerId,
+            fulfilment: bill.fulfilment,
+            customerName: input.customer.name,
+            customerPhone: input.customer.phone,
+            customerEmail: null,
+            addressLine: delivery ? input.customer.address : null,
+            pincode: delivery ? input.customer.pincode : null,
+            state: delivery ? input.customer.state : null,
+            country: delivery ? input.customer.country : null,
+            billingAddress: Prisma.DbNull,
+            customFields: Prisma.DbNull,
+            subtotal: bill.subtotal,
+            shippingCharge: bill.shippingCharge,
+            shippingMethod: "BILL",
+            shippingBasis: Prisma.DbNull,
+            tax: new Prisma.Decimal(0),
+            discount: bill.discount,
+            total: bill.total,
+            // Taken in the shop: confirmed, packed and delivered in one go
+            // (a pickup order never has a "shipped" step).
+            status: done ? "DELIVERED" : "CONFIRMED",
+            confirmedAt: now,
+            packedAt: done ? now : null,
+            deliveredAt: done ? now : null,
+            paymentMethod: "OFFLINE",
+            paymentStatus: "PAID",
+            paymentRef: input.offlineRef,
+            offlineMode: input.offlineMode,
+            // Nothing for the payments job to announce — the seller was paid in person.
+            paidNotifiedAt: now,
+            items: {
+              create: bill.lines.map((line) => ({
+                productId: line.productId,
+                variantId: line.variantId,
+                productName: line.productName,
+                variantName: line.variantName,
+                sku: line.sku,
+                productSlug: line.productSlug,
+                imageKey: line.imageKey,
+                unitPrice: new Prisma.Decimal(line.unitPrice),
+                quantity: line.quantity,
+                lineTotal: new Prisma.Decimal(line.lineTotal),
+              })),
+            },
+          },
+          select: orderSelect,
+        });
+        await runHooks("order.placing", tx, created.id);
+        // A package took a line (a supplier ships it): not sellable offline.
+        const shippedByOthers = await tx.orderItem.count({ where: { orderId: created.id, fulfilledBy: { not: null } } });
+        if (shippedByOthers > 0) {
+          throw HttpError.conflict(
+            "Some items on this bill are shipped by your supplier — those need online payment. Send a payment link instead.",
+          );
+        }
+        await tx.bill.update({
+          where: { id: bill.id },
+          data: { status: "PAID", paidAt: now, orderId: created.id },
+        });
+        return created;
+      });
+    } catch (err) {
+      if (isOrderNumberConflict(err) && attempt < ORDER_NUMBER_ATTEMPTS) continue;
+      throw err;
+    }
+  }
+  emit("order.placed", { orderId: row.id });
+  // Taken in the shop: delivered now — the ledger posts the seller's dues at once.
+  emit("order.status", { orderId: row.id, status: input.handedOver ? "DELIVERED" : "CONFIRMED" });
+  return { orderId: row.id, orderNumber: row.orderNumber };
 }

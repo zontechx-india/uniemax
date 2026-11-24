@@ -17,6 +17,7 @@ import { registerPrisma } from "./plugins/prisma.js";
 import { registerRoutes } from "./routes.js";
 import { startPaymentJobs } from "./modules/payments/payments.jobs.js";
 import { startFinance } from "./modules/finance/finance.jobs.js";
+import { startBills } from "./modules/bills/bills.jobs.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 
 /**
@@ -117,6 +118,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Seller ledger: post delivered orders (event + 15-min sweep that also
   // backfills older orders and payouts). Idempotent.
   const stopFinance = startFinance(app.log);
+  // Seller bills: link bill orders to a customer when they sign in.
+  startBills(app.log);
   app.addHook("onClose", async () => stopFinance());
 
   return app;

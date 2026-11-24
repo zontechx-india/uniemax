@@ -122,6 +122,7 @@ export default function OrdersPage() {
               { value: '', label: 'Any method' },
               { value: 'ONLINE', label: 'Online' },
               { value: 'COD', label: 'Cash on delivery' },
+              { value: 'OFFLINE', label: 'Paid to seller (bill)' },
             ]}
           />
           <FilterSelect

@@ -26,6 +26,12 @@ export const feeRuleCreateSchema = z.object({
       .nullable()
       .optional(),
   ),
+  /**
+   * PLATFORM only — a rule for one payment method (beats the any-method rule
+   * for it). OFFLINE = bills the seller was paid for directly (e.g. 0% to
+   * waive the fee there). Absent = every method.
+   */
+  paymentMethod: z.enum(["ONLINE", "COD", "OFFLINE"]).optional(),
   /** GATEWAY only — who pays it. The platform fee is always the seller's. */
   bearer: z.enum(["SELLER", "PLATFORM"]).optional(),
   note: optionalText(300),

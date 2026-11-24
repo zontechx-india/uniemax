@@ -188,7 +188,8 @@ export async function getDashboard(query: RangeQuery) {
       _sum: { total: true },
     }),
     prisma.order.aggregate({
-      where: { ...REVENUE_ORDERS, paymentMethod: "COD" },
+      // Cash the sellers hold: COD and OFFLINE (paid on a seller's bill).
+      where: { ...REVENUE_ORDERS, paymentMethod: { in: ["COD", "OFFLINE"] } },
       _sum: { total: true },
     }),
     prisma.order.aggregate({

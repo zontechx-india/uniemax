@@ -27,7 +27,7 @@ export type OrderStatus =
   | 'DELIVERED'
   | 'CANCELLED'
 export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED'
-export type PaymentMethod = 'ONLINE' | 'COD'
+export type PaymentMethod = 'ONLINE' | 'COD' | 'OFFLINE'
 export type BankVerificationStatus = 'PENDING' | 'VERIFIED' | 'FAILED'
 
 /** One refund of an online payment. FAILED = a person must refund it by hand. */
@@ -186,6 +186,10 @@ export interface OrderDetail extends OrderRow {
   customFields: { id: string; label: string; section: 'CONTACT' | 'DELIVERY'; value: string }[]
   cfOrderId: string | null
   paymentIntentId: string | null
+  /** A seller's bill: how the seller was paid (OFFLINE), who paid (someone else). */
+  offlineMode: 'CASH' | 'UPI' | 'BANK' | 'OTHER' | null
+  paidByName: string | null
+  paidByPhone: string | null
   /** Refunds to the customer through PaymentHub, newest first. */
   refunds?: OrderRefund[]
   confirmedAt: string | null
@@ -1182,7 +1186,7 @@ export interface Payout {
 
 /** An order's fee breakdown — admin and seller only, never the customer. */
 export interface OrderFinancials {
-  paymentMethod: 'ONLINE' | 'COD'
+  paymentMethod: 'ONLINE' | 'COD' | 'OFFLINE'
   orderTotal: string
   itemsAmount: string
   shippingAmount: string
@@ -1314,13 +1318,19 @@ export interface RateNow {
 export interface FinanceRates {
   platform: RateNow
   platformCod: RateNow
+  /** A seller's bill paid to the seller directly — `platform` until an OFFLINE rule exists. */
+  platformOffline: RateNow
   gateway: RateNow
-  upcoming: { kind: FeeKind; percent: string; bearer: FeeBearer; effectiveFrom: string }[]
+  upcoming: { kind: FeeKind; paymentMethod: FeeMethod | null; percent: string; bearer: FeeBearer; effectiveFrom: string }[]
 }
+
+/** A platform fee rule for one payment method only (null = every method). */
+export type FeeMethod = 'ONLINE' | 'COD' | 'OFFLINE'
 
 export interface FeeRule {
   id: string
   kind: FeeKind
+  paymentMethod: FeeMethod | null
   scope: 'GLOBAL' | 'STORE' | 'CATEGORY'
   percent: string
   bearer: FeeBearer
@@ -1516,6 +1526,8 @@ export const adminApi = {
     effectiveFrom?: string | null
     bearer?: FeeBearer
     note?: string | null
+    /** PLATFORM only: just this payment method (e.g. OFFLINE bills). */
+    paymentMethod?: FeeMethod
   }) {
     return call<FeeRules>(http.post(`${BASE}/finance/fee-rules`, body))
   },

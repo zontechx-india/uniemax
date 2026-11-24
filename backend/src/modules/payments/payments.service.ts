@@ -27,6 +27,7 @@ import {
 } from "./paymenthub.client.js";
 import { decide, rupeesToPaise, type OrderSnapshot } from "./paymenthub.webhook.js";
 import { queueRefund, sendRefundSoon } from "./refunds.service.js";
+import { settleBillOwner } from "../bills/billOwner.js";
 
 /**
  * Two providers behind one lifecycle. With PAYMENTS_VIA_HUB=true, new ONLINE
@@ -375,6 +376,9 @@ export async function releaseToSeller(
       where: { id: bill.billId, status: "OPEN" },
       data: { status: "PAID", paidAt: now, orderId },
     });
+    // The order belongs to the bill's customer, not necessarily the payer.
+    const made = await db.bill.findUnique({ where: { id: bill.billId }, select: { customerPhone: true } });
+    if (made) await settleBillOwner(db, orderId, made.customerPhone);
   }
 }
 

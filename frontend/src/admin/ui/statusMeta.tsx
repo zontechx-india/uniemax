@@ -58,6 +58,13 @@ export function OrderStatusChip({ status }: { status: OrderStatus }) {
   return <Chip tone={meta.tone}>{meta.label}</Chip>
 }
 
+/** How the order is paid, in words (OFFLINE = a seller's bill paid to the seller directly). */
+export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+  ONLINE: 'Online',
+  COD: 'Cash on delivery',
+  OFFLINE: 'Paid to seller',
+}
+
 export function PaymentChip({
   status,
   method,
@@ -72,7 +79,7 @@ export function PaymentChip({
   return (
     <Chip tone={meta.tone}>
       {meta.label}
-      {status === 'PAID' ? ` · ${method === 'COD' ? 'Cash' : 'Online'}` : ''}
+      {status === 'PAID' ? ` · ${method === 'COD' ? 'Cash' : method === 'OFFLINE' ? 'To seller' : 'Online'}` : ''}
     </Chip>
   )
 }

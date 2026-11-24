@@ -9,7 +9,7 @@ import { MediaImg } from '../../../shared/media/MediaImg'
 import { PageSkeleton } from '../../../shared/ui/states'
 import { useMarketSession } from '../../app/marketSession'
 import { openAuthDialog, storeAuthRequest } from '../../features/auth/authDialogStore'
-import { publicBillApi, spacedNumber } from '../../features/bills/billsApi'
+import { OFFLINE_MODE, publicBillApi, spacedNumber } from '../../features/bills/billsApi'
 import type { PublicBill } from '../../features/bills/billsApi'
 import { storeVars } from '../../features/publicStore/storeTheme'
 import { useStoreShell } from '../../features/publicStore/useStoreShells'
@@ -165,11 +165,15 @@ export function BillPayPage({ token }: { token: string }) {
             <CheckIcon className="h-5 w-5" />
           </span>
           <div className="min-w-0">
-            <h1 className="text-xl font-semibold">This bill is paid</h1>
+            <h1 className="text-xl font-semibold">{bill.payWay === 'OFFLINE' ? 'Thank you — paid' : 'This bill is paid'}</h1>
             <p className="mt-0.5 text-sm text-muted">
               {formatPrice(bill.total)} to {bill.store.name}
+              {bill.payWay === 'OFFLINE' && bill.offlineMode && <> by {OFFLINE_MODE[bill.offlineMode].toLowerCase()}</>}
               {bill.paidAt && <> · {when(bill.paidAt)}</>}
             </p>
+            {bill.payWay === 'OFFLINE' && !bill.order && (
+              <p className="mt-1 text-sm text-muted">Sign in with your number ({bill.customerPhone}) to keep it in your orders.</p>
+            )}
           </div>
         </section>
         {bill.order && (

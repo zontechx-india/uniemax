@@ -668,11 +668,32 @@ under `/admin/bills` (endpoints in `docs/API.md` → Seller bills).
   (`visibleProductWhere`) by words over name, category name, variant name
   (size / colour) and SKU, 30 a page, in-stock first; categories with
   counts; "often billed" from the store's last bills and order lines.
-- **Not built yet** (`prototype/docs/BILLS.md`): cash bills (the seller took
-  the money — needs a finance / courier review of the 46 places that treat
-  non-ONLINE as COD), one-off items (a hidden product would surface in
-  Categories and admin category mapping), an expiry sweep job (expiry is
-  read-time), sending from the UnieMax WhatsApp number.
+- **Already paid to the seller** (`payWay: OFFLINE` — cash, UPI to their own
+  number, bank, other): no link to pay. `createBill` calls
+  `placeOfflineBillOrder` (`orders.service.ts`), which in one transaction takes
+  the stock, makes the order (`paymentMethod: OFFLINE`, `PAID`, `paymentRef` =
+  the seller's reference, `offlineMode`), runs the `order.placing` hooks and
+  refuses (409) a line a supplier ships — dropship needs the money through
+  UnieMax — then marks the bill PAID. "Took it now" → PICKUP + `DELIVERED`;
+  "Deliver" → the seller's typed address + `CONFIRMED` (packed and shipped like
+  any order). If the order fails the bill is deleted. Money: OFFLINE is a
+  "seller holds the money" method like COD (`sellerHoldsMoney` in
+  `finance.rules.ts`) — no gateway fee, never paid out, settled
+  `CASH_COLLECTED`, the platform fee posted as dues (OWED) on delivery — and
+  an admin can give it its own platform fee rule (`paymentMethod: OFFLINE`).
+  Cancelling an OFFLINE order queues no refund (only ONLINE money is refunded
+  through the hub).
+- **Whose order** (`bills/billOwner.ts`): the bill's customer, matched by the
+  last 10 digits of a **verified** phone, owns the order — not the payer, who
+  is kept as `paidByName` / `paidByPhone` (`settleBillOwner`, inside the PAID
+  transaction of `releaseToSeller`). No such account: the order stays the
+  payer's when their phone is the bill's, else it has no owner. On every OTP
+  sign-in (`customer.signedIn` event → `bills.jobs.ts`) `claimBillOrders` gives
+  the account every unowned BILL order made for its phone.
+- **Not built yet** (`prototype/docs/BILLS.md`): a PDF receipt, one-off items
+  (a hidden product would surface in Categories and admin category mapping),
+  an expiry sweep job (expiry is read-time), sending from the UnieMax WhatsApp
+  number.
 
 ### Support tickets — `modules/support`
 
@@ -1634,10 +1655,16 @@ White-label design — one codebase, any business:
   (`[{ at, via: WHATSAPP | COPY | SHARE }]` — the seller's taps, not the
   chat), `openedAt`, `paidAt`, `cancelledAt`, `orderId` (unique, the paid
   order). Prices are fixed at creation; an OPEN bill holds no stock and no
-  order. Indexed `(storeId, createdAt)`, `(status, expiresAt)`.
+  order. `payWay` (`BillPayWay`: LINK default | OFFLINE — already paid to the
+  seller), `offlineMode` (CASH | UPI | BANK | OTHER, text), `offlineRef`,
+  `handedOver` (taken in the shop), `address` JSON (`{ address, pincode,
+  state }`, OFFLINE delivery). Indexed `(storeId, createdAt)`, `(status, expiresAt)`.
   **Order** carries `source` (`OrderSource`: CHECKOUT default | BILL) and
   `billId` (indexed, not unique — a payment attempt whose window closed is
-  cancelled and the next attempt is a new order).
+  cancelled and the next attempt is a new order), `offlineMode` (OFFLINE
+  orders) and `paidByName` / `paidByPhone` (a bill order paid by someone other
+  than its customer). `PaymentMethod` has `OFFLINE` (a seller's bill paid to
+  the seller directly; never at checkout).
 - **Order / OrderItem** — customer orders, placed **per store** at the
   storefront checkout (`modules/orders`; placement runs behind
   `requireCustomer` — only signed-in customers can order, and every order

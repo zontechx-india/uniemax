@@ -81,7 +81,7 @@ export function Stepper({
 }
 
 /** One "pick one" value: a radio input dressed as a chip (solid ink when chosen). */
-function ChoiceChip({ name, label, checked, disabled, onPick }: { name: string; label: string; checked: boolean; disabled: boolean; onPick: () => void }) {
+export function ChoiceChip({ name, label, checked, disabled, onPick }: { name: string; label: string; checked: boolean; disabled: boolean; onPick: () => void }) {
   return (
     <label
       className={`inline-flex min-h-10 min-w-11 cursor-pointer items-center justify-center rounded-md border px-3 text-sm transition-colors duration-150 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent/40 ${

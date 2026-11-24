@@ -6,7 +6,7 @@ import { Card, Chip, PageHeader } from '../ui/primitives'
 import { DataTable, Pagination } from '../ui/DataTable'
 import type { Column } from '../ui/DataTable'
 import { FilterSelect, SearchInput, Tabs, Toolbar } from '../ui/Toolbar'
-import { PaymentChip } from '../ui/statusMeta'
+import { PAYMENT_METHOD_LABEL, PaymentChip } from '../ui/statusMeta'
 import { formatDateTime, formatMoney, formatRelative } from '../ui/format'
 
 /**
@@ -57,7 +57,7 @@ export default function PaymentsPage() {
     {
       header: 'Method',
       cell: (row) => (
-        <Chip>{row.paymentMethod === 'COD' ? 'Cash on delivery' : 'Online'}</Chip>
+        <Chip>{PAYMENT_METHOD_LABEL[row.paymentMethod]}</Chip>
       ),
     },
     {
@@ -111,6 +111,7 @@ export default function PaymentsPage() {
               { value: '', label: 'Any method' },
               { value: 'ONLINE', label: 'Online' },
               { value: 'COD', label: 'Cash on delivery' },
+              { value: 'OFFLINE', label: 'Paid to seller (bill)' },
             ]}
           />
         </Toolbar>
@@ -138,7 +139,7 @@ export default function PaymentsPage() {
                 {row.paymentStatus === 'PAID' ||
                 (row.paymentStatus === 'PENDING' && row.paymentMethod === 'COD') ? null : (
                   <span className="text-xs text-muted">
-                    {row.paymentMethod === 'COD' ? 'Cash on delivery' : 'Online'}
+                    {PAYMENT_METHOD_LABEL[row.paymentMethod]}
                   </span>
                 )}
                 <span className="ml-auto text-xs text-muted">{formatRelative(row.placedAt)}</span>

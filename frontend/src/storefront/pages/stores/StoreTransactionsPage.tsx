@@ -77,7 +77,7 @@ type Mode = 'ALL' | 'ONLINE' | 'COD'
 const MODES: { key: Mode; label: string; title: string }[] = [
   { key: 'ALL', label: 'All', title: 'All payments' },
   { key: 'ONLINE', label: 'Online', title: 'Paid online' },
-  { key: 'COD', label: 'Cash', title: 'Cash on delivery' },
+  { key: 'COD', label: 'Cash', title: 'Cash on delivery and bills paid to you' },
 ]
 
 export function StoreTransactionsPage() {
@@ -220,7 +220,7 @@ export function StoreTransactionsPage() {
               sub={`${data.summary.billed.orders} ${data.summary.billed.orders === 1 ? 'order' : 'orders'}`}
             />
             <Stat label="Paid online" value={money(data.summary.online.amount)} sub={`${data.summary.online.orders} orders`} />
-            <Stat label="Cash on delivery" value={money(data.summary.cod.amount)} sub={`${data.summary.cod.orders} orders`} />
+            <Stat label="Cash or paid to you" value={money(data.summary.cod.amount)} sub={`${data.summary.cod.orders} orders`} />
             <Stat
               label="Sent to your bank"
               value={money(data.summary.paidToYou)}

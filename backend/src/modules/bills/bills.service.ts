@@ -13,9 +13,11 @@ import {
   expireUnpaidOrder,
   newOrderNumber,
   placeBillOrder,
+  placeOfflineBillOrder,
   priceBillLines,
   type BillLine,
 } from "../orders/orders.service.js";
+import { verifiedCustomerByPhone } from "./billOwner.js";
 import { getOrCreatePaySession } from "../payments/payments.service.js";
 import type {
   AdminBillListQuery,
@@ -57,6 +59,11 @@ const billSelect = {
   customerName: true,
   customerPhone: true,
   fulfilment: true,
+  payWay: true,
+  offlineMode: true,
+  offlineRef: true,
+  handedOver: true,
+  address: true,
   items: true,
   subtotal: true,
   shippingCharge: true,
@@ -110,7 +117,7 @@ async function shapeForSeller(bill: BillRow) {
   const order = bill.orderId
     ? await prisma.order.findUnique({
         where: { id: bill.orderId },
-        select: { id: true, orderNumber: true, status: true, paymentRef: true },
+        select: { id: true, orderNumber: true, status: true, paymentRef: true, paidByName: true, paidByPhone: true },
       })
     : null;
   const shares = sharesOf(bill);
@@ -125,6 +132,11 @@ async function shapeForSeller(bill: BillRow) {
     customerName: bill.customerName,
     customerPhone: bill.customerPhone,
     fulfilment: bill.fulfilment,
+    payWay: bill.payWay,
+    offlineMode: bill.offlineMode,
+    offlineRef: bill.offlineRef,
+    handedOver: bill.handedOver,
+    address: (bill.address as { address: string; pincode: string; state: string } | null) ?? null,
     items: shapeLines(bill),
     itemCount: linesOf(bill).reduce((s, l) => s + l.quantity, 0),
     subtotal: money(bill.subtotal),
@@ -244,13 +256,24 @@ export async function getBill(actor: StoreActor, storeRef: string, billId: strin
 export async function createBill(actor: StoreActor, storeRef: string, input: BillCreateInput) {
   const store = await myStore(actor, storeRef);
   if (store.suspendedAt) throw HttpError.conflict("UnieMax has paused your shop — bills cannot be made right now.");
-  if (!store.isPublished) throw HttpError.conflict("Publish your shop first — customers pay bills through it.");
-  if (!resolvePayments(store.payments).acceptOnlinePayment) {
-    throw HttpError.conflict("Online payment is off for your shop. Turn it on in Payments, then make the bill.");
+  const offline = input.payWay === "OFFLINE";
+  // A link bill is paid through the shop online; an offline one was paid already.
+  if (!offline) {
+    if (!store.isPublished) throw HttpError.conflict("Publish your shop first — customers pay bills through it.");
+    if (!resolvePayments(store.payments).acceptOnlinePayment) {
+      throw HttpError.conflict("Online payment is off for your shop. Turn it on in Payments, then make the bill.");
+    }
   }
 
   const shipping = resolveShipping(store.shipping);
-  const fulfilment = shipping.mode === "PICKUP" ? "PICKUP" : "DELIVERY";
+  // Offline: the seller says how it reaches the customer. Link: the shop's mode.
+  const fulfilment = offline
+    ? input.handover === "TAKEN"
+      ? "PICKUP"
+      : "DELIVERY"
+    : shipping.mode === "PICKUP"
+      ? "PICKUP"
+      : "DELIVERY";
   let priced: Awaited<ReturnType<typeof priceBillLines>>;
   try {
     priced = await priceBillLines(store.id, input.items, shipping, fulfilment);
@@ -301,11 +324,56 @@ export async function createBill(actor: StoreActor, storeRef: string, input: Bil
       discount: rawDiscount,
       total,
       note: input.note,
-      expiresAt: new Date(Date.now() + input.expiryDays * 24 * 60 * 60 * 1000),
+      expiresAt: offline ? new Date() : new Date(Date.now() + input.expiryDays * 24 * 60 * 60 * 1000),
+      payWay: input.payWay,
+      offlineMode: offline ? (input.offlineMode ?? "CASH") : null,
+      offlineRef: offline ? input.offlineRef : null,
+      handedOver: offline && input.handover === "TAKEN",
+      address:
+        offline && fulfilment === "DELIVERY"
+          ? ({ address: input.address, pincode: input.pincode, state: input.state } as Prisma.InputJsonValue)
+          : Prisma.DbNull,
     },
     select: billSelect,
   });
-  return shapeForSeller(bill);
+  if (!offline) return shapeForSeller(bill);
+
+  // Already paid: its order is made now, for the bill's customer (their
+  // account when their phone is verified — else linked when they sign in).
+  try {
+    const owner = await verifiedCustomerByPhone(prisma, input.customerPhone);
+    await placeOfflineBillOrder({
+      bill: {
+        id: bill.id,
+        number: bill.number,
+        fulfilment,
+        lines: priced.lines,
+        subtotal,
+        shippingCharge,
+        discount: rawDiscount,
+        total,
+        store: { id: store.id, name: store.name, slug: store.slug },
+      },
+      customerId: owner?.id ?? null,
+      customer: {
+        name: input.customerName ?? input.customerPhone,
+        phone: input.customerPhone,
+        email: null,
+        address: fulfilment === "DELIVERY" ? input.address : null,
+        pincode: fulfilment === "DELIVERY" ? input.pincode : null,
+        state: fulfilment === "DELIVERY" ? input.state : null,
+        country: fulfilment === "DELIVERY" ? "India" : null,
+      },
+      offlineMode: input.offlineMode ?? "CASH",
+      offlineRef: input.offlineRef,
+      handedOver: input.handover === "TAKEN",
+    });
+  } catch (err) {
+    // The sale did not happen — no half-made bill is left behind.
+    await prisma.bill.delete({ where: { id: bill.id } }).catch(() => {});
+    throw err;
+  }
+  return getBill(actor, storeRef, bill.id);
 }
 
 /** The seller sent or copied the link. Recorded; the chat itself is theirs. */
@@ -527,7 +595,8 @@ const maskPhone = (phone: string) => {
 /** What the customer sees. Opening it the first time marks the bill opened. */
 export async function getPublicBill(token: string, viewerCustomerId: string | null) {
   const bill = await billByToken(token);
-  if (!bill.openedAt && billState(bill) === "OPEN") {
+  // A link bill: only while it takes payment. A paid-to-you bill (receipt): the first view.
+  if (!bill.openedAt && (billState(bill) === "OPEN" || bill.payWay === "OFFLINE")) {
     await prisma.bill.updateMany({ where: { id: bill.id, openedAt: null }, data: { openedAt: new Date() } });
   }
   // The paid order is shown only to the account that paid it.
@@ -541,6 +610,8 @@ export async function getPublicBill(token: string, viewerCustomerId: string | nu
     customerName: bill.customerName,
     customerPhone: maskPhone(bill.customerPhone),
     fulfilment: bill.fulfilment,
+    payWay: bill.payWay,
+    offlineMode: bill.offlineMode,
     items: shapeLines(bill).map(({ productId: _p, productSlug: _s, ...line }) => line),
     subtotal: money(bill.subtotal),
     shippingCharge: money(bill.shippingCharge),

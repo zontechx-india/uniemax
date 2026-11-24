@@ -5,7 +5,7 @@ import { toApiError } from '../../../../shared/auth/http'
 import { Button, buttonClass } from '../../../../shared/ui/Button'
 import { ConfirmDialog } from '../../../../shared/ui/ConfirmDialog'
 import { ErrorNote, InfoNote } from '../../../../shared/ui/form'
-import { billMessage, billsApi, spacedNumber, whatsappUrl } from '../../../features/bills/billsApi'
+import { billMessage, billsApi, OFFLINE_MODE, spacedNumber, whatsappUrl } from '../../../features/bills/billsApi'
 import type { Bill, ShareVia } from '../../../features/bills/billsApi'
 import { useManagedStore } from '../../../features/stores/useManagedStore'
 import { ArrowLeftIcon, ArrowRightIcon, BoxIcon, ChatIcon, ClipboardIcon, LinkIcon, MapPinIcon, ReceiptIcon, UserIcon } from '../../../layout/icons'
@@ -74,6 +74,10 @@ export function StoreBillPage() {
   }
 
   const open = bill.state === 'OPEN'
+  // Paid to the seller directly: the bill is a receipt — still sent on WhatsApp.
+  const offline = bill.payWay === 'OFFLINE'
+  const paidTo = offline ? `Paid to you${bill.offlineMode ? ` · ${OFFLINE_MODE[bill.offlineMode]}` : ''}` : 'Paid online'
+  const canSend = open || (offline && bill.state === 'PAID')
   const message = billMessage(bill, rupees)
 
   /** Record what the seller did (WhatsApp itself is opened by the link they tapped). */
@@ -139,15 +143,30 @@ export function StoreBillPage() {
           Bill <span className="font-figure tabular-nums">{spacedNumber(bill.number)}</span> · made {when(bill.createdAt)}
           {open && ` · open till ${when(bill.expiresAt)}`}
         </p>
+        {offline && bill.state === 'PAID' && (
+          <p className="mt-0.5 text-sm text-muted">
+            {paidTo}
+            {bill.offlineRef && <> · Ref {bill.offlineRef}</>}
+          </p>
+        )}
       </section>
       {error && <ErrorNote>{error}</ErrorNote>}
-      {bill.order && <InfoNote>Paid online — this bill is now order {bill.order.orderNumber}. Pack and send it from the order.</InfoNote>}
+      {bill.order && (
+        <InfoNote>
+          {offline
+            ? bill.handedOver
+              ? `Saved as order ${bill.order.orderNumber}, delivered — they took it in the shop.`
+              : `Saved as order ${bill.order.orderNumber}. Pack and send it from the order.`
+            : `Paid online — this bill is now order ${bill.order.orderNumber}. Pack and send it from the order.`}
+          {bill.order.paidByName && ` Paid by ${bill.order.paidByName}${bill.order.paidByPhone ? ` (${bill.order.paidByPhone})` : ''}; the order is in ${bill.customerName ?? 'the customer'}'s history.`}
+        </InfoNote>
+      )}
       {bill.state === 'EXPIRED' && <InfoNote>Not paid in time, so the link no longer takes payment. Nothing was charged and no stock was held.</InfoNote>}
 
-      {open && (
+      {canSend && (
         <PanelCard
           icon={ChatIcon}
-          title={bill.sharedAt ? 'The message you shared' : `Send the bill to ${bill.customerName ?? 'your customer'}`}
+          title={bill.sharedAt ? 'The message you shared' : `Send the ${offline ? 'receipt' : 'bill'} to ${bill.customerName ?? 'your customer'}`}
           description="It goes from your own WhatsApp, so they see a number they know."
         >
           <div className="rounded-lg bg-surface-alt p-3">
@@ -166,10 +185,16 @@ export function StoreBillPage() {
           <div className="border-t border-line pt-3">
             <p className="flex items-center gap-2 text-sm font-semibold text-fg">
               <MapPinIcon className="h-4 w-4 text-muted" />
-              {bill.fulfilment === 'PICKUP' ? 'Store pickup' : 'Send to'}
+              {bill.handedOver ? 'In the shop' : bill.fulfilment === 'PICKUP' ? 'Store pickup' : 'Send to'}
             </p>
             <p className="mt-1 text-base text-muted">
-              {bill.fulfilment === 'PICKUP' ? 'They collect it from your shop.' : 'The customer adds their address when they pay.'}
+              {bill.handedOver
+                ? 'They took it with them.'
+                : bill.address
+                  ? `${bill.address.address}, ${bill.address.state} ${bill.address.pincode}`
+                  : bill.fulfilment === 'PICKUP'
+                    ? 'They collect it from your shop.'
+                    : 'The customer adds their address when they pay.'}
             </p>
           </div>
         </div>
@@ -206,6 +231,14 @@ export function StoreBillPage() {
       </PanelCard>
 
       <PanelCard title="What has happened">
+        {offline ? (
+          <ol>
+            {step('Bill made', bill.createdAt)}
+            {step(paidTo, bill.paidAt, bill.offlineRef ? `Ref ${bill.offlineRef}` : undefined)}
+            {step('Receipt sent', bill.sharedAt, bill.shares[0] ? SHARE_VIA[bill.shares[0].via] : 'Send it from the button below')}
+            {step('Customer opened it', bill.openedAt, undefined, true)}
+          </ol>
+        ) : (
         <ol>
           {step('Bill made', bill.createdAt)}
           {step('Shared with the customer', bill.sharedAt, bill.shares[0] ? SHARE_VIA[bill.shares[0].via] : open ? 'Send it from the button below' : undefined)}
@@ -216,6 +249,7 @@ export function StoreBillPage() {
               ? step('Link expired', bill.expiresAt, undefined, true, true)
               : step('Paid online', bill.paidAt, open ? `Open till ${when(bill.expiresAt)}` : undefined, true)}
         </ol>
+        )}
       </PanelCard>
 
       {open && (
@@ -228,7 +262,24 @@ export function StoreBillPage() {
 
       <div className="sticky bottom-[calc(var(--seller-dock,0px)+0.75rem)] z-20">
         <div className="ws-bar flex items-center gap-2 rounded-lg p-2 sm:p-3">
-          {bill.order ? (
+          {offline && bill.order ? (
+            <>
+              <a
+                href={whatsappUrl(bill.customerPhone, message)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => void share('WHATSAPP')}
+                className="flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-md bg-whatsapp px-4 text-base font-semibold whitespace-nowrap text-whatsapp-contrast transition-[filter] duration-150 hover:brightness-95"
+              >
+                <ChatIcon className="h-5 w-5" />
+                {bill.sharedAt ? 'Send again' : 'Send receipt'}
+              </a>
+              <Link to={`/mystores/${store.slug}/orders/${bill.order.id}`} className={buttonClass({ variant: 'secondary', size: 'lg', className: 'px-3.5' })}>
+                Order
+                <ArrowRightIcon className="h-4 w-4" />
+              </Link>
+            </>
+          ) : bill.order ? (
             <Link to={`/mystores/${store.slug}/orders/${bill.order.id}`} className={buttonClass({ variant: 'ink', size: 'lg', className: 'min-w-0 flex-1' })}>
               Open order {bill.order.orderNumber}
               <ArrowRightIcon className="h-4 w-4" />

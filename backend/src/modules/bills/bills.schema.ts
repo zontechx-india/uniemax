@@ -43,10 +43,29 @@ export const billCreateSchema = z
       .int()
       .refine((n) => (BILL_EXPIRY_DAYS as readonly number[]).includes(n), "Choose 1, 3 or 7 days")
       .default(3),
+    // LINK = the customer pays online from the link; OFFLINE = the seller
+    // was already paid (cash / UPI to their own number / bank / other).
+    payWay: z.enum(["LINK", "OFFLINE"]).default("LINK"),
+    offlineMode: z.enum(["CASH", "UPI", "BANK", "OTHER"]).optional(),
+    offlineRef: z.string().trim().max(60).optional().transform((v) => v || null),
+    // OFFLINE only: DELIVER (the seller types the address) or TAKEN (in the shop, now).
+    handover: z.enum(["DELIVER", "TAKEN"]).default("DELIVER"),
+    address: z.string().trim().max(300).optional().default(""),
+    pincode: z.string().trim().max(10).optional().default(""),
+    state: z.string().trim().max(60).optional().default(""),
   })
   .refine((v) => v.discountType !== "PERCENT" || v.discountValue <= 100, {
     message: "A discount cannot be more than 100%",
     path: ["discountValue"],
+  })
+  .superRefine((v, ctx) => {
+    if (v.payWay !== "OFFLINE") return;
+    if (!v.offlineMode) ctx.addIssue({ code: "custom", message: "Choose how you were paid", path: ["offlineMode"] });
+    if (v.handover === "DELIVER") {
+      if (v.address.length < 10) ctx.addIssue({ code: "custom", message: "Enter the delivery address", path: ["address"] });
+      if (!isValidPincode(v.pincode, "India")) ctx.addIssue({ code: "custom", message: PINCODE_MESSAGE, path: ["pincode"] });
+      if (!v.state) ctx.addIssue({ code: "custom", message: "Choose the state", path: ["state"] });
+    }
   });
 export type BillCreateInput = z.infer<typeof billCreateSchema>;
 
