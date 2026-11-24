@@ -7,7 +7,7 @@ response shapes stay in [`docs/API.md`](../API.md) → *Seller bills* and
 *Seller bill link*; this file says which endpoint does what.
 
 **Status (25 Nov 2026):** live on **dev and prod** (tag `v1.130.0`). The
-**PDF bill / receipt** (§5.8) is on dev, not prod yet.
+**PDF bill / receipt** (§5.8) is live on prod as `v1.131.0`.
 Commits: `e70594f` link bills · `f5ae961` review sheet / buttons / icons ·
 `ea7f4dc` already-paid bills, bill-phone ownership, OFFLINE fee rule.
 Migrations: `20261124120000_seller_bills`, `20261125100000_offline_bills`.
