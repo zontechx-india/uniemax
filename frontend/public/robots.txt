@@ -12,6 +12,8 @@ Allow: /
 Disallow: /cart
 Disallow: /checkout/
 Disallow: /order/
+# A seller's bill link — one customer's bill (noindex page as well).
+Disallow: /b/
 Disallow: /login
 Disallow: /orders
 Disallow: /profile

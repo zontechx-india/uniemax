@@ -349,10 +349,33 @@ export async function releaseToSeller(
   db: Prisma.TransactionClient,
   orderId: string,
 ): Promise<void> {
-  await db.order.updateMany({
-    where: { id: orderId, status: "AWAITING_PAYMENT" },
+  // A checkout order (source CHECKOUT) — unchanged: it now waits for the
+  // seller's "Confirm".
+  const released = await db.order.updateMany({
+    where: { id: orderId, status: "AWAITING_PAYMENT", source: "CHECKOUT" },
     data: { status: "PENDING" },
   });
+  if (released.count > 0) return;
+  // A seller's bill (modules/bills): the seller made it, so it skips
+  // "waiting" and starts CONFIRMED — and its bill is now PAID. A bill the
+  // seller cancelled meanwhile stays cancelled; the order still records the
+  // real payment, like any order paid after the fact.
+  const now = new Date();
+  const bill = await db.order.findFirst({
+    where: { id: orderId, source: "BILL" },
+    select: { billId: true },
+  });
+  if (!bill) return;
+  await db.order.updateMany({
+    where: { id: orderId, status: "AWAITING_PAYMENT" },
+    data: { status: "CONFIRMED", confirmedAt: now },
+  });
+  if (bill.billId) {
+    await db.bill.updateMany({
+      where: { id: bill.billId, status: "OPEN" },
+      data: { status: "PAID", paidAt: now, orderId },
+    });
+  }
 }
 
 /**

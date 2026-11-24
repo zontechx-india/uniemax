@@ -2604,6 +2604,10 @@ export interface PlacedOrder {
   paymentStatus: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED'
   /** "DEV-SIMULATED" on development-mode online payments. */
   paymentRef: string | null
+  /** CHECKOUT, or BILL — a seller's bill the customer paid (features/bills). */
+  source?: 'CHECKOUT' | 'BILL'
+  /** The seller's bill this order paid (source BILL). */
+  billId?: string | null
   /** The refund of a cancelled paid order: on its way, sent, or needing
    *  UnieMax's help. Null when no money was owed back. */
   refund?: {
@@ -2740,6 +2744,8 @@ export interface SellerOrderSummary {
   itemCount: number
   /** Another party (a supplier) ships some of the lines. Absent on the dashboard's recent orders. */
   hasPackageLines?: boolean
+  /** BILL = made from a seller's bill (shows "From a bill"). */
+  source?: 'CHECKOUT' | 'BILL'
 }
 
 export interface SellerOrderListQuery {

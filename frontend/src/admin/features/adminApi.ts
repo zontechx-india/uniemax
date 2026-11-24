@@ -59,6 +59,50 @@ export interface OrderRow {
   total: string
   placedAt: string
   itemCount: number
+  /** CHECKOUT, or BILL — paid from a seller's bill. */
+  source?: 'CHECKOUT' | 'BILL'
+  /** The seller's bill this order paid (source BILL). */
+  billId?: string | null
+}
+
+/** A seller's bill as the console reads it (read-only; GET /admin/bills). */
+export interface AdminBill {
+  id: string
+  number: string
+  link: string
+  state: 'OPEN' | 'PAID' | 'CANCELLED' | 'EXPIRED'
+  stage: 'NEW' | 'SHARED' | 'OPENED'
+  store: { id: string; name: string; slug: string }
+  customerName: string | null
+  customerPhone: string
+  fulfilment: 'DELIVERY' | 'PICKUP'
+  items: {
+    productId: string
+    variantId: string | null
+    productName: string
+    variantName: string | null
+    sku: string | null
+    imageUrl: string | null
+    unitPrice: string
+    quantity: number
+    lineTotal: string
+  }[]
+  itemCount: number
+  subtotal: string
+  shippingCharge: string
+  discountType: 'AMOUNT' | 'PERCENT' | null
+  discountValue: string | null
+  discount: string
+  total: string
+  note: string | null
+  expiresAt: string
+  sharedAt: string | null
+  shares: { at: string; via: 'WHATSAPP' | 'COPY' | 'SHARE' }[]
+  openedAt: string | null
+  paidAt: string | null
+  cancelledAt: string | null
+  createdAt: string
+  order: { id: string; orderNumber: string; status: OrderStatus; paymentRef: string | null } | null
 }
 
 export type OrderMessageKey =
@@ -1381,6 +1425,14 @@ export const adminApi = {
   },
   blockCustomer(id: string, body: { blocked: boolean; reason?: string | null }) {
     return call<CustomerDetail>(http.patch(`${BASE}/customers/${id}/block`, body))
+  },
+
+  // Seller bills (read-only)
+  listBills(query: Params) {
+    return callList<AdminBill>(http.get(`${BASE}/bills`, params(query)))
+  },
+  getBill(id: string) {
+    return call<AdminBill>(http.get(`${BASE}/bills/${id}`))
   },
 
   // Orders & payments

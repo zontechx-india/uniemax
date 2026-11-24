@@ -77,6 +77,8 @@ export const orderListQuery = searchQuery.extend({
   paymentStatus: z.enum(["PENDING", "PAID", "FAILED", "REFUNDED"]).optional(),
   paymentMethod: z.enum(["ONLINE", "COD"]).optional(),
   storeId: z.string().min(1).optional(),
+  // Storefront checkout or a seller's bill (modules/bills).
+  source: z.enum(["CHECKOUT", "BILL"]).optional(),
   from: isoDate,
   to: isoDate,
 });

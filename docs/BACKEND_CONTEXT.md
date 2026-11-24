@@ -633,6 +633,47 @@ no endpoint, no UI and no migration change.
   column maintained on profile writes, **not** a second copy of the rules in
   SQL.
 
+### Seller bills — `modules/bills`
+
+A seller makes a bill for a phone / in-shop customer from the store's own
+products; the customer pays it from a link. Owner routes under
+`/stores/:id/bills` (a separate plugin from `storeRoutes`, never on the admin
+store mount), the public bill under `/public/bills/:token`, read-only admin
+under `/admin/bills` (endpoints in `docs/API.md` → Seller bills).
+
+- **Checkout is untouched.** A bill reaches orders through two new
+  functions in `orders.service.ts`: `priceBillLines` (once, at creation —
+  checkout's own `loadPricingProducts` + `priceLine` + `priceOrder`, so a
+  bill can only hold what checkout could sell) and `placeBillOrder` (at
+  payment — the same guarded stock decrement, `order.placing` hooks and
+  `createPaymentSession` as checkout, with the bill's fixed prices; status
+  `AWAITING_PAYMENT`, `source: BILL`, `billId`; the first attempt reuses the
+  bill's number). Dev without gateway keys pays at once, like checkout.
+- **Paid** goes through `payments.service.ts#releaseToSeller`, the one step
+  both payment paths (Cashfree and PaymentHub webhooks, reconcile) already
+  run inside the PAID transaction: a CHECKOUT order → PENDING exactly as
+  before; a BILL order → **CONFIRMED** (`confirmedAt`) and its bill → PAID
+  with `orderId`. `afterOrderPaid` then sends the usual placed
+  notifications. A payment window that closes cancels the attempt order as
+  for checkout; the bill stays OPEN until `expiresAt`.
+- **One live attempt per bill**: paying again by the same customer reuses
+  its open attempt (`getOrCreatePaySession`); another account gets 409.
+  **Cancelling** an OPEN bill also cancels any open attempt
+  (`expireUnpaidOrder`: stock back, gateway checkout closed); a payment that
+  lands anyway follows the paid-after-cancel refund path.
+- **Sharing** is the seller's own WhatsApp (`wa.me` link with the message) or
+  a copied link — no Meta template, no platform-number sends. `shares` records
+  the tap.
+- **Item picker** endpoints search sellable products only
+  (`visibleProductWhere`) by words over name, category name, variant name
+  (size / colour) and SKU, 30 a page, in-stock first; categories with
+  counts; "often billed" from the store's last bills and order lines.
+- **Not built yet** (`prototype/docs/BILLS.md`): cash bills (the seller took
+  the money — needs a finance / courier review of the 46 places that treat
+  non-ONLINE as COD), one-off items (a hidden product would surface in
+  Categories and admin category mapping), an expiry sweep job (expiry is
+  read-time), sending from the UnieMax WhatsApp number.
+
 ### Support tickets — `modules/support`
 
 One module, three route trees: a public contact endpoint, the reporter's
@@ -1578,6 +1619,25 @@ White-label design — one codebase, any business:
 - **OAuthAccount** — social identity linked to a Customer; unique on
   `(provider, providerAccountId)` (the provider's stable `sub`). Supports Google now,
   Apple later (enum value already present).
+- **Bill** (`bills`) — a seller's bill (`modules/bills`): an order the
+  SELLER fills in from the store's own products for a phone / in-shop
+  customer, paid from a shared link `/b/{token}`. `number` (8 digits, unique
+  across bills AND orders — the paid order reuses it when it can), `token`
+  (unique, random, the link's secret), `customerName?` / `customerPhone`,
+  `fulfilment` (DELIVERY, or PICKUP for a pickup-only store), `items` JSON
+  line snapshots (`BillLine`: productId, variantId — null for a product
+  without options — stockVariantId, names, sku, imageKey, unitPrice,
+  quantity, lineTotal; money as strings), `subtotal`, `shippingCharge`,
+  `discountType`/`discountValue` as entered + `discount` in rupees, `total`,
+  `note`, `status` (`BillStatus`: OPEN → PAID | CANCELLED; EXPIRED is not
+  stored — OPEN past `expiresAt` reads EXPIRED), `sharedAt` + `shares` JSON
+  (`[{ at, via: WHATSAPP | COPY | SHARE }]` — the seller's taps, not the
+  chat), `openedAt`, `paidAt`, `cancelledAt`, `orderId` (unique, the paid
+  order). Prices are fixed at creation; an OPEN bill holds no stock and no
+  order. Indexed `(storeId, createdAt)`, `(status, expiresAt)`.
+  **Order** carries `source` (`OrderSource`: CHECKOUT default | BILL) and
+  `billId` (indexed, not unique — a payment attempt whose window closed is
+  cancelled and the next attempt is a new order).
 - **Order / OrderItem** — customer orders, placed **per store** at the
   storefront checkout (`modules/orders`; placement runs behind
   `requireCustomer` — only signed-in customers can order, and every order

@@ -398,6 +398,8 @@ export function StoreOrderDetailPage() {
             <p className="mt-0.5 text-hint text-muted">
               Order {order.orderNumber}
               {order.paymentRef === 'DEV-SIMULATED' && <> · simulated payment (development)</>}
+              {/* Plain text: the admin console mounts this page too, where a bills link has nowhere to go. */}
+              {order.source === 'BILL' && <> · made from a bill</>}
             </p>
           </section>
 

@@ -504,6 +504,7 @@ model Store {
   bankAccounts   StoreBankAccount[]
   bankEvents     StoreBankAccountEvent[]
   orders         Order[]
+  bills          Bill[]
   supportTickets SupportTicket[]
   /// Set when a platform admin has checked the store BY HAND — its GSTIN on
   /// the GST portal and that the legal name there matches the profile. Null =
@@ -1268,6 +1269,12 @@ model Order {
   /// checkout attempt). Unique per customer, so a retried or double-fired
   /// Place Order returns the order it already created instead of a second one.
   idempotencyKey      String?
+  /// How the order started: the storefront checkout, or a seller's bill
+  /// (modules/bills) that the customer paid from its link.
+  source              OrderSource     @default(CHECKOUT)
+  /// The bill this order pays (source = BILL). Not unique: a payment attempt
+  /// whose window closed is cancelled, and the next attempt is a new order.
+  billId              String?
   estimatedDeliveryAt DateTime?
   placedAt            DateTime        @default(now())
   items               OrderItem[]
@@ -1293,7 +1300,86 @@ model Order {
   @@index([customerPhone])
   @@index([status])
   @@index([paymentStatus])
+  @@index([billId])
   @@map("orders")
+  @@schema("public")
+}
+
+enum OrderSource {
+  CHECKOUT
+  BILL
+
+  @@schema("public")
+}
+
+/// OPEN until paid or cancelled. "Expired" is not stored: an OPEN bill past
+/// `expiresAt` is shown as expired and refuses payment (modules/bills).
+enum BillStatus {
+  OPEN
+  PAID
+  CANCELLED
+
+  @@schema("public")
+}
+
+/// A seller's bill (modules/bills): an order the SELLER fills in from the
+/// store's own products, for a customer who ordered by phone or in the shop.
+/// The seller shares its link (`/b/{token}`) from their own WhatsApp; the
+/// customer opens it, signs in (OTP), adds the address and pays online —
+/// only then does it become an Order (source BILL, status CONFIRMED).
+/// An open bill holds no stock and no order. Prices are copied onto the bill
+/// when it is made and never change after.
+model Bill {
+  id      String @id @default(cuid())
+  /// 8 digits, unique across bills and orders; the paid order reuses it.
+  number  String @unique
+  /// The public link's secret (`/b/{token}`) — random, unguessable.
+  token   String @unique
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  /// The seller account that made it.
+  createdById String?
+
+  customerName  String?
+  customerPhone String
+  /// DELIVERY (the customer adds the address when paying) or PICKUP for a
+  /// pickup-only store.
+  fulfilment    OrderFulfilment @default(DELIVERY)
+  /// Line snapshots: [{ productId, variantId, productName, variantName, sku,
+  /// productSlug, imageKey, unitPrice, quantity, lineTotal }]. Money as strings.
+  items         Json
+
+  subtotal       Decimal @db.Decimal(10, 2)
+  shippingCharge Decimal @default(0) @db.Decimal(10, 2)
+  /// The seller's discount as entered: AMOUNT (₹) or PERCENT, and its value.
+  discountType   String?
+  discountValue  Decimal? @db.Decimal(10, 2)
+  /// The discount in rupees, as applied to the total.
+  discount       Decimal @default(0) @db.Decimal(10, 2)
+  total          Decimal @db.Decimal(10, 2)
+  /// Shown to the customer on the bill page.
+  note           String?
+
+  status      BillStatus @default(OPEN)
+  expiresAt   DateTime
+  /// The seller tapped "Send on WhatsApp" / "Copy link" (first time). We
+  /// cannot see the chat — this is what the seller did.
+  sharedAt    DateTime?
+  /// [{ at, via: WHATSAPP | COPY | SHARE }]
+  shares      Json?
+  /// The customer opened the link (first time).
+  openedAt    DateTime?
+  paidAt      DateTime?
+  cancelledAt DateTime?
+  /// The paid order (Order.source = BILL).
+  orderId     String?   @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([storeId, createdAt])
+  @@index([status, expiresAt])
+  @@map("bills")
   @@schema("public")
 }
 

@@ -100,6 +100,8 @@ const SECTION_GROUPS: SectionGroup[] = [
     items: [
       { label: 'Dashboard', to: '.', icon: ChartIcon, end: true },
       { label: 'Orders', to: 'orders', icon: CartIcon, badge: true },
+      // Bills for phone / in-shop customers, paid from a shared link.
+      { label: 'Bills', to: 'bills', icon: ReceiptIcon },
     ],
   },
   {

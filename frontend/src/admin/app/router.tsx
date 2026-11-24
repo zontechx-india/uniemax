@@ -29,6 +29,8 @@ const StoreDetailPage = lazy(() => import('../pages/StoreDetailPage'))
 const CustomersPage = lazy(() => import('../pages/CustomersPage'))
 const CustomerDetailPage = lazy(() => import('../pages/CustomerDetailPage'))
 const OrdersPage = lazy(() => import('../pages/OrdersPage'))
+const SellerBillsPage = lazy(() => import('../pages/bills/SellerBillsPage'))
+const SellerBillPage = lazy(() => import('../pages/bills/SellerBillPage'))
 const OrderDetailPage = lazy(() => import('../pages/OrderDetailPage'))
 const PaymentsPage = lazy(() => import('../pages/PaymentsPage'))
 const SellerPayoutsPage = lazy(() => import('../pages/SellerPayoutsPage'))
@@ -227,6 +229,8 @@ export function AdminRouter() {
                 <Route path="customers/:customerId" element={<CustomerDetailPage />} />
                 <Route path="orders" element={<OrdersPage />} />
                 <Route path="orders/:orderId" element={<OrderDetailPage />} />
+                <Route path="bills" element={<SellerBillsPage />} />
+                <Route path="bills/:billId" element={<SellerBillPage />} />
                 <Route path="payments" element={<PaymentsPage />} />
                 <Route path="seller-payouts" element={<SellerPayoutsPage />} />
                 <Route path="finance/fees" element={<FeeSettingsPage />} />

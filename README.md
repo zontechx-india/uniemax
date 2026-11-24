@@ -131,6 +131,12 @@ never ships to a shopper.
   payment needs a payout account (which needs an address); pickup needs an
   address to collect from. One server-side registry decides all of it.
 
+- **Seller bills** (`/mystores/:slug/bills`): for a phone / in-shop customer,
+  the seller makes a bill from the shop's products (search a big catalog,
+  pick sizes / colours), adds delivery and a discount, and sends the link
+  from their own WhatsApp; the customer pays it at `/b/{token}` and it becomes
+  a confirmed order. Admin reads every bill under Commerce → Seller bills.
+
 ### For platform staff (`/admin`)
 
 - One-request dashboard: totals, today, per-day series, order pipeline, payment

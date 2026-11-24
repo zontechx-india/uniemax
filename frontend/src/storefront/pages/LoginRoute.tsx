@@ -28,7 +28,7 @@ function safeNext(raw: string | null): string {
  * here from `/checkout/{slug}`) needs a full page load, because this login
  * page lives in the marketplace router where those routes don't exist.
  */
-const SHOPPING_PATH = /^\/(store|cart|checkout|order)(\/|$)/
+const SHOPPING_PATH = /^\/(store|cart|checkout|order|b)(\/|$)/
 
 export function LoginRoute() {
   const { state, signedIn } = useMarketSession()

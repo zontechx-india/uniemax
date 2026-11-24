@@ -41,6 +41,8 @@ export const NAV_GROUPS: NavGroup[] = [
     title: 'Commerce',
     items: [
       { to: '/orders', label: 'Orders', icon: 'orders' },
+      // Read-only: bills sellers made for phone / in-shop customers.
+      { to: '/bills', label: 'Seller bills', icon: 'file' },
       { to: '/payments', label: 'Payments', icon: 'card' },
       { to: '/products', label: 'Products', icon: 'tag' },
       { to: '/categories', label: 'Categories', icon: 'layers' },
@@ -95,6 +97,7 @@ export const NAV_GROUPS: NavGroup[] = [
 /** Browser tab title per path prefix — longest match wins. */
 const TITLES: [string, string][] = [
   ['/orders', 'Orders'],
+  ['/bills', 'Seller bills'],
   ['/payments', 'Payments'],
   ['/seller-payouts', 'Seller payouts'],
   ['/finance/sellers', 'Seller balances'],

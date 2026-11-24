@@ -77,6 +77,10 @@ const OrderSuccessPage = lazy(() =>
   })),
 )
 
+const BillPayPage = lazy(() =>
+  import('../pages/bill/BillPayPage').then((m) => ({ default: m.BillPayPage })),
+)
+
 function Loading() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
@@ -140,6 +144,8 @@ export const publicRouter = createBrowserRouter([
       { path: '/checkout/:storeSlug', element: <CheckoutRoute /> },
       // Confirmation a successful Place Order lands on (guest-friendly).
       { path: '/order/:storeSlug/:orderId', element: <OrderSuccessRoute /> },
+      // A seller's bill, opened from the link they shared (features/bills).
+      { path: '/b/:token', element: <BillRoute /> },
     ],
   },
 ])
@@ -158,4 +164,9 @@ function CheckoutRoute() {
 function OrderSuccessRoute() {
   const { storeSlug = '', orderId = '' } = useParams()
   return lazyRoute(<OrderSuccessPage storeSlug={storeSlug} orderId={orderId} />)
+}
+
+function BillRoute() {
+  const { token = '' } = useParams()
+  return lazyRoute(<BillPayPage token={token} />)
 }

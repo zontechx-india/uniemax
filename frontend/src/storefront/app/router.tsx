@@ -266,6 +266,26 @@ export const router = createBrowserRouter([
                       Component: (await import('../pages/stores/StoreOrderDetailPage')).StoreOrderDetailPage,
                     }),
                   },
+                  // Seller bills — make a bill for a phone / in-shop customer
+                  // and share its link (features/bills).
+                  {
+                    path: 'bills',
+                    lazy: async () => ({
+                      Component: (await import('../pages/stores/bills/StoreBillsPage')).StoreBillsPage,
+                    }),
+                  },
+                  {
+                    path: 'bills/new',
+                    lazy: async () => ({
+                      Component: (await import('../pages/stores/bills/StoreBillNewPage')).StoreBillNewPage,
+                    }),
+                  },
+                  {
+                    path: 'bills/:billId',
+                    lazy: async () => ({
+                      Component: (await import('../pages/stores/bills/StoreBillPage')).StoreBillPage,
+                    }),
+                  },
                   {
                     path: 'details',
                     lazy: async () => ({

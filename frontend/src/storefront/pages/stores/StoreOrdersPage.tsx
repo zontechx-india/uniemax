@@ -12,7 +12,8 @@ import type {
   StoreDashboard,
 } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
-import { CartIcon, SearchIcon } from '../../layout/icons'
+import { useStoreManageScope } from '../../features/stores/storeManageScope'
+import { CartIcon, ReceiptIcon, SearchIcon } from '../../layout/icons'
 import { ORDER_STATUS_META, SellerOrderRow } from './orderMeta'
 import { LeadsPanel } from './orders/LeadsPanel'
 import { EmptyState } from './ui/EmptyState'
@@ -77,6 +78,8 @@ function isSellerStatus(value: string | null): value is SellerStatus {
 
 export function StoreOrdersPage() {
   const { store, dashboard } = useManagedStore()
+  // Bills are the seller's own — not on the admin console's mount of this page.
+  const ownerView = useStoreManageScope().mode === 'owner'
   const [params, setParams] = useSearchParams()
   // Orders | Leads (?tab=leads) — Leads lists people who nearly bought.
   const leadsTab = params.get('tab') === 'leads'
@@ -164,6 +167,15 @@ export function StoreOrdersPage() {
         icon={CartIcon}
         title="Orders"
         description="New orders show here. Open one to confirm it, then mark it packed and sent."
+        action={
+          // A customer on the phone or in the shop: make them a bill (features/bills).
+          ownerView ? (
+            <Link to="../bills/new" relative="path" className={buttonClass({ variant: 'secondary', size: 'lg' })}>
+              <ReceiptIcon className="h-5 w-5" />
+              Create a bill
+            </Link>
+          ) : undefined
+        }
       />
       <OrdersTabs leads={leadsTab} />
     </>

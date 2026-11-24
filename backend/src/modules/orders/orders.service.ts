@@ -155,6 +155,9 @@ const orderSelect = {
   paymentMethod: true,
   paymentStatus: true,
   paymentRef: true,
+  // CHECKOUT, or BILL with the seller's bill it paid (modules/bills).
+  source: true,
+  billId: true,
   placedAt: true,
   // Lifecycle stamps — null until the seller reaches that stage (a skipped
   // stage, e.g. SHIPPED on a pickup order, stays null forever).
@@ -958,6 +961,8 @@ const orderSummarySelect = {
   paymentStatus: true,
   total: true,
   placedAt: true,
+  // "From a bill" chip on the seller's Orders list.
+  source: true,
   _count: { select: { items: true } },
   // One probe row: does a package (a supplier) ship any line of this order?
   items: { where: { fulfilledBy: { not: null } }, select: { id: true }, take: 1 },
@@ -1539,5 +1544,223 @@ export async function getPublicOrder(
     // gateway reference is the buyer's business.
     paymentRef: shaped.paymentRef === "DEV-SIMULATED" ? shaped.paymentRef : null,
     redacted: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Seller bills (modules/bills) — the only two places a bill touches orders.
+// `createOrder` (checkout) is untouched: these reuse its pricing and stock
+// rules, so a bill can never sell what checkout would refuse.
+// ---------------------------------------------------------------------------
+
+/** One bill line as stored on `Bill.items` (money as strings, Json-safe). */
+export interface BillLine {
+  productId: string;
+  /** Null for a product without options (its implicit Default variant). */
+  variantId: string | null;
+  /** The variant that holds the stock — the Default one when `variantId` is null. */
+  stockVariantId: string;
+  productName: string;
+  variantName: string | null;
+  sku: string | null;
+  productSlug: string;
+  imageKey: string | null;
+  unitPrice: string;
+  quantity: number;
+  lineTotal: string;
+}
+
+/**
+ * Price a seller's bill ONCE from the live catalog — visible products and
+ * active variants only, stock checked, the store's delivery rate quoted —
+ * exactly as checkout prices a cart. The bill then keeps these prices.
+ */
+export async function priceBillLines(
+  storeId: string,
+  items: OrderItemRef[],
+  shipping: ReturnType<typeof resolveShipping>,
+  fulfilment: "DELIVERY" | "PICKUP",
+) {
+  assertNoDuplicateLines(items);
+  const productById = await loadPricingProducts(storeId, items);
+  const priced = items.map((item) => priceLine(item, productById.get(item.productId), true)!);
+  const money = priceOrder(priced, fulfilment, shipping);
+  const lines: BillLine[] = priced.map((line) => ({
+    productId: line.productId,
+    variantId: line.variantId ?? null,
+    stockVariantId: line.stockVariantId,
+    productName: line.productName,
+    variantName: line.variantName,
+    sku: line.sku,
+    productSlug: line.productSlug,
+    imageKey: line.imageKey,
+    unitPrice: line.unitPrice.toFixed(2),
+    quantity: line.quantity,
+    lineTotal: line.lineTotal.toFixed(2),
+  }));
+  return { lines, subtotal: money.subtotal, shippingCharge: money.shippingCharge };
+}
+
+export interface BillForPayment {
+  id: string;
+  number: string;
+  fulfilment: "DELIVERY" | "PICKUP";
+  lines: BillLine[];
+  subtotal: Prisma.Decimal;
+  shippingCharge: Prisma.Decimal;
+  discount: Prisma.Decimal;
+  total: Prisma.Decimal;
+  store: { id: string; name: string; slug: string };
+}
+
+/**
+ * The customer pays a bill: place its order (status AWAITING_PAYMENT, the
+ * bill's fixed prices, the same guarded stock decrement and package hooks as
+ * checkout) and open the payment session. The payment webhook then makes it
+ * CONFIRMED and the bill PAID (`releaseToSeller`). The first attempt reuses
+ * the bill's number; a later attempt (the first one's window closed) gets a
+ * fresh one. Dev without gateway keys pays at once, like checkout does.
+ */
+export async function placeBillOrder(
+  bill: BillForPayment,
+  customerId: string,
+  customer: OrderCustomerInput,
+) {
+  const viaGateway = gatewayConfigured;
+  if (!viaGateway && isProduction) {
+    throw new HttpError(503, "Online payment is not available right now — please try again later");
+  }
+  const simulated = !viaGateway;
+  const withAddress = bill.fulfilment === "DELIVERY";
+
+  let row!: OrderRow; // set by the loop below, which only exits with an order or a throw
+  for (let attempt = 1; !row; attempt += 1) {
+    const orderNumber = attempt === 1 ? bill.number : newOrderNumber();
+    try {
+      row = await prisma.$transaction(async (tx) => {
+        for (const line of bill.lines) {
+          const updated = await tx.storeProductVariant.updateMany({
+            where: { id: line.stockVariantId, isActive: true, stockQuantity: { gte: line.quantity } },
+            data: { stockQuantity: { decrement: line.quantity } },
+          });
+          if (updated.count === 0) {
+            const label = line.variantName ? `${line.productName} (${line.variantName})` : line.productName;
+            throw HttpError.conflict(`"${label}" just sold out — ask the shop for a new bill`);
+          }
+        }
+        for (const productId of new Set(bill.lines.map((l) => l.productId))) {
+          await recomputeProductAggregates(productId, tx);
+        }
+        const now = new Date();
+        const created = await tx.order.create({
+          data: {
+            orderNumber,
+            source: "BILL",
+            billId: bill.id,
+            storeId: bill.store.id,
+            storeName: bill.store.name,
+            storeSlug: bill.store.slug,
+            customerId,
+            fulfilment: bill.fulfilment,
+            customerName: customer.name,
+            customerPhone: customer.phone,
+            customerEmail: customer.email,
+            addressLine: withAddress ? customer.address : null,
+            pincode: withAddress ? customer.pincode : null,
+            state: withAddress ? customer.state : null,
+            country: withAddress ? customer.country : null,
+            billingAddress: Prisma.DbNull,
+            customFields: Prisma.DbNull,
+            subtotal: bill.subtotal,
+            shippingCharge: bill.shippingCharge,
+            shippingMethod: "BILL",
+            shippingBasis: Prisma.DbNull,
+            tax: new Prisma.Decimal(0),
+            discount: bill.discount,
+            total: bill.total,
+            status: simulated ? "CONFIRMED" : "AWAITING_PAYMENT",
+            confirmedAt: simulated ? now : null,
+            paymentMethod: "ONLINE",
+            paymentStatus: simulated ? "PAID" : "PENDING",
+            paymentRef: simulated ? "DEV-SIMULATED" : null,
+            items: {
+              create: bill.lines.map((line) => ({
+                productId: line.productId,
+                variantId: line.variantId,
+                productName: line.productName,
+                variantName: line.variantName,
+                sku: line.sku,
+                productSlug: line.productSlug,
+                imageKey: line.imageKey,
+                unitPrice: new Prisma.Decimal(line.unitPrice),
+                quantity: line.quantity,
+                lineTotal: new Prisma.Decimal(line.lineTotal),
+              })),
+            },
+          },
+          select: orderSelect,
+        });
+        await runHooks("order.placing", tx, created.id);
+        if (simulated) {
+          await tx.bill.updateMany({
+            where: { id: bill.id, status: "OPEN" },
+            data: { status: "PAID", paidAt: now, orderId: created.id },
+          });
+        }
+        return created;
+      });
+    } catch (err) {
+      if (isOrderNumberConflict(err) && attempt < ORDER_NUMBER_ATTEMPTS) continue;
+      throw err;
+    }
+  }
+
+  let payment: PaymentSession | undefined;
+  if (viaGateway) {
+    try {
+      payment = await createPaymentSession({
+        id: row.id,
+        orderNumber: row.orderNumber,
+        storeSlug: row.storeSlug,
+        total: row.total,
+        customerId,
+        customerName: row.customerName,
+        customerPhone: row.customerPhone,
+        customerEmail: row.customerEmail,
+      });
+    } catch (err) {
+      // Same undo as checkout: the attempt never happened, stock goes back.
+      await prisma.$transaction(async (tx) => {
+        for (const line of bill.lines) {
+          await tx.storeProductVariant.updateMany({
+            where: { id: line.stockVariantId },
+            data: { stockQuantity: { increment: line.quantity } },
+          });
+        }
+        for (const productId of new Set(bill.lines.map((l) => l.productId))) {
+          await recomputeProductAggregates(productId, tx);
+        }
+        await runHooks("order.unplacing", tx, row.id);
+        await tx.order.delete({ where: { id: row.id } });
+      });
+      throw err;
+    }
+  }
+
+  emit("order.placed", { orderId: row.id });
+  if (simulated) {
+    // Dev only: no gateway, so no webhook — tell both sides now.
+    const store = await prisma.store.findUnique({
+      where: { id: bill.store.id },
+      select: { owner: { select: { id: true, email: true } } },
+    });
+    notifyOrderPlaced(shapeOrder(row), customerId, store?.owner ?? null);
+  }
+  return {
+    orderId: row.id,
+    orderNumber: row.orderNumber,
+    storeSlug: row.storeSlug,
+    paid: simulated,
+    payment: payment ?? null,
   };
 }

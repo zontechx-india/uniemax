@@ -36,7 +36,7 @@ export default function OrdersPage() {
   const navigate = useNavigate()
   const list = useAdminList<OrderRow>(
     (query) => adminApi.listOrders(query),
-    { keys: ['q', 'status', 'paymentStatus', 'paymentMethod', 'storeId'] },
+    { keys: ['q', 'status', 'paymentStatus', 'paymentMethod', 'storeId', 'source'] },
   )
 
   const columns: Column<OrderRow>[] = [
@@ -49,6 +49,7 @@ export default function OrdersPage() {
           <p className="truncate text-xs text-muted">
             {order.itemCount} item{order.itemCount === 1 ? '' : 's'} ·{' '}
             {order.fulfilment === 'PICKUP' ? 'Pickup' : 'Delivery'}
+            {order.source === 'BILL' && ' · Seller bill'}
           </p>
         </div>
       ),
@@ -121,6 +122,16 @@ export default function OrdersPage() {
               { value: '', label: 'Any method' },
               { value: 'ONLINE', label: 'Online' },
               { value: 'COD', label: 'Cash on delivery' },
+            ]}
+          />
+          <FilterSelect
+            label="Source"
+            value={list.filters['source'] ?? ''}
+            onChange={(value) => list.setFilter('source', value)}
+            options={[
+              { value: '', label: 'Any source' },
+              { value: 'CHECKOUT', label: 'Shop checkout' },
+              { value: 'BILL', label: 'Seller bill' },
             ]}
           />
         </Toolbar>

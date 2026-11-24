@@ -91,6 +91,11 @@ export default function OrderDetailPage() {
           <span className="flex flex-wrap items-center gap-2">
             <OrderStatusChip status={order.status} />
             <PaymentChip status={order.paymentStatus} method={order.paymentMethod} />
+            {order.source === 'BILL' && order.billId && (
+              <Link to={`/bills/${order.billId}`} className="lnk">
+                From a seller bill
+              </Link>
+            )}
             <span>Placed {formatDateTime(order.placedAt)}</span>
           </span>
         }

@@ -13,6 +13,7 @@ import {
   adminCategoryRoutes,
 } from "./modules/category/category.routes.js";
 import { storeRoutes, publicStoreRoutes } from "./modules/stores/stores.routes.js";
+import { adminBillRoutes, publicBillRoutes, sellerBillRoutes } from "./modules/bills/bills.routes.js";
 import {
   sellerThemeTemplateRoutes,
   adminThemeTemplateRoutes,
@@ -81,6 +82,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       await api.register(publicCategoryRoutes, { prefix: "/categories" });
       // Customer-owned stores (guarded inside the plugin — requireCustomer).
       await api.register(storeRoutes, { prefix: "/stores", mode: "owner" });
+      // Seller bills — owner only (never on the admin store mount).
+      await api.register(sellerBillRoutes, { prefix: "/stores" });
       // Curated storefront palettes a seller applies from Appearance —
       // active templates only (guarded inside the plugin — requireCustomer).
       await api.register(sellerThemeTemplateRoutes, {
@@ -108,6 +111,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       await api.register(publicStoreRoutes, { prefix: "/public/stores" });
       // Order placement + confirmation lookup (guest checkout, same prefix).
       await api.register(publicOrderRoutes, { prefix: "/public/stores" });
+      // A seller's bill, opened from its shared link; paying needs sign-in.
+      await api.register(publicBillRoutes, { prefix: "/public/bills" });
       // The courier list behind the seller's "Mark as sent" sheet.
       await api.register(publicCourierRoutes, { prefix: "/public" });
       // Marketplace discovery — global search + platform stats (homepage).
@@ -174,6 +179,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
             // Support ticket queue — the platform team's side of the threads
             // sellers raise from their stores.
             await guarded.register(adminSupportRoutes, { prefix: "/support" });
+            // Seller bills — read-only oversight.
+            await guarded.register(adminBillRoutes, { prefix: "/bills" });
             // Marketplace homepage banners — the platform's own carousel,
             // distinct from the per-store banners sellers manage.
             await guarded.register(adminBannerRoutes, { prefix: "/banners" });

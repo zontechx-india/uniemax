@@ -31,6 +31,8 @@ const summarySelect = {
   customerPhone: true,
   fulfilment: true,
   paymentMethod: true,
+  source: true,
+  billId: true,
   paymentStatus: true,
   paymentRef: true,
   total: true,
@@ -60,6 +62,7 @@ function buildWhere(query: OrderListQuery | PaymentListQuery) {
   }
   if ("status" in query && query.status) where.status = query.status;
   if ("storeId" in query && query.storeId) where.storeId = query.storeId;
+  if ("source" in query && query.source) where.source = query.source;
   if (query.paymentStatus) where.paymentStatus = query.paymentStatus;
   if (query.paymentMethod) where.paymentMethod = query.paymentMethod;
   if (query.from || query.to) {

@@ -508,6 +508,33 @@ latest refund (always `null` in the redacted public view). The admin order
 detail carries `refunds[]` with `id`, `status`, `amount`, `reason`,
 `failureReason`, `hubRefundId`, `attempts`, `createdAt`, `processedAt`.
 
+### Seller bills — `/api/v1/stores/:id/bills` 🔒 owner
+
+A bill is an order the **seller** fills in from the store's own products for a
+phone / in-shop customer; the customer pays it from its link (public section
+below). Owner only — never on the admin store mount. Design: `docs/BACKEND_CONTEXT.md`
+→ Seller bills.
+
+The **bill** shape: `{ id, number, link, state: OPEN|PAID|CANCELLED|EXPIRED,
+stage: NEW|SHARED|OPENED, store { id, name, slug }, customerName, customerPhone,
+fulfilment, items[{ productId, variantId, productName, variantName, sku,
+productSlug, imageUrl, unitPrice, quantity, lineTotal }], itemCount, subtotal,
+shippingCharge, discountType, discountValue, discount, total, note, expiresAt,
+sharedAt, shares[{ at, via }], openedAt, paidAt, cancelledAt, createdAt,
+order: { id, orderNumber, status, paymentRef } | null }`. `link` is
+`PUBLIC_WEB_URL/b/{token}`. `EXPIRED` = OPEN past `expiresAt`.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/:id/bills?tab=ALL\|WAITING\|PAID\|CLOSED&page&pageSize` | Newest first; the list envelope plus `summary { waiting, waitingTotal, notShared, tabs { ALL, WAITING, PAID, CLOSED } }` |
+| `POST` | `/:id/bills` → `201` | Body `{ customerPhone, customerName?, items[{ productId, variantId \| null, quantity }] (1–50), shippingCharge: number \| null (null = the store's delivery rate), discountType: AMOUNT\|PERCENT, discountValue, note? (≤200), expiryDays: 1\|3\|7 }`. Priced once from the live catalog (visible products, active variants, stock checked — checkout's pricing) and kept. `409` paused / unpublished shop or online payment off; `409` stock / vanished item; `400` discount over the items or total ≤ 0 |
+| `GET` | `/:id/bills/:billId` | One bill |
+| `POST` | `/:id/bills/:billId/share` | Body `{ via: WHATSAPP\|COPY\|SHARE }` — records the seller's tap (first one sets `sharedAt`); `409` on a closed bill |
+| `POST` | `/:id/bills/:billId/cancel` | OPEN only (`409` otherwise). Cancels any payment attempt still open (stock back, checkout closed) |
+| `GET` | `/:id/bills/catalog?q&categoryId&page&pageSize(≤50, default 30)` | The item picker: sellable products; every word of `q` must match the name, category name, a variant's name (size / colour) or SKU; `categoryId` includes its sub-categories; in stock first. Rows `{ id, name, category ("Parent › Child"), imageUrl, optionTypes[{ name, values }], priceMin, stock, variants[{ id \| null (default variant), name, optionValues, price, stock, sku, imageUrl }] }` |
+| `GET` | `/:id/bills/catalog/categories` | `[{ id, name, parentId, count }]` — sellable products per category (children counted in the parent), empty ones left out |
+| `GET` | `/:id/bills/catalog/often` | Up to 6 `{ product, variant }` — the variants this store billed or sold most recently, with today's price and stock |
+
 ### Seller leads — `GET /api/v1/stores/:id/leads` 🔒 owner
 
 The **Leads** tab on Orders: people who nearly bought. Read-only; also on the
@@ -2192,6 +2219,27 @@ an `AWAITING_PAYMENT` order — the seller never saw it). Returns the
 order (unredacted). `409` once confirmed, paid, or already cancelled; `404`
 for an order that is not the caller's. 10/min.
 
+### Seller bill link — `/api/v1/public/bills/:token`
+
+The page a seller shares (`/b/{token}` on the storefront). `GET` (optional
+auth) answers `{ number, state, store { name, slug }, customerName,
+customerPhone (masked "+91 98400 •••23"), fulfilment, items[{ variantId,
+productName, variantName, sku, imageUrl, unitPrice, quantity, lineTotal }],
+subtotal, shippingCharge, discount, total, note, expiresAt, createdAt, paidAt,
+order: { id, orderNumber } | null }` — `order` only for the account that paid
+it. The first `GET` of an OPEN bill stamps `openedAt`. `404` unknown token.
+
+`POST /:token/pay` 🔒 customer — body `{ name, phone, address?, pincode?,
+state? }` (address, 6-digit pincode and state required for a DELIVERY bill).
+Places the bill's order (`source: BILL`, `AWAITING_PAYMENT`, the bill's
+prices, stock taken) and opens the payment session — answers `{ orderId,
+orderNumber, storeSlug, paid, payment: PaymentSession | null }`; the web
+client launches Cashfree checkout with `payment`, which returns to
+`/order/{storeSlug}/{orderId}`. Paying again (same account) reuses the open
+attempt. Paid (webhook) → the order is `CONFIRMED` and the bill `PAID`.
+`409` paid / expired / cancelled bill, a paused shop, or another account
+paying right now; `409` sold out; `503` no gateway in production.
+
 ### `POST /api/v1/payments/webhooks/cashfree` (no auth — HMAC-guarded)
 
 Cashfree's server-to-server payment notification. Authenticity is verified
@@ -3648,13 +3696,22 @@ outlives it. Unblocking notifies the customer. Already in that state → `409`.
 ### `GET /api/v1/admin/orders` · `GET /api/v1/admin/orders/:id`
 
 List query: `q` (order number / customer / phone / store / payment reference),
-`status`, `paymentStatus`, `paymentMethod`, `storeId`, `from`, `to`, `page`,
-`pageSize`. The list also returns **`filteredRevenue`** — the revenue of the
+`status`, `paymentStatus`, `paymentMethod`, `storeId`, `source`
+(`CHECKOUT` | `BILL` — a seller's bill), `from`, `to`, `page`,
+`pageSize`. Rows and detail carry `source` and `billId`. The list also returns **`filteredRevenue`** — the revenue of the
 current filter, so the header answers "what is this slice worth".
 Detail adds the money breakdown, contact + delivery snapshot, lifecycle
 timestamps, `cfOrderId`, the linked customer/store, items with `imageUrl`,
 and `shipments[]` as the seller sees them (proof-of-delivery `podUrl`
 included — shape under **Parcels**).
+
+### `GET /api/v1/admin/bills` · `GET /api/v1/admin/bills/:id`
+
+Seller bills, read-only (only the seller shares or cancels). List query:
+`state` (`OPEN` | `PAID` | `EXPIRED` | `CANCELLED`), `storeId`, `q` (bill
+number / customer name / phone), `page`, `pageSize`; the list envelope plus
+`summary { open, openTotal, paid, paidTotal, closed }`. Rows and detail use
+the seller's bill shape (Seller bills, above).
 
 ### `POST /api/v1/admin/orders/:id/refunds/:refundId/retry`
 

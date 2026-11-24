@@ -2872,6 +2872,44 @@ is never shown a pickup-address item.
 
 ---
 
+### Seller bills (`features/bills/`, `pages/stores/bills/`, `pages/bill/`)
+
+A seller makes a bill for a phone / in-shop customer and shares its link;
+the customer pays it like a checkout order. API client `features/bills/billsApi.ts`
+(`billsApi` owner, `publicBillApi` customer; `billMessage`, `whatsappUrl`,
+`spacedNumber` "4820 3917").
+
+- **Seller** (`/mystores/{slug}/bills`, nav Overview → Bills; Orders has a
+  secondary "Create a bill" — both owner-only: `bills` is in the admin
+  scope's `hiddenSections`, and the button checks `useStoreManageScope().mode`).
+  `StoreBillsPage` (segmented tabs All · Waiting · Paid · Expired or cancelled
+  via `?tab=`, Load more), `StoreBillNewPage` (customer · items · delivery /
+  discount / note / link days; sticky total + Review → `Dialog` → Make bill; the
+  draft lives in `sessionStorage` per store; the delivery hint is the checkout
+  quote), `StoreBillPage` (the exact WhatsApp text, `wa.me` "Send on WhatsApp"
+  link + Copy link — both recorded via `/share` — timeline, Cancel low on the
+  page, "Make a new bill like this" for closed ones). Order rows show "From a
+  bill" (`source: 'BILL'`).
+- **Item picker** (`ItemPicker.tsx`, a `fill` + `flush` `Dialog`) for big
+  catalogs: server search (30 a page, Show more), category list (radio rows
+  with counts), "Often billed". A product without options adds with + then a
+  `Stepper`; a product WITH options opens (a `<details>` disclosure) to one
+  row of `ChoiceChip` radios per option type — a value is disabled when no
+  in-stock combination fits the other choices, a typed value ("kurti teal")
+  and a lone in-stock value are pre-chosen — then quantity + "Add N to bill";
+  "On the bill" lists the product's added variants with − / +. Chosen cells
+  are solid ink (`bg-fg text-surface`); every action is a `Button`.
+- **Customer** — `BillPayPage` at `/b/:token` on the **public** router
+  (`PUBLIC_PATH` / `LoginRoute`'s `SHOPPING_PATH` include `b`), in the shop's
+  colours (`useStoreShell` + `storeVars`), `usePrivatePageTitle` (noindex).
+  Bill → Pay (signs in in place with the store-branded `openAuthDialog`) →
+  name / phone / address (pincode + `INDIAN_STATES`) → `publicBillApi.pay` →
+  `launchCashfreeCheckout` → back on `/order/{store}/{order}`. Paid, expired,
+  cancelled and unknown bills get their own screens.
+- **Admin** — `pages/bills/SellerBillsPage` + `SellerBillPage` (Commerce →
+  Seller bills, read-only), Orders' **Source** filter, and "From a seller bill"
+  on the order detail.
+
 ## Admin console (`src/admin/`) — the platform operator's app
 
 Served at **`/admin`** on the same origin (see "Two Apps, One Repo"). The

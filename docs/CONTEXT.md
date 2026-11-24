@@ -179,6 +179,19 @@ A single account can own multiple stores and switch between them.
   says so (they may be damaged), and a paid order is marked refunded
   (status only for gateway payments — the money is refunded from the
   Cashfree dashboard until the automatic refund call ships).
+- **Bills (Overview → Bills, or Orders → Create a bill)** — for a customer
+  who orders by phone or in the shop, the seller makes a bill from the
+  shop's own products (search, categories, "often billed", sizes / colours
+  picked per option), with a delivery charge, a discount (₹ or %), a note
+  and a link that stays open 1, 3 or 7 days. The seller sends the link from
+  their **own WhatsApp** (or copies it); the customer sees the bill, signs in
+  with OTP, adds the address and pays online; it then becomes a normal
+  order, already **Confirmed**, with the bill's number. An open bill holds
+  no stock; prices are fixed when it is made. The seller sees each bill as
+  not shared / shared / opened / paid, can cancel it, or make a new one like
+  it. Not a payment link for any amount — every bill is products from the
+  shop. Not yet: cash bills (the seller already took the money) and one-off
+  items that are not in the shop.
 - **Leads (Orders → Leads tab)** — people who nearly bought, read-only:
   **Not paid** (online checkouts whose payment never went through — the
   shopper gave the shop their name and phone at checkout, so the seller

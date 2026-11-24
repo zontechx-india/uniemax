@@ -18,7 +18,7 @@ import { useWishlistSync } from './features/wishlist/wishlist'
  * client-side navigation can never swap routers mid-session):
  *
  *  - The SHOPPING surface — `/store/...`, `/cart...`, `/checkout/...`,
- *    `/order/...` (confirmation) — mounts `app/publicRouter.tsx`. Nothing
+*    `/order/...` (confirmation), `/b/...` (a seller's bill) — mounts `app/publicRouter.tsx`. Nothing
  *    there *requires* an account: browsing, the cart and a shared store link
  *    all work signed out.
  *
@@ -40,7 +40,8 @@ import { useWishlistSync } from './features/wishlist/wishlist'
  * needs to know who is looking. Nothing waits on the probe: every public page
  * renders immediately and the account slot resolves from a skeleton.
  */
-const PUBLIC_PATH = /^\/(store|cart|checkout|order)(\/|$)/
+// `b` = a seller's bill link (/b/{token}, features/bills).
+const PUBLIC_PATH = /^\/(store|cart|checkout|order|b)(\/|$)/
 
 const activeRouter = PUBLIC_PATH.test(window.location.pathname)
   ? publicRouter
