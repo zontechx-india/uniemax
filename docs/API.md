@@ -106,7 +106,7 @@ own profile/orders. Three sign-in methods (see
 | ------ | --------- | ----- |
 | **Email + password** (primary) | `/register/request` → `/{web,mobile}/register/verify` · `/{web,mobile}/login` | **verify-first** — the account is created only after the emailed code is confirmed |
 | **Google Sign-In** | `/{web,mobile}/google` | **disabled** — no verifier registered; both endpoints return `400 "GOOGLE sign-in is not enabled"` |
-| **Mobile number + OTP** | `/otp/request` → `/{web,mobile}/otp/verify` | **login-only** — works for phones already linked to an account (via `/me/link`); registration is always by email |
+| **Mobile number + OTP** | `/otp/request` → `/{web,mobile}/otp/verify` | **sign in or sign up** — a linked number signs in to its account; a number nobody owns gets a new phone-only account (no email, no password) on first verify |
 
 Apple Sign-In is planned (same shape as Google). Email and phone are each unique to
 one account. Every login method returns the same `customer` object (includes
@@ -190,9 +190,8 @@ with the email pre-verified. Response is `{ customer, isNewUser }` + tokens per 
 ```jsonc
 { "phone": "9876543210" }
 ```
-**Login-only** — OTP sign-in never creates an account. `404` (with guidance) if the
-phone is not linked to any customer; link it first via `/me/link` after an email login.
-`429` if a code for this number is already in flight (Message Central); `502` if the
+Works for any number — linked or new. Nothing is created here; a new number becomes
+an account only when its code is verified. `429` if a code for this number is already in flight (Message Central); `502` if the
 SMS service fails.
 ```jsonc
 { "success": true, "data": { "channel": "SMS", "destination": "9876543210",
@@ -204,8 +203,9 @@ SMS service fails.
 { "phone": "9876543210", "code": "123456" }
 ```
 Verifies the code and signs in the account that owns the phone (re-stamps
-`phoneVerifiedAt`). `404` if the phone is unlinked; `401` on wrong/expired code or after
-`OTP_MAX_ATTEMPTS` failures.
+`phoneVerifiedAt`). If no account owns it, creates a phone-only customer (phone
+verified, no email, no password) and signs it in with `isNewUser: true`. `401` on
+wrong/expired code or after `OTP_MAX_ATTEMPTS` failures.
 
 ### `GET /api/v1/auth/me` 🔒 customer
 The logged-in customer's profile (includes `hasPassword`).
@@ -232,7 +232,8 @@ alive); the session that made the change stays signed in. Response:
 
 ### Account linking 🔒 customer
 Add the *other* identifier to your account, verified by a code to the new identifier.
-This is how a mobile number becomes an OTP sign-in method (registration is email-only).
+This is how an email account adds a mobile number for OTP sign-in, or a phone-only
+account adds an email.
 There is no separate post-register email-verify flow — emails are verified **before**
 the account is created.
 

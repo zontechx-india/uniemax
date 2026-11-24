@@ -52,8 +52,10 @@ import {
  * either host can frame it.
  *
  * Three sign-in methods, matching what `package/auth` ships today:
+ *   Mobile tab → phone → OTP code (account created on first verify) — first
+ *                and the default: many shoppers have no email habit, and an
+ *                email + password form made them reach for their Gmail password
  *   Email tab  → sign in / create account (+ forgot-password flow)
- *   Mobile tab → phone → OTP code (account created on first verify)
  *   Google     → dev simulation until GOOGLE_CLIENT_ID + the real GIS button land
  *
  * Verification-code delivery is dummy on the backend for now, so responses
@@ -81,7 +83,7 @@ export type AuthView =
 
 export function CustomerAuthPanel({
   onSignedIn,
-  initialView = 'email',
+  initialView = 'phone',
   variant = 'page',
   intent,
 }: {
@@ -107,8 +109,8 @@ export function CustomerAuthPanel({
 
   const tab = view === 'phone' || view === 'phone-verify' ? 'phone' : 'email'
   // The tabs switch the SIGN-IN method. Register / forgot / reset are
-  // email-only sub-flows (Mobile OTP is login-only), so the switcher is
-  // not part of those views at all.
+  // email-only sub-flows (Mobile signs in and signs up in one step), so the
+  // switcher is not part of those views at all.
   const showMethodTabs = view === 'email' || view === 'phone' || view === 'phone-verify'
 
   const body = (
@@ -116,8 +118,8 @@ export function CustomerAuthPanel({
       {showMethodTabs && (
         <SegmentedTabs
           tabs={[
+            { value: 'phone', label: 'Mobile' },
             { value: 'email', label: 'Email' },
-            { value: 'phone', label: 'Mobile OTP' },
           ]}
           value={tab}
           onChange={(t) => {
@@ -239,6 +241,7 @@ function EmailSignIn({
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             trailing={<PasswordToggle show={showPassword} onToggle={() => setShowPassword((s) => !s)} />}
+            hint="The password you made for this site, not your Gmail password."
           />
           <div className="mt-1.5 text-right">
             <button
@@ -375,7 +378,7 @@ function Register({
           onChange={(e) => setEmail(e.target.value)}
         />
         <TextField
-          label="Password"
+          label="Create a new password"
           type={showPassword ? 'text' : 'password'}
           autoComplete="new-password"
           placeholder="At least 8 characters"
@@ -383,6 +386,7 @@ function Register({
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           trailing={<PasswordToggle show={showPassword} onToggle={() => setShowPassword((s) => !s)} />}
+          hint="Make a new password for this site. Do not use your Gmail password."
         />
         {error && <ErrorNote>{error}</ErrorNote>}
         <PrimaryButton type="submit" disabled={busy}>
@@ -612,9 +616,9 @@ function PhoneOtp({
         phone: phone.replace(/\s/g, ''),
         code,
       })
-      // OTP is login-only today, but the backend still reports whether it had
-      // to create the account — only that case is a registration. Buyer vs
-      // seller split is driven by the opener's `intent` (see `fireSignup`).
+      // The backend creates the account on the first verify of a new number
+      // and says so via `isNewUser` — only that case is a registration. Buyer
+      // vs seller split is driven by the opener's `intent` (see `fireSignup`).
       if (isNewUser) fireSignup(intent, 'phone_otp')
       onSignedIn(customer)
     } catch (err) {
@@ -641,8 +645,8 @@ function PhoneOtp({
           {busy ? 'Sending…' : 'Send code'}
         </PrimaryButton>
         <p className="text-center text-xs text-muted">
-          Works for numbers linked to an account. New here? Create an account
-          with email first, then add your number from your profile.
+          We&apos;ll text you a code. New here? Your account is created when
+          you enter it, no password needed.
         </p>
       </form>
     )
@@ -673,7 +677,7 @@ function PhoneOtp({
       {/* Real SMS codes are 4 digits (Message Central default); the dev
           fallback/bypass sends 6 — so gate at the backend's minimum. */}
       <PrimaryButton type="submit" disabled={busy || code.length < 4}>
-        {busy ? 'Verifying…' : 'Verify & sign in'}
+        {busy ? 'Verifying…' : 'Verify & continue'}
       </PrimaryButton>
       <div className="flex items-center justify-between text-xs">
         <button

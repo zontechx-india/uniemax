@@ -138,11 +138,15 @@ the API same-origin — matching production, so no CORS/SameSite issues.
   `AuthLayout` + `Brand` + the same panel with `variant="page"` (bordered
   `AuthCard`; the dialog uses `variant="dialog"`, flat).
 
-All three backend methods, switched by a segmented Email / Mobile-OTP control. The switcher is
+All three backend methods, switched by a segmented **Mobile / Email** control —
+Mobile first and the default view (also for the `/sell` opener), because many
+shoppers avoid email and the email + password form made them type their Gmail
+password. The switcher is
 a **sign-in** method picker only: it renders on the sign-in views (email
 password, phone, phone-verify) and is hidden on the email-only sub-flows —
 create account (which carries its own "Create your account" heading),
-forgot password and reset — since Mobile OTP cannot create an account:
+forgot password and reset. Password fields say plainly it is a password for
+this site, not the Gmail one:
 - **Email + password** — sign in, **verify-first registration** (form → emailed
   code → account created verified + signed in), and the forgot-password flow
   (email → code + new password).
@@ -151,11 +155,10 @@ forgot password and reset — since Mobile OTP cannot create an account:
   in place, ready to re-enable when the real integration is planned (the
   backend currently has **no Google verifier registered** either — its
   `/google` endpoints answer 400).
-- **Mobile OTP** — **login-only**: phone → SMS code (4 digits from the real
+- **Mobile OTP** — **sign in or sign up**: phone → SMS code (4 digits from the real
   Message Central delivery, 6 from the dev fallback/bypass — the inputs
-  accept 4–8 and never hardcode a length), for numbers already
-  linked to an account from the profile (unlinked numbers get a clear 404
-  message). Dev responses include `devCode` (**123456**), surfaced as hints.
+  accept 4–8 and never hardcode a length). A new number gets its account
+  on verify (`isNewUser` fires the sign-up event). Dev responses include `devCode` (**123456**), surfaced as hints.
 
 **Admin login** (`admin/pages/LoginPage.tsx`) — email + password. No
 self-service reset (accounts are provisioned via `npm run create-admin`).

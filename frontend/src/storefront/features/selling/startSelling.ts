@@ -75,7 +75,7 @@ export function useStartSelling() {
     // dialog sits outside the router and can't navigate itself.
     openAuthDialog({
       intent: 'sell',
-      initialView: 'register',
+      initialView: 'phone',
       onSignedIn: openWizard,
     })
   }

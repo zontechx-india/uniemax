@@ -81,8 +81,7 @@ export const customerAuth = {
     return call<CustomerLogin>(http.post(`${AUTH}/web/google`, { idToken }))
   },
 
-  // Phone OTP — login-only: works for numbers already linked to an account
-  // (404 with a helpful message otherwise).
+  // Phone OTP — sign in or sign up: a new number gets its account on verify.
   requestOtp(phone: string) {
     return call<CodeSent>(http.post(`${AUTH}/otp/request`, { phone }))
   },

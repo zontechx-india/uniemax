@@ -1038,8 +1038,8 @@ extracted into a standalone service later with minimal churn. The rest of the ap
   real, **verify-first registration** — the account is created only after the emailed
   code is confirmed], Google [**currently disabled** — no verifier registered, the
   endpoints return 400], phone OTP [Message Central delivery, console/`OTP_BYPASS`
-  fallback in dev, **login-only** for phones linked via `/me/link` — never creates
-  accounts]; Apple planned), each resolving to the same
+  fallback in dev, **sign in or sign up** — a number nobody owns gets a new
+  phone-only account on first verify, never at `/otp/request`]; Apple planned), each resolving to the same
   `{ principal, customer, isNewUser }` — plus
   self-service: `/me`, orders, change/set password, identifier linking. Password reset
   revokes all sessions; a password change revokes every session **except the one that

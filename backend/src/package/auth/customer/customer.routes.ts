@@ -15,8 +15,8 @@ import * as controller from "./customer.controller.js";
  *                       + /password/forgot · /password/reset
  *   Google            → /{web,mobile}/google
  *   Phone OTP         → /otp/request → /{web,mobile}/otp/verify
- *                       (login-only — works for phones linked via /me/link;
- *                       registration is always by email)
+ *                       (sign in or sign up — a number nobody owns gets a
+ *                       new phone-only account on first verify)
  *
  * plus the generic session endpoints (refresh / logout / logout-all) and the
  * authenticated /me surface.
@@ -46,7 +46,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
   app.post("/web/google", { config: VERIFY }, controller.webGoogle);
   app.post("/mobile/google", { config: VERIFY }, controller.mobileGoogle);
 
-  // ---- Public: phone OTP (login for already-linked numbers) ---------------
+  // ---- Public: phone OTP (sign in, or sign up on first verify) ------------
   app.post("/otp/request", { config: SEND_CODE }, controller.requestOtp);
   app.post("/web/otp/verify", { config: VERIFY }, controller.webVerifyOtp);
   app.post("/mobile/otp/verify", { config: VERIFY }, controller.mobileVerifyOtp);
