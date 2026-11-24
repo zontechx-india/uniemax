@@ -253,7 +253,7 @@ function PaymentLeadRow({ lead, storeName, now }: { lead: PaymentLead; storeName
         <p className="shrink-0 font-figure text-sm font-semibold tabular-nums text-fg">{money(lead.amount)}</p>
       </div>
       <p className="mt-0.5 truncate text-hint text-muted">
-        {lead.orderNumber} · {timeAgo(lead.at)}
+        Order ID: {lead.orderNumber} · {timeAgo(lead.at)}
       </p>
       <div className="mt-1.5 flex min-w-0 items-center gap-2">
         <StatusPill tone={state.tone}>{state.label}</StatusPill>
