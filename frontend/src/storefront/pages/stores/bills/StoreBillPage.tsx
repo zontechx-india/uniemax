@@ -5,10 +5,10 @@ import { toApiError } from '../../../../shared/auth/http'
 import { Button, buttonClass } from '../../../../shared/ui/Button'
 import { ConfirmDialog } from '../../../../shared/ui/ConfirmDialog'
 import { ErrorNote, InfoNote } from '../../../../shared/ui/form'
-import { billMessage, billsApi, OFFLINE_MODE, spacedNumber, whatsappUrl } from '../../../features/bills/billsApi'
+import { billMessage, billsApi, downloadFile, OFFLINE_MODE, pdfFileName, shareOrDownload, spacedNumber, whatsappUrl } from '../../../features/bills/billsApi'
 import type { Bill, ShareVia } from '../../../features/bills/billsApi'
 import { useManagedStore } from '../../../features/stores/useManagedStore'
-import { ArrowLeftIcon, ArrowRightIcon, BoxIcon, ChatIcon, ClipboardIcon, LinkIcon, MapPinIcon, ReceiptIcon, UserIcon } from '../../../layout/icons'
+import { ArrowLeftIcon, ArrowRightIcon, BoxIcon, ChatIcon, ClipboardIcon, DownloadIcon, LinkIcon, MapPinIcon, ReceiptIcon, ShareIcon, UserIcon } from '../../../layout/icons'
 import { EmptyState } from '../ui/EmptyState'
 import { PanelCard } from '../ui/PanelCard'
 import { showToast } from '../ui/Toast'
@@ -47,6 +47,26 @@ export function StoreBillPage() {
     }
   }, [store.id, billId])
 
+  // Fetch the PDF ahead (bill while open, receipt once paid): a share sheet
+  // must open straight from the tap, and Safari refuses one after a slow wait.
+  const [pdf, setPdf] = useState<Blob | null>(null)
+  const [pdfBusy, setPdfBusy] = useState(false)
+  const pdfState = bill?.state
+  useEffect(() => {
+    setPdf(null)
+    if (pdfState !== 'OPEN' && pdfState !== 'PAID') return
+    let live = true
+    billsApi
+      .pdf(store.id, billId)
+      .then((blob) => live && setPdf(blob))
+      .catch(() => {
+        /* made again on tap, which shows the error */
+      })
+    return () => {
+      live = false
+    }
+  }, [store.id, billId, pdfState])
+
   const back = (
     <Button variant="ghost" size="md" className="-ml-2 px-2!" onClick={goBack}>
       <ArrowLeftIcon className="h-5 w-5" />
@@ -79,6 +99,48 @@ export function StoreBillPage() {
   const paidTo = offline ? `Paid to you${bill.offlineMode ? ` · ${OFFLINE_MODE[bill.offlineMode]}` : ''}` : 'Paid online'
   const canSend = open || (offline && bill.state === 'PAID')
   const message = billMessage(bill, rupees)
+  const docName = bill.state === 'PAID' ? 'Receipt' : 'Bill'
+
+  /** The PDF (already fetched, so the share sheet opens straight from the tap). */
+  const pdfNow = async () => pdf ?? (await billsApi.pdf(store.id, bill.id))
+  const sharePdf = async () => {
+    setPdfBusy(true)
+    try {
+      const blob = await pdfNow()
+      setPdf(blob)
+      const result = await shareOrDownload(blob, pdfFileName(bill), message)
+      if (result === 'shared') void share('SHARE')
+      if (result === 'downloaded') showToast(`${docName} saved as a PDF`)
+    } catch (err) {
+      showToast(toApiError(err).message, 'danger')
+    } finally {
+      setPdfBusy(false)
+    }
+  }
+  const savePdf = async () => {
+    setPdfBusy(true)
+    try {
+      const blob = await pdfNow()
+      setPdf(blob)
+      downloadFile(blob, pdfFileName(bill))
+    } catch (err) {
+      showToast(toApiError(err).message, 'danger')
+    } finally {
+      setPdfBusy(false)
+    }
+  }
+  const pdfButtons = (
+    <div className="mt-3 flex gap-2">
+      <Button variant="secondary" size="md" className="min-w-0 flex-1" loading={pdfBusy} onClick={sharePdf}>
+        <ShareIcon className="h-4 w-4" />
+        Share {docName.toLowerCase()} PDF
+      </Button>
+      <Button variant="ghost" size="md" disabled={pdfBusy} onClick={savePdf} aria-label={`Download the ${docName.toLowerCase()} PDF`} title="Download PDF">
+        <DownloadIcon className="h-4 w-4" />
+        <span className="hidden sm:inline">Download</span>
+      </Button>
+    </div>
+  )
 
   /** Record what the seller did (WhatsApp itself is opened by the link they tapped). */
   const share = async (via: ShareVia) => {
@@ -176,6 +238,12 @@ export function StoreBillPage() {
             <LinkIcon className="h-4 w-4 shrink-0 text-muted" />
             <span className="min-w-0 flex-1 truncate text-sm text-fg">{bill.link.replace(/^https?:\/\//, '')}</span>
           </div>
+          {pdfButtons}
+        </PanelCard>
+      )}
+      {!canSend && bill.state === 'PAID' && (
+        <PanelCard icon={ReceiptIcon} title="Receipt (PDF)" description="Send it to your customer or keep it for your records.">
+          {pdfButtons}
         </PanelCard>
       )}
 

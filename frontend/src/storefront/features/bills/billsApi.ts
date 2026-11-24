@@ -1,4 +1,4 @@
-import { call, callList, http, toApiError } from '../../../shared/auth/http'
+import { ApiError, call, callList, http, toApiError } from '../../../shared/auth/http'
 import type { ListMeta } from '../../../shared/auth/http'
 import type { PaymentSession } from '../stores/storesApi'
 
@@ -181,6 +181,33 @@ export interface BillPayResult {
 const SELLER = '/api/v1/stores'
 const PUBLIC = '/api/v1/public/bills'
 
+/**
+ * A bill's PDF as bytes — "Receipt" once paid, "Bill" while open (the server
+ * draws it: backend `bills/billPdf.ts`). The error body of a blob request is
+ * a Blob too, so its message is read out of it.
+ */
+async function pdfBlob(url: string): Promise<Blob> {
+  try {
+    const res = await http.get(url, { responseType: 'blob' })
+    return res.data as Blob
+  } catch (err) {
+    const data = (err as { response?: { data?: unknown; status?: number } }).response
+    if (data?.data instanceof Blob) {
+      try {
+        const body = JSON.parse(await data.data.text()) as { message?: string }
+        if (body.message) throw new ApiError(body.message, data.status ?? 0)
+      } catch (inner) {
+        if (inner instanceof ApiError) throw inner
+      }
+    }
+    throw toApiError(err)
+  }
+}
+
+/** "Receipt-48203917.pdf" / "Bill-48203917.pdf" — matches the server's name. */
+export const pdfFileName = (bill: { state: BillState; number: string }) =>
+  `${bill.state === 'PAID' ? 'Receipt' : 'Bill'}-${bill.number}.pdf`
+
 export const billsApi = {
   async list(
     storeRef: string,
@@ -199,6 +226,8 @@ export const billsApi = {
   share: (storeRef: string, billId: string, via: ShareVia) =>
     call<Bill>(http.post(`${SELLER}/${storeRef}/bills/${billId}/share`, { via })),
   cancel: (storeRef: string, billId: string) => call<Bill>(http.post(`${SELLER}/${storeRef}/bills/${billId}/cancel`, {})),
+  /** The seller's copy (full phone and address — they send it to their customer). */
+  pdf: (storeRef: string, billId: string) => pdfBlob(`${SELLER}/${storeRef}/bills/${billId}/pdf`),
 
   /** The item picker: words over name / size / colour / SKU / category, 30 a page. */
   catalog: (storeRef: string, query: { q?: string; categoryId?: string; page?: number; pageSize?: number }) =>
@@ -211,6 +240,8 @@ export const billsApi = {
 export const publicBillApi = {
   get: (token: string) => call<PublicBill>(http.get(`${PUBLIC}/${token}`)),
   pay: (token: string, input: BillPayInput) => call<BillPayResult>(http.post(`${PUBLIC}/${token}/pay`, input)),
+  /** The copy behind the link — masked like the page. */
+  pdf: (token: string) => pdfBlob(`${PUBLIC}/${token}/pdf`),
 }
 
 /** "4820 3917" — read out in two halves on a call. */
@@ -234,3 +265,36 @@ export function billMessage(
 /** wa.me opens the seller's own WhatsApp on a chat with the customer, text filled in. */
 export const whatsappUrl = (phone: string, text: string) =>
   `https://wa.me/${phone.replace(/\D/g, '').replace(/^(?!91)(\d{10})$/, '91$1')}?text=${encodeURIComponent(text)}`
+
+/** Save a file the browser holds (a PDF made by the server). */
+export function downloadFile(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}
+
+/**
+ * The phone's share sheet with the PDF attached (WhatsApp, Gmail…), or a
+ * download where files cannot be shared (most desktops). Call it straight
+ * from the tap with the PDF already fetched — Safari refuses a share that
+ * comes after a slow await.
+ */
+export async function shareOrDownload(blob: Blob, name: string, text: string): Promise<'shared' | 'downloaded' | 'cancelled'> {
+  const file = new File([blob], name, { type: 'application/pdf' })
+  if (typeof navigator !== 'undefined' && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], text })
+      return 'shared'
+    } catch (err) {
+      if ((err as DOMException).name === 'AbortError') return 'cancelled'
+      // NotAllowedError and friends: fall back to saving it.
+    }
+  }
+  downloadFile(blob, name)
+  return 'downloaded'
+}

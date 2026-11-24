@@ -89,3 +89,25 @@ export async function adminGetBill(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   return ok(await service.adminGetBill(id));
 }
+
+// ---- PDF (the bill, or its receipt once paid) ----
+
+/** Sends PDF bytes as a download, never cached or indexed. */
+function sendPdf(reply: FastifyReply, file: { fileName: string; bytes: Buffer }) {
+  return reply
+    .header("Content-Type", "application/pdf")
+    .header("Content-Disposition", `attachment; filename="${file.fileName}"`)
+    .header("Cache-Control", "private, no-store")
+    .header("X-Robots-Tag", "noindex, nofollow")
+    .send(file.bytes);
+}
+
+export async function sellerBillPdf(request: FastifyRequest, reply: FastifyReply) {
+  const { id, billId } = billParamSchema.parse(request.params);
+  return sendPdf(reply, await service.sellerBillPdf(storeActor(request), id, billId));
+}
+
+export async function publicBillPdf(request: FastifyRequest, reply: FastifyReply) {
+  const { token } = tokenParamSchema.parse(request.params);
+  return sendPdf(reply, await service.publicBillPdf(token));
+}

@@ -9,13 +9,13 @@ import { MediaImg } from '../../../shared/media/MediaImg'
 import { PageSkeleton } from '../../../shared/ui/states'
 import { useMarketSession } from '../../app/marketSession'
 import { openAuthDialog, storeAuthRequest } from '../../features/auth/authDialogStore'
-import { OFFLINE_MODE, publicBillApi, spacedNumber } from '../../features/bills/billsApi'
+import { downloadFile, OFFLINE_MODE, pdfFileName, publicBillApi, spacedNumber } from '../../features/bills/billsApi'
 import type { PublicBill } from '../../features/bills/billsApi'
 import { storeVars } from '../../features/publicStore/storeTheme'
 import { useStoreShell } from '../../features/publicStore/useStoreShells'
 import { INDIAN_STATES } from '../../features/stores/storeProfile'
 import { formatPrice, launchCashfreeCheckout } from '../../features/stores/storesApi'
-import { ArrowLeftIcon, CheckIcon, LifebuoyIcon, LockIcon, MapPinIcon } from '../../layout/icons'
+import { ArrowLeftIcon, CheckIcon, DownloadIcon, LifebuoyIcon, LockIcon, MapPinIcon } from '../../layout/icons'
 import { StoreLogo } from '../cart/StoreLogo'
 
 /**
@@ -44,6 +44,8 @@ export function BillPayPage({ token }: { token: string }) {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [paying, setPaying] = useState(false)
   const [payError, setPayError] = useState<string | null>(null)
+  const [pdfBusy, setPdfBusy] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
   const shell = useStoreShell(bill?.store.slug ?? '')
 
   useEffect(() => {
@@ -98,6 +100,32 @@ export function BillPayPage({ token }: { token: string }) {
   if (!bill) return frame(<PageSkeleton label="Loading your bill" />)
 
   const delivery = bill.fulfilment === 'DELIVERY'
+  const isPaid = bill.state === 'PAID'
+  /** The bill (or receipt, once paid) as a PDF — the masked copy, like this page. */
+  const savePdf = async () => {
+    setPdfBusy(true)
+    setPdfError(null)
+    try {
+      downloadFile(await publicBillApi.pdf(token), pdfFileName(bill))
+    } catch (err) {
+      setPdfError(toApiError(err).message)
+    } finally {
+      setPdfBusy(false)
+    }
+  }
+  const pdfButton = (
+    <>
+      <Button variant="secondary" size="md" full className="mt-4" loading={pdfBusy} onClick={savePdf}>
+        <DownloadIcon className="h-4 w-4" />
+        Download {isPaid ? 'receipt' : 'bill'} (PDF)
+      </Button>
+      {pdfError && (
+        <div className="mt-2">
+          <ErrorNote>{pdfError}</ErrorNote>
+        </div>
+      )}
+    </>
+  )
   const help = (
     <Link to={`/store/${bill.store.slug}/support`} className={buttonClass({ variant: 'secondary', size: 'md', full: true, className: 'mt-4' })}>
       <LifebuoyIcon className="h-4 w-4" />
@@ -182,6 +210,7 @@ export function BillPayPage({ token }: { token: string }) {
           </Link>
         )}
         {paper}
+        {pdfButton}
         {help}
       </>,
     )
@@ -366,6 +395,7 @@ export function BillPayPage({ token }: { token: string }) {
           <ErrorNote>{payError}</ErrorNote>
         </div>
       )}
+      {pdfButton}
       {help}
     </>,
     payBar(signedIn ? `Pay ${formatPrice(bill.total)}` : 'Sign in to pay', start),

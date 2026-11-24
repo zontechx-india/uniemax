@@ -20,12 +20,15 @@ export const sellerBillRoutes: FastifyPluginAsync = async (app) => {
   app.get("/:id/bills/catalog/categories", controller.billCatalogCategories);
   app.get("/:id/bills/catalog/often", controller.oftenBilled);
   app.get("/:id/bills/:billId", controller.getBill);
+  app.get("/:id/bills/:billId/pdf", controller.sellerBillPdf);
   app.post("/:id/bills/:billId/share", controller.shareBill);
   app.post("/:id/bills/:billId/cancel", controller.cancelBill);
 };
 
 export const publicBillRoutes: FastifyPluginAsync = async (app) => {
   app.get("/:token", controller.getPublicBill);
+  // The same masked copy as the page, as a PDF (bill while open, receipt once paid).
+  app.get("/:token/pdf", controller.publicBillPdf);
   app.post("/:token/pay", { preHandler: requireCustomer }, controller.payBill);
 };
 

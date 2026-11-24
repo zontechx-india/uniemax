@@ -3,11 +3,14 @@ import { prisma } from "../../config/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../../utils/httpError.js";
 import { buildListMeta } from "../../utils/response.js";
-import { mediaUrl } from "../../package/storage/index.js";
+import sharp from "sharp";
+import { mediaUrl, storage } from "../../package/storage/index.js";
 import { publicWebUrl } from "../../package/mail/index.js";
 import type { StoreActor } from "../stores/storeActor.js";
 import { storeScope } from "../stores/storeActor.js";
-import { resolvePayments, resolveShipping } from "../stores/stores.schema.js";
+import { DEFAULT_STORE_THEME, resolvePayments, resolveShipping } from "../stores/stores.schema.js";
+import { resolveProfile } from "../stores/storeProfile.schema.js";
+import { formatAddress } from "../stores/storeAddress.schema.js";
 import { visibleProductWhere } from "../stores/publicStore.service.js";
 import {
   expireUnpaidOrder,
@@ -18,6 +21,7 @@ import {
   type BillLine,
 } from "../orders/orders.service.js";
 import { verifiedCustomerByPhone } from "./billOwner.js";
+import { formatDate, renderBillPdf, toPaise, type BillPdfData } from "./billPdf.js";
 import { getOrCreatePaySession } from "../payments/payments.service.js";
 import type {
   AdminBillListQuery,
@@ -753,4 +757,152 @@ export async function adminGetBill(billId: string) {
   const bill = await prisma.bill.findUnique({ where: { id: billId }, select: billSelect });
   if (!bill) throw HttpError.notFound("Bill not found");
   return shapeForSeller(bill);
+}
+
+// ---------------------------------------------------------------------------
+// PDF — the bill (OPEN) or its receipt (PAID), see billPdf.ts
+// ---------------------------------------------------------------------------
+
+const OFFLINE_MODE_LABEL: Record<string, string> = { CASH: "cash", UPI: "UPI", BANK: "bank transfer", OTHER: "another way" };
+
+/** "+91 98400 11223" — a number as people write it. */
+const spacedPhone = (p: string) => {
+  const d = p.replace(/\D/g, "").slice(-10);
+  return d.length === 10 ? `+91 ${d.slice(0, 5)} ${d.slice(5)}` : p;
+};
+
+/** The shop's logo as a square PNG for the PDF, or null (missing, unreadable). */
+async function logoPng(logoKey: string | null): Promise<Buffer | null> {
+  if (!logoKey) return null;
+  try {
+    const bytes = await storage.get("logo", logoKey);
+    if (!bytes) return null;
+    return await sharp(bytes, { failOn: "error" }).resize(256, 256, { fit: "cover" }).png().toBuffer();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What the PDF shows. `audience: "public"` is the copy behind the link (it
+ * may be forwarded): phone masked as on the page, the street address left
+ * out (PIN + state only), the payer's phone masked too.
+ */
+async function billPdfData(bill: BillRow, audience: "seller" | "public"): Promise<BillPdfData> {
+  const state = billState(bill);
+  if (state === "CANCELLED" || state === "EXPIRED") {
+    throw HttpError.conflict(state === "CANCELLED" ? "This bill was cancelled — there is no PDF for it." : "This bill expired unpaid — there is no PDF for it.");
+  }
+  const paid = state === "PAID";
+  const [store, order] = await Promise.all([
+    prisma.store.findUniqueOrThrow({
+      where: { id: bill.storeId },
+      select: { name: true, slug: true, logoKey: true, theme: true, profile: true },
+    }),
+    bill.orderId
+      ? prisma.order.findUnique({
+          where: { id: bill.orderId },
+          select: {
+            orderNumber: true,
+            customerName: true,
+            addressLine: true,
+            pincode: true,
+            state: true,
+            paymentRef: true,
+            paidByName: true,
+            paidByPhone: true,
+          },
+        })
+      : null,
+  ]);
+  const profile = resolveProfile(store.profile);
+  const theme = (store.theme ?? {}) as { primaryColor?: unknown };
+  const pub = audience === "public";
+  const phone = (p: string) => (pub ? maskPhone(p) : spacedPhone(p));
+
+  // Where it goes: the order's address (link, paid) or the seller's (offline).
+  const offlineAddress = bill.address as { address: string; pincode: string; state: string } | null;
+  const addr = order?.addressLine
+    ? { address: order.addressLine, pincode: order.pincode ?? "", state: order.state ?? "" }
+    : offlineAddress;
+  const handover = bill.handedOver
+    ? { label: "Handover", lines: ["Collected in the shop"] }
+    : bill.fulfilment === "PICKUP"
+      ? { label: "Store pickup", lines: [`Collect from ${store.name}`] }
+      : addr
+        ? {
+            label: "Deliver to",
+            lines: pub
+              ? [`PIN ${addr.pincode}${addr.state ? `, ${addr.state}` : ""}`]
+              : [addr.address, `${addr.state} ${addr.pincode}`.trim()].filter(Boolean),
+          }
+        : { label: "Delivery", lines: ["Address added when the bill is paid"] };
+
+  const payment: string[] = [];
+  if (paid && bill.payWay === "OFFLINE") {
+    payment.push(`Paid to ${store.name} by ${OFFLINE_MODE_LABEL[bill.offlineMode ?? ""] ?? "a direct payment"} on ${formatDate(bill.paidAt ?? bill.createdAt)}`);
+    if (bill.offlineRef) payment.push(`Reference ${bill.offlineRef}`);
+  } else if (paid) {
+    payment.push(`Paid online on ${formatDate(bill.paidAt ?? bill.createdAt)}`);
+    if (order?.paymentRef === "DEV-SIMULATED") payment.push("Simulated payment (development build)");
+    else if (order?.paymentRef) payment.push(`Payment reference ${order.paymentRef}`);
+  } else {
+    payment.push(`Pay online from this link by ${formatDate(bill.expiresAt)}`);
+  }
+  if (order?.paidByName) payment.push(`Paid by ${order.paidByName}${order.paidByPhone ? ` (${phone(order.paidByPhone)})` : ""}`);
+
+  const link = billLink(bill.token);
+  const lines = linesOf(bill);
+  const legal = profile.businessName && profile.businessName.trim().toLowerCase() !== store.name.trim().toLowerCase() ? profile.businessName : null;
+  return {
+    kind: paid ? "RECEIPT" : "BILL",
+    number: bill.number,
+    orderNumber: order && order.orderNumber !== bill.number ? order.orderNumber : null,
+    issuedAt: paid ? (bill.paidAt ?? bill.createdAt) : bill.createdAt,
+    store: {
+      name: store.name,
+      legalName: legal,
+      addressLines: profile.address ? [formatAddress(profile.address)] : [],
+      phone: profile.phone ? spacedPhone(profile.phone) : null,
+      email: profile.email,
+      gstin: profile.tax.gstin,
+      accent: typeof theme.primaryColor === "string" ? theme.primaryColor : DEFAULT_STORE_THEME.primaryColor,
+      logo: await logoPng(store.logoKey),
+    },
+    // A name only when it has letters — an order made without one stores the phone there.
+    customer: { name: [bill.customerName, order?.customerName].find((n) => n && /\p{L}/u.test(n)) ?? null, phone: phone(bill.customerPhone) },
+    handover,
+    lines: lines.map((l) => ({
+      name: l.productName,
+      detail: [l.variantName, l.sku ? `SKU ${l.sku}` : null].filter(Boolean).join("  ·  ") || null,
+      quantity: l.quantity,
+      unitPaise: toPaise(l.unitPrice),
+      amountPaise: toPaise(l.lineTotal),
+    })),
+    subtotalPaise: toPaise(money(bill.subtotal)),
+    shippingPaise: toPaise(money(bill.shippingCharge)),
+    shippingNote: bill.fulfilment === "PICKUP" ? "Pickup" : Number(bill.shippingCharge) === 0 ? "Free" : null,
+    discountPaise: toPaise(money(bill.discount)),
+    totalPaise: toPaise(money(bill.total)),
+    payment,
+    payLink: paid ? null : link,
+    note: bill.note,
+    viewLink: link,
+  };
+}
+
+const pdfName = (data: BillPdfData) => `${data.kind === "RECEIPT" ? "Receipt" : "Bill"}-${data.number}.pdf`;
+
+/** The seller's copy: full phone and address (they send it to their customer). */
+export async function sellerBillPdf(actor: StoreActor, storeRef: string, billId: string) {
+  const { bill } = await myBill(actor, storeRef, billId);
+  const data = await billPdfData(bill, "seller");
+  return { fileName: pdfName(data), bytes: await renderBillPdf(data) };
+}
+
+/** The copy behind the link (`/b/{token}`): masked like the page. */
+export async function publicBillPdf(token: string) {
+  const bill = await billByToken(token);
+  const data = await billPdfData(bill, "public");
+  return { fileName: pdfName(data), bytes: await renderBillPdf(data) };
 }

@@ -533,6 +533,7 @@ order: { id, orderNumber, status, paymentRef, paidByName, paidByPhone } | null }
 | `GET` | `/:id/bills?tab=ALL\|WAITING\|PAID\|CLOSED&page&pageSize` | Newest first; the list envelope plus `summary { waiting, waitingTotal, notShared, tabs { ALL, WAITING, PAID, CLOSED } }` |
 | `POST` | `/:id/bills` → `201` | Body `{ customerPhone, customerName?, items[{ productId, variantId \| null, quantity }] (1–50), shippingCharge: number \| null (null = the store's delivery rate), discountType: AMOUNT\|PERCENT, discountValue, note? (≤200), expiryDays: 1\|3\|7, payWay: LINK\|OFFLINE (default LINK), offlineMode?: CASH\|UPI\|BANK\|OTHER, offlineRef? (≤60), handover?: DELIVER\|TAKEN, address?, pincode?, state? }`. Priced once from the live catalog (visible products, active variants, stock checked — checkout's pricing) and kept. **OFFLINE**: `offlineMode` required; `DELIVER` needs address (≥10), a 6-digit pincode and state; `TAKEN` = PICKUP, no delivery charge. The order is made at once (`paymentMethod: OFFLINE`, `PAID`, `paymentRef` = `offlineRef`, stock taken) — `DELIVERED` when TAKEN, else `CONFIRMED` — and the bill answers `PAID`; the published / online-payment checks are skipped. `409` (LINK) paused / unpublished shop or online payment off; `409` stock / vanished item; `409` (OFFLINE) a line the supplier ships (dropship); `400` discount over the items or total ≤ 0 |
 | `GET` | `/:id/bills/:billId` | One bill |
+| `GET` | `/:id/bills/:billId/pdf` | The bill as a PDF (`application/pdf`, attachment `Bill-{number}.pdf`, or `Receipt-{number}.pdf` once paid) — the seller's copy, full phone and address. `409` cancelled / expired. Design: `docs/bills/README.md` §5.8 |
 | `POST` | `/:id/bills/:billId/share` | Body `{ via: WHATSAPP\|COPY\|SHARE }` — records the seller's tap (first one sets `sharedAt`); `409` on a closed bill |
 | `POST` | `/:id/bills/:billId/cancel` | OPEN only (`409` otherwise). Cancels any payment attempt still open (stock back, checkout closed) |
 | `GET` | `/:id/bills/catalog?q&categoryId&page&pageSize(≤50, default 30)` | The item picker: sellable products; every word of `q` must match the name, category name, a variant's name (size / colour) or SKU; `categoryId` includes its sub-categories; in stock first. Rows `{ id, name, category ("Parent › Child"), imageUrl, optionTypes[{ name, values }], priceMin, stock, variants[{ id \| null (default variant), name, optionValues, price, stock, sku, imageUrl }] }` |
@@ -2233,6 +2234,9 @@ subtotal, shippingCharge, discount, total, note, expiresAt, createdAt, paidAt,
 order: { id, orderNumber } | null, payWay, offlineMode }` — `order` only for
 the account that owns it. The first `GET` of an OPEN bill (or of an OFFLINE
 receipt) stamps `openedAt`. `404` unknown token.
+
+`GET /:token/pdf` (no auth) — the same bill / receipt as a PDF, masked like
+the page (phone `•••`, delivery as PIN + state only); `409` cancelled / expired.
 
 `POST /:token/pay` 🔒 customer — body `{ name, phone, address?, pincode?,
 state? }` (address, 6-digit pincode and state required for a DELIVERY bill).

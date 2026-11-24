@@ -6,7 +6,8 @@ flow, every file, the money rules and what is not built. Exact request /
 response shapes stay in [`docs/API.md`](../API.md) → *Seller bills* and
 *Seller bill link*; this file says which endpoint does what.
 
-**Status (25 Nov 2026):** live on **dev and prod** (tag `v1.130.0`).
+**Status (25 Nov 2026):** live on **dev and prod** (tag `v1.130.0`). The
+**PDF bill / receipt** (§5.8) is on dev, not prod yet.
 Commits: `e70594f` link bills · `f5ae961` review sheet / buttons / icons ·
 `ea7f4dc` already-paid bills, bill-phone ownership, OFFLINE fee rule.
 Migrations: `20261124120000_seller_bills`, `20261125100000_offline_bills`.
@@ -54,6 +55,8 @@ platform, not a payment gateway: **every bill is products from the shop.**
 | `modules/bills/bills.controller.ts` | Zod parse → service |
 | `modules/bills/bills.schema.ts` | `billCreateSchema` (LINK + OFFLINE fields, `superRefine` for OFFLINE), `billPaySchema`, list / catalog / admin queries |
 | `modules/bills/bills.service.ts` | `createBill`, `listBills`, `getBill`, `shareBill`, `cancelBill`, item picker (`billCatalog`, `billCatalogCategories`, `oftenBilled`), `getPublicBill`, `payBill`, `adminListBills`, `adminGetBill`, `billState` |
+| `modules/bills/billPdf.ts` | `renderBillPdf(data)` → PDF bytes (pdfkit, A4); `amountInWords` (Indian grouping), `toPaise`, `printable`, `formatDate` (IST) |
+| `assets/fonts/plus-jakarta-sans/` | The app's typeface for the PDF (OFL, `OFL.txt`): Latin 400–700 + Latin-Ext 400/700 — only Latin-Ext has ₹ |
 | `modules/bills/billOwner.ts` | `last10`, `verifiedCustomerByPhone`, `settleBillOwner`, `claimBillOrders` — who owns a bill's order |
 | `modules/bills/bills.jobs.ts` | `startBills(log)` — listens to `customer.signedIn` → `claimBillOrders` (started in `app.ts` after `startFinance`) |
 | `modules/orders/orders.service.ts` | `priceBillLines` (pricing once), `placeBillOrder` (LINK payment attempt), `placeOfflineBillOrder` (OFFLINE order at once); cancel refund only for ONLINE |
@@ -67,18 +70,19 @@ platform, not a payment gateway: **every bill is products from the shop.**
 | `package/auth/customer/customer.controller.ts` | `deliverLogin` emits `customer.signedIn` after `issueSession` |
 | `prisma/schema/core.prisma` | `Bill`, `BillStatus`, `BillPayWay`, `OrderSource`, Order bill fields, `PaymentMethod.OFFLINE` |
 | `test/unit/offline-bills.test.ts` | Money rules + phone matching (7 tests) |
+| `test/unit/bill-pdf.test.ts` | Words, paise, safe text, receipt / bill / multi-page render (`BILL_PDF_OUT=dir` writes the samples) |
 
 ### Frontend (`frontend/src/`)
 
 | File | Role |
 | --- | --- |
-| `storefront/features/bills/billsApi.ts` | Types, `billsApi` (owner), `publicBillApi` (customer), `billMessage` (link text or receipt text), `whatsappUrl`, `spacedNumber`, `OFFLINE_MODE` labels |
+| `storefront/features/bills/billsApi.ts` | Types, `billsApi` (owner), `publicBillApi` (customer), `billMessage` (link text or receipt text), `whatsappUrl`, `spacedNumber`, `OFFLINE_MODE` labels, `billsApi.pdf` / `publicBillApi.pdf` (Blob), `pdfFileName`, `downloadFile`, `shareOrDownload` |
 | `storefront/pages/stores/bills/StoreBillsPage.tsx` | List: tabs All · Waiting · Paid · Expired or cancelled (`?tab=`), Load more, "To you · Cash" tag |
 | `storefront/pages/stores/bills/StoreBillNewPage.tsx` | Make a bill: 1 Customer · 2 Items · 3 Payment · 4 Delivery / discount / note (+ link days for LINK) · sticky total · Review `Dialog` |
-| `storefront/pages/stores/bills/StoreBillPage.tsx` | One bill: hero, message, Send on WhatsApp / Send receipt, Copy link, customer + address, items, timeline, Cancel, Open order, "Make a new bill like this" |
+| `storefront/pages/stores/bills/StoreBillPage.tsx` | One bill: hero, message, Send on WhatsApp / Send receipt, Copy link, customer + address, items, timeline, Cancel, Open order, "Make a new bill like this", **Share bill / receipt PDF** + Download (PDF fetched ahead) |
 | `storefront/pages/stores/bills/ItemPicker.tsx` | Big-catalog picker (`fill` + `flush` Dialog), `Stepper`, `ChoiceChip` |
 | `storefront/pages/stores/bills/billUi.tsx` | `BillDraft` (+ `sessionStorage` per store), `draftFromBill`, `BILL_STATE`, `BILL_STAGE`, `Thumb`, `QuietTag`, `variantLabel` |
-| `storefront/pages/bill/BillPayPage.tsx` | Customer page `/b/:token` (public router), pay flow, paid / expired / cancelled screens, OFFLINE "Thank you — paid" |
+| `storefront/pages/bill/BillPayPage.tsx` | Customer page `/b/:token` (public router), pay flow, paid / expired / cancelled screens, OFFLINE "Thank you — paid", **Download bill / receipt (PDF)** |
 | `storefront/pages/stores/orderMeta.tsx` | `paymentLabel` — OFFLINE = "Paid to you directly" |
 | `storefront/pages/stores/StoreOrderDetailPage.tsx` · `StoreOrdersPage.tsx` | Mode + "Paid by"; "From a bill" tag; "Create a bill" button (owner only) |
 | `storefront/pages/OrdersPage.tsx` | Customer's orders: "Paid at the shop" |
@@ -275,6 +279,48 @@ UI: product without options → + then Stepper; with options → <details> with 
   → quantity → "Add N to bill".
 ```
 
+### 5.8 PDF bill / receipt
+
+```
+Seller: StoreBillPage (OPEN or PAID)
+  on load → billsApi.pdf → GET /api/v1/stores/:id/bills/:billId/pdf   (owner)
+            (fetched ahead: the share sheet must open straight from the tap —
+             Safari refuses navigator.share after a slow await)
+  "Share bill PDF" / "Share receipt PDF" → shareOrDownload:
+       navigator.share({ files: [Receipt-48203917.pdf], text: the WhatsApp text })
+       → WhatsApp / Gmail… ; desktop or not allowed → download ; records share SHARE
+  "Download" → downloadFile
+Customer: BillPayPage (open or paid) "Download bill / receipt (PDF)"
+  → publicBillApi.pdf → GET /api/v1/public/bills/:token/pdf   (no sign-in; the token is the secret)
+
+Server: bills.service billPdfData(bill, audience) → billPdf.renderBillPdf
+  CANCELLED / EXPIRED → 409 (no PDF)
+  OPEN → "Bill" (Payment due, amount due, pay link + "pay by" date)
+  PAID → "Receipt" (Paid, amount paid, how: "Paid to {shop} by UPI on …" + reference,
+         or "Paid online on …" + payment reference; "Paid by X" when someone else paid)
+  shop: name, legal name (profile.businessName when different), profile address,
+        phone, email, GSTIN — each only if filled in; logo (storage "logo" → sharp →
+        256px PNG) or the initial on the shop colour; theme.primaryColor as the top band
+  customer: a name only when it has letters (an order made without one stores the phone)
+  audience "seller": full phone + street address
+  audience "public": phone masked "+91 98400 •••23", address = PIN + state only
+  headers: application/pdf, attachment; filename="Receipt-48203917.pdf",
+           Cache-Control private, no-store; X-Robots-Tag noindex
+```
+
+Layout (A4, Plus Jakarta Sans): shop colour band → logo/initial + shop block |
+title, number, date, order no., Paid / Payment due pill → Billed to | Deliver to /
+Collected in the shop / Store pickup → items table (#, item + variant · SKU, qty,
+rate, amount; header repeats on new pages, which get a "Receipt 4820 3917 · shop ·
+continued" line) → amount in words (Rupees … Only) | totals, Total, Amount paid /
+due → Payment box → Note from the shop → footer on every page: "computer-generated
+… does not need a signature", contact, "View online: link", Page x of y.
+
+**Never claims more than is true:** it is not called a tax invoice (prices carry
+no GST split — `Order.tax` is 0), no "inclusive of taxes" line, no signature.
+Text the font cannot draw is folded (accents dropped, ₹ → "Rs"); names in other
+scripts (Tamil, Hindi) are dropped until a font for them is added.
+
 ### 5.7 Admin
 
 Commerce → **Seller bills** (`GET /admin/bills?state&storeId&q`, `GET
@@ -312,7 +358,8 @@ seller (bill)"; order detail shows method + `offlineMode` + **Paid by**.
 
 | Item | Why it waits |
 | --- | --- |
-| PDF receipt | User said "later"; the WhatsApp receipt text + `/b/` page cover it now |
+| GST tax invoice (CGST/SGST/IGST split, HSN) | Prices carry no tax split today; needs the accountant and per-product tax data |
+| Other scripts in the PDF (Tamil, Hindi…) | Needs Noto fonts per script and run-splitting; today such text is dropped |
 | One-off items (not in the shop) | A hidden product would show in Categories and admin category mapping; also B1 |
 | OTP confirmation of a cash bill by the customer | Optional later trust step |
 | Expiry sweep job | Expiry is read at request time; nothing needs a job yet |
