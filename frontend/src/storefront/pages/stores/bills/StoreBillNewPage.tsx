@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGoBack } from '../../../../shared/useGoBack'
 import { toApiError } from '../../../../shared/auth/http'
@@ -12,6 +12,8 @@ import type { OfflineMode, PickerProduct, PickerVariant } from '../../../feature
 import { publicOrderApi } from '../../../features/stores/storesApi'
 import { INDIAN_STATES } from '../../../features/stores/storeProfile'
 import { useManagedStore } from '../../../features/stores/useManagedStore'
+import { useSuppliedProducts } from '../../../../packages/dropship'
+import { Badge } from '../../../../shared/ui/Badge'
 import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, ClockIcon, PlusIcon, ReceiptIcon, SearchIcon } from '../../../layout/icons'
 import { PageHeader } from '../ui/PageHeader'
 import { PanelCard } from '../ui/PanelCard'
@@ -85,6 +87,14 @@ export function StoreBillNewPage() {
   const discountRaw = Number(draft.discount) || 0
   const discount = Math.min(subtotal, Math.round(draft.discountType === 'PERCENT' ? (subtotal * Math.min(discountRaw, 100)) / 100 : discountRaw))
   const offline = draft.payWay === 'OFFLINE'
+  // Supplier products ("Supplied by …"): they ship from the supplier, so they need a pay link (B10).
+  const supplied = useSuppliedProducts(store.id, store.slug)
+  const suppliers = useMemo(() => new Map([...supplied.byProduct].map(([id, s]) => [id, s.supplier.name])), [supplied.byProduct])
+  const suppliedLines = draft.lines.filter((l) => suppliers.has(l.productId))
+  const suppliedNote =
+    suppliedLines.length === 0
+      ? null
+      : `${suppliedLines.length === 1 ? `"${suppliedLines[0]!.name}" is` : `${suppliedLines.length} items are`} shipped by your supplier, so the customer must pay through a pay link. Remove ${suppliedLines.length === 1 ? 'it' : 'them'}, or choose "Send a pay link".`
   // Taken in the shop: nothing to deliver, so no delivery charge (the server agrees).
   const taken = offline && draft.handover === 'TAKEN'
   const shipping = taken ? 0 : draft.shipping.trim() === '' ? autoShipping : Math.max(0, Math.round(Number(draft.shipping) || 0))
@@ -128,6 +138,7 @@ export function StoreBillNewPage() {
     if (draft.discountType === 'AMOUNT' && subtotal > 0 && discountRaw > subtotal) e.discount = `A discount cannot be more than the items (${rupees(subtotal)}).`
     if (!e.items && !e.discount && subtotal - discount + (shipping ?? 0) <= 0) e.discount = 'The total must be more than ₹0.'
     if (offline) {
+      if (suppliedNote) e.supplied = suppliedNote
       if (!draft.offlineMode) e.offlineMode = 'Choose how they paid you.'
       if (!taken) {
         if (draft.address.trim().length < 10) e.address = 'Enter the delivery address.'
@@ -229,6 +240,11 @@ export function StoreBillNewPage() {
                     {l.variantLabel && <span className="font-medium text-fg">{l.variantLabel} · </span>}
                     {rupees(l.price)} each
                   </p>
+                  {suppliers.has(l.productId) && (
+                    <Badge tone="brand" wrap className="mt-1.5">
+                      Supplied by {suppliers.get(l.productId)}
+                    </Badge>
+                  )}
                   <div className="mt-2 flex items-center gap-2">
                     <Stepper qty={l.qty} max={l.stock} label={l.name} onChange={(by) => changeQty(l.key, by)} />
                     <span className="ml-auto font-figure text-base font-semibold tabular-nums text-fg">{rupees(Number(l.price) * l.qty)}</span>
@@ -263,6 +279,11 @@ export function StoreBillNewPage() {
           />
           {offline && (
             <>
+              {suppliedNote && (
+                <p role={errors.supplied ? 'alert' : undefined} className="rounded-md bg-pending-soft px-3 py-2 text-sm font-medium text-pending">
+                  {suppliedNote}
+                </p>
+              )}
               <div>
                 <span className={FIELD_LABEL}>They paid by</span>
                 {/* Nothing chosen at first — the seller says how, never a silent "Cash". */}
@@ -455,7 +476,7 @@ export function StoreBillNewPage() {
         </div>
       </div>
 
-      <ItemPicker storeId={store.id} open={pickerOpen} lines={draft.lines} onAdd={addLine} onQty={changeQty} onClose={() => setPickerOpen(false)} />
+      <ItemPicker storeId={store.id} open={pickerOpen} lines={draft.lines} suppliers={suppliers} onAdd={addLine} onQty={changeQty} onClose={() => setPickerOpen(false)} />
 
       <Dialog
         open={reviewOpen}

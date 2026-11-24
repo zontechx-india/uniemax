@@ -80,7 +80,7 @@ platform, not a payment gateway: **every bill is products from the shop.**
 | `storefront/pages/stores/bills/StoreBillsPage.tsx` | List: tabs All · Waiting · Paid · Expired or cancelled (`?tab=`), Load more, "To you · Cash" tag |
 | `storefront/pages/stores/bills/StoreBillNewPage.tsx` | Make a bill: 1 Customer · 2 Items · 3 Payment · 4 Delivery / discount / note (+ link days for LINK) · sticky total · Review `Dialog` |
 | `storefront/pages/stores/bills/StoreBillPage.tsx` | One bill: hero, message, Send on WhatsApp / Send receipt, Copy link, customer + address, items, timeline, Cancel, Open order, "Make a new bill like this", **Share bill / receipt PDF** + Download (PDF fetched ahead) |
-| `storefront/pages/stores/bills/ItemPicker.tsx` | Big-catalog picker (`fill` + `flush` Dialog), `Stepper`, `ChoiceChip` |
+| `storefront/pages/stores/bills/ItemPicker.tsx` | Big-catalog picker (`fill` + `flush` Dialog) — one list, "Often billed" first, "Supplied by" badge (`suppliers` prop); `Stepper`, `ChoiceChip` |
 | `storefront/pages/stores/bills/billUi.tsx` | `BillDraft` (+ `sessionStorage` per store), `draftFromBill`, `BILL_STATE`, `BILL_STAGE`, `Thumb`, `QuietTag`, `variantLabel` |
 | `storefront/pages/bill/BillPayPage.tsx` | Customer page `/b/:token` (public router), pay flow, paid / expired / cancelled screens, OFFLINE "Thank you — paid", **Download bill / receipt (PDF)** |
 | `storefront/pages/stores/orderMeta.tsx` | `paymentLabel` — OFFLINE = "Paid to you directly" |
@@ -273,10 +273,16 @@ GET …/bills/catalog?q&categoryId&page&pageSize(30)
   categoryId includes children; in-stock first
 GET …/bills/catalog/categories → [{ id, name, parentId, count }] (empty left out)
 GET …/bills/catalog/often → up to 6 { product, variant } recently billed / sold
-UI: product without options → + then Stepper; with options → <details> with a
-  ChoiceChip row per option (values with no in-stock combination disabled;
-  a typed value like "kurti teal" and a lone in-stock value pre-chosen)
-  → quantity → "Add N to bill".
+UI: ONE list. No search + no category → the "often" products come first in
+  the same list, tagged "Often billed" (not shown again below; opening one
+  pre-chooses the variant last billed). Product without options → + then
+  Stepper; with options → <details> with a ChoiceChip row per option (values
+  with no in-stock combination disabled; a typed value like "kurti teal" and
+  a lone in-stock value pre-chosen) → quantity → "Add N to bill".
+Supplier products: StoreBillNewPage loads useSuppliedProducts (dropship
+  package; empty when off) → "Supplied by {supplier}" badge in the picker and
+  on the bill's lines. "Already paid me" with such a line → warning in step 3
+  and Review blocked (the server's B10 409 stays as the backstop).
 ```
 
 ### 5.8 PDF bill / receipt

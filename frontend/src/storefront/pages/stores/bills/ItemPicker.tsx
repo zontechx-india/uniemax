@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { toApiError } from '../../../../shared/auth/http'
+import { Badge } from '../../../../shared/ui/Badge'
 import { Button } from '../../../../shared/ui/Button'
 import { Dialog } from '../../../../shared/ui/Dialog'
 import { ErrorNote } from '../../../../shared/ui/form'
@@ -7,7 +8,7 @@ import { fieldClass } from '../../../../shared/ui/field'
 import { billsApi } from '../../../features/bills/billsApi'
 import type { PickerCategory, PickerProduct, PickerVariant } from '../../../features/bills/billsApi'
 import { ArrowLeftIcon, CheckIcon, ChevronDownIcon, MinusIcon, PlusIcon, SearchIcon, TrashIcon } from '../../../layout/icons'
-import { lineKey, rupees, Thumb, variantLabel } from './billUi'
+import { lineKey, QuietTag, rupees, Thumb, variantLabel } from './billUi'
 import type { DraftLine } from './billUi'
 
 /**
@@ -16,7 +17,11 @@ import type { DraftLine } from './billUi'
  *  - Search first: every word matches the name, a size / colour, the SKU or
  *    the category (server-side, 30 a page, "Show more").
  *  - Category list with counts, as the second way in.
- *  - "Often billed": the variants this store bills most, one tap to add.
+ *  - ONE list. With no search and no category, the products this store
+ *    bills most come first, tagged "Often billed" (opening one pre-chooses
+ *    the size / colour last billed) — they are not shown a second time.
+ *  - A supplier's product says "Supplied by {supplier}" (it ships from them,
+ *    so it needs a pay link — an "already paid" bill refuses it).
  *  - Picking follows the product's REAL options (optionTypes):
  *      none        → +, then − n +
  *      one or more → open the product: one row of choices per option (a value
@@ -105,10 +110,13 @@ export function ItemPicker({
   onAdd,
   onQty,
   onClose,
+  suppliers,
 }: {
   storeId: string
   open: boolean
   lines: DraftLine[]
+  /** Product id → supplier name, for products a supplier ships. */
+  suppliers: Map<string, string>
   onAdd: (product: PickerProduct, variant: PickerVariant, qty: number) => void
   onQty: (key: string, by: number) => void
   onClose: () => void
@@ -186,10 +194,26 @@ export function ItemPicker({
   const parent = category ? (categories?.find((c) => c.id === category.parentId) ?? null) : null
   const categoryLabel = category ? (parent ? `${parent.name} › ${category.name}` : category.name) : 'All categories'
 
+  // The whole shop, no search: often-billed products lead the one list.
+  const showOften = !q && !categoryId
+  const oftenVariant = useMemo(() => {
+    const m = new Map<string, PickerVariant>()
+    for (const o of often) if (!m.has(o.product.id)) m.set(o.product.id, o.variant)
+    return m
+  }, [often])
+  const oftenProducts = useMemo(() => {
+    const seen = new Set<string>()
+    return often.filter((o) => !seen.has(o.product.id) && seen.add(o.product.id)).map((o) => o.product)
+  }, [often])
+  const rows = results === null ? null : showOften ? [...oftenProducts, ...results.filter((p) => !oftenVariant.has(p.id))] : results
+
   const setOpen = (p: PickerProduct, opening: boolean) => {
     if (opening) {
       setOpenId(p.id)
-      setChoice({ productId: p.id, values: autoChoice(p, q), qty: 1 })
+      // Often billed, no search: start on the size / colour last billed (when still in stock).
+      const last = showOften ? oftenVariant.get(p.id) : undefined
+      const values = last && last.stock > 0 && last.optionValues ? { ...last.optionValues } : autoChoice(p, q)
+      setChoice({ productId: p.id, values, qty: 1 })
     } else if (openId === p.id) {
       setOpenId(null)
       setChoice(null)
@@ -298,10 +322,22 @@ export function ItemPicker({
           : `${p.stock} left`
         : p.optionTypes.map((t) => `${t.values.length} ${t.name.toLowerCase()}${t.values.length === 1 ? '' : 's'}`).join(' · ') + (out ? ' · sold out' : ''),
     ].join(' · ')
+    const supplier = suppliers.get(p.id)
+    const isOften = showOften && oftenVariant.has(p.id)
     const text = (
       <span className="min-w-0 flex-1">
         <span className={`line-clamp-2 text-sm leading-snug font-medium ${out ? 'text-muted' : 'text-fg'}`}>{p.name}</span>
         <span className="mt-0.5 block text-xs text-muted">{meta}</span>
+        {(supplier || isOften) && (
+          <span className="mt-1 flex flex-wrap gap-1.5">
+            {isOften && <QuietTag>Often billed</QuietTag>}
+            {supplier && (
+              <Badge tone="brand" wrap>
+                Supplied by {supplier}
+              </Badge>
+            )}
+          </span>
+        )}
       </span>
     )
     if (isSimple(p) && v0) {
@@ -343,31 +379,7 @@ export function ItemPicker({
 
   const listBody = (
     <>
-      {!q && !categoryId && often.length > 0 && (
-        <section className="pb-1">
-          <h3 className="px-4 pt-3 pb-1 text-sm font-semibold text-fg">Often billed</h3>
-          <ul>
-            {often.map(({ product: p, variant: v }) => {
-              const n = onBill.get(lineKey(p.id, v.id)) ?? 0
-              const label = variantLabel(p, v)
-              return (
-                <li key={lineKey(p.id, v.id)} className="flex items-center gap-3 px-4 py-2">
-                  <Thumb src={v.imageUrl ?? p.imageUrl} />
-                  <span className="min-w-0 flex-1">
-                    <span className="line-clamp-2 text-sm leading-snug font-medium text-fg">{p.name}</span>
-                    <span className="mt-0.5 block text-xs text-muted">
-                      {label && <span className="font-medium text-fg">{label} · </span>}
-                      {rupees(v.price)} · {v.stock ? `${v.stock} left` : 'Sold out'}
-                    </span>
-                  </span>
-                  {n ? <Stepper qty={n} max={v.stock} label={p.name} onChange={(by) => onQty(lineKey(p.id, v.id), by)} /> : addButton(p, v, `${p.name} ${label}`)}
-                </li>
-              )
-            })}
-          </ul>
-        </section>
-      )}
-      <h3 className={`flex items-baseline justify-between gap-3 px-4 pt-3 pb-1 text-sm font-semibold text-fg ${!q && !categoryId && often.length > 0 ? 'border-t border-line' : ''}`}>
+      <h3 className="flex items-baseline justify-between gap-3 px-4 pt-3 pb-1 text-sm font-semibold text-fg">
         <span>{q ? `Results for “${q}”` : category ? category.name : 'All products'}</span>
         {results && <span className="font-figure text-xs font-normal tabular-nums text-muted">{total.toLocaleString('en-IN')}</span>}
       </h3>
@@ -376,13 +388,13 @@ export function ItemPicker({
           <ErrorNote>{error}</ErrorNote>
         </div>
       )}
-      {results === null ? (
+      {rows === null ? (
         <div aria-busy="true" className="space-y-2 px-4 py-2">
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="h-12 animate-pulse rounded-md bg-fg/6" />
           ))}
         </div>
-      ) : results.length === 0 ? (
+      ) : rows.length === 0 ? (
         <div className="px-4 py-6 text-center">
           <p className="text-sm text-muted">{q ? `Nothing in ${category ? category.name : 'your shop'} matches “${q}”.` : 'No products in this category.'}</p>
           {category && q && (
@@ -394,7 +406,7 @@ export function ItemPicker({
         </div>
       ) : (
         <ul>
-          {results.map((p) => (
+          {rows.map((p) => (
             <Fragment key={p.id}>{renderRow(p)}</Fragment>
           ))}
         </ul>
