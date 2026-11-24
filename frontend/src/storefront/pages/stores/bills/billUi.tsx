@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react'
 import { MediaImg } from '../../../../shared/media/MediaImg'
+import { Badge } from '../../../../shared/ui/Badge'
+import type { BadgeTone } from '../../../../shared/ui/Badge'
+import { OFFLINE_MODE } from '../../../features/bills/billsApi'
 import { StatusPill } from '../ui/StatusPill'
 import type { StatusTone } from '../ui/StatusPill'
 import { formatPrice } from '../../../features/stores/storesApi'
@@ -27,6 +30,35 @@ export const rupees = (v: string | number) => formatPrice(v)
 
 export function BillStatePill({ state }: { state: BillState }) {
   return <StatusPill tone={BILL_STATE[state].tone}>{BILL_STATE[state].label}</StatusPill>
+}
+
+/**
+ * ONE badge that says where a bill is — state and stage together, so a row
+ * never carries two pills: "Not sent yet", "Opened · not paid", "Paid · UPI".
+ */
+export function billStatus(bill: Pick<Bill, 'state' | 'stage' | 'payWay' | 'offlineMode'>): { label: string; tone: BadgeTone } {
+  if (bill.state === 'PAID') {
+    return { label: bill.payWay === 'OFFLINE' ? `Paid${bill.offlineMode ? ` · ${OFFLINE_MODE[bill.offlineMode]}` : ''}` : 'Paid online', tone: 'success' }
+  }
+  if (bill.state === 'EXPIRED') return { label: 'Expired', tone: 'neutral' }
+  if (bill.state === 'CANCELLED') return { label: 'Cancelled', tone: 'neutral' }
+  if (bill.stage === 'OPENED') return { label: 'Opened · not paid', tone: 'info' }
+  if (bill.stage === 'SHARED') return { label: 'Sent · not opened', tone: 'pending' }
+  return { label: 'Not sent yet', tone: 'pending' }
+}
+export function BillStatus({ bill }: { bill: Pick<Bill, 'state' | 'stage' | 'payWay' | 'offlineMode'> }) {
+  const s = billStatus(bill)
+  return (
+    <Badge tone={s.tone} dot>
+      {s.label}
+    </Badge>
+  )
+}
+
+/** "+91 98400 11223" — a number read out on a call. */
+export function spacedPhone(phone: string) {
+  const d = phone.replace(/\D/g, '').slice(-10)
+  return d.length === 10 ? `+91 ${d.slice(0, 5)} ${d.slice(5)}` : phone
 }
 
 /** A quiet grey tag (stage, "From a bill"). */

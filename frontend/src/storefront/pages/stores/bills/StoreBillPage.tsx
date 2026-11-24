@@ -8,11 +8,11 @@ import { ErrorNote, InfoNote } from '../../../../shared/ui/form'
 import { billMessage, billsApi, downloadFile, OFFLINE_MODE, pdfFileName, shareOrDownload, spacedNumber, whatsappUrl } from '../../../features/bills/billsApi'
 import type { Bill, ShareVia } from '../../../features/bills/billsApi'
 import { useManagedStore } from '../../../features/stores/useManagedStore'
-import { ArrowLeftIcon, ArrowRightIcon, BoxIcon, ChatIcon, ClipboardIcon, DownloadIcon, LinkIcon, MapPinIcon, ReceiptIcon, ShareIcon, UserIcon } from '../../../layout/icons'
+import { ArrowLeftIcon, ArrowRightIcon, ChatIcon, ClipboardIcon, DownloadIcon, ReceiptIcon, ShareIcon } from '../../../layout/icons'
 import { EmptyState } from '../ui/EmptyState'
 import { PanelCard } from '../ui/PanelCard'
 import { showToast } from '../ui/Toast'
-import { BILL_STAGE, BillStatePill, draftFromBill, QuietTag, rupees, saveDraft, Thumb } from './billUi'
+import { BillStatus, draftFromBill, rupees, saveDraft, spacedPhone, Thumb } from './billUi'
 
 /**
  * One bill. While it waits: the exact message, "Send on WhatsApp" (opens the
@@ -192,25 +192,58 @@ export function StoreBillPage() {
   return (
     <div className="ws-form space-y-4">
       {back}
-      <section className="ws-card rounded-lg p-4 sm:p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <BillStatePill state={bill.state} />
-          {open && <QuietTag>{BILL_STAGE[bill.stage]}</QuietTag>}
-        </div>
-        <h2 className="mt-3 font-figure text-3xl leading-tight font-semibold tabular-nums text-fg">{rupees(bill.total)}</h2>
-        <p className="mt-1 text-base text-fg">
-          {bill.customerName ?? bill.customerPhone} · {bill.itemCount} item{bill.itemCount === 1 ? '' : 's'}
-        </p>
-        <p className="mt-0.5 text-sm text-muted">
-          Bill <span className="font-figure tabular-nums">{spacedNumber(bill.number)}</span> · made {when(bill.createdAt)}
-          {open && ` · open till ${when(bill.expiresAt)}`}
-        </p>
-        {offline && bill.state === 'PAID' && (
-          <p className="mt-0.5 text-sm text-muted">
-            {paidTo}
-            {bill.offlineRef && <> · Ref {bill.offlineRef}</>}
+      <section className="ws-card rounded-lg">
+        <div className="p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-muted">
+              {docName} <span className="font-figure tabular-nums">{spacedNumber(bill.number)}</span>
+            </p>
+            <BillStatus bill={bill} />
+          </div>
+          <p className="mt-2 font-figure text-3xl leading-tight font-semibold tabular-nums text-fg">{rupees(bill.total)}</p>
+          <p className="mt-1 text-base text-fg">
+            {bill.customerName ?? spacedPhone(bill.customerPhone)}
+            <span className="text-muted">
+              {' '}
+              · {bill.itemCount} item{bill.itemCount === 1 ? '' : 's'}
+            </span>
           </p>
-        )}
+        </div>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 border-t border-line px-4 py-3 text-sm sm:px-5">
+          {bill.customerName && (
+            <>
+              <dt className="text-muted">Phone</dt>
+              <dd className="text-fg">{spacedPhone(bill.customerPhone)}</dd>
+            </>
+          )}
+          <dt className="text-muted">Made</dt>
+          <dd className="text-fg">{when(bill.createdAt)}</dd>
+          {open && (
+            <>
+              <dt className="text-muted">Open till</dt>
+              <dd className="text-fg">{when(bill.expiresAt)}</dd>
+            </>
+          )}
+          {bill.state === 'PAID' && (
+            <>
+              <dt className="text-muted">Paid</dt>
+              <dd className="text-fg">
+                {offline ? `To you${bill.offlineMode ? ` · ${OFFLINE_MODE[bill.offlineMode]}` : ''}` : 'Online'}
+                {bill.offlineRef && <span className="text-muted"> · Ref {bill.offlineRef}</span>}
+              </dd>
+            </>
+          )}
+          <dt className="text-muted">{bill.fulfilment === 'PICKUP' && !bill.handedOver ? 'Pickup' : 'Delivery'}</dt>
+          <dd className="break-words text-fg">
+            {bill.handedOver
+              ? 'Taken in the shop'
+              : bill.address
+                ? `${bill.address.address}, ${bill.address.state} ${bill.address.pincode}`
+                : bill.fulfilment === 'PICKUP'
+                  ? 'They collect it from your shop'
+                  : 'They add the address when they pay'}
+          </dd>
+        </dl>
       </section>
       {error && <ErrorNote>{error}</ErrorNote>}
       {bill.order && (
@@ -226,79 +259,52 @@ export function StoreBillPage() {
       {bill.state === 'EXPIRED' && <InfoNote>Not paid in time, so the link no longer takes payment. Nothing was charged and no stock was held.</InfoNote>}
 
       {canSend && (
-        <PanelCard
-          icon={ChatIcon}
-          title={bill.sharedAt ? 'The message you shared' : `Send the ${offline ? 'receipt' : 'bill'} to ${bill.customerName ?? 'your customer'}`}
-          description="It goes from your own WhatsApp, so they see a number they know."
-        >
-          <div className="rounded-lg bg-surface-alt p-3">
-            <p className="max-w-[94%] rounded-lg rounded-tl-sm border border-line bg-surface px-3 py-2 text-sm leading-relaxed break-words text-fg">{message}</p>
-          </div>
-          <div className="mt-3 flex items-center gap-2 rounded-md border border-line px-3 py-2">
-            <LinkIcon className="h-4 w-4 shrink-0 text-muted" />
-            <span className="min-w-0 flex-1 truncate text-sm text-fg">{bill.link.replace(/^https?:\/\//, '')}</span>
-          </div>
+        <PanelCard title={bill.sharedAt ? 'Message sent' : `Send the ${offline ? 'receipt' : 'bill'}`} description="Goes from your own WhatsApp.">
+          <p className="rounded-md bg-surface-alt px-3 py-2.5 text-sm leading-relaxed break-words text-fg">{message}</p>
           {pdfButtons}
         </PanelCard>
       )}
       {!canSend && bill.state === 'PAID' && (
-        <PanelCard icon={ReceiptIcon} title="Receipt (PDF)" description="Send it to your customer or keep it for your records.">
+        <PanelCard title="Receipt PDF" description="Send it to your customer or keep it for your records.">
           {pdfButtons}
         </PanelCard>
       )}
 
-      <PanelCard icon={UserIcon} title={bill.customerName ?? 'Customer'}>
-        <div className="space-y-3">
-          <p className="text-base text-fg">{bill.customerPhone}</p>
-          <div className="border-t border-line pt-3">
-            <p className="flex items-center gap-2 text-sm font-semibold text-fg">
-              <MapPinIcon className="h-4 w-4 text-muted" />
-              {bill.handedOver ? 'In the shop' : bill.fulfilment === 'PICKUP' ? 'Store pickup' : 'Send to'}
-            </p>
-            <p className="mt-1 text-base text-muted">
-              {bill.handedOver
-                ? 'They took it with them.'
-                : bill.address
-                  ? `${bill.address.address}, ${bill.address.state} ${bill.address.pincode}`
-                  : bill.fulfilment === 'PICKUP'
-                    ? 'They collect it from your shop.'
-                    : 'The customer adds their address when they pay.'}
-            </p>
-          </div>
-        </div>
-      </PanelCard>
-
-      <PanelCard icon={BoxIcon} title={`On the bill (${bill.items.length})`} padded={false}>
+      <PanelCard title={`Items (${bill.items.length})`} padded={false}>
         <ul className="divide-y divide-line px-4 sm:px-5">
           {bill.items.map((i) => (
             <li key={`${i.productId}:${i.variantId ?? ''}`} className="flex items-center gap-3 py-3">
-              <Thumb src={i.imageUrl} size="h-12 w-12" px="48px" />
+              <Thumb src={i.imageUrl} size="h-11 w-11" px="44px" />
               <div className="min-w-0 flex-1">
                 <p className="text-base leading-snug font-medium break-words text-fg">{i.productName}</p>
                 <p className="mt-0.5 text-sm text-muted">
-                  {i.variantName && <span className="font-medium text-fg">{i.variantName} · </span>}
-                  <span className="font-semibold text-fg">{i.quantity}</span> × {rupees(i.unitPrice)}
+                  {i.variantName && <>{i.variantName} · </>}
+                  {i.quantity} × {rupees(i.unitPrice)}
                 </p>
               </div>
               <span className="shrink-0 font-figure text-base font-semibold tabular-nums text-fg">{rupees(i.lineTotal)}</span>
             </li>
           ))}
         </ul>
-        <dl className="space-y-1.5 border-t border-line px-4 py-3 text-base sm:px-5">
-          <div className="flex justify-between"><dt className="text-muted">Items</dt><dd className="font-figure tabular-nums">{rupees(bill.subtotal)}</dd></div>
-          <div className="flex justify-between"><dt className="text-muted">Delivery</dt><dd className="font-figure tabular-nums">{bill.fulfilment === 'PICKUP' ? 'Pickup' : Number(bill.shippingCharge) === 0 ? 'Free' : rupees(bill.shippingCharge)}</dd></div>
+        <dl className="space-y-1.5 border-t border-line px-4 py-3 text-sm sm:px-5">
+          <div className="flex justify-between"><dt className="text-muted">Items</dt><dd className="font-figure tabular-nums text-fg">{rupees(bill.subtotal)}</dd></div>
+          <div className="flex justify-between"><dt className="text-muted">Delivery</dt><dd className="font-figure tabular-nums text-fg">{bill.fulfilment === 'PICKUP' ? 'Pickup' : Number(bill.shippingCharge) === 0 ? 'Free' : rupees(bill.shippingCharge)}</dd></div>
           {Number(bill.discount) > 0 && (
             <div className="flex justify-between">
               <dt className="text-muted">Discount{bill.discountType === 'PERCENT' && bill.discountValue ? ` (${Number(bill.discountValue)}%)` : ''}</dt>
-              <dd className="font-figure tabular-nums">− {rupees(bill.discount)}</dd>
+              <dd className="font-figure tabular-nums text-fg">− {rupees(bill.discount)}</dd>
             </div>
           )}
-          <div className="flex justify-between border-t border-line pt-2 font-semibold"><dt>Total</dt><dd className="font-figure tabular-nums">{rupees(bill.total)}</dd></div>
+          <div className="flex items-baseline justify-between border-t border-line pt-2 text-base font-semibold text-fg"><dt>Total</dt><dd className="font-figure tabular-nums">{rupees(bill.total)}</dd></div>
         </dl>
-        {bill.note && <p className="border-t border-line px-4 py-3 text-sm text-muted sm:px-5">Note to the customer: <span className="text-fg">“{bill.note}”</span></p>}
+        {bill.note && (
+          <p className="border-t border-line px-4 py-3 text-sm text-muted sm:px-5">
+            Note: <span className="text-fg">{bill.note}</span>
+          </p>
+        )}
       </PanelCard>
 
-      <PanelCard title="What has happened">
+      <PanelCard title="Activity">
         {offline ? (
           <ol>
             {step('Bill made', bill.createdAt)}

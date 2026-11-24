@@ -194,9 +194,9 @@ export function StoreBillNewPage() {
         <ArrowLeftIcon className="h-5 w-5" />
         Bills
       </Button>
-      <PageHeader icon={ReceiptIcon} title="Create a bill" description="Pick what they are buying from your shop. Prices come from your products. Already paid in cash or UPI? Choose that in step 3." />
+      <PageHeader icon={ReceiptIcon} title="Create a bill" description="For a customer who ordered by phone or in your shop." />
 
-      <PanelCard title={step(1, 'Customer')} description="Their WhatsApp number — you send them the bill.">
+      <PanelCard title={step(1, 'Customer')} description="You send the bill to this WhatsApp number.">
         <div className="space-y-4">
           <label className="block">
             <span className={FIELD_LABEL}>Mobile number</span>
@@ -227,7 +227,7 @@ export function StoreBillNewPage() {
 
       <PanelCard
         title={step(2, 'What they are buying')}
-        description={draft.lines.length ? `${itemCount} item${itemCount === 1 ? '' : 's'} · ${rupees(subtotal)}` : 'Search your shop by name, size, colour or code.'}
+        description={draft.lines.length ? `${itemCount} item${itemCount === 1 ? '' : 's'} · ${rupees(subtotal)}` : 'From your products, at their prices.'}
       >
         {draft.lines.length > 0 && (
           <ul className="-mt-2 mb-3 divide-y divide-line">
@@ -263,7 +263,7 @@ export function StoreBillNewPage() {
 
       <PanelCard
         title={step(3, 'Payment')}
-        description={offline ? 'They already paid you. The bill is saved as a paid order — you send it as a receipt.' : 'You send them a link on WhatsApp. They pay online from it.'}
+        description={offline ? 'Saved as a paid order. You send it as a receipt.' : 'They pay online from a link you send.'}
       >
         <div className="space-y-4">
           <SegmentedControl
@@ -401,7 +401,7 @@ export function StoreBillNewPage() {
               placeholder={autoShipping === null ? 'Your usual rate' : autoShipping === 0 ? '0 — free' : String(autoShipping)}
               className={fieldClass()}
             />
-            <span className="mt-1.5 block text-sm text-muted">Leave empty to use your usual delivery rate.</span>
+            <span className="mt-1.5 block text-sm text-muted">Leave empty for your usual rate.</span>
           </label>
           )}
           <div>
@@ -454,7 +454,7 @@ export function StoreBillNewPage() {
               className="w-full"
               cellClassName="min-h-10 px-3"
             />
-            <span className="mt-1.5 block text-sm text-muted">They add their address when they pay. Stock goes down only when they pay.</span>
+            <span className="mt-1.5 block text-sm text-muted">Stock goes down only when they pay.</span>
           </div>
           )}
         </div>

@@ -4,18 +4,17 @@ import { toApiError } from '../../../../shared/auth/http'
 import type { ListMeta } from '../../../../shared/auth/http'
 import { Button, buttonClass } from '../../../../shared/ui/Button'
 import { ErrorNote } from '../../../../shared/ui/form'
-import { SegmentedControl } from '../../../../shared/ui/SegmentedControl'
-import { billsApi, OFFLINE_MODE, spacedNumber } from '../../../features/bills/billsApi'
+import { billsApi } from '../../../features/bills/billsApi'
 import type { Bill, BillListSummary, BillTab } from '../../../features/bills/billsApi'
 import { useManagedStore } from '../../../features/stores/useManagedStore'
-import { ChevronRightIcon, ClockIcon, PlusIcon, ReceiptIcon } from '../../../layout/icons'
+import { PlusIcon, ReceiptIcon } from '../../../layout/icons'
 import { EmptyState } from '../ui/EmptyState'
 import { PageHeader } from '../ui/PageHeader'
-import { BILL_STAGE, BillStatePill, QuietTag, rupees } from './billUi'
+import { BillStatus, rupees, spacedPhone } from './billUi'
 
 /**
  * Bills — every bill the seller made for a phone / in-shop customer, newest
- * first, by tab (All · Waiting · Paid · Expired or cancelled, deep-linkable
+ * first, by tab (All · Waiting · Paid · Closed = expired or cancelled, deep-linkable
  * via ?tab=). A row opens the bill, where it is shared or followed.
  */
 
@@ -24,7 +23,7 @@ const TABS: { key: BillTab; label: string }[] = [
   { key: 'ALL', label: 'All' },
   { key: 'WAITING', label: 'Waiting' },
   { key: 'PAID', label: 'Paid' },
-  { key: 'CLOSED', label: 'Expired or cancelled' },
+  { key: 'CLOSED', label: 'Closed' },
 ]
 const isTab = (v: string | null): v is BillTab => TABS.some((t) => t.key === v)
 
@@ -40,7 +39,7 @@ const timeAgo = (iso: string) => {
 
 export function StoreBillsPage() {
   const { store } = useManagedStore()
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
   const tabParam = params.get('tab')
   const tab: BillTab = isTab(tabParam) ? tabParam : 'ALL'
   const [bills, setBills] = useState<Bill[] | null>(null)
@@ -84,21 +83,17 @@ export function StoreBillsPage() {
   }
 
   const create = (
-    <Link to="new" className={buttonClass({ variant: 'ink', size: 'lg' })}>
+    <Link to="new" className={buttonClass({ variant: 'ink', size: 'md' })}>
       <PlusIcon className="h-5 w-5" />
       Create a bill
     </Link>
   )
   const nothingYet = summary !== null && summary.tabs.ALL === 0
+  const tabTo = (key: BillTab) => (key === 'ALL' ? '.' : `?tab=${key}`)
 
   return (
     <div className="ws-form space-y-4">
-      <PageHeader
-        icon={ReceiptIcon}
-        title="Bills"
-        description="For customers who order by phone or in your shop. Share the bill on WhatsApp — they see it and pay online."
-        action={nothingYet ? undefined : create}
-      />
+      <PageHeader icon={ReceiptIcon} title="Bills" description="For customers who order by phone or in your shop." action={nothingYet ? undefined : create} />
       {error && <ErrorNote>{error}</ErrorNote>}
 
       {nothingYet ? (
@@ -106,94 +101,84 @@ export function StoreBillsPage() {
           <EmptyState
             icon={ReceiptIcon}
             title="No bills yet"
-            description="A customer called or walked in? Make them a bill from your products and send it on WhatsApp. It becomes an order when they pay."
+            description="Make a bill from your products and send it on WhatsApp. It becomes an order when they pay."
             action={create}
           />
         </div>
       ) : (
         <>
           {summary && summary.waiting > 0 && (
-            <p className="flex items-center gap-2 text-sm text-fg">
-              <ClockIcon className="h-4 w-4 shrink-0 text-muted" />
-              <span>
-                <span className="font-semibold">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="ws-card rounded-lg px-4 py-3">
+                <p className="text-sm text-muted">Waiting</p>
+                <p className="mt-0.5 font-figure text-xl font-semibold tabular-nums text-fg">{rupees(summary.waitingTotal)}</p>
+                <p className="text-sm text-muted">
                   {summary.waiting} bill{summary.waiting === 1 ? '' : 's'}
-                </span>{' '}
-                waiting · {rupees(summary.waitingTotal)}
-                {summary.notShared > 0 && <span className="text-pending"> · {summary.notShared} not shared yet</span>}
-              </span>
-            </p>
+                </p>
+              </div>
+              <Link to="?tab=WAITING" replace className="ws-card rounded-lg px-4 py-3 transition-colors hover:bg-fg/5">
+                <p className="text-sm text-muted">Not sent</p>
+                <p className={`mt-0.5 font-figure text-xl font-semibold tabular-nums ${summary.notShared > 0 ? 'text-pending' : 'text-fg'}`}>{summary.notShared}</p>
+                <p className="text-sm text-muted">{summary.notShared === 1 ? 'bill' : 'bills'}</p>
+              </Link>
+            </div>
           )}
-          <div className="-mx-4 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:mx-0 sm:px-0">
-            <SegmentedControl
-              label="Show bills"
-              equal={false}
-              value={tab}
-              onChange={(next) =>
-                setParams(
-                  (prev) => {
-                    const copy = new URLSearchParams(prev)
-                    if (next === 'ALL') copy.delete('tab')
-                    else copy.set('tab', next)
-                    return copy
-                  },
-                  { replace: true },
-                )
-              }
-              options={TABS.map((t) => ({
-                value: t.key,
-                label: (
-                  <span className="flex items-center gap-1.5">
-                    {t.label}
-                    {summary && t.key !== 'ALL' && summary.tabs[t.key] > 0 && (
-                      <span className="font-figure tabular-nums opacity-70">{summary.tabs[t.key]}</span>
-                    )}
-                  </span>
-                ),
-              }))}
-            />
-          </div>
 
-          {bills === null ? (
-            <div aria-busy="true" className="space-y-2">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="ws-card h-[88px] animate-pulse rounded-lg" />
-              ))}
-            </div>
-          ) : bills.length === 0 ? (
-            <div className="ws-card rounded-lg">
+          <section className="ws-card overflow-hidden rounded-lg">
+            {/* Tabs: links (deep-linkable ?tab=), underlined when chosen; four short words fit a phone. */}
+            <nav aria-label="Show bills" className="flex border-b border-line px-2 sm:px-3">
+              {TABS.map((t) => {
+                const on = tab === t.key
+                const n = summary?.tabs[t.key] ?? 0
+                return (
+                  <Link
+                    key={t.key}
+                    to={tabTo(t.key)}
+                    replace
+                    aria-current={on ? 'page' : undefined}
+                    className={`-mb-px flex min-h-12 items-center gap-1.5 border-b-2 px-2.5 text-sm font-semibold whitespace-nowrap transition-colors sm:px-3 ${
+                      on ? 'border-fg text-fg' : 'border-transparent text-muted hover:text-fg'
+                    }`}
+                  >
+                    {t.label}
+                    {t.key !== 'ALL' && n > 0 && <span className="font-figure text-xs font-medium tabular-nums text-muted">{n}</span>}
+                  </Link>
+                )
+              })}
+            </nav>
+
+            {bills === null ? (
+              <div aria-busy="true" className="divide-y divide-line">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="space-y-2 px-4 py-3.5 sm:px-5">
+                    <div className="h-5 w-1/2 animate-pulse rounded bg-fg/6" />
+                    <div className="h-4 w-1/3 animate-pulse rounded bg-fg/6" />
+                  </div>
+                ))}
+              </div>
+            ) : bills.length === 0 ? (
               <EmptyState icon={ReceiptIcon} title="No bills here" description="Try another tab." compact />
-            </div>
-          ) : (
-            <ul className="ws-card divide-y divide-line overflow-hidden rounded-lg">
-              {bills.map((bill) => (
-                <li key={bill.id}>
-                  <Link to={bill.id} className="flex min-h-16 items-center gap-3 px-4 py-3 transition-colors hover:bg-fg/5 sm:px-5">
-                    <div className="min-w-0 flex-1">
+            ) : (
+              <ul className="divide-y divide-line">
+                {bills.map((bill) => (
+                  <li key={bill.id}>
+                    <Link to={bill.id} className="block px-4 py-3.5 transition-colors hover:bg-fg/5 sm:px-5">
                       <div className="flex items-baseline justify-between gap-3">
-                        <p className="min-w-0 truncate text-base font-medium text-fg">
-                          {bill.customerName ?? bill.customerPhone}
-                        </p>
-                        <span className="shrink-0 font-figure text-base font-semibold tabular-nums text-fg">
-                          {rupees(bill.total)}
+                        <p className="min-w-0 truncate text-base font-medium text-fg">{bill.customerName ?? spacedPhone(bill.customerPhone)}</p>
+                        <span className="shrink-0 font-figure text-base font-semibold tabular-nums text-fg">{rupees(bill.total)}</span>
+                      </div>
+                      <div className="mt-1.5 flex items-center justify-between gap-3">
+                        <BillStatus bill={bill} />
+                        <span className="min-w-0 truncate text-sm text-muted">
+                          {bill.itemCount} item{bill.itemCount === 1 ? '' : 's'} · {timeAgo(bill.createdAt)}
                         </span>
                       </div>
-                      <p className="mt-0.5 text-sm text-muted">
-                        {timeAgo(bill.createdAt)} · {bill.itemCount} item{bill.itemCount === 1 ? '' : 's'} ·{' '}
-                        <span className="font-figure tabular-nums">{spacedNumber(bill.number)}</span>
-                      </p>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <BillStatePill state={bill.state} />
-                        {bill.state === 'OPEN' && <QuietTag>{BILL_STAGE[bill.stage]}</QuietTag>}
-                        {bill.payWay === 'OFFLINE' && <QuietTag>To you · {bill.offlineMode ? OFFLINE_MODE[bill.offlineMode] : 'Direct'}</QuietTag>}
-                      </div>
-                    </div>
-                    <ChevronRightIcon className="h-5 w-5 shrink-0 text-muted" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
           {meta && meta.page < meta.totalPages && (
             <Button variant="secondary" size="lg" full loading={loadingMore} onClick={loadMore}>
               Show more
