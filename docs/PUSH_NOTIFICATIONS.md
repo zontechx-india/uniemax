@@ -99,6 +99,7 @@ a browser standard — the VAPID pair *is* the credential.
 | ----- | ---------- | ---- | ----- |
 | Order placed (COD, or ONLINE once paid) | customer · store owner · every active admin | `ORDER_PLACED` | order confirmation / seller order page / admin order page |
 | Order Confirmed · Shipped · Delivered · Cancelled | customer | `ORDER_STATUS` | order confirmation page |
+| Delivery address updated by the seller (also emailed, with the new address) | customer | `ORDER_STATUS` | order confirmation page |
 | Store suspended / restored by an admin | store owner | `STORE` | their store management page |
 | Product hidden / restored by an admin | store owner | `STORE` | their store's products section |
 | Payout account verified / failed | store owner | `ACCOUNT` | their store's bank-accounts section |

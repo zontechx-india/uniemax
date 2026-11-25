@@ -109,6 +109,8 @@ never ships to a shopper.
   mark delivered with an optional proof-of-delivery photo, and handle a parcel
   that came back — send it again, or cancel and choose whether the returned
   items go back in stock.
+- Delivery address correction: the seller fixes an incomplete address until the
+  order is delivered; the old address is kept and the customer is told.
 - Payout bank account (verified manually by platform staff).
 - Answer the support tickets their own shoppers raise.
 - Publish switch — a store is a private draft until the owner publishes it. The
@@ -304,6 +306,8 @@ env config — see [`backend/docs/PACKAGE_AUTH.md`](./backend/docs/PACKAGE_AUTH.
 - **OrderShipment** — a parcel of an order: courier, tracking number, optional
   pasted tracking link, delivered / came back, optional proof-of-delivery photo;
   each order line points at the parcel it went out in.
+- **OrderAddressChange** — one correction of an order's delivery address:
+  the address before and after, and who changed it (seller or support).
 - **SupportTicket / SupportTicketMessage** — one table serving all three
   conversations (shopper→UnieMax, seller→UnieMax, shopper→shop), separated by
   `recipient` + `storeId`.
