@@ -970,7 +970,12 @@ and their WhatsApp text says the order "is waiting for payment" instead of
   big **Call** (`tel:`) and **WhatsApp** (`wa.me/91…` with a ready "Hello …,
   this is {shop} about your order …" message; a bare 10-digit number gets
   91) buttons and the delivery address with **Copy address** (name, address,
-  phone — for the courier slip) or the pickup note; the items with 56px
+  phone — for the courier slip) and **Edit address** (until delivered:
+  `orders/AddressDialog.tsx` — address, state, pincode, country and the
+  store's DELIVERY questions; name / phone / email are not editable; a note
+  when the order is already sent to tell the courier too), or the pickup
+  note — after a correction an "Updated by you · {time}" `<details>` under
+  the address opens the address it replaced (`order.addressChanges`); the items with 56px
   photos, choice name, "qty × price · Code …" and the money summary; a
   **Money** card (`orders/MoneyCard.tsx`, right column above the timeline —
   this order's Transactions row: bill, paid by, platform / gateway fee, You

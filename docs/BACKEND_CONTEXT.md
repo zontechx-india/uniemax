@@ -1747,6 +1747,14 @@ White-label design — one codebase, any business:
   (`shapeOrder(row, audience)`): the parcels' proof-of-delivery photo is the
   seller's (and admins'), the buyer sees courier + tracking, and anyone else
   on an order link gets tracking numbers nulled.
+- **OrderAddressChange** (`order_address_changes`) — one correction of an
+  order's delivery address after placement (`modules/orders/orderAddress.service.ts`,
+  `PATCH /stores/:id/orders/:orderId/address`): `before` / `after` JSON
+  snapshots `{ addressLine, pincode, state, country, answers[] }` (answers =
+  the store's DELIVERY questions), `changedBy` (`OrderAddressEditor` SELLER |
+  SUPPORT), `actorId`, `createdAt`. The order row holds the current address;
+  these rows are never edited. Shaped into `addressChanges` for the seller
+  audience only.
 - **OrderShipment** (`order_shipments`) — one **parcel** of an order
   (`modules/orders/shipments.service.ts`; rules in
   [dropshipping/shipments](./dropshipping/shipments/context.md)):

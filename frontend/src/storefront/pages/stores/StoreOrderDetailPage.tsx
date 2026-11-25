@@ -9,6 +9,8 @@ import { ErrorNote, InfoNote } from '../../../shared/ui/form'
 import { formatPrice, sellerOrderApi } from '../../features/stores/storesApi'
 import { OFFLINE_MODE } from '../../features/bills/billsApi'
 import type {
+  OrderAddressInput,
+  OrderAddressSnapshot,
   OrderShipment,
   PlacedOrder,
   ShipmentTrackingInput,
@@ -23,6 +25,7 @@ import {
   ClipboardIcon,
   CloseIcon,
   MapPinIcon,
+  PencilIcon,
   PhoneCallIcon,
   ReturnIcon,
   TruckIcon,
@@ -31,6 +34,7 @@ import {
 import { OrderStatusChip, formatOrderDateTime, paymentLabel, timeAgo, whatsAppNumber } from './orderMeta'
 import { Button, buttonClass } from '../../../shared/ui/Button'
 import { MediaImg } from '../../../shared/media/MediaImg'
+import { AddressDialog } from './orders/AddressDialog'
 import { DeliveredDialog } from './orders/DeliveredDialog'
 import { MoneyCard } from './orders/MoneyCard'
 import type { PickedPhoto } from './orders/DeliveredDialog'
@@ -103,6 +107,8 @@ function nextAction(
 }
 
 const CANCELLABLE = new Set(['PENDING', 'CONFIRMED', 'PACKED'])
+/** The delivery address can be corrected until the order is delivered. */
+const ADDRESS_EDITABLE = new Set(['PENDING', 'CONFIRMED', 'PACKED', 'SHIPPED'])
 
 /** Which courier sheet is open — sending, adding tracking, sending again, or correcting. */
 type ShipSheet =
@@ -137,6 +143,7 @@ export function StoreOrderDetailPage() {
   const [delivering, setDelivering] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const [sheetError, setSheetError] = useState<string | null>(null)
+  const [editingAddress, setEditingAddress] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -236,6 +243,21 @@ export function StoreOrderDetailPage() {
     }
   }
 
+  const submitAddress = async (input: OrderAddressInput) => {
+    if (!order) return
+    setBusy(true)
+    setSheetError(null)
+    try {
+      setOrder(await sellerOrderApi.updateAddress(store.id, order.id, input))
+      setEditingAddress(false)
+      showToast('Address updated')
+    } catch (err) {
+      setSheetError(toApiError(err).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const markCameBack = async () => {
     const parcel = openParcels[0]
     if (!order || !parcel) return
@@ -303,6 +325,9 @@ export function StoreOrderDetailPage() {
   // with the address — and in what "Copy address" copies; the rest stand apart.
   const deliveryAnswers = order?.customFields.filter((a) => a.section === 'DELIVERY') ?? []
   const contactAnswers = order?.customFields.filter((a) => a.section === 'CONTACT') ?? []
+  const addressEditable =
+    !!order && order.fulfilment === 'DELIVERY' && ADDRESS_EDITABLE.has(order.status)
+  const lastAddressChange = order?.addressChanges?.at(-1) ?? null
 
   const copyAddress = async () => {
     if (!order) return
@@ -482,15 +507,40 @@ export function StoreOrderDetailPage() {
                           {address || 'No address was given.'}
                         </p>
                         <OrderAnswerList answers={deliveryAnswers} className="text-base" />
-                        {address && (
-                          <button
-                            type="button"
-                            onClick={() => void copyAddress()}
-                            className={buttonClass({ variant: 'secondary', size: 'md', className: 'mt-2.5' })}
-                          >
-                            <ClipboardIcon className="h-4 w-4" />
-                            Copy address
-                          </button>
+                        {lastAddressChange && (
+                          <AddressChangeNote
+                            change={lastAddressChange}
+                            count={order.addressChanges?.length ?? 0}
+                          />
+                        )}
+                        {(address || addressEditable) && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {address && (
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="md"
+                                onClick={() => void copyAddress()}
+                              >
+                                <ClipboardIcon className="h-4 w-4" />
+                                Copy address
+                              </Button>
+                            )}
+                            {addressEditable && (
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="md"
+                                onClick={() => {
+                                  setSheetError(null)
+                                  setEditingAddress(true)
+                                }}
+                              >
+                                <PencilIcon className="h-4 w-4" />
+                                Edit address
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </>
                     )}
@@ -682,7 +732,7 @@ export function StoreOrderDetailPage() {
                   <Button
                     type="button"
                     size="lg"
-                    variant="primary"
+                    variant="ink"
                     disabled={busy}
                     onClick={() => {
                       setSheetError(null)
@@ -697,7 +747,7 @@ export function StoreOrderDetailPage() {
                   <Button
                     type="button"
                     size="lg"
-                    variant="primary"
+                    variant="ink"
                     disabled={busy}
                     onClick={primary}
                     className="min-w-0 flex-1 text-base"
@@ -748,7 +798,7 @@ export function StoreOrderDetailPage() {
         confirmLabel={action ? `Yes, ${action.label.toLowerCase()}` : 'Yes'}
         // "Cancel" next to "Confirm order" reads as "cancel the order".
         cancelLabel="Go back"
-        tone="neutral"
+        tone="ink"
         busy={busy}
         onConfirm={() => void advance()}
         onCancel={() => setConfirming(null)}
@@ -817,7 +867,7 @@ export function StoreOrderDetailPage() {
         }
         confirmLabel="Yes, it came back"
         cancelLabel="Go back"
-        tone="neutral"
+        tone="ink"
         busy={busy}
         onConfirm={() => void markCameBack()}
         onCancel={() => setConfirming(null)}
@@ -835,6 +885,19 @@ export function StoreOrderDetailPage() {
         onClose={() => setShipSheet(null)}
       />
 
+      {/* Correct the delivery address */}
+      {order && (
+        <AddressDialog
+          open={editingAddress}
+          order={order}
+          questions={store.checkout.customFields}
+          busy={busy}
+          error={sheetError}
+          onSubmit={(input) => void submitAddress(input)}
+          onClose={() => setEditingAddress(false)}
+        />
+      )}
+
       {/* Delivered — optional proof photo */}
       <DeliveredDialog
         open={delivering}
@@ -846,6 +909,50 @@ export function StoreOrderDetailPage() {
         onClose={() => setDelivering(false)}
       />
     </div>
+  )
+}
+
+/** "Line, State, 191131, India" plus the delivery answers, one per line. */
+function snapshotLines(a: OrderAddressSnapshot): string[] {
+  return [
+    [a.addressLine, a.state, a.pincode, a.country].filter(Boolean).join(', '),
+    ...a.answers.map((x) => `${x.label}: ${x.value}`),
+  ].filter(Boolean)
+}
+
+/**
+ * "Address updated by you · 25 Nov, 5:40 pm" under the address — and the
+ * address the latest change replaced, one tap away (every change is kept
+ * server-side in `order_address_changes`).
+ */
+function AddressChangeNote({
+  change,
+  count,
+}: {
+  change: NonNullable<PlacedOrder['addressChanges']>[number]
+  count: number
+}) {
+  const who = change.changedBy === 'SUPPORT' ? 'UnieMax support' : 'you'
+  return (
+    <details className="group mt-3 rounded-md bg-fg/[0.04] px-3 py-2.5 text-hint">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-muted [&::-webkit-details-marker]:hidden">
+        <span>
+          Updated by {who} ·{' '}
+          <span className="whitespace-nowrap">{formatOrderDateTime(change.changedAt)}</span>
+          {count > 1 && <> · {count} changes</>}
+        </span>
+        <span className="shrink-0 font-semibold text-fg group-open:hidden">Show old</span>
+        <span className="hidden shrink-0 font-semibold text-fg group-open:inline">Hide</span>
+      </summary>
+      <div className="mt-2 border-t border-line pt-2">
+        <p className="text-muted">Before this change</p>
+        {snapshotLines(change.before).map((line) => (
+          <p key={line} className="break-words text-fg">
+            {line}
+          </p>
+        ))}
+      </div>
+    </details>
   )
 }
 

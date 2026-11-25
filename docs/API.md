@@ -475,6 +475,32 @@ order with a courier and tracking number is the **Parcels** endpoint below;
 this one stays for confirm / pack, pickup orders and orders sent before
 parcels existed.
 
+**`PATCH /api/v1/stores/:id/orders/:orderId/address`** — correct the delivery address
+```jsonc
+{
+  "address": "House 12, near JK Bank, Manasbal",  // 5–300 chars
+  "pincode": "191 131",                            // checked per country, stored normalised
+  "state": "Jammu and Kashmir",                    // optional
+  "country": "India",                              // optional
+  "answers": { "po": "Tullmulla" }                 // store DELIVERY questions by id; blank removes
+}
+```
+For when the customer gave an incomplete address and the seller got the right
+one (usually by phone). Delivery orders only, while `PENDING` / `CONFIRMED` /
+`PACKED` / `SHIPPED` — `409` for a pickup, delivered or cancelled order.
+Only the address changes: name, phone and email stay as the customer gave
+them, and no money moves (the shipping charge is not re-quoted). The store's
+DELIVERY questions are the ones asked today plus any older answer whose
+question was removed; a required one can't be blanked, CHOICE / NUMBER rules
+apply to changed values. Each real change writes an **`OrderAddressChange`**
+(before + after, `changedBy` SELLER | SUPPORT) and the customer gets
+*"Delivery address updated"* (push + email, with the new address); saving
+with nothing changed writes nothing. Returns the full order — its
+`addressChanges` (oldest first, `{ id, changedBy, changedAt, before, after }`)
+are filled for the seller and admins only, `[]` for the customer. A supplier
+shipping part of the order reads the address live, so it sees the correction.
+Both mounts (owner, and the super-admin store mount — audited).
+
 **`POST /api/v1/stores/:id/orders/:orderId/cancel`**
 ```jsonc
 {

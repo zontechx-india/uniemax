@@ -28,6 +28,7 @@ import {
 } from "../stores/stores.schema.js";
 import type { CheckoutFieldKey } from "../stores/stores.schema.js";
 import { collectCustomAnswers, readOrderCustomFields } from "./customFields.js";
+import { shapeAddressChange } from "./orderAddress.shape.js";
 import {
   effectiveDeliveryRule,
   isDeliverable,
@@ -192,6 +193,11 @@ const orderSelect = {
     },
   },
   shipments: { orderBy: { shippedAt: "asc" }, select: shipmentSelect },
+  // Corrections of the delivery address (seller only — see shapeOrder).
+  addressChanges: {
+    orderBy: { createdAt: "asc" },
+    select: { id: true, before: true, after: true, changedBy: true, createdAt: true },
+  },
   // The latest refund to the customer, if any (payments/refunds.service.ts).
   refunds: {
     orderBy: { createdAt: "desc" },
@@ -208,9 +214,12 @@ type OrderRow = Prisma.OrderGetPayload<{ select: typeof orderSelect }>;
  * contact redaction for the public link is `getPublicOrder`'s job.
  */
 function shapeOrder(row: OrderRow, audience: OrderAudience = "customer") {
-  const { items, shipments, customFields, refunds, ...rest } = row;
+  const { items, shipments, customFields, refunds, addressChanges, ...rest } = row;
   return {
     ...rest,
+    /** Address corrections, oldest first — the seller's record; [] for anyone else. */
+    addressChanges:
+      audience === "seller" ? addressChanges.map(shapeAddressChange) : [],
     /** Where the customer's money stands after a cancel — null when none was owed. */
     refund: refunds[0] ?? null,
     customFields: readOrderCustomFields(customFields),

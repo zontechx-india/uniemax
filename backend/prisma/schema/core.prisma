@@ -1297,6 +1297,8 @@ model Order {
   payouts             OrderPayout[]
   /// Money sent back to the customer through PaymentHub (payments/refunds.service.ts).
   refunds             OrderRefund[]
+  /// Every correction of the delivery address after placement, oldest first.
+  addressChanges      OrderAddressChange[]
   /// Fee breakdown (platform / gateway fee, seller earning) — seller and
   /// admin only, never the customer (modules/finance).
   financials          OrderFinancials?
@@ -1723,6 +1725,36 @@ model OrderShipment {
 
   @@index([orderId])
   @@map("order_shipments")
+  @@schema("public")
+}
+
+/// The seller (or support) corrected an order's delivery address after it was
+/// placed — e.g. the customer gave an incomplete one and the seller phoned to
+/// get it right. The order row holds the current address; this keeps what it
+/// replaced, so a later "I never got it" can be traced. Never edited.
+model OrderAddressChange {
+  id        String             @id @default(cuid())
+  orderId   String
+  order     Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// { addressLine, pincode, state, country, answers: [{ id, label, value }] }
+  /// — the address before and after; answers = the store's DELIVERY questions.
+  before    Json
+  after     Json
+  /// SELLER = the store owner; SUPPORT = a UnieMax admin on the seller's behalf.
+  changedBy OrderAddressEditor
+  /// Customer id of the owner, or admin id — who pressed Save.
+  actorId   String
+  createdAt DateTime           @default(now())
+
+  @@index([orderId, createdAt])
+  @@map("order_address_changes")
+  @@schema("public")
+}
+
+enum OrderAddressEditor {
+  SELLER
+  SUPPORT
+
   @@schema("public")
 }
 

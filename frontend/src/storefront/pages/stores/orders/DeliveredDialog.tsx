@@ -116,7 +116,7 @@ export function DeliveredDialog({
           </Button>
           <Button
             type="button"
-            variant="primary"
+            variant="ink"
             size="lg"
             loading={busy}
             disabled={preparing}

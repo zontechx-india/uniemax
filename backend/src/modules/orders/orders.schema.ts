@@ -258,6 +258,43 @@ export const shipmentTrackingSchema = z
     }
   });
 
+// ---------------------------------------------------------------------------
+// Delivery address correction (/stores/:id/orders/:orderId/address)
+// ---------------------------------------------------------------------------
+
+/**
+ * The corrected delivery address — the full set every time (the sheet sends
+ * every field). `answers` are the store's DELIVERY questions (Post Office,
+ * Tehsil…) keyed by question id; a blank answer removes it. Name, phone and
+ * email are not here on purpose: they tie the order to the customer.
+ */
+export const orderAddressUpdateSchema = z
+  .object({
+    address: z
+      .string()
+      .trim()
+      .min(5, "Type the full address")
+      .max(300, "The address is too long (up to 300 characters)"),
+    pincode: z.string().trim().min(1, "Pincode is required").max(10),
+    state: optionalText(100),
+    country: optionalText(100),
+    answers: z
+      .record(z.string().max(32), z.string().max(500))
+      .nullish()
+      .transform((v) => v ?? {}),
+  })
+  .superRefine((val, ctx) => {
+    if (!isValidPincode(val.pincode, val.country)) {
+      ctx.addIssue({ code: "custom", path: ["pincode"], message: PINCODE_MESSAGE });
+    }
+  })
+  .transform((val) => ({
+    ...val,
+    pincode: normalizePincode(val.pincode, val.country),
+  }));
+
+export type OrderAddressUpdateInput = z.infer<typeof orderAddressUpdateSchema>;
+
 export const shipmentParamSchema = sellerOrderParamSchema.extend({
   shipmentId: z.string().min(1),
 });

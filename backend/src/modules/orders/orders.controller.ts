@@ -6,6 +6,7 @@ import { optionalCustomerId } from "../../package/auth/index.js";
 import { readUpload } from "../../package/storage/index.js";
 import { COURIERS } from "./couriers.js";
 import {
+  orderAddressUpdateSchema,
   orderCancelSchema,
   idempotencyHeaderSchema,
   orderCreateSchema,
@@ -19,6 +20,7 @@ import {
 } from "./orders.schema.js";
 import * as service from "./orders.service.js";
 import * as shipments from "./shipments.service.js";
+import * as orderAddress from "./orderAddress.service.js";
 
 /**
  * Storefront order endpoints. Placement runs behind `requireCustomer`
@@ -172,6 +174,13 @@ export async function markShipmentReturned(request: FastifyRequest) {
   return ok(
     await shipments.markShipmentReturned(storeActor(request), id, orderId, shipmentId),
   );
+}
+
+/** Correct the delivery address — kept in the order's history, customer told. */
+export async function updateOrderAddress(request: FastifyRequest) {
+  const { id, orderId } = sellerOrderParamSchema.parse(request.params);
+  const input = orderAddressUpdateSchema.parse(request.body);
+  return ok(await orderAddress.updateOrderAddress(storeActor(request), id, orderId, input));
 }
 
 /** The courier list for the "Mark as sent" sheet (public, static). */

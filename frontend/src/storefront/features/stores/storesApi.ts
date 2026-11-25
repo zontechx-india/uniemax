@@ -2574,6 +2574,35 @@ export type OrderStatus =
   | 'DELIVERED'
   | 'CANCELLED'
 
+/** The delivery address as one value — before / after a correction. */
+export interface OrderAddressSnapshot {
+  addressLine: string | null
+  pincode: string | null
+  state: string | null
+  country: string | null
+  /** The store's DELIVERY questions (Post Office, Tehsil…). */
+  answers: { id: string; label: string; value: string }[]
+}
+
+/** The seller (or UnieMax support for them) corrected the delivery address. */
+export interface OrderAddressChange {
+  id: string
+  changedBy: 'SELLER' | 'SUPPORT'
+  changedAt: string
+  before: OrderAddressSnapshot
+  after: OrderAddressSnapshot
+}
+
+/** `PATCH /stores/:id/orders/:orderId/address` — the full address every time. */
+export interface OrderAddressInput {
+  address: string
+  pincode: string
+  state: string | null
+  country: string | null
+  /** DELIVERY question id → answer; blank removes it. */
+  answers: Record<string, string>
+}
+
 export interface PlacedOrder {
   id: string
   orderNumber: string
@@ -2635,6 +2664,9 @@ export interface PlacedOrder {
   items: PlacedOrderItem[]
   /** Parcels the order went out in, oldest first. */
   shipments: OrderShipment[]
+  /** Corrections of the delivery address, oldest first — the seller's view
+   *  only (always empty for the customer). */
+  addressChanges?: OrderAddressChange[]
   /** Order lookup only: true when the viewer is not the customer who placed
    *  the order — contact + delivery fields then come back null. */
   redacted?: boolean
@@ -2825,6 +2857,20 @@ export const sellerOrderApi = {
   ): Promise<PlacedOrder> {
     return call<PlacedOrder>(
       http.post(`${base()}/${storeRef}/orders/${orderId}/shipments`, input),
+    )
+  },
+
+  /**
+   * Correct the delivery address (until the order is delivered). The old
+   * address is kept in `addressChanges`; the customer is told.
+   */
+  async updateAddress(
+    storeRef: string,
+    orderId: string,
+    input: OrderAddressInput,
+  ): Promise<PlacedOrder> {
+    return call<PlacedOrder>(
+      http.patch(`${base()}/${storeRef}/orders/${orderId}/address`, input),
     )
   },
 

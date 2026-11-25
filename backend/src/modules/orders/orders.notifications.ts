@@ -535,6 +535,55 @@ export function notifyTrackingUpdated(
 }
 
 /**
+ * The seller corrected the delivery address (orderAddress.service.ts). The
+ * customer is always told, with the new address in full — if they did not
+ * ask for it, they can reply before the parcel goes to the wrong place.
+ * Push + email; there is no WhatsApp template for it.
+ */
+export function notifyAddressChanged(
+  order: OrderMailData,
+  customerId: string | null,
+  address: string,
+  answers: { label: string; value: string }[],
+): void {
+  const subject = `Delivery address updated for order ${order.orderNumber}`;
+  const line = `${order.storeName} has updated the delivery address for your order.`;
+  const lines = [address, ...answers.map((a) => `${a.label}: ${a.value}`)];
+
+  if (customerId) {
+    notify({
+      principalType: "CUSTOMER",
+      principalId: customerId,
+      kind: "ORDER_STATUS",
+      title: subject,
+      body: `It will be delivered to: ${lines.join(", ")}`,
+      url: `/order/${order.storeSlug}/${order.id}`,
+      data: { orderId: order.id, status: order.status },
+    });
+  }
+
+  void (async () => {
+    const to = await customerAddress(order, customerId);
+    if (!to) return;
+    const url = publicWebUrl ? `${publicWebUrl}/order/${order.storeSlug}/${order.id}` : null;
+    const ask = `If you did not ask for this change, contact ${order.storeName} straight away.`;
+    await sendMail({
+      to,
+      subject,
+      text: `Hi${order.customerName ? ` ${order.customerName}` : ""},\n\n${line}\n\nIt will be delivered to:\n${lines.join("\n")}\n\n${ask}${url ? `\n\nView your order: ${url}` : ""}`,
+      html: wrapHtml(
+        subject,
+        `<p style="margin:0;font-size:14px;color:#444">${escapeHtml(line)}</p>
+         <p style="margin:12px 0 0;font-size:14px;color:#111;line-height:1.5">
+           <strong>It will be delivered to:</strong><br />${lines.map(escapeHtml).join("<br />")}</p>
+         <p style="margin:12px 0 0;font-size:14px;color:#444">${escapeHtml(ask)}</p>
+         ${url ? linkHtml(url, "View your order") : ""}`,
+      ),
+    });
+  })().catch(logFailure("customer address changed"));
+}
+
+/**
  * The buyer cancelled an order the seller had not confirmed yet — the seller
  * must not pack it. A bell/push notification is enough: the order detail
  * already shows the cancellation and its reason.

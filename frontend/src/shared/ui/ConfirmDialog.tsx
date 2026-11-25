@@ -13,7 +13,7 @@ import { ModalShell } from './ModalShell'
  *     confirm.
  *   - `busy` locks both buttons for async confirms and shows the spinner.
  *   - `tone="danger"` gives the confirm the destructive (red) role; `neutral`
- *     the primary role.
+ *     the primary role; `ink` the solid-ink main action (seller tools).
  */
 export function ConfirmDialog({
   open,
@@ -32,8 +32,8 @@ export function ConfirmDialog({
   description: ReactNode
   confirmLabel?: string
   cancelLabel?: string
-  /** `danger` = red confirm (destructive), `neutral` = primary confirm. */
-  tone?: 'danger' | 'neutral'
+  /** `danger` = red confirm (destructive), `neutral` = primary, `ink` = solid ink. */
+  tone?: 'danger' | 'neutral' | 'ink'
   busy?: boolean
   /** Hold the confirm until a question in `description` is answered. */
   confirmDisabled?: boolean
@@ -84,7 +84,7 @@ export function ConfirmDialog({
           {cancelLabel}
         </Button>
         <Button
-          variant={tone === 'danger' ? 'danger' : 'primary'}
+          variant={tone === 'danger' ? 'danger' : tone === 'ink' ? 'ink' : 'primary'}
           size="lg"
           loading={busy}
           disabled={confirmDisabled}

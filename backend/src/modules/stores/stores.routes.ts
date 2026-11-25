@@ -77,6 +77,9 @@ export const storeRoutes: FastifyPluginAsync<StoreRoutesOptions> = async (
   app.get("/:id/orders/:orderId", ordersController.getStoreOrder);
   app.patch("/:id/orders/:orderId/status", ordersController.updateStoreOrderStatus);
   app.post("/:id/orders/:orderId/cancel", ordersController.cancelStoreOrder);
+  // Correct the delivery address (customer gave an incomplete one). Both
+  // mounts: support can fix it for the seller (audited, saved as SUPPORT).
+  app.patch("/:id/orders/:orderId/address", ordersController.updateOrderAddress);
   // Parcels — send with a courier + tracking number, correct the tracking,
   // delivered (optional proof photo, multipart), came back. Both mounts:
   // support can correct a seller's parcel the same way (audited).

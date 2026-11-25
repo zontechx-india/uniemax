@@ -123,7 +123,7 @@ export function ShipDialog({
           <Button type="button" variant="secondary" size="lg" disabled={busy} onClick={onClose}>
             Go back
           </Button>
-          <Button type="submit" form={formId} variant="primary" size="lg" loading={busy}>
+          <Button type="submit" form={formId} variant="ink" size="lg" loading={busy}>
             {busy ? 'Please wait…' : submitLabel}
           </Button>
         </>
