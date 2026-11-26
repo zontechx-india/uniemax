@@ -26,9 +26,8 @@ import { decimalToPaise, paiseToAmount, payoutTotals } from "./payouts.rules.js"
  *     `seller_payout_sent_v2` (13 values, with the payment gateway fee line —
  *     shown as UnieMax's discount when UnieMax pays it) once it is approved
  *     in WhatsApp Manager; until then `seller_payout_sent` (10 values).
- *     An ADVANCE (paid before delivery) uses `seller_advance_sent` (10
- *     values, says it is an advance and what is still to come) once it is
- *     approved; until then it falls back to the templates above.
+ *     An ADVANCE (paid before delivery) always uses `seller_advance_sent`
+ *     (10 values, says it is an advance and what is still to come).
  *     Button = `<slug>/earnings`. Renaming or re-ordering a template in Meta
  *     breaks this — the value order is `payoutParams` / `payoutParamsV2` /
  *     `advanceParams`.
@@ -182,17 +181,13 @@ export function advanceParams(m: PayoutMessage): string[] {
 }
 
 /**
- * An advance → `seller_advance_sent` once Meta lists it as approved.
- * Otherwise v2 once approved; v1 otherwise (also when Meta's list can't be
- * read — v1 is the one known to be approved).
+ * An advance → always `seller_advance_sent`. Otherwise v2 once Meta lists
+ * it as approved; v1 otherwise (also when Meta's list can't be read).
  */
 async function chooseTemplate(m: PayoutMessage, log: FastifyBaseLogger) {
   const templates = env.WA_ENABLED ? await availableTemplates(log) : null;
   const find = (name: string) => templates?.find((t) => t.name === name && t.language === LANGUAGE) ?? null;
-  if (m.isAdvance) {
-    const advance = find(ADVANCE_TEMPLATE);
-    if (advance) return { name: ADVANCE_TEMPLATE, params: advanceParams(m), template: advance };
-  }
+  if (m.isAdvance) return { name: ADVANCE_TEMPLATE, params: advanceParams(m), template: find(ADVANCE_TEMPLATE) };
   const v2 = find(PAYOUT_TEMPLATE_V2);
   if (v2) return { name: PAYOUT_TEMPLATE_V2, params: payoutParamsV2(m), template: v2 };
   return { name: PAYOUT_TEMPLATE, params: payoutParams(m), template: find(PAYOUT_TEMPLATE) };

@@ -386,7 +386,7 @@ It may take a few hours to show in your bank account. Tap below to see all your 
     language: 'en',
     recipient: 'Seller',
     when: 'An advance payout (paid before the order is delivered) is marked Paid out',
-    templateId: 'In review (submitted 27 Nov 2026)',
+    templateId: 'Active (added 27 Nov 2026; ID not recorded yet)',
     body: `Hi {{1}},
 
 UnieMax has sent you an advance of ₹{{2}} for order #{{3}} from your store {{4}}. The order is not delivered yet.
@@ -419,7 +419,7 @@ On delivery, this advance is part of what you earn. If the order is cancelled or
       field: 'Store slug + /earnings',
       example: 'fashion-hub/earnings',
     },
-    note: 'Advances only (docs/seller-finance §9). The backend uses it as soon as WhatsApp Manager lists it as approved; until then advances go out as seller_payout_sent_v2 / seller_payout_sent — no code change on approval.',
+    note: 'Advances only (docs/seller-finance §9) — the backend always sends this one for an advance payout.',
   },
   {
     name: 'uniemax_address_update',

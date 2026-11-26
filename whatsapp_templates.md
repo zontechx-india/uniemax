@@ -9,7 +9,7 @@ Checked in WhatsApp Manager on 27 Nov 2026.
 | Sending phone number | +91 70943 10139 |
 | Phone Number ID | `1297227253483920` |
 | Meta Business ID | `998630909433831` |
-| Total templates | 14 (13 **Active**, `seller_advance_sent` in review) |
+| Total templates | 14 (all **Active**) |
 
 > Templates only work inside the WABA where they were created. Always send from the UnieMax account above.
 > The other account "Zontechx" (`1762129785093231`) has no phone number and cannot send. Ignore any templates there.
@@ -33,7 +33,7 @@ Checked in WhatsApp Manager on 27 Nov 2026.
 | 11 | `uniemax_address_update` | Utility | `en_US` | 3 | – | Customer | 1833517641150563 |
 | 12 | `seller_payout_sent` | Utility | `en` | 10 | URL (dynamic) | Seller | – (approved 6 Nov 2026; ID not recorded yet) |
 | 13 | `seller_payout_sent_v2` | Utility | `en` | 13 | URL (dynamic) | Seller | – (Active, added 6 Nov 2026 — used instead of #12) |
-| 14 | `seller_advance_sent` | Utility | `en` | 10 | URL (dynamic) | Seller | – (In review, submitted 27 Nov 2026 — used for advance payouts automatically once approved) |
+| 14 | `seller_advance_sent` | Utility | `en` | 10 | URL (dynamic) | Seller | – (Active, added 27 Nov 2026 — every advance payout) |
 
 ---
 
@@ -409,9 +409,9 @@ UnieMax seller payouts
 
 ### 5.3 `seller_advance_sent` (advance — paid before delivery)
 
-- **Category:** Utility · **Language:** `en` · **Status:** In review (submitted 27 Nov 2026)
+- **Category:** Utility · **Language:** `en` · **Status:** Active (added 27 Nov 2026)
 - **Send to:** Seller (store business phone, else owner phone) · **When:** an **advance payout** (paid before the order is delivered — docs/seller-finance §9) is marked **Paid out**, automatically or by hand (**Send message**)
-- **The code sends it for advances automatically once Meta approves it**; until then advances get 5.2 / 5.1. No code change needed when it is approved.
+- **The code always sends this one for an advance** (never 5.1 / 5.2).
 - **Header:** none · **Footer:** `UnieMax seller payouts`
 - **Button:** "View earnings" → `https://uniemax.com/mystores/{{1}}`
 

@@ -3914,10 +3914,9 @@ phone, else owner phone; button `<slug>/earnings`. The email shows the
 gateway fee row whenever it is above 0. Once per payout, fire-and-forget. No SMS yet.
 For an advance the email says so ("Advance payout of ₹… sent", the amount
 marked "advance, before delivery", and that a cancelled / refunded order is
-taken back from the next payouts). WhatsApp: `seller_advance_sent` (10
+taken back from the next payouts). WhatsApp: always `seller_advance_sent` (10
 values — amount, order, store, order total, earning, still to come after
-delivery, bank, UTR, date) once Meta lists it as approved, else the payout
-templates above.
+delivery, bank, UTR, date).
 
 #### `GET …/payouts/:payoutId/message/preview?channel=email|whatsapp` · `POST …/payouts/:payoutId/message`
 
