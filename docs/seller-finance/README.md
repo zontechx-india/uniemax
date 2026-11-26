@@ -211,7 +211,8 @@ warning on a cancelled order, the **Paid in advance** balance and tab on
 Seller balances, a **Kind** filter on Seller payouts. Seller: the
 `ADVANCE_PAID` status on Transactions and the order's Money card, a **Paid to
 you in advance** tile on Earnings (only when above 0), "Advance — paid before
-delivery" on the payout, and an email that says it is an advance.
+delivery" on the payout, and an email and WhatsApp that say it is an advance
+(WhatsApp `seller_advance_sent` — submitted to Meta 27 Nov 2026, in review; used automatically once approved — whatsapp_templates.md §5.3).
 
 **Recovery risk.** If a cancelled order's advance can't be taken from later
 payouts (the seller stops selling), OWED still shows it — collecting it is

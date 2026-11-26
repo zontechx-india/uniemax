@@ -9,6 +9,7 @@ import { clean, firstWaId } from "../whatsapp/whatsapp.orderMessages.js";
 import { availableTemplates, sendTemplate } from "../whatsapp/whatsapp.service.js";
 import { fillTemplateBody } from "../whatsapp/whatsapp.templates.js";
 import { getOrderFinancials } from "../finance/finance.service.js";
+import { decimalToPaise, paiseToAmount, payoutTotals } from "./payouts.rules.js";
 
 /**
  * "Your payout was sent" — to the SELLER, the moment a payout becomes
@@ -25,12 +26,17 @@ import { getOrderFinancials } from "../finance/finance.service.js";
  *     `seller_payout_sent_v2` (13 values, with the payment gateway fee line —
  *     shown as UnieMax's discount when UnieMax pays it) once it is approved
  *     in WhatsApp Manager; until then `seller_payout_sent` (10 values).
+ *     An ADVANCE (paid before delivery) uses `seller_advance_sent` (10
+ *     values, says it is an advance and what is still to come) once it is
+ *     approved; until then it falls back to the templates above.
  *     Button = `<slug>/earnings`. Renaming or re-ordering a template in Meta
- *     breaks this — the value order is `payoutParams` / `payoutParamsV2`.
+ *     breaks this — the value order is `payoutParams` / `payoutParamsV2` /
+ *     `advanceParams`.
  */
 
 export const PAYOUT_TEMPLATE = "seller_payout_sent";
 export const PAYOUT_TEMPLATE_V2 = "seller_payout_sent_v2";
+export const ADVANCE_TEMPLATE = "seller_advance_sent";
 const LANGUAGE = "en";
 
 /** "1,349.10" — the ₹ sign is in the template / mail text. */
@@ -81,6 +87,15 @@ async function load(payoutId: string) {
   if (!payout || payout.status !== "SUCCEEDED" || !payout.order.store) return null;
   const fin = await getOrderFinancials(payout.order.id);
   const store = payout.order.store;
+  // What is still to come on the order after this payout (an advance's message says it).
+  const rows = await prisma.orderPayout.findMany({
+    where: { orderId: payout.order.id },
+    select: { status: true, amount: true, duesDeducted: true },
+  });
+  const totals = payoutTotals(
+    fin.sellerEarningPaise,
+    rows.map((row) => ({ status: row.status, amountPaise: decimalToPaise(row.amount), duesPaise: decimalToPaise(row.duesDeducted) })),
+  );
   const profile = resolveProfile(store.profile);
   return {
     sellerName: profile.sellerName ?? store.owner.name ?? "there",
@@ -102,6 +117,10 @@ async function load(payoutId: string) {
     paidOn: paidOn(payout.paidAt, payout.paidAt ? payout.paidAtTimeKnown : true),
     /** Paid before the order was delivered. */
     isAdvance: payout.isAdvance,
+    /** What the seller earns on the order (total − fees). */
+    earning: fin.sellerEarning,
+    /** Earning − everything paid or on its way — what comes after delivery. */
+    stillToCome: paiseToAmount(totals.remaining),
   };
 }
 
@@ -146,13 +165,34 @@ export function payoutParamsV2(m: PayoutMessage): string[] {
   ];
 }
 
+/** `seller_advance_sent` — {{1}}…{{10}}, in WhatsApp Manager's order. */
+export function advanceParams(m: PayoutMessage): string[] {
+  return [
+    clean(m.sellerName),
+    clean(num(m.amount)),
+    clean(m.orderNumber),
+    clean(m.storeName),
+    clean(num(m.orderTotal)),
+    clean(num(m.earning)),
+    clean(num(m.stillToCome)),
+    clean(m.paidTo),
+    clean(m.utr),
+    clean(m.paidOn),
+  ];
+}
+
 /**
- * v2 once Meta lists it as approved; v1 otherwise (also when Meta's list
- * can't be read — v1 is the one known to be approved).
+ * An advance → `seller_advance_sent` once Meta lists it as approved.
+ * Otherwise v2 once approved; v1 otherwise (also when Meta's list can't be
+ * read — v1 is the one known to be approved).
  */
 async function chooseTemplate(m: PayoutMessage, log: FastifyBaseLogger) {
   const templates = env.WA_ENABLED ? await availableTemplates(log) : null;
   const find = (name: string) => templates?.find((t) => t.name === name && t.language === LANGUAGE) ?? null;
+  if (m.isAdvance) {
+    const advance = find(ADVANCE_TEMPLATE);
+    if (advance) return { name: ADVANCE_TEMPLATE, params: advanceParams(m), template: advance };
+  }
   const v2 = find(PAYOUT_TEMPLATE_V2);
   if (v2) return { name: PAYOUT_TEMPLATE_V2, params: payoutParamsV2(m), template: v2 };
   return { name: PAYOUT_TEMPLATE, params: payoutParams(m), template: find(PAYOUT_TEMPLATE) };

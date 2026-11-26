@@ -331,7 +331,7 @@ It may take a few hours to show in your bank account. Tap below to see all your 
       field: 'Store slug + /earnings',
       example: 'fashion-hub/earnings',
     },
-    note: 'Sent by modules/payouts/payouts.notifications.ts, once per payout, alongside an email; also by hand from the order page (Send message). Active since 6 Nov 2026. Replaced automatically by seller_payout_sent_v2 once that is approved.',
+    note: 'Sent by modules/payouts/payouts.notifications.ts, once per payout, alongside an email; also by hand from the order page (Send message). Active since 6 Nov 2026. Now replaced by seller_payout_sent_v2 (approved) — kept as the fallback.',
   },
   {
     name: 'seller_payout_sent_v2',
@@ -340,7 +340,7 @@ It may take a few hours to show in your bank account. Tap below to see all your 
     language: 'en',
     recipient: 'Seller',
     when: 'Same as seller_payout_sent — with the payment gateway fee shown as UnieMax’s discount',
-    templateId: 'To submit in WhatsApp Manager (6 Nov 2026)',
+    templateId: 'Active (added 6 Nov 2026; ID not recorded yet)',
     body: `Hi {{1}},
 
 UnieMax has sent you a payout of ₹{{2}} for order #{{3}} from your store {{4}}.
@@ -377,7 +377,49 @@ It may take a few hours to show in your bank account. Tap below to see all your 
       field: 'Store slug + /earnings',
       example: 'fashion-hub/earnings',
     },
-    note: 'The backend uses this one as soon as WhatsApp Manager lists it as approved, and seller_payout_sent until then — no code change on approval.',
+    note: 'Active — the backend sends this one because WhatsApp Manager lists it as approved; it falls back to seller_payout_sent only if v2 is missing from that list.',
+  },
+  {
+    name: 'seller_advance_sent',
+    group: 'Payout',
+    category: 'Utility',
+    language: 'en',
+    recipient: 'Seller',
+    when: 'An advance payout (paid before the order is delivered) is marked Paid out',
+    templateId: 'In review (submitted 27 Nov 2026)',
+    body: `Hi {{1}},
+
+UnieMax has sent you an advance of ₹{{2}} for order #{{3}} from your store {{4}}. The order is not delivered yet.
+
+Advance details:
+• Order total: ₹{{5}}
+• You earn on this order: ₹{{6}}
+• Still to come after delivery: ₹{{7}}
+• Paid to: {{8}}
+• Reference (UTR): {{9}}
+• Paid on: {{10}}
+
+On delivery, this advance is part of what you earn. If the order is cancelled or refunded, it is taken back from your next payouts. Tap below to see all your earnings.`,
+    footer: 'UnieMax seller payouts',
+    params: [
+      p(1, 'sellerName', 'Seller name', 'Ravi'),
+      p(2, 'amountSent', 'Advance amount sent (number only)', '500.00'),
+      p(3, 'orderId', 'Order number (no #)', '48203917'),
+      p(4, 'storeName', 'Store name', 'Fashion Hub'),
+      p(5, 'orderTotal', 'Order total (number only)', '1,499.00'),
+      p(6, 'earning', 'What the seller earns on the order (number only)', '1,349.10'),
+      p(7, 'stillToCome', 'Still to come after delivery (number only)', '849.10'),
+      p(8, 'paidTo', 'Bank + last 4 digits', 'State Bank of India A/c XX4821'),
+      p(9, 'utr', 'UTR / reference ("NA" if none)', 'HDFCR52026110512345'),
+      p(10, 'paidOn', 'Date (and time) paid', '27 Nov 2026, 2:30 pm'),
+    ],
+    button: {
+      label: 'View earnings',
+      urlPrefix: MYSTORES,
+      field: 'Store slug + /earnings',
+      example: 'fashion-hub/earnings',
+    },
+    note: 'Advances only (docs/seller-finance §9). The backend uses it as soon as WhatsApp Manager lists it as approved; until then advances go out as seller_payout_sent_v2 / seller_payout_sent — no code change on approval.',
   },
   {
     name: 'uniemax_address_update',
