@@ -43,7 +43,8 @@ The first implementation will be for a **Cricket Bat Store**, but the architectu
 - Oversee the seller catalog; hide a listing that breaks the rules
 - Suspend / restore a store; verify a seller's payout account
 - Pay sellers for online orders (record a manual transfer now; PaymentHub
-  payouts once the hub offers them) and track every payout
+  payouts once the hub offers them) and track every payout; for stores you
+  trust, pay before delivery (an advance)
 - Set the platform fee % and the gateway fee % (and who pays it); see every
   seller's balance — what UnieMax owes them, what they owe — and its ledger
 - Block / unblock a customer account
@@ -1080,6 +1081,18 @@ revoked from anywhere else.
   gets an **email** and a **WhatsApp** message with the amount, order,
   platform fee, COD dues adjusted, bank (last 4 digits), UTR and date, and a
   button to their Earnings page. SMS is on hold.
+- **Advance payouts** (rules: docs/seller-finance/README.md §9) — some
+  sellers ask to be paid before delivery. UnieMax may agree, at its own risk,
+  for stores an admin trusts: an **Allow advance payouts** switch per store
+  (off by default; on the order's Seller payout card or the store's finance
+  page, with the risk explained before it is turned on). Then an online, paid
+  order that is not delivered yet can be paid by hand — the full amount the
+  seller earns, or a part, in one or more advances. It is tracked as its own
+  balance (**Paid in advance**). On delivery it comes out of what the seller
+  earns, so only the rest is paid. If the order is cancelled or refunded, the
+  seller owes it back and it is taken from their next payouts (like COD
+  dues). The seller sees "Advance paid" on the order, a **Paid to you in
+  advance** tile on Earnings, and an email that says it is an advance.
 - **Seller finance** (full rules: docs/seller-finance/README.md) — UnieMax
   takes a **platform fee %** on the product price (never shipping), set under
   **Finance → Fee settings** and 0% to start. Customers never see it; sellers

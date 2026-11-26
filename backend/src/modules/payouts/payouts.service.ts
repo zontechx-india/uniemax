@@ -23,7 +23,7 @@ import {
   NEEDS_REASON,
   nextStatuses,
   paiseToAmount,
-  payoutBlockers,
+  payoutPlan,
   payoutTotals,
   type PayoutStatus,
 } from "./payouts.rules.js";
@@ -59,6 +59,11 @@ import {
  *
  * Payout status is separate from the order's status and payment status — it
  * never changes the order.
+ *
+ * Advance payouts (docs/seller-finance/README.md §9): a manual payout on an
+ * online, paid order that is NOT delivered yet, allowed only when the store's
+ * `advancePayoutsAllowed` switch is on. Whether a payout is an advance is
+ * decided under the order lock (`payoutPlan`) and stored as `isAdvance`.
  */
 
 export interface PayoutActor {
@@ -83,6 +88,7 @@ const ORDER_FACTS = {
   storeSlug: true,
   storeName: true,
   deliveredAt: true,
+  store: { select: { advancePayoutsAllowed: true } },
 } satisfies Prisma.OrderSelect;
 
 type OrderFacts = Prisma.OrderGetPayload<{ select: typeof ORDER_FACTS }>;
@@ -123,7 +129,7 @@ async function totalsFor(db: Tx | typeof prisma, order: OrderFacts) {
   const [rows, fin] = await Promise.all([
     db.orderPayout.findMany({
       where: { orderId: order.id },
-      select: { status: true, amount: true, duesDeducted: true, method: true },
+      select: { status: true, amount: true, duesDeducted: true, method: true, isAdvance: true },
     }),
     getOrderFinancials(order.id, db),
   ]);
@@ -209,11 +215,18 @@ export async function getOrderPayouts(orderId: string) {
   ]);
   const { sellerEarningPaise: _, ...financials } = fin;
 
-  const blockers = payoutBlockers(order);
+  const plan = payoutPlan(order, order.store?.advancePayoutsAllowed ?? false);
+  const { blockers } = plan;
+  // Paid (or on its way) before delivery, on this order.
+  const advancePaid = rows
+    .filter((row) => row.isAdvance && (ACTIVE_STATUSES as readonly string[]).includes(row.status))
+    .reduce((acc, row) => acc + decimalToPaise(row.amount), 0n);
   const gatewayInFlight = rows.some(
     (row) => row.method === "GATEWAY" && (IN_FLIGHT_STATUSES as readonly string[]).includes(row.status),
   );
-  const gatewayBlocker = !paymentHubPayoutsEnabled
+  const gatewayBlocker = plan.advance
+    ? "An advance (before delivery) is recorded by hand only — use Record advance payout."
+    : !paymentHubPayoutsEnabled
     ? paymentHubConfigured
       ? "Gateway payouts are not switched on yet — PaymentHub does not offer payouts yet."
       : "PaymentHub is not set up on this server."
@@ -237,12 +250,26 @@ export async function getOrderPayouts(orderId: string) {
       remaining: paiseToAmount(totals.remaining),
       /** The store's COD dues right now — can be taken from this payout. */
       storeDues: balance ? balance.owed.toFixed(2) : "0.00",
-      /** The form's starting split: settle the dues first, send the rest. */
-      suggested: suggestSplit(totals.remaining, balance ? decimalToPaise(balance.owed) : 0n),
+      /** The form's starting split: settle the dues first, send the rest.
+       *  An advance never settles dues — it sends the full amount. */
+      suggested: plan.advance
+        ? { duesDeducted: "0.00", amount: paiseToAmount(totals.remaining) }
+        : suggestSplit(totals.remaining, balance ? decimalToPaise(balance.owed) : 0n),
       financials,
       /** Why no payout can be made at all — empty when one can. */
       blockers,
       canPay: blockers.length === 0 && totals.remaining > 0n,
+      advance: {
+        /** A payout made now is an advance (the order isn't delivered). */
+        now: plan.advance,
+        /** The store's switch. */
+        allowed: order.store?.advancePayoutsAllowed ?? false,
+        /** Only the switch is in the way — the card offers to turn it on. */
+        needsSwitch: plan.needsAdvanceSwitch && order.storeId !== null,
+        /** Paid (or on its way) before delivery on this order. */
+        paid: paiseToAmount(advancePaid),
+      },
+      storeId: order.storeId,
       payee,
       gateway: { available: gatewayBlocker === null, reason: gatewayBlocker },
     },
@@ -267,7 +294,9 @@ const listSelect = {
   failureReason: true,
   createdByEmail: true,
   createdAt: true,
-  order: { select: { id: true, orderNumber: true, storeId: true, storeName: true, total: true } },
+  isAdvance: true,
+  advanceOutcome: true,
+  order: { select: { id: true, orderNumber: true, storeId: true, storeName: true, total: true, status: true } },
 } satisfies Prisma.OrderPayoutSelect;
 
 /** Every payout, newest first — the Payouts page's reconciliation view. */
@@ -275,6 +304,7 @@ export async function listPayouts(query: PayoutListQuery) {
   const where: Prisma.OrderPayoutWhereInput = {};
   if (query.status) where.status = query.status;
   if (query.method) where.method = query.method;
+  if (query.kind) where.isAdvance = query.kind === "ADVANCE";
   if (query.q) {
     where.OR = [
       { utr: { contains: query.q, mode: "insensitive" } },
@@ -404,8 +434,11 @@ export async function recordManualPayout(
     });
     if (repeat) return repeat.id;
 
-    const blockers = payoutBlockers(order);
-    if (blockers.length > 0) throw HttpError.conflict(blockers[0]!);
+    const plan = payoutPlan(order, order.store?.advancePayoutsAllowed ?? false);
+    if (plan.blockers.length > 0) throw HttpError.conflict(plan.blockers[0]!);
+    if (plan.advance && (amountToPaise(input.duesDeducted) ?? 0n) !== 0n) {
+      throw HttpError.conflict("Dues can't be taken from an advance — take them from a payout after delivery.");
+    }
     const { totals } = await totalsFor(tx, order);
     // Lock order: the order row (above), then the store's balance row.
     const owed = order.storeId ? (await lockedBalances(tx, order.storeId)).owed : 0n;
@@ -417,6 +450,7 @@ export async function recordManualPayout(
         orderId,
         method: "MANUAL",
         status: input.status,
+        isAdvance: plan.advance,
         amount: new Prisma.Decimal(paiseToAmount(paise)),
         duesDeducted: new Prisma.Decimal(paiseToAmount(duesPaise)),
         payeeAccountId: payee?.id ?? null,
@@ -441,7 +475,11 @@ export async function recordManualPayout(
             source: "ADMIN",
             actorId: actor.id,
             actorEmail: actor.email,
-            note: duesPaise > 0n ? `Manual payout recorded — ₹${paiseToAmount(duesPaise)} COD dues deducted` : "Manual payout recorded",
+            note: plan.advance
+              ? `Advance payout recorded — order not delivered yet (${order.status.toLowerCase()})`
+              : duesPaise > 0n
+                ? `Manual payout recorded — ₹${paiseToAmount(duesPaise)} COD dues deducted`
+                : "Manual payout recorded",
           },
         },
       },
@@ -536,8 +574,11 @@ export async function triggerGatewayPayout(
     });
     if (repeat) return { id: repeat.id, isNew: false };
 
-    const blockers = payoutBlockers(order);
-    if (blockers.length > 0) throw HttpError.conflict(blockers[0]!);
+    const plan = payoutPlan(order, order.store?.advancePayoutsAllowed ?? false);
+    if (plan.blockers.length > 0) throw HttpError.conflict(plan.blockers[0]!);
+    if (plan.advance) {
+      throw HttpError.conflict("An advance (before delivery) is recorded by hand only — record a manual payout.");
+    }
     const payee = await primaryAccount(tx, order.storeId);
     if (!payee || !order.storeId) throw HttpError.conflict("The store has no primary bank account.");
     if (payee.verificationStatus !== "VERIFIED") {

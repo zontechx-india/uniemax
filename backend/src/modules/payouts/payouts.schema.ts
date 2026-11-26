@@ -111,6 +111,8 @@ export const payoutListQuery = paginationQuery.extend({
   q: z.string().trim().min(1).max(100).optional(),
   status: z.enum(["PENDING", "PROCESSING", "SUCCEEDED", "FAILED", "REVERSED", "CANCELLED"]).optional(),
   method: z.enum(["MANUAL", "GATEWAY"]).optional(),
+  /** ADVANCE = paid before delivery · STANDARD = after. */
+  kind: z.enum(["ADVANCE", "STANDARD"]).optional(),
 });
 
 export const awaitingPayoutQuery = paginationQuery.extend({

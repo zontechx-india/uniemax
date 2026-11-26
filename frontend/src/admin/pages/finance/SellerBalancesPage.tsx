@@ -10,14 +10,16 @@ import { StatTile } from '../../ui/StatTile'
 import { formatMoneyExact } from '../../ui/format'
 
 /**
- * Seller balances — what UnieMax owes each seller and what each seller owes
- * UnieMax, from the seller ledger. A row opens that seller's full ledger.
+ * Seller balances — what UnieMax owes each seller, what each seller owes
+ * UnieMax, and what was paid ahead of delivery (advances, UnieMax's risk),
+ * from the seller ledger. A row opens that seller's full ledger.
  */
 
 const TABS = [
   { value: '', label: 'All' },
   { value: 'PAYABLE', label: 'We owe them' },
   { value: 'OWED', label: 'They owe us' },
+  { value: 'ADVANCE', label: 'Paid in advance' },
 ] as const
 
 export default function SellerBalancesPage() {
@@ -50,6 +52,12 @@ export default function SellerBalancesPage() {
       ),
     },
     {
+      header: 'Paid in advance',
+      hideOnMobile: true,
+      className: 'text-right',
+      cell: (row) => <span className="font-figure text-muted">{formatMoneyExact(row.advance)}</span>,
+    },
+    {
       header: 'Net to seller',
       hideOnMobile: true,
       className: 'text-right',
@@ -63,14 +71,19 @@ export default function SellerBalancesPage() {
         title="Seller balances"
         subtitle="From delivered orders, payouts and COD platform fees. Pay a seller from the order page."
       />
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="We owe sellers" value={totals.data ? formatMoneyExact(totals.data.payable) : '—'} hint="Ready to pay" />
         <StatTile label="Being paid" value={totals.data ? formatMoneyExact(totals.data.inPayout) : '—'} hint="Payouts not finished" />
         <StatTile
           label="Sellers owe us"
           value={totals.data ? formatMoneyExact(totals.data.owed) : '—'}
-          hint="COD platform fees not settled"
+          hint="COD fees and advances to recover"
           tone={totals.data && Number(totals.data.owed) > 0 ? 'warning' : 'default'}
+        />
+        <StatTile
+          label="Paid in advance"
+          value={totals.data ? formatMoneyExact(totals.data.advance) : '—'}
+          hint="Orders not delivered yet — at our risk"
         />
       </div>
       {/* Edge to edge on a phone, like a native list; a card from `sm`. */}
@@ -115,6 +128,11 @@ export default function SellerBalancesPage() {
                 {Number(row.owed) > 0 ? (
                   <span>
                     They owe <span className="font-figure text-warning">{formatMoneyExact(row.owed)}</span>
+                  </span>
+                ) : null}
+                {Number(row.advance) > 0 ? (
+                  <span>
+                    Advance <span className="font-figure text-fg">{formatMoneyExact(row.advance)}</span>
                   </span>
                 ) : null}
               </p>

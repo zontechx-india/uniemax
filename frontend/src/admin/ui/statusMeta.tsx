@@ -1,6 +1,7 @@
 import { Chip } from './primitives'
 import type { ChipTone } from './primitives'
 import type {
+  AdvanceOutcome,
   BankVerificationStatus,
   OrderStatus,
   PaymentMethod,
@@ -107,6 +108,17 @@ export function PayoutStatusChip({ status }: { status: PayoutStatus }) {
 
 export function PayoutMethodChip({ method }: { method: PayoutMethod }) {
   return <Chip>{method === 'MANUAL' ? 'Manual' : 'PaymentHub'}</Chip>
+}
+
+/**
+ * A payout made before delivery, and where it stands: still open (the order
+ * isn't delivered), cleared by delivery, or to recover (order cancelled /
+ * refunded — the seller owes it back).
+ */
+export function AdvanceChip({ outcome }: { outcome: AdvanceOutcome | null }) {
+  if (outcome === 'DUES') return <Chip tone="warning">Advance · to recover</Chip>
+  if (outcome === 'SETTLED') return <Chip>Advance · delivered</Chip>
+  return <Chip tone="info">Advance</Chip>
 }
 
 /** Published / Draft / Suspended — suspension outranks the publish flag. */

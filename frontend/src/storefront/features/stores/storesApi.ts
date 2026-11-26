@@ -1431,7 +1431,8 @@ export interface SellerLedgerRow {
 }
 
 export interface SellerEarnings {
-  balance: { payable: string; inPayout: string; owed: string; net: string }
+  /** `advance` = paid to the seller before delivery, not cleared yet. */
+  balance: { payable: string; inPayout: string; owed: string; advance: string; net: string }
   delivered: Record<'online' | 'cod', { orders: number; sales: string; platformFees: string; gatewayFees: string }>
   rates: { platform: { percent: string }; gateway: { percent: string; bearer: 'SELLER' | 'PLATFORM' } }
   ledger: { rows: SellerLedgerRow[]; meta: ListMeta }
@@ -1443,6 +1444,8 @@ export interface SellerEarnings {
     paidAt: string | null
     paidAtTimeKnown: boolean
     utr: string | null
+    /** Paid before the order was delivered. */
+    isAdvance: boolean
     createdAt: string
     order: { id: string; orderNumber: string }
   }[]
@@ -1451,6 +1454,8 @@ export interface SellerEarnings {
 /** Where one order's money stands (docs/seller-finance §Transactions). */
 export type SettlementStatus =
   | 'AWAITING_DELIVERY'
+  /** Some was paid before delivery. */
+  | 'ADVANCE_PAID'
   | 'READY_TO_PAY'
   | 'ON_ITS_WAY'
   | 'PARTLY_SETTLED'
@@ -1496,6 +1501,9 @@ export interface SellerTransaction {
     duesDeducted: string
     remaining: string
     lastPayoutFailed: boolean
+    /** Paid before delivery (part of paidOut / onItsWay). On a cancelled /
+     *  refunded order, what the seller pays back. */
+    advance: string
     paidAt: string | null
     paidAtTimeKnown: boolean
     utr: string | null

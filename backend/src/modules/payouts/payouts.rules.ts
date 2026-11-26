@@ -92,8 +92,39 @@ export function payoutBlockers(order: PayoutOrderFacts): string[] {
     );
   }
   if (order.status === "CANCELLED") blockers.push("The order is cancelled.");
-  else if (order.status !== "DELIVERED") blockers.push("Waiting for delivery — pay the seller once the order is delivered.");
+  else if (order.status !== "DELIVERED") blockers.push(WAITING_FOR_DELIVERY);
   return blockers;
+}
+
+const WAITING_FOR_DELIVERY = "Waiting for delivery — pay the seller once the order is delivered.";
+
+export interface PayoutPlan {
+  /** A payout made now is an ADVANCE — the order isn't delivered yet. */
+  advance: boolean;
+  /** Why no payout can be made now — empty when one can. */
+  blockers: string[];
+  /** The only thing in the way is the store's advance switch (off). */
+  needsAdvanceSwitch: boolean;
+}
+
+/**
+ * What a payout made now would be. Delivered → a normal payout
+ * (`payoutBlockers`). Paid online, not delivered and not cancelled → an
+ * ADVANCE, allowed only when the store's `advancePayoutsAllowed` is on
+ * (UnieMax's own risk, docs/seller-finance/README.md §9).
+ */
+export function payoutPlan(order: PayoutOrderFacts, advanceAllowed: boolean): PayoutPlan {
+  const blockers = payoutBlockers(order);
+  const waiting = blockers.includes(WAITING_FOR_DELIVERY);
+  if (!waiting) return { advance: false, blockers, needsAdvanceSwitch: false };
+  const others = blockers.filter((b) => b !== WAITING_FOR_DELIVERY);
+  if (others.length > 0) return { advance: true, blockers: others, needsAdvanceSwitch: false };
+  if (advanceAllowed) return { advance: true, blockers: [], needsAdvanceSwitch: false };
+  return {
+    advance: true,
+    blockers: ["Waiting for delivery — pay the seller once the order is delivered, or allow advance payouts for this store."],
+    needsAdvanceSwitch: true,
+  };
 }
 
 // ---------------------------------------------------------------------------

@@ -65,6 +65,7 @@ async function load(payoutId: string) {
       paidAt: true,
       paidAtTimeKnown: true,
       utr: true,
+      isAdvance: true,
       order: {
         select: {
           id: true,
@@ -99,6 +100,8 @@ async function load(payoutId: string) {
     paidTo: payout.payeeBank ? `${payout.payeeBank} A/c XX${payout.payeeLast4 ?? ""}` : "your bank account",
     utr: payout.utr,
     paidOn: paidOn(payout.paidAt, payout.paidAt ? payout.paidAtTimeKnown : true),
+    /** Paid before the order was delivered. */
+    isAdvance: payout.isAdvance,
   };
 }
 
@@ -155,6 +158,10 @@ async function chooseTemplate(m: PayoutMessage, log: FastifyBaseLogger) {
   return { name: PAYOUT_TEMPLATE, params: payoutParams(m), template: find(PAYOUT_TEMPLATE) };
 }
 
+/** Why an advance is different — said once in the mail. */
+const ADVANCE_NOTE =
+  "This is an advance: the order is not delivered yet. If it is cancelled or refunded, this amount is taken back from your next payouts.";
+
 function payoutMail(m: PayoutMessage, to: string) {
   const earningsUrl = publicWebUrl ? `${publicWebUrl}/mystores/${m.slug}/earnings` : null;
   const gateway: [string, string][] =
@@ -166,22 +173,22 @@ function payoutMail(m: PayoutMessage, to: string) {
     ["Platform fee", `₹${num(m.platformFee)}`],
     ...gateway,
     ...(Number(m.dues) > 0 ? ([["COD dues adjusted", `₹${num(m.dues)}`]] as [string, string][]) : []),
-    ["Amount sent", `₹${num(m.amount)}`],
+    ["Amount sent", `₹${num(m.amount)}${m.isAdvance ? " (advance, before delivery)" : ""}`],
     ["Paid to", m.paidTo],
     ["Reference (UTR)", m.utr ?? "—"],
     ["Paid on", m.paidOn],
   ];
   return {
     to,
-    subject: `Payout of ₹${num(m.amount)} sent — order ${m.orderNumber}`,
-    text: `Hi ${m.sellerName},\n\nUnieMax has sent you a payout of ₹${num(m.amount)} for order ${m.orderNumber} from ${m.storeName}.\n\n${rows
+    subject: `${m.isAdvance ? "Advance payout" : "Payout"} of ₹${num(m.amount)} sent — order ${m.orderNumber}`,
+    text: `Hi ${m.sellerName},\n\nUnieMax has sent you ${m.isAdvance ? "an advance" : "a payout"} of ₹${num(m.amount)} for order ${m.orderNumber} from ${m.storeName}.${m.isAdvance ? ` ${ADVANCE_NOTE}` : ""}\n\n${rows
       .map(([label, value]) => `${label}: ${value}`)
       .join("\n")}\n\nIt may take a few hours to show in your bank account.${earningsUrl ? `\n\nSee all your earnings: ${earningsUrl}` : ""}`,
     html: wrapHtml(
       "Your payout has been sent",
       `<p style="margin:0;font-size:14px;color:#444">Hi ${m.sellerName}, UnieMax has sent you
          <strong>₹${num(m.amount)}</strong> for order <strong>${m.orderNumber}</strong> from
-         <strong>${m.storeName}</strong>.</p>
+         <strong>${m.storeName}</strong>.${m.isAdvance ? ` ${ADVANCE_NOTE}` : ""}</p>
        <table style="margin:12px 0 0;font-size:14px;color:#444;border-collapse:collapse">
          ${rows
            .map(

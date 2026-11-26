@@ -8,6 +8,7 @@ import { SELLER_VISIBLE } from "../orders/orders.service.js";
 import {
   bpToPercent,
   computeFinancials,
+  nextAdvanceOutcome,
   orderLegs,
   paiseToAmount,
   payoutLegs,
@@ -248,6 +249,8 @@ export async function postDeliveredOrder(orderId: string): Promise<"posted" | "s
     );
     await postLegs(tx, order.storeId, legs);
     await tx.orderFinancials.update({ where: { orderId }, data: { postedAt: new Date() } });
+    // Advances paid before delivery now come out of this earning.
+    await syncOrderAdvances(tx, orderId);
     return "posted";
   });
 }
@@ -269,11 +272,30 @@ export async function syncPayoutLedger(tx: Tx, payoutId: string): Promise<void> 
       status: true,
       amount: true,
       duesDeducted: true,
-      order: { select: { id: true, orderNumber: true, storeId: true } },
+      isAdvance: true,
+      advanceOutcome: true,
+      order: {
+        select: {
+          id: true,
+          orderNumber: true,
+          storeId: true,
+          status: true,
+          paymentStatus: true,
+          financials: { select: { postedAt: true } },
+        },
+      },
       events: { where: { toStatus: "SUCCEEDED" }, select: { id: true }, take: 1 },
     },
   });
   if (!payout) return;
+  // An advance is cleared once its order ends (delivered, or cancelled /
+  // refunded) — decided here, once, and kept on the row.
+  const advanceOutcome = payout.isAdvance
+    ? nextAdvanceOutcome(payout.advanceOutcome, payout.status, {
+        posted: Boolean(payout.order.financials?.postedAt),
+        ended: advanceOrderEnded(payout.order),
+      })
+    : null;
   if (payout.order.storeId) {
     // The payouts module posts the order's own earning (postDeliveredOrder)
     // before it creates a payout, so the sale is on the ledger first.
@@ -285,10 +307,43 @@ export async function syncPayoutLedger(tx: Tx, payoutId: string): Promise<void> 
       amountPaise: decimalToPaise(payout.amount),
       duesPaise: decimalToPaise(payout.duesDeducted),
       wasPaid: payout.events.length > 0,
+      isAdvance: payout.isAdvance,
+      advanceOutcome,
     });
     await postLegs(tx, payout.order.storeId, legs);
   }
-  await tx.orderPayout.update({ where: { id: payout.id }, data: { ledgerStatus: payout.status } });
+  await tx.orderPayout.update({
+    where: { id: payout.id },
+    data: { ledgerStatus: payout.status, ...(advanceOutcome !== payout.advanceOutcome ? { advanceOutcome } : {}) },
+  });
+}
+
+/** The advanced order ended without delivery: the customer gets (or got) the money back. */
+function advanceOrderEnded(order: { status: string; paymentStatus: string }): boolean {
+  return order.status === "CANCELLED" || order.paymentStatus === "REFUNDED";
+}
+
+/** Bring every advance on one order in line (inside the caller's transaction). */
+async function syncOrderAdvances(tx: Tx, orderId: string): Promise<void> {
+  const advances = await tx.orderPayout.findMany({
+    where: { orderId, isAdvance: true, advanceOutcome: null },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  for (const { id } of advances) await syncPayoutLedger(tx, id);
+}
+
+/**
+ * The order was cancelled or refunded: any advance on it becomes the
+ * seller's dues. Called from the order-status event; the sweep catches the
+ * rest (refunds included). Idempotent.
+ */
+export async function resolveOrderAdvances(orderId: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    // Order row first, then the balance row — the lock order used everywhere.
+    await tx.$queryRaw`SELECT "id" FROM "public"."orders" WHERE "id" = ${orderId} FOR UPDATE`;
+    await syncOrderAdvances(tx, orderId);
+  });
 }
 
 /** The store's balances, locked — payouts read the seller's dues with this. */
@@ -336,6 +391,28 @@ export async function sweep(log: FastifyBaseLogger): Promise<{ orders: number; p
       log.error({ err, payoutId: id }, "finance sweep: payout sync failed");
     }
   }
+  // Advances whose order has ended (delivered + posted, cancelled or
+  // refunded) but that are not cleared yet — a missed event.
+  const openAdvances = await prisma.orderPayout.findMany({
+    where: {
+      isAdvance: true,
+      advanceOutcome: null,
+      status: { in: ["PENDING", "PROCESSING", "SUCCEEDED"] },
+      order: {
+        OR: [{ status: "CANCELLED" }, { paymentStatus: "REFUNDED" }, { financials: { postedAt: { not: null } } }],
+      },
+    },
+    take: SWEEP_BATCH,
+    select: { orderId: true },
+  });
+  for (const orderId of new Set(openAdvances.map((row) => row.orderId))) {
+    try {
+      await resolveOrderAdvances(orderId);
+      syncedPayouts += 1;
+    } catch (err) {
+      log.error({ err, orderId }, "finance sweep: advance clearing failed");
+    }
+  }
   return { orders: postedOrders, payouts: syncedPayouts };
 }
 
@@ -345,10 +422,20 @@ export async function sweep(log: FastifyBaseLogger): Promise<{ orders: number; p
 
 const money = (value: Prisma.Decimal) => value.toFixed(2);
 
-function shapeBalance(row: { payable: Prisma.Decimal; inPayout: Prisma.Decimal; owed: Prisma.Decimal; updatedAt: Date } | null) {
-  if (!row) return { payable: "0.00", inPayout: "0.00", owed: "0.00", net: "0.00", updatedAt: null };
+function shapeBalance(
+  row: { payable: Prisma.Decimal; inPayout: Prisma.Decimal; owed: Prisma.Decimal; advance: Prisma.Decimal; updatedAt: Date } | null,
+) {
+  if (!row) return { payable: "0.00", inPayout: "0.00", owed: "0.00", advance: "0.00", net: "0.00", updatedAt: null };
   const net = decimalToPaise(row.payable) - decimalToPaise(row.owed);
-  return { payable: money(row.payable), inPayout: money(row.inPayout), owed: money(row.owed), net: paiseToAmount(net), updatedAt: row.updatedAt };
+  return {
+    payable: money(row.payable),
+    inPayout: money(row.inPayout),
+    owed: money(row.owed),
+    /** Paid ahead on orders not delivered yet — not part of `net`. */
+    advance: money(row.advance),
+    net: paiseToAmount(net),
+    updatedAt: row.updatedAt,
+  };
 }
 
 /** Every store with a balance row, largest amounts first. */
@@ -364,6 +451,7 @@ export async function listBalances(query: BalanceListQuery) {
     ...(storeFilter ? { storeId: { in: storeFilter.map((s) => s.id) } } : {}),
     ...(query.filter === "PAYABLE" ? { payable: { gt: 0 } } : {}),
     ...(query.filter === "OWED" ? { owed: { gt: 0 } } : {}),
+    ...(query.filter === "ADVANCE" ? { advance: { gt: 0 } } : {}),
   };
   const [total, rows, sums] = await Promise.all([
     prisma.sellerBalance.count({ where }),
@@ -373,7 +461,7 @@ export async function listBalances(query: BalanceListQuery) {
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     }),
-    prisma.sellerBalance.aggregate({ where, _sum: { payable: true, inPayout: true, owed: true } }),
+    prisma.sellerBalance.aggregate({ where, _sum: { payable: true, inPayout: true, owed: true, advance: true } }),
   ]);
   const stores = await prisma.store.findMany({
     where: { id: { in: rows.map((row) => row.storeId) } },
@@ -391,6 +479,7 @@ export async function listBalances(query: BalanceListQuery) {
       payable: money(sums._sum.payable ?? new Prisma.Decimal(0)),
       inPayout: money(sums._sum.inPayout ?? new Prisma.Decimal(0)),
       owed: money(sums._sum.owed ?? new Prisma.Decimal(0)),
+      advance: money(sums._sum.advance ?? new Prisma.Decimal(0)),
     },
     meta: buildListMeta(total, query.page, query.pageSize),
   };
@@ -399,7 +488,7 @@ export async function listBalances(query: BalanceListQuery) {
 /** One store's money: balances, fee totals, rates. */
 export async function getStoreFinance(storeId: string) {
   const [store, balance, fees, rates] = await Promise.all([
-    prisma.store.findUnique({ where: { id: storeId }, select: { id: true, name: true, slug: true } }),
+    prisma.store.findUnique({ where: { id: storeId }, select: { id: true, name: true, slug: true, advancePayoutsAllowed: true } }),
     prisma.sellerBalance.findUnique({ where: { storeId } }),
     prisma.orderFinancials.groupBy({
       by: ["paymentMethod"],
@@ -423,7 +512,9 @@ export async function getStoreFinance(storeId: string) {
     };
   };
   return {
-    store: store ?? { id: storeId, name: "(deleted store)", slug: null },
+    store: store ? { id: store.id, name: store.name, slug: store.slug } : { id: storeId, name: "(deleted store)", slug: null },
+    /** UnieMax may pay this seller before delivery (§9). */
+    advancePayoutsAllowed: store?.advancePayoutsAllowed ?? false,
     balance: shapeBalance(balance),
     /** Delivered orders only (they are the ones on the ledger). */
     delivered: { online: pick("ONLINE"), cod: pick("COD") },
@@ -456,6 +547,18 @@ export async function listLedger(storeId: string, query: LedgerListQuery) {
     rows: rows.map((row) => ({ ...row, orderNumber: row.orderId ? (numbers.get(row.orderId) ?? null) : null })),
     meta: buildListMeta(total, query.page, query.pageSize),
   };
+}
+
+/**
+ * Let (or stop) UnieMax paying this seller before delivery. Turning it off
+ * stops new advances only — ones already paid stay and clear as normal.
+ */
+export async function setAdvancePayouts(storeId: string, allowed: boolean) {
+  const store = await prisma.store.findUnique({ where: { id: storeId }, select: { advancePayoutsAllowed: true } });
+  if (!store) throw HttpError.notFound("Store not found");
+  const changed = store.advancePayoutsAllowed !== allowed;
+  if (changed) await prisma.store.update({ where: { id: storeId }, data: { advancePayoutsAllowed: allowed } });
+  return { storeId, advancePayoutsAllowed: allowed, changed };
 }
 
 /** An admin's correction — a new entry with a reason, never an edit. */
@@ -497,6 +600,7 @@ export async function getSellerEarnings(storeId: string, page: number, pageSize:
         paidAtTimeKnown: true,
         utr: true,
         method: true,
+        isAdvance: true,
         createdAt: true,
         order: { select: { id: true, orderNumber: true } },
       },
@@ -520,7 +624,7 @@ const TRANSACTION_SELECT = {
   deliveredAt: true,
   financials: true,
   payouts: {
-    select: { status: true, amount: true, duesDeducted: true, paidAt: true, paidAtTimeKnown: true, utr: true, createdAt: true },
+    select: { status: true, amount: true, duesDeducted: true, paidAt: true, paidAtTimeKnown: true, utr: true, createdAt: true, isAdvance: true },
     orderBy: { createdAt: "asc" },
   },
   fulfilment: true,
@@ -559,6 +663,11 @@ function shapeTransaction(order: OrderForTransaction, rules: Awaited<ReturnType<
     refunds,
   });
   const lastPaid = [...payouts].reverse().find((p) => p.status === "SUCCEEDED") ?? null;
+  // Paid (or on its way) before delivery. On an order that ended without
+  // delivery this is what the seller owes back.
+  const advancePaise = payouts
+    .filter((p) => p.isAdvance && (p.status === "SUCCEEDED" || p.status === "PENDING" || p.status === "PROCESSING"))
+    .reduce((acc, p) => acc + decimalToPaise(p.amount), 0n);
   const refundedPaise = refunds
     .filter((r) => r.status === "SUCCEEDED")
     .reduce((acc, r) => acc + decimalToPaise(r.amount), 0n);
@@ -588,6 +697,8 @@ function shapeTransaction(order: OrderForTransaction, rules: Awaited<ReturnType<
       duesDeducted: paiseToAmount(settlement.totals.duesDeducted),
       remaining: paiseToAmount(settlement.totals.remaining),
       lastPayoutFailed: settlement.lastPayoutFailed,
+      /** Paid before delivery (part of paidOut / onItsWay). */
+      advance: paiseToAmount(advancePaise),
       paidAt: lastPaid?.paidAt ?? null,
       paidAtTimeKnown: lastPaid?.paidAtTimeKnown ?? false,
       utr: lastPaid?.utr ?? null,

@@ -39,12 +39,12 @@ export const feeRuleCreateSchema = z.object({
 
 export const balanceListQuery = paginationQuery.extend({
   q: z.string().trim().min(1).max(100).optional(),
-  /** PAYABLE = we owe them · OWED = they owe us. */
-  filter: z.enum(["PAYABLE", "OWED"]).optional(),
+  /** PAYABLE = we owe them · OWED = they owe us · ADVANCE = paid ahead of delivery. */
+  filter: z.enum(["PAYABLE", "OWED", "ADVANCE"]).optional(),
 });
 
 export const ledgerListQuery = paginationQuery.extend({
-  bucket: z.enum(["PAYABLE", "IN_PAYOUT", "OWED"]).optional(),
+  bucket: z.enum(["PAYABLE", "IN_PAYOUT", "OWED", "ADVANCE"]).optional(),
   type: z
     .enum([
       "ORDER_SALE",
@@ -58,6 +58,9 @@ export const ledgerListQuery = paginationQuery.extend({
       "PAYOUT_RELEASED",
       "PAYOUT_RETURNED",
       "ADJUSTMENT",
+      "ADVANCE_PAID",
+      "ADVANCE_SETTLED",
+      "ADVANCE_TO_DUES",
     ])
     .optional(),
   from: z.coerce.date().optional(),
@@ -95,6 +98,9 @@ export const transactionListQuery = paginationQuery
   .refine((v) => !v.from || !v.to || v.from <= v.to, { message: "The start date is after the end date", path: ["from"] });
 
 export const storeIdParams = z.object({ storeId: z.string().min(1) });
+
+/** Let (or stop) UnieMax paying this store before delivery. */
+export const advancePayoutsSchema = z.object({ allowed: z.boolean() });
 
 export type FeeRuleCreateInput = z.infer<typeof feeRuleCreateSchema>;
 export type BalanceListQuery = z.infer<typeof balanceListQuery>;

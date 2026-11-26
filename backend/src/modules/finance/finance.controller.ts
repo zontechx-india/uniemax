@@ -66,6 +66,21 @@ export async function addAdjustment(request: FastifyRequest) {
   return ok(result);
 }
 
+export async function setAdvancePayouts(request: FastifyRequest) {
+  const { storeId } = schema.storeIdParams.parse(request.params);
+  const { allowed } = schema.advancePayoutsSchema.parse(request.body);
+  const result = await service.setAdvancePayouts(storeId, allowed);
+  if (result.changed) {
+    recordAudit(request, {
+      action: "finance.advancePayouts",
+      entityType: "store",
+      entityId: storeId,
+      meta: { allowed },
+    });
+  }
+  return ok(result);
+}
+
 export async function getOrderFinancials(request: FastifyRequest) {
   const { id } = idParamSchema.parse(request.params);
   const { sellerEarningPaise: _, ...fin } = await service.getOrderFinancials(id);

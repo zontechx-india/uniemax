@@ -11,6 +11,7 @@ import type {
 } from '../../features/adminApi'
 import { Tabs } from '../../ui/Toolbar'
 import { EmailPreview, WhatsAppPreview } from './OrderMessagesCard'
+import { AdvanceSwitchDialog } from '../finance/AdvanceSwitchDialog'
 import { useAdminQuery } from '../../features/useAdminQuery'
 import { Dialog } from '../../../shared/ui/Dialog'
 import { Alert } from '../../../shared/ui/Alert'
@@ -24,7 +25,7 @@ import {
   TextArea,
   TextInput,
 } from '../../ui/primitives'
-import { BankStatusChip, PayoutMethodChip, PayoutStatusChip, payoutStatusLabel } from '../../ui/statusMeta'
+import { AdvanceChip, BankStatusChip, PayoutMethodChip, PayoutStatusChip, payoutStatusLabel } from '../../ui/statusMeta'
 import { formatDate, formatDateTime, formatMoneyExact } from '../../ui/format'
 
 /**
@@ -35,6 +36,11 @@ import { formatDate, formatDateTime, formatMoneyExact } from '../../ui/format'
  *   - Record manual payout: the admin already sent the money from a savings
  *     account and writes down what happened.
  *   - Pay via PaymentHub: the hub sends it (off until the hub offers payouts).
+ *
+ * Advance (docs/seller-finance §9): when the store's "allow advance payouts"
+ * switch is on, an online-paid order that is NOT delivered yet can be paid
+ * now, by hand only. The card says plainly that it is UnieMax's risk; if the
+ * switch is off it offers to turn it on (with a confirmation) right here.
  *
  * The server owns every number here (totals, what is left, what is allowed);
  * the page never does money maths.
@@ -58,7 +64,11 @@ const errorText = (err: unknown, fallback: string) => (err instanceof Error ? er
 export function OrderPayoutCard({ orderId }: { orderId: string }) {
   const { data, loading, error, refresh } = useAdminQuery(() => adminApi.getOrderPayouts(orderId), [orderId])
   const [dialog, setDialog] = useState<
-    { kind: 'manual' } | { kind: 'gateway' } | { kind: 'status'; payout: Payout } | null
+    | { kind: 'manual' }
+    | { kind: 'gateway' }
+    | { kind: 'status'; payout: Payout }
+    | { kind: 'advance-switch'; allow: boolean }
+    | null
   >(null)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -95,8 +105,32 @@ export function OrderPayoutCard({ orderId }: { orderId: string }) {
             </>
           ) : null}
 
-          {data.summary.blockers.length > 0 ? (
+          <AdvanceToRecover data={data} />
+
+          {data.summary.advance.needsSwitch ? (
+            <Alert tone="info" title="Not delivered yet">
+              <p>Pay the seller after delivery — or, if you trust this seller, allow advance payouts for the store and pay now.</p>
+              <div className="mt-2">
+                <Button onClick={() => setDialog({ kind: 'advance-switch', allow: true })}>Allow advance payouts</Button>
+              </div>
+            </Alert>
+          ) : data.summary.blockers.length > 0 ? (
             <Alert tone="info">{data.summary.blockers.join(' ')}</Alert>
+          ) : data.summary.canPay && data.summary.advance.now ? (
+            <div className="space-y-2">
+              <Alert tone="warning" title="Advance — the order is not delivered yet">
+                Paying now is at UnieMax&apos;s risk. If the order is cancelled or refunded, the seller owes this money
+                back and it is taken from their next payouts. On delivery it comes out of what the seller earns.
+              </Alert>
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                <Button variant="primary" onClick={() => setDialog({ kind: 'manual' })}>
+                  Record advance payout
+                </Button>
+                <Button variant="ghost" onClick={() => setDialog({ kind: 'advance-switch', allow: false })}>
+                  Stop advances for this store
+                </Button>
+              </div>
+            </div>
           ) : data.summary.canPay ? (
             <div className="space-y-2">
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -148,7 +182,19 @@ export function OrderPayoutCard({ orderId }: { orderId: string }) {
           summary={data.summary}
           onClose={() => setDialog(null)}
           onSaved={(payout) =>
-            done(`Payout of ${formatMoneyExact(payout.amount)} recorded as ${payoutStatusLabel(payout.status).toLowerCase()}.`)
+            done(
+              `${payout.isAdvance ? 'Advance' : 'Payout'} of ${formatMoneyExact(payout.amount)} recorded as ${payoutStatusLabel(payout.status).toLowerCase()}.`,
+            )
+          }
+        />
+      ) : null}
+      {data && dialog?.kind === 'advance-switch' && data.summary.storeId ? (
+        <AdvanceSwitchDialog
+          storeId={data.summary.storeId}
+          allow={dialog.allow}
+          onClose={() => setDialog(null)}
+          onSaved={(allowed) =>
+            done(allowed ? 'Advance payouts are allowed for this store.' : 'Advance payouts are stopped for this store.')
           }
         />
       ) : null}
@@ -186,6 +232,7 @@ function Totals({ summary }: { summary: Summary }) {
     { label: feeLabel, value: summary.platformFee },
     { label: 'Seller earns', value: summary.sellerEarning },
     { label: 'Paid out', value: summary.paidOut },
+    ...(Number(summary.advance.paid) > 0 ? [{ label: 'of which in advance', value: summary.advance.paid }] : []),
     ...(Number(summary.duesDeducted) > 0 ? [{ label: 'COD dues deducted', value: summary.duesDeducted }] : []),
     { label: 'In progress', value: summary.inProgress },
     { label: 'Left to pay', value: summary.remaining, strong: true },
@@ -242,6 +289,23 @@ function PayTo({ summary }: { summary: Summary }) {
   )
 }
 
+/**
+ * The order ended without delivery after an advance: the seller owes it
+ * back. Says so plainly — the money is recovered from later payouts.
+ */
+function AdvanceToRecover({ data }: { data: OrderPayouts }) {
+  const toRecover = data.payouts.some(
+    (p) => p.isAdvance && p.advanceOutcome === 'DUES' && (p.status === 'SUCCEEDED' || p.status === 'PENDING' || p.status === 'PROCESSING'),
+  )
+  if (!toRecover) return null
+  return (
+    <Alert tone="warning" title={`${formatMoneyExact(data.summary.advance.paid)} paid in advance — to recover`}>
+      This order ended without delivery. The seller owes the advance back; it is taken from their next payouts
+      (it shows as dues). Or record a correction on the store&apos;s finance page if they pay it back directly.
+    </Alert>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // History
 // ---------------------------------------------------------------------------
@@ -292,6 +356,7 @@ function PayoutItem({
           <span className="font-figure text-base font-semibold text-fg">{formatMoneyExact(payout.amount)}</span>
           <PayoutStatusChip status={payout.status} />
           <PayoutMethodChip method={payout.method} />
+          {payout.isAdvance ? <AdvanceChip outcome={payout.advanceOutcome} /> : null}
         </div>
         <div className="flex gap-2">
           {payout.canResend ? (
@@ -450,7 +515,9 @@ function ManualPayoutDialog({
 }) {
   // One key per opening: a double click or a retry saves ONE payout.
   const [idempotencyKey] = useState(newKey)
-  const hasDues = Number(summary.storeDues) > 0
+  const advance = summary.advance.now
+  // An advance never settles dues — those come out of a payout after delivery.
+  const hasDues = !advance && Number(summary.storeDues) > 0
   const [form, setForm] = useState({
     // The server's split: the seller's COD dues first, the rest sent.
     amount: summary.suggested.amount,
@@ -504,8 +571,12 @@ function ManualPayoutDialog({
   return (
     <Dialog
       open
-      title="Record manual payout"
-      subtitle="For money you already sent (or are sending) from a bank account by hand."
+      title={advance ? 'Record advance payout' : 'Record manual payout'}
+      subtitle={
+        advance
+          ? 'Money sent before the order is delivered — full or part of what the seller earns.'
+          : 'For money you already sent (or are sending) from a bank account by hand.'
+      }
       onClose={() => {
         if (!busy) onClose()
       }}
@@ -516,12 +587,17 @@ function ManualPayoutDialog({
             Cancel
           </Button>
           <Button variant="primary" type="submit" form="manual-payout" disabled={!canSave || busy}>
-            {busy ? 'Saving…' : 'Save payout'}
+            {busy ? 'Saving…' : advance ? 'Save advance' : 'Save payout'}
           </Button>
         </>
       }
     >
       <form id="manual-payout" onSubmit={(e) => void submit(e)} className="space-y-4">
+        {advance ? (
+          <Alert tone="warning" title="The order is not delivered yet">
+            If it is cancelled or refunded, the seller owes this back and it is taken from their next payouts.
+          </Alert>
+        ) : null}
         {hasDues ? (
           <Alert tone="info" title={`The seller owes ${formatMoneyExact(summary.storeDues)} in COD platform fees`}>
             It is taken from this payout below. Clear the field to send the full amount instead.
@@ -534,7 +610,11 @@ function ManualPayoutDialog({
             required
             value={form.amount}
             onChange={(e) => set('amount')(e.target.value)}
-            hint={`Up to ${formatMoneyExact(summary.remaining)} is left to pay${hasDues ? ' (amount + dues)' : ''}.`}
+            hint={
+              advance
+                ? `Up to ${formatMoneyExact(summary.remaining)} — the full amount, or less for a part advance.`
+                : `Up to ${formatMoneyExact(summary.remaining)} is left to pay${hasDues ? ' (amount + dues)' : ''}.`
+            }
             aria-invalid={!amountOk}
           />
           {hasDues ? (

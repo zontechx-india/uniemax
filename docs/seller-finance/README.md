@@ -15,7 +15,7 @@ between UnieMax and a seller is an entry on the **seller ledger**.
 
 | Who | Sees |
 | --- | --- |
-| Admin | **Finance → Fee settings** (platform + gateway fee %), **Seller balances** (per store, with the full ledger and corrections), the fee breakdown and COD-dues deduction on each order's **Seller payout** card |
+| Admin | **Finance → Fee settings** (platform + gateway fee %), **Seller balances** (per store, with the full ledger, corrections and the advance-payout switch), the fee breakdown, COD-dues deduction and advance payouts (§9) on each order's **Seller payout** card |
 | Seller | The fee % and "You get ₹…" under the price when adding a product; **Earnings** page (balances, delivered totals, payouts, every entry); **Transactions** page (one row per order — §8) |
 | Customer | Nothing |
 
@@ -28,7 +28,7 @@ between UnieMax and a seller is an entry on the **seller ledger**.
 | D3 | Fee base = **product price only** (line totals), never shipping. |
 | D4 | Gateway fee = a configurable %, **0% to start**, **paid by UnieMax** (bearer configurable; not taken from the seller while UnieMax pays). Online orders only, on what the customer paid. **Set to 2% on 6 Nov 2026** (in Fee settings) and **shown to the seller as UnieMax's discount** — under the product price, on Earnings, in the payout email and WhatsApp (`seller_payout_sent_v2`). |
 | D5 | Old orders follow the same rules → the rule in force when they were placed, i.e. 0%. |
-| D6 | Online money is payable once the order is **delivered** and **paid** — no hold period yet. |
+| D6 | Online money is payable once the order is **delivered** and **paid** — no hold period yet. Exception (27 Nov 2026): an admin may pay a trusted store **in advance**, before delivery, at UnieMax's risk — §9. |
 | D7 | COD dues are deducted from a **manual** payout (the form suggests the full dues; the admin can change it). Gateway payouts don't deduct dues. |
 | D8 | Tax / GST, discounts, wallet top-up, sellers paying dues online, automatic settlements — **not built**; see §6. Tax needs the accountant first. |
 
@@ -70,14 +70,15 @@ paise / basis points (`finance.rules.ts`).
 
 ## 5. The ledger
 
-Per store, three balances (`seller_balances`) — always the sum of that store's
+Per store, four balances (`seller_balances`) — always the sum of that store's
 entries (`seller_ledger_entries`) per bucket:
 
 | Bucket | Meaning (admin / seller wording in `shared/finance/ledgerLabels.ts`) |
 | --- | --- |
 | `PAYABLE` | UnieMax owes the seller — ready to pay |
 | `IN_PAYOUT` | Taken out of PAYABLE for a payout not finished (stops double payment) |
-| `OWED` | The seller owes UnieMax (COD and OFFLINE platform fees, corrections) |
+| `OWED` | The seller owes UnieMax (COD and OFFLINE platform fees, advances to recover, corrections) |
+| `ADVANCE` | Paid to the seller before delivery, not cleared yet (§9). Not part of `net` |
 
 Entries are **never edited or deleted**; each has a signed amount, balance
 before/after, a unique `idempotencyKey`, order / payout links, who made it.
@@ -93,6 +94,7 @@ keys already posted).
 | Payout FAILED / CANCELLED before paid | `PAYOUT_RELEASED` back to PAYABLE · `DUES_RESTORED` |
 | Payout REVERSED / CANCELLED after paid | `PAYOUT_RETURNED` PAYABLE +amount · `DUES_RESTORED` |
 | Admin correction | `ADJUSTMENT` ± on PAYABLE or OWED, reason required, audited |
+| Advance payout created / delivered / order ended — see §9 | `ADVANCE_PAID` · `ADVANCE_SETTLED` · `ADVANCE_TO_DUES` |
 
 Zero-amount entries are skipped (so at 0% no fee entries appear).
 
@@ -100,7 +102,7 @@ Zero-amount entries are skipped (so at 0% no fee entries appear).
 and a **15-minute sweep** (first run 45 s after boot) that posts any delivered
 order not posted yet and syncs any payout whose `ledgerStatus ≠ status`. The
 sweep is also the **backfill** for orders and payouts from before this
-feature. Every payout change also syncs inside its own transaction
+feature, and it clears any advance whose order has ended but was missed (§9). Every payout change also syncs inside its own transaction
 (`syncPayoutLedger` → `payoutLegs`, which lists every leg the payout's
 current state needs; posting adds only the missing ones).
 
@@ -152,6 +154,7 @@ Status (`finance.rules.ts → settlementStatus`, unit-tested in
 | `REFUNDED` | payment REFUNDED (the refund covered the order), or a cancelled order with a SUCCEEDED refund. A **part** refund on a delivered order keeps the normal status; the row shows `refundedAmount` |
 | `REFUND_PENDING` / `CANCELLED` | order cancelled, with / without a PENDING refund |
 | `CASH_TO_COLLECT` / `CASH_COLLECTED` | COD, before / after delivery · OFFLINE is `CASH_COLLECTED` from the start (the seller already has the money; never paid out) |
+| `ADVANCE_PAID` | online, not delivered, and an advance is paid or on its way (§9) — `settlement.advance` says how much |
 | `AWAITING_DELIVERY` | online, not delivered (UnieMax holds the money, D6) |
 | `ON_ITS_WAY` | a payout is PENDING / PROCESSING |
 | `SETTLED` | nothing left to pay (`payoutTotals.remaining = 0`; COD dues kept count as paid) |
@@ -159,6 +162,65 @@ Status (`finance.rules.ts → settlementStatus`, unit-tested in
 | `READY_TO_PAY` | delivered, nothing paid (`lastPayoutFailed` when the newest payout failed / came back) |
 
 On COD, OFFLINE, cancelled and refunded orders UnieMax owes nothing, so `remaining` is 0.
+On a cancelled / refunded order with an advance, `settlement.advance` is what
+the seller pays back, and the note says it comes out of the next payouts.
+
+## 9. Advance payouts (paying before delivery)
+
+Built 27 Nov 2026. Some sellers ask to be paid before the order is
+delivered; UnieMax may agree, **at its own risk**, full or part of the
+order's earning.
+
+**Who may get one.** Only a store whose **`advancePayoutsAllowed`** switch is
+on (`stores`, default off). An admin turns it on or off from the order's
+Seller payout card ("Allow advance payouts", with the risk said first) or
+from Seller balances → the store (`PATCH …/finance/stores/:id/advance-payouts`,
+audited). Off stops new advances only.
+
+**Which orders.** `ONLINE` + `PAID`, not `DELIVERED`, not `CANCELLED`
+(`payoutPlan` in `payouts.rules.ts`). Manual only — never the gateway, never
+with COD dues deducted. Any number of advances, together never more than the
+earning (the normal "left to pay" check). Whether a payout is an advance is
+decided under the order lock and stored on it (`order_payouts.isAdvance`).
+
+**On the ledger** (`advanceLegs` in `finance.rules.ts`, unit-tested in
+`test/unit/advance-payouts.test.ts`):
+
+| When | Entries |
+| --- | --- |
+| Advance recorded | `ADVANCE_PAID`: ADVANCE +amount, IN_PAYOUT +amount |
+| It reaches SUCCEEDED | `PAYOUT_PAID`: IN_PAYOUT −amount |
+| Order delivered (its sale posts) | `ADVANCE_SETTLED`: ADVANCE −amount, PAYABLE −amount — it comes out of the order's own earning, so only the rest is left to pay |
+| Order cancelled / refunded before delivery | `ADVANCE_TO_DUES`: ADVANCE −amount, OWED +amount — the seller owes it back; the next manual payout suggests deducting it like COD dues |
+| Advance FAILED / CANCELLED / REVERSED | the money goes back to where it sits now: ADVANCE (not cleared yet), PAYABLE (after delivery) or OWED (after cancellation) |
+
+Why a separate ADVANCE bucket and not OWED straight away: OWED is deducted
+from the next payout of **any** order. An advance on an order that will be
+delivered must not be taken from another order's payout.
+
+**Clearing** is decided once and kept on the payout (`advanceOutcome`:
+`SETTLED` | `DUES`, `nextAdvanceOutcome`): `postDeliveredOrder` clears the
+order's advances in the same transaction as its sale; the `order.cancelled`
+event calls `resolveOrderAdvances`; the 15-minute sweep catches the rest
+(refunds included). An advance undone before its order ended is never
+cleared.
+
+**Who sees what.** Admin: an "Advance" chip (`· delivered` / `· to recover`)
+on the payout, "of which in advance" in the order totals, a "to recover"
+warning on a cancelled order, the **Paid in advance** balance and tab on
+Seller balances, a **Kind** filter on Seller payouts. Seller: the
+`ADVANCE_PAID` status on Transactions and the order's Money card, a **Paid to
+you in advance** tile on Earnings (only when above 0), "Advance — paid before
+delivery" on the payout, and an email that says it is an advance.
+
+**Recovery risk.** If a cancelled order's advance can't be taken from later
+payouts (the seller stops selling), OWED still shows it — collecting it is
+manual (record a correction once they pay).
+
+**End-to-end check** against the dev DB: `npx tsx scripts/advance-payouts-check.ts`
+in `backend/` — makes its own store and orders, runs every path above through
+the real services, checks every balance against the ledger, cleans up.
+Refuses production.
 
 **Payment mode** is Online / Cash — the Cash filter and tile include OFFLINE
 (a seller's bill paid to them by cash / UPI / bank; its `offlineMode` says which).

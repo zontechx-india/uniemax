@@ -153,6 +153,10 @@ never ships to a shopper.
   from customers) and gateway fee %, a per-store ledger (what we owe / what
   they owe), COD fees taken from the next payout; sellers see it on Earnings,
   and per order (bill, payment mode, settled or not) on Transactions.
+- **Advance payouts** — for stores an admin trusts (a per-store switch), pay
+  an online order before it is delivered, full or part; tracked as its own
+  balance, taken out of the earning on delivery, or owed back (and taken from
+  the next payouts) if the order is cancelled or refunded.
 - **Manage a seller's store for them** (SUPER_ADMIN only) — the support path
   for "can you fix my listing?". Opens the seller's own dashboard (catalog,
   media, storefront, delivery, orders), not an admin rebuild of it, so staff

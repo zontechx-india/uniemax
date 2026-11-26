@@ -14,6 +14,8 @@ export const adminFinanceRoutes: FastifyPluginAsync = async (app) => {
   app.get("/finance/stores/:storeId", controller.getStoreFinance);
   app.get("/finance/stores/:storeId/ledger", controller.listLedger);
   app.post("/finance/stores/:storeId/adjustments", controller.addAdjustment);
+  // Per-store switch: may UnieMax pay this seller before delivery?
+  app.patch("/finance/stores/:storeId/advance-payouts", controller.setAdvancePayouts);
 
   app.get("/orders/:id/financials", controller.getOrderFinancials);
 };

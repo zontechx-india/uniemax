@@ -6,7 +6,7 @@ import { Card, Chip, PageHeader } from '../ui/primitives'
 import { DataTable, Pagination } from '../ui/DataTable'
 import type { Column } from '../ui/DataTable'
 import { FilterSelect, SearchInput, Tabs, Toolbar } from '../ui/Toolbar'
-import { PayoutMethodChip, PayoutStatusChip } from '../ui/statusMeta'
+import { AdvanceChip, PayoutMethodChip, PayoutStatusChip } from '../ui/statusMeta'
 import { formatDate, formatDateTime, formatMoneyExact } from '../ui/format'
 
 /**
@@ -16,7 +16,8 @@ import { formatDate, formatDateTime, formatMoneyExact } from '../ui/format'
  *
  * "To pay" lists online-paid, delivered orders with no payout pending,
  * processing or done, oldest delivery first. "All payouts" is the ledger,
- * searchable by UTR, sender, order or store.
+ * searchable by UTR, sender, order or store; "Advances" filters it to
+ * payouts made before delivery.
  */
 
 const VIEW_TABS = [
@@ -135,7 +136,7 @@ function ToPayView() {
 function LedgerView() {
   const navigate = useNavigate()
   const list = useAdminList<PayoutRow>((query) => adminApi.listSellerPayouts(query), {
-    keys: ['q', 'status', 'method'],
+    keys: ['q', 'status', 'method', 'kind'],
   })
 
   const columns: Column<PayoutRow>[] = [
@@ -151,7 +152,12 @@ function LedgerView() {
     },
     {
       header: 'Status',
-      cell: (row) => <PayoutStatusChip status={row.status} />,
+      cell: (row) => (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <PayoutStatusChip status={row.status} />
+          {row.isAdvance ? <AdvanceChip outcome={row.advanceOutcome} /> : null}
+        </div>
+      ),
     },
     {
       header: 'Method',
@@ -218,6 +224,16 @@ function LedgerView() {
             { value: 'GATEWAY', label: 'PaymentHub' },
           ]}
         />
+        <FilterSelect
+          label="Kind"
+          value={list.filters['kind'] ?? ''}
+          onChange={(value) => list.setFilter('kind', value)}
+          options={[
+            { value: '', label: 'Any kind' },
+            { value: 'ADVANCE', label: 'Advance (before delivery)' },
+            { value: 'STANDARD', label: 'After delivery' },
+          ]}
+        />
       </Toolbar>
       <DataTable
         rows={list.rows}
@@ -237,6 +253,7 @@ function LedgerView() {
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <PayoutStatusChip status={row.status} />
               <PayoutMethodChip method={row.method} />
+              {row.isAdvance ? <AdvanceChip outcome={row.advanceOutcome} /> : null}
               {row.paidAt ? (
                 <span className="ml-auto text-xs text-muted">{formatDate(row.paidAt)}</span>
               ) : null}

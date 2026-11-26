@@ -185,7 +185,7 @@ export function computeFinancials(input: OrderFinancialsInput, rules: RuleLike[]
 // Ledger legs
 // ---------------------------------------------------------------------------
 
-export type Bucket = "PAYABLE" | "IN_PAYOUT" | "OWED";
+export type Bucket = "PAYABLE" | "IN_PAYOUT" | "OWED" | "ADVANCE";
 export type EntryType =
   | "ORDER_SALE"
   | "PLATFORM_FEE"
@@ -197,7 +197,10 @@ export type EntryType =
   | "PAYOUT_PAID"
   | "PAYOUT_RELEASED"
   | "PAYOUT_RETURNED"
-  | "ADJUSTMENT";
+  | "ADJUSTMENT"
+  | "ADVANCE_PAID"
+  | "ADVANCE_SETTLED"
+  | "ADVANCE_TO_DUES";
 
 /** One movement to post. `amount` is signed paise: + grows the bucket. */
 export interface Leg {
@@ -277,6 +280,34 @@ export interface PayoutForLedger {
   duesPaise: bigint;
   /** It reached SUCCEEDED at some point (from its history). */
   wasPaid: boolean;
+  /** Paid before the order was delivered (§9 of the finance README). */
+  isAdvance?: boolean;
+  /** Advance only — how it was cleared (`nextAdvanceOutcome`); null = not yet. */
+  advanceOutcome?: AdvanceOutcome | null;
+}
+
+export type AdvanceOutcome = "SETTLED" | "DUES";
+
+const UNDONE: readonly PayoutForLedger["status"][] = ["FAILED", "REVERSED", "CANCELLED"];
+
+/**
+ * How an advance payout is cleared — decided once, then kept:
+ *   the order was delivered (its sale is on the ledger) → SETTLED
+ *   the order ended without delivery (cancelled / refunded) → DUES
+ *   still open, or the payout was undone before either → null
+ * An advance undone before its order ended is never cleared: undoing it
+ * already took it out of the ADVANCE balance.
+ */
+export function nextAdvanceOutcome(
+  current: AdvanceOutcome | null,
+  status: PayoutForLedger["status"],
+  order: { posted: boolean; ended: boolean },
+): AdvanceOutcome | null {
+  if (current) return current;
+  if (UNDONE.includes(status)) return null;
+  if (order.posted) return "SETTLED";
+  if (order.ended) return "DUES";
+  return null;
 }
 
 /**
@@ -288,6 +319,7 @@ export interface PayoutForLedger {
  *   failed / reversed / cancelled → money back to PAYABLE, dues restored
  */
 export function payoutLegs(p: PayoutForLedger): Leg[] {
+  if (p.isAdvance) return advanceLegs(p);
   const ref = { orderId: p.orderId, payoutId: p.id };
   const k = (suffix: string) => `payout:${p.id}:${suffix}`;
   const legs: Leg[] = [];
@@ -324,6 +356,69 @@ export function payoutLegs(p: PayoutForLedger): Leg[] {
   return legs.filter((leg) => leg.amount !== 0n);
 }
 
+/**
+ * The legs of an ADVANCE payout (paid before delivery) for its current
+ * state. Same idea as `payoutLegs`: only ever grows, posted by key.
+ *
+ *   recorded          → ADVANCE +amount, IN_PAYOUT +amount  (ADVANCE_PAID)
+ *   reached SUCCEEDED → IN_PAYOUT −amount                   (PAYOUT_PAID)
+ *   order delivered   → ADVANCE −amount, PAYABLE −amount    (ADVANCE_SETTLED)
+ *                       — taken out of the order's own earning, so from
+ *                       here on it is exactly a normal payout
+ *   order cancelled / refunded
+ *                     → ADVANCE −amount, OWED +amount       (ADVANCE_TO_DUES)
+ *                       — the seller owes it back, taken from later payouts
+ *   undone (failed / reversed / cancelled) → the money goes back to where
+ *     it sits now: ADVANCE (not cleared), PAYABLE (settled) or OWED (dues)
+ *
+ * An advance never settles COD dues (`duesPaise` is 0).
+ */
+function advanceLegs(p: PayoutForLedger): Leg[] {
+  const ref = { orderId: p.orderId, payoutId: p.id };
+  const k = (suffix: string) => `payout:${p.id}:${suffix}`;
+  const n = p.orderNumber;
+  const a = p.amountPaise;
+  const legs: Leg[] = [
+    { ...ref, bucket: "ADVANCE", type: "ADVANCE_PAID", amount: a, key: k("advance:reserve:advance"), description: `Advance for order ${n} (before delivery)` },
+    { ...ref, bucket: "IN_PAYOUT", type: "ADVANCE_PAID", amount: a, key: k("advance:reserve:in-payout"), description: `Advance for order ${n} (before delivery)` },
+  ];
+
+  const paid = p.wasPaid || p.status === "SUCCEEDED" || p.status === "REVERSED";
+  if (paid) {
+    legs.push({ ...ref, bucket: "IN_PAYOUT", type: "PAYOUT_PAID", amount: -a, key: k("paid"), description: `Advance paid to the seller — order ${n}` });
+  }
+
+  const outcome = p.advanceOutcome ?? null;
+  if (outcome === "SETTLED") {
+    legs.push(
+      { ...ref, bucket: "ADVANCE", type: "ADVANCE_SETTLED", amount: -a, key: k("advance:settled:advance"), description: `Order ${n} delivered — advance taken from its earning` },
+      { ...ref, bucket: "PAYABLE", type: "ADVANCE_SETTLED", amount: -a, key: k("advance:settled:payable"), description: `Order ${n} delivered — advance taken from its earning` },
+    );
+  } else if (outcome === "DUES") {
+    legs.push(
+      { ...ref, bucket: "ADVANCE", type: "ADVANCE_TO_DUES", amount: -a, key: k("advance:dues:advance"), description: `Order ${n} not delivered — advance to be paid back` },
+      { ...ref, bucket: "OWED", type: "ADVANCE_TO_DUES", amount: a, key: k("advance:dues:owed"), description: `Order ${n} not delivered — advance to be paid back` },
+    );
+  }
+
+  if (UNDONE.includes(p.status)) {
+    // Where the money sits now, and the sign that takes it back out.
+    const home: { bucket: Bucket; amount: bigint } =
+      outcome === "SETTLED" ? { bucket: "PAYABLE", amount: a } : outcome === "DUES" ? { bucket: "OWED", amount: -a } : { bucket: "ADVANCE", amount: -a };
+    const where = home.bucket.toLowerCase().replace("_", "-");
+    if (paid) {
+      legs.push({ ...ref, ...home, type: "PAYOUT_RETURNED", key: k(`advance:returned:${where}`), description: `Advance came back / was cancelled — order ${n}` });
+    } else {
+      legs.push(
+        { ...ref, bucket: "IN_PAYOUT", type: "PAYOUT_RELEASED", amount: -a, key: k("advance:released:in-payout"), description: `Advance did not go out — order ${n}` },
+        { ...ref, ...home, type: "PAYOUT_RELEASED", key: k(`advance:released:${where}`), description: `Advance did not go out — order ${n}` },
+      );
+    }
+  }
+
+  return legs.filter((leg) => leg.amount !== 0n);
+}
+
 // ---------------------------------------------------------------------------
 // Per-order settlement — the seller's Transactions page
 // ---------------------------------------------------------------------------
@@ -331,12 +426,14 @@ export function payoutLegs(p: PayoutForLedger): Leg[] {
 /**
  * Where one order's money stands for the seller — one word per order.
  *   Online: AWAITING_DELIVERY → READY_TO_PAY → ON_ITS_WAY → SETTLED
+ *           (ADVANCE_PAID: some was paid before delivery — §9)
  *           (PARTLY_SETTLED when only some of it went out)
  *   COD:    CASH_TO_COLLECT → CASH_COLLECTED (the seller has the cash)
  *   Either: CANCELLED · REFUND_PENDING · REFUNDED
  */
 export type Settlement =
   | "AWAITING_DELIVERY"
+  | "ADVANCE_PAID"
   | "READY_TO_PAY"
   | "ON_ITS_WAY"
   | "PARTLY_SETTLED"
@@ -392,7 +489,10 @@ export function settlementStatus(f: SettlementFacts): SettlementResult {
   if (f.method === "COD") return result(f.status === "DELIVERED" ? "CASH_COLLECTED" : "CASH_TO_COLLECT");
   // Paid to the seller when the bill was made — nothing left to collect.
   if (f.method === "OFFLINE") return result("CASH_COLLECTED");
-  if (f.status !== "DELIVERED") return result("AWAITING_DELIVERY");
+  // Only an advance can be paid (or on its way) before delivery.
+  if (f.status !== "DELIVERED") {
+    return result(totals.paidOut + totals.inProgress > 0n ? "ADVANCE_PAID" : "AWAITING_DELIVERY");
+  }
   if (totals.inProgress > 0n) return result("ON_ITS_WAY");
   if (totals.remaining === 0n) return result("SETTLED");
   if (totals.paidOut + totals.duesDeducted > 0n) return result("PARTLY_SETTLED");

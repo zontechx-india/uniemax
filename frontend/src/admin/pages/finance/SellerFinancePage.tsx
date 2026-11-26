@@ -12,11 +12,14 @@ import { StatTile } from '../../ui/StatTile'
 import { formatDateTime, formatMoneyExact } from '../../ui/format'
 import { BackIcon } from '../../layout/icons'
 import { BUCKET_LABEL, ENTRY_LABEL, signed } from '../../../shared/finance/ledgerLabels'
+import { AdvanceSwitchDialog } from './AdvanceSwitchDialog'
 
 /**
- * One seller's money: the three balances, delivered-order totals and the
+ * One seller's money: the four balances, delivered-order totals and the
  * full ledger — every entry with the balance before and after. Entries are
  * never edited; a correction is a new entry ("Adjust balance") with a reason.
+ * Also the store's "allow advance payouts" switch (pay before delivery,
+ * docs/seller-finance §9), with a confirmation each way.
  */
 
 export default function SellerFinancePage() {
@@ -25,6 +28,7 @@ export default function SellerFinancePage() {
   const summary = useAdminQuery(() => adminApi.getStoreFinance(storeId), [storeId])
   const ledger = useAdminList<LedgerEntry>((query) => adminApi.listLedger(storeId, query), { keys: ['bucket'] })
   const [adjusting, setAdjusting] = useState(false)
+  const [switching, setSwitching] = useState(false)
 
   const columns: Column<LedgerEntry>[] = [
     {
@@ -93,15 +97,33 @@ export default function SellerFinancePage() {
         actions={<Button onClick={() => setAdjusting(true)}>Adjust balance</Button>}
       />
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+      <Card className="mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="flex flex-wrap items-center gap-2 font-medium text-fg">
+              Advance payouts
+              {data.advancePayoutsAllowed ? <Chip tone="info">Allowed</Chip> : <Chip>Off</Chip>}
+            </p>
+            <p className="text-sm text-muted">
+              {data.advancePayoutsAllowed
+                ? 'You can pay this seller for online orders before delivery, from the order page. At UnieMax’s risk.'
+                : 'Online orders are paid only after delivery.'}
+            </p>
+          </div>
+          <Button onClick={() => setSwitching(true)}>{data.advancePayoutsAllowed ? 'Stop advances' : 'Allow advances'}</Button>
+        </div>
+      </Card>
+
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="We owe the seller" value={formatMoneyExact(data.balance.payable)} hint="Ready to pay" />
         <StatTile label="Being paid" value={formatMoneyExact(data.balance.inPayout)} hint="Payouts not finished" />
         <StatTile
           label="Seller owes UnieMax"
           value={formatMoneyExact(data.balance.owed)}
-          hint="COD platform fees"
+          hint="COD fees, advances to recover"
           tone={Number(data.balance.owed) > 0 ? 'warning' : 'default'}
         />
+        <StatTile label="Paid in advance" value={formatMoneyExact(data.balance.advance)} hint="Orders not delivered yet" />
       </div>
 
       <div className="mb-4 grid gap-4 md:grid-cols-2">
@@ -121,6 +143,7 @@ export default function SellerFinancePage() {
               { value: 'PAYABLE', label: BUCKET_LABEL.PAYABLE.admin },
               { value: 'IN_PAYOUT', label: BUCKET_LABEL.IN_PAYOUT.admin },
               { value: 'OWED', label: BUCKET_LABEL.OWED.admin },
+              { value: 'ADVANCE', label: BUCKET_LABEL.ADVANCE.admin },
             ]}
           />
         </Toolbar>
@@ -141,6 +164,18 @@ export default function SellerFinancePage() {
           busy={ledger.loading}
         />
       </Card>
+
+      {switching ? (
+        <AdvanceSwitchDialog
+          storeId={storeId}
+          allow={!data.advancePayoutsAllowed}
+          onClose={() => setSwitching(false)}
+          onSaved={() => {
+            setSwitching(false)
+            summary.refresh()
+          }}
+        />
+      ) : null}
 
       {adjusting ? (
         <AdjustDialog

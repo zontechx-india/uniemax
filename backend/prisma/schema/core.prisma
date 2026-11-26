@@ -521,6 +521,12 @@ model Store {
   verifiedBy    String?
   verifiedGstin String?
 
+  /// An admin lets UnieMax pay this seller for an online order BEFORE it is
+  /// delivered (an advance, at UnieMax's own risk). Off by default; turned
+  /// on per store from the order's Seller payout card or the store's finance
+  /// page (audited). Turning it off stops new advances only.
+  advancePayoutsAllowed Boolean @default(false)
+
   cartLines      CartLine[]
   productGroups  ProductGroup[]
   banners        StoreBanner[]
@@ -1447,6 +1453,16 @@ enum PayoutStatus {
   @@schema("public")
 }
 
+/// How an advance payout was cleared once its order ended.
+/// SETTLED  the order was delivered — the advance came out of its earning.
+/// DUES     the order was cancelled / refunded — the seller owes it back.
+enum AdvanceOutcome {
+  SETTLED
+  DUES
+
+  @@schema("public")
+}
+
 /// What moved a payout to a status.
 enum PayoutEventSource {
   /// An admin in the console (recorded, triggered or changed by hand).
@@ -1483,6 +1499,14 @@ model OrderPayout {
   /// The status the seller ledger was last brought in line with — differs
   /// from `status` only until the sync (same transaction, or the sweep).
   ledgerStatus PayoutStatus?
+
+  /// Paid BEFORE the order was delivered (decided under the order lock when
+  /// it is recorded, never changed). Its money sits in the seller's ADVANCE
+  /// balance until the order ends — docs/seller-finance/README.md §9.
+  isAdvance      Boolean         @default(false)
+  /// How an advance was cleared on the ledger. Null = not yet (or it was
+  /// undone first). Set once, by `syncPayoutLedger`.
+  advanceOutcome AdvanceOutcome?
 
   // Who received it — the store's PRIMARY bank account at the time,
   // snapshotted (the seller may change accounts later). Never the full

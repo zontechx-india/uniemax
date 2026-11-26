@@ -22,25 +22,28 @@ export interface Balances {
   payable: bigint;
   inPayout: bigint;
   owed: bigint;
+  advance: bigint;
 }
 
 const FIELD: Record<Bucket, keyof Balances> = {
   PAYABLE: "payable",
   IN_PAYOUT: "inPayout",
   OWED: "owed",
+  ADVANCE: "advance",
 };
 
 /** Creates the row if needed and locks it for the rest of the transaction. */
 export async function lockBalance(tx: Tx, storeId: string): Promise<Balances> {
   await tx.$executeRaw`INSERT INTO "public"."seller_balances" ("storeId", "updatedAt") VALUES (${storeId}, now()) ON CONFLICT ("storeId") DO NOTHING`;
-  const rows = await tx.$queryRaw<{ payable: Prisma.Decimal; inPayout: Prisma.Decimal; owed: Prisma.Decimal }[]>`
-    SELECT "payable", "inPayout", "owed" FROM "public"."seller_balances" WHERE "storeId" = ${storeId} FOR UPDATE`;
+  const rows = await tx.$queryRaw<{ payable: Prisma.Decimal; inPayout: Prisma.Decimal; owed: Prisma.Decimal; advance: Prisma.Decimal }[]>`
+    SELECT "payable", "inPayout", "owed", "advance" FROM "public"."seller_balances" WHERE "storeId" = ${storeId} FOR UPDATE`;
   const row = rows[0];
   if (!row) throw new Error(`Seller balance row missing for store ${storeId}`);
   return {
     payable: decimalToPaise(new Prisma.Decimal(row.payable)),
     inPayout: decimalToPaise(new Prisma.Decimal(row.inPayout)),
     owed: decimalToPaise(new Prisma.Decimal(row.owed)),
+    advance: decimalToPaise(new Prisma.Decimal(row.advance)),
   };
 }
 
@@ -102,6 +105,7 @@ export async function postLegs(
         payable: new Prisma.Decimal(paiseToAmount(balances.payable)),
         inPayout: new Prisma.Decimal(paiseToAmount(balances.inPayout)),
         owed: new Prisma.Decimal(paiseToAmount(balances.owed)),
+        advance: new Prisma.Decimal(paiseToAmount(balances.advance)),
       },
     });
   }

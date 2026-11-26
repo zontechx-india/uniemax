@@ -113,6 +113,10 @@ enum LedgerBucket {
   IN_PAYOUT
   /// The seller owes UnieMax (COD platform fees, adjustments).
   OWED
+  /// Paid to the seller in advance for online orders not delivered yet.
+  /// Cleared when the order is delivered (out of its earning) or ends
+  /// without delivery (moved to OWED).
+  ADVANCE
 
   @@schema("public")
 }
@@ -140,11 +144,19 @@ enum LedgerEntryType {
   PAYOUT_RETURNED
   /// An admin's correction, with a reason.
   ADJUSTMENT
+  /// An advance payout recorded (ADVANCE +, IN_PAYOUT +).
+  ADVANCE_PAID
+  /// The advanced order was delivered: the advance comes out of its
+  /// earning (ADVANCE −, PAYABLE −).
+  ADVANCE_SETTLED
+  /// The advanced order was cancelled / refunded: the seller owes the
+  /// advance back (ADVANCE −, OWED +).
+  ADVANCE_TO_DUES
 
   @@schema("public")
 }
 
-/// A store's three balances — always equal to the sum of its ledger entries
+/// A store's four balances — always equal to the sum of its ledger entries
 /// per bucket. Locked (`SELECT … FOR UPDATE`) for every posting. No foreign
 /// key to the store on purpose: financial history outlives a deleted store.
 model SellerBalance {
@@ -152,6 +164,8 @@ model SellerBalance {
   payable   Decimal  @default(0) @db.Decimal(12, 2)
   inPayout  Decimal  @default(0) @db.Decimal(12, 2)
   owed      Decimal  @default(0) @db.Decimal(12, 2)
+  /// Paid in advance on orders not delivered yet (ADVANCE bucket).
+  advance   Decimal  @default(0) @db.Decimal(12, 2)
   updatedAt DateTime @updatedAt
 
   @@map("seller_balances")

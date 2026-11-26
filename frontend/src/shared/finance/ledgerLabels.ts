@@ -4,7 +4,7 @@
  * (docs/seller-finance/README.md).
  */
 
-export type LedgerBucketKey = 'PAYABLE' | 'IN_PAYOUT' | 'OWED'
+export type LedgerBucketKey = 'PAYABLE' | 'IN_PAYOUT' | 'OWED' | 'ADVANCE'
 export type LedgerTypeKey =
   | 'ORDER_SALE'
   | 'PLATFORM_FEE'
@@ -17,12 +17,16 @@ export type LedgerTypeKey =
   | 'PAYOUT_RELEASED'
   | 'PAYOUT_RETURNED'
   | 'ADJUSTMENT'
+  | 'ADVANCE_PAID'
+  | 'ADVANCE_SETTLED'
+  | 'ADVANCE_TO_DUES'
 
 /** Balance names, from UnieMax's side (admin) and the seller's side. */
 export const BUCKET_LABEL: Record<LedgerBucketKey, { admin: string; seller: string }> = {
   PAYABLE: { admin: 'We owe the seller', seller: 'Ready to be paid to you' },
   IN_PAYOUT: { admin: 'Being paid', seller: 'Being paid to you' },
   OWED: { admin: 'Seller owes UnieMax', seller: 'You owe UnieMax' },
+  ADVANCE: { admin: 'Paid in advance', seller: 'Paid to you in advance' },
 }
 
 export const ENTRY_LABEL: Record<LedgerTypeKey, string> = {
@@ -37,6 +41,9 @@ export const ENTRY_LABEL: Record<LedgerTypeKey, string> = {
   PAYOUT_RELEASED: 'Payout did not go out',
   PAYOUT_RETURNED: 'Payout came back',
   ADJUSTMENT: 'Correction by UnieMax',
+  ADVANCE_PAID: 'Advance before delivery',
+  ADVANCE_SETTLED: 'Advance taken from earning',
+  ADVANCE_TO_DUES: 'Advance to pay back',
 }
 
 /** "+₹10.00" / "−₹10.00" from a signed decimal string. */

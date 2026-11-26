@@ -3828,6 +3828,11 @@ the others don't.
 
 **Eligible order:** `paymentMethod: ONLINE`, `paymentStatus: PAID`, `status:
 DELIVERED` (a picked-up order is DELIVERED too). COD never needs a payout.
+**Advance:** when the store's `advancePayoutsAllowed` switch is on, a MANUAL
+payout may also be made on an `ONLINE` + `PAID` order that is not delivered
+and not cancelled — full or part of the earning, never with dues deducted,
+never through the gateway. It is stored with `isAdvance: true` (decided under
+the order lock) and cleared on delivery or cancellation — docs/seller-finance §9.
 **Payout base = the seller's earning** (order total − platform fee, see
 [Seller finance](#seller-finance--apiv1adminfinance)), not the order total.
 **No duplicates:** each create locks the order row, refuses an amount above
@@ -3852,12 +3857,20 @@ GATEWAY payout is `PENDING`/`PROCESSING` per order.
     "financials": { /* as GET /admin/orders/:id/financials */ },
     "blockers": [],            // why no payout can be made (COD, not delivered…) — empty when one can
     "canPay": true,            // no blockers and remaining > 0
+    "advance": {
+      "now": false,            // a payout made now is an ADVANCE (order not delivered)
+      "allowed": false,        // the store's advancePayoutsAllowed switch
+      "needsSwitch": false,    // only the switch is in the way (the card offers to turn it on)
+      "paid": "0.00"           // advances PENDING / PROCESSING / SUCCEEDED on this order
+    },
+    "storeId": "…",            // null when the store was deleted
     "payee": { "id", "accountHolderName", "bankName", "ifsc", "last4", "verificationStatus" } | null,
     "gateway": { "available": false, "reason": "Gateway payouts are not switched on yet — …" }
   },
   "payouts": [ /* oldest first */ {
     "id", "method": "MANUAL" | "GATEWAY", "status", "amount",
     "duesDeducted",                                         // COD dues settled instead of sent
+    "isAdvance", "advanceOutcome",                          // paid before delivery · SETTLED | DUES | null
     "payeeName", "payeeBank", "payeeIfsc", "payeeLast4",   // store's primary account AT THE TIME
     "senderName", "senderBank", "senderLast4",              // MANUAL
     "paidAt", "paidAtTimeKnown", "utr", "notes",
@@ -3876,7 +3889,7 @@ GATEWAY payout is `PENDING`/`PROCESSING` per order.
 ```jsonc
 {
   "amount": "80.00",             // money sent; may be "0" only when duesDeducted > 0
-  "duesDeducted": "10.00",       // optional (default 0) — COD dues kept to settle OWED; ≤ storeDues
+  "duesDeducted": "10.00",       // optional (default 0) — COD dues kept to settle OWED; ≤ storeDues; must be 0 on an advance
   "idempotencyKey": "…",         // amount + duesDeducted ≤ remaining
   "status": "SUCCEEDED",         // default · or PROCESSING / PENDING
   "senderName": "Anwin Paulji",  // whose account the money left from
@@ -3899,6 +3912,9 @@ WhatsApp template `seller_payout_sent_v2` once Meta lists it as approved
 while UnieMax pays it), else `seller_payout_sent` (10 values); business
 phone, else owner phone; button `<slug>/earnings`. The email shows the
 gateway fee row whenever it is above 0. Once per payout, fire-and-forget. No SMS yet.
+For an advance the email says so ("Advance payout of ₹… sent", the amount
+marked "advance, before delivery", and that a cancelled / refunded order is
+taken back from the next payouts); the WhatsApp templates are unchanged.
 
 #### `GET …/payouts/:payoutId/message/preview?channel=email|whatsapp` · `POST …/payouts/:payoutId/message`
 
@@ -3911,7 +3927,8 @@ approved list, or Meta unreachable). `POST` body `{ "channel" }` sends now and
 waits: `{ channel, to, delivered }` / `{ channel, to, templateName, wamid }`.
 `422` no email / phone · `503` WhatsApp off · `502` email provider refused ·
 Meta's refusals pass through. Audit `payout.message.send`. `409` order not eligible · `409` amount + dues above what is left · `409`
-dues above what the seller owes · `422` date in the future. Audit
+dues above what the seller owes · `409` not delivered and the store's advance
+switch is off · `409` dues on an advance · `422` date in the future. Audit
 `payout.manual.record`.
 
 #### `PATCH /api/v1/admin/orders/:id/payouts/:payoutId/status`
@@ -3927,7 +3944,8 @@ CANCELLED (stored as `failureReason`). `utr` fills in a missing reference.
 #### `POST /api/v1/admin/orders/:id/payouts/gateway`
 
 Body `{ "amount", "idempotencyKey" }`. Needs `PAYMENTHUB_PAYOUTS_ENABLED=true`
-(else `409`) and a **verified** primary bank account. Creates the payout
+(else `409`) and a **verified** primary bank account. Never an advance — an
+undelivered order → `409` (record it by hand). Creates the payout
 (`PENDING`), then calls the hub's `POST /v1/payouts` with idempotency key =
 the payout id and body `{ reference: <payout id>, payeeRef: "store_<storeId>",
 amountMinor, currency: "INR", metadata: { orderId, orderNumber, storeSlug } }`
@@ -3949,10 +3967,12 @@ same idempotency key — the hub can't pay twice. `409` otherwise. Audit
 #### `GET /api/v1/admin/seller-payouts` · `GET /api/v1/admin/seller-payouts/awaiting`
 
 `/seller-payouts` — every payout, newest first. Query `q` (UTR / sender / hub
-payout id / order number / store), `status`, `method`, `page`, `pageSize`.
+payout id / order number / store), `status`, `method`, `kind` (`ADVANCE` =
+paid before delivery · `STANDARD`), `page`, `pageSize`.
 Rows: `{ id, method, status, amount, payeeName, payeeBank, payeeLast4,
 senderName, paidAt, paidAtTimeKnown, utr, gateway, hubPayoutId, failureReason,
-createdByEmail, createdAt, order { id, orderNumber, storeId, storeName, total } }`,
+createdByEmail, createdAt, isAdvance, advanceOutcome, order { id, orderNumber,
+storeId, storeName, total, status } }`,
 plus **`totals`** — count + amount per status for the filter.
 
 `/seller-payouts/awaiting` — eligible orders with **no** payout pending,
@@ -4006,15 +4026,16 @@ the order is delivered (same numbers).
 #### `GET /api/v1/admin/finance/balances`
 
 Query `q` (store name / slug), `filter` (`PAYABLE` = we owe them · `OWED` =
-they owe us), `page`, `pageSize`. Rows `{ storeId, storeName, storeSlug,
-payable, inPayout, owed, net, updatedAt }` (only stores with ledger activity),
-plus **`totals`** `{ payable, inPayout, owed }` for the filter.
+they owe us · `ADVANCE` = paid ahead of delivery), `page`, `pageSize`. Rows
+`{ storeId, storeName, storeSlug, payable, inPayout, owed, advance, net,
+updatedAt }` (only stores with ledger activity; `net` = payable − owed),
+plus **`totals`** `{ payable, inPayout, owed, advance }` for the filter.
 
 #### `GET /api/v1/admin/finance/stores/:storeId` · `GET …/ledger`
 
-Summary → `{ store, balance { payable, inPayout, owed, net, updatedAt },
-delivered { online, cod: { orders, sales, platformFees, gatewayFees } },
-rates }` (delivered = orders on the ledger).
+Summary → `{ store, advancePayoutsAllowed, balance { payable, inPayout, owed,
+advance, net, updatedAt }, delivered { online, cod: { orders, sales,
+platformFees, gatewayFees } }, rates }` (delivered = orders on the ledger).
 
 `…/ledger` — entries newest first. Query `bucket`, `type`, `from`, `to`,
 `page`, `pageSize`. Rows `{ id, storeId, bucket, type, amount (signed),
@@ -4028,6 +4049,14 @@ amount, reason (5–300), idempotencyKey }` — a correction entry (`ADJUSTMENT`
 nothing existing changes. The seller sees the reason. → the store summary.
 Audit `finance.adjustment`.
 
+#### `PATCH /api/v1/admin/finance/stores/:storeId/advance-payouts`
+
+Body `{ "allowed": true | false }` — may UnieMax pay this store's online
+orders before delivery (docs/seller-finance §9)? Off for every store until
+turned on. Turning it off stops new advances only. → `{ storeId,
+advancePayoutsAllowed, changed }`. `404` unknown store. Audit
+`finance.advancePayouts` (only when it changed).
+
 #### Seller side — `GET /api/v1/stores/:id/platform-fee` · `GET /api/v1/stores/:id/earnings` 🔒 owner
 
 Also on the admin manage mount. `platform-fee` → `{ percent, effectiveFrom,
@@ -4035,8 +4064,8 @@ upcoming: { kind, percent, bearer, effectiveFrom } | null, gateway: { percent,
 bearer } }` — the product form's note (gateway shown as UnieMax's discount
 when `bearer` is `PLATFORM`). `earnings` → `rates` also carries `gateway`. `earnings?page&pageSize(≤50)` → `{ balance, delivered, rates,
 ledger { rows (no actor / key / meta), meta }, payouts[20] { id, status,
-amount, duesDeducted, paidAt, paidAtTimeKnown, utr, method, createdAt,
-order { id, orderNumber } } }`.
+amount, duesDeducted, paidAt, paidAtTimeKnown, utr, method, isAdvance,
+createdAt, order { id, orderNumber } } }`. `balance` has `advance` too.
 
 #### `GET /api/v1/stores/:id/transactions` · `GET …/transactions/:orderId` 🔒 owner
 
@@ -4073,6 +4102,8 @@ number or customer name; a leading `#` is ignored).
       "paidOut", "onItsWay", "duesDeducted",
       "remaining",                          // 0 on COD / cancelled / refunded orders
       "lastPayoutFailed": false,            // newest payout FAILED/REVERSED, money still due
+      "advance": "0.00",                    // paid before delivery (part of paidOut / onItsWay); on a
+                                            // cancelled / refunded order, what the seller pays back
       "paidAt", "paidAtTimeKnown", "utr"    // newest SUCCEEDED payout, else null
     }
   } ],

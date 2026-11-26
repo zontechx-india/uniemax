@@ -40,6 +40,7 @@ export function settlementPill(row: SellerTransaction): { label: string; tone: S
 
 const SETTLEMENT: Record<SettlementStatus, { label: string; tone: StatusTone }> = {
   AWAITING_DELIVERY: { label: 'Waiting for delivery', tone: 'pending' },
+  ADVANCE_PAID: { label: 'Advance paid', tone: 'pending' },
   READY_TO_PAY: { label: 'Ready to pay', tone: 'brand' },
   ON_ITS_WAY: { label: 'On its way', tone: 'pending' },
   PARTLY_SETTLED: { label: 'Partly paid', tone: 'pending' },
@@ -80,6 +81,10 @@ export function settlementShort(row: SellerTransaction): string {
   switch (s.status) {
     case 'AWAITING_DELIVERY':
       parts.push(pickup ? 'Yours after pickup' : 'Yours after delivery')
+      break
+    case 'ADVANCE_PAID':
+      parts.push(`${money(s.advance)} paid early`)
+      if (Number(s.remaining) > 0) parts.push(`${money(s.remaining)} ${pickup ? 'after pickup' : 'after delivery'}`)
       break
     case 'READY_TO_PAY':
       parts.push(s.lastPayoutFailed ? 'Last payment failed, sending again' : `${money(s.remaining)} to come`)
@@ -129,6 +134,12 @@ function baseNote(row: SellerTransaction): string {
       return pickup
         ? `The customer paid online. You get ${money(row.youGet)} after they collect the order.`
         : `The customer paid online. You get ${money(row.youGet)} after the order is delivered.`
+    case 'ADVANCE_PAID': {
+      const after = pickup ? 'after the customer collects it' : 'after delivery'
+      const rest =
+        Number(s.remaining) > 0 ? `You get the rest, ${money(s.remaining)}, ${after}.` : 'Nothing more is due on this order.'
+      return `UnieMax paid you ${money(s.advance)} before the order reached the customer. ${rest} If the order is cancelled, this advance is taken from your next payouts.`
+    }
     case 'READY_TO_PAY':
       return s.lastPayoutFailed
         ? `The last payment did not reach your bank. UnieMax will send ${money(s.remaining)} again.`
@@ -152,10 +163,16 @@ function baseNote(row: SellerTransaction): string {
         ? `You have the cash. The platform fee of ${money(sellerFee(row))} is taken from your next payout.`
         : 'You have the cash.'
     case 'REFUND_PENDING':
-      return "The customer's money is being sent back to them."
+      return Number(s.advance) > 0
+        ? `The customer's money is being sent back to them. The ${money(s.advance)} UnieMax paid you in advance is taken from your next payouts.`
+        : "The customer's money is being sent back to them."
     case 'REFUNDED':
-      return 'The money went back to the customer.'
+      return Number(s.advance) > 0
+        ? `The money went back to the customer. The ${money(s.advance)} UnieMax paid you in advance is taken from your next payouts.`
+        : 'The money went back to the customer.'
     case 'CANCELLED':
-      return 'This order was cancelled. No money is due.'
+      return Number(s.advance) > 0
+        ? `This order was cancelled. The ${money(s.advance)} UnieMax paid you in advance is taken from your next payouts.`
+        : 'This order was cancelled. No money is due.'
   }
 }

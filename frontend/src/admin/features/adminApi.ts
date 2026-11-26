@@ -1138,6 +1138,7 @@ export type PayoutStatus =
   | 'REVERSED'
   | 'CANCELLED'
 export type PayoutMethod = 'MANUAL' | 'GATEWAY'
+export type AdvanceOutcome = 'SETTLED' | 'DUES'
 
 export interface PayoutEvent {
   id: string
@@ -1177,6 +1178,10 @@ export interface Payout {
   failureReason: string | null
   createdByEmail: string | null
   createdAt: string
+  /** Paid before the order was delivered (docs/seller-finance §9). */
+  isAdvance: boolean
+  /** How an advance was cleared: SETTLED (delivered) · DUES (cancelled / refunded) · null = not yet. */
+  advanceOutcome: AdvanceOutcome | null
   events: PayoutEvent[]
   /** Where an admin may move it (manual payouts only). */
   nextStatuses: PayoutStatus[]
@@ -1220,6 +1225,18 @@ export interface OrderPayouts {
     /** Why no payout can be made — empty when one can. */
     blockers: string[]
     canPay: boolean
+    /** Paying before delivery (docs/seller-finance §9). */
+    advance: {
+      /** A payout made now is an advance — the order isn't delivered. */
+      now: boolean
+      /** The store's "allow advance payouts" switch. */
+      allowed: boolean
+      /** Only the switch is in the way — offer to turn it on. */
+      needsSwitch: boolean
+      /** Paid (or on its way) before delivery on this order. */
+      paid: string
+    }
+    storeId: string | null
     payee: {
       id: string
       accountHolderName: string
@@ -1275,7 +1292,9 @@ export interface PayoutRow {
   failureReason: string | null
   createdByEmail: string | null
   createdAt: string
-  order: { id: string; orderNumber: string; storeId: string | null; storeName: string; total: string }
+  isAdvance: boolean
+  advanceOutcome: AdvanceOutcome | null
+  order: { id: string; orderNumber: string; storeId: string | null; storeName: string; total: string; status: string }
 }
 
 export interface AwaitingPayoutRow {
@@ -1294,7 +1313,7 @@ export interface AwaitingPayoutRow {
 
 export type FeeKind = 'PLATFORM' | 'GATEWAY'
 export type FeeBearer = 'SELLER' | 'PLATFORM'
-export type LedgerBucket = 'PAYABLE' | 'IN_PAYOUT' | 'OWED'
+export type LedgerBucket = 'PAYABLE' | 'IN_PAYOUT' | 'OWED' | 'ADVANCE'
 export type LedgerEntryType =
   | 'ORDER_SALE'
   | 'PLATFORM_FEE'
@@ -1307,6 +1326,9 @@ export type LedgerEntryType =
   | 'PAYOUT_RELEASED'
   | 'PAYOUT_RETURNED'
   | 'ADJUSTMENT'
+  | 'ADVANCE_PAID'
+  | 'ADVANCE_SETTLED'
+  | 'ADVANCE_TO_DUES'
 
 export interface RateNow {
   ruleId: string | null
@@ -1350,6 +1372,8 @@ export interface Balance {
   payable: string
   inPayout: string
   owed: string
+  /** Paid ahead on orders not delivered yet — not part of `net`. */
+  advance: string
   /** payable − owed */
   net: string
   updatedAt: string | null
@@ -1370,6 +1394,8 @@ export interface DeliveredTotals {
 
 export interface StoreFinance {
   store: { id: string; name: string; slug: string | null }
+  /** UnieMax may pay this seller before delivery. */
+  advancePayoutsAllowed: boolean
   balance: Balance
   delivered: { online: DeliveredTotals; cod: DeliveredTotals }
   rates: FinanceRates
@@ -1536,7 +1562,7 @@ export const adminApi = {
   },
   /** Platform-wide sums of every store's balances. */
   async balanceTotals() {
-    const envelope = await callEnvelope<{ totals: { payable: string; inPayout: string; owed: string } }>(
+    const envelope = await callEnvelope<{ totals: { payable: string; inPayout: string; owed: string; advance: string } }>(
       http.get(`${BASE}/finance/balances`, params({ pageSize: 1 })),
     )
     return envelope.totals
@@ -1558,6 +1584,12 @@ export const adminApi = {
     },
   ) {
     return call<StoreFinance>(http.post(`${BASE}/finance/stores/${storeId}/adjustments`, body))
+  },
+  /** Let (or stop) UnieMax paying this seller before delivery. */
+  setAdvancePayouts(storeId: string, allowed: boolean) {
+    return call<{ storeId: string; advancePayoutsAllowed: boolean; changed: boolean }>(
+      http.patch(`${BASE}/finance/stores/${storeId}/advance-payouts`, { allowed }),
+    )
   },
 
   // Catalog

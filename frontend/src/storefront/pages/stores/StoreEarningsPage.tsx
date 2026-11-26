@@ -16,8 +16,9 @@ import type { StatusTone } from './ui/StatusPill'
 /**
  * Earnings — the seller's side of seller finance (docs/seller-finance/).
  * Read-only: what UnieMax will pay them, what is on its way, what they owe
- * (platform fees on cash orders), the payouts made and every entry behind
- * those numbers, newest first. Every figure comes from the server.
+ * (platform fees on cash orders), what was paid to them in advance (before
+ * delivery — shown only when there is some), the payouts made and every
+ * entry behind those numbers, newest first. Every figure comes from the server.
  */
 
 const inr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2 })
@@ -86,6 +87,14 @@ export function StoreEarningsPage() {
             />
           </div>
 
+          {Number(data.balance.advance) > 0 ? (
+            <Tile
+              label={BUCKET_LABEL.ADVANCE.seller}
+              value={money(data.balance.advance)}
+              hint="Paid before your orders were delivered. It comes out of what you earn on delivery. If an order is cancelled, it is taken from your next payout."
+            />
+          ) : null}
+
           <Card className="space-y-2">
             <p className="text-base text-fg">
               <span className="font-semibold">Platform fee: {Number(data.rates.platform.percent)}%</span>{' '}
@@ -126,6 +135,9 @@ export function StoreEarningsPage() {
                   <li key={payout.id} className="flex flex-wrap items-start justify-between gap-2 py-3 first:pt-0 last:pb-0">
                     <div className="min-w-0">
                       <p className="font-figure text-base font-semibold text-fg">{money(payout.amount)}</p>
+                      {payout.isAdvance ? (
+                        <p className="text-sm font-medium text-fg">Advance — paid before delivery</p>
+                      ) : null}
                       <p className="text-sm text-muted">
                         Order{' '}
                         <Link to={`../orders/${payout.order.id}`} className="text-brand hover:underline">

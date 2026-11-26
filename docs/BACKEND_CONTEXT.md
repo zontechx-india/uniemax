@@ -523,7 +523,12 @@ module repeats the guard. Deliberate scope decisions:
   lock order: order row, then the store's balance row). The code path that
   moves a payout to `SUCCEEDED` calls `notifySellerPayoutSent`
   (`payouts.notifications.ts`): email + WhatsApp `seller_payout_sent`, once,
-  fire-and-forget (SMS not built). Gateway payouts stay off until `PAYMENTHUB_PAYOUTS_ENABLED` —
+  fire-and-forget (SMS not built). **Advance payouts** (docs/seller-finance
+  §9): `payoutPlan` makes a MANUAL payout on an undelivered `ONLINE` + `PAID`
+  order an advance when the store's `advancePayoutsAllowed` is on
+  (`isAdvance`, decided under the order lock); its money sits in the ADVANCE
+  balance until `postDeliveredOrder` (same transaction) or the
+  `order.cancelled` event / sweep clears it. Gateway payouts stay off until `PAYMENTHUB_PAYOUTS_ENABLED` —
   the hub has no payout API yet, so the request body and webhook shape are
   UnieMax's expectation, to align when the hub ships it.
 - **CSRF, second layer.** The whole `requireAdmin` subtree also carries
@@ -1800,13 +1805,17 @@ White-label design — one codebase, any business:
   order — a financial record keeps its order.
 - **OrderPayout** also has `duesDeducted` (COD dues settled by the payout
   instead of sent) and `ledgerStatus` (status the seller ledger last matched;
-  the finance sweep syncs rows where it differs from `status`).
+  the finance sweep syncs rows where it differs from `status`), `isAdvance`
+  (paid before delivery) and `advanceOutcome` (enum **AdvanceOutcome**
+  `SETTLED | DUES` — how an advance was cleared; null = not yet).
 - **Seller finance** (`finance.prisma`) — **FeeRule** (`fee_rules`, versioned,
   never edited), **OrderFinancials** (`order_financials`, one per order,
   `Order.financials`, Restrict), **SellerBalance** (`seller_balances`, per
   store, no FK so history outlives a deleted store) and **SellerLedgerEntry**
   (`seller_ledger_entries`, immutable, unique `idempotencyKey`). Enums
-  `FeeKind`, `FeeScope`, `FeeBearer`, `LedgerBucket`, `LedgerEntryType`. Field
+  `FeeKind`, `FeeScope`, `FeeBearer`, `LedgerBucket` (`PAYABLE | IN_PAYOUT |
+  OWED | ADVANCE` — `seller_balances` has one column each), `LedgerEntryType`
+  (incl. `ADVANCE_PAID | ADVANCE_SETTLED | ADVANCE_TO_DUES`). Field
   meanings and posting rules: [`docs/seller-finance/README.md`](./seller-finance/README.md).
 - **OrderPayoutEvent** (`order_payout_events`) — append-only history of a
   payout: `fromStatus` (null on creation) → `toStatus`, `source` `ADMIN |
@@ -1905,6 +1914,8 @@ White-label design — one codebase, any business:
   (`setStoreVerification` in `adminStores.service.ts`; a store needs a GSTIN to
   be verified). `updateStoreProfile` clears all three when the GSTIN or
   business name changes. Verified stores rank first in `GET /public/stores`.
+  `advancePayoutsAllowed` (default false) — an admin lets UnieMax pay this
+  store before delivery (docs/seller-finance §9).
 - **Customer** additions: `blockedAt` / `blockedReason` — set when an admin
   blocks the account; every sign-in strategy checks it and blocking revokes
   all sessions. `metaSellerSignupSentAt` — set when the Meta Conversions API
@@ -2211,7 +2222,8 @@ payout-account verification**, **seller payouts** per order (manual records
 now; PaymentHub payouts built but switched off until the hub offers them —
 `modules/payouts`), **seller finance** — versioned platform / gateway fee %,
 per-order fee snapshots and a per-store ledger with COD dues deducted from
-payouts (`modules/finance`, docs/seller-finance/), an append-only **audit trail** of every admin
+payouts and **advance payouts** before delivery for trusted stores
+(`modules/finance`, docs/seller-finance/), an append-only **audit trail** of every admin
 write, and SUPER_ADMIN-only **admin-account management** (create / role /
 deactivate / password reset, each revoking that admin's sessions). Verified
 end to end against the live database.
