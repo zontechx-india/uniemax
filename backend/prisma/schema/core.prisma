@@ -883,7 +883,13 @@ model StoreBankAccount {
   store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   accountHolderName String
+  /// ENCRYPTED at rest (`enc:v1:…`, utils/bankCrypto.ts) — the Prisma
+  /// client seals it on write and returns it decrypted. Never filter on it.
   accountNumber     String
+  /// Keyed HMAC of the plain number, for lookups and uniqueness (the
+  /// encrypted value differs every time). Set on every write; null only for
+  /// a legacy row the boot backfill has not sealed yet.
+  accountNumberHash String?
   ifsc              String
   bankName          String
   branch            String
@@ -925,7 +931,7 @@ model StoreBankAccount {
 
   // The same account can't be added to one store twice (archived rows
   // included — re-adding one restores it).
-  @@unique([storeId, accountNumber, ifsc])
+  @@unique([storeId, accountNumberHash, ifsc])
   @@index([storeId])
   // The `verification.updated` webhook finds its account by check id.
   @@index([verificationRef])
@@ -953,6 +959,7 @@ model StoreBankAccountChange {
   storeId   String
 
   accountHolderName String
+  /// ENCRYPTED at rest, like `StoreBankAccount.accountNumber`.
   accountNumber     String
   ifsc              String
   bankName          String

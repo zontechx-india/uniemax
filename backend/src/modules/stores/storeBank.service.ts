@@ -3,6 +3,7 @@ import { prisma } from "../../config/prisma.js";
 import type { StoreActor } from "./storeActor.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../../utils/httpError.js";
+import { bankNumberIndex } from "../../utils/bankCrypto.js";
 import { confirmActionCode, requestActionCode } from "../../package/auth/index.js";
 import { publicWebUrl, sendMail } from "../../package/mail/index.js";
 import { notify } from "../notifications/notifications.service.js";
@@ -218,7 +219,8 @@ async function findArchivedDuplicate(
   const clash = await prisma.storeBankAccount.findFirst({
     where: {
       storeId,
-      accountNumber: details.accountNumber,
+      // The stored number is encrypted — match on its keyed hash.
+      accountNumberHash: bankNumberIndex(details.accountNumber),
       ifsc: details.ifsc,
       ...(exceptAccountId ? { id: { not: exceptAccountId } } : {}),
     },

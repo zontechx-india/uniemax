@@ -46,6 +46,10 @@ const envSchema = z.object({
   DATABASE_URL: z.string().optional(),
   // Direct (non-pooled) connection — used by Prisma CLI for migrations.
   DIRECT_URL: z.string().optional(),
+  // Encrypts payout bank account numbers at rest (utils/bankCrypto.ts) —
+  // 32 random bytes, base64, DIFFERENT per environment. Losing it loses
+  // every stored number: keep a copy outside the server.
+  BANK_DATA_KEY: z.string().optional(),
 
   // Cashfree Payment Gateway (PG REST API v4, header x-api-version).
   // Both keys unset = gateway off: dev simulates ONLINE payments, production

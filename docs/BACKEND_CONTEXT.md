@@ -66,7 +66,7 @@ backend/
 │   ├── routes.ts              # Central route registrar (public + /admin subtrees)
 │   ├── config/
 │   │   ├── env.ts             # Zod-validated, typed `env`
-│   │   └── prisma.ts          # PrismaClient singleton (pg adapter, pooled URL)
+│   │   └── prisma.ts          # PrismaClient singleton (pg adapter, pooled URL; bank-number encryption extension)
 │   ├── plugins/
 │   │   └── prisma.ts          # Decorates app.prisma; connect/disconnect lifecycle
 │   ├── middleware/
@@ -1463,10 +1463,11 @@ White-label design — one codebase, any business:
   under `/stores/:id/…`, same ownership rules), with slug/aggregate helpers in
   `catalogSlug.ts` and the anonymous storefront surface in `publicStore.*`.
 - **StoreBankAccount** — a seller **payout account** (cascade delete with its
-  store; unique per store on `accountNumber + ifsc`; service caps at 5).
+  store; unique per store on `accountNumberHash + ifsc`; service caps at 5).
   Fields: holder name (hub characters only), account number (9–18 digits,
-  stored in plain text — encryption is planned, see
-  `docs/BANK_VERIFICATION_TODO.md`), IFSC, bank name, branch, optional UPI
+  **encrypted at rest** — see *Bank number encryption* below),
+  `accountNumberHash` (keyed HMAC of the number, for lookups and
+  uniqueness), IFSC, bank name, branch, optional UPI
   id and phone. Exactly **one per store is `isPrimary`** — the only account
   that receives payouts from UnieMax (first saved account is primary
   automatically; promoting one demotes the current primary in the same
@@ -1481,6 +1482,17 @@ White-label design — one codebase, any business:
   number + IFSC again restores the row as a fresh, `PENDING` account (the
   unique index covers archived rows). Editing another account onto an
   archived row's details → `409`.
+  **Bank number encryption**: `accountNumber` on this model and on
+  `StoreBankAccountChange` is stored as `enc:v1:<base64 iv|tag|ciphertext>`
+  (AES-256-GCM, `utils/bankCrypto.ts`, key `BANK_DATA_KEY`). A Prisma
+  extension in `config/prisma.ts` seals it on every write (and sets
+  `accountNumberHash`) and decrypts it on every read, nested reads included,
+  so services handle plain numbers. Rule: **never filter on
+  `accountNumber`**; filter on `accountNumberHash` (`bankNumberIndex()`).
+  `prismaRaw` (unextended) is only for `bankNumberBackfill.ts`, which runs
+  before the server listens and seals any plain-text row left. Other copies
+  stay masked (payout snapshot, history: last 4). PaymentHub stores no full
+  number either.
   **Verification**: `verificationStatus` (`PENDING`/`VERIFIED`/`FAILED`,
   default `PENDING`), `verificationMethod` (`THIRD_PARTY` = a PaymentHub
   bank check / `MANUAL` = an admin's decision), `verificationRef` (latest hub

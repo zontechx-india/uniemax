@@ -179,10 +179,11 @@ against a throwaway database.
 
 ## 6. Not built — decided to do later
 
-☐ **Encrypt bank details at rest.** The account number is stored as plain
-text in `store_bank_accounts` and `store_bank_account_changes`. The owner
-chose to plan this later. The repo has no encryption helper yet — ask before
-adding one. PaymentHub's future payee creation will need the full number.
+☑ **Encrypt bank details at rest.** Done 2026-11-27: the account number in
+`store_bank_accounts` and `store_bank_account_changes` is AES-256-GCM
+encrypted with `BANK_DATA_KEY` (`utils/bankCrypto.ts`, wired in
+`config/prisma.ts`), decryptable whenever the code needs it, for example
+PaymentHub's future payee creation. Details: BACKEND_CONTEXT.md, StoreBankAccount.
 
 ☐ **SMS alert when bank details change.** Today: in-app alert + email only.
 We have no plain SMS sender (Message Central is only used for OTP).

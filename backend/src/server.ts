@@ -2,6 +2,7 @@
 import "./config/loadEnv.js";
 import { buildApp } from "./app.js";
 import { env } from "./config/env.js";
+import { sealLegacyBankNumbers } from "./modules/stores/bankNumberBackfill.js";
 import { startAutomationScanner, stopAutomationScanner } from "./modules/whatsapp/whatsapp.automations.js";
 import { startCampaignWorker, stopCampaignWorker } from "./modules/whatsapp/whatsapp.campaigns.js";
 import { startOrderMessages } from "./modules/whatsapp/whatsapp.orderMessages.js";
@@ -28,6 +29,10 @@ async function start(): Promise<void> {
   // ---------------------------------------------------------------------------
 
   try {
+    // Before serving: encrypt any bank number still in plain text. Fails the
+    // boot when BANK_DATA_KEY is missing — bank pages would fail without it.
+    const sealed = await sealLegacyBankNumbers();
+    if (sealed > 0) app.log.info(`Encrypted ${sealed} legacy bank account number(s)`);
     await app.listen({ port: env.PORT, host: env.HOST });
     // Background WhatsApp work (no-ops while WA_ENABLED=false): the campaign
     // queue, the automation scanner and order messages. Started here, not in

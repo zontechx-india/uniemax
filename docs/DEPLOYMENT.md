@@ -89,6 +89,7 @@ database. Only the frontend *root* is shared in the sense that each has its own.
 | URL | `dev.uniemax.zontechx.com` | `uniemax.com`, `www` |
 | Deployed by | push to `main` → `deploy-dev.yml` | tag `v*` → `deploy-prod.yml` (no approval step) |
 | `PAYMENTHUB_WEBHOOK_SECRET` | dev hub's secret, in `~/uniemax-dev/backend/.env.development` | prod hub's secret, in `~/uniemax/backend/.env.production` |
+| `BANK_DATA_KEY` | dev key (same as the local `.env.development` — they share the dev DB), in `~/uniemax-dev/backend/.env.development` | prod key, in `~/uniemax/backend/.env.production`. **Never lose or change it** — the bank numbers are encrypted with it; keep a copy outside the server |
 | `PAYMENTHUB_API_KEY` | dev hub's TEST key `ph_test_6hl1…`, same file | prod hub's LIVE key `ph_live_kXFI…`, same file |
 | `PAYMENTHUB_URL` | `https://pay.dev.zontechx.com`, same file | `https://pay.zontechx.com`, same file |
 | PaymentHub webhook URL | `https://dev.uniemax.zontechx.com/api/v1/payments/webhooks/paymenthub` | `https://uniemax.com/api/v1/payments/webhooks/paymenthub` |
@@ -131,7 +132,7 @@ then `.env` for whatever the overlay omits:
 | File on the server | Contents |
 | ------------------ | -------- |
 | `backend/.env` | Shared values — JWT, S3/AWS, Cashfree, Resend, Message Central, media rules, `HOST`/`PORT`/`LOG_LEVEL`, `VAPID_SUBJECT` |
-| `backend/.env.production` | `NODE_ENV=production`, prod DB pair, `CORS_ORIGIN`, `PUBLIC_WEB_URL`, `PUBLIC_API_URL`, the server's `VAPID_*` pair, `PAYMENTHUB_WEBHOOK_SECRET` (prod hub's secret) |
+| `backend/.env.production` | `NODE_ENV=production`, prod DB pair, `CORS_ORIGIN`, `PUBLIC_WEB_URL`, `PUBLIC_API_URL`, the server's `VAPID_*` pair, `PAYMENTHUB_WEBHOOK_SECRET` (prod hub's secret), `BANK_DATA_KEY` |
 | `backend/ecosystem.config.cjs` | **In git.** Sets `APP_ENV=production` for pm2 — the whole switch |
 
 **Live since 2026-08-07.** The pm2 side was applied with `pm2 delete` +
