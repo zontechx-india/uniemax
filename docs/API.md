@@ -1152,7 +1152,7 @@ first. Each:
   "promoteWhenVerified",          // becomes main once verified
   "verificationStatus": "PENDING | VERIFIED | FAILED",
   "verificationMethod": "THIRD_PARTY | MANUAL | null",
-  "verificationNote": null,       // why it failed — written for the seller
+  "verificationNote": null,       // why it failed — FAILED only; always null otherwise (an admin note on any other status is internal)
   "verifiedAt": null,
   "checkStatus": null,            // last check (see table) — no reason code
   "checkRegisteredName": null,    // the name the bank holds, VALID only
@@ -3644,7 +3644,9 @@ worse than no answer. Stamps `verifiedBy` with the acting admin and records a
 `MANUAL_*` history event (with the note). A manual `VERIFIED` also performs a
 queued main-account switch (`promoteWhenVerified`). Acts on the account's
 current details only — a pending change is not affected. The seller is
-notified. → the full store.
+notified; only a `FAILED` note reaches them (in the notification and as
+`verificationNote`). A note on `VERIFIED` / `PENDING` stays internal (admin
+view + admin history). → the full store.
 
 ### `POST /api/v1/admin/stores/:id/bank-accounts/:accountId/bank-check`
 

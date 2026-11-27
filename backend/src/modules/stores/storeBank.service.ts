@@ -111,13 +111,16 @@ type AccountRow = Prisma.StoreBankAccountGetPayload<{ select: typeof accountSele
 
 /**
  * The seller's view: last 4 digits only, no reason code, the bank's name
- * only when VALID (the hub fills it only then).
+ * only when VALID (the hub fills it only then). `verificationNote` reaches
+ * the seller only as a FAILED reason — on any other status it is an
+ * admin's internal note and is sent as null.
  */
 function toSellerAccount(row: AccountRow) {
-  const { accountNumber, changes, storeId: _storeId, ...rest } = row;
+  const { accountNumber, changes, storeId: _storeId, verificationNote, ...rest } = row;
   const change = changes[0];
   return {
     ...rest,
+    verificationNote: rest.verificationStatus === "FAILED" ? verificationNote : null,
     accountNumberLast4: accountNumber.slice(-4),
     pendingChange: change
       ? {

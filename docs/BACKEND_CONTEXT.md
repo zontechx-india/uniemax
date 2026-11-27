@@ -1477,7 +1477,8 @@ White-label design — one codebase, any business:
   default `PENDING`), `verificationMethod` (`THIRD_PARTY` = a PaymentHub
   bank check / `MANUAL` = an admin's decision), `verificationRef` (latest hub
   check id `vf_…`, indexed for the `verification.updated` webhook),
-  `verifiedBy` (admin id, manual only), `verificationNote` (seller-visible),
+  `verifiedBy` (admin id, manual only), `verificationNote` (seller-visible only when `FAILED`; on any other status
+  an internal admin note, nulled in the seller response),
   `verifiedAt`. The last check: `checkStatus` (enum **BankCheckStatus**
   `VALID`/`NEEDS_REVIEW`/`INVALID`/`RETRY_LATER`, plus our `UNAVAILABLE` =
   the check could not run), `checkReasonCode` (admin-only), `checkRegisteredName`,

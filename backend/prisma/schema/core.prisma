@@ -871,7 +871,8 @@ enum BankCheckStatus {
 /// may be primary — that account alone receives payouts from UnieMax when
 /// customers pay through the platform. `verificationRef` stores the latest
 /// PaymentHub check id (`vf_…`), `verifiedBy` the admin who manually
-/// verified, `verificationNote` a failure reason the SELLER sees. The
+/// verified, `verificationNote` a failure reason the SELLER sees (on any
+/// other status it is an internal admin note the seller API hides). The
 /// `check*` fields hold the last check of THESE details; `checkReasonCode`
 /// is admin-only (it can say the provider flagged the account as fraud).
 /// New details for a VERIFIED account wait in `StoreBankAccountChange`, so

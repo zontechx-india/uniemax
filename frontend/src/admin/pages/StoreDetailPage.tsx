@@ -616,10 +616,18 @@ export default function StoreDetailPage() {
                 : 'the seller is told verification failed, with your note.'}
             </p>
             <TextArea
-              label={bankTarget?.status === 'FAILED' ? 'Reason (required)' : 'Note (optional)'}
+              label={
+                bankTarget?.status === 'FAILED'
+                  ? 'Reason for the seller (required)'
+                  : "Internal note (optional) — the seller won't see this"
+              }
               value={note}
               onChange={(event) => setNote(event.target.value)}
-              placeholder="e.g. Account holder name doesn't match the bank record"
+              placeholder={
+                bankTarget?.status === 'FAILED'
+                  ? "e.g. Account holder name doesn't match the bank record"
+                  : 'e.g. Checked the cancelled cheque on a call with the seller'
+              }
               maxLength={300}
             />
             {actionError ? <p className="text-sm text-danger">{actionError}</p> : null}
