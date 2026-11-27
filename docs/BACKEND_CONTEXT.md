@@ -1473,6 +1473,14 @@ White-label design — one codebase, any business:
   transaction — unless the current primary is VERIFIED and the new one is
   not, which sets `promoteWhenVerified` instead; deleting the primary never
   auto-promotes — payouts hold until one is picked).
+  **Archive**: `archivedAt` is set instead of deleting when the seller
+  removes an account that an `OrderPayout.payeeAccountId` names. The row keeps
+  its full details for the money record. It is hidden from the seller, never
+  primary, and not editable, checkable or verifiable; late check answers are
+  dropped. A never-paid account is deleted for real. Adding the same
+  number + IFSC again restores the row as a fresh, `PENDING` account (the
+  unique index covers archived rows). Editing another account onto an
+  archived row's details → `409`.
   **Verification**: `verificationStatus` (`PENDING`/`VERIFIED`/`FAILED`,
   default `PENDING`), `verificationMethod` (`THIRD_PARTY` = a PaymentHub
   bank check / `MANUAL` = an admin's decision), `verificationRef` (latest hub

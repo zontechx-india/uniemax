@@ -208,9 +208,11 @@ export async function getStore(storeRef: string) {
       verifiedBy: true,
       verifiedGstin: true,
       bankAccounts: {
-        orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+        // Archived (seller-removed, kept for payout records) listed last.
+        orderBy: [{ isPrimary: "desc" }, { archivedAt: { sort: "desc", nulls: "first" } }, { createdAt: "asc" }],
         select: {
           id: true,
+          archivedAt: true,
           accountHolderName: true,
           accountNumber: true,
           ifsc: true,
@@ -490,7 +492,8 @@ export async function setBankVerification(
   if (!store) throw HttpError.notFound("Store not found");
 
   const account = await prisma.storeBankAccount.findFirst({
-    where: { id: accountId, storeId: store.id },
+    // Archived = removed by the seller, kept only for payout records.
+    where: { id: accountId, storeId: store.id, archivedAt: null },
     select: {
       id: true,
       accountHolderName: true,

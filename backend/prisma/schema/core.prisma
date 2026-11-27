@@ -913,10 +913,18 @@ model StoreBankAccount {
 
   changes StoreBankAccountChange[]
 
+  /// Set when the seller deletes an account that a payout names
+  /// (`OrderPayout.payeeAccountId`): the row is kept for the money record,
+  /// hidden from the seller and never a payout target again. Accounts
+  /// never paid are deleted for real. Re-adding the same number + IFSC
+  /// restores the row as a fresh, unchecked account.
+  archivedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // The same account can't be added to one store twice.
+  // The same account can't be added to one store twice (archived rows
+  // included — re-adding one restores it).
   @@unique([storeId, accountNumber, ifsc])
   @@index([storeId])
   // The `verification.updated` webhook finds its account by check id.

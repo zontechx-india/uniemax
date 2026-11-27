@@ -356,8 +356,18 @@ export default function StoreDetailPage() {
                   <p className="flex flex-wrap items-center gap-2 font-medium text-fg">
                     {account.bankName} ····{account.accountNumberLast4}
                     {account.isPrimary ? <Chip tone="brand">Primary</Chip> : null}
-                    <BankStatusChip status={account.verificationStatus} />
+                    {account.archivedAt ? (
+                      <Chip>Removed by seller</Chip>
+                    ) : (
+                      <BankStatusChip status={account.verificationStatus} />
+                    )}
                   </p>
+                  {account.archivedAt ? (
+                    <p className="mt-1 text-xs text-muted">
+                      Removed on {formatDateTime(account.archivedAt)}. Kept because payouts were sent
+                      here — it can't receive new ones.
+                    </p>
+                  ) : null}
                   <BankAccountDetails account={account} />
                   {account.promoteWhenVerified ? (
                     <p className="mt-1 text-xs text-muted">Becomes the main account once verified.</p>
@@ -389,41 +399,43 @@ export default function StoreDetailPage() {
                     </div>
                   ) : null}
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {account.checkStatus !== 'VALID' ? (
-                    <Button
-                      onClick={() => {
-                        setCheckTarget(account)
-                        setActionError(null)
-                      }}
-                    >
-                      Verify with bank
-                    </Button>
-                  ) : null}
-                  {account.verificationStatus !== 'VERIFIED' ? (
-                    <Button
-                      onClick={() => {
-                        setBankTarget({ account, status: 'VERIFIED' })
-                        setNote('')
-                        setActionError(null)
-                      }}
-                    >
-                      Mark verified
-                    </Button>
-                  ) : null}
-                  {account.verificationStatus !== 'FAILED' ? (
-                    <Button
-                      variant="danger"
-                      onClick={() => {
-                        setBankTarget({ account, status: 'FAILED' })
-                        setNote('')
-                        setActionError(null)
-                      }}
-                    >
-                      Mark failed
-                    </Button>
-                  ) : null}
-                </div>
+                {account.archivedAt ? null : (
+                  <div className="flex flex-wrap gap-2">
+                    {account.checkStatus !== 'VALID' ? (
+                      <Button
+                        onClick={() => {
+                          setCheckTarget(account)
+                          setActionError(null)
+                        }}
+                      >
+                        Verify with bank
+                      </Button>
+                    ) : null}
+                    {account.verificationStatus !== 'VERIFIED' ? (
+                      <Button
+                        onClick={() => {
+                          setBankTarget({ account, status: 'VERIFIED' })
+                          setNote('')
+                          setActionError(null)
+                        }}
+                      >
+                        Mark verified
+                      </Button>
+                    ) : null}
+                    {account.verificationStatus !== 'FAILED' ? (
+                      <Button
+                        variant="danger"
+                        onClick={() => {
+                          setBankTarget({ account, status: 'FAILED' })
+                          setNote('')
+                          setActionError(null)
+                        }}
+                      >
+                        Mark failed
+                      </Button>
+                    ) : null}
+                  </div>
+                )}
               </li>
             ))}
           </ul>

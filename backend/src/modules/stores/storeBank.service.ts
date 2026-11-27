@@ -37,6 +37,9 @@ import { listBankEvents, recordBankEvent, type BankActor } from "./storeBank.his
  *    applied only when VALID, so payouts never move to unchecked details; an
  *    unverified account is edited in place. Likewise a new account asked to
  *    be main while a VERIFIED one is main takes over only once verified;
+ *  - deleting an account a payout names ARCHIVES it (`archivedAt`) so the
+ *    money record keeps its details; it is hidden here and can never be
+ *    paid again. A never-paid account is deleted for real;
  *  - the full account number is never returned — sellers see the last 4;
  *  - every write lands in the history (`storeBank.history.ts`).
  */
@@ -202,8 +205,12 @@ function label(details: { bankName: string; accountNumber: string }) {
   return `${details.bankName} ····${details.accountNumber.slice(-4)}`;
 }
 
-/** The same number + IFSC may not be saved twice in one store. */
-async function assertNotDuplicate(
+/**
+ * The same number + IFSC may not be saved twice in one store. An ARCHIVED
+ * row with those details is not a clash — it is returned, and adding the
+ * account again restores it (the unique index covers archived rows too).
+ */
+async function findArchivedDuplicate(
   storeId: string,
   details: { accountNumber: string; ifsc: string },
   exceptAccountId?: string,
@@ -215,10 +222,29 @@ async function assertNotDuplicate(
       ifsc: details.ifsc,
       ...(exceptAccountId ? { id: { not: exceptAccountId } } : {}),
     },
-    select: { id: true },
+    select: { id: true, archivedAt: true },
   });
-  if (clash) throw HttpError.conflict("This bank account is already saved in your store.");
+  if (clash && !clash.archivedAt) throw HttpError.conflict("This bank account is already saved in your store.");
+  return clash;
 }
+
+/** Details that changed are unchecked again — a new bank check decides. */
+const UNCHECKED = {
+  verificationStatus: "PENDING",
+  verificationMethod: null,
+  verificationRef: null,
+  verificationNote: null,
+  verifiedAt: null,
+  verifiedBy: null,
+  checkStatus: null,
+  checkReasonCode: null,
+  checkRegisteredName: null,
+  checkNameMatch: null,
+  checkedAt: null,
+} satisfies Prisma.StoreBankAccountUpdateInput;
+
+/** Archived accounts are kept for payout records only — never seller-facing. */
+const ACTIVE = { archivedAt: null } satisfies Prisma.StoreBankAccountWhereInput;
 
 // ---------------------------------------------------------------------------
 // Reads
@@ -228,7 +254,7 @@ export async function listBankAccounts(actor: StoreActor, storeRef: string) {
   assertOwner(actor);
   const store = await getMyStore(actor, storeRef); // ownership check
   const rows = await prisma.storeBankAccount.findMany({
-    where: { storeId: store.id },
+    where: { storeId: store.id, ...ACTIVE },
     select: accountSelect,
     orderBy: { createdAt: "asc" },
   });
@@ -270,7 +296,7 @@ export async function createBankAccount(
   }
 
   const existing = await prisma.storeBankAccount.findMany({
-    where: { storeId: store.id },
+    where: { storeId: store.id, ...ACTIVE },
     select: { id: true, isPrimary: true, verificationStatus: true },
   });
   if (existing.length >= MAX_ACCOUNTS) {
@@ -282,7 +308,7 @@ export async function createBankAccount(
   if (existing.length > 0) await requireCode(actor, input.otp);
 
   const { isPrimary, otp: _otp, ...details } = input;
-  await assertNotDuplicate(store.id, details);
+  const archived = await findArchivedDuplicate(store.id, details);
 
   // The first account is always the payout target. A later one asked to be
   // main takes over at once — unless the current main is VERIFIED, in which
@@ -300,10 +326,16 @@ export async function createBankAccount(
         data: { isPrimary: false },
       });
     }
-    const account = await tx.storeBankAccount.create({
-      data: { ...details, storeId: store.id, isPrimary: makePrimary, promoteWhenVerified: queued },
-      select: { id: true },
-    });
+    const data = { ...details, isPrimary: makePrimary, promoteWhenVerified: queued };
+    // Re-adding an archived account restores its row (old payouts keep
+    // pointing at it) as a fresh, unchecked account — same as a new one.
+    const account = archived
+      ? await tx.storeBankAccount.update({
+          where: { id: archived.id },
+          data: { ...data, ...UNCHECKED, archivedAt: null },
+          select: { id: true },
+        })
+      : await tx.storeBankAccount.create({ data: { ...data, storeId: store.id }, select: { id: true } });
     await recordBankEvent({ storeId: store.id, accountId: account.id, action: "ACCOUNT_ADDED", actor: who, details }, tx);
     if (makePrimary && existing.length > 0) {
       await recordBankEvent({ storeId: store.id, accountId: account.id, action: "PRIMARY_CHANGED", actor: who, details }, tx);
@@ -338,7 +370,7 @@ export async function updateBankAccount(
   assertOwner(actor);
   const store = await getMyStore(actor, storeRef); // ownership check
   const existing = await prisma.storeBankAccount.findFirst({
-    where: { id: accountId, storeId: store.id },
+    where: { id: accountId, storeId: store.id, ...ACTIVE },
   });
   if (!existing) throw HttpError.notFound("Bank account not found");
   await requireCode(actor, input.otp);
@@ -359,7 +391,12 @@ export async function updateBankAccount(
   let check: CheckOutcome | null = null;
 
   if (detailChanged) {
-    await assertNotDuplicate(store.id, next, existing.id);
+    if (await findArchivedDuplicate(store.id, next, existing.id)) {
+      // Its row is kept for old payouts, so these details can't move here.
+      throw HttpError.conflict(
+        "You removed this bank account earlier. Add it again as a new account to use it.",
+      );
+    }
 
     if (existing.verificationStatus === "VERIFIED") {
       // Held aside: payouts stay on the verified details until these are VALID.
@@ -389,20 +426,7 @@ export async function updateBankAccount(
       await prisma.$transaction(async (tx) => {
         await tx.storeBankAccount.update({
           where: { id: existing.id },
-          data: {
-            ...next,
-            verificationStatus: "PENDING",
-            verificationMethod: null,
-            verificationRef: null,
-            verificationNote: null,
-            verifiedAt: null,
-            verifiedBy: null,
-            checkStatus: null,
-            checkReasonCode: null,
-            checkRegisteredName: null,
-            checkNameMatch: null,
-            checkedAt: null,
-          },
+          data: { ...next, ...UNCHECKED },
         });
         await recordBankEvent(
           { storeId: store.id, accountId: existing.id, action: "DETAILS_CHANGED", actor: who, details: next },
@@ -475,7 +499,7 @@ export async function recheckBankAccount(
   assertOwner(actor);
   const store = await getMyStore(actor, storeRef);
   const account = await prisma.storeBankAccount.findFirst({
-    where: { id: accountId, storeId: store.id },
+    where: { id: accountId, storeId: store.id, ...ACTIVE },
     select: { id: true, verificationStatus: true, changes: { where: { status: "OPEN" }, select: { id: true }, take: 1 } },
   });
   if (!account) throw HttpError.notFound("Bank account not found");
@@ -517,14 +541,31 @@ export async function deleteBankAccount(
   assertOwner(actor);
   const store = await getMyStore(actor, storeRef); // ownership check
   const existing = await prisma.storeBankAccount.findFirst({
-    where: { id: accountId, storeId: store.id },
+    where: { id: accountId, storeId: store.id, ...ACTIVE },
     select: { id: true, accountHolderName: true, accountNumber: true, ifsc: true, bankName: true, branch: true },
   });
   if (!existing) throw HttpError.notFound("Bank account not found");
+  // An account a payout names is archived, not deleted, so the money record
+  // keeps its full details. To the seller both are the same: it is gone.
+  const paid = await prisma.orderPayout.findFirst({
+    where: { payeeAccountId: existing.id },
+    select: { id: true },
+  });
   // Deliberately no auto-promotion of another account: the payout target
   // must always be an explicit choice by the seller.
   await prisma.$transaction(async (tx) => {
-    await tx.storeBankAccount.delete({ where: { id: existing.id } });
+    if (paid) {
+      await tx.storeBankAccount.update({
+        where: { id: existing.id },
+        data: { archivedAt: new Date(), isPrimary: false, promoteWhenVerified: false },
+      });
+      await tx.storeBankAccountChange.updateMany({
+        where: { accountId: existing.id, status: "OPEN" },
+        data: { status: "DISCARDED", resolvedAt: new Date() },
+      });
+    } else {
+      await tx.storeBankAccount.delete({ where: { id: existing.id } });
+    }
     await recordBankEvent(
       { storeId: store.id, accountId: existing.id, action: "ACCOUNT_DELETED", actor: sellerActor(actor), details: existing },
       tx,

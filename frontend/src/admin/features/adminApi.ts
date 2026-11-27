@@ -342,6 +342,8 @@ export interface BankAccount {
   branch: string
   upiId: string | null
   isPrimary: boolean
+  /** Set = the seller removed it; kept only because payouts name it. */
+  archivedAt: string | null
   verificationStatus: BankVerificationStatus
   verificationMethod: 'THIRD_PARTY' | 'MANUAL' | null
   /** The verification provider's check id, when a third party verified it. */

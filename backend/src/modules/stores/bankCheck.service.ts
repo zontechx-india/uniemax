@@ -93,10 +93,12 @@ async function saveAccountResult(
       branch: true,
       verificationStatus: true,
       promoteWhenVerified: true,
+      archivedAt: true,
       store: { select: { ownerId: true } },
     },
   });
-  if (!account) return false;
+  // An archived account is frozen for the payout record — a late answer is dropped.
+  if (!account || account.archivedAt) return false;
 
   const settlement = settlementFor(result.status);
   // An UNAVAILABLE / RETRY_LATER on an account an admin already verified by
@@ -409,7 +411,7 @@ export async function runAdminBankCheck(
   });
   if (!store) throw HttpError.notFound("Store not found");
   const account = await prisma.storeBankAccount.findFirst({
-    where: { id: accountId, storeId: store.id },
+    where: { id: accountId, storeId: store.id, archivedAt: null },
     select: { id: true },
   });
   if (!account) throw HttpError.notFound("Bank account not found");

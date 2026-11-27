@@ -1187,7 +1187,10 @@ destination; 5 requests per 10 min.
 `400` while the `PAYOUT_SETUP` gate is blocked (see *Store readiness*) —
 the business address must be in first (the seller's bank page asks for it in
 place); the message names every missing one. `409` on the 6th account or when the same
-`accountNumber` + `ifsc` is already saved for this store.
+`accountNumber` + `ifsc` is already saved for this store. If those details
+belong to an account the seller removed earlier that payouts name (archived,
+see `DELETE` below), that row is restored as a fresh `PENDING` account
+instead (same `id`).
 
 **`PATCH /api/v1/stores/:id/bank-accounts/:accountId`** → `{ account, check }`
 — partial update (≥ 1 field besides `otp`; `otp` always required). A left-out
@@ -1195,7 +1198,9 @@ place); the message names every missing one. `409` on the 6th account or when th
 account: edited in place, reset to `PENDING`, checked. On a VERIFIED account:
 held as a pending change (any older pending change is `SUPERSEDED`) and
 checked. `isPrimary` accepts **only `true`** — promoting demotes the current
-primary in the same transaction (or queues it, see above).
+primary in the same transaction (or queues it, see above). `409` when the new
+details match an archived account (the seller is told to add it again as a
+new account, which restores it).
 
 **`POST /api/v1/stores/:id/bank-accounts/:accountId/check`** →
 `{ account, check }` — run the check again (after `RETRY_LATER`,
@@ -1212,6 +1217,11 @@ account — withdraw pending new details (the account keeps its verified ones).
 owner is still alerted. Deleting the primary does **not** auto-promote
 another account (payouts must never silently retarget) — the seller picks
 the next primary explicitly, and payouts stay on hold until they do.
+An account that a payout names (`payeeAccountId`) is **archived**, not
+deleted. Its row keeps the full details for the money record, its pending
+change is `DISCARDED`, and it leaves this API (list, edit, check and delete
+all answer `404`). An account never paid is deleted for real. Same
+`ACCOUNT_DELETED` history event either way.
 
 **`GET /api/v1/stores/:id/bank-accounts/history`** — newest first (50):
 `{ id, accountId, action, actor: "SELLER" | "ADMIN" | "SYSTEM", details:
@@ -3603,7 +3613,9 @@ checkout — the same effective values the storefront sees), `bankAccounts`
 `verificationMethod`, `verificationRef`, `verifiedBy` (admin name or email),
 `updatedAt`; no role-based masking yet; each with the admin-only check
 fields and its `pendingChange` — new details waiting for their check, also
-with the full `accountNumber` — including `checkReasonCode`), `bankHistory`
+with the full `accountNumber` — including `checkReasonCode`; `archivedAt` set =
+the seller removed it but payouts name it — listed last, read-only, and the
+verify endpoints answer `404`), `bankHistory`
 (the last 30 payout-account events, newest first, **with** `actorId` and
 `note` — reason codes, manual notes; details stay masked to the last 4), `orderStatus` counts, `theme`,
 `footer`, the 10 latest orders, and `readiness` — the **full** evaluation
