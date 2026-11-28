@@ -63,10 +63,10 @@ the seller owes the supplier.
   change log ([terms](../terms/context.md)).
 - The top line is the balance in plain words: *"You owe Sri Textiles ₹3,450"*
   or *"Sri Textiles owes you ₹1,200"*.
-- Lines: order number, date, *Prepaid* / *COD*, customer paid, supplier gets,
-  you get, and state. `SPLIT` lines read *"Paid by UnieMax · pays out on {date}"*.
+- Lines: order number, date, *Prepaid* / *COD*, customer paid, supplier gets
+  (on the supplier's side: *your share*), you get, and state. `SPLIT` lines read *"Paid by UnieMax · pays out on {date}"*.
 - **Record a payment**: *I paid {name}* / *{name} paid me*; amount (prefilled
-  with the balance); date; UPI or bank reference; note. The other side is
+  with the balance); date (defaults to today in the viewer's time zone); UPI or bank reference; note. The other side is
   notified. The person who recorded a payment can delete it; it is kept for
   audit and the other side is told.
 

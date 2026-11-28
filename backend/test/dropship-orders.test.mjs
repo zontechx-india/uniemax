@@ -235,13 +235,19 @@ test("a shop that sells can't join as a supplier, and isn't offered on the join 
   if (!c) return;
   const shop = await c.B.req("POST", "/api/v1/stores", { form: fileForm({ name: uniq("QA Shop") }, PNG_1PX, "logo.png") });
   assert.equal(shop.status, 201, JSON.stringify(shop.body));
-  const inv = await c.A.req("POST", `${c.S}/supplier-invites`, {
-    json: { name: "QA Second", email: `${uniq("qa-two")}@example.test`, codAllowed: true, returnFeePayer: "SELLER" },
+  // A second shop of A's invites B (B already supplies A's first shop, so that one can't
+  // invite B again). An invite is personal (D-52): it must name B for B to see the picker.
+  const shop2 = await c.A.req("POST", "/api/v1/stores", { form: fileForm({ name: uniq("QA Shop Two") }, PNG_1PX, "logo.png") });
+  assert.equal(shop2.status, 201, JSON.stringify(shop2.body));
+  const inv = await c.A.req("POST", `/api/v1/dropship/stores/${shop2.body.data.id}/supplier-invites`, {
+    json: { name: "QA Second", email: need("QA_EMAIL_B"), codAllowed: true, returnFeePayer: "SELLER" },
   });
   assert.equal(inv.status, 201, JSON.stringify(inv.body));
   const token = inv.body.data.inviteUrl.split("/").pop();
   // The picker offers supplier accounts only.
-  const offered = (await c.B.req("GET", `/api/v1/dropship/invites/${token}/stores`)).body.data.map((s) => s.id);
+  const picker = (await c.B.req("GET", `/api/v1/dropship/invites/${token}/stores`)).body.data;
+  assert.equal(picker.forYou, true, JSON.stringify(picker));
+  const offered = picker.stores.map((s) => s.id);
   assert.ok(offered.includes(c.supStoreId), "its supplier account is offered");
   assert.ok(!offered.includes(shop.body.data.id), "a shop that sells is not");
   // Joining with the shop is refused, and the invite stays usable.

@@ -769,7 +769,8 @@ adds one **Suppliers** row to Catalog for every owned store (two tabs, `Supplier
 and a **Supply to sellers**
 group (Orders to ship · Products for sellers · Sellers · Supplier settings) after Catalog for a
 store that supplies. A **supply-only** store (made when its owner joined as a
-supplier) loses Storefront, Marketing and Payments · Delivery · Checkout; its
+supplier) loses Storefront, Marketing, Payments · Delivery · Checkout, Orders, Bills
+(a bill needs a published shop) and Customer messages (`SELLING_ONLY`); its
 layout hides the publish card and the phone strip's Publish button, and its
 Dashboard is the package's `SupplierHome`. The admin view never shows these rows.
 

@@ -282,7 +282,9 @@ export function AddSheet({
             onChange={setFixed}
             label="Keep my price fixed instead"
             onText="Price fixed"
-            offText="Follows the supplier"
+            // The switch turns "fixed" on, so its off label names that action — an off switch
+            // beside "Follows the supplier" read as "following is off".
+            offText="Keep my price fixed"
           />
         </div>
 

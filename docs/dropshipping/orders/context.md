@@ -119,7 +119,7 @@ The customer order never runs ahead of its slowest parcel.
 ## Screens
 
 **Supplier: Orders to ship** (tabs New · Shipped · Done, sorted by "Ship by"):
-- Each card: the "Ship by" date; **Collect ₹748 cash** (COD), or **Prepaid —
+- Each card: the "Ship by" date; **Collect ₹748 cash** (COD; *Collected* once delivered), or **Prepaid —
   don't collect cash**; items (photo, name, option, the supplier's SKU);
   delivery name, phone and address; the seller's store name and phone.
 - Actions: **Confirm** (optional one tap) · **Ship** sheet (courier from the

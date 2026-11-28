@@ -14,6 +14,12 @@ import { accountApi, sellerSuppliersApi, supplierApi } from '../api'
 import type { Account, AccountLine, AccountPayment } from '../api'
 import { TermsLog, money, shortDate, useLoad } from '../ui'
 
+/** Today as YYYY-MM-DD in the viewer's own time zone (toISOString is UTC: before 5:30 AM IST it says yesterday). */
+function localToday(): string {
+  const d = new Date()
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
+}
+
 /**
  * The account with one supplier (seller side) or one seller (supplier side):
  * who owes whom, line by line, and the payments either of you recorded. Both
@@ -196,7 +202,7 @@ function LineRow({ line: l, side }: { line: AccountLine; side: 'seller' | 'suppl
       <p className="mt-1 text-sm text-fg">
         {l.paymentMode === 'COD' ? 'Cash on delivery' : 'Prepaid'}
         {l.customerPaid != null ? ` · customer paid ${money(l.customerPaid)}` : ''}
-        {` · supplier gets ${money(l.supplierGets)}`}
+        {side === 'supplier' ? ` · your share ${money(l.supplierGets)}` : ` · supplier gets ${money(l.supplierGets)}`}
       </p>
       <p className={`mt-1 text-sm font-semibold ${l.counts ? 'text-fg' : 'text-muted'}`}>{amountText}</p>
     </li>
@@ -223,7 +229,7 @@ function RecordSheet({
   const youOwe = account.balance < 0
   const [paid, setPaid] = useState<'me' | 'them'>(youOwe ? 'me' : 'them')
   const [amount, setAmount] = useState(account.balance === 0 ? '' : String(Math.abs(account.balance)))
-  const [paidOn, setPaidOn] = useState(new Date().toISOString().slice(0, 10))
+  const [paidOn, setPaidOn] = useState(localToday)
   const [reference, setReference] = useState('')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
@@ -273,7 +279,7 @@ function RecordSheet({
           </Button>
         </div>
         <TextField label="Amount (₹)" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))} />
-        <TextField label="Date paid" type="date" value={paidOn} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setPaidOn(e.target.value)} />
+        <TextField label="Date paid" type="date" value={paidOn} max={localToday()} onChange={(e) => setPaidOn(e.target.value)} />
         <TextField label="UPI or bank reference (optional)" value={reference} maxLength={60} onChange={(e) => setReference(e.target.value)} />
         <TextField label="Note (optional)" value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} />
         <InfoNote>{name} is told about this payment and can see it on their account.</InfoNote>

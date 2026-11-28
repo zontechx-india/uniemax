@@ -76,6 +76,9 @@ Open the link → sign in (OTP) → **Join {seller} as a supplier**:
 - **Join** → the link is active. Next step offered: **Add the products you'll
   supply** (the store's product editor), or **Choose products to offer** for an
   existing supplier account.
+- Opening a used link again (e.g. from the email later): *"This invite has already
+  been used."* plus **Go to my supplier account** (→ `/mystores`) when signed in, or
+  **Sign in to see your supplier account**.
 
 ### The supplier offers products
 A supplier account has no shop, so it never publishes a product (D-53). It adds one in the same

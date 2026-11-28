@@ -172,9 +172,10 @@ export function sectionItem(to: string): SectionItem | undefined {
 
 /**
  * Rows a supply-only store doesn't use: it never sells to customers, so it has
- * no customer orders (its work is Orders to ship) and no buyers writing in.
+ * no customer orders (its work is Orders to ship), no bills (a bill needs a
+ * published shop, which a supplier account can never be) and no buyers writing in.
  */
-const SELLING_ONLY = new Set(['earnings', 'transactions', 'payments', 'shipping', 'checkout', 'orders', 'customer-support'])
+const SELLING_ONLY = new Set(['earnings', 'transactions', 'payments', 'shipping', 'checkout', 'orders', 'bills', 'customer-support'])
 
 /**
  * The supplier rows (docs/dropshipping/): one **Suppliers** row under Catalog for a

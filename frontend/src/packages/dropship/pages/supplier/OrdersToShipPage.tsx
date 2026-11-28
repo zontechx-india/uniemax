@@ -188,7 +188,7 @@ function OrderCard({
         }`}
       >
         {o.paymentMode === 'COD' && o.collectAmount != null
-          ? `Collect ${money(o.collectAmount)} cash`
+          ? `${o.status === 'DELIVERED' ? 'Collected' : 'Collect'} ${money(o.collectAmount)} cash`
           : "Prepaid — don't collect cash"}
       </p>
 

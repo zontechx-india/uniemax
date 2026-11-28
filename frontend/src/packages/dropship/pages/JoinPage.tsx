@@ -69,11 +69,24 @@ export function JoinPage() {
             </dl>
 
             {data.status !== 'SENT' ? (
-              <p className="mt-6 rounded-md bg-surface-alt p-3 text-sm text-muted">
-                {data.status === 'ACCEPTED' && 'This invite has already been used.'}
-                {data.status === 'EXPIRED' && `This invite has expired — ask ${data.sellerName} to send it again.`}
-                {data.status === 'REVOKED' && `${data.sellerName} cancelled this invite.`}
-              </p>
+              <>
+                <p className="mt-6 rounded-md bg-surface-alt p-3 text-sm text-muted">
+                  {data.status === 'ACCEPTED' && 'This invite has already been used.'}
+                  {data.status === 'EXPIRED' && `This invite has expired — ask ${data.sellerName} to send it again.`}
+                  {data.status === 'REVOKED' && `${data.sellerName} cancelled this invite.`}
+                </p>
+                {/* The supplier who joined often opens the link again (from the email) — don't strand them. */}
+                {data.status === 'ACCEPTED' &&
+                  (authed ? (
+                    <Link to="/mystores" className={`mt-4 ${buttonClass({ full: true })}`}>
+                      Go to my supplier account
+                    </Link>
+                  ) : (
+                    <Button full className="mt-4" onClick={() => openAuthDialog()}>
+                      Sign in to see your supplier account
+                    </Button>
+                  ))}
+              </>
             ) : authed ? (
               <JoinForm token={token} invite={data} onJoined={setJoined} />
             ) : (

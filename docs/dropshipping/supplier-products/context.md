@@ -70,7 +70,7 @@ add button and its tick box.
 - **MRP** is stated inline: *"Can't be more than ₹999 (MRP)."*
 - Under the price, in plain words: *"If the supplier changes their price, yours
   changes by the same amount, so you keep earning ₹238."* Next to it, a switch:
-  **Keep my price fixed instead**.
+  **Keep my price fixed instead** (off: *Keep my price fixed*; on: *Price fixed*).
 - **Shelf:** pre-picked when one of the store's shelves carries the same global
   category. Otherwise **+ New shelf: {category}** creates the shelf for the
   supplier product's own taxonomy category (D-32). A product with no category
