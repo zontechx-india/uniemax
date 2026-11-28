@@ -11,6 +11,7 @@ import { PUBLIC_SECTIONS } from "../stores/publicStore.schema.js";
  *   section  /store/{slug}/shop — merchandising scope (unknown = none)
  *   page     /c/{slug} — listing page (anything unusable = 1)
  *   sort     /c/{slug} — listing order (unknown = newest)
+ *   version  /policies/{code} — an older version (unusable = none)
  */
 export const pageShellQuerySchema = z.object({
   q: z
@@ -27,6 +28,14 @@ export const pageShellQuerySchema = z.object({
       return Number.isFinite(page) && page >= 1 && page <= 10_000 ? page : 1;
     }),
   sort: z.enum(["newest", "priceAsc", "priceDesc"]).catch("newest"),
+  /** /policies/{code} — an older version (`PolicyPage` reads `Number(…) || null`). */
+  version: z
+    .string()
+    .optional()
+    .transform((value) => {
+      const version = Number(value);
+      return Number.isInteger(version) && version > 0 ? version : null;
+    }),
 });
 
 export type PageShellQuery = z.infer<typeof pageShellQuerySchema>;

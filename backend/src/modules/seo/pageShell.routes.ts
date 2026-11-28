@@ -23,6 +23,8 @@ export const pageShellRoutes: FastifyPluginAsync = async (app) => {
   for (const path of Object.keys(INFO_PAGES)) {
     app.get(path, { helmet: false }, controller.infoPage);
   }
+  app.get("/policies", { helmet: false }, controller.policiesPage);
+  app.get("/policies/*", { helmet: false }, controller.policyPage);
   for (const path of Object.keys(LISTING_PAGES)) {
     app.get(path, { helmet: false }, controller.listingPage);
   }

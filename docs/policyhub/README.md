@@ -11,8 +11,7 @@
 
 **Status (28 Nov 2026):** Phases 1–4 **built, committed, pushed to `main` and deployed to dev**
 (GitHub Actions "Deploy dev" succeeded; both migrations ran on dev). **Not on production.**
-**Phase 5 (publish version 1) not done** — nothing is published on dev or prod yet, so on dev
-`GET /api/v1/policies/PYO-001` answers `404 "Policy PYO-001 not found"` (proof the tables exist).
+**Phase 5:** `PYO-001` v1 is **published on dev** (since 28 Nov 2026, by the admin screen); prod not yet.
 
 | Phase | What | Commit | Dev | Prod |
 |---|---|---|---|---|
@@ -20,15 +19,18 @@
 | 2 | Each payout saves its policy version | `45361a4` | ☑ deployed | ☐ |
 | 3 | Admin **Platform → Policies** screens | `6b027d4` | ☑ deployed | ☐ |
 | 4 | Seller **Earnings → Payout policy** | `436722e` | ☑ deployed | ☐ |
-| 5 | Publish `PYO-001` v1 (by a SUPER_ADMIN in the admin screen) | — | ☐ | ☐ |
-| 6 | Admin policy page: **For developers** card (code, API URLs, live sample, snippet) | — | ☐ | ☐ |
+| 5 | Publish `PYO-001` v1 (by a SUPER_ADMIN in the admin screen) | — | ☑ published | ☐ |
+| 6 | Admin policy page: **For developers** card (code, API URLs, live sample, snippet) | `3f26f3d` | ☑ deployed | ☐ |
+| 7 | Public **Policies** pages `/policies` + `/policies/:code` (replace the seller's in-app page), `GET /api/v1/policies`, page shells + sitemap | commit "feat(policy): public Policies pages" | ☑ deployed (nginx ☐) | ☐ |
 
 **Next steps, in order**
-1. Test on dev (§15) and publish v1 there (Test 1 of §15).
-2. Production: push a `v*` tag (deploys at once — see `docs/DEPLOYMENT.md`), then publish v1 the same
+1. Test on dev (§15).
+2. nginx: forward `/policies` and `/policies/` to the page shells on the storefront vhosts (dev, then
+   prod) — §13 item 3. Until then the pages work; only crawlers get the default head.
+3. Production: push a `v*` tag (deploys at once — see `docs/DEPLOYMENT.md`), then publish v1 the same
    way on the prod admin console. Prod's migrations run on deploy (`npm run db:deploy`).
-3. Follow-ups, not built (§13): show the policy version on the **admin** order's Seller payout card,
-   the optional public `/payout-policy` page, telling sellers about a new version.
+4. Follow-ups, not built (§13): show the policy version on the **admin** order's Seller payout card,
+   images on the Policies pages (design pending), telling sellers about a new version.
 
 **URLs (dev):** admin `https://admin.dev.uniemax.zontechx.com/` · seller app
 `https://dev.uniemax.zontechx.com/` · API `https://dev.uniemax.zontechx.com/api/v1/...`.
@@ -39,13 +41,14 @@
 |---|---|
 | Schema | `backend/prisma/schema/policy.prisma` (3 tables) · `core.prisma` (`"policyhub"` in `schemas`; `OrderPayout.policyVersionId`) |
 | Migrations | `backend/prisma/migrations/20261128100000_policyhub/` · `20261128140000_payout_policy_version/` |
-| Backend package | `backend/src/package/policy/` — `rules.ts` (pure logic) · `schema.ts` (Zod) · `service.ts` (only DB access) · `controller.ts` · `routes.ts` · `config.ts` · `index.ts` (public face: routes, `versionAt`, `versionsByIds`) |
-| Backend wiring | `src/routes.ts` (public `/api/v1/policies`, admin `/api/v1/admin/policies`) · `src/config/env.ts` (`POLICY_PROJECT`) · `modules/payouts/payouts.service.ts` (`PAYOUT_POLICY_CODE`, `payoutPolicyVersionId`, `policyVersionsFor`) · `modules/finance/finance.service.ts › getSellerEarnings` |
-| Backend tests | `backend/test/unit/policy.test.ts` (13) · `backend/scripts/policy-check.ts` (19 real-DB checks) · `backend/scripts/payout-policy-check.ts` (8 real-payout checks) |
+| Backend package | `backend/src/package/policy/` — `rules.ts` (pure logic) · `schema.ts` (Zod) · `service.ts` (only DB access) · `controller.ts` · `routes.ts` · `config.ts` · `index.ts` (public face: routes, `versionAt`, `versionsByIds`, `getPublicPolicy`, `listPublicPolicies`) |
+| Backend wiring | `src/routes.ts` (public `/api/v1/policies`, admin `/api/v1/admin/policies`) · `src/config/env.ts` (`POLICY_PROJECT`) · `modules/payouts/payouts.service.ts` (`PAYOUT_POLICY_CODE`, `payoutPolicyVersionId`, `policyVersionsFor`) · `modules/finance/finance.service.ts › getSellerEarnings` · `modules/seo/pageShell.service.ts` (`policies` / `policy` page kinds, `POLICIES_HEAD`, `policyDescription`), `pageShell.routes.ts`, `pageShell.controller.ts`, `pageShell.schema.ts` (`version`), `sitemap.service.ts` |
+| Backend tests | `backend/test/unit/policy.test.ts` (13) · `backend/scripts/policy-check.ts` (19 real-DB checks) · `backend/scripts/payout-policy-check.ts` (8 real-payout checks) · `backend/test/unit/policy-page-shell.test.ts` (3: head text identical on both sides, `?version=` parsing) |
 | Admin UI | `frontend/src/admin/pages/policies/` — `PoliciesPage.tsx` · `PolicyPage.tsx` · `PolicyDeveloperCard.tsx` · `policyTemplates.ts` (approved v1 text + `AUDIENCES`) · `admin/features/adminApi.ts` (policy types + calls) · `admin/app/navigation.ts`, `router.tsx` · `admin/layout/icons.tsx` (`scroll`) |
-| Seller UI | `frontend/src/storefront/pages/stores/StorePayoutPolicyPage.tsx` · `StoreEarningsPage.tsx` · `storefront/app/router.tsx` (`earnings/payout-policy`) · `storefront/features/stores/storesApi.ts` (`policyVersion` on earnings payouts) |
-| Shared UI | `frontend/src/shared/policy/` — `PolicyText.tsx` (safe Markdown subset) · `policyWording.ts` (placeholder fill — browser twin of `rules.ts › renderBody`) · `PayoutTimes.tsx` (times in plain words) · `policyApi.ts` (public API + `PAYOUT_POLICY_CODE`) |
-| Other docs touched | `docs/API.md` (pointer + payout `policyVersion`), `docs/BACKEND_CONTEXT.md`, `docs/FRONTEND_CONTEXT.md`, `docs/seller-finance/README.md`, `docs/CONTEXT.md`, `backend/README.md` (env + scripts), `CLAUDE.md` (docs table row) |
+| Public pages | `frontend/src/storefront/pages/policies/` — `PoliciesPage.tsx` (`/policies`) · `PolicyPage.tsx` (`/policies/:code`) · `policySeo.ts` (head text — twin of the page shell) · footer link "All policies" in `storefront/pages/HomePage.tsx` (`MarketFooter`) |
+| Seller UI | `StoreEarningsPage.tsx` (links open `/policies/PYO-001` in a new tab) · `storefront/app/router.tsx` (`earnings/payout-policy` → redirect) · `storefront/features/stores/storesApi.ts` (`policyVersion` on earnings payouts) |
+| Shared UI | `frontend/src/shared/policy/` — `PolicyText.tsx` (safe Markdown subset) · `policyWording.ts` (placeholder fill — browser twin of `rules.ts › renderBody`) · `PayoutTimes.tsx` (times in plain words) · `policyApi.ts` (public API, `PAYOUT_POLICY_CODE`, `policyPath`) |
+| Other docs touched | `docs/API.md` (pointer + payout `policyVersion`), `docs/BACKEND_CONTEXT.md`, `docs/FRONTEND_CONTEXT.md`, `docs/seller-finance/README.md`, `docs/CONTEXT.md`, `backend/README.md` (env + scripts), `CLAUDE.md` (docs table row), `docs/SEO.md` (policy page shells, sitemap) |
 
 ---
 
@@ -260,6 +263,7 @@ ids, emails, `changeReason` or events.
 
 | Method | Path | Returns |
 |---|---|---|
+| GET | `/` | `[{ code, name, audience, version, effectiveFrom, changeSummary }]` — every policy with a version in force, by code; none → `[]` |
 | GET | `/:code` | `{ code, name, audience, version, effectiveFrom, effectiveTo, body, changeSummary, settings }` · `404` unknown or nothing published |
 | GET | `/:code/versions` | `{ code, name, versions: [{ version, effectiveFrom, effectiveTo, changeSummary }] }`, newest first |
 | GET | `/:code/versions?version=N` | that version in full · `404` unknown / not started |
@@ -293,10 +297,10 @@ The admin policy page ends with a **For developers** card that shows all of this
 |---|---|---|
 | Admin | **Platform → Policies** (`/policies`) | List with chips (version in force · scheduled · draft). Empty state: SUPER_ADMIN gets **Create the seller payout policy** (pre-filled PYO-001). |
 | Admin | `/policies/:code` | **Draft editor**: payout time fields + timezone, wording textarea with **insert buttons** for each placeholder, "What changed" / "Why", **live preview**; under it the server's problems ("Before this can be published") or "Ready to publish"; **Save draft** · **Publish version N…** (SUPER_ADMIN; dialog: now or a date, "can never be edited" warning) · **Discard changes** (confirm). Empty PYO-001 draft → **Use the approved wording**. Then **What readers see now**, **Versions** (period, summary, who published, "Show wording"), **Activity** and **For developers** (§8a: code, the three public API URLs with copy buttons, a live sample of the public response — or "nothing published yet, the API answers 404" — and the frontend snippet). An ADMIN sees "Only a super admin can publish". |
-| Seller | **Earnings** | "When we pay you" card (`PayoutTimes`: before cutoff → same day, at/after → next day, transfer window, every day) + **Read the payout policy** link; each payout shows **"Paid under payout policy vN"** linking to `payout-policy?version=N`. Card hidden when nothing is published or the call fails. |
-| Seller | **Earnings → Payout policy** (`/mystores/:slug/earnings/payout-policy`) | Version in force (badge, since date, times card, "What changed", wording), **Earlier versions** (dates, summary, **Read** loads that version's own wording + times); `?version=N` opens and scrolls to it; nothing published → "Not published yet". |
+| Seller | **Earnings** | "When we pay you" card (`PayoutTimes`: before cutoff → same day, at/after → next day, transfer window, every day) + **Read the payout policy** link; each payout shows **"Paid under payout policy vN"**. Both open the public page `/policies/PYO-001` (`?version=N` for a payout) **in a new tab**. Card hidden when nothing is published or the call fails. The old in-app page `/mystores/:slug/earnings/payout-policy` now redirects there, keeping `?version=N`. |
+| Public | **Policies** `/policies` | Marketplace chrome; tabs **Sellers · Customers · Suppliers** (`SegmentedControl`; the tab is the URL hash `#sellers` / `#customers` / `#suppliers`, so no second indexable URL). Each tab lists the policies with a version in force for that audience (from `GET /api/v1/policies` — a newly published policy appears with no code change): name, "Version N · since date", what changed (v2+). The Customers tab also links the hand-written `/refund-policy` and `/shipping-policy` and says a store may add its own terms. Empty tab → "No policies for … yet". Footer: **Legal → All policies**. |
+| Public | **One policy** `/policies/:code` | Breadcrumb UnieMax › Policies; name, "For sellers · Version N · in force since date"; `PayoutTimes` (payout policy only), "What changed" (v2+), the wording, code; **Earlier versions** (dates, summary, **Read** loads that version's wording + times). `?version=N` opens and scrolls to it. Code is case-insensitive. Unknown or unpublished → "This policy isn't published" + **See all policies**. Images: none yet — design pending (§13). |
 | Admin | Order page → Seller payout card | **Not built** — the API already returns `policyVersion`; the card doesn't show it yet (§13). |
-| Public | `/payout-policy` | **Not built** (optional) — the public API is ready. |
 
 Policy wording is drawn by `shared/policy/PolicyText` — a tiny safe Markdown subset (a line that is
 only `**bold**` or starts with `#` = heading; `- ` / `* ` = bullet; `**bold**` inline; blank line =
@@ -346,7 +350,9 @@ Rule for every stage: **the policy never starts a transfer.**
 | **2 ☑** `45361a4` | migration `20261128140000_payout_policy_version`, payouts + finance services, package `versionAt` / `versionsByIds` | `scripts/payout-policy-check.ts` (8: nothing published → null · delivered under v1 → v1, also when paid after v2 started · v2 → v2 · advance → version at creation · repeated key → same payout · admin + seller views · lookup error → null + warning) · `advance-payouts-check.ts`, `policy-check.ts`, 297 unit tests unchanged |
 | **3 ☑** `6b027d4` | admin `pages/policies/*`, `adminApi.ts`, nav, router, icon, `shared/policy/` | visual at 1280 / 390px with a fake API using the backend's own `rules.ts` (list, empty, editor + preview, save → ready, publish → v2 in force, ADMIN view, approved wording passes every check) · `tsc -b`, `check:ui`, `vite build` |
 | **4 ☑** `436722e` | `StoreEarningsPage`, `StorePayoutPolicyPage`, route, `storesApi.ts`, `shared/policy/policyApi.ts`, `PayoutTimes.tsx` | visual at 390 / 1280px (Earnings card + links, policy page, `?version=1`, not published) · `tsc -b`, `check:ui`, `vite build` |
-| **5 ☐** | publish v1 in the admin screen — dev, then prod (no hard-coded seed) | §15 |
+| **5 ◐** | publish v1 in the admin screen — dev ☑, prod ☐ (no hard-coded seed) | §15 |
+| **6 ☑** `3f26f3d` | admin `PolicyDeveloperCard.tsx` on the policy page | `tsc -b`, `check:ui` |
+| **7 ☑** | public `GET /api/v1/policies`, storefront `pages/policies/*`, page shells (`policies` / `policy` kinds, `?version=` → noindex), sitemap entries, Earnings links → new tab, old seller page removed (route redirects) | `test/unit/policy-page-shell.test.ts` (3) · 300 unit tests · read-only check against dev DB (list, both heads, `?version=1` noindex, unknown → 404) · visual at 390 / 1280px through a read-only GET proxy to the dev API (hub, Customers tab, policy page; no overflow, no console errors) · `tsc -b`, `check:ui` |
 
 No phase changed payout amounts, fees, the ledger, PaymentHub or bank code.
 
@@ -362,9 +368,13 @@ production and use throwaway project names, cleaning up after): `npm run test:un
 
 1. **Phase 5** — publish v1 on dev, then prod (§0, §15).
 2. **Admin order page**: show "Paid under payout policy vN" on the Seller payout card (`admin/pages/orders/OrderPayoutCard.tsx`); the data is already in the response.
-3. **Public `/payout-policy` page** (optional) — reuse `PolicyText`, `PayoutTimes`, `policyApi`; mind the SEO rules in `docs/SEO.md` (page shells) if added.
-4. **Tell sellers about a new version** (WhatsApp / email / push)? Not decided.
-5. Stage 2 / 3 of §10 (provider APIs, automatic payouts) — separate high-risk money projects.
+3. **nginx for the policy page shells** — add `/policies` (exact) and `/policies/` (prefix) to the
+   page-shell snippet of the **storefront** vhosts (`docs/DEPLOYMENT.md` → Page shells), dev then prod,
+   after a release that has them. Never on the admin hosts: the admin console has its own `/policies`.
+4. **Images on the Policies pages** — the owner is designing them; keep images in the page design
+   (e.g. one per audience), not in the policy data.
+5. **Tell sellers about a new version** (WhatsApp / email / push)? Not decided.
+6. Stage 2 / 3 of §10 (provider APIs, automatic payouts) — separate high-risk money projects.
 
 ---
 
@@ -398,7 +408,13 @@ real approved wording; publish a test v2 only if it may stay in dev's history fo
    (Activity: "Changes discarded"). An unpublished draft is safe to leave.
 3. **ADMIN role:** can edit and save; no Publish button ("Only a super admin can publish"); no New policy.
 4. **Seller:** Payments & delivery → **Earnings** → "When we pay you" card (6:00 PM rules) →
-   **Read the payout policy** → version 1, "In force". Check on a phone: no sideways scrolling.
+   **Read the payout policy** → a **new tab** opens `/policies/PYO-001`: version 1, the times card and
+   the wording. Check on a phone: no sideways scrolling.
+4b. **Public Policies:** open `/policies` signed out → Sellers tab lists the payout policy; Customers
+   tab shows Refund & Returns and Shipping; Suppliers says "No policies for suppliers yet". Footer →
+   Legal → **All policies**. The old link `/mystores/<slug>/earnings/payout-policy?version=1`
+   redirects to `/policies/PYO-001?version=1`. After the nginx step (§13), `curl -s <host>/policies/PYO-001 | grep '<title>'`
+   shows "Seller Payout Policy · Policies · UnieMax".
 5. **Payout link:** on a **test** online order delivered after v1 was published, record a manual
    payout (it moves the test store's balance) → seller Earnings → Payouts shows "Paid under payout
    policy v1". Older payouts show no line (paid before PolicyHub).

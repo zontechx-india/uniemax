@@ -396,6 +396,8 @@ canonical it is the current path **without** the query string.
 | Marketplace home `/` **S** | — (the platform title) | platform description | `/` | index | platform card (`og-image.jpg`) | `WebSite` + platform `Organization` (logo, return policy, `parentOrganization` Zontechx) | — |
 | `/sell` **S** | `Create your free online store` | seller pitch | `/sell` | index | platform card | platform `Organization` | — |
 | `/about`, `/contact`, `/refund-policy`, `/shipping-policy` **S** | `About` / `Contact us` / `Refund & Returns Policy` / `Shipping Policy` | one fixed line each (`INFO_PAGES`) | path | index | platform card | platform `Organization` on `/about` and `/contact` only (`ORGANIZATION_PAGES`) | — |
+| Policies `/policies` **S** | `Policies` | "The rules UnieMax works by, for sellers, customers and suppliers. …" (`POLICIES_HEAD` / `POLICIES_SEO`) | `/policies` (tabs are `#hash`, never a second URL) | index | platform card | — | — |
+| One policy `/policies/{code}` **S** | policy name, `Policies` | `{name} for {sellers/customers/suppliers} on UnieMax: the version in force now and every earlier version, …` (`policyDescription`, both sides) | `/policies/{CODE}` (code upper-cased) | `?version=` → **noindex, follow** | platform card | — | 404 (unknown or unpublished code), noindex |
 | `/privacy`, `/terms` **S** | `Privacy Policy` / `Terms & Conditions` | platform | path | **noindex** while they are holding pages | platform card | — | — |
 | All categories `/categories` **S** | `All categories` | "Browse every product category on UnieMax …" | `/categories` | index | platform | — | — |
 | All shops `/shops` **S** | `All shops` | "Every independent shop on UnieMax in one place …" | `/shops` | `?page=` > 1 → noindex, follow | platform | — | — |
@@ -480,7 +482,8 @@ sitemaps list everything, and `lastmod` is what gets a price change
 re-crawled.
 
 - `robots.txt` declares `https://uniemax.com/api/v1/public/sitemap.xml`
-  (an index → `sitemap-stores.xml` (`/`, `/sell` and every store's front
+  (an index → `sitemap-stores.xml` (`/`, `/sell`, the "View all" pages,
+  `/policies` and each published policy, and every store's front
   page), `sitemap-categories.xml`, one `sitemap-store-{slug}.xml` per
   published store).
 - **Image sitemap:** each per-store file lists the logo on the store home and
@@ -597,6 +600,11 @@ Automated tests: `backend/test/page-shell.test.mjs` (read-only; part of
   most (`GET /admin/catalog/coverage`); sellers see such shelves flagged
   "not shown on UnieMax category pages". Dev, 4 Oct 2026: 35 of 38 live
   products reached, 3 missing on 3 shelves.
+- **Policy page shells need nginx.** `/policies` and `/policies/{code}` have page
+  shells in the backend, but nginx does not forward those paths yet, so for
+  now crawlers get the default head (the pages themselves work). To do: add
+  them to the **storefront** vhosts' page-shell snippet ([`DEPLOYMENT.md`](./DEPLOYMENT.md)
+  → Page shells), never the admin hosts (the console has its own `/policies`).
 - **`/privacy` and `/terms` are holding pages** (`noindex`) until the
   business supplies the legal text. Merchant Center and Cashfree both look
   for them.
@@ -642,6 +650,7 @@ search/filter URLs get indexed, mass-produced pages with nothing on them.
 | Product feed | `backend/src/modules/seo/productFeed.ts` + `.service.ts`; anything that changes which variant/price/stock/shipping a product page shows (`firstSellableSelection`, `sortByOptionOrder`, `effectiveProductShipping`) |
 | Info pages | `frontend/src/storefront/pages/InfoComingSoonPage.tsx` (`PAGES`) ↔ `INFO_PAGES` in `pageShell.service.ts` |
 | Landing pages | `BrowseCategoryPage.tsx`, the "View all" pages `AllCategoriesPage.tsx` · `AllShopsPage.tsx` · `NewArrivalsPage.tsx` (server twin: `LISTING_PAGES` in `pageShell.service.ts`), `SearchPage.tsx` (noindex, browser only), `backend/src/modules/discovery/browse.service.ts` (SEO shape only, `DISCOVERABLE_PRODUCT`), `getCoverage` in `adminCategoryMapping.service.ts` |
+| Policies pages | `frontend/src/storefront/pages/policies/` (`PoliciesPage.tsx`, `PolicyPage.tsx`, `policySeo.ts`) ↔ `POLICIES_HEAD` / `policyDescription` / `policyPage` in `pageShell.service.ts`; twin test `backend/test/unit/policy-page-shell.test.ts` |
 | Infra | the nginx page-shell snippets (record changes in `DEPLOYMENT.md` too) |
 | Data that feeds tags | new product/store fields used in titles, descriptions, images or JSON-LD |
 
@@ -695,3 +704,4 @@ search/filter URLs get indexed, mass-produced pages with nothing on them.
 | 15 Nov 2026 | nginx: `www.uniemax.com` (HTTP and HTTPS) 301s to `https://uniemax.com` with the path kept — one copy of the site for search engines ([`DEPLOYMENT.md`](./DEPLOYMENT.md) → `www.uniemax.com` → `uniemax.com`) |
 | 19 Nov 2026 | "UnieMax is a product of Zontechx" in the first byte of every marketplace page shell (body block at `<!-- shell:operator -->`, `<meta name="author">`), never on `/store/**`; platform `Organization` gains `parentOrganization` (both writers) and is also on `/sell`, `/about`, `/contact`. Marketplace footer, `/about` ("Who runs UnieMax") and `/contact` ("Operated by Zontechx") show the same facts. For Meta's WhatsApp display-name review. Tests: `test/unit/page-shell-operator.test.ts`, `page-shell.test.mjs` |
 | 1 Nov 2026 | Meta Pixel `content_ids` and GA4 `item_id` switched from the product slug to the product id, matching the feed's `g:id` (Meta catalogue reported "products not matching ad events"); placed-order lines now carry `productId`. Feed live on prod since 24 Oct: Merchant Center (371 products, return policy under review) and Meta catalogue "UnieMax" (371 eligible, hourly fetch). Released as `v1.78.0` |
+| 28 Nov 2026 | Public Policies pages (PolicyHub): `/policies` (tabs Sellers · Customers · Suppliers by `#hash`) and `/policies/{code}` — page shells (`policies` / `policy` kinds; unknown or unpublished code → 404; `?version=` → noindex, follow; new `version` in the page-shell query), browser twin `storefront/pages/policies/policySeo.ts` (kept equal by `test/unit/policy-page-shell.test.ts`), both in `sitemap-stores.xml`. Footer gains **All policies**. nginx forwarding not applied yet ([§10](#10-known-gaps-and-caveats)) |

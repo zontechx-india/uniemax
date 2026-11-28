@@ -45,6 +45,15 @@ function BuilderRedirect() {
 }
 
 /**
+ * The seller's old payout-policy page → the public policy page, keeping
+ * `?version=N`. `replace` keeps the retired path out of the back button.
+ */
+function PayoutPolicyRedirect() {
+  const { search } = useLocation()
+  return <Navigate to={`/policies/PYO-001${search}`} replace />
+}
+
+/**
  * Marketplace router — everything that is not the per-store shopping surface
  * (`/store`, `/cart`, `/checkout` live in `publicRouter.tsx`).
  *
@@ -140,6 +149,20 @@ export const router = createBrowserRouter([
           Component: (await import('../pages/InfoComingSoonPage')).InfoComingSoonPage,
         }),
       })),
+      // Platform policies (PolicyHub) — public, one tab per reader; a policy
+      // published in the admin console appears with no code change.
+      {
+        path: '/policies',
+        lazy: async () => ({
+          Component: (await import('../pages/policies/PoliciesPage')).PoliciesPage,
+        }),
+      },
+      {
+        path: '/policies/:code',
+        lazy: async () => ({
+          Component: (await import('../pages/policies/PolicyPage')).PolicyPage,
+        }),
+      },
       // Affiliate short links and invitations — public, no layout.
       ...affiliatePublicRoutes,
       // Supplier invite links — public, no layout.
@@ -327,11 +350,10 @@ export const router = createBrowserRouter([
                     }),
                   },
                   {
-                    // When UnieMax pays — the published payout policy (PolicyHub PYO-001).
+                    // The payout policy moved to the public Policies page
+                    // (`/policies/PYO-001`); old links keep `?version=N`.
                     path: 'earnings/payout-policy',
-                    lazy: async () => ({
-                      Component: (await import('../pages/stores/StorePayoutPolicyPage')).StorePayoutPolicyPage,
-                    }),
+                    element: <PayoutPolicyRedirect />,
                   },
                   {
                     path: 'transactions',

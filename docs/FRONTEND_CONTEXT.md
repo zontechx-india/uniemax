@@ -755,7 +755,7 @@ once-ever setting look as important as a daily job:
 | **Overview** | Dashboard · Orders *(pending-count badge)* |
 | **Catalog** | Categories · Products |
 | **Storefront** | Shop name & logo · Business details · **Design your shop** |
-| **Payments & delivery** | Earnings *(with a "When we pay you" card and "Paid under payout policy vN" on each payout → `earnings/payout-policy`, `StorePayoutPolicyPage`: the published PYO-001 — times in plain words via `shared/policy/PayoutTimes`, the wording via `PolicyText`, earlier versions readable in full, `?version=N` opens one; data from `shared/policy/policyApi`)* · **Transactions** *(one row per order: bill, payment mode, settled or not — `StoreTransactionsPage`)* · Payments · Bank account · Delivery · Checkout |
+| **Payments & delivery** | Earnings *(with a "When we pay you" card and "Paid under payout policy vN" on each payout — both open the public `/policies/PYO-001[?version=N]` in a new tab; the old `earnings/payout-policy` route only redirects there)* · **Transactions** *(one row per order: bill, payment mode, settled or not — `StoreTransactionsPage`)* · Payments · Bank account · Delivery · Checkout |
 | **Marketing** | Affiliate marketing |
 | **Help** | Customer messages · Help from UnieMax |
 
@@ -3751,6 +3751,7 @@ frontend/
     │       │                     #   My Stores, seller CTA
     │       ├── SellPage.tsx      # /sell — seller landing page (where seller ads point)
     │       ├── InfoComingSoonPage.tsx # /about /contact /refund-policy /shipping-policy (real) · /privacy /terms (holding page + support contact)
+    │       ├── policies/              # PolicyHub public pages: PoliciesPage (/policies, tabs by #hash: sellers · customers · suppliers, from GET /api/v1/policies) · PolicyPage (/policies/:code — times card, wording, earlier versions, ?version=N) · policySeo.ts (head text, twin of the page shell)
     │       ├── ProfilePage.tsx   # /profile — account details + mobile-number linking (SMS OTP)
     │       ├── AddressesPage.tsx # /addresses — saved delivery addresses (one primary)
     │       ├── SupportPage.tsx   # /support — shopper → UnieMax (contact + tickets)

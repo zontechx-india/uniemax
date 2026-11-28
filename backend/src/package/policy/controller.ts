@@ -64,6 +64,10 @@ export async function publishDraft(request: FastifyRequest) {
 
 // ---- Public ---------------------------------------------------------------
 
+export async function listPublicPolicies() {
+  return ok(await service.listPublicPolicies());
+}
+
 export async function getPublicPolicy(request: FastifyRequest) {
   const { code } = schema.codeParams.parse(request.params);
   return ok(await service.getPublicPolicy(code));

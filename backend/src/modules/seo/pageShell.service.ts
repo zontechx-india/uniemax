@@ -1,5 +1,6 @@
 import type { FastifyBaseLogger } from "fastify";
 import { shareImagePath } from "../../package/storage/index.js";
+import { getPublicPolicy } from "../../package/policy/index.js";
 import { HttpError } from "../../utils/httpError.js";
 import { browseCategory } from "../discovery/browse.service.js";
 import {
@@ -53,7 +54,7 @@ import {
  * `info` = the marketplace footer pages (`INFO_PAGES`), `listing` = the
  * "View all" pages (`LISTING_PAGES`).
  */
-export type PageKind = "home" | "sell" | "store" | "browse" | "info" | "listing";
+export type PageKind = "home" | "sell" | "store" | "browse" | "info" | "listing" | "policies" | "policy";
 
 export interface ResolvedPage {
   status: 200 | 404;
@@ -118,7 +119,7 @@ export async function resolvePage(
   if (!segments) return pageNotFound;
 
   const { origin, path, log } = context;
-  const key = [kind, origin, path, query.q, query.section ?? "", query.page, query.sort].join("|");
+  const key = [kind, origin, path, query.q, query.section ?? "", query.page, query.sort, query.version ?? ""].join("|");
   const hit = cache.get(key);
   if (hit && hit.expiresAt > Date.now()) return hit.page;
 
@@ -162,6 +163,10 @@ function pageFor(
       return Promise.resolve(homePage(origin));
     case "sell":
       return Promise.resolve(sellPage(origin));
+    case "policies":
+      return Promise.resolve(policiesPage());
+    case "policy":
+      return policyPage(segments, query);
     case "store":
       return storePage(segments, query, origin);
     case "browse":
@@ -337,6 +342,59 @@ function listingPage(path: string, query: PageShellQuery): ResolvedPage {
       canonical,
       platform: true,
       ...(listing.paged && query.page > 1 ? { robots: NOINDEX } : {}),
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// /policies and /policies/{code} — PolicyHub (docs/policyhub/README.md §9)
+// ---------------------------------------------------------------------------
+
+/** Must match `POLICIES_SEO` in `frontend/src/storefront/pages/policies/policySeo.ts`. */
+export const POLICIES_HEAD: PageHead = {
+  title: ["Policies"],
+  description:
+    "The rules UnieMax works by, for sellers, customers and suppliers. Every version is kept, with the date it started.",
+};
+
+/** Plural reader name per audience — must match `AUDIENCE_READERS` in `policySeo.ts`. */
+const AUDIENCE_READERS: Record<string, string> = {
+  seller: "sellers",
+  customer: "customers",
+  supplier: "suppliers",
+};
+
+/** `PolicyPage` description — must match `policyDescription` in `policySeo.ts`. */
+export function policyDescription(name: string, audience: string): string {
+  const readers = AUDIENCE_READERS[audience] ?? audience;
+  return `${name} for ${readers} on UnieMax: the version in force now and every earlier version, with the date each one started.`;
+}
+
+/** `PoliciesPage`. */
+function policiesPage(): ResolvedPage {
+  return { status: 200, head: { ...POLICIES_HEAD, canonical: "/policies", platform: true } };
+}
+
+/**
+ * `PolicyPage` — one published policy. Unknown code or nothing published →
+ * 404. `?version=N` reads an older version: the same page re-cut, so
+ * `noindex, follow` with the canonical on the bare page.
+ */
+async function policyPage(segments: string[], query: PageShellQuery): Promise<ResolvedPage> {
+  const [raw, ...extra] = segments;
+  if (!raw || extra.length > 0) return pageNotFound;
+  const code = raw.trim().toUpperCase();
+  if (!/^[A-Z][A-Z0-9-]{1,19}$/.test(code)) return pageNotFound;
+  const policy = await orNull(getPublicPolicy(code));
+  if (!policy) return pageNotFound;
+  return {
+    status: 200,
+    head: {
+      title: [policy.name, "Policies"],
+      description: policyDescription(policy.name, policy.audience),
+      canonical: `/policies/${policy.code}`,
+      platform: true,
+      ...(query.version !== null ? { robots: NOINDEX } : {}),
     },
   };
 }

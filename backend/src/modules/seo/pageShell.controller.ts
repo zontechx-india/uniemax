@@ -6,7 +6,7 @@ import { siteOrigin } from "./siteOrigin.js";
 
 /**
  * Page shells — the storefront's `index.html` for `/`, `/sell`, `/store/**`,
- * `/c/**` and the footer info pages, with the page's own head written in and a real status code.
+ * `/c/**`, the footer info pages and `/policies/**`, with the page's own head written in and a real status code.
  *
  * Every failure short of "there is no frontend build" still answers the
  * shell: a slow or failed lookup serves it unmodified (what nginx served
@@ -32,6 +32,12 @@ export const infoPage = (request: FastifyRequest, reply: FastifyReply) =>
 export const listingPage = (request: FastifyRequest, reply: FastifyReply) =>
   sendPage("listing", request, reply);
 
+export const policiesPage = (request: FastifyRequest, reply: FastifyReply) =>
+  sendPage("policies", request, reply);
+
+export const policyPage = (request: FastifyRequest, reply: FastifyReply) =>
+  sendPage("policy", request, reply);
+
 async function sendPage(kind: PageKind, request: FastifyRequest, reply: FastifyReply) {
   const shell = await loadShell(request.log);
   if (!shell) {
@@ -54,6 +60,7 @@ async function sendPage(kind: PageKind, request: FastifyRequest, reply: FastifyR
     section: params.get("section") ?? undefined,
     page: params.get("page") ?? undefined,
     sort: params.get("sort") ?? undefined,
+    version: params.get("version") ?? undefined,
   });
 
   const context = { origin: siteOrigin(request), path: url.pathname };

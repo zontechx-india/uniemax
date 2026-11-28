@@ -2551,7 +2551,9 @@ catalog is indexed" without any extra reporting.
 
 ### `GET /api/v1/public/sitemap-stores.xml`
 The marketplace homepage (`/`), the seller landing page (`/sell`), the
-"View all" pages (`/categories`, `/shops`, `/new`) and every
+"View all" pages (`/categories`, `/shops`, `/new`), the Policies page
+(`/policies`) and each policy with a version in force (`/policies/{code}`,
+`lastmod` = that version's start), and every
 published store's front page (`/store/{slug}`), `lastmod` from the store's
 `updatedAt`.
 
@@ -2692,6 +2694,7 @@ calls — the SPA boots from the response exactly as from the static file.
 | `GET /c/*` | `/c/{slug}[?page=][&sort=]` |
 | `GET /about` · `/contact` · `/refund-policy` · `/shipping-policy` · `/privacy` · `/terms` | The marketplace footer pages. `/privacy` and `/terms` are `noindex, follow` while they are holding pages |
 | `GET /categories` · `/shops[?page=]` · `/new[?page=]` | The marketplace "View all" pages (`LISTING_PAGES`). `?page=` > 1 is `noindex, follow` |
+| `GET /policies` · `/policies/*` | The public Policies pages (PolicyHub): `/policies` and `/policies/{code}[?version=]`. Unknown or unpublished code → 404; `?version=` is `noindex, follow`. Heads in [`policyhub/README.md`](./policyhub/README.md) §9 and [`SEO.md`](./SEO.md) §5 |
 
 Every URL in the head (`canonical`, `og:url`, `og:image`) is absolute, built
 from `PUBLIC_WEB_URL` (else the request's host).
@@ -3430,7 +3433,8 @@ and [admin](./dropshipping/admin/context.md).
 
 Served by `package/policy`. Platform policies with versions (first: the seller
 payout policy `PYO-001`). Public routes return only published versions that
-have started, with no admin fields. Admin: any admin reads and edits the
+have started, with no admin fields; `GET /api/v1/policies` lists every policy
+with a version in force (for the public `/policies` page). Admin: any admin reads and edits the
 draft; creating a policy and publishing need **SUPER_ADMIN** (`403` otherwise).
 Endpoint tables, request bodies and errors live only in the knowledge base:
 [`docs/policyhub/README.md`](./policyhub/README.md) §8.

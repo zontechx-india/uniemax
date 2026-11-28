@@ -1110,9 +1110,10 @@ revoked from anywhere else.
   (PYO-001: delivered before the cutoff → paid the same day, transfers in an
   evening window, every day). Any admin drafts a change with a live preview;
   only a super admin publishes, now or from a date. A published version
-  never changes; sellers read the version in force and every earlier one
-  from **Earnings → Payout policy**, and each payout says which version it
-  was paid under (docs/policyhub/).
+  never changes; everyone reads the version in force and every earlier one
+  on the public **Policies** page (`/policies`, one tab each for sellers,
+  customers and suppliers — a seller's Earnings links open it in a new tab),
+  and each payout says which version it was paid under (docs/policyhub/).
 - **Products** — the seller catalog across all stores, with inventory views
   (low stock, out of stock) and the platform's one moderation lever:
   **hide a listing** (with a reason the seller is told). It flips the same

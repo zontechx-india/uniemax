@@ -8,8 +8,8 @@ import { BUCKET_LABEL, ENTRY_LABEL, signed } from '../../../shared/finance/ledge
 import { storeFinanceApi } from '../../features/stores/storesApi'
 import type { SellerEarnings } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
-import { ChevronRightIcon, RupeeIcon } from '../../layout/icons'
-import { PAYOUT_POLICY_CODE, policyApi } from '../../../shared/policy/policyApi'
+import { ExternalLinkIcon, RupeeIcon } from '../../layout/icons'
+import { PAYOUT_POLICY_CODE, policyApi, policyPath } from '../../../shared/policy/policyApi'
 import type { PublicPolicy } from '../../../shared/policy/policyApi'
 import { PayoutTimes } from '../../../shared/policy/PayoutTimes'
 import { PageHeader } from './ui/PageHeader'
@@ -140,11 +140,14 @@ export function StoreEarningsPage() {
               <CardHeader title="When we pay you" subtitle="From UnieMax's payout policy." />
               <PayoutTimes settings={policy.settings} />
               <Link
-                to="payout-policy"
-                className="inline-flex min-h-11 items-center gap-1 text-base font-medium text-brand hover:underline"
+                to={policyPath(PAYOUT_POLICY_CODE)}
+                target="_blank"
+                rel="noopener"
+                className="inline-flex min-h-11 items-center gap-1.5 text-base font-medium text-brand hover:underline"
               >
                 Read the payout policy
-                <ChevronRightIcon className="h-4 w-4" />
+                <ExternalLinkIcon className="h-4 w-4" />
+                <span className="sr-only">(opens in a new tab)</span>
               </Link>
             </Card>
           ) : null}
@@ -186,7 +189,9 @@ export function StoreEarningsPage() {
                       ) : null}
                       {payout.policyVersion ? (
                         <Link
-                          to={`payout-policy?version=${payout.policyVersion.version}`}
+                          to={policyPath(PAYOUT_POLICY_CODE, payout.policyVersion.version)}
+                          target="_blank"
+                          rel="noopener"
                           className="text-sm text-muted underline decoration-line underline-offset-2 hover:text-fg"
                         >
                           Paid under payout policy v{payout.policyVersion.version}

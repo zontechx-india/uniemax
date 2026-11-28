@@ -453,6 +453,34 @@ export async function getPublicPolicy(code: string) {
   return publicVersion(policy, current);
 }
 
+/**
+ * Every policy with a version in force, for the public Policies page: one
+ * line each, no wording. A policy with nothing published (or only a version
+ * scheduled for later) is left out.
+ */
+export async function listPublicPolicies() {
+  const now = new Date();
+  const policies = await prisma.policy.findMany({
+    where: { project: project() },
+    orderBy: { code: "asc" },
+    include: { versions: { where: { status: "PUBLISHED", effectiveFrom: { lte: now } } } },
+  });
+  return policies.flatMap((p) => {
+    const current = versionInForce(p.versions, now);
+    if (!current) return [];
+    return [
+      {
+        code: p.code,
+        name: p.name,
+        audience: p.audience,
+        version: current.version,
+        effectiveFrom: current.effectiveFrom,
+        changeSummary: current.changeSummary,
+      },
+    ];
+  });
+}
+
 /** The version list (no wording), or one version in full with `version`. */
 export async function getPublicHistory(code: string, version?: number) {
   const { policy, history } = await startedVersions(code);

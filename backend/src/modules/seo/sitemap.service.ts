@@ -7,6 +7,7 @@ import {
 } from "../stores/publicStore.service.js";
 import { loadShelves, shelfIndex } from "../stores/shelfTree.js";
 import { listBrowsableCategories } from "../discovery/browse.service.js";
+import { listPublicPolicies } from "../../package/policy/index.js";
 import { absoluteUrl } from "./structuredData.js";
 
 /**
@@ -174,16 +175,17 @@ export function buildSitemapIndex(origin: string): Promise<string> {
 
 /**
  * The marketplace surface: the platform's own pages (the homepage, the
- * seller landing page and the "View all" lists) and every published store's
- * front page.
+ * seller landing page, the "View all" lists, the Policies page and each
+ * policy with a version in force) and every published store's front page.
  */
 export function buildMarketplaceSitemap(origin: string): Promise<string> {
   return cached(`stores:${origin}`, async () => {
+    const policies = await listPublicPolicies();
     const stores = await prisma.store.findMany({
       where: PUBLIC_STORE_VISIBILITY,
       select: { slug: true, updatedAt: true },
       orderBy: { publishedAt: "desc" },
-      take: MAX_URLS - 5, // room for the five fixed pages below
+      take: MAX_URLS - 6 - policies.length, // room for the fixed pages and policies below
     });
 
     return urlSet([
@@ -193,6 +195,8 @@ export function buildMarketplaceSitemap(origin: string): Promise<string> {
       { loc: `${origin}/categories`, priority: 0.7 },
       { loc: `${origin}/shops`, priority: 0.7 },
       { loc: `${origin}/new`, priority: 0.6 },
+      { loc: `${origin}/policies`, priority: 0.4 },
+      ...policies.map((p) => ({ loc: `${origin}/policies/${p.code}`, lastmod: p.effectiveFrom, priority: 0.4 })),
       ...stores.map((store) => ({
         loc: `${origin}/store/${store.slug}`,
         lastmod: store.updatedAt,

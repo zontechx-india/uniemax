@@ -25,6 +25,16 @@ export interface PolicyHistory {
   versions: { version: number; effectiveFrom: string; effectiveTo: string | null; changeSummary: string | null }[]
 }
 
+/** One line per policy with a version in force (`GET /policies`). */
+export interface PolicySummary {
+  code: string
+  name: string
+  audience: string
+  version: number
+  effectiveFrom: string
+  changeSummary: string | null
+}
+
 const path = (code: string) => `/api/v1/policies/${encodeURIComponent(code)}`
 
 /** A 404 means "not published yet" — the caller shows that, not an error. */
@@ -38,6 +48,10 @@ async function orNull<T>(request: Promise<T>): Promise<T | null> {
 }
 
 export const policyApi = {
+  /** Every policy with a version in force — the public Policies page. */
+  list() {
+    return call<PolicySummary[]>(http.get('/api/v1/policies'))
+  },
   /** The version in force, or null when nothing is published yet. */
   current(code: string) {
     return orNull(call<PublicPolicy>(http.get(path(code))))
@@ -54,3 +68,7 @@ export const policyApi = {
 
 /** The seller payout policy's code (backend: `PAYOUT_POLICY_CODE`). */
 export const PAYOUT_POLICY_CODE = 'PYO-001'
+
+/** The public page of a policy (`?version=N` opens an earlier version). */
+export const policyPath = (code: string, version?: number) =>
+  `/policies/${encodeURIComponent(code)}${version ? `?version=${version}` : ''}`

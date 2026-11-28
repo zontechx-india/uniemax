@@ -1779,6 +1779,7 @@ const FOOTER_COLUMNS = [
       { label: 'Terms and conditions', to: '/terms' },
       { label: 'Refunds and returns', to: '/refund-policy' },
       { label: 'Shipping policy', to: '/shipping-policy' },
+      { label: 'All policies', to: '/policies' },
     ],
   },
 ] as const

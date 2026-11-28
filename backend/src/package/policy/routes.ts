@@ -20,6 +20,7 @@ export const adminPolicyRoutes: FastifyPluginAsync = async (app) => {
 
 /** Public — mounted at /api/v1/policies. Published, started versions only. */
 export const publicPolicyRoutes: FastifyPluginAsync = async (app) => {
+  app.get("/", controller.listPublicPolicies);
   app.get("/:code", controller.getPublicPolicy);
   app.get("/:code/versions", controller.getPublicHistory);
 };
