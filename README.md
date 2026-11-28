@@ -221,6 +221,8 @@ root — a per-folder install wipes the shared `node_modules`.
 │       ├── storefront/          app · layout · pages · features
 │       └── admin/               app · layout · pages · features · ui
 ├── docs/                        the reference documentation (see below)
+├── prototype/                   clickable seller + admin mock-up, dummy data, no build
+│                                (prototype/start.cmd — see prototype/README.md)
 └── .github/workflows/           ci.yml · deploy-dev.yml · deploy-prod.yml
 ```
 

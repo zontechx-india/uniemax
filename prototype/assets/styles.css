@@ -1,0 +1,167 @@
+/* Prototype-only styles: the control panel's layout.
+ *
+ * The app itself is styled by the REAL design system — frontend/src/index.css
+ * (and admin.css in the console), which server.js puts into each page. So every
+ * colour here is one of its tokens (var(--surface), var(--line)…), and dark
+ * mode follows <html data-theme="dark"> on its own. No colours in JS either:
+ * screens use token classes (bg-surface, text-muted, btn-primary…).
+ */
+
+:root {
+  --cp-w: 288px; /* control panel width */
+  --cp-gap: 12px;
+  --cp-radius: 10px;
+  --cp-text: 13px;
+  --cp-text-sm: 12px;
+}
+
+body {
+  visibility: hidden; /* app.js shows the page once the first render is styled */
+}
+
+/* Hidden below 1024 px: phone layouts are seen clean. */
+.cp {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  /* The app moves right to make room — the panel never covers it. */
+  html.cp-open body {
+    padding-left: var(--cp-w);
+  }
+
+  .cp {
+    display: block;
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 45;
+    font-size: var(--cp-text);
+    line-height: 1.45;
+    color: var(--fg);
+  }
+
+  html.cp-open .cp {
+    width: var(--cp-w);
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border-right: 1px solid var(--line);
+  }
+}
+
+.cp-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--cp-gap) 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.cp-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.cp-sec {
+  padding: var(--cp-gap) 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.cp-sec h3 {
+  margin: 0 0 8px;
+  font-size: var(--cp-text-sm);
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fg-muted);
+}
+
+.cp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+/* Panel buttons: the shared Button, made compact for the panel. */
+.cp .cp-btn {
+  height: 32px;
+  padding: 0 10px;
+  font-size: var(--cp-text-sm);
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.cp-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--fg-muted);
+}
+.cp-icon:hover {
+  background: var(--surface-alt);
+  color: var(--fg);
+}
+
+.cp-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cp-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: var(--cp-text-sm);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.cp-check input {
+  margin-top: 2px;
+  accent-color: var(--brand);
+}
+
+.cp-select {
+  height: 30px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--fg);
+  font-size: var(--cp-text-sm);
+}
+
+.cp-mono {
+  margin-top: 2px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+  color: var(--fg-muted);
+  overflow-wrap: anywhere;
+}
+
+/* Collapsed: a small tab on the left edge. */
+.cp-tab {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 9999px;
+  background: var(--surface);
+  color: var(--fg);
+  font-size: var(--cp-text);
+  font-weight: 600;
+  box-shadow: var(--shadow-lifted);
+}
+.cp-tab:hover {
+  background: var(--surface-alt);
+}

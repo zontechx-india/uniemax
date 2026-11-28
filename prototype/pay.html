@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en" data-app="customer">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- A per-customer page: never indexed (docs/SEO.md — per-customer pages are noindex + disallowed). -->
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Your bill · UnieMax prototype</title>
+    <link rel="icon" href="/app_logo.png" />
+    <script>try{var m=localStorage.getItem('uniemax-theme');if(m==='dark'||m==='light')document.documentElement.dataset.theme=m}catch(e){}</script>
+    <style>@layer theme, base, components, utilities;</style>
+    <!-- @index-css : server.js puts the real frontend/src/index.css here -->
+    <link rel="stylesheet" href="assets/styles.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <!-- Fixed order. Each file adds global objects the next ones use. -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.1.11/dist/index.global.js"></script>
+    <script src="js/icons.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/catalog.js"></script>
+    <script src="js/store.js"></script>
+    <script src="js/bills.js"></script>
+    <script src="js/router.js"></script>
+    <script src="js/screens/pay.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
