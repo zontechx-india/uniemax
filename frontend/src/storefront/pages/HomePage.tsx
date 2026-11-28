@@ -1788,8 +1788,10 @@ export function MarketFooter() {
   return (
     <footer className="border-t border-line bg-surface">
       <div className={`${CONTENT_COLUMN} py-12 lg:py-14`}>
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="max-w-xs">
+        {/* Phones: logo and "Sell" span both columns; Marketplace and Legal
+            sit side by side so the footer stays short. */}
+        <div className="grid grid-cols-2 gap-x-6 gap-y-10 lg:grid-cols-4">
+          <div className="col-span-2 max-w-xs lg:col-span-1">
             <Link to="/" aria-label="UnieMax home" className="flex items-center">
               <AppLogoLockup className="h-8" />
             </Link>
@@ -1819,7 +1821,7 @@ export function MarketFooter() {
             </nav>
           ))}
 
-          <div>
+          <div className="col-span-2 lg:col-span-1">
             <p className="text-sm font-medium text-muted">
               Sell on UnieMax
             </p>

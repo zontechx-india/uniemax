@@ -449,7 +449,9 @@ for guests and signed-in customers alike and adapts per session state.
   zeros and a failed fetch simply drop out; plain white figures split by
   hairlines, sentence-case labels, no tiles) above **how it
   works**, three numbered steps, both inside one flat hairline `aurora-pane`). The
-  **footer** is a structured 4-column block: brand + tagline, Marketplace
+  **footer** is a structured 4-column block (on phones and tablets 2 columns: brand
+  and "Sell on UnieMax" span the full width, Marketplace and Legal sit side by
+  side): brand + tagline, Marketplace
   (All categories / All shops / Fresh Finds / About / Support / Contact) and Legal (Privacy / Terms / Refund & Returns /
   Shipping Policy) columns
   (→ `pages/InfoComingSoonPage.tsx`: About, Contact and the two policies with
