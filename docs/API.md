@@ -3426,6 +3426,17 @@ and [admin](./dropshipping/admin/context.md).
 
 ---
 
+## Policies (PolicyHub) — `/api/v1/policies` (no auth) · `/api/v1/admin/policies` 🔒 admin
+
+Served by `package/policy`. Platform policies with versions (first: the seller
+payout policy `PYO-001`). Public routes return only published versions that
+have started, with no admin fields. Admin: any admin reads and edits the
+draft; creating a policy and publishing need **SUPER_ADMIN** (`403` otherwise).
+Endpoint tables, request bodies and errors live only in the knowledge base:
+[`docs/policyhub/README.md`](./policyhub/README.md) §8.
+
+---
+
 ## Affiliate Marketing — `/api/v1/affiliate`
 
 Served by `package/affiliate` (see `docs/BACKEND_CONTEXT.md` and

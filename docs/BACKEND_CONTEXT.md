@@ -57,7 +57,8 @@ backend/
 │   ├── schema/                # Multi-file Prisma schema (one datasource, three Postgres schemas)
 │   │   ├── core.prisma        #   the platform models — `public` schema
 │   │   ├── affiliate.prisma   #   affiliate_* models — `affiliate` schema, no FK to core
-│   │   └── dropship.prisma    #   supplier models — `dropship` schema, no FK to core
+│   │   ├── dropship.prisma    #   supplier models — `dropship` schema, no FK to core
+│   │   └── policy.prisma      #   PolicyHub — `policyhub` schema, no FK to core, `project` on every row
 │   └── check.sql              # Connectivity probe for `npm run db:check`
 ├── prisma.config.ts           # Prisma 7 config — migration datasource (DIRECT_URL)
 ├── src/
@@ -103,6 +104,9 @@ backend/
 │   │   ├── dropship/          # Sellers' own suppliers (only when DROPSHIP_ENABLED) —
 │   │   │                      #   same shape as affiliate; documented only in
 │   │   │                      #   docs/dropshipping/ (architecture/context.md)
+│   │   ├── policy/            # PolicyHub — versioned platform policies (PYO-001 …);
+│   │   │                      #   rules · schema · service · controller · routes;
+│   │   │                      #   documented in docs/policyhub/README.md
 │   │   └── auth/              # The whole auth system — see "Authentication" below
 │   │       ├── index.ts       #   PUBLIC facade — the ONLY entry the app imports
 │   │       ├── guards.ts      #   requireAdmin / requireCustomer + request types
@@ -994,6 +998,19 @@ the package seams above, and `createStoreWithoutLogo` in `stores.service.ts`
 — an unpublished, logo-less store with the given business phone and address
 in its profile (same slug and profile seeding as `createStore`), made for a
 supplier who joins without a store of its own.
+
+### PolicyHub — the `package/policy` sub-system
+
+Versioned platform policies (first: the seller payout policy `PYO-001`) in
+their own `policyhub` Postgres schema, built to move to a separate database
+shared by several products: every row carries `project` (from
+`POLICY_PROJECT`, never a request), links only inside `policyhub`, and people
+are an id + email snapshot. Only `package/policy/service.ts` touches the
+tables; `controller.ts` is the one place that imports core (`resolveActor`).
+Mounted from `routes.ts`: `/api/v1/policies` (public) and
+`/api/v1/admin/policies` (admin subtree; create / publish = `requireSuperAdmin`).
+Everything else — rules, data model, endpoints, phases — lives in
+[`docs/policyhub/README.md`](./policyhub/README.md).
 
 ### Affiliate marketing — the `package/affiliate` sub-system
 
@@ -1985,6 +2002,15 @@ display snapshot beside them):
 Core touch points: `Order.affiliateRef` (nullable opaque token from checkout)
 and `NotificationKind.AFFILIATE`.
 
+### PolicyHub (`prisma/schema/policy.prisma`, `policyhub` schema)
+
+`Policy` (`policies`, unique `project + code`) → `PolicyVersion`
+(`policy_versions`: `version` 1, 2, 3…, `DRAFT | PUBLISHED`, `body` with
+`{{placeholders}}`, `settings` JSON, `effectiveFrom`, who created / published)
+→ `PolicyEvent` (`policy_events`, append-only audit). Links use `(id, project)`
+so the database refuses a version or event in another project. No relation to
+any core model. Field-by-field: [`docs/policyhub/README.md`](./policyhub/README.md) §6.
+
 ### WhatsApp (`prisma/schema/whatsapp.prisma`, `public` schema)
 
 Standalone — no relation to a core model. Ids are cuids like the rest of the
@@ -2042,11 +2068,11 @@ schema (not `BigInt`: it does not survive `JSON.stringify` into responses).
   db:migrate` (dev — creates + applies a migration) → commit the migration
   folder → `npm run db:deploy` on production. `npm run db:status` shows
   pending migrations. `prisma db push` is no longer used.
-- **Multi-file schema, two Postgres schemas.** `prisma.config.ts` points at the
-  `prisma/schema/` folder; every model and enum carries `@@schema("public")`
-  or `@@schema("affiliate")` (Prisma's `multiSchema` — GA in Prisma 7, so the
-  datasource lists `schemas = ["public", "affiliate"]`). One generated client
-  covers both. The generator `output` is relative to the schema folder, hence
+- **Multi-file schema, four Postgres schemas.** `prisma.config.ts` points at the
+  `prisma/schema/` folder; every model and enum carries `@@schema("public")`,
+  `"affiliate"`, `"dropship"` or `"policyhub"` (Prisma's `multiSchema` — GA in
+  Prisma 7, so the datasource lists `schemas = ["public", "affiliate",
+  "dropship", "policyhub"]`). One generated client covers them all. The generator `output` is relative to the schema folder, hence
   `../../src/generated/prisma`.
 - When `migrate dev` refuses because the dev database carries a migration the
   local folder does not (history drift), do **not** reset. Generate the exact

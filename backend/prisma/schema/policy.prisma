@@ -1,0 +1,108 @@
+// PolicyHub — platform policies (docs/policyhub/README.md).
+//
+// ISOLATION (§5): these tables will move to their own database, shared by
+// several products. So every model lives in schema "policyhub", every row
+// carries its `project`, relations point ONLY at other policyhub tables, and
+// people are plain ids + an email snapshot (no link to `admins`). Only
+// `src/package/policy/` reads or writes them.
+
+/// DRAFT     editable, never shown publicly.
+/// PUBLISHED frozen forever; shown once `effectiveFrom` has passed.
+enum PolicyVersionStatus {
+  DRAFT
+  PUBLISHED
+
+  @@schema("policyhub")
+}
+
+/// One policy of one project. Its `code` never changes.
+model Policy {
+  id       String @id @default(cuid())
+  /// Which product owns it: "uniemax", "zontechx", ...
+  project  String
+  /// Stable code shown to readers, e.g. "PYO-001". Unique per project.
+  code     String
+  name     String
+  /// Who it is for: "seller", "customer", "supplier", ...
+  audience String
+
+  versions PolicyVersion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([project, code])
+  /// Target of the project-safe links: a version can't point at another
+  /// project's policy.
+  @@unique([id, project])
+  @@map("policies")
+  @@schema("policyhub")
+}
+
+/// One version of a policy. A DRAFT may change; a PUBLISHED one never does
+/// (service-enforced — there is no update path for it). At most one DRAFT per
+/// policy, and it is never deleted (reset instead) so its events stay whole.
+model PolicyVersion {
+  id       String @id @default(cuid())
+  /// Same as the policy's project — the link below makes the DB refuse a mismatch.
+  project  String
+  policyId String
+  policy   Policy @relation(fields: [policyId, project], references: [id, project], onDelete: Restrict)
+
+  /// 1, 2, 3 ... per policy.
+  version Int
+  status  PolicyVersionStatus @default(DRAFT)
+
+  /// Full wording (Markdown). Times are {{placeholders}} filled from `settings`.
+  body          String
+  /// What changed vs the previous version — shown to readers.
+  changeSummary String?
+  /// Why it changed — internal, admin only.
+  changeReason  String?
+  /// Machine-readable values, shape checked per policy code (rules.ts).
+  settings      Json?
+
+  /// When it starts to apply. Set on publish; never in the past, always after
+  /// the previous published version's.
+  effectiveFrom    DateTime?
+  publishedAt      DateTime?
+  publishedById    String?
+  publishedByEmail String?
+  createdById      String
+  createdByEmail   String
+
+  events PolicyEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([policyId, version])
+  @@unique([id, project])
+  @@index([project, policyId, status, effectiveFrom])
+  @@map("policy_versions")
+  @@schema("policyhub")
+}
+
+/// Append-only audit trail of policy actions. Never edited or deleted.
+model PolicyEvent {
+  id        String        @id @default(cuid())
+  project   String
+  versionId String
+  version   PolicyVersion @relation(fields: [versionId, project], references: [id, project], onDelete: Restrict)
+
+  /// CREATED | EDITED | RESET | PUBLISHED
+  action     String
+  actorId    String
+  actorEmail String
+  note       String?
+  /// Changed fields only.
+  before     Json?
+  after      Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([versionId, createdAt])
+  @@index([project, createdAt])
+  @@map("policy_events")
+  @@schema("policyhub")
+}

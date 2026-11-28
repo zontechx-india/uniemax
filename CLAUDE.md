@@ -23,6 +23,7 @@ one file (no duplication).
 | Seller finance — platform / gateway fee rules, order fee snapshots, seller ledger & balances, COD dues, Earnings page | [`docs/seller-finance/README.md`](./docs/seller-finance/README.md) — start there |
 | Dropshipping — anything in `package/dropship` (its endpoints, schema, rules, screens), plans and status | [`docs/dropshipping/`](./docs/dropshipping/README.md) — start at its README |
 | Seller bills — `modules/bills`, bill pages, link / already-paid (OFFLINE) bills, bill order ownership, the OFFLINE fee rule, the PDF bill / receipt | [`docs/bills/README.md`](./docs/bills/README.md) — the feature's knowledge base; start there |
+| Policies (PolicyHub) — `policyhub` schema, `package/policy`, policy versions, the seller payout policy `PYO-001` | [`docs/policyhub/README.md`](./docs/policyhub/README.md) — start there |
 | UI/UX rules (spacing, type, colour, components, states) | [`docs/DESIGN_GUIDELINES.md`](./docs/DESIGN_GUIDELINES.md) — **read before any UI work; it wins over older plans** |
 | Design-system clean-up phases and status | [`docs/DESIGN_SYSTEM_PLAN.md`](./docs/DESIGN_SYSTEM_PLAN.md) |
 | Anything SEO — head tags, structured data, `robots.txt`, sitemaps, page shells, indexing rules, `/c/` landing pages' SEO, the SEO roadmap | [`docs/SEO.md`](./docs/SEO.md) (rules tables, status, roadmap **and** change log) |

@@ -69,6 +69,7 @@ Verify: `curl http://localhost:4000/health`
 | `npm run test:unit` | Unit tests for pure logic (`test/unit/*.test.ts`, `node:test` run through `tsx`) — no server, no database. Currently the WhatsApp webhook signature check and payload parsing, template requirements and campaign mappings, and the store-readiness gates (what blocks publishing, payouts and online payment) |
 | `npm run test:api` | API regression suite (`test/*.test.mjs`, Node's built-in `node:test`, no extra deps) against a **running** backend. Env: `API_BASE`, `QA_EMAIL_A`/`QA_PASSWORD_A` (seller + buyer), `QA_EMAIL_B`/`QA_PASSWORD_B` (second customer), optional `QA_PHONE_A` (+ `QA_OTP_CODE`, default `123456`) so the test store can publish via the SMS OTP bypass. Creates a store, products and orders — local or dev only; refuses `*.uniemax.com`. |
 | `npx tsx scripts/advance-payouts-check.ts` | End-to-end check of **advance payouts** (docs/seller-finance §9) against the current mode's DB: makes its own customer, store and orders, runs every advance path through the real payout / finance services, checks each balance against the ledger, then deletes what it made. Refuses production. |
+| `npx tsx scripts/policy-check.ts` | End-to-end check of **PolicyHub** (docs/policyhub §7) against the current mode's DB, under a throwaway project name: create, edit, publish now / later, reset, every publish refusal, the public view, project isolation in the DB, a parallel draft race; then deletes what it made. Refuses production. |
 
 ## Environment (`.env`)
 
@@ -94,6 +95,7 @@ Verify: `curl http://localhost:4000/health`
 | `WEB_SHELL_PATH` | Optional path to the built storefront `index.html` the page shells (`GET /store/*`, `GET /c/*`) write each page's head into. Default: this clone's `../frontend/dist/index.html` — right on the server (each clone builds its own frontend) and locally after `npm run build` in `frontend/`. Without a build those routes answer 503 |
 | `AFFILIATE_MAX_PERCENT` | Highest percentage commission a seller may offer (default `50`) — the platform ceiling for `package/affiliate` |
 | `AFFILIATE_INVITE_DAYS` | Days an affiliate invitation stays valid (default `14`) |
+| `POLICY_PROJECT` | Which project's policies this app reads and writes in PolicyHub (schema `policyhub`; default `uniemax`). Lowercase letters, digits, dashes. Never set from a request — [docs/policyhub](../docs/policyhub/README.md) |
 | `DROPSHIP_ENABLED` | `true` registers the dropshipping package (`/api/v1/dropship`, `/api/v1/admin/dropship`). Default off; on in dev only until the feature is complete. Other `DROPSHIP_*` knobs: [docs/dropshipping/architecture](../docs/dropshipping/architecture/context.md) (Config) |
 | `AFFILIATE_CLICK_RETENTION_DAYS` | Days of raw click rows kept before the hourly job prunes them (default `90`); link click counters are never pruned |
 | `DATABASE_URL` | Pooled connection (runtime) — Supabase PgBouncer `:6543`  |

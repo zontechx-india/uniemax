@@ -139,6 +139,13 @@ const envSchema = z.object({
     .default("false")
     .transform((v) => v === "true"),
 
+  // PolicyHub (docs/policyhub/README.md): which project's policies this app
+  // reads and writes. Always from config, never from a request.
+  POLICY_PROJECT: z
+    .string()
+    .regex(/^[a-z][a-z0-9-]{1,39}$/, "lowercase letters, digits and dashes")
+    .default("uniemax"),
+
   // NOTE: all auth config (JWT, cookies, OTP/verification codes, OAuth) lives
   // inside the self-contained auth package (src/package/auth/core/config/env.ts),
   // not here.

@@ -42,6 +42,7 @@ import { paymentRoutes } from "./modules/payments/payments.routes.js";
 import { adminConsoleRoutes } from "./modules/admin/admin.routes.js";
 import { adminPayoutRoutes } from "./modules/payouts/payouts.routes.js";
 import { adminFinanceRoutes } from "./modules/finance/finance.routes.js";
+import { adminPolicyRoutes, publicPolicyRoutes } from "./package/policy/index.js";
 import {
   adminNotificationRoutes,
   customerNotificationRoutes,
@@ -130,6 +131,9 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       await api.register(publicMarketHomeRoutes, {
         prefix: "/public/home-sections",
       });
+      // Published platform policies (PolicyHub), e.g. the seller payout
+      // policy PYO-001. Started versions only — docs/policyhub/README.md.
+      await api.register(publicPolicyRoutes, { prefix: "/policies" });
       // Payment gateway callbacks (Cashfree webhook — signature-guarded).
       await api.register(paymentRoutes, { prefix: "/payments" });
       // WhatsApp Cloud API webhook (Meta → us — signature-guarded).
@@ -201,6 +205,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
             await guarded.register(adminPayoutRoutes);
             // Seller finance — fee rules, balances, ledger, adjustments.
             await guarded.register(adminFinanceRoutes);
+            // Policies (PolicyHub): drafts for any admin, publish = SUPER_ADMIN.
+            await guarded.register(adminPolicyRoutes, { prefix: "/policies" });
             // Store management ON BEHALF OF A SELLER — the SAME plugin that
             // serves /stores, mounted a second time with an admin actor so
             // support can fix a seller's catalog or storefront without a
