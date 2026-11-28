@@ -955,7 +955,9 @@ and their WhatsApp text says the order "is waiting for payment" instead of
   plain words — Waiting · Confirmed · Packed · Sent · Delivered · Cancelled —
   the shared `SegmentedControl` with `equal={false}` (cells as wide as their
   label) and `draggable={false}` (a swipe scrolls the row), 44px cells on a
-  phone / 36px from `sm`, in one sideways-scrolling row with a right-edge fade,
+  phone / 36px from `sm`, in one sideways-scrolling row with a right-edge fade
+  that goes once the row is scrolled to its end (`shared/useScrolledToEnd.ts`, so it
+  never dims the last status),
   deep-linkable via `?status=` so dashboard tiles land pre-filtered; counts
   from the layout's dashboard stats where it has them: All, Waiting (orange
   `pending-soft` pill), Sent, Delivered, Cancelled), a 48px debounced search (order number

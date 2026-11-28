@@ -5,6 +5,7 @@ import type { ListMeta } from '../../../shared/auth/http'
 import { buttonClass } from '../../../shared/ui/Button'
 import { ErrorNote } from '../../../shared/ui/form'
 import { SegmentedControl } from '../../../shared/ui/SegmentedControl'
+import { useScrolledToEnd } from '../../../shared/useScrolledToEnd'
 import { sellerOrderApi } from '../../features/stores/storesApi'
 import type {
   OrderStatus,
@@ -160,6 +161,7 @@ export function StoreOrdersPage() {
   }
 
   const filtered = q !== '' || status !== 'ALL'
+  const statusRow = useScrolledToEnd<HTMLDivElement>()
 
   const header = (
     <>
@@ -197,11 +199,16 @@ export function StoreOrdersPage() {
       {/*
         Status — the shared SegmentedControl (same look as Leads), cells as
         wide as their label, in one row that scrolls sideways on a phone (a
-        fade on the right says there are more). No thumb dragging here, so a
-        swipe scrolls the row.
+        fade on the right says there are more, and goes once the row is at
+        its end so it never dims the last status). No thumb dragging here, so
+        a swipe scrolls the row.
       */}
-      <div className="-mx-4 [mask-image:linear-gradient(to_right,#000_88%,transparent)] sm:mx-0 sm:[mask-image:none]">
-        <div className="overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:px-0">
+      <div
+        className={`-mx-4 sm:mx-0 sm:[mask-image:none] ${
+          statusRow.atEnd ? '' : '[mask-image:linear-gradient(to_right,#000_88%,transparent)]'
+        }`}
+      >
+        <div ref={statusRow.ref} className="overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:px-0">
           <SegmentedControl
             label="Show orders"
             options={STATUS_TABS.map(({ key, label }) => ({ value: key, label }))}
