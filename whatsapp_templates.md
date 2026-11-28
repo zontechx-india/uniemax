@@ -1,7 +1,7 @@
 # UnieMax – WhatsApp Message Templates (full list)
 
 All templates on the **Message templates** page of the **UnieMax** WhatsApp Business Account.
-Checked in WhatsApp Manager on 27 Nov 2026.
+Checked in WhatsApp Manager on 29 Nov 2026.
 
 | Item | Value |
 |---|---|
@@ -9,7 +9,7 @@ Checked in WhatsApp Manager on 27 Nov 2026.
 | Sending phone number | +91 70943 10139 |
 | Phone Number ID | `1297227253483920` |
 | Meta Business ID | `998630909433831` |
-| Total templates | 15 (all **Active**) |
+| Total templates | 12 (all **Active**) |
 
 > Templates only work inside the WABA where they were created. Always send from the UnieMax account above.
 > The other account "Zontechx" (`1762129785093231`) has no phone number and cannot send. Ignore any templates there.
@@ -30,11 +30,8 @@ Checked in WhatsApp Manager on 27 Nov 2026.
 | 8 | `seller_setup_tax` | Utility | `en` | 2 | URL (dynamic) | Seller | 1118453820592716 |
 | 9 | `seller_setup_payout` | Utility | `en` | 2 | URL (dynamic) | Seller | 1134438049011372 |
 | 10 | `seller_motivation_tip` | Marketing | `en` | 2 | URL (dynamic) | Seller | 1672165614609890 |
-| 11 | `uniemax_address_update` | Utility | `en_US` | 3 | – | Customer | 1833517641150563 |
-| 12 | `seller_payout_sent` | Utility | `en` | 10 | URL (dynamic) | Seller | – (**not sent by the code since 29 Nov 2026 — can be deleted**) |
-| 13 | `seller_payout_sent_v2` | Utility | `en` | 13 | URL (dynamic) | Seller | – (**not sent by the code since 29 Nov 2026 — can be deleted**) |
-| 14 | `seller_advance_sent` | Utility | `en` | 10 | URL (dynamic) | Seller | – (Active, added 27 Nov 2026 — every advance payout) |
-| 15 | `seller_payout_sent_v3` | Utility | `en` | 14 | URL (dynamic) | Seller | – (Active, approved 29 Nov 2026 — every payout that is not an advance) |
+| 11 | `seller_advance_sent` | Utility | `en` | 10 | URL (dynamic) | Seller | – (Active, added 27 Nov 2026 — every advance payout) |
+| 12 | `seller_payout_sent_v3` | Utility | `en` | 14 | URL (dynamic) | Seller | – (Active, approved 29 Nov 2026 — every payout that is not an advance) |
 
 ---
 
@@ -376,9 +373,6 @@ to the seller. Order total − platform fee − gateway fee + discount − COD d
 
 > Only send the masked account number (last 4 digits). Never send the full bank account number.
 
-> **`seller_payout_sent` (10 values) and `seller_payout_sent_v2` (13 values)** — the older
-> versions. The code stopped sending them on 29 Nov 2026; they can be deleted in WhatsApp Manager.
-
 ### 5.2 `seller_advance_sent` (advance — paid before delivery)
 
 - **Category:** Utility · **Language:** `en` · **Status:** Active (added 27 Nov 2026)
@@ -420,29 +414,7 @@ UnieMax seller payouts
 
 ---
 
-## 6. Other templates
-
-### 6.1 `uniemax_address_update`
-
-- **Category:** Utility · **Language:** `en_US` (note: not `en`) · **Status:** Active
-- **Send to:** Customer · **When:** Customer's delivery address is changed
-- **Header (text):** `Address update` · **Footer / Buttons:** none
-
-```
-Address update
-
-Hi {{1}}, your delivery address has been successfully updated to {{2}}. Contact {{3}} for any inquiries.
-```
-
-| Var | Field | Example |
-|---|---|---|
-| {{1}} | Customer name | John |
-| {{2}} | New address (one line) | 123 Main St |
-| {{3}} | Support contact (email / phone) | support@uniemax.com |
-
----
-
-## 7. Full example – template with button
+## 6. Full example – template with button
 
 ```json
 {
@@ -477,7 +449,7 @@ Hi {{1}}, your delivery address has been successfully updated to {{2}}. Contact 
 
 ---
 
-## 8. Template config (copy into code)
+## 7. Template config (copy into code)
 
 `body` = body params in order. `button` = what the URL button param should contain (null = no button).
 
@@ -533,11 +505,6 @@ Hi {{1}}, your delivery address has been successfully updated to {{2}}. Contact 
     "body": ["sellerName", "storeName"],
     "button": "{storeSlug}"
   },
-  "uniemax_address_update": {
-    "language": "en_US", "category": "UTILITY", "recipient": "customer",
-    "body": ["customerName", "newAddress", "supportContact"],
-    "button": null
-  },
   "seller_payout_sent_v3": {
     "language": "en", "category": "UTILITY", "recipient": "seller",
     "body": ["sellerName", "amountSent", "orderId", "storeName", "orderTotal", "platformFee", "gatewayPercent", "gatewayFee", "gatewayDiscount", "codDues", "amountSent", "paidTo", "utr", "paidOn"],
@@ -551,7 +518,7 @@ Hi {{1}}, your delivery address has been successfully updated to {{2}}. Contact 
 }
 ```
 
-## 9. Common errors
+## 8. Common errors
 
 | Code | Meaning |
 |---|---|

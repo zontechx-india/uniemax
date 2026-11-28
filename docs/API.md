@@ -3174,7 +3174,7 @@ The last 30 days plus the number's health from Meta (cached 5 min):
 Checked against the WABA's template list (cached 60 s) **before** calling Meta — no
 template with that name **and** language, a template that can't be sent, or a value /
 button count / media header that doesn't match → `422` saying which (e.g. *Template
-"uniemax_address_update" has no "en" version — use "en_US"*). Skipped only when Meta
+"order_delivered" has no "en_US" version — use "en"*). Skipped only when Meta
 can't list templates; Meta then decides. Saved as an outbound message with
 `lastStatus: "accepted"` and, as `body`, the template text with the values filled in.
 → `{ "data": <Meta's response + "recordId"> }` (`messages[0].id` is the wamid).

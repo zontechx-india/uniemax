@@ -8,7 +8,7 @@
  * WhatsApp Manager, update the md file and this file together.
  */
 
-export type TemplateGroup = 'Order' | 'Seller setup' | 'Payout' | 'Other'
+export type TemplateGroup = 'Order' | 'Seller setup' | 'Payout'
 
 export interface TemplateParam {
   /** `{{1}}`, `{{2}}`… — the position Meta expects. */
@@ -340,7 +340,7 @@ It may take a few hours to show in your bank account. Tap below to see all your 
       field: 'Store slug + /earnings',
       example: 'mukesh-electronics/earnings',
     },
-    note: 'Sent by modules/payouts/payouts.notifications.ts for every payout that is not an advance, once, alongside an email; also by hand from the order page (Send message). The header is fixed text — send only the body (14 values) and the button. Replaced seller_payout_sent and seller_payout_sent_v2 (no longer sent).',
+    note: 'Sent by modules/payouts/payouts.notifications.ts for every payout that is not an advance, once, alongside an email; also by hand from the order page (Send message). The header is fixed text — send only the body (14 values) and the button.',
   },
   {
     name: 'seller_advance_sent',
@@ -384,26 +384,9 @@ On delivery, this advance is part of what you earn. If the order is cancelled or
     },
     note: 'Advances only (docs/seller-finance §9) — the backend always sends this one for an advance payout.',
   },
-  {
-    name: 'uniemax_address_update',
-    group: 'Other',
-    category: 'Utility',
-    language: 'en_US',
-    recipient: 'Customer',
-    when: "The customer's delivery address is changed",
-    templateId: '1833517641150563',
-    header: 'Address update',
-    body: 'Hi {{1}}, your delivery address has been successfully updated to {{2}}. Contact {{3}} for any inquiries.',
-    params: [
-      p(1, 'customerName', 'Customer name', 'John'),
-      p(2, 'newAddress', 'New address (one line)', '123 Main St'),
-      p(3, 'supportContact', 'Support contact (email / phone)', 'support@uniemax.com'),
-    ],
-    note: 'Language is en_US, not en — sending with "en" fails with error 132001.',
-  },
 ]
 
-export const TEMPLATE_GROUPS: TemplateGroup[] = ['Order', 'Seller setup', 'Payout', 'Other']
+export const TEMPLATE_GROUPS: TemplateGroup[] = ['Order', 'Seller setup', 'Payout']
 
 /** The Cloud API request body for this template, filled with the examples. */
 export function sampleRequest(doc: TemplateDoc): string {

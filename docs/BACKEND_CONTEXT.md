@@ -526,7 +526,8 @@ module repeats the guard. Deliberate scope decisions:
   posts its seller-ledger entries in the same transaction (`syncPayoutLedger`;
   lock order: order row, then the store's balance row). The code path that
   moves a payout to `SUCCEEDED` calls `notifySellerPayoutSent`
-  (`payouts.notifications.ts`): email + WhatsApp `seller_payout_sent`, once,
+  (`payouts.notifications.ts`): email + WhatsApp `seller_payout_sent_v3`
+  (`seller_advance_sent` for an advance), once,
   fire-and-forget (SMS not built). **Advance payouts** (docs/seller-finance
   §9): `payoutPlan` makes a MANUAL payout on an undelivered `ONLINE` + `PAID`
   order an advance when the store's `advancePayoutsAllowed` is on
