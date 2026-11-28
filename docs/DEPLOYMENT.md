@@ -687,6 +687,29 @@ location ~ ^/(categories|shops|new)$ {
     proxy_intercept_errors on;
     error_page 400 404 429 500 502 503 504 = @uniemax_static_shell;
 }
+# Policies list (PolicyHub) — a fixed page: fall back on 404 like /sell.
+location = /policies {
+    proxy_pass http://127.0.0.1:__PORT__;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 10s;
+    proxy_intercept_errors on;
+    error_page 400 404 429 500 502 503 504 = @uniemax_static_shell;
+}
+# One policy — the API's 404 (unknown/unpublished code, noindex) is kept,
+# like /store/.
+location ^~ /policies/ {
+    proxy_pass http://127.0.0.1:__PORT__;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 10s;
+    proxy_intercept_errors on;
+    error_page 400 429 500 502 503 504 = @uniemax_static_shell;
+}
 # Re-enters `location = /index.html` from the SPA cache snippet (no-cache).
 location @uniemax_static_shell {
     rewrite ^ /index.html last;
@@ -723,6 +746,14 @@ release does not matter. Right after a backend restart the first request or
 two can still get the default head (warm-up) — check again before worrying.
 Verify: `curl -s http://127.0.0.1:8081/shops | grep -o '<title[^<]*</title>'`
 → `All shops · UnieMax`.
+
+The two **Policies** locations (`= /policies`, `^~ /policies/`, page shells
+since `v1.137.0`) were **applied 28 Nov 2026** on dev and prod the same way
+(backups `*.conf.pre-policies-*`). Like `/store/`, `/policies/` keeps the API's
+404 for an unknown or unpublished code. They live only in this storefront
+snippet — the admin hosts never include it, and their own `/policies` stays
+the admin console. Verify: `curl -s http://127.0.0.1:8081/policies | grep -o
+'<title[^<]*</title>'` → `Policies · UnieMax`.
 
 `404` is deliberately **not** in `error_page` for `/store/` and `/c/`: the
 API's 404 is the point (same HTML, `noindex`), and intercepting it would turn

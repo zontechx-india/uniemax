@@ -21,12 +21,12 @@
 | 4 | Seller **Earnings → Payout policy** | `436722e` | ☑ deployed | ☐ |
 | 5 | Publish `PYO-001` v1 (by a SUPER_ADMIN in the admin screen) | — | ☑ published | ☐ |
 | 6 | Admin policy page: **For developers** card (code, API URLs, live sample, snippet) | `3f26f3d` | ☑ deployed | ☐ |
-| 7 | Public **Policies** pages `/policies` + `/policies/:code` (replace the seller's in-app page), `GET /api/v1/policies`, page shells + sitemap | commit "feat(policy): public Policies pages" | ☑ deployed (nginx ☐) | ☐ |
+| 7 | Public **Policies** pages `/policies` + `/policies/:code` (replace the seller's in-app page), `GET /api/v1/policies`, page shells + sitemap | commit "feat(policy): public Policies pages" | ☑ deployed (nginx ☑ 28 Nov) | ☑ v1.137.0 (nginx ☑ 28 Nov) |
 
 **Next steps, in order**
 1. Test on dev (§15).
-2. nginx: forward `/policies` and `/policies/` to the page shells on the storefront vhosts (dev, then
-   prod) — §13 item 3. Until then the pages work; only crawlers get the default head.
+2. ~~nginx: forward `/policies` and `/policies/` to the page shells~~ — done on dev and prod, 28 Nov
+   2026 (§13 item 3).
 3. Production: push a `v*` tag (deploys at once — see `docs/DEPLOYMENT.md`), then publish v1 the same
    way on the prod admin console. Prod's migrations run on deploy (`npm run db:deploy`).
 4. Follow-ups, not built (§13): show the policy version on the **admin** order's Seller payout card,
@@ -368,9 +368,9 @@ production and use throwaway project names, cleaning up after): `npm run test:un
 
 1. **Phase 5** — publish v1 on dev, then prod (§0, §15).
 2. **Admin order page**: show "Paid under payout policy vN" on the Seller payout card (`admin/pages/orders/OrderPayoutCard.tsx`); the data is already in the response.
-3. **nginx for the policy page shells** — add `/policies` (exact) and `/policies/` (prefix) to the
-   page-shell snippet of the **storefront** vhosts (`docs/DEPLOYMENT.md` → Page shells), dev then prod,
-   after a release that has them. Never on the admin hosts: the admin console has its own `/policies`.
+3. ~~**nginx for the policy page shells**~~ — **done 28 Nov 2026** on dev and prod: `/policies` (exact)
+   and `/policies/` (prefix) are in the **storefront** page-shell snippet (`docs/DEPLOYMENT.md` → Page
+   shells). Never on the admin hosts: the admin console has its own `/policies`.
 4. **Move the hand-written policies into PolicyHub** (owner's plan): Refund & Returns, Shipping,
    Privacy, Terms. Order matters — publish each as a PolicyHub policy first, then make its old URL
    redirect to `/policies/{code}` (keep the URL working: Merchant Center reads `/refund-policy`, the
@@ -419,7 +419,7 @@ real approved wording; publish a test v2 only if it may stay in dev's history fo
 4b. **Public Policies:** open `/policies` signed out → Sellers tab lists the payout policy; Customers
    tab shows Refund & Returns and Shipping; Suppliers says "No policies for suppliers yet". Footer →
    Legal → **UnieMax Policies**. The old link `/mystores/<slug>/earnings/payout-policy?version=1`
-   redirects to `/policies/PYO-001?version=1`. After the nginx step (§13), `curl -s <host>/policies/PYO-001 | grep '<title>'`
+   redirects to `/policies/PYO-001?version=1`. `curl -s <host>/policies/PYO-001 | grep '<title>'`
    shows "Seller Payout Policy · Policies · UnieMax".
 5. **Payout link:** on a **test** online order delivered after v1 was published, record a manual
    payout (it moves the test store's balance) → seller Earnings → Payouts shows "Paid under payout

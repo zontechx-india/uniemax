@@ -535,6 +535,7 @@ Product feed.
 | --- | --- |
 | nginx forwards `/store/` and `/c/` to the API | **Live since 1 Oct 2026** on all four vhosts (dev → `:4001`, prod → `:4000`). Commands, verification and rollback: [`DEPLOYMENT.md`](./DEPLOYMENT.md) → Page shells. |
 | nginx forwards `/` and `/sell` to the API | **Applied on dev and prod, 4 Oct 2026** ([`DEPLOYMENT.md`](./DEPLOYMENT.md) → Adding `/` and `/sell`). Page shells on both since `v1.23.0`. |
+| nginx forwards `/policies` and `/policies/` to the API | **Applied on dev and prod, 28 Nov 2026** — storefront vhosts only, never the admin hosts ([`DEPLOYMENT.md`](./DEPLOYMENT.md) → Page shells). Page shells since `v1.137.0`. |
 | Store cards for existing logos | **Done on dev and production, 4 Oct 2026** (`optimize-media -- --apply --only=logos`): dev 20, prod 30 logos; nothing re-encoded. New logos get theirs on upload. |
 | ⚠️ Rolling production back past `747a9b3` | Remove the prod page-shell include **first** — an older backend answers those paths with a JSON 404. |
 | Google Search Console | **Set up**: domain property `sc-domain:uniemax.com` (owner account anwin@zontechx.com, verified by DNS). `sitemap.xml` **submitted 23 Oct 2026**. Indexing on 23 Oct: 41 indexed, 22 not — 8 `/cart?from=` (robots.txt, correct), 7 thin store pages ("crawled, not indexed"), 2 `/c/` pages that were empty when crawled, `/about` (no first-byte canonical — fixed by the info-page shells), and the `www` duplicates ([§10](#10-known-gaps-and-caveats)). |
@@ -600,11 +601,6 @@ Automated tests: `backend/test/page-shell.test.mjs` (read-only; part of
   most (`GET /admin/catalog/coverage`); sellers see such shelves flagged
   "not shown on UnieMax category pages". Dev, 4 Oct 2026: 35 of 38 live
   products reached, 3 missing on 3 shelves.
-- **Policy page shells need nginx.** `/policies` and `/policies/{code}` have page
-  shells in the backend, but nginx does not forward those paths yet, so for
-  now crawlers get the default head (the pages themselves work). To do: add
-  them to the **storefront** vhosts' page-shell snippet ([`DEPLOYMENT.md`](./DEPLOYMENT.md)
-  → Page shells), never the admin hosts (the console has its own `/policies`).
 - **`/privacy` and `/terms` are holding pages** (`noindex`) until the
   business supplies the legal text. Merchant Center and Cashfree both look
   for them.
@@ -704,4 +700,4 @@ search/filter URLs get indexed, mass-produced pages with nothing on them.
 | 15 Nov 2026 | nginx: `www.uniemax.com` (HTTP and HTTPS) 301s to `https://uniemax.com` with the path kept — one copy of the site for search engines ([`DEPLOYMENT.md`](./DEPLOYMENT.md) → `www.uniemax.com` → `uniemax.com`) |
 | 19 Nov 2026 | "UnieMax is a product of Zontechx" in the first byte of every marketplace page shell (body block at `<!-- shell:operator -->`, `<meta name="author">`), never on `/store/**`; platform `Organization` gains `parentOrganization` (both writers) and is also on `/sell`, `/about`, `/contact`. Marketplace footer, `/about` ("Who runs UnieMax") and `/contact` ("Operated by Zontechx") show the same facts. For Meta's WhatsApp display-name review. Tests: `test/unit/page-shell-operator.test.ts`, `page-shell.test.mjs` |
 | 1 Nov 2026 | Meta Pixel `content_ids` and GA4 `item_id` switched from the product slug to the product id, matching the feed's `g:id` (Meta catalogue reported "products not matching ad events"); placed-order lines now carry `productId`. Feed live on prod since 24 Oct: Merchant Center (371 products, return policy under review) and Meta catalogue "UnieMax" (371 eligible, hourly fetch). Released as `v1.78.0` |
-| 28 Nov 2026 | Public Policies pages (PolicyHub): `/policies` (tabs Sellers · Customers · Suppliers by `#hash`) and `/policies/{code}` — page shells (`policies` / `policy` kinds; unknown or unpublished code → 404; `?version=` → noindex, follow; new `version` in the page-shell query), browser twin `storefront/pages/policies/policySeo.ts` (kept equal by `test/unit/policy-page-shell.test.ts`), both in `sitemap-stores.xml`. The footer's Legal column became one link, **UnieMax Policies** → `/policies`, which lists the four hand-written pages (their URLs unchanged). nginx forwarding not applied yet ([§10](#10-known-gaps-and-caveats)) |
+| 28 Nov 2026 | Public Policies pages (PolicyHub): `/policies` (tabs Sellers · Customers · Suppliers by `#hash`) and `/policies/{code}` — page shells (`policies` / `policy` kinds; unknown or unpublished code → 404; `?version=` → noindex, follow; new `version` in the page-shell query), browser twin `storefront/pages/policies/policySeo.ts` (kept equal by `test/unit/policy-page-shell.test.ts`), both in `sitemap-stores.xml`. The footer's Legal column became one link, **UnieMax Policies** → `/policies`, which lists the four hand-written pages (their URLs unchanged). nginx forwards `/policies` and `/policies/` to these shells on dev and prod (storefront vhosts only; [`DEPLOYMENT.md`](./DEPLOYMENT.md) → Page shells) |
