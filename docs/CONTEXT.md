@@ -1106,6 +1106,13 @@ revoked from anywhere else.
   every entry, with corrections (reason required). Sellers see the same on
   their **Earnings** page, and each order's bill, payment mode and whether
   the money reached them on **Transactions**.
+- **Policies** — rules UnieMax publishes, first the **seller payout policy**
+  (PYO-001: delivered before the cutoff → paid the same day, transfers in an
+  evening window, every day). Any admin drafts a change with a live preview;
+  only a super admin publishes, now or from a date. A published version
+  never changes; sellers read the version in force and every earlier one
+  from **Earnings → Payout policy**, and each payout says which version it
+  was paid under (docs/policyhub/).
 - **Products** — the seller catalog across all stores, with inventory views
   (low stock, out of stock) and the platform's one moderation lever:
   **hide a listing** (with a reason the seller is told). It flips the same

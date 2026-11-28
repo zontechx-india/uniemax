@@ -327,6 +327,13 @@ export const router = createBrowserRouter([
                     }),
                   },
                   {
+                    // When UnieMax pays — the published payout policy (PolicyHub PYO-001).
+                    path: 'earnings/payout-policy',
+                    lazy: async () => ({
+                      Component: (await import('../pages/stores/StorePayoutPolicyPage')).StorePayoutPolicyPage,
+                    }),
+                  },
+                  {
                     path: 'transactions',
                     lazy: async () => ({
                       Component: (await import('../pages/stores/StoreTransactionsPage')).StoreTransactionsPage,

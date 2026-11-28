@@ -1,7 +1,7 @@
 # PolicyHub — platform policies (first policy: Seller Payout, `PYO-001`)
 
-> **Start here** for any policy work. Status: **Phases 1–3 built** (backend, payout link,
-> admin screen — 28 Nov 2026); Phases 4–5 (seller screen, publishing v1) not started — see §12.
+> **Start here** for any policy work. Status: **Phases 1–4 built** (backend, payout link,
+> admin and seller screens — 28 Nov 2026); Phase 5 (publishing v1 on dev / prod) to do — see §12.
 > This file replaces the earlier `payout-management-review-plan.md`.
 > Seller money rules (fees, ledger, payouts) stay in
 > [`docs/seller-finance/README.md`](../seller-finance/README.md). This file only covers
@@ -349,9 +349,9 @@ seller's `GET /stores/:id/earnings` payouts carry `policyVersion` only (no raw i
 | Who | Where | What |
 |---|---|---|
 | Admin | **Platform → Policies** (built, Phase 3) | A list of policies. Open one to see its versions and history. Edit the draft with a text editor, the settings fields (cutoff, window) and a live preview. **Publish** (now or at a date) appears for `SUPER_ADMIN` only. `ADMIN` sees "Ask a super admin to publish". |
-| Seller | **Earnings → "Payout policy"** link (new page) | Current version: name, code, version, "in force since", the wording, cutoff and window as a small card. Below it, a list of older versions with their periods and change summaries. |
+| Seller | **Earnings → "Payout policy"** (built, Phase 4: `/mystores/:slug/earnings/payout-policy`) | Current version: name, code, version, "in force since", the wording, cutoff and window as a small card. Below it, a list of older versions with their periods and change summaries. |
 | Seller / Admin | Payout detail (existing) | One small line: "Payout policy v1". It links to that version. |
-| Public | `/payout-policy` (optional) | The same view as the seller page, next to the `refund-policy` and `shipping-policy` pages. |
+| Public | `/payout-policy` (optional — **not built**; the public API is ready) | The same view as the seller page, next to the `refund-policy` and `shipping-policy` pages. |
 
 Follow `docs/DESIGN_GUIDELINES.md`. Buttons come from `shared/ui/Button.tsx`.
 
@@ -401,7 +401,7 @@ Rule for every stage: **the policy never starts a transfer.** Payout code checks
 | **1. Schema + backend** ☑ 28 Nov 2026 | `prisma/schema/policy.prisma`, `core.prisma` (`schemas` list), migration `20261128100000_policyhub` (applied on dev), `src/package/policy/*`, `src/routes.ts`, `POLICY_PROJECT` in `config/env.ts` | `test/unit/policy.test.ts` (13 tests: cutoff 17:59:59 / 18:00 / 23:59 IST + UTC input + month/year end, version in force, history periods, start-time checks, settings shape, placeholders) · `scripts/policy-check.ts` (19 checks on the real DB, see backend/README) · HTTP guards checked: anonymous → 401, ADMIN create / publish → 403, ADMIN draft edit → 200, SUPER_ADMIN publish → 200 | ☑ All pass; the full unit suite (297) still passes. |
 | **2. Link payouts** ☑ 28 Nov 2026 | migration `20261128140000_payout_policy_version` (applied on dev) · `payouts.service.ts` (`payoutPolicyVersionId` in `recordManualPayout` and `triggerGatewayPayout`; `policyVersion` on the payout shape) · `finance.service.ts › getSellerEarnings` · `package/policy` (`versionAt`, `versionsByIds`) | `scripts/payout-policy-check.ts` (8 checks on real payouts: nothing published → null · delivered under v1 → v1, also when paid after v2 started · delivered under v2 → v2 · advance → version at creation · repeated key → same payout · admin + seller views · lookup error → null + warning) · `advance-payouts-check.ts`, `policy-check.ts` and all 297 unit tests pass unchanged | ☑ New payouts carry the version. Amounts, ledger and hub calls unchanged. |
 | **3. Admin screen** ☑ 28 Nov 2026 | Platform → **Policies** (`/policies`, `/policies/:code`): `admin/pages/policies/` (`PoliciesPage`, `PolicyPage`, `policyTemplates.ts`), `adminApi.ts` (policy types + calls), nav, router, `scroll` icon; shared `shared/policy/` (`PolicyText` renderer, `policyWording.ts` placeholder fill) for Phase 4 too. Details: `docs/FRONTEND_CONTEXT.md` → Admin pages | Visual check at 1280px and 390px against the backend's own rules (in-memory fake API): list, empty state, editor + live preview, save → "Ready to publish", publish dialog → v2 in force, ADMIN sees no Publish + "Only a super admin can publish", approved wording passes every publish check; no horizontal overflow, no console errors · `tsc -b`, `check:ui` (within budget), `vite build` pass | ☑ Screens built. Publishing v1 on dev / prod is Phase 5. |
-| **4. Seller screen** | Earnings link + Payout policy page + "Payout policy vN" line on payouts (+ optional public page) | Manual check | A seller sees the current version, its history and the version on each new payout. No admin fields appear in the response. |
+| **4. Seller screen** ☑ 28 Nov 2026 | `StoreEarningsPage` ("When we pay you" card, "Paid under payout policy vN" link per payout) · new `StorePayoutPolicyPage` + route `earnings/payout-policy` · `storesApi.ts` (`policyVersion` on earnings payouts) · `shared/policy/policyApi.ts`, `PayoutTimes.tsx`. Public `/payout-policy` page **not built** (optional) | Visual check at 390px and 1280px with a fake API: Earnings card + links, policy page (times card, wording, earlier versions), `?version=1` opens and scrolls to v1 with its own times, not-published → calm note and no Earnings card; no overflow, no console errors · `tsc -b`, `check:ui`, `vite build` pass | ☑ A seller sees the current version, every earlier one and the version on each payout. The public API returns no admin fields (Phase 1). |
 | **5. Go live** | Publish `PYO-001` v1 through the admin screen on dev, then prod (no hard-coded seed) | — | The live wording is the signed-off §4 text. |
 | Docs, each phase | This file, `docs/API.md`, `docs/BACKEND_CONTEXT.md` (data model), `docs/seller-finance/README.md` (payout column), `docs/FRONTEND_CONTEXT.md`, `backend/README.md` (env) | — | Docs match the code |
 

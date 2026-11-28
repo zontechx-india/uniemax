@@ -8,7 +8,10 @@ import { BUCKET_LABEL, ENTRY_LABEL, signed } from '../../../shared/finance/ledge
 import { storeFinanceApi } from '../../features/stores/storesApi'
 import type { SellerEarnings } from '../../features/stores/storesApi'
 import { useManagedStore } from '../../features/stores/useManagedStore'
-import { RupeeIcon } from '../../layout/icons'
+import { ChevronRightIcon, RupeeIcon } from '../../layout/icons'
+import { PAYOUT_POLICY_CODE, policyApi } from '../../../shared/policy/policyApi'
+import type { PublicPolicy } from '../../../shared/policy/policyApi'
+import { PayoutTimes } from '../../../shared/policy/PayoutTimes'
 import { PageHeader } from './ui/PageHeader'
 import { StatusPill } from './ui/StatusPill'
 import type { StatusTone } from './ui/StatusPill'
@@ -61,6 +64,22 @@ export function StoreEarningsPage() {
   useEffect(() => {
     load()
   }, [load])
+
+  // "When we pay you" — the published payout policy. A failure or nothing
+  // published just hides the card; the page's money never depends on it.
+  const [policy, setPolicy] = useState<PublicPolicy | null>(null)
+  useEffect(() => {
+    let live = true
+    policyApi
+      .current(PAYOUT_POLICY_CODE)
+      .then((p) => {
+        if (live) setPolicy(p)
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [])
 
   return (
     <div className="space-y-4">
@@ -116,6 +135,20 @@ export function StoreEarningsPage() {
             ) : null}
           </Card>
 
+          {policy ? (
+            <Card className="space-y-3">
+              <CardHeader title="When we pay you" subtitle="From UnieMax's payout policy." />
+              <PayoutTimes settings={policy.settings} />
+              <Link
+                to="payout-policy"
+                className="inline-flex min-h-11 items-center gap-1 text-base font-medium text-brand hover:underline"
+              >
+                Read the payout policy
+                <ChevronRightIcon className="h-4 w-4" />
+              </Link>
+            </Card>
+          ) : null}
+
           <div className="grid gap-4 md:grid-cols-2">
             <Totals
               title="Online orders delivered"
@@ -150,6 +183,14 @@ export function StoreEarningsPage() {
                         <p className="text-sm text-muted">
                           {money(payout.duesDeducted)} of your COD dues was taken from this payout.
                         </p>
+                      ) : null}
+                      {payout.policyVersion ? (
+                        <Link
+                          to={`payout-policy?version=${payout.policyVersion.version}`}
+                          className="text-sm text-muted underline decoration-line underline-offset-2 hover:text-fg"
+                        >
+                          Paid under payout policy v{payout.policyVersion.version}
+                        </Link>
                       ) : null}
                     </div>
                     <StatusPill tone={PAYOUT_STATUS[payout.status].tone}>{PAYOUT_STATUS[payout.status].label}</StatusPill>

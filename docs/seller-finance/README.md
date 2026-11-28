@@ -16,7 +16,7 @@ between UnieMax and a seller is an entry on the **seller ledger**.
 | Who | Sees |
 | --- | --- |
 | Admin | **Finance → Fee settings** (platform + gateway fee %), **Seller balances** (per store, with the full ledger, corrections and the advance-payout switch), the fee breakdown, COD-dues deduction and advance payouts (§9) on each order's **Seller payout** card |
-| Seller | The fee % and "You get ₹…" under the price when adding a product; **Earnings** page (balances, delivered totals, payouts, every entry); **Transactions** page (one row per order — §8) |
+| Seller | The fee % and "You get ₹…" under the price when adding a product; **Earnings** page (balances, delivered totals, "When we pay you" from the payout policy, payouts with the policy version each was paid under, every entry) and its **Payout policy** page ([`docs/policyhub`](../policyhub/README.md)); **Transactions** page (one row per order — §8) |
 | Customer | Nothing |
 
 ## 2. Decisions (agreed 5 Nov 2026)

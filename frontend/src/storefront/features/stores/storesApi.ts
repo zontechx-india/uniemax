@@ -1447,6 +1447,8 @@ export interface SellerEarnings {
     /** Paid before the order was delivered. */
     isAdvance: boolean
     createdAt: string
+    /** The payout policy (PYO-001) version it was paid under; null before PolicyHub. */
+    policyVersion: { version: number; effectiveFrom: string } | null
     order: { id: string; orderNumber: string }
   }[]
 }
