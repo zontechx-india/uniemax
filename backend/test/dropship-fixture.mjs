@@ -1,6 +1,6 @@
 // Shared setup for the dropshipping API suites: seller A (a published shop), supplier B (a
 // supplier store linked to A with one offered product), A's supplier-product copy of it, and
-// B also acting as the customer who buys from A. Needs DROPSHIP_ENABLED=true on the server.
+// B also acting as the customer who buys from A. Needs the dropship package on the server.
 import assert from "node:assert/strict";
 import { Client, PNG_1PX, fileForm, need, uniq, webLogin } from "./helpers.mjs";
 import { sellerFixture } from "./fixture.mjs";
@@ -22,7 +22,7 @@ export async function dropshipFixture(t) {
   }
   if ((await new Client().req("GET", `${D}/status`)).status !== 200) {
     ctx = null;
-    t.skip("DROPSHIP_ENABLED is off on this server");
+    t.skip("the dropship package is not on this server");
     return null;
   }
   const fx = await sellerFixture();

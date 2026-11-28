@@ -1,7 +1,7 @@
 // Dropshipping Phase 6: Easy Split in sandbox mode. The role tells each store the payout mode and
 // whether it can be paid out to; a cash-on-delivery order is never split. (A prepaid order needs the
 // payment hub's checkout, so its split is covered by the end-to-end run on the dev database.)
-// Needs DROPSHIP_ENABLED=true; the role checks adapt to whether DROPSHIP_SPLIT is on.
+// Needs the dropship package; the role checks adapt to whether DROPSHIP_SPLIT is on.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { BUYER, dropshipFixture } from "./dropship-fixture.mjs";

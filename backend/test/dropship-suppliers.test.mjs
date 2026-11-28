@@ -1,6 +1,6 @@
 // Dropshipping Phase 2: a seller (A) invites a supplier (B), who joins with a
 // new supply-only store, offers products with prices for sellers, and both
-// sides change terms, pause and end. Needs DROPSHIP_ENABLED=true on the server
+// sides change terms, pause and end. Needs the dropship package on the server
 // under test; skipped otherwise. SU-* / T-* refer to docs/dropshipping/.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -33,7 +33,7 @@ async function invite(c, extra = {}) {
 
 async function joined(t) {
   const c = await setup(t);
-  if (!c) return t.skip("DROPSHIP_ENABLED is off on this server");
+  if (!c) return t.skip("the dropship package is not on this server");
   if (c.joined) return c;
   const r = await invite(c, { email: need("QA_EMAIL_B") });
   assert.equal(r.status, 201, JSON.stringify(r.body));
@@ -53,7 +53,7 @@ async function joined(t) {
 
 test("both term answers are required; no default (D-5, D-17)", async (t) => {
   const c = await setup(t);
-  if (!c) return t.skip("DROPSHIP_ENABLED is off on this server");
+  if (!c) return t.skip("the dropship package is not on this server");
   const r = await c.A.req("POST", `${c.S}/supplier-invites`, { json: { name: "X", email: "x@example.test" } });
   assert.equal(r.status, 422);
   const r2 = await c.A.req("POST", `${c.S}/supplier-invites`, { json: { name: "X", codAllowed: true, returnFeePayer: "SELLER" } });
@@ -62,7 +62,7 @@ test("both term answers are required; no default (D-5, D-17)", async (t) => {
 
 test("SU-10: another customer can't read this store's suppliers", async (t) => {
   const c = await setup(t);
-  if (!c) return t.skip("DROPSHIP_ENABLED is off on this server");
+  if (!c) return t.skip("the dropship package is not on this server");
   assert.equal((await c.B.req("GET", `${c.S}/suppliers`)).status, 404);
 });
 
@@ -112,7 +112,7 @@ test("SU-14: inviting a supplier you already have is refused", async (t) => {
 
 test("D-27 / SU-1: resend makes a new link, revoke kills it", async (t) => {
   const c = await setup(t);
-  if (!c) return t.skip("DROPSHIP_ENABLED is off on this server");
+  if (!c) return t.skip("the dropship package is not on this server");
   const r = await invite(c);
   const id = r.body.data.invite.id;
   const resent = await c.A.req("POST", `${c.S}/supplier-invites/${id}/resend`);
@@ -144,7 +144,7 @@ const randomPhone = () => `9${Math.floor(100000000 + Math.random() * 899999999)}
 
 test("D-51: one open invite per phone or email", async (t) => {
   const c = await setup(t);
-  if (!c) return t.skip("DROPSHIP_ENABLED is off on this server");
+  if (!c) return t.skip("the dropship package is not on this server");
   const phone = randomPhone();
   const first = await invite(c, { name: "QA One", phone, email: undefined });
   assert.equal(first.status, 201, JSON.stringify(first.body));

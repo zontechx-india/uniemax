@@ -23,7 +23,7 @@ export interface NavItem {
   end?: boolean
   /** Only a SUPER_ADMIN sees the item — the API enforces it regardless. */
   superAdminOnly?: boolean
-  /** Shown only when the supplier package is switched on (DROPSHIP_ENABLED). */
+  /** Shown once the supplier package answers `GET /dropship/status`. */
   dropship?: boolean
 }
 

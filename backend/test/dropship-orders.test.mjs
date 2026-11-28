@@ -1,7 +1,7 @@
 // Dropshipping Phase 4: a customer orders a supplier product from seller A's
 // shop (cash on delivery); the supplier B sees it, ships it with tracking, the
 // customer's order follows; can't-ship and a buyer's cancel end cleanly. Needs
-// DROPSHIP_ENABLED=true on the server under test; skipped otherwise.
+// the dropship package on the server under test; skipped otherwise.
 // K-* and F-* refer to docs/dropshipping/orders.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -16,12 +16,12 @@ let ctx;
 /** A (seller), B (supplier and buyer), a linked supplier store with one offered product, and A's copy of it. */
 async function setup(t) {
   if (ctx !== undefined) {
-    if (ctx === null) t.skip("DROPSHIP_ENABLED is off on this server");
+    if (ctx === null) t.skip("the dropship package is not on this server");
     return ctx;
   }
   if ((await new Client().req("GET", `${D}/status`)).status !== 200) {
     ctx = null;
-    t.skip("DROPSHIP_ENABLED is off on this server");
+    t.skip("the dropship package is not on this server");
     return null;
   }
   const fx = await sellerFixture();

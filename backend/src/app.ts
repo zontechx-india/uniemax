@@ -9,7 +9,6 @@ import { registerStoragePlugins } from "./package/storage/index.js";
 import { createInProcessHost, registerAffiliate } from "./package/affiliate/index.js";
 import {
   createInProcessHost as createDropshipHost,
-  dropshipConfig,
   registerDropship,
 } from "./package/dropship/index.js";
 import { loggerConfig } from "./utils/logger.js";
@@ -101,14 +100,11 @@ export async function buildApp(): Promise<FastifyInstance> {
     host: createInProcessHost(app.prisma),
   });
 
-  // Dropshipping — self-contained package, only when DROPSHIP_ENABLED=true
-  // (off in production until it is complete). See docs/dropshipping/.
-  if (dropshipConfig.enabled) {
-    await registerDropship(app, {
-      prisma: app.prisma,
-      host: createDropshipHost(app.prisma),
-    });
-  }
+  // Dropshipping — self-contained package, always on (D-56). See docs/dropshipping/.
+  await registerDropship(app, {
+    prisma: app.prisma,
+    host: createDropshipHost(app.prisma),
+  });
 
   // Webhook safety net: settle ONLINE orders whose payment landed but whose
   // webhook never did. No-op without Cashfree credentials.

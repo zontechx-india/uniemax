@@ -1,7 +1,7 @@
 // Dropshipping Phase 5: the account between a seller and a supplier. A customer pays cash on
 // delivery; once the supplier delivers, the line counts and both sides see the same balance in
 // opposite words. Payments either side records move it; only the recorder can delete theirs.
-// Needs DROPSHIP_ENABLED=true on the server under test; skipped otherwise.
+// Needs the dropship package on the server under test; skipped otherwise.
 // M-* refer to docs/dropshipping/money.
 import { test } from "node:test";
 import assert from "node:assert/strict";

@@ -231,8 +231,8 @@ interface DropshipHost {
 ## Config (`package/dropship/config.ts`) ◐
 
 Every key can be overridden by env as `DROPSHIP_` + the key in
-UPPER_SNAKE (`DROPSHIP_INVITE_EXPIRY_DAYS`, …); `DROPSHIP_ENABLED` is in
-`backend/README.md`. Built in Phase 2: `enabled`, `inviteExpiryDays`,
+UPPER_SNAKE (`DROPSHIP_INVITE_EXPIRY_DAYS`, …); the `DROPSHIP_*` row is in
+`backend/README.md`. Built in Phase 2: `inviteExpiryDays`,
 `inviteNeedsAdminApproval`, `shipWithinDaysMax`, and `returnDaysMax` (30, the
 longest returns window a supplier may offer). Built in Phase 3:
 `suggestedMarkupPct`, `minMarginWarnPct`, `platformFeePct` and `jobIntervalMs`; in Phase 4:
@@ -241,7 +241,7 @@ The rest is planned.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `DROPSHIP_ENABLED` (env) | `false` | Registers the package. On in dev from Phase 2, in production after Phase 5. |
+| ~~`DROPSHIP_ENABLED`~~ | — | Removed 2026-11-28 (D-56): the package is always registered, dev and production. |
 | `DROPSHIP_SPLIT` (env) ☑ | `false` | New prepaid supplier orders may be `SPLIT` (only while `host.splitLive()` and both payout accounts are active). Lets store payouts move to Easy Split before dropship does. Phase 6. |
 | `inviteExpiryDays` | 14 | How long an invite link works |
 | `inviteNeedsAdminApproval` | `false` | D-7 |

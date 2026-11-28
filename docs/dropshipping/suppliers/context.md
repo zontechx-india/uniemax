@@ -105,7 +105,7 @@ fills the prices (still editable). A price above the suggested price shows a war
 ## API: `/api/v1/dropship` ◐
 
 Built 20 Oct 2026 in `backend/src/package/dropship/routes/`; registered only
-when `DROPSHIP_ENABLED=true`. `:storeId` is the store's id or slug.
+(always on, D-56). `:storeId` is the store's id or slug.
 
 | Method | Path | Guard | Purpose |
 | --- | --- | --- | --- |

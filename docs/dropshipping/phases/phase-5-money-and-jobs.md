@@ -67,7 +67,7 @@ and cancelled cases. A dropped `order.paid` handler is repaired by reconcile.
 ## Release
 
 - ☐ Set `platformFeePct` to the agreed rate (Q-5).
-- ☐ Run through `docs/DEPLOYMENT.md`, then set `DROPSHIP_ENABLED=true` in production.
+- ☑ Live in production since 2026-11-28 — the flag was removed instead of switched on (D-56).
 - ☐ Onboard the first seller and supplier together, and watch the first orders.
 
 ## Done when

@@ -6,8 +6,6 @@ const flag = (key: string) => process.env[key] === "true";
  * docs/dropshipping/architecture/context.md says what each one means.
  */
 export const dropshipConfig = {
-  /** Registers the package at all (D-15: off in production until Phase 5). */
-  enabled: flag("DROPSHIP_ENABLED"),
   inviteExpiryDays: num("DROPSHIP_INVITE_EXPIRY_DAYS", 14),
   /** D-7: invited suppliers start ACTIVE unless this is on. */
   inviteNeedsAdminApproval: flag("DROPSHIP_INVITE_NEEDS_ADMIN_APPROVAL"),

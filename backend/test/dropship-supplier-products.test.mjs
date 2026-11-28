@@ -1,6 +1,6 @@
 // Dropshipping Phase 3: seller A adds supplier B's product to its store; the
 // supplier's price and offer changes reach the copy; the copy's locked fields
-// and Duplicate are refused. Needs DROPSHIP_ENABLED=true on the server under
+// and Duplicate are refused. Needs the dropship package on the server under
 // test; skipped otherwise. C-* refer to docs/dropshipping/supplier-products.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -14,12 +14,12 @@ let ctx;
 /** A, a supplier store for B linked to A, and one offered product with a photo. */
 async function setup(t) {
   if (ctx !== undefined) {
-    if (ctx === null) t.skip("DROPSHIP_ENABLED is off on this server");
+    if (ctx === null) t.skip("the dropship package is not on this server");
     return ctx;
   }
   if ((await new Client().req("GET", `${D}/status`)).status !== 200) {
     ctx = null;
-    t.skip("DROPSHIP_ENABLED is off on this server");
+    t.skip("the dropship package is not on this server");
     return null;
   }
   const fx = await sellerFixture();

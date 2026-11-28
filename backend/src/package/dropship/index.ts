@@ -12,8 +12,8 @@ import { supplierRoutes } from "./routes/supplier.js";
 import type { DropshipDeps } from "./types.js";
 
 /**
- * PUBLIC facade of the dropship package — the only file the app imports, and
- * only when `DROPSHIP_ENABLED=true` (D-15). Mounts every route under
+ * PUBLIC facade of the dropship package — the only file the app imports
+ * (always registered, D-56). Mounts every route under
  * /api/v1/dropship and the admin screens under /api/v1/admin/dropship.
  * Design and status: docs/dropshipping/.
  */

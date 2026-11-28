@@ -97,7 +97,7 @@ Verify: `curl http://localhost:4000/health`
 | `AFFILIATE_MAX_PERCENT` | Highest percentage commission a seller may offer (default `50`) — the platform ceiling for `package/affiliate` |
 | `AFFILIATE_INVITE_DAYS` | Days an affiliate invitation stays valid (default `14`) |
 | `POLICY_PROJECT` | Which project's policies this app reads and writes in PolicyHub (schema `policyhub`; default `uniemax`). Lowercase letters, digits, dashes. Never set from a request — [docs/policyhub](../docs/policyhub/README.md) |
-| `DROPSHIP_ENABLED` | `true` registers the dropshipping package (`/api/v1/dropship`, `/api/v1/admin/dropship`). Default off; on in dev only until the feature is complete. Other `DROPSHIP_*` knobs: [docs/dropshipping/architecture](../docs/dropshipping/architecture/context.md) (Config) |
+| `DROPSHIP_*` | Optional knobs for the dropshipping package (always on; `/api/v1/dropship`, `/api/v1/admin/dropship`), e.g. `DROPSHIP_SPLIT`. All have defaults: [docs/dropshipping/architecture](../docs/dropshipping/architecture/context.md) (Config) |
 | `AFFILIATE_CLICK_RETENTION_DAYS` | Days of raw click rows kept before the hourly job prunes them (default `90`); link click counters are never pruned |
 | `DATABASE_URL` | Pooled connection (runtime) — Supabase PgBouncer `:6543`  |
 | `DIRECT_URL`   | Direct connection (migrations) — Supabase `:5432`         |

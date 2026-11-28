@@ -101,7 +101,7 @@ backend/
 │   │   │   ├── services/      #   program · invitations · partner · tracking · commissions
 │   │   │   ├── routes/        #   seller · partner · public · admin (/api/v1/affiliate)
 │   │   │   └── events.ts      #   order-event subscribers + hourly approve/prune job
-│   │   ├── dropship/          # Sellers' own suppliers (only when DROPSHIP_ENABLED) —
+│   │   ├── dropship/          # Sellers' own suppliers (always on) —
 │   │   │                      #   same shape as affiliate; documented only in
 │   │   │                      #   docs/dropshipping/ (architecture/context.md)
 │   │   ├── policy/            # PolicyHub — versioned platform policies (PYO-001 …);
@@ -992,7 +992,7 @@ without the core naming it. Rules: [dropshipping/architecture](./dropshipping/ar
 
 Built like `package/affiliate` (facade `registerDropship`, a `DropshipHost`,
 its own `dropship` Postgres schema with no foreign key to core) and mounted by
-`app.ts` only when `DROPSHIP_ENABLED=true`. Everything inside it is documented
+`app.ts` (always on, D-56). Everything inside it is documented
 in [`docs/dropshipping/`](./dropshipping/README.md). Core pieces it uses:
 the package seams above, and `createStoreWithoutLogo` in `stores.service.ts`
 — an unpublished, logo-less store with the given business phone and address
