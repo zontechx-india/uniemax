@@ -48,6 +48,11 @@ export function ListingHeader({
               </Link>
             </li>
           ))}
+          {/* The page itself ends the trail — plain text, not a link. */}
+          <li aria-current="page" className="flex items-center gap-1.5 text-fg">
+            <span aria-hidden className="text-muted">›</span>
+            {title}
+          </li>
         </ol>
       </nav>
 

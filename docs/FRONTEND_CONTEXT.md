@@ -478,7 +478,9 @@ for guests and signed-in customers alike and adapts per session state.
   `HomePage`) and `features/discovery/MarketListing.tsx` (`ListingHeader`
   breadcrumb + `<h1>`, `MarketProductCard`, `ListingPagination`,
   `ListingSkeleton` — also used by `/c/{slug}`, whose breadcrumb now starts
-  UnieMax › All categories).
+  UnieMax › All categories). The breadcrumb ends with the page itself as
+  plain text (`aria-current="page"`), e.g. UnieMax › Policies › Seller
+  Payout Policy.
 - **Back to top** (`layout/BackToTop.tsx`) — "↑ Top", the shared secondary
   `Button` fixed bottom-right once the page is scrolled two screens down;
   smooth scroll unless reduced motion. Mounted by `HomePage`, `MarketChrome`
