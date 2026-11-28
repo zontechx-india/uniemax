@@ -452,8 +452,8 @@ for guests and signed-in customers alike and adapts per session state.
   **footer** is a structured 4-column block (on phones and tablets 2 columns: brand
   and "Sell on UnieMax" span the full width, Marketplace and Legal sit side by
   side): brand + tagline, Marketplace
-  (All categories / All shops / Fresh Finds / About / Support / Contact) and Legal (Privacy / Terms / Refund & Returns /
-  Shipping Policy) columns
+  (All categories / All shops / Fresh Finds / About / Support / Contact) and Legal (one link, **UnieMax Policies** → `/policies`, which lists Privacy / Terms / Refund & Returns /
+  Shipping Policy and every PolicyHub policy) columns
   (→ `pages/InfoComingSoonPage.tsx`: About, Contact and the two policies with
   real content — Contact shows the live `SupportContactCard` — Privacy and
   Terms a holding page with the support contact until the legal text is

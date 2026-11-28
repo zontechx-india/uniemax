@@ -17,9 +17,11 @@ import { POLICIES_SEO, policyDay } from './policySeo'
  * console appears here with no code change.
  *
  * The tab is the URL hash (`#customers`), not a query: a query would be a
- * second indexable copy of this page. The customers tab also lists the two
- * policy pages written by hand before PolicyHub (Refund & Returns, Shipping —
- * Merchant Center points at `/refund-policy`, so they keep their URLs).
+ * second indexable copy of this page. The customers tab also lists the
+ * policy pages written by hand before PolicyHub (Refund & Returns, Shipping,
+ * and the Privacy / Terms holding pages). The footer links only here, so this
+ * is how those pages stay reachable; they keep their URLs because Merchant
+ * Center points at `/refund-policy` and the payment gateway checks them.
  *
  * These are UnieMax's own rules. A store's own return or shipping terms live
  * on that store's site — the customers tab says so.
@@ -44,6 +46,8 @@ const FIXED: Record<Audience, { name: string; to: string; note: string }[]> = {
   customer: [
     { name: 'Refund & Returns Policy', to: '/refund-policy', note: 'Returns within 7 days of delivery, and how refunds are paid.' },
     { name: 'Shipping Policy', to: '/shipping-policy', note: 'How stores ship your order, delivery areas and charges.' },
+    { name: 'Privacy Policy', to: '/privacy', note: 'Being finalised. Questions about your data? Contact support.' },
+    { name: 'Terms & Conditions', to: '/terms', note: 'Being finalised. Questions? Contact support.' },
   ],
   supplier: [],
 }

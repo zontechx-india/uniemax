@@ -298,7 +298,7 @@ The admin policy page ends with a **For developers** card that shows all of this
 | Admin | **Platform → Policies** (`/policies`) | List with chips (version in force · scheduled · draft). Empty state: SUPER_ADMIN gets **Create the seller payout policy** (pre-filled PYO-001). |
 | Admin | `/policies/:code` | **Draft editor**: payout time fields + timezone, wording textarea with **insert buttons** for each placeholder, "What changed" / "Why", **live preview**; under it the server's problems ("Before this can be published") or "Ready to publish"; **Save draft** · **Publish version N…** (SUPER_ADMIN; dialog: now or a date, "can never be edited" warning) · **Discard changes** (confirm). Empty PYO-001 draft → **Use the approved wording**. Then **What readers see now**, **Versions** (period, summary, who published, "Show wording"), **Activity** and **For developers** (§8a: code, the three public API URLs with copy buttons, a live sample of the public response — or "nothing published yet, the API answers 404" — and the frontend snippet). An ADMIN sees "Only a super admin can publish". |
 | Seller | **Earnings** | "When we pay you" card (`PayoutTimes`: before cutoff → same day, at/after → next day, transfer window, every day) + **Read the payout policy** link; each payout shows **"Paid under payout policy vN"**. Both open the public page `/policies/PYO-001` (`?version=N` for a payout) **in a new tab**. Card hidden when nothing is published or the call fails. The old in-app page `/mystores/:slug/earnings/payout-policy` now redirects there, keeping `?version=N`. |
-| Public | **Policies** `/policies` | Marketplace chrome; tabs **Sellers · Customers · Suppliers** (`SegmentedControl`; the tab is the URL hash `#sellers` / `#customers` / `#suppliers`, so no second indexable URL). Each tab lists the policies with a version in force for that audience (from `GET /api/v1/policies` — a newly published policy appears with no code change): name, "Version N · since date", what changed (v2+). The Customers tab also links the hand-written `/refund-policy` and `/shipping-policy` and says a store may add its own terms. Empty tab → "No policies for … yet". Footer: **Legal → All policies**. |
+| Public | **Policies** `/policies` | Marketplace chrome; tabs **Sellers · Customers · Suppliers** (`SegmentedControl`; the tab is the URL hash `#sellers` / `#customers` / `#suppliers`, so no second indexable URL). Each tab lists the policies with a version in force for that audience (from `GET /api/v1/policies` — a newly published policy appears with no code change): name, "Version N · since date", what changed (v2+). The Customers tab also links the hand-written `/refund-policy`, `/shipping-policy`, `/privacy` and `/terms` (the last two are holding pages) and says a store may add its own terms. Empty tab → "No policies for … yet". Footer: **Legal → UnieMax Policies** is the only Legal link, so this page is how the old pages stay reachable. |
 | Public | **One policy** `/policies/:code` | Breadcrumb UnieMax › Policies; name, "For sellers · Version N · in force since date"; `PayoutTimes` (payout policy only), "What changed" (v2+), the wording, code; **Earlier versions** (dates, summary, **Read** loads that version's wording + times). `?version=N` opens and scrolls to it. Code is case-insensitive. Unknown or unpublished → "This policy isn't published" + **See all policies**. Images: none yet — design pending (§13). |
 | Admin | Order page → Seller payout card | **Not built** — the API already returns `policyVersion`; the card doesn't show it yet (§13). |
 
@@ -371,10 +371,16 @@ production and use throwaway project names, cleaning up after): `npm run test:un
 3. **nginx for the policy page shells** — add `/policies` (exact) and `/policies/` (prefix) to the
    page-shell snippet of the **storefront** vhosts (`docs/DEPLOYMENT.md` → Page shells), dev then prod,
    after a release that has them. Never on the admin hosts: the admin console has its own `/policies`.
-4. **Images on the Policies pages** — the owner is designing them; keep images in the page design
+4. **Move the hand-written policies into PolicyHub** (owner's plan): Refund & Returns, Shipping,
+   Privacy, Terms. Order matters — publish each as a PolicyHub policy first, then make its old URL
+   redirect to `/policies/{code}` (keep the URL working: Merchant Center reads `/refund-policy`, the
+   payment gateway checks privacy/terms/refund pages), point `merchantReturnLink` /
+   `hasMerchantReturnPolicy` (both `structuredData.ts`) and the page shells at the new page, and only
+   then delete the entries from `InfoComingSoonPage.tsx` / `INFO_PAGES`.
+5. **Images on the Policies pages** — the owner is designing them; keep images in the page design
    (e.g. one per audience), not in the policy data.
-5. **Tell sellers about a new version** (WhatsApp / email / push)? Not decided.
-6. Stage 2 / 3 of §10 (provider APIs, automatic payouts) — separate high-risk money projects.
+6. **Tell sellers about a new version** (WhatsApp / email / push)? Not decided.
+7. Stage 2 / 3 of §10 (provider APIs, automatic payouts) — separate high-risk money projects.
 
 ---
 
@@ -412,7 +418,7 @@ real approved wording; publish a test v2 only if it may stay in dev's history fo
    the wording. Check on a phone: no sideways scrolling.
 4b. **Public Policies:** open `/policies` signed out → Sellers tab lists the payout policy; Customers
    tab shows Refund & Returns and Shipping; Suppliers says "No policies for suppliers yet". Footer →
-   Legal → **All policies**. The old link `/mystores/<slug>/earnings/payout-policy?version=1`
+   Legal → **UnieMax Policies**. The old link `/mystores/<slug>/earnings/payout-policy?version=1`
    redirects to `/policies/PYO-001?version=1`. After the nginx step (§13), `curl -s <host>/policies/PYO-001 | grep '<title>'`
    shows "Seller Payout Policy · Policies · UnieMax".
 5. **Payout link:** on a **test** online order delivered after v1 was published, record a manual

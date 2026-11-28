@@ -1775,11 +1775,11 @@ const FOOTER_COLUMNS = [
   {
     title: 'Legal',
     links: [
-      { label: 'Privacy policy', to: '/privacy' },
-      { label: 'Terms and conditions', to: '/terms' },
-      { label: 'Refunds and returns', to: '/refund-policy' },
-      { label: 'Shipping policy', to: '/shipping-policy' },
-      { label: 'All policies', to: '/policies' },
+      // One door to every platform policy (PolicyHub). The old pages
+      // (/privacy, /terms, /refund-policy, /shipping-policy) stay live —
+      // linked from /policies — until their text moves into PolicyHub:
+      // Merchant Center and the payment gateway check those URLs.
+      { label: 'UnieMax Policies', to: '/policies' },
     ],
   },
 ] as const
