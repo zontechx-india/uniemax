@@ -80,6 +80,8 @@ export const NAV_GROUPS: NavGroup[] = [
       // Order and on/off for the marketplace homepage's sections.
       { to: '/home-sections', label: 'Homepage sections', icon: 'layout' },
       { to: '/theme-templates', label: 'Store themes', icon: 'palette' },
+      // Published rules (PolicyHub), e.g. the seller payout policy.
+      { to: '/policies', label: 'Policies', icon: 'scroll' },
       { to: '/notifications', label: 'Notifications', icon: 'bell' },
       { to: '/activity', label: 'Activity log', icon: 'activity' },
       { to: '/admins', label: 'Admin users', icon: 'shield', superAdminOnly: true },
@@ -113,6 +115,7 @@ const TITLES: [string, string][] = [
   ['/support', 'Support'],
   ['/whatsapp', 'WhatsApp'],
   ['/theme-templates', 'Store themes'],
+  ['/policies', 'Policies'],
   ['/banners', 'Homepage banners'],
   ['/home-sections', 'Homepage sections'],
   ['/notifications', 'Notifications'],

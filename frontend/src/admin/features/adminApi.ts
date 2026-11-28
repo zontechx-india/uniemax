@@ -1370,6 +1370,76 @@ export interface FeeRules {
   rules: FeeRule[]
 }
 
+// ---- Policies (PolicyHub — docs/policyhub/README.md §8) -------------------
+
+export interface PolicyVersionRef {
+  version: number
+  effectiveFrom: string | null
+}
+
+export interface PolicySummary {
+  code: string
+  name: string
+  audience: string
+  current: PolicyVersionRef | null
+  scheduled: PolicyVersionRef | null
+  draft: { version: number; updatedAt: string } | null
+  versionCount: number
+}
+
+export type PolicyVersionState = 'DRAFT' | 'SCHEDULED' | 'CURRENT' | 'PAST'
+
+export interface PolicyVersion {
+  id: string
+  version: number
+  status: 'DRAFT' | 'PUBLISHED'
+  state: PolicyVersionState
+  body: string
+  renderedBody: string
+  /** Drafts only: what stops publishing. */
+  problems: string[]
+  changeSummary: string | null
+  changeReason: string | null
+  settings: Record<string, string> | null
+  effectiveFrom: string | null
+  effectiveTo: string | null
+  publishedAt: string | null
+  publishedByEmail: string | null
+  createdByEmail: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PolicyEvent {
+  id: string
+  version: number | null
+  action: 'CREATED' | 'EDITED' | 'RESET' | 'PUBLISHED'
+  actorEmail: string
+  note: string | null
+  before: Record<string, unknown> | null
+  after: Record<string, unknown> | null
+  createdAt: string
+}
+
+export interface PolicyDetail {
+  code: string
+  name: string
+  audience: string
+  /** The code has structured settings (PYO-001: cutoff + window). */
+  hasSettings: boolean
+  current: PolicyVersionRef | null
+  /** Newest first; the draft (if any) included. */
+  versions: PolicyVersion[]
+  events: PolicyEvent[]
+}
+
+export interface PolicyDraftInput {
+  body?: string
+  changeSummary?: string | null
+  changeReason?: string | null
+  settings?: Record<string, string> | null
+}
+
 export interface Balance {
   payable: string
   inPayout: string
@@ -1542,6 +1612,30 @@ export const adminApi = {
   },
   listAwaitingPayouts(query: Params) {
     return callList<AwaitingPayoutRow>(http.get(`${BASE}/seller-payouts/awaiting`, params(query)))
+  },
+
+  // Policies (PolicyHub). Any admin edits the draft; create + publish need
+  // SUPER_ADMIN (the API enforces it).
+  listPolicies() {
+    return call<PolicySummary[]>(http.get(`${BASE}/policies`))
+  },
+  getPolicy(code: string) {
+    return call<PolicyDetail>(http.get(`${BASE}/policies/${encodeURIComponent(code)}`))
+  },
+  createPolicy(body: { code: string; name: string; audience: string }) {
+    return call<PolicyDetail>(http.post(`${BASE}/policies`, body))
+  },
+  startPolicyDraft(code: string) {
+    return call<PolicyDetail>(http.post(`${BASE}/policies/${encodeURIComponent(code)}/draft`))
+  },
+  updatePolicyDraft(code: string, body: PolicyDraftInput) {
+    return call<PolicyDetail>(http.patch(`${BASE}/policies/${encodeURIComponent(code)}/draft`, body))
+  },
+  resetPolicyDraft(code: string) {
+    return call<PolicyDetail>(http.post(`${BASE}/policies/${encodeURIComponent(code)}/draft/reset`))
+  },
+  publishPolicyDraft(code: string, body: { effectiveFrom?: string }) {
+    return call<PolicyDetail>(http.post(`${BASE}/policies/${encodeURIComponent(code)}/draft/publish`, body))
   },
 
   // Seller finance

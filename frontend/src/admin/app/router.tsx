@@ -72,6 +72,8 @@ const PayoutsPage = lazy(
 const NotificationsPage = lazy(() => import('../pages/NotificationsPage'))
 const ActivityPage = lazy(() => import('../pages/ActivityPage'))
 const AdminsPage = lazy(() => import('../pages/AdminsPage'))
+const PoliciesPage = lazy(() => import('../pages/policies/PoliciesPage'))
+const PolicyPage = lazy(() => import('../pages/policies/PolicyPage'))
 const WhatsAppTemplateDocsPage = lazy(() => import('../pages/docs/WhatsAppTemplateDocsPage'))
 
 /**
@@ -251,6 +253,8 @@ export function AdminRouter() {
                 <Route path="whatsapp/automations" element={<WhatsAppAutomationsPage />} />
                 <Route path="whatsapp/templates" element={<WhatsAppTemplatesPage />} />
                 <Route path="theme-templates" element={<ThemeTemplatesPage />} />
+                <Route path="policies" element={<PoliciesPage />} />
+                <Route path="policies/:code" element={<PolicyPage />} />
                 <Route path="banners" element={<BannersPage />} />
                 <Route path="home-sections" element={<HomeSectionsPage />} />
                 <Route path="affiliates" element={<AffiliateAdminPage />} />
