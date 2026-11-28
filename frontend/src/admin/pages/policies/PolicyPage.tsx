@@ -31,6 +31,7 @@ import {
 import type { ChipTone } from '../../ui/primitives'
 import { formatDateTime } from '../../ui/format'
 import { audienceLabel, POLICY_TEMPLATES } from './policyTemplates'
+import { PolicyDeveloperCard } from './PolicyDeveloperCard'
 
 /**
  * One policy (PolicyHub, docs/policyhub/README.md): the version in force,
@@ -111,6 +112,7 @@ export default function PolicyPage() {
         <CurrentCard current={current} />
         <HistoryCard versions={published} />
         <ActivityCard events={data.events} />
+        <PolicyDeveloperCard code={data.code} />
       </div>
     </>
   )
