@@ -61,6 +61,8 @@ the seller owes the supplier.
 - ☑ Seller: Suppliers → {supplier} → **Account** (an **Account** button beside **Terms**, route `suppliers/:linkId/account`). Supplier: Sellers → {seller} →
   **Account** (`sellers/:linkId/account`). Both sides see the same numbers, plus the **Terms** panel with its
   change log ([terms](../terms/context.md)).
+- The seller's order **Money** card and Transactions point here for a supplier-shipped
+  COD order (*Supplier collects*, no "You get" — [seller-finance](../seller-finance/README.md)).
 - The top line is the balance in plain words: *"You owe Sri Textiles ₹3,450"*
   or *"Sri Textiles owes you ₹1,200"*.
 - Lines: order number, date, *Prepaid* / *COD*, customer paid, supplier gets

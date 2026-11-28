@@ -166,6 +166,14 @@ Status (`finance.rules.ts → settlementStatus`, unit-tested in
 | `READY_TO_PAY` | delivered, nothing paid (`lastPayoutFailed` when the newest payout failed / came back) |
 
 On COD, OFFLINE, cancelled and refunded orders UnieMax owes nothing, so `remaining` is 0.
+
+**Supplier-shipped orders** (`shippedByOthers`: a line has `OrderItem.fulfilledBy`). On
+**COD** the supplier's courier collects the cash, so the pill reads *Supplier collects* /
+*Supplier collected*, "You get" is hidden (Transactions shows *Via supplier*), and the note
+says the seller's share is settled on the supplier's **Account**
+([dropshipping money](../dropshipping/money/context.md)). **Prepaid** keeps the normal
+numbers (UnieMax pays the seller the whole order) and the note adds that part of it is the
+supplier's. The ledger is unchanged: the platform fee is the seller's either way.
 On a cancelled / refunded order with an advance, `settlement.advance` is what
 the seller pays back, and the note says it comes out of the next payouts.
 

@@ -8,7 +8,7 @@ import { useStoreManageScope } from '../../../features/stores/storeManageScope'
 import { RupeeIcon } from '../../../layout/icons'
 import { PanelCard } from '../ui/PanelCard'
 import { StatusPill } from '../ui/StatusPill'
-import { money, moneyCounts, paymentModeLabel, settlementNote, settlementPill } from './settlementMeta'
+import { money, moneyCounts, paymentModeLabel, settlementNote, settlementPill, supplierCollects } from './settlementMeta'
 
 /**
  * The order page's **Money** card — this order's row from Transactions
@@ -73,10 +73,13 @@ export function MoneyCard({ storeId, orderId, version }: { storeId: string; orde
                       value={<span className="text-muted line-through">{money(row.gatewayFee)}</span>}
                     />
                   ))}
-                <div className="mt-1.5 flex justify-between gap-3 border-t border-line pt-2">
-                  <dt className="font-semibold text-fg">You get</dt>
-                  <dd className="font-figure font-semibold tabular-nums text-fg">{money(row.youGet)}</dd>
-                </div>
+                {/* The supplier holds this cash — "You get" here would be the whole bill. */}
+                {!supplierCollects(row) && (
+                  <div className="mt-1.5 flex justify-between gap-3 border-t border-line pt-2">
+                    <dt className="font-semibold text-fg">You get</dt>
+                    <dd className="font-figure font-semibold tabular-nums text-fg">{money(row.youGet)}</dd>
+                  </div>
+                )}
               </>
             )}
           </dl>

@@ -4125,6 +4125,7 @@ number or customer name; a leading `#` is ignored).
   "rows": [ {
     "id", "orderNumber", "placedAt", "deliveredAt", "customerName",
     "orderStatus", "fulfilment",           // DELIVERY · PICKUP (pickup wording: "Waiting for pickup")
+    "shippedByOthers": false,              // a line has OrderItem.fulfilledBy (a supplier ships it)
     "refundedAmount": "0.00",              // SUCCEEDED refunds, part or full
     "paymentMethod",                       // COD · ONLINE (old rows: UPI / CARD / NETBANKING / RAZORPAY)
     "paymentStatus",

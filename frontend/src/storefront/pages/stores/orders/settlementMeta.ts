@@ -29,12 +29,23 @@ export function paymentModeLabel(method: string): string {
   return labels[method] ?? 'Online'
 }
 
+/**
+ * A supplier ships this cash-on-delivery order, so their courier collects the
+ * cash — not the seller. The seller's share is settled on the supplier account.
+ */
+export const supplierCollects = (row: SellerTransaction): boolean =>
+  row.shippedByOthers && row.paymentMethod === 'COD'
+
+const SUPPLIER_ACCOUNT = 'Your share is settled with your supplier — see their Account under Suppliers.'
+
 /** The pill for a row — pickup orders wait to be collected, not delivered. */
 export function settlementPill(row: SellerTransaction): { label: string; tone: StatusTone } {
   const pill = SETTLEMENT[row.settlement.status]
   if (row.fulfilment === 'PICKUP' && row.settlement.status === 'AWAITING_DELIVERY') {
     return { ...pill, label: 'Waiting for pickup' }
   }
+  if (supplierCollects(row) && row.settlement.status === 'CASH_TO_COLLECT') return { ...pill, label: 'Supplier collects' }
+  if (supplierCollects(row) && row.settlement.status === 'CASH_COLLECTED') return { ...pill, label: 'Supplier collected' }
   return pill
 }
 
@@ -100,7 +111,7 @@ export function settlementShort(row: SellerTransaction): string {
       if (s.utr) parts.push(`UTR ${s.utr}`)
       break
     case 'CASH_TO_COLLECT':
-      parts.push(pickup ? 'Collect at pickup' : 'Collect on delivery')
+      if (!supplierCollects(row)) parts.push(pickup ? 'Collect at pickup' : 'Collect on delivery')
       break
     case 'CASH_COLLECTED':
       if (sellerFee(row) > 0) parts.push(`Fee ${money(sellerFee(row))} from next payout`)
@@ -123,12 +134,23 @@ export function settlementNote(row: SellerTransaction): string {
     Number(row.refundedAmount) > 0 &&
     row.settlement.status !== 'REFUNDED' &&
     row.settlement.status !== 'REFUND_PENDING'
-  return partRefund ? `${note} ${money(row.refundedAmount)} was refunded to the customer.` : note
+  const withRefund = partRefund ? `${note} ${money(row.refundedAmount)} was refunded to the customer.` : note
+  // Prepaid: UnieMax pays the seller the whole order; the supplier's part is theirs to pass on.
+  return row.shippedByOthers && !supplierCollects(row) && moneyCounts(row)
+    ? `${withRefund} Part of it is your supplier's — settle it on their Account under Suppliers.`
+    : withRefund
 }
 
 function baseNote(row: SellerTransaction): string {
   const s = row.settlement
   const pickup = row.fulfilment === 'PICKUP'
+  if (supplierCollects(row) && s.status === 'CASH_TO_COLLECT') {
+    return `Your supplier's courier collects ${money(row.billAmount)} in cash. ${SUPPLIER_ACCOUNT}`
+  }
+  if (supplierCollects(row) && s.status === 'CASH_COLLECTED') {
+    const fee = sellerFee(row) > 0 ? ` The platform fee of ${money(sellerFee(row))} is taken from your next payout.` : ''
+    return `Your supplier collected the cash. ${SUPPLIER_ACCOUNT}${fee}`
+  }
   switch (s.status) {
     case 'AWAITING_DELIVERY':
       return pickup

@@ -138,7 +138,7 @@ const ORDER_FOR_FIN = {
   total: true,
   shippingCharge: true,
   placedAt: true,
-  items: { select: { id: true, lineTotal: true } },
+  items: { select: { id: true, lineTotal: true, fulfilledBy: true } },
 } satisfies Prisma.OrderSelect;
 
 type OrderForFin = Prisma.OrderGetPayload<{ select: typeof ORDER_FOR_FIN }>;
@@ -690,6 +690,12 @@ function shapeTransaction(order: OrderForTransaction, rules: Awaited<ReturnType<
     orderStatus: forFin.status,
     /** DELIVERY · PICKUP (the customer collects — wording changes). */
     fulfilment,
+    /**
+     * Another party (a supplier) ships lines of this order (`OrderItem.fulfilledBy`).
+     * On COD their courier collects the cash, not the seller; the seller's share is
+     * settled with that party (docs/dropshipping/money).
+     */
+    shippedByOthers: forFin.items.some((item) => item.fulfilledBy !== null),
     /** Money sent back to the customer (SUCCEEDED refunds), part or full. */
     refundedAmount: paiseToAmount(refundedPaise),
     /** COD · ONLINE (legacy rows may hold UPI / CARD / NETBANKING / RAZORPAY). */

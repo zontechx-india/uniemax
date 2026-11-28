@@ -18,6 +18,7 @@ import {
   settlementPill,
   settlementShort,
   shortDay,
+  supplierCollects,
 } from './orders/settlementMeta'
 import { EmptyState } from './ui/EmptyState'
 import { PageHeader } from './ui/PageHeader'
@@ -353,7 +354,10 @@ function TransactionTable({ rows }: { rows: SellerTransaction[] }) {
                   {money(row.billAmount)}
                 </td>
                 <td className="px-4 py-3 text-right font-figure whitespace-nowrap tabular-nums">
-                  {counts ? (
+                  {counts && supplierCollects(row) ? (
+                    // The supplier holds the cash; the seller's share is on the supplier account.
+                    <span className="text-hint text-muted">Via supplier</span>
+                  ) : counts ? (
                     <>
                       <span className="text-fg">{money(row.youGet)}</span>
                       <span className="block text-hint text-muted">Fee {money(sellerFee(row))}</span>

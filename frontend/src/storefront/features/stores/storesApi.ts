@@ -1486,6 +1486,8 @@ export interface SellerTransaction {
   customerName: string | null
   orderStatus: string
   fulfilment: 'DELIVERY' | 'PICKUP'
+  /** A supplier ships lines of this order — on COD their courier collects the cash. */
+  shippedByOthers: boolean
   /** Money sent back to the customer (part or full). */
   refundedAmount: string
   /** COD · ONLINE (old rows may hold UPI / CARD / NETBANKING / RAZORPAY). */
