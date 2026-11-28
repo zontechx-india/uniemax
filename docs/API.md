@@ -3937,11 +3937,12 @@ posts its seller-ledger entries in the same transaction (docs/seller-finance
 §5). **Seller message:** when a payout becomes `SUCCEEDED` — recorded as
 sent here, marked sent via `…/status`, or reported by PaymentHub — the
 seller gets an email (store business email, else owner email) and the
-WhatsApp template `seller_payout_sent_v2` once Meta lists it as approved
-(13 values, with the gateway fee line — "paid by UnieMax as your discount"
-while UnieMax pays it), else `seller_payout_sent` (10 values); business
-phone, else owner phone; button `<slug>/earnings`. The email shows the
-gateway fee row whenever it is above 0. Once per payout, fire-and-forget. No SMS yet.
+WhatsApp template `seller_payout_sent_v3` (14 values — order total, platform
+fee, gateway fee % and amount, UnieMax's discount on it (the whole fee while
+UnieMax pays it, else 0), COD dues, amount sent; fixed-text header, so no
+header values); business phone, else owner phone; button `<slug>/earnings`.
+The email shows the gateway fee and "UnieMax discount on gateway fee" rows
+whenever the fee is above 0. Once per payout, fire-and-forget. No SMS yet.
 For an advance the email says so ("Advance payout of ₹… sent", the amount
 marked "advance, before delivery", and that a cancelled / refunded order is
 taken back from the next payouts). WhatsApp: always `seller_advance_sent` (10

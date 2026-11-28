@@ -292,13 +292,14 @@ We look forward to serving you again!`,
     note: 'Made for the Marketing Messages Lite API (MM Lite). Marketing messages cost more than Utility and may not reach users who opted out of marketing.',
   },
   {
-    name: 'seller_payout_sent',
+    name: 'seller_payout_sent_v3',
     group: 'Payout',
     category: 'Utility',
     language: 'en',
     recipient: 'Seller',
-    when: 'A payout to the seller is marked Paid out (manual or PaymentHub)',
-    templateId: 'Approved 6 Nov 2026 (ID not recorded yet)',
+    when: 'A payout to the seller is marked Paid out (manual or PaymentHub) — not an advance',
+    templateId: 'Active (approved 29 Nov 2026; ID not recorded yet)',
+    header: 'Payout sent',
     body: `Hi {{1}},
 
 UnieMax has sent you a payout of ₹{{2}} for order #{{3}} from your store {{4}}.
@@ -306,78 +307,40 @@ UnieMax has sent you a payout of ₹{{2}} for order #{{3}} from your store {{4}}
 Payout details:
 • Order total: ₹{{5}}
 • Platform fee: ₹{{6}}
-• COD dues adjusted: ₹{{7}}
-• Paid to: {{8}}
-• Reference (UTR): {{9}}
-• Paid on: {{10}}
-
-It may take a few hours to show in your bank account. Tap below to see all your earnings.`,
-    footer: 'UnieMax seller payouts',
-    params: [
-      p(1, 'sellerName', 'Seller name', 'Ravi'),
-      p(2, 'amountSent', 'Amount sent (number only)', '1,349.10'),
-      p(3, 'orderId', 'Order number (no #)', '48203917'),
-      p(4, 'storeName', 'Store name', 'Fashion Hub'),
-      p(5, 'orderTotal', 'Order total (number only)', '1,499.00'),
-      p(6, 'platformFee', 'Platform fee (number only)', '149.90'),
-      p(7, 'codDues', 'COD dues adjusted (number only)', '0.00'),
-      p(8, 'paidTo', 'Bank + last 4 digits', 'State Bank of India A/c XX4821'),
-      p(9, 'utr', 'UTR / reference ("NA" if none)', 'HDFCR52026110512345'),
-      p(10, 'paidOn', 'Date (and time) paid', '5 Nov 2026, 2:30 pm'),
-    ],
-    button: {
-      label: 'View earnings',
-      urlPrefix: MYSTORES,
-      field: 'Store slug + /earnings',
-      example: 'fashion-hub/earnings',
-    },
-    note: 'Sent by modules/payouts/payouts.notifications.ts, once per payout, alongside an email; also by hand from the order page (Send message). Active since 6 Nov 2026. Now replaced by seller_payout_sent_v2 (approved) — kept as the fallback.',
-  },
-  {
-    name: 'seller_payout_sent_v2',
-    group: 'Payout',
-    category: 'Utility',
-    language: 'en',
-    recipient: 'Seller',
-    when: 'Same as seller_payout_sent — with the payment gateway fee shown as UnieMax’s discount',
-    templateId: 'Active (added 6 Nov 2026; ID not recorded yet)',
-    body: `Hi {{1}},
-
-UnieMax has sent you a payout of ₹{{2}} for order #{{3}} from your store {{4}}.
-
-Payout details:
-• Order total: ₹{{5}}
-• Platform fee: ₹{{6}}
-• Payment gateway fee ({{7}}): ₹{{8}}, {{9}}
+• Payment gateway fee ({{7}}): ₹{{8}}
+• UnieMax discount on gateway fee: ₹{{9}}
 • COD dues adjusted: ₹{{10}}
-• Paid to: {{11}}
-• Reference (UTR): {{12}}
-• Paid on: {{13}}
+• Amount sent: ₹{{11}}
+
+Paid to: {{12}}
+Reference (UTR): {{13}}
+Paid on: {{14}}
 
 It may take a few hours to show in your bank account. Tap below to see all your earnings.`,
-    footer: 'UnieMax seller payouts',
+    footer: 'UnieMax',
     params: [
-      p(1, 'sellerName', 'Seller name', 'Ravi'),
-      p(2, 'amountSent', 'Amount sent (number only)', '1,349.10'),
-      p(3, 'orderId', 'Order number (no #)', '48203917'),
-      p(4, 'storeName', 'Store name', 'Fashion Hub'),
-      p(5, 'orderTotal', 'Order total (number only)', '1,499.00'),
-      p(6, 'platformFee', 'Platform fee (number only)', '149.90'),
+      p(1, 'sellerName', 'Seller name', 'Anitesh'),
+      p(2, 'amountSent', 'Amount sent (number only)', '698.00'),
+      p(3, 'orderId', 'Order number (no #)', '50780309'),
+      p(4, 'storeName', 'Store name', 'Mukesh Electronics'),
+      p(5, 'orderTotal', 'Order total (number only)', '698.00'),
+      p(6, 'platformFee', 'Platform fee (number only)', '0.00'),
       p(7, 'gatewayPercent', 'Gateway fee percent (with %)', '2%'),
-      p(8, 'gatewayFee', 'Gateway fee amount (number only)', '29.98'),
-      p(9, 'gatewayNote', 'Who pays it', 'paid by UnieMax as your discount'),
+      p(8, 'gatewayFee', 'Gateway fee amount (number only)', '13.96'),
+      p(9, 'gatewayDiscount', 'UnieMax discount on it — the whole fee while UnieMax pays, else 0.00', '13.96'),
       p(10, 'codDues', 'COD dues adjusted (number only)', '0.00'),
-      p(11, 'paidTo', 'Bank + last 4 digits', 'State Bank of India A/c XX4821'),
-      p(12, 'utr', 'UTR / reference ("NA" if none)', 'HDFCR52026110512345'),
-      p(13, 'paidOn', 'Date (and time) paid', '5 Nov 2026, 2:30 pm'),
+      p(11, 'amountSent', 'Amount sent (same as {{2}})', '698.00'),
+      p(12, 'paidTo', 'Bank + last 4 digits', 'Punjab National Bank A/c XX4400'),
+      p(13, 'utr', 'UTR / reference ("NA" if none)', 'NA'),
+      p(14, 'paidOn', 'Date (and time) paid', '28 Nov 2026, 9:54 pm'),
     ],
     button: {
       label: 'View earnings',
       urlPrefix: MYSTORES,
       field: 'Store slug + /earnings',
-      example: 'fashion-hub/earnings',
+      example: 'mukesh-electronics/earnings',
     },
-    note: 'Active — the backend sends this one because WhatsApp Manager lists it as approved; it falls back to seller_payout_sent only if v2 is missing from that list.',
+    note: 'Sent by modules/payouts/payouts.notifications.ts for every payout that is not an advance, once, alongside an email; also by hand from the order page (Send message). The header is fixed text — send only the body (14 values) and the button. Replaced seller_payout_sent and seller_payout_sent_v2 (no longer sent).',
   },
   {
     name: 'seller_advance_sent',

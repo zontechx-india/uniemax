@@ -9,7 +9,7 @@ Checked in WhatsApp Manager on 27 Nov 2026.
 | Sending phone number | +91 70943 10139 |
 | Phone Number ID | `1297227253483920` |
 | Meta Business ID | `998630909433831` |
-| Total templates | 14 (all **Active**) |
+| Total templates | 15 (all **Active**) |
 
 > Templates only work inside the WABA where they were created. Always send from the UnieMax account above.
 > The other account "Zontechx" (`1762129785093231`) has no phone number and cannot send. Ignore any templates there.
@@ -31,9 +31,10 @@ Checked in WhatsApp Manager on 27 Nov 2026.
 | 9 | `seller_setup_payout` | Utility | `en` | 2 | URL (dynamic) | Seller | 1134438049011372 |
 | 10 | `seller_motivation_tip` | Marketing | `en` | 2 | URL (dynamic) | Seller | 1672165614609890 |
 | 11 | `uniemax_address_update` | Utility | `en_US` | 3 | – | Customer | 1833517641150563 |
-| 12 | `seller_payout_sent` | Utility | `en` | 10 | URL (dynamic) | Seller | – (approved 6 Nov 2026; ID not recorded yet) |
-| 13 | `seller_payout_sent_v2` | Utility | `en` | 13 | URL (dynamic) | Seller | – (Active, added 6 Nov 2026 — used instead of #12) |
+| 12 | `seller_payout_sent` | Utility | `en` | 10 | URL (dynamic) | Seller | – (**not sent by the code since 29 Nov 2026 — can be deleted**) |
+| 13 | `seller_payout_sent_v2` | Utility | `en` | 13 | URL (dynamic) | Seller | – (**not sent by the code since 29 Nov 2026 — can be deleted**) |
 | 14 | `seller_advance_sent` | Utility | `en` | 10 | URL (dynamic) | Seller | – (Active, added 27 Nov 2026 — every advance payout) |
+| 15 | `seller_payout_sent_v3` | Utility | `en` | 14 | URL (dynamic) | Seller | – (Active, approved 29 Nov 2026 — every payout that is not an advance) |
 
 ---
 
@@ -68,7 +69,7 @@ Content-Type: application/json
 }
 ```
 
-**Template with a dynamic URL button** (all `seller_setup_*`, `seller_motivation_tip`, `seller_payout_sent`, `seller_payout_sent_v2` and `seller_advance_sent`)
+**Template with a dynamic URL button** (all `seller_setup_*`, `seller_motivation_tip`, `seller_payout_sent_v3` and `seller_advance_sent`)
 
 The button URL in the template is `https://uniemax.com/mystores/{{1}}`.
 You only send the part after `/mystores/` (the store slug + path). Example: `sabse-kart-home-food-delivery/products`.
@@ -320,15 +321,17 @@ Hi {{1}}, a quick tip for {{2}}: clear photos and accurate prices help customers
 
 ## 5. Payout templates
 
-### 5.1 `seller_payout_sent`
+### 5.1 `seller_payout_sent_v3` (with the gateway fee and UnieMax's discount)
 
-- **Category:** Utility · **Language:** `en` · **Status:** Active (approved 6 Nov 2026)
-- **Send to:** Seller (store business phone, else owner phone) · **When:** A payout is marked **Paid out** — automatically (manual payout recorded as Sent / changed to Paid out, or PaymentHub success), or by hand from the order page (**Send message**)
-- **Header:** none · **Footer:** `UnieMax seller payouts`
+- **Category:** Utility · **Language:** `en` · **Status:** Active (approved 29 Nov 2026)
+- **Send to:** Seller (store business phone, else owner phone) · **When:** a payout that is **not an advance** is marked **Paid out** — automatically (manual payout recorded as Sent / changed to Paid out, or PaymentHub success), or by hand from the order page (**Send message**)
+- **Header:** text `Payout sent` (no variable — the API call sends **no** header component) · **Footer:** `UnieMax`
 - **Button:** "View earnings" → `https://uniemax.com/mystores/{{1}}`
-- **Code:** `backend/src/modules/payouts/payouts.notifications.ts`
+- **Code:** `backend/src/modules/payouts/payouts.notifications.ts` (`payoutParams`)
 
 ```
+Payout sent
+
 Hi {{1}},
 
 UnieMax has sent you a payout of ₹{{2}} for order #{{3}} from your store {{4}}.
@@ -336,82 +339,51 @@ UnieMax has sent you a payout of ₹{{2}} for order #{{3}} from your store {{4}}
 Payout details:
 • Order total: ₹{{5}}
 • Platform fee: ₹{{6}}
-• COD dues adjusted: ₹{{7}}
-• Paid to: {{8}}
-• Reference (UTR): {{9}}
-• Paid on: {{10}}
+• Payment gateway fee ({{7}}): ₹{{8}}
+• UnieMax discount on gateway fee: ₹{{9}}
+• COD dues adjusted: ₹{{10}}
+• Amount sent: ₹{{11}}
+
+Paid to: {{12}}
+Reference (UTR): {{13}}
+Paid on: {{14}}
 
 It may take a few hours to show in your bank account. Tap below to see all your earnings.
-UnieMax seller payouts
+UnieMax
 ```
 
 | Var | Field | Example |
 |---|---|---|
-| {{1}} | Seller name | Ravi |
-| {{2}} | Amount sent (number only) | 1,349.10 |
-| {{3}} | Order number (no `#`) | UM-1002 |
-| {{4}} | Store name | Fashion Hub |
-| {{5}} | Order total (number only) | 1,499.00 |
-| {{6}} | Platform fee (number only) | 149.90 |
-| {{7}} | COD dues adjusted (number only) | 0.00 |
-| {{8}} | Bank + last 4 digits | State Bank of India A/c XX4821 |
-| {{9}} | UTR / reference (`NA` if none) | HDFCR52026110512345 |
-| {{10}} | Date (and time) paid | 5 Nov 2026, 2:30 pm |
-| Button {{1}} | Store slug + `/earnings` | fashion-hub/earnings |
+| {{1}} | Seller name | Anitesh |
+| {{2}} | Amount sent (number only) | 698.00 |
+| {{3}} | Order number (no `#`) | 50780309 |
+| {{4}} | Store name | Mukesh Electronics |
+| {{5}} | Order total (number only) | 698.00 |
+| {{6}} | Platform fee (number only) | 0.00 |
+| {{7}} | Gateway fee percent (include `%`) | 2% |
+| {{8}} | Gateway fee amount (number only) | 13.96 |
+| {{9}} | UnieMax discount on the gateway fee (number only) | 13.96 |
+| {{10}} | COD dues adjusted (number only) | 0.00 |
+| {{11}} | Amount sent (same as {{2}}) | 698.00 |
+| {{12}} | Bank + last 4 digits | Punjab National Bank A/c XX4400 |
+| {{13}} | UTR / reference (`NA` if none) | NA |
+| {{14}} | Date (and time) paid | 28 Nov 2026, 9:54 pm |
+| Button {{1}} | Store slug + `/earnings` | mukesh-electronics/earnings |
+
+`{{9}}` is the whole gateway fee while UnieMax pays it (Finance → Fee settings, bearer
+UnieMax), so the seller is sent the full amount; it is `0.00` if the fee is ever switched
+to the seller. Order total − platform fee − gateway fee + discount − COD dues = amount sent.
 
 > Only send the masked account number (last 4 digits). Never send the full bank account number.
 
-### 5.2 `seller_payout_sent_v2` (with the payment gateway fee)
+> **`seller_payout_sent` (10 values) and `seller_payout_sent_v2` (13 values)** — the older
+> versions. The code stopped sending them on 29 Nov 2026; they can be deleted in WhatsApp Manager.
 
-- **Category:** Utility · **Language:** `en` · **Status:** Active (added 6 Nov 2026)
-- **Same use as 5.1**, plus the payment gateway fee line — shown to the seller as **UnieMax's discount** while UnieMax pays it.
-- **The code sends v2** because Meta lists it as approved; it falls back to 5.1 only if v2 is ever missing from Meta's list.
-- **Header:** none · **Footer:** `UnieMax seller payouts`
-- **Button:** "View earnings" → `https://uniemax.com/mystores/{{1}}`
-
-```
-Hi {{1}},
-
-UnieMax has sent you a payout of ₹{{2}} for order #{{3}} from your store {{4}}.
-
-Payout details:
-• Order total: ₹{{5}}
-• Platform fee: ₹{{6}}
-• Payment gateway fee ({{7}}): ₹{{8}}, {{9}}
-• COD dues adjusted: ₹{{10}}
-• Paid to: {{11}}
-• Reference (UTR): {{12}}
-• Paid on: {{13}}
-
-It may take a few hours to show in your bank account. Tap below to see all your earnings.
-UnieMax seller payouts
-```
-
-| Var | Field | Example |
-|---|---|---|
-| {{1}} | Seller name | Ravi |
-| {{2}} | Amount sent (number only) | 1,349.10 |
-| {{3}} | Order number (no `#`) | UM-1002 |
-| {{4}} | Store name | Fashion Hub |
-| {{5}} | Order total (number only) | 1,499.00 |
-| {{6}} | Platform fee (number only) | 149.90 |
-| {{7}} | Gateway fee percent (include `%`) | 2% |
-| {{8}} | Gateway fee amount (number only) | 29.98 |
-| {{9}} | Who pays it | paid by UnieMax as your discount |
-| {{10}} | COD dues adjusted (number only) | 0.00 |
-| {{11}} | Bank + last 4 digits | State Bank of India A/c XX4821 |
-| {{12}} | UTR / reference (`NA` if none) | HDFCR52026110512345 |
-| {{13}} | Date (and time) paid | 5 Nov 2026, 2:30 pm |
-| Button {{1}} | Store slug + `/earnings` | fashion-hub/earnings |
-
-`{{9}}` is `paid by UnieMax as your discount` while UnieMax pays the gateway fee
-(Finance → Fee settings), or `deducted from this payout` if that is ever switched to the seller.
-
-### 5.3 `seller_advance_sent` (advance — paid before delivery)
+### 5.2 `seller_advance_sent` (advance — paid before delivery)
 
 - **Category:** Utility · **Language:** `en` · **Status:** Active (added 27 Nov 2026)
 - **Send to:** Seller (store business phone, else owner phone) · **When:** an **advance payout** (paid before the order is delivered — docs/seller-finance §9) is marked **Paid out**, automatically or by hand (**Send message**)
-- **The code always sends this one for an advance** (never 5.1 / 5.2).
+- **The code always sends this one for an advance** (never 5.1).
 - **Header:** none · **Footer:** `UnieMax seller payouts`
 - **Button:** "View earnings" → `https://uniemax.com/mystores/{{1}}`
 
@@ -566,14 +538,9 @@ Hi {{1}}, your delivery address has been successfully updated to {{2}}. Contact 
     "body": ["customerName", "newAddress", "supportContact"],
     "button": null
   },
-  "seller_payout_sent": {
+  "seller_payout_sent_v3": {
     "language": "en", "category": "UTILITY", "recipient": "seller",
-    "body": ["sellerName", "amountSent", "orderId", "storeName", "orderTotal", "platformFee", "codDues", "paidTo", "utr", "paidOn"],
-    "button": "{storeSlug}/earnings"
-  },
-  "seller_payout_sent_v2": {
-    "language": "en", "category": "UTILITY", "recipient": "seller",
-    "body": ["sellerName", "amountSent", "orderId", "storeName", "orderTotal", "platformFee", "gatewayPercent", "gatewayFee", "gatewayNote", "codDues", "paidTo", "utr", "paidOn"],
+    "body": ["sellerName", "amountSent", "orderId", "storeName", "orderTotal", "platformFee", "gatewayPercent", "gatewayFee", "gatewayDiscount", "codDues", "amountSent", "paidTo", "utr", "paidOn"],
     "button": "{storeSlug}/earnings"
   },
   "seller_advance_sent": {

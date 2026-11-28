@@ -23,18 +23,16 @@ import { decimalToPaise, paiseToAmount, payoutTotals } from "./payouts.rules.js"
  *
  *   Email    → store's business email, else the owner's login email.
  *   WhatsApp → store's business phone, else the owner's phone. Template:
- *     `seller_payout_sent_v2` (13 values, with the payment gateway fee line —
- *     shown as UnieMax's discount when UnieMax pays it) once it is approved
- *     in WhatsApp Manager; until then `seller_payout_sent` (10 values).
- *     An ADVANCE (paid before delivery) always uses `seller_advance_sent`
- *     (10 values, says it is an advance and what is still to come).
- *     Button = `<slug>/earnings`. Renaming or re-ordering a template in Meta
- *     breaks this — the value order is `payoutParams` / `payoutParamsV2` /
- *     `advanceParams`.
+ *     `seller_payout_sent_v3` (14 values — the gateway fee, UnieMax's
+ *     discount on it and the amount sent, each on its own line). An ADVANCE
+ *     (paid before delivery) uses `seller_advance_sent` (10 values, says it
+ *     is an advance and what is still to come). The header is fixed text, so
+ *     only body + button values are sent. Button = `<slug>/earnings`.
+ *     Renaming or re-ordering a template in Meta breaks this — the value
+ *     order is `payoutParams` / `advanceParams`.
  */
 
-export const PAYOUT_TEMPLATE = "seller_payout_sent";
-export const PAYOUT_TEMPLATE_V2 = "seller_payout_sent_v2";
+export const PAYOUT_TEMPLATE = "seller_payout_sent_v3";
 export const ADVANCE_TEMPLATE = "seller_advance_sent";
 const LANGUAGE = "en";
 
@@ -108,8 +106,9 @@ async function load(payoutId: string) {
     platformFee: fin.platformFee,
     gatewayFee: fin.gatewayFee,
     gatewayPercent: fin.gatewayFeePercent,
-    /** UnieMax pays the gateway → it is the seller's discount, not a deduction. */
-    gatewayPaidByUs: fin.gatewayFeeBearer === "PLATFORM",
+    /** UnieMax's discount on the gateway fee: the whole fee while UnieMax pays
+     *  it (the seller keeps the full amount), else 0 (taken from the payout). */
+    gatewayDiscount: fin.gatewayFeeBearer === "PLATFORM" ? fin.gatewayFee : "0.00",
     dues: payout.duesDeducted.toFixed(2),
     paidTo: payout.payeeBank ? `${payout.payeeBank} A/c XX${payout.payeeLast4 ?? ""}` : "your bank account",
     utr: payout.utr,
@@ -125,28 +124,8 @@ async function load(payoutId: string) {
 
 type PayoutMessage = NonNullable<Awaited<ReturnType<typeof load>>>;
 
-/** Who pays the gateway fee, in the seller's words. */
-const gatewayNote = (m: PayoutMessage) =>
-  m.gatewayPaidByUs ? "paid by UnieMax as your discount" : "deducted from this payout";
-
-/** `seller_payout_sent` — {{1}}…{{10}}, in WhatsApp Manager's order. */
+/** `seller_payout_sent_v3` — {{1}}…{{14}}, in WhatsApp Manager's order. */
 export function payoutParams(m: PayoutMessage): string[] {
-  return [
-    clean(m.sellerName),
-    clean(num(m.amount)),
-    clean(m.orderNumber),
-    clean(m.storeName),
-    clean(num(m.orderTotal)),
-    clean(num(m.platformFee)),
-    clean(num(m.dues)),
-    clean(m.paidTo),
-    clean(m.utr),
-    clean(m.paidOn),
-  ];
-}
-
-/** `seller_payout_sent_v2` — {{1}}…{{13}}, with the gateway fee line. */
-export function payoutParamsV2(m: PayoutMessage): string[] {
   return [
     clean(m.sellerName),
     clean(num(m.amount)),
@@ -156,8 +135,9 @@ export function payoutParamsV2(m: PayoutMessage): string[] {
     clean(num(m.platformFee)),
     clean(pct(m.gatewayPercent)),
     clean(num(m.gatewayFee)),
-    clean(gatewayNote(m)),
+    clean(num(m.gatewayDiscount)),
     clean(num(m.dues)),
+    clean(num(m.amount)),
     clean(m.paidTo),
     clean(m.utr),
     clean(m.paidOn),
@@ -181,15 +161,14 @@ export function advanceParams(m: PayoutMessage): string[] {
 }
 
 /**
- * An advance → always `seller_advance_sent`. Otherwise v2 once Meta lists
- * it as approved; v1 otherwise (also when Meta's list can't be read).
+ * An advance → `seller_advance_sent`; any other payout → `seller_payout_sent_v3`.
+ * `template` = Meta's approved copy, for the preview (null while it is not
+ * approved or Meta's list can't be read — the send is tried either way).
  */
 async function chooseTemplate(m: PayoutMessage, log: FastifyBaseLogger) {
   const templates = env.WA_ENABLED ? await availableTemplates(log) : null;
   const find = (name: string) => templates?.find((t) => t.name === name && t.language === LANGUAGE) ?? null;
   if (m.isAdvance) return { name: ADVANCE_TEMPLATE, params: advanceParams(m), template: find(ADVANCE_TEMPLATE) };
-  const v2 = find(PAYOUT_TEMPLATE_V2);
-  if (v2) return { name: PAYOUT_TEMPLATE_V2, params: payoutParamsV2(m), template: v2 };
   return { name: PAYOUT_TEMPLATE, params: payoutParams(m), template: find(PAYOUT_TEMPLATE) };
 }
 
@@ -199,9 +178,13 @@ const ADVANCE_NOTE =
 
 function payoutMail(m: PayoutMessage, to: string) {
   const earningsUrl = publicWebUrl ? `${publicWebUrl}/mystores/${m.slug}/earnings` : null;
+  // Same lines as the WhatsApp message: the fee, then UnieMax's discount on it.
   const gateway: [string, string][] =
     Number(m.gatewayFee) > 0
-      ? [[`Payment gateway fee (${pct(m.gatewayPercent)})`, `₹${num(m.gatewayFee)} — ${gatewayNote(m)}`]]
+      ? [
+          [`Payment gateway fee (${pct(m.gatewayPercent)})`, `₹${num(m.gatewayFee)}`],
+          ["UnieMax discount on gateway fee", `₹${num(m.gatewayDiscount)}`],
+        ]
       : [];
   const rows: [string, string][] = [
     ["Order total", `₹${num(m.orderTotal)}`],
