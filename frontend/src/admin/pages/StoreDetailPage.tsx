@@ -351,7 +351,10 @@ export default function StoreDetailPage() {
         ) : (
           <ul className="divide-y divide-line">
             {store.bankAccounts.map((account) => (
-              <li key={account.id} className="flex flex-wrap items-center gap-3 py-3">
+              <li
+                key={account.id}
+                className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start"
+              >
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2 font-medium text-fg">
                     {account.bankName} ····{account.accountNumberLast4}
@@ -400,7 +403,7 @@ export default function StoreDetailPage() {
                   ) : null}
                 </div>
                 {account.archivedAt ? null : (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 sm:max-w-[45%] sm:shrink-0 sm:justify-end">
                     {account.checkStatus !== 'VALID' ? (
                       <Button
                         onClick={() => {
@@ -701,14 +704,14 @@ function BankAccountDetails({ account }: { account: BankAccount }) {
     <dl className="mt-2 max-w-xl">
       <Detail label="Account holder">{account.accountHolderName}</Detail>
       <Detail label="Account number">
-        <span className="inline-flex items-center gap-2">
-          <span className="font-mono tabular-nums">{account.accountNumber}</span>
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="break-all font-mono tabular-nums">{account.accountNumber}</span>
           <CopyButton text={account.accountNumber} label="Copy" variant="ghost" />
         </span>
       </Detail>
       <Detail label="IFSC">
-        <span className="inline-flex items-center gap-2">
-          <span className="font-mono">{account.ifsc}</span>
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="break-all font-mono">{account.ifsc}</span>
           <CopyButton text={account.ifsc} label="Copy" variant="ghost" />
         </span>
       </Detail>
@@ -716,8 +719,8 @@ function BankAccountDetails({ account }: { account: BankAccount }) {
       <Detail label="Branch">{account.branch}</Detail>
       <Detail label="UPI ID">
         {account.upiId ? (
-          <span className="inline-flex items-center gap-2">
-            <span>{account.upiId}</span>
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="break-all">{account.upiId}</span>
             <CopyButton text={account.upiId} label="Copy" variant="ghost" />
           </span>
         ) : (
