@@ -75,6 +75,7 @@ export const storeRoutes: FastifyPluginAsync<StoreRoutesOptions> = async (
   // (confirm → pack → ship → deliver) and cancellation (restores stock).
   app.get("/:id/orders", ordersController.listStoreOrders);
   app.get("/:id/orders/:orderId", ordersController.getStoreOrder);
+  app.get("/:id/orders/:orderId/receipt", ordersController.getStoreOrderReceipt);
   app.patch("/:id/orders/:orderId/status", ordersController.updateStoreOrderStatus);
   app.post("/:id/orders/:orderId/cancel", ordersController.cancelStoreOrder);
   // Correct the delivery address (customer gave an incomplete one). Both

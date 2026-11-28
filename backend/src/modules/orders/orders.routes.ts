@@ -32,6 +32,8 @@ export const publicOrderRoutes: FastifyPluginAsync = async (app) => {
     controller.createOrder,
   );
   app.get("/:slug/orders/:orderId", controller.getOrder);
+  // The receipt PDF once delivered — same access as the order link (Meta fetches it for WhatsApp).
+  app.get("/:slug/orders/:orderId/receipt", controller.getOrderReceipt);
   // The buyer cancels an order the seller hasn't confirmed yet (unpaid only —
   // a paid one needs a real refund, so it goes through the store).
   app.post(

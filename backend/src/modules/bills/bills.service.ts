@@ -3,14 +3,11 @@ import { prisma } from "../../config/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../../utils/httpError.js";
 import { buildListMeta } from "../../utils/response.js";
-import sharp from "sharp";
-import { mediaUrl, storage } from "../../package/storage/index.js";
+import { mediaUrl } from "../../package/storage/index.js";
 import { publicWebUrl } from "../../package/mail/index.js";
 import type { StoreActor } from "../stores/storeActor.js";
 import { storeScope } from "../stores/storeActor.js";
-import { DEFAULT_STORE_THEME, resolvePayments, resolveShipping } from "../stores/stores.schema.js";
-import { resolveProfile } from "../stores/storeProfile.schema.js";
-import { formatAddress } from "../stores/storeAddress.schema.js";
+import { resolvePayments, resolveShipping } from "../stores/stores.schema.js";
 import { visibleProductWhere } from "../stores/publicStore.service.js";
 import {
   expireUnpaidOrder,
@@ -22,6 +19,7 @@ import {
 } from "../orders/orders.service.js";
 import { verifiedCustomerByPhone } from "./billOwner.js";
 import { formatDate, renderBillPdf, toPaise, type BillPdfData } from "./billPdf.js";
+import { OFFLINE_MODE_LABEL, maskPhone, pdfShop, spacedPhone } from "./pdfShop.js";
 import { getOrCreatePaySession } from "../payments/payments.service.js";
 import type {
   AdminBillListQuery,
@@ -590,11 +588,6 @@ async function billByToken(token: string) {
   return bill;
 }
 
-/** "+91 98400 •••23" — the link may be forwarded; the full number is not needed to pay. */
-const maskPhone = (phone: string) => {
-  const d = phone.replace(/\D/g, "").slice(-10);
-  return d.length === 10 ? `+91 ${d.slice(0, 5)} •••${d.slice(8)}` : phone;
-};
 
 /** What the customer sees. Opening it the first time marks the bill opened. */
 export async function getPublicBill(token: string, viewerCustomerId: string | null) {
@@ -763,25 +756,6 @@ export async function adminGetBill(billId: string) {
 // PDF — the bill (OPEN) or its receipt (PAID), see billPdf.ts
 // ---------------------------------------------------------------------------
 
-const OFFLINE_MODE_LABEL: Record<string, string> = { CASH: "cash", UPI: "UPI", BANK: "bank transfer", OTHER: "another way" };
-
-/** "+91 98400 11223" — a number as people write it. */
-const spacedPhone = (p: string) => {
-  const d = p.replace(/\D/g, "").slice(-10);
-  return d.length === 10 ? `+91 ${d.slice(0, 5)} ${d.slice(5)}` : p;
-};
-
-/** The shop's logo as a square PNG for the PDF, or null (missing, unreadable). */
-async function logoPng(logoKey: string | null): Promise<Buffer | null> {
-  if (!logoKey) return null;
-  try {
-    const bytes = await storage.get("logo", logoKey);
-    if (!bytes) return null;
-    return await sharp(bytes, { failOn: "error" }).resize(256, 256, { fit: "cover" }).png().toBuffer();
-  } catch {
-    return null;
-  }
-}
 
 /**
  * What the PDF shows. `audience: "public"` is the copy behind the link (it
@@ -794,11 +768,8 @@ async function billPdfData(bill: BillRow, audience: "seller" | "public"): Promis
     throw HttpError.conflict(state === "CANCELLED" ? "This bill was cancelled — there is no PDF for it." : "This bill expired unpaid — there is no PDF for it.");
   }
   const paid = state === "PAID";
-  const [store, order] = await Promise.all([
-    prisma.store.findUniqueOrThrow({
-      where: { id: bill.storeId },
-      select: { name: true, slug: true, logoKey: true, theme: true, profile: true },
-    }),
+  const [shop, order] = await Promise.all([
+    pdfShop(bill.storeId),
     bill.orderId
       ? prisma.order.findUnique({
           where: { id: bill.orderId },
@@ -815,8 +786,6 @@ async function billPdfData(bill: BillRow, audience: "seller" | "public"): Promis
         })
       : null,
   ]);
-  const profile = resolveProfile(store.profile);
-  const theme = (store.theme ?? {}) as { primaryColor?: unknown };
   const pub = audience === "public";
   const phone = (p: string) => (pub ? maskPhone(p) : spacedPhone(p));
 
@@ -828,7 +797,7 @@ async function billPdfData(bill: BillRow, audience: "seller" | "public"): Promis
   const handover = bill.handedOver
     ? { label: "Handover", lines: ["Collected in the shop"] }
     : bill.fulfilment === "PICKUP"
-      ? { label: "Store pickup", lines: [`Collect from ${store.name}`] }
+      ? { label: "Store pickup", lines: [`Collect from ${shop.name}`] }
       : addr
         ? {
             label: "Deliver to",
@@ -840,7 +809,7 @@ async function billPdfData(bill: BillRow, audience: "seller" | "public"): Promis
 
   const payment: string[] = [];
   if (paid && bill.payWay === "OFFLINE") {
-    payment.push(`Paid to ${store.name} by ${OFFLINE_MODE_LABEL[bill.offlineMode ?? ""] ?? "a direct payment"} on ${formatDate(bill.paidAt ?? bill.createdAt)}`);
+    payment.push(`Paid to ${shop.name} by ${OFFLINE_MODE_LABEL[bill.offlineMode ?? ""] ?? "a direct payment"} on ${formatDate(bill.paidAt ?? bill.createdAt)}`);
     if (bill.offlineRef) payment.push(`Reference ${bill.offlineRef}`);
   } else if (paid) {
     payment.push(`Paid online on ${formatDate(bill.paidAt ?? bill.createdAt)}`);
@@ -853,22 +822,12 @@ async function billPdfData(bill: BillRow, audience: "seller" | "public"): Promis
 
   const link = billLink(bill.token);
   const lines = linesOf(bill);
-  const legal = profile.businessName && profile.businessName.trim().toLowerCase() !== store.name.trim().toLowerCase() ? profile.businessName : null;
   return {
     kind: paid ? "RECEIPT" : "BILL",
     number: bill.number,
     orderNumber: order && order.orderNumber !== bill.number ? order.orderNumber : null,
     issuedAt: paid ? (bill.paidAt ?? bill.createdAt) : bill.createdAt,
-    store: {
-      name: store.name,
-      legalName: legal,
-      addressLines: profile.address ? [formatAddress(profile.address)] : [],
-      phone: profile.phone ? spacedPhone(profile.phone) : null,
-      email: profile.email,
-      gstin: profile.tax.gstin,
-      accent: typeof theme.primaryColor === "string" ? theme.primaryColor : DEFAULT_STORE_THEME.primaryColor,
-      logo: await logoPng(store.logoKey),
-    },
+    store: shop,
     // A name only when it has letters — an order made without one stores the phone there.
     customer: { name: [bill.customerName, order?.customerName].find((n) => n && /\p{L}/u.test(n)) ?? null, phone: phone(bill.customerPhone) },
     handover,

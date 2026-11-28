@@ -168,7 +168,15 @@ export async function sendTemplate(
   if (input.header) {
     components.push({
       type: "header",
-      parameters: [{ type: input.header.type, [input.header.type]: { link: input.header.link } }],
+      parameters: [
+        {
+          type: input.header.type,
+          [input.header.type]: {
+            link: input.header.link,
+            ...(input.header.type === "document" && input.header.filename ? { filename: input.header.filename } : {}),
+          },
+        },
+      ],
     });
   }
   if (input.bodyParams.length > 0) {

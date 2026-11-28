@@ -1,3 +1,5 @@
+import type { FastifyReply } from "fastify";
+
 /**
  * Standard API response envelope so every endpoint returns a predictable shape.
  *
@@ -31,4 +33,17 @@ export function buildListMeta(
     pageSize,
     totalPages: pageSize > 0 ? Math.ceil(total / pageSize) : 0,
   };
+}
+
+/** Sends PDF bytes as a download, never cached or indexed (bills, order receipts). */
+export function sendPdf(
+  reply: FastifyReply,
+  file: { fileName: string; bytes: Buffer },
+) {
+  return reply
+    .header("Content-Type", "application/pdf")
+    .header("Content-Disposition", `attachment; filename="${file.fileName}"`)
+    .header("Cache-Control", "private, no-store")
+    .header("X-Robots-Tag", "noindex, nofollow")
+    .send(file.bytes);
 }

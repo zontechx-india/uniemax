@@ -31,6 +31,8 @@ const headerMedia = z
   .object({
     type: z.enum(["image", "video", "document"]),
     link: z.string().trim().url().max(2048),
+    /** Document only: the file name the recipient sees ("Receipt-48203917.pdf"). */
+    filename: z.string().trim().min(1).max(240).optional(),
   })
   .nullable()
   .default(null);

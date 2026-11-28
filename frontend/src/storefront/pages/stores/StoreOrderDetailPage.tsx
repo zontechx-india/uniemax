@@ -37,6 +37,7 @@ import { MediaImg } from '../../../shared/media/MediaImg'
 import { AddressDialog } from './orders/AddressDialog'
 import { DeliveredDialog } from './orders/DeliveredDialog'
 import { MoneyCard } from './orders/MoneyCard'
+import { ReceiptButton } from '../../features/stores/ReceiptButton'
 import type { PickedPhoto } from './orders/DeliveredDialog'
 import { ParcelCard } from './orders/ParcelCard'
 import { ShipDialog } from './orders/ShipDialog'
@@ -690,6 +691,11 @@ export function StoreOrderDetailPage() {
                 orderId={order.id}
                 version={`${order.status}:${order.paymentStatus}`}
               />
+
+              {/* The receipt PDF the customer was sent on delivery — the seller's full copy */}
+              {order.status === 'DELIVERED' && (
+                <ReceiptButton url={`/api/v1/stores/${store.id}/orders/${order.id}/receipt`} orderNumber={order.orderNumber} />
+              )}
 
               {/* Timeline */}
               <PanelCard title="What has happened">

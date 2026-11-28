@@ -1,6 +1,8 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { storeActor } from "../stores/storeActor.js";
-import { list, ok } from "../../utils/response.js";
+import { list, ok, sendPdf } from "../../utils/response.js";
+import { getMyStore } from "../stores/stores.service.js";
+import { orderReceiptPdf } from "./orderReceipt.js";
 import { idParamSchema, slugParamSchema } from "../../utils/zodHelpers.js";
 import { optionalCustomerId } from "../../package/auth/index.js";
 import { readUpload } from "../../package/storage/index.js";
@@ -93,6 +95,19 @@ export async function listStoreOrders(request: FastifyRequest) {
     query,
   );
   return list(rows, meta);
+}
+
+/** The receipt PDF behind the order link — masked like the public order page. 409 until delivered. */
+export async function getOrderReceipt(request: FastifyRequest, reply: FastifyReply) {
+  const { slug, orderId } = orderParamSchema.parse(request.params);
+  return sendPdf(reply, await orderReceiptPdf({ id: orderId, storeSlug: slug }, "public"));
+}
+
+/** The seller's copy of the receipt — full phone and address. 409 until delivered. */
+export async function getStoreOrderReceipt(request: FastifyRequest, reply: FastifyReply) {
+  const { id, orderId } = sellerOrderParamSchema.parse(request.params);
+  const store = await getMyStore(storeActor(request), id);
+  return sendPdf(reply, await orderReceiptPdf({ id: orderId, storeId: store.id }, "full"));
 }
 
 export async function getStoreOrder(request: FastifyRequest) {

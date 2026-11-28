@@ -5,6 +5,7 @@ import { HttpError } from "../../utils/httpError.js";
 import { notify, notifyAdmins } from "../notifications/notifications.service.js";
 import { whatsAppNewOrder, whatsAppOrderStatus } from "../whatsapp/whatsapp.orderMessages.js";
 import { escapeHtml } from "./couriers.js";
+import { orderReceiptPdf } from "./orderReceipt.js";
 
 /**
  * Order notifications — **email + push + WhatsApp, from one place**, so a new
@@ -370,27 +371,43 @@ export function notifyOrderStatusChange(
 
   void (async () => {
     const to = await customerAddress(order, customerId);
-    if (to) await sendMail(statusMail(order, order.status, to));
+    if (!to) return;
+    const receipt = order.status === "DELIVERED" ? await deliveredReceipt(order.id) : null;
+    const mail = statusMail(order, order.status, to, receipt !== null);
+    if (receipt) mail.attachments = [{ filename: receipt.fileName, content: receipt.bytes }];
+    await sendMail(mail);
   })().catch(logFailure(`customer ${order.status.toLowerCase()}`));
 }
 
+/** The receipt PDF for the delivered email — the email still goes without it if it can't be made. */
+async function deliveredReceipt(orderId: string) {
+  try {
+    return await orderReceiptPdf({ id: orderId }, "full");
+  } catch (error) {
+    logFailure("order receipt PDF")(error);
+    return null;
+  }
+}
+
 /** The customer's plain status email (no parcel details). */
-function statusMail(order: OrderMailData, status: string, to: string): MailMessage {
+function statusMail(order: OrderMailData, status: string, to: string, withReceipt = false): MailMessage {
   const copy = STATUS_MAIL[status];
   if (!copy) throw new Error(`No email copy for status ${status}`);
   const confirmationUrl = publicWebUrl
     ? `${publicWebUrl}/order/${order.storeSlug}/${order.id}`
     : null;
   const line = copy.line(order);
+  const receiptLine = withReceipt ? "Your receipt is attached as a PDF." : null;
   return {
     to,
     subject: copy.subject(order),
-    text: `Hi${order.customerName ? ` ${order.customerName}` : ""},\n\n${line}\n\nTotal: ${formatTotal(order.total)}${confirmationUrl ? `\n\nView your order: ${confirmationUrl}` : ""}`,
+    text: `Hi${order.customerName ? ` ${order.customerName}` : ""},\n\n${line}\n\nTotal: ${formatTotal(order.total)}${receiptLine ? `\n\n${receiptLine}` : ""}${confirmationUrl ? `\n\nView your order: ${confirmationUrl}` : ""}`,
     html: wrapHtml(
       copy.subject(order),
       `<p style="margin:0;font-size:14px;color:#444">${escapeHtml(line)}</p>
        <p style="margin:12px 0 0;font-size:14px;color:#111">
          <strong>Total: ${formatTotal(order.total)}</strong></p>
+       ${receiptLine ? `<p style="margin:12px 0 0;font-size:14px;color:#444">${receiptLine}</p>` : ""}
        ${confirmationUrl ? linkHtml(confirmationUrl, "View your order") : ""}`,
     ),
   };
@@ -650,7 +667,11 @@ export async function buildOrderMail(
     const { line, subject } = parcelShippedCopy(order, context.parcel, true);
     return parcelMail(order, context.parcel, to, subject, line);
   }
-  return statusMail(order, message, to);
+  // A re-sent "delivered" email carries the receipt like the automatic one.
+  const receipt = message === "DELIVERED" ? await deliveredReceipt(order.id) : null;
+  const mail = statusMail(order, message, to, receipt !== null);
+  if (receipt) mail.attachments = [{ filename: receipt.fileName, content: receipt.bytes }];
+  return mail;
 }
 
 /**

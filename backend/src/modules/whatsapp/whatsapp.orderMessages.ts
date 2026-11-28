@@ -7,6 +7,7 @@ import { resolveProfile } from "../stores/storeProfile.schema.js";
 import { availableTemplates, sendTemplate } from "./whatsapp.service.js";
 import { fillTemplateBody } from "./whatsapp.templates.js";
 import { toWaId } from "./whatsapp.webhook.js";
+import { publicReceiptUrl, receiptFileName } from "../orders/orderReceipt.js";
 
 /**
  * Order messages on WhatsApp — sent ALONGSIDE the order email and push (see
@@ -112,6 +113,20 @@ interface PreparedMessage {
   to: string | null;
   templateName: string;
   bodyParams: string[];
+  /** Delivered only: the receipt PDF, sent with `RECEIPT_TEMPLATE` once that template is approved. */
+  receipt?: { link: string; filename: string } | null;
+}
+
+/**
+ * "Delivered" with the receipt PDF as its document header — same {{1}} name,
+ * {{2}} order number, {{3}} shop as `order_delivered`. Until it is approved in
+ * WhatsApp Manager, `order_delivered` (no PDF) goes out instead.
+ */
+const RECEIPT_TEMPLATE = "order_delivered_receipt";
+
+async function receiptTemplateReady(logger: FastifyBaseLogger): Promise<boolean> {
+  const templates = await availableTemplates(logger);
+  return !!templates?.some((t) => t.name === RECEIPT_TEMPLATE && t.language === LANGUAGE && t.sendable);
 }
 
 /** Sends a prepared message and returns Meta's message id. Throws on refusal. */
@@ -119,14 +134,15 @@ async function deliverPrepared(
   message: PreparedMessage & { to: string },
   logger: FastifyBaseLogger,
 ): Promise<string | null> {
+  const receipt = message.receipt && (await receiptTemplateReady(logger)) ? message.receipt : null;
   const result = await sendTemplate(
     {
       to: message.to,
-      templateName: message.templateName,
+      templateName: receipt ? RECEIPT_TEMPLATE : message.templateName,
       languageCode: LANGUAGE,
       bodyParams: message.bodyParams,
       buttonParams: [],
-      header: null,
+      header: receipt ? { type: "document", link: receipt.link, filename: receipt.filename } : null,
     },
     logger,
   );
@@ -268,10 +284,12 @@ function prepareCustomerStatus(
   } else {
     params = [name, number, store];
   }
+  const receiptLink = status === "DELIVERED" ? publicReceiptUrl(order.storeSlug, order.id) : null;
   return {
     to: firstWaId(order.customerPhone, order.customer?.phone),
     templateName: TEMPLATES[status],
     bodyParams: params,
+    receipt: receiptLink ? { link: receiptLink, filename: receiptFileName(order.orderNumber) } : null,
   };
 }
 

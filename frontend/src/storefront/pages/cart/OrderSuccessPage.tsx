@@ -16,6 +16,7 @@ import {
 } from '../../features/stores/storesApi'
 import type { PlacedOrder } from '../../features/stores/storesApi'
 import { ParcelTracking } from '../../features/stores/ParcelTracking'
+import { ReceiptButton } from '../../features/stores/ReceiptButton'
 import { OrderAnswerList } from '../../features/stores/OrderAnswerList'
 import {
   formatStepTime,
@@ -276,6 +277,13 @@ export function OrderSuccessPage({
                       ? 'Cash on delivery — nothing to pay'
                       : 'Pay on delivery'}
               </p>
+              {order.status === 'DELIVERED' && (
+                <ReceiptButton
+                  url={`/api/v1/public/stores/${order.storeSlug}/orders/${order.id}/receipt`}
+                  orderNumber={order.orderNumber}
+                  className="mt-4 w-full max-w-xs"
+                />
+              )}
               {!cancelled && (paymentState === 'pending' || paymentState === 'failed') && (
                 <div className="mt-4 flex flex-col items-center gap-2">
                   <Button loading={retrying} onClick={() => void retryPayment()}>

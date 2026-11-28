@@ -459,6 +459,12 @@ as order placement below, incl. the lifecycle stamps and its parcels —
 `shipments[]` with the proof-of-delivery photo, see **Parcels** below).
 `404` if not this store's.
 
+**`GET /api/v1/stores/:id/orders/:orderId/receipt`** — the order receipt PDF, the
+seller's full copy (phone + street address). `409` until the order is `DELIVERED`.
+`application/pdf`, `attachment; filename="Receipt-{orderNumber}.pdf"`, `no-store`,
+`noindex`. Drawn by `orders/orderReceipt.ts` with the seller-bill renderer
+([bills §5.8](./bills/README.md)).
+
 **`PATCH /api/v1/stores/:id/orders/:orderId/status`**
 ```jsonc
 { "status": "CONFIRMED" }   // CONFIRMED | PACKED | SHIPPED | DELIVERED
@@ -2236,6 +2242,14 @@ never the proof-of-delivery photo.
 **reconciled against Cashfree** before answering (webhook fallback, at most
 once per order every 5 s — the endpoint is public), so the success page
 converges on `PAID` by polling this endpoint.
+
+### `GET /api/v1/public/stores/:slug/orders/:orderId/receipt`
+
+The order receipt PDF behind the order link — the same access rule as the order
+above, so it is **masked** like the redacted view (phone `+91 98400 •••23`, PIN +
+state instead of the street address). `409` until the order is `DELIVERED`, `404` if
+unknown. Meta fetches this URL as the document of the `order_delivered_receipt`
+WhatsApp template. Headers as the seller copy.
 
 ### `POST /api/v1/public/stores/:slug/orders/:orderId/pay` 🔒 customer
 

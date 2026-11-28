@@ -202,6 +202,26 @@ We look forward to serving you again!
 | {{2}} | Order ID (no `#`) | ORD12345 |
 | {{3}} | Store name | Fashion Hub |
 
+### 3.5 `order_delivered_receipt` — to create
+
+- **Category:** Utility · **Language:** `en` · **Status:** not created yet
+- **Send to:** Customer · **When:** Order is delivered (replaces `order_delivered` once approved — automatic, no deploy)
+- **Header:** **Document** (the receipt PDF, `Receipt-{order no}.pdf`, sent by the app) · **Footer / Buttons:** none
+- Same three values as `order_delivered`.
+
+```
+Hi {{1}},
+Your order #{{2}} has been successfully delivered! 🎉
+Your receipt is attached.
+Thank you for shopping with {{3}}.
+```
+
+| Var | Field | Example |
+|---|---|---|
+| {{1}} | Customer name | Rahul |
+| {{2}} | Order ID (no `#`) | ORD12345 |
+| {{3}} | Store name | Fashion Hub |
+
 ---
 
 ## 4. Seller setup templates

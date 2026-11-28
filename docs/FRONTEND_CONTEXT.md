@@ -986,7 +986,8 @@ and their WhatsApp text says the order "is waiting for payment" instead of
   this order's Transactions row: bill, paid by, platform / gateway fee, You
   get, the settled-or-not pill and sentence, "See all transactions"; reloads
   when status or payment changes; wording shared with the Transactions page
-  in `orders/settlementMeta.ts`); and a
+  in `orders/settlementMeta.ts`); once delivered, **Download receipt (PDF)**
+  under it (`features/stores/ReceiptButton.tsx`, the seller's full copy); and a
   **timeline stepper** (Order placed → Confirmed → Packed → Sent →
   Delivered, ticked with times; pickup shows "Picked up" and skips Sent; a
   cancelled order shows the stages it reached + Cancelled). The **status
@@ -1993,7 +1994,8 @@ re-checks stock), success clears that store's cart lines and replaces the
 route with **`/order/{storeSlug}/{orderId}`** —
 `pages/cart/OrderSuccessPage.tsx`, a store-themed confirmation (green
 check, order number pill, paid/pay-on-delivery line — flagging simulated
-dev payments —, item list with thumbnails, delivery/pickup summary,
+dev payments —, **Download receipt (PDF)** once delivered (`ReceiptButton`, the
+masked copy), item list with thumbnails, delivery/pickup summary,
 Continue shopping). The same page is where a buyer comes back to **track**
 the order: "Order placed!" only while the order is `PENDING` and under 30
 minutes old; otherwise the headline and sub-line follow the real status in

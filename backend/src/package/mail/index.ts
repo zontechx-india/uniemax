@@ -30,6 +30,8 @@ export interface MailMessage {
   subject: string;
   html: string;
   text: string;
+  /** Files to attach (e.g. the order receipt PDF). */
+  attachments?: { filename: string; content: Buffer }[];
 }
 
 /**
@@ -40,7 +42,9 @@ export async function sendMail(message: MailMessage): Promise<void> {
   if (!RESEND_API_KEY) {
     // eslint-disable-next-line no-console
     console.log(
-      `📧 [mail:console] to=${message.to} subject="${message.subject}"\n${message.text}`,
+      `📧 [mail:console] to=${message.to} subject="${message.subject}"${
+        message.attachments?.length ? ` attachments=${message.attachments.map((a) => a.filename).join(",")}` : ""
+      }\n${message.text}`,
     );
     return;
   }
@@ -57,6 +61,10 @@ export async function sendMail(message: MailMessage): Promise<void> {
       subject: message.subject,
       html: message.html,
       text: message.text,
+      // Resend takes each file as base64.
+      ...(message.attachments?.length
+        ? { attachments: message.attachments.map((a) => ({ filename: a.filename, content: a.content.toString("base64") })) }
+        : {}),
     }),
   });
 

@@ -56,6 +56,8 @@ platform, not a payment gateway: **every bill is products from the shop.**
 | `modules/bills/bills.schema.ts` | `billCreateSchema` (LINK + OFFLINE fields, `superRefine` for OFFLINE), `billPaySchema`, list / catalog / admin queries |
 | `modules/bills/bills.service.ts` | `createBill`, `listBills`, `getBill`, `shareBill`, `cancelBill`, item picker (`billCatalog`, `billCatalogCategories`, `oftenBilled`), `getPublicBill`, `payBill`, `adminListBills`, `adminGetBill`, `billState` |
 | `modules/bills/billPdf.ts` | `renderBillPdf(data)` → PDF bytes (pdfkit, A4); `amountInWords` (Indian grouping), `toPaise`, `printable`, `formatDate` (IST) |
+| `modules/bills/pdfShop.ts` | Shared by every PDF from `billPdf.ts`: `pdfShop(storeId)` (the shop block — name, legal name, address, contact, GSTIN, colour, logo), `spacedPhone`, `maskPhone`, `OFFLINE_MODE_LABEL` |
+| `modules/orders/orderReceipt.ts` | The **order receipt** — every DELIVERED order, same renderer: `orderReceiptPdf(where, audience)` ("full" or "public"); attached to the delivered email, the WhatsApp `order_delivered_receipt` document, and "Download receipt" on the customer and seller order pages ([API](../API.md)) |
 | `assets/fonts/plus-jakarta-sans/` | The app's typeface for the PDF (OFL, `OFL.txt`): Latin 400–700 + Latin-Ext 400/700 — only Latin-Ext has ₹ |
 | `modules/bills/billOwner.ts` | `last10`, `verifiedCustomerByPhone`, `settleBillOwner`, `claimBillOrders` — who owns a bill's order |
 | `modules/bills/bills.jobs.ts` | `startBills(log)` — listens to `customer.signedIn` → `claimBillOrders` (started in `app.ts` after `startFinance`) |

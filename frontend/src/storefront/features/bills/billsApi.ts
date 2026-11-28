@@ -186,7 +186,7 @@ const PUBLIC = '/api/v1/public/bills'
  * draws it: backend `bills/billPdf.ts`). The error body of a blob request is
  * a Blob too, so its message is read out of it.
  */
-async function pdfBlob(url: string): Promise<Blob> {
+export async function pdfBlob(url: string): Promise<Blob> {
   try {
     const res = await http.get(url, { responseType: 'blob' })
     return res.data as Blob

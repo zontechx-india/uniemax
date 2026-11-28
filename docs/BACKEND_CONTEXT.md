@@ -39,8 +39,8 @@ Media uploads via
 `@aws-sdk/client-s3`, local-disk driver for dev served by `@fastify/static`;
 **production refuses the local driver** — object storage only).
 Transactional email via the tiny **`package/mail`** (Resend REST, console
-fallback without a key; `PUBLIC_WEB_URL` adds deep links) — used by the
-order notifications. Browser **Web Push** via **`package/push`** (`web-push`
+fallback without a key; `PUBLIC_WEB_URL` adds deep links; optional `attachments`) — used by the
+order notifications (the "delivered" email carries the order receipt PDF). Browser **Web Push** via **`package/push`** (`web-push`
 library, VAPID; console fallback without keys — see
 `docs/PUSH_NOTIFICATIONS.md`). Online payments via **Cashfree PG v4**
 (`modules/payments` — REST wrapper, no SDK; see
@@ -703,7 +703,7 @@ under `/admin/bills` (endpoints in `docs/API.md` → Seller bills).
   payer's when their phone is the bill's, else it has no owner. On every OTP
   sign-in (`customer.signedIn` event → `bills.jobs.ts`) `claimBillOrders` gives
   the account every unowned BILL order made for its phone.
-- **Not built yet** (`prototype/docs/BILLS.md`): a PDF receipt, one-off items
+- **Not built yet** (`prototype/docs/BILLS.md`): one-off items
   (a hidden product would surface in Categories and admin category mapping),
   an expiry sweep job (expiry is read-time), sending from the UnieMax WhatsApp
   number.
@@ -907,7 +907,10 @@ WhatsApp Cloud API; setup: `backend/README.md`.
   order no., total, store), `order_shipped_without_link` (name, order no., courier,
   tracking no., tracking link — the seller's link, else the courier site, else the
   order page — store; once, when the order turns Shipped), `order_delivered` (name,
-  order no., store), to the checkout phone, else the account's. Cancelled has no
+  order no., store) — or, once **`order_delivered_receipt`** (same three values plus a
+  **document header**) is approved in WhatsApp Manager, that template with the order
+  receipt PDF (Meta fetches `GET /api/v1/public/stores/:slug/orders/:orderId/receipt`;
+  the switch is automatic, `receiptTemplateReady`) — to the checkout phone, else the account's. Cancelled has no
   template. All language `en`; an empty value is sent as `NA`, whitespace collapsed.
   Fire-and-forget: a refused or failed send is logged with the order id and never
   touches the order. Off until `startOrderMessages` runs in `server.ts` with

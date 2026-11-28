@@ -1,7 +1,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { optionalCustomerId } from "../../package/auth/index.js";
 import { idParamSchema } from "../../utils/zodHelpers.js";
-import { list, ok } from "../../utils/response.js";
+import { list, ok, sendPdf } from "../../utils/response.js";
 import { storeActor } from "../stores/storeActor.js";
 import * as service from "./bills.service.js";
 import {
@@ -91,16 +91,6 @@ export async function adminGetBill(request: FastifyRequest) {
 }
 
 // ---- PDF (the bill, or its receipt once paid) ----
-
-/** Sends PDF bytes as a download, never cached or indexed. */
-function sendPdf(reply: FastifyReply, file: { fileName: string; bytes: Buffer }) {
-  return reply
-    .header("Content-Type", "application/pdf")
-    .header("Content-Disposition", `attachment; filename="${file.fileName}"`)
-    .header("Cache-Control", "private, no-store")
-    .header("X-Robots-Tag", "noindex, nofollow")
-    .send(file.bytes);
-}
 
 export async function sellerBillPdf(request: FastifyRequest, reply: FastifyReply) {
   const { id, billId } = billParamSchema.parse(request.params);
