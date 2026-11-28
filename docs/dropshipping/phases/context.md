@@ -6,7 +6,7 @@
 
 | Phase | Goal | Ships to | Needs first | Status |
 | --- | --- | --- | --- | --- |
-| [0](phase-0-shipments.md) | Parcel tracking for every order (core) | **production on its own** | — | ◐ built — API tests pass on dev; dev walkthrough pending |
+| [0](phase-0-shipments.md) | Parcel tracking for every order (core) | **production on its own** | — | ☑ built — API tests pass on dev; walkthrough done by the owner (confirmed 29 Nov 2026) |
 | [1](phase-1-core-seams.md) | Core seams for packages (no visible change) | dev → production with the next release | 0 | ☑ built, API tests pass on dev |
 | [2](phase-2-suppliers.md) | Suppliers: invite and join; link terms | production (always on, D-56) | 1 | ☑ built — API tests pass on dev (flag on); walkthrough done by the owner (confirmed 28 Nov 2026) |
 | [3](phase-3-supplier-products.md) | Supplier products in the seller's store | production (D-56) | 2 | ☑ built — API tests pass on dev (flag on); walkthrough done by the owner (confirmed 28 Nov 2026) |

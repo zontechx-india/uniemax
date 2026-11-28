@@ -1,7 +1,7 @@
-# Phase 0: Parcel tracking for every order (core) ◐
+# Phase 0: Parcel tracking for every order (core) ☑
 
 > Built 20 Oct 2026 and verified locally (see "Verified"). The API tests pass
-> on dev (21 Oct 2026). Still open: the walkthrough on dev — then flip this to ☑.
+> on dev (21 Oct 2026). Walkthrough on dev done by the owner (confirmed 29 Nov 2026).
 
 ## Goal
 
@@ -61,7 +61,7 @@ in Phase 4 (D-6).
   tracking, and the customer blocks.
 - ☑ `npm run test:api` — `test/order-shipments.test.mjs` passes on dev (21 Oct 2026),
   with the seller account's phone already linked (the SMS bypass is off on dev).
-- ☐ Walkthrough on dev after deploy.
+- ☑ Walkthrough on dev — done by the owner (confirmed 29 Nov 2026).
 
 ## Done when
 
