@@ -5,6 +5,7 @@ import { HttpError } from "../../utils/httpError.js";
 import { buildListMeta } from "../../utils/response.js";
 import { decimalToPaise, indiaDateTime } from "../payouts/payouts.rules.js";
 import { SELLER_VISIBLE } from "../orders/orders.service.js";
+import { versionsByIds } from "../../package/policy/index.js";
 import {
   bpToPercent,
   computeFinancials,
@@ -602,10 +603,16 @@ export async function getSellerEarnings(storeId: string, page: number, pageSize:
         method: true,
         isAdvance: true,
         createdAt: true,
+        policyVersionId: true,
         order: { select: { id: true, orderNumber: true } },
       },
     }),
   ]);
+  // "Paid under Payout Policy vN" (docs/policyhub §10). Display only — a
+  // PolicyHub failure shows no version rather than failing the page.
+  const versions = await versionsByIds(
+    payouts.flatMap((p) => (p.policyVersionId ? [p.policyVersionId] : [])),
+  ).catch(() => new Map<string, { version: number; effectiveFrom: Date }>());
   return {
     balance: summary.balance,
     delivered: summary.delivered,
@@ -614,7 +621,10 @@ export async function getSellerEarnings(storeId: string, page: number, pageSize:
       rows: ledger.rows.map(({ createdById: _a, createdByEmail: _b, meta: _c, idempotencyKey: _d, ...row }) => row),
       meta: ledger.meta,
     },
-    payouts,
+    payouts: payouts.map(({ policyVersionId, ...p }) => ({
+      ...p,
+      policyVersion: (policyVersionId && versions.get(policyVersionId)) || null,
+    })),
   };
 }
 

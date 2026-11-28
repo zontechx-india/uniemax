@@ -70,6 +70,7 @@ Verify: `curl http://localhost:4000/health`
 | `npm run test:api` | API regression suite (`test/*.test.mjs`, Node's built-in `node:test`, no extra deps) against a **running** backend. Env: `API_BASE`, `QA_EMAIL_A`/`QA_PASSWORD_A` (seller + buyer), `QA_EMAIL_B`/`QA_PASSWORD_B` (second customer), optional `QA_PHONE_A` (+ `QA_OTP_CODE`, default `123456`) so the test store can publish via the SMS OTP bypass. Creates a store, products and orders — local or dev only; refuses `*.uniemax.com`. |
 | `npx tsx scripts/advance-payouts-check.ts` | End-to-end check of **advance payouts** (docs/seller-finance §9) against the current mode's DB: makes its own customer, store and orders, runs every advance path through the real payout / finance services, checks each balance against the ledger, then deletes what it made. Refuses production. |
 | `npx tsx scripts/policy-check.ts` | End-to-end check of **PolicyHub** (docs/policyhub §7) against the current mode's DB, under a throwaway project name: create, edit, publish now / later, reset, every publish refusal, the public view, project isolation in the DB, a parallel draft race; then deletes what it made. Refuses production. |
+| `npx tsx scripts/payout-policy-check.ts` | End-to-end check that **payouts save their PYO-001 version** (docs/policyhub §10): own store, orders and throwaway policy project; real manual payouts with no version / v1 / v2 / advance / repeated key / lookup failure; admin and seller views. Deletes what it made. Refuses production. |
 
 ## Environment (`.env`)
 

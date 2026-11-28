@@ -1006,7 +1006,9 @@ their own `policyhub` Postgres schema, built to move to a separate database
 shared by several products: every row carries `project` (from
 `POLICY_PROJECT`, never a request), links only inside `policyhub`, and people
 are an id + email snapshot. Only `package/policy/service.ts` touches the
-tables; `controller.ts` is the one place that imports core (`resolveActor`).
+tables; `controller.ts` is its one read of core (the acting admin's email
+from `admins`). Core uses it through `index.ts` only: payouts save the PYO-001
+version in force (`versionAt`) and show it (`versionsByIds`).
 Mounted from `routes.ts`: `/api/v1/policies` (public) and
 `/api/v1/admin/policies` (admin subtree; create / publish = `requireSuperAdmin`).
 Everything else — rules, data model, endpoints, phases — lives in
@@ -1845,7 +1847,10 @@ White-label design — one codebase, any business:
   instead of sent) and `ledgerStatus` (status the seller ledger last matched;
   the finance sweep syncs rows where it differs from `status`), `isAdvance`
   (paid before delivery) and `advanceOutcome` (enum **AdvanceOutcome**
-  `SETTLED | DUES` — how an advance was cleared; null = not yet).
+  `SETTLED | DUES` — how an advance was cleared; null = not yet), and
+  `policyVersionId` — the PolicyHub PYO-001 version in force (at delivery, or
+  at creation for an advance); plain string, no FK; null = before PolicyHub
+  (docs/policyhub §10).
 - **Seller finance** (`finance.prisma`) — **FeeRule** (`fee_rules`, versioned,
   never edited), **OrderFinancials** (`order_financials`, one per order,
   `Order.financials`, Restrict), **SellerBalance** (`seller_balances`, per

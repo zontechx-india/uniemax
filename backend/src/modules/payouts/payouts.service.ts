@@ -35,6 +35,7 @@ import type {
   PayoutStatusInput,
 } from "./payouts.schema.js";
 import { notifySellerPayoutSent } from "./payouts.notifications.js";
+import { versionAt, versionsByIds } from "../../package/policy/index.js";
 import {
   getOrderFinancials,
   lockedBalances,
@@ -176,10 +177,52 @@ const payoutInclude = {
 
 type PayoutWithEvents = Prisma.OrderPayoutGetPayload<{ include: typeof payoutInclude }>;
 
+// ---------------------------------------------------------------------------
+// Payout policy (PolicyHub) — docs/policyhub/README.md §10
+// ---------------------------------------------------------------------------
+
+/** The seller payout policy's stable code in PolicyHub. */
+export const PAYOUT_POLICY_CODE = "PYO-001";
+
+/**
+ * The PYO-001 version in force for a payout on this order: at its delivery
+ * (the cutoff promise was made then), or now for an advance. Runs BEFORE the
+ * payout transaction — no lock, no cross-schema read inside it — and NEVER
+ * blocks a payout: any failure saves the payout without a version.
+ */
+export async function payoutPolicyVersionId(orderId: string, log: FastifyBaseLogger): Promise<string | null> {
+  try {
+    const order = await prisma.order.findUnique({ where: { id: orderId }, select: { deliveredAt: true } });
+    const version = await versionAt(PAYOUT_POLICY_CODE, order?.deliveredAt ?? new Date());
+    return version?.id ?? null;
+  } catch (err) {
+    log.warn({ err, orderId }, "payout policy lookup failed — payout saved without a policy version");
+    return null;
+  }
+}
+
+type PolicyVersions = Awaited<ReturnType<typeof versionsByIds>>;
+
+/** Version numbers for saved ids. Display only — a failure shows none. */
+export async function policyVersionsFor(ids: readonly (string | null)[]): Promise<PolicyVersions> {
+  try {
+    return await versionsByIds(ids.filter((id): id is string => id !== null));
+  } catch {
+    return new Map();
+  }
+}
+
+/** `{ version, effectiveFrom }` of a payout's policy, or null. */
+export function policyVersionOf(id: string | null, versions: PolicyVersions) {
+  return (id && versions.get(id)) || null;
+}
+
 /** The API shape — plus which statuses an admin may move it to. */
-function shapePayout(payout: PayoutWithEvents) {
+function shapePayout(payout: PayoutWithEvents, versions: PolicyVersions) {
   return {
     ...payout,
+    /** "Paid under Payout Policy vN" — null before PolicyHub. */
+    policyVersion: policyVersionOf(payout.policyVersionId, versions),
     nextStatuses: payout.method === "MANUAL" ? nextStatuses("MANUAL", payout.status) : [],
     // A gateway payout the hub never acknowledged can be sent again (same key).
     canResend: payout.method === "GATEWAY" && payout.status === "PENDING" && !payout.hubPayoutId,
@@ -214,6 +257,7 @@ export async function getOrderPayouts(orderId: string) {
       : null,
   ]);
   const { sellerEarningPaise: _, ...financials } = fin;
+  const versions = await policyVersionsFor(payouts.map((p) => p.policyVersionId));
 
   const plan = payoutPlan(order, order.store?.advancePayoutsAllowed ?? false);
   const { blockers } = plan;
@@ -273,7 +317,7 @@ export async function getOrderPayouts(orderId: string) {
       payee,
       gateway: { available: gatewayBlocker === null, reason: gatewayBlocker },
     },
-    payouts: payouts.map(shapePayout),
+    payouts: payouts.map((p) => shapePayout(p, versions)),
   };
 }
 
@@ -396,7 +440,7 @@ export async function listAwaitingPayout(query: AwaitingPayoutQuery) {
 async function loadPayout(payoutId: string) {
   const payout = await prisma.orderPayout.findUnique({ where: { id: payoutId }, include: payoutInclude });
   if (!payout) throw HttpError.notFound("Payout not found");
-  return shapePayout(payout);
+  return shapePayout(payout, await policyVersionsFor([payout.policyVersionId]));
 }
 
 // ---------------------------------------------------------------------------
@@ -424,6 +468,7 @@ export async function recordManualPayout(
 
   // The order's own sale must be on the ledger before money is paid out of it.
   await postDeliveredOrder(orderId);
+  const policyVersionId = await payoutPolicyVersionId(orderId, log);
 
   const payoutId = await prisma.$transaction(async (tx) => {
     const order = await lockOrder(tx, orderId);
@@ -468,6 +513,7 @@ export async function recordManualPayout(
         createdById: actor.id,
         createdByEmail: actor.email,
         idempotencyKey: input.idempotencyKey,
+        policyVersionId,
         events: {
           create: {
             fromStatus: null,
@@ -564,6 +610,7 @@ export async function triggerGatewayPayout(
   }
 
   await postDeliveredOrder(orderId);
+  const policyVersionId = await payoutPolicyVersionId(orderId, log);
 
   const created = await prisma.$transaction(async (tx) => {
     const order = await lockOrder(tx, orderId);
@@ -605,6 +652,7 @@ export async function triggerGatewayPayout(
         createdById: actor.id,
         createdByEmail: actor.email,
         idempotencyKey: input.idempotencyKey,
+        policyVersionId,
       },
       select: { id: true },
     });

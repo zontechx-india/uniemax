@@ -131,6 +131,10 @@ first, the rest sent); `amount + duesDeducted ≤ left to pay` and
 - Never edit or delete a fee rule, snapshot or ledger entry — add a new one.
 - Every posting goes through `postLegs` with a stable idempotency key.
 - Fees are never added to a customer-facing response.
+- Each new payout saves `order_payouts.policyVersionId` — the payout policy
+  (PYO-001) version in force, looked up before the payout transaction and
+  never blocking it. Money logic doesn't read it. See
+  [`docs/policyhub/README.md`](../policyhub/README.md) §10.
 - Update this file in the same task; endpoint details go to `docs/API.md`.
 
 ## 8. Transactions (seller, per order)

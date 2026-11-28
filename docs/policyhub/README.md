@@ -1,7 +1,7 @@
 # PolicyHub — platform policies (first policy: Seller Payout, `PYO-001`)
 
-> **Start here** for any policy work. Status: **Phase 1 built** (schema + backend, 28 Nov 2026);
-> Phases 2–5 not started — see §12.
+> **Start here** for any policy work. Status: **Phases 1–2 built** (backend + payout link,
+> 28 Nov 2026); Phases 3–5 (screens, publishing v1) not started — see §12.
 > This file replaces the earlier `payout-management-review-plan.md`.
 > Seller money rules (fees, ledger, payouts) stay in
 > [`docs/seller-finance/README.md`](../seller-finance/README.md). This file only covers
@@ -57,6 +57,7 @@ Each payout remembers which promise applied to it.
 | P11 | **Every new payout saves `policyVersionId`**, the PolicyHub version in force for it. This starts with manual payouts. |
 | P12 | The wording **briefly mentions advance payouts** as UnieMax's own choice. |
 | P13 | **Times in the wording come from `settings`**, never typed by hand (§7). |
+| P14 | The cutoff clock is **`orders.deliveredAt`** (when the order is marked DELIVERED), not the courier's `order_shipments.deliveredAt`. Confirmed 28 Nov 2026. |
 
 Not in scope: per-tenant or per-seller policies, multi-step approval, seller acceptance, any
 change to payout amounts, the ledger or bank integration.
@@ -334,8 +335,10 @@ Each event (newest first, up to 200): `id, version, action, actorEmail, note, be
 | GET | `/:code/versions` | `{ code, name, versions: [{ version, effectiveFrom, effectiveTo, changeSummary }] }`, newest first. A scheduled version is hidden and doesn't end the current one. |
 | GET | `/:code/versions?version=N` | That version in full (same shape as `/:code`). `404` unknown / not started |
 
-**Payout responses.** Admin and seller payout responses gain `policyVersion: { version, effectiveFrom } | null`,
-so the payout screen can say "Paid under Payout Policy v1".
+**Payout responses** (built, Phase 2). The admin order payouts view (`GET …/orders/:id/payouts` and every
+payout a write returns) carries `policyVersionId` + `policyVersion: { version, effectiveFrom } | null`; the
+seller's `GET /stores/:id/earnings` payouts carry `policyVersion` only (no raw id). So a screen can say
+"Paid under Payout Policy v1". Shapes in `docs/API.md` → payouts / earnings.
 
 ---
 
@@ -354,7 +357,11 @@ Follow `docs/DESIGN_GUIDELINES.md`. Buttons come from `shared/ui/Button.tsx`.
 
 ## 10. Payouts roadmap and traceability
 
-**Which version a payout gets** (`policy.versionInForce('PYO-001', at)`):
+Built (Phase 2). `payouts.service.ts › payoutPolicyVersionId()` calls the package's `versionAt('PYO-001', at)`;
+display uses `versionsByIds()` (`policyVersionsFor` in payouts, inline in `finance.service › getSellerEarnings`).
+Both are exported from `package/policy/index.ts`.
+
+**Which version a payout gets**:
 
 | Payout | `at` = | Why |
 |---|---|---|
@@ -390,7 +397,7 @@ Rule for every stage: **the policy never starts a transfer.** Payout code checks
 | Phase | Changes | Tests | Done when |
 |---|---|---|---|
 | **1. Schema + backend** ☑ 28 Nov 2026 | `prisma/schema/policy.prisma`, `core.prisma` (`schemas` list), migration `20261128100000_policyhub` (applied on dev), `src/package/policy/*`, `src/routes.ts`, `POLICY_PROJECT` in `config/env.ts` | `test/unit/policy.test.ts` (13 tests: cutoff 17:59:59 / 18:00 / 23:59 IST + UTC input + month/year end, version in force, history periods, start-time checks, settings shape, placeholders) · `scripts/policy-check.ts` (19 checks on the real DB, see backend/README) · HTTP guards checked: anonymous → 401, ADMIN create / publish → 403, ADMIN draft edit → 200, SUPER_ADMIN publish → 200 | ☑ All pass; the full unit suite (297) still passes. |
-| **2. Link payouts** | `order_payouts.policyVersionId` migration · `payouts.service.ts` (`recordManualPayout`, `triggerGatewayPayout`) · payout response shape | Payout saves the version in force at `deliveredAt`. Advance → creation time. No version → null and the payout still succeeds. PolicyHub error → null and the payout still succeeds. **Every existing payout and finance test passes unchanged.** | New payouts carry the version. Amounts, ledger and hub calls are unchanged. |
+| **2. Link payouts** ☑ 28 Nov 2026 | migration `20261128140000_payout_policy_version` (applied on dev) · `payouts.service.ts` (`payoutPolicyVersionId` in `recordManualPayout` and `triggerGatewayPayout`; `policyVersion` on the payout shape) · `finance.service.ts › getSellerEarnings` · `package/policy` (`versionAt`, `versionsByIds`) | `scripts/payout-policy-check.ts` (8 checks on real payouts: nothing published → null · delivered under v1 → v1, also when paid after v2 started · delivered under v2 → v2 · advance → version at creation · repeated key → same payout · admin + seller views · lookup error → null + warning) · `advance-payouts-check.ts`, `policy-check.ts` and all 297 unit tests pass unchanged | ☑ New payouts carry the version. Amounts, ledger and hub calls unchanged. |
 | **3. Admin screen** | Settings → Policies page + endpoints file | Manual check on desktop and phone width, as ADMIN and as SUPER_ADMIN | An ADMIN drafts `PYO-001` v1 and a SUPER_ADMIN publishes it. The public endpoint shows it only from `effectiveFrom`. |
 | **4. Seller screen** | Earnings link + Payout policy page + "Payout policy vN" line on payouts (+ optional public page) | Manual check | A seller sees the current version, its history and the version on each new payout. No admin fields appear in the response. |
 | **5. Go live** | Publish `PYO-001` v1 through the admin screen on dev, then prod (no hard-coded seed) | — | The live wording is the signed-off §4 text. |
@@ -405,8 +412,7 @@ No phase changes payout amounts, fees, the ledger, PaymentHub or bank code.
 
 ## 13. Open questions
 
-1. Cutoff clock: the plan uses **`orders.deliveredAt`** (when the status is set to DELIVERED), not the courier's `order_shipments.deliveredAt`. Confirm before Phase 2.
-2. Should sellers be **told** when a new version is published (WhatsApp / email / push)? Not in the plan yet.
+1. Should sellers be **told** when a new version is published (WhatsApp / email / push)? Not in the plan yet.
 
 ---
 

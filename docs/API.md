@@ -3896,6 +3896,7 @@ GATEWAY payout is `PENDING`/`PROCESSING` per order.
     "id", "method": "MANUAL" | "GATEWAY", "status", "amount",
     "duesDeducted",                                         // COD dues settled instead of sent
     "isAdvance", "advanceOutcome",                          // paid before delivery · SETTLED | DUES | null
+    "policyVersionId", "policyVersion": { "version", "effectiveFrom" } | null,  // PYO-001 in force (docs/policyhub §10)
     "payeeName", "payeeBank", "payeeIfsc", "payeeLast4",   // store's primary account AT THE TIME
     "senderName", "senderBank", "senderLast4",              // MANUAL
     "paidAt", "paidAtTimeKnown", "utr", "notes",
@@ -4092,7 +4093,8 @@ bearer } }` — the product form's note (gateway shown as UnieMax's discount
 when `bearer` is `PLATFORM`). `earnings` → `rates` also carries `gateway`. `earnings?page&pageSize(≤50)` → `{ balance, delivered, rates,
 ledger { rows (no actor / key / meta), meta }, payouts[20] { id, status,
 amount, duesDeducted, paidAt, paidAtTimeKnown, utr, method, isAdvance,
-createdAt, order { id, orderNumber } } }`. `balance` has `advance` too.
+createdAt, policyVersion { version, effectiveFrom } | null, order { id, orderNumber } } }`
+(`policyVersion` = the payout policy PYO-001 version it was paid under; null before PolicyHub). `balance` has `advance` too.
 
 #### `GET /api/v1/stores/:id/transactions` · `GET …/transactions/:orderId` 🔒 owner
 

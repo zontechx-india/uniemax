@@ -380,6 +380,44 @@ export async function publishDraft(code: string, input: PublishInput, actor: Pol
 }
 
 // ---------------------------------------------------------------------------
+// For other UnieMax code (payouts) — docs/policyhub/README.md §10
+// ---------------------------------------------------------------------------
+
+export interface VersionRef {
+  id: string;
+  version: number;
+  effectiveFrom: Date;
+}
+
+/** The version of `code` in force at `at`, or null (no policy, nothing started then). */
+export async function versionAt(code: string, at: Date): Promise<VersionRef | null> {
+  const row = await prisma.policyVersion.findFirst({
+    where: {
+      project: project(),
+      policy: { code },
+      status: "PUBLISHED",
+      effectiveFrom: { lte: at },
+    },
+    orderBy: { effectiveFrom: "desc" },
+    select: { id: true, version: true, effectiveFrom: true },
+  });
+  return row?.effectiveFrom ? { id: row.id, version: row.version, effectiveFrom: row.effectiveFrom } : null;
+}
+
+/** Version number + start for saved version ids (unknown ids are left out). */
+export async function versionsByIds(ids: readonly string[]): Promise<Map<string, Omit<VersionRef, "id">>> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return new Map();
+  const rows = await prisma.policyVersion.findMany({
+    where: { project: project(), id: { in: unique }, status: "PUBLISHED" },
+    select: { id: true, version: true, effectiveFrom: true },
+  });
+  return new Map(
+    rows.flatMap((r) => (r.effectiveFrom ? [[r.id, { version: r.version, effectiveFrom: r.effectiveFrom }]] : [])),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Public — published and started versions only, no admin fields
 // ---------------------------------------------------------------------------
 

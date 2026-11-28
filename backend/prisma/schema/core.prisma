@@ -1570,6 +1570,14 @@ model OrderPayout {
   /// Client-generated per dialog — a double-click returns the same payout.
   idempotencyKey String
 
+  /// The PolicyHub version (`policyhub.policy_versions.id`) of the seller
+  /// payout policy PYO-001 in force for this payout — at the order's
+  /// delivery, or at creation for an advance. A plain string, no FK (another
+  /// schema, later another database). Null = made before PolicyHub, nothing
+  /// was published yet, or the lookup failed (it never blocks a payout).
+  /// docs/policyhub/README.md §10.
+  policyVersionId String?
+
   events OrderPayoutEvent[]
 
   createdAt DateTime @default(now())

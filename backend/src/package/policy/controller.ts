@@ -1,18 +1,22 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { prisma } from "../../config/prisma.js";
 import { ok } from "../../utils/response.js";
 import { HttpError } from "../../utils/httpError.js";
-// The one UnieMax-side dependency: who the acting admin is. When PolicyHub
-// becomes its own service this controller stays in UnieMax and passes the
-// actor along (docs/policyhub/README.md §5).
-import { resolveActor } from "../../modules/payouts/payouts.service.js";
 import * as schema from "./schema.js";
 import * as service from "./service.js";
+import type { PolicyActor } from "./service.js";
 
 /** PolicyHub — parse, call. Every write is audited by the service (policy_events). */
 
-async function actor(request: FastifyRequest) {
+/**
+ * The acting admin, with their email snapshotted. The one UnieMax-side read
+ * in the package (`admins`): when PolicyHub becomes its own service this
+ * controller stays in UnieMax and passes the actor along (README §5).
+ */
+async function actor(request: FastifyRequest): Promise<PolicyActor> {
   if (!request.admin) throw HttpError.unauthorized();
-  return resolveActor(request.admin.id);
+  const admin = await prisma.admin.findUnique({ where: { id: request.admin.id }, select: { email: true } });
+  return { id: request.admin.id, email: admin?.email ?? "(deleted admin)" };
 }
 
 // ---- Admin ----------------------------------------------------------------
