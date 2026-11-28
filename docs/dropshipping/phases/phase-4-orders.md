@@ -1,7 +1,7 @@
-# Phase 4: Orders and shipping ◐
+# Phase 4: Orders and shipping ☑
 
 > Built 21 Oct 2026 (migration `20261021140000_dropship_supplier_orders`). The
-> API suites pass on dev (21 Oct 2026). Left: the walkthrough of the screens on dev.
+> API suites pass on dev (21 Oct 2026). Screen walkthrough done by the owner (confirmed 28 Nov 2026).
 
 ## Goal
 

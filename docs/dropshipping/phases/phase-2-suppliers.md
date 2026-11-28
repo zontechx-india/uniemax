@@ -1,7 +1,7 @@
-# Phase 2: Suppliers, invite and join ◐
+# Phase 2: Suppliers, invite and join ☑
 
-> Built 20 Oct 2026 (migration `20261020180000_dropship_suppliers`). Left:
-> the walkthrough of the screens on dev. The API suite
+> Built 20 Oct 2026 (migration `20261020180000_dropship_suppliers`). Screen
+> walkthrough done by the owner (confirmed 28 Nov 2026). The API suite
 > (`test/dropship-suppliers.test.mjs`) passes on dev with the flag on (21 Oct 2026).
 
 ## Goal

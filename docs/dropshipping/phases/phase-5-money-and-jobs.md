@@ -1,8 +1,8 @@
-# Phase 5: Statement, reminders, self-healing. MVP complete ◐
+# Phase 5: Statement, reminders, self-healing. MVP complete ☑
 
 > Built 21 Oct 2026 (migration `20261021150000_dropship_statement`). The API suites pass on dev
-> (21 Oct 2026). Left: the walkthrough of the screens on dev, and the **Release** steps below,
-> which are the owner's.
+> (21 Oct 2026). Screen walkthrough done by the owner (confirmed 28 Nov 2026); live in production (D-56). Left: onboarding
+> the first seller and supplier (**Release** below).
 
 ## Goal
 
